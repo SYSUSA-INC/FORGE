@@ -1,0 +1,256 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Space Grotesk", "Arial Black", Impact, sans-serif;
+  --font-stencil: "Archivo Black", "Arial Black", Impact, sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", Menlo, monospace;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    background: #f5f1e8;
+    color: #0a0a0a;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      linear-gradient(rgba(10, 10, 10, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(10, 10, 10, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: -1px -1px;
+  }
+
+  ::selection {
+    background: #ffd500;
+    color: #0a0a0a;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+
+  *:focus-visible {
+    outline: 3px solid #ffd500;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .brut-card {
+    @apply border-2 border-ink bg-paper shadow-brut;
+  }
+
+  .brut-card-sm {
+    @apply border-2 border-ink bg-paper shadow-brut-sm;
+  }
+
+  .brut-card-flat {
+    @apply border-2 border-ink bg-paper;
+  }
+
+  .brut-btn {
+    @apply inline-flex items-center justify-center gap-2 border-2 border-ink bg-paper px-4 py-2 font-display text-sm uppercase tracking-wide shadow-brut-sm transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-brut active:translate-x-0 active:translate-y-0 active:shadow-none;
+  }
+
+  .brut-btn-primary {
+    @apply brut-btn bg-ink text-paper hover:bg-ink;
+  }
+
+  .brut-btn-hazard {
+    @apply brut-btn bg-hazard text-ink;
+  }
+
+  .brut-btn-blood {
+    @apply brut-btn bg-blood text-paper;
+  }
+
+  .brut-btn-signal {
+    @apply brut-btn bg-signal text-ink;
+  }
+
+  .brut-input {
+    @apply w-full border-2 border-ink bg-paper px-3 py-2 font-mono text-sm placeholder:text-ink/40 focus:bg-bone;
+  }
+
+  .brut-label {
+    @apply mb-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-ink/70;
+  }
+
+  .brut-chip {
+    @apply inline-flex items-center gap-1.5 border-2 border-ink bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider;
+  }
+
+  .brut-pill {
+    @apply inline-block border-2 border-ink px-2 py-0.5 font-mono text-[10px] uppercase;
+  }
+
+  .brut-divider {
+    @apply h-[2px] w-full bg-ink;
+  }
+
+  .brut-diagonal {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #0a0a0a 0,
+      #0a0a0a 2px,
+      transparent 2px,
+      transparent 10px
+    );
+  }
+
+  .brut-diagonal-hazard {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #0a0a0a 0,
+      #0a0a0a 14px,
+      #ffd500 14px,
+      #ffd500 28px
+    );
+  }
+
+  .brut-diagonal-blood {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #0a0a0a 0,
+      #0a0a0a 10px,
+      #e63026 10px,
+      #e63026 20px
+    );
+  }
+
+  .brut-dots {
+    background-image: radial-gradient(#0a0a0a 1px, transparent 1px);
+    background-size: 10px 10px;
+  }
+
+  .brut-crosshatch {
+    background-image:
+      repeating-linear-gradient(45deg, rgba(10, 10, 10, 0.12) 0 1px, transparent 1px 6px),
+      repeating-linear-gradient(-45deg, rgba(10, 10, 10, 0.12) 0 1px, transparent 1px 6px);
+  }
+
+  .brut-scan {
+    position: relative;
+  }
+
+  .brut-scan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent, rgba(0, 230, 118, 0.18), transparent);
+    animation: scan 4s linear infinite;
+    pointer-events: none;
+  }
+
+  .brut-grid {
+    background-image:
+      linear-gradient(#0a0a0a 2px, transparent 2px),
+      linear-gradient(90deg, #0a0a0a 2px, transparent 2px);
+    background-size: 100% 100%, 100% 100%;
+  }
+
+  /* Perforated / torn-off edge like pull tabs on a receipt */
+  .brut-perf-top {
+    background-image: radial-gradient(#f5f1e8 4px, transparent 4px);
+    background-size: 16px 16px;
+    background-position: 0 -8px;
+    background-repeat: repeat-x;
+    height: 8px;
+  }
+
+  .brut-perf-bottom {
+    background-image: radial-gradient(#f5f1e8 4px, transparent 4px);
+    background-size: 16px 16px;
+    background-position: 0 8px;
+    background-repeat: repeat-x;
+    height: 8px;
+  }
+
+  /* Redaction bar — heavy ink block used over classified-style text */
+  .brut-redact {
+    display: inline-block;
+    background: #0a0a0a;
+    color: transparent;
+    padding: 0 2px;
+    user-select: none;
+  }
+
+  /* Angled classified stamp */
+  .brut-stamp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid currentColor;
+    padding: 4px 10px;
+    letter-spacing: 0.15em;
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 11px;
+    transform: rotate(-6deg);
+    opacity: 0.88;
+  }
+
+  .brut-stamp::before,
+  .brut-stamp::after {
+    content: "";
+    position: absolute;
+  }
+
+  /* Crop / registration mark */
+  .brut-crop-corner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #0a0a0a;
+    background: #f5f1e8;
+  }
+
+  .brut-crop-tl { top: -8px; left: -8px; border-right: 0; border-bottom: 0; }
+  .brut-crop-tr { top: -8px; right: -8px; border-left: 0; border-bottom: 0; }
+  .brut-crop-bl { bottom: -8px; left: -8px; border-right: 0; border-top: 0; }
+  .brut-crop-br { bottom: -8px; right: -8px; border-left: 0; border-top: 0; }
+
+  /* Heavy hero numerals */
+  .brut-stencil {
+    font-family: var(--font-stencil);
+    letter-spacing: -0.03em;
+    line-height: 0.85;
+  }
+
+  /* Panel gutter / file tab */
+  .brut-tab {
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+  }
+}
+
+.brut-noise {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.25'/></svg>");
+}
+
+.brut-ticker {
+  animation: marquee 40s linear infinite;
+}
+
+.brut-ticker-fast {
+  animation: marquee 18s linear infinite;
+}
+
+/* Film-reel perforation strip */
+.brut-sprockets {
+  background:
+    repeating-linear-gradient(90deg, #0a0a0a 0 8px, transparent 8px 20px),
+    repeating-linear-gradient(90deg, #f5f1e8 0 4px, #0a0a0a 4px 6px, #f5f1e8 6px 20px);
+  background-position: 0 0, 0 100%;
+  background-size: 100% 6px, 100% 6px;
+  background-repeat: repeat-x, repeat-x;
+}
