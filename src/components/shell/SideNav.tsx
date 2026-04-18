@@ -8,30 +8,22 @@ const NAV = [
   { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops" },
   { href: "/solicitations", label: "Solicitations", icon: "✦", group: "ops" },
   { href: "/proposals", label: "Proposals", icon: "❑", group: "ops" },
-  { href: "/proposals/FRG-0042/editor", label: "Editor", icon: "✎", group: "build" },
-  { href: "/proposals/FRG-0042/compliance", label: "Compliance", icon: "◎", group: "build" },
-  { href: "/proposals/FRG-0042/review", label: "Review", icon: "◔", group: "build" },
-  { href: "/proposals/FRG-0042/export", label: "Export", icon: "⎘", group: "build" },
+  { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel" },
   { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel" },
   { href: "/settings", label: "Settings", icon: "⚙", group: "intel" },
 ] as const;
 
 const GROUPS: Record<string, string> = {
   ops: "Operations",
-  build: "Proposal Build",
   intel: "Intelligence",
 };
 
 export function SideNav() {
   const pathname = usePathname();
-  const groupOrder = ["ops", "build", "intel"];
+  const groupOrder = ["ops", "intel"];
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
-    if (href.includes("/editor")) return pathname?.includes("/editor") ?? false;
-    if (href.includes("/compliance")) return pathname?.includes("/compliance") ?? false;
-    if (href.includes("/review")) return pathname?.includes("/review") ?? false;
-    if (href.includes("/export")) return pathname?.includes("/export") ?? false;
     return pathname === href || (pathname?.startsWith(href + "/") ?? false);
   };
 
@@ -53,13 +45,20 @@ export function SideNav() {
       </div>
 
       <div className="px-4 pt-4">
-        <button className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-white/20">
+        <Link
+          href="/settings"
+          className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-white/20"
+        >
           <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Organization</div>
-            <div className="mt-0.5 font-display text-sm font-semibold">SYSUSA Inc.</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+              Organization
+            </div>
+            <div className="mt-0.5 font-display text-sm font-semibold">
+              Configure in Settings
+            </div>
           </div>
-          <span className="text-muted">⌄</span>
-        </button>
+          <span className="text-muted">→</span>
+        </Link>
       </div>
 
       <nav className="mt-6 flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-6">
@@ -104,27 +103,29 @@ export function SideNav() {
       </nav>
 
       <div className="border-t border-white/10 p-4">
-        <div className="aur-card p-3">
+        <Link
+          href="/intelligence"
+          className="aur-card block p-3 transition-colors hover:border-white/20"
+        >
           <div className="flex items-center justify-between">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-              AI credits
+              Brain status
             </div>
-            <span className="text-[10px] text-emerald">Healthy</span>
+            <span className="text-[10px] text-muted">View →</span>
           </div>
-          <div className="mt-2 flex items-end justify-between">
-            <div className="font-display text-xl font-semibold tabular-nums">824k</div>
-            <div className="text-[10px] text-muted">of 2M</div>
+          <div className="mt-2 font-display text-sm font-semibold text-text">
+            Phase A · plumbing
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/5">
             <div
               className="h-full rounded-full"
               style={{
-                width: "41%",
+                width: "25%",
                 background: "linear-gradient(90deg, #8B5CF6, #D946EF, #F5B544)",
               }}
             />
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );
