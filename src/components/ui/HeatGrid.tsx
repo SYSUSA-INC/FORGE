@@ -13,48 +13,52 @@ export function HeatGrid({
 }) {
   const max = Math.max(1, ...matrix.flat());
 
-  const color = (v: number) => {
-    if (v === 0) return "bg-paper";
+  const cellStyle = (v: number) => {
     const r = v / max;
-    if (r < 0.2) return "bg-bone";
-    if (r < 0.4) return "bg-[#F3E29B]";
-    if (r < 0.6) return "bg-hazard";
-    if (r < 0.8) return "bg-[#F79523]";
-    return "bg-blood";
+    if (v === 0) return "bg-white/[0.03] text-subtle";
+    if (r < 0.25) return "bg-violet/15 text-text";
+    if (r < 0.5) return "bg-violet/30 text-white";
+    if (r < 0.75) return "bg-gradient-to-br from-violet/50 to-magenta/40 text-white";
+    return "bg-gradient-to-br from-magenta/70 to-gold/50 text-white";
   };
 
   return (
     <div className="font-mono text-[10px]">
-      {title ? (
-        <div className="mb-1 flex items-center justify-between uppercase tracking-[0.25em] text-ink/70">
+      {(title || legend) && (
+        <div className="mb-2 flex items-center justify-between uppercase tracking-[0.2em] text-muted">
           <span>{title}</span>
           {legend ? <span>{legend}</span> : null}
         </div>
-      ) : null}
-      <div className="grid gap-0 border-2 border-ink" style={{ gridTemplateColumns: `64px repeat(${cols.length}, minmax(0, 1fr))` }}>
-        <div className="border-b-2 border-ink bg-ink" />
+      )}
+      <div
+        className="grid gap-1 overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] p-1"
+        style={{
+          gridTemplateColumns: `72px repeat(${cols.length}, minmax(0, 1fr))`,
+        }}
+      >
+        <div />
         {cols.map((c) => (
           <div
             key={c}
-            className="border-b-2 border-l border-ink bg-ink px-1 py-1 text-center text-[9px] font-bold uppercase tracking-widest text-paper"
+            className="px-1 py-1 text-center text-[9px] font-semibold uppercase tracking-widest text-muted"
           >
             {c}
           </div>
         ))}
         {rows.map((r, ri) => (
           <div key={r} className="contents">
-            <div className="border-t border-ink bg-ink px-2 py-1 text-right text-[9px] font-bold uppercase tracking-widest text-paper">
+            <div className="px-2 py-1.5 text-right text-[9px] font-semibold uppercase tracking-widest text-muted">
               {r}
             </div>
             {cols.map((c, ci) => (
               <div
                 key={`${r}-${c}`}
-                className={`relative grid h-7 place-items-center border-t border-l border-ink ${color(
+                className={`grid h-8 place-items-center rounded-md ${cellStyle(
                   matrix[ri][ci] ?? 0,
                 )}`}
                 title={`${r} / ${c} = ${matrix[ri][ci] ?? 0}`}
               >
-                <span className="font-mono text-[10px] font-bold text-ink/80">
+                <span className="font-mono text-[10px] font-bold tabular-nums">
                   {matrix[ri][ci] ?? 0}
                 </span>
               </div>
@@ -62,14 +66,13 @@ export function HeatGrid({
           </div>
         ))}
       </div>
-      <div className="mt-1 flex items-center gap-1 text-[9px] uppercase tracking-widest text-ink/60">
-        <span>LOW</span>
-        <span className="h-2 w-4 border border-ink bg-bone" />
-        <span className="h-2 w-4 border border-ink bg-[#F3E29B]" />
-        <span className="h-2 w-4 border border-ink bg-hazard" />
-        <span className="h-2 w-4 border border-ink bg-[#F79523]" />
-        <span className="h-2 w-4 border border-ink bg-blood" />
-        <span>HIGH</span>
+      <div className="mt-2 flex items-center gap-1 text-[9px] uppercase tracking-widest text-muted">
+        <span>Low</span>
+        <span className="h-2 w-4 rounded bg-violet/15" />
+        <span className="h-2 w-4 rounded bg-violet/30" />
+        <span className="h-2 w-4 rounded bg-gradient-to-r from-violet/50 to-magenta/40" />
+        <span className="h-2 w-4 rounded bg-gradient-to-r from-magenta/70 to-gold/50" />
+        <span>High</span>
       </div>
     </div>
   );
