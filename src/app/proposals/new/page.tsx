@@ -11,6 +11,7 @@ import {
   makeProposalCode,
   daysUntil,
 } from "@/lib/proposalsStore";
+import { recordProposalCreated } from "@/lib/intelligence";
 
 export default function NewProposalPage() {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function NewProposalPage() {
       compliancePct: 0,
     };
     proposalsStore.add(proposal);
+    recordProposalCreated(proposal);
     router.push("/proposals");
   };
 
@@ -66,7 +68,7 @@ export default function NewProposalPage() {
       <PageHeader
         eyebrow="Proposals — Initiate"
         title="New proposal"
-        subtitle="Create a proposal record. It will appear on the Kanban board and Proposal register; drag to change phase."
+        subtitle="Create a proposal record. It will appear on the Kanban board and Proposal register; drag to change phase. The intelligence layer captures each event."
         actions={
           <Link href="/proposals" className="aur-btn">
             Cancel
@@ -161,8 +163,11 @@ export default function NewProposalPage() {
               Submitted).
             </li>
             <li className="list-decimal">
-              Every move is recorded for the intelligence layer to learn win / loss
-              patterns by phase duration and progression.
+              The{" "}
+              <Link href="/intelligence" className="underline underline-offset-2">
+                intelligence layer
+              </Link>{" "}
+              records an artifact + signal on create, and a velocity signal per phase move.
             </li>
             <li className="list-decimal">
               Open the proposal to draft sections, run compliance, and kick off review

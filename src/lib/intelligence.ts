@@ -1,10 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import type { Proposal } from "@/lib/mock";
 
 // ---------- Types ----------
 
 export type ArtifactKind =
+  | "proposal"
   | "draft_section"
   | "revision"
   | "review_comment"
@@ -81,10 +83,13 @@ export type TrainingSignal = {
     | "comment_severity"
     | "win_loss"
     | "eval_score"
-    | "retrieval_reward";
+    | "retrieval_reward"
+    | "phase_advance"
+    | "phase_revert";
   positive: boolean;
   weight: number;
   artifactId: string;
+  note?: string;
   appliedAt: string;
 };
 
@@ -95,6 +100,8 @@ export type BrainState = {
   patterns: LearnedPattern[];
   signals: TrainingSignal[];
 };
+
+// ---------- Store ----------
 
 const KEY = "forge.brain.v1";
 
@@ -123,7 +130,7 @@ function save(next: BrainState) {
   try {
     window.localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
-    // noop
+    // quota or disabled
   }
 }
 
@@ -230,6 +237,87 @@ export function useBrain(): BrainState {
     brainStore.getServerSnapshot,
   );
 }
+
+// ---------- Higher-level event helpers ----------
+
+// Stage names are the 10 proposal phases already in Proposal.status.
+// Map them to a linear position for velocity signals.
+const PHASE_ORDER: Proposal["status"][] = [
+  "PLANNING",
+  "OUTLINING",
+  "DRAFTING",
+  "PINK_TEAM",
+  "REVISING",
+  "RED_TEAM",
+  "GOLD_TEAM",
+  "FINAL_REVIEW",
+  "PRODUCTION",
+  "SUBMITTED",
+];
+
+function phaseIndex(status: Proposal["status"]): number {
+  const i = PHASE_ORDER.indexOf(status);
+  return i < 0 ? 0 : i;
+}
+
+/**
+ * Proposal creation — write a `proposal` artifact (metadata corpus) + a weak
+ * positive retrieval-reward signal so the brain has something to show immediately.
+ */
+export function recordProposalCreated(p: Proposal) {
+  const content = [
+    `Proposal: ${p.title}`,
+    p.solicitation ? `Solicitation: ${p.solicitation}` : undefined,
+    p.agency ? `Agency: ${p.agency}` : undefined,
+    p.captureManager ? `Capture: ${p.captureManager}` : undefined,
+    p.proposalManager ? `PM: ${p.proposalManager}` : undefined,
+    `Target: ${p.pagesLimit}p due ${p.dueAt || "TBD"}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const artifact = brainStore.recordArtifact({
+    kind: "proposal",
+    proposalId: p.id,
+    content,
+    agency: p.agency || undefined,
+  });
+
+  brainStore.recordSignal({
+    source: "retrieval_reward",
+    positive: true,
+    weight: 0.1,
+    artifactId: artifact.id,
+    note: `New proposal ${p.code} captured`,
+  });
+
+  return artifact;
+}
+
+/**
+ * Kanban drag-drop or explicit phase change — emit a velocity signal.
+ * Forward moves are positive, reverts are negative; weight scales with distance.
+ */
+export function recordPhaseMove(
+  proposalId: string,
+  from: Proposal["status"],
+  to: Proposal["status"],
+) {
+  if (from === to) return;
+  const delta = phaseIndex(to) - phaseIndex(from);
+  const positive = delta > 0;
+  const weight = Math.min(1, Math.abs(delta) * 0.15);
+
+  brainStore.recordSignal({
+    source: positive ? "phase_advance" : "phase_revert",
+    positive,
+    weight,
+    artifactId: proposalId,
+    note: `${from} → ${to}`,
+  });
+}
+
+// ---------- Derived summary ----------
 
 export type BrainSummary = {
   corpusSize: number;

@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Proposal } from "@/lib/mock";
 import { BarMeter } from "@/components/ui/BarMeter";
 import { proposalsStore } from "@/lib/proposalsStore";
+import { recordPhaseMove } from "@/lib/intelligence";
 
 type Phase = Proposal["status"];
 
@@ -63,7 +64,10 @@ export function KanbanBoard({ proposals }: { proposals: Proposal[] }) {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain") || dragId;
     if (!id) return;
+    // Capture prior phase before mutation so the brain can emit a velocity signal.
+    const prior = proposalsStore.getSnapshot().find((p) => p.id === id)?.status;
     proposalsStore.update(id, { status: phase });
+    if (prior) recordPhaseMove(id, prior, phase);
     setDragId(null);
     setOverPhase(null);
     // TODO: await trpc.proposal.updateStatus.mutate({ id, status: phase });
