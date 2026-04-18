@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { BarMeter } from "@/components/ui/BarMeter";
+import { BarSpark } from "@/components/ui/Sparkline";
 import { proposals, reviewComments } from "@/lib/mock";
 
 export default function ReviewPage({ params }: { params: { id: string } }) {
@@ -13,6 +14,8 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
         eyebrow={`RVW // ${p.code} · REVIEW CYCLE OPS`}
         title="REVIEW"
         subtitle="Pink Team → Red Team → Gold Team. Anchored comments resolve against source sections."
+        barcode={`${p.code}-PINK`}
+        stamp={{ label: "PINK CYCLE · LIVE", tone: "blood" }}
         actions={
           <>
             <button className="brut-btn">AI RED TEAM</button>
@@ -29,14 +32,14 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
       />
 
       {/* Review cycle ribbon */}
-      <div className="mb-6 grid grid-cols-3 border-2 border-ink shadow-brut">
+      <div className="mb-6 grid grid-cols-3 border-2 border-ink shadow-brut-xl">
         {(["PINK", "RED", "GOLD"] as const).map((cycle, i) => {
           const active = cycle === "PINK";
           const done = false;
           return (
             <div
               key={cycle}
-              className={`relative border-ink p-5 ${i !== 2 ? "border-r-2" : ""} ${
+              className={`relative overflow-hidden border-ink p-5 ${i !== 2 ? "border-r-2" : ""} ${
                 cycle === "PINK"
                   ? "bg-[#FF80A8]"
                   : cycle === "RED"
@@ -44,10 +47,13 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
                     : "bg-hazard"
               } ${active ? "" : "opacity-60"}`}
             >
+              {active ? (
+                <div className="brut-scan pointer-events-none absolute inset-0" />
+              ) : null}
               <div className="font-mono text-[10px] uppercase tracking-[0.3em]">
                 CYCLE 0{i + 1}
               </div>
-              <div className="mt-1 font-display text-3xl font-bold uppercase">{cycle} TEAM</div>
+              <div className="brut-stencil mt-1 text-5xl leading-none">{cycle}</div>
               <div className="mt-2 font-mono text-[11px] uppercase tracking-wider">
                 {cycle === "PINK"
                   ? "EVALUATE AS OWN TEAM · DRAFT QUALITY"
@@ -63,8 +69,8 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
                 />
               </div>
               {active ? (
-                <div className="absolute right-3 top-3 border-2 border-ink bg-paper px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
-                  ● LIVE
+                <div className="absolute right-3 top-3 flex items-center gap-1 border-2 border-ink bg-paper px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
+                  <span className="h-1.5 w-1.5 animate-blink bg-blood" /> LIVE
                 </div>
               ) : null}
             </div>
@@ -73,7 +79,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
-        <Panel title="COMMENTS · PINK CYCLE" code="CMT" dense>
+        <Panel title="COMMENTS · PINK CYCLE" code="CMT" accent="blood" dense>
           <div className="grid grid-cols-[90px_110px_110px_1fr_130px_120px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
             <div className="border-r border-paper/20 p-2">ID</div>
             <div className="border-r border-paper/20 p-2">SEVERITY</div>
@@ -89,7 +95,9 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
                 i % 2 ? "bg-bone" : "bg-paper"
               } ${c.severity === "CRITICAL" && !c.resolved ? "ring-2 ring-inset ring-blood" : ""}`}
             >
-              <div className="border-r-2 border-ink p-3 font-mono text-[11px] font-bold">{c.id}</div>
+              <div className="border-r-2 border-ink p-3 font-mono text-[11px] font-bold">
+                {c.id}
+              </div>
               <div className="border-r-2 border-ink p-3">
                 <StatusPill value={c.severity} />
               </div>
@@ -104,9 +112,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
               <div className="border-r-2 border-ink p-3 font-mono text-[11px]">{c.anchor}</div>
               <div className="p-2">
                 <button
-                  className={`brut-btn w-full px-2 py-1 text-[10px] ${
-                    c.resolved ? "bg-signal" : ""
-                  }`}
+                  className={`brut-btn w-full px-2 py-1 text-[10px] ${c.resolved ? "bg-signal" : ""}`}
                 >
                   {c.resolved ? "RESOLVED" : "RESOLVE"}
                 </button>
@@ -132,26 +138,29 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-display text-sm font-bold">{u.n}</div>
-                    <div className="text-[10px] uppercase text-ink/60">{u.r} · {u.c} comments</div>
+                    <div className="text-[10px] uppercase text-ink/60">
+                      {u.r} · {u.c} comments
+                    </div>
                   </div>
+                  <span className="brut-stencil text-2xl leading-none">{u.c}</span>
                 </li>
               ))}
             </ul>
           </Panel>
 
-          <Panel title="BURN-DOWN" code="BRN" accent="hazard">
-            <div className="brut-label">OPEN vs RESOLVED · 7D</div>
-            <div className="flex h-28 items-end gap-1 border-2 border-ink p-1">
-              {[22, 24, 28, 26, 20, 18, 14].map((v, i) => (
-                <div key={i} className="flex-1 bg-blood" style={{ height: `${(v / 30) * 100}%` }} />
-              ))}
+          <Panel title="BURN-DOWN · 7D" code="BRN" accent="hazard">
+            <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-widest">
+              <span>OPEN</span>
+              <span className="font-bold">-36%</span>
             </div>
-            <div className="mt-2 flex h-28 items-end gap-1 border-2 border-ink p-1">
-              {[2, 6, 12, 18, 20, 24, 26].map((v, i) => (
-                <div key={i} className="flex-1 bg-signal" style={{ height: `${(v / 30) * 100}%` }} />
-              ))}
+            <BarSpark data={[22, 24, 28, 26, 20, 18, 14]} color="bg-blood" />
+            <div className="mt-3 mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-widest">
+              <span>RESOLVED</span>
+              <span className="font-bold">+1100%</span>
             </div>
-            <div className="mt-1 flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest">
+            <BarSpark data={[2, 6, 12, 18, 20, 24, 26]} color="bg-signal" />
+
+            <div className="mt-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest">
               <span className="flex items-center gap-1">
                 <span className="h-2 w-4 bg-blood" /> OPEN
               </span>
@@ -163,13 +172,14 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
 
           <Panel title="AI RED TEAM" code="ARG" accent="blood">
             <p className="font-mono text-[11px] leading-relaxed">
-              Run Claude in <b>Government Evaluator</b> mode against the current draft.
-              Produces simulated SSEB findings against Section M criteria.
+              Run Claude in <b>Government Evaluator</b> mode against the current draft. Produces
+              simulated SSEB findings against Section M criteria.
             </p>
             <button className="brut-btn-hazard mt-3 w-full">SIMULATE SSEB →</button>
             <div className="mt-2 font-mono text-[10px] uppercase text-ink/60">
               LAST RUN · 2D AGO · 14 findings
             </div>
+            <div className="brut-diagonal-blood mt-3 h-2 border-2 border-ink" />
           </Panel>
         </aside>
       </div>

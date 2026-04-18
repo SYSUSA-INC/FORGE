@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { requirements, solicitations } from "@/lib/mock";
 import { BarMeter } from "@/components/ui/BarMeter";
+import { Radar } from "@/components/ui/Radar";
+import { Perforation } from "@/components/ui/Perforation";
+import { requirements, solicitations } from "@/lib/mock";
 
 export default function SolicitationDetail({ params }: { params: { id: string } }) {
   const sol = solicitations.find((s) => s.id === params.id) ?? solicitations[0];
@@ -18,8 +20,18 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
     <>
       <PageHeader
         eyebrow={`SOL // ${sol.number} · ${sol.type}`}
-        title={sol.title}
-        subtitle={`${sol.agency} · NAICS ${sol.naics} · ${sol.setAside} · CT ${sol.contractType}`}
+        title={sol.id.replace("SOL-", "SOL·")}
+        subtitle={`${sol.title} — ${sol.agency} · NAICS ${sol.naics} · ${sol.setAside} · CT ${sol.contractType}`}
+        barcode={sol.number}
+        stamp={{
+          label:
+            sol.bidDecision === "BID"
+              ? "BID APPROVED"
+              : sol.bidDecision === "NO_BID"
+                ? "NO BID"
+                : "UNDER REVIEW",
+          tone: sol.bidDecision === "BID" ? "signal" : sol.bidDecision === "NO_BID" ? "blood" : "hazard",
+        }}
         actions={
           <>
             <StatusPill value={sol.bidDecision} />
@@ -40,35 +52,25 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4">
           <Panel title="SECTION L · INSTRUCTIONS TO OFFERORS" code="L" accent="ink">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-              <div className="rounded-none border-2 border-ink bg-blood p-3 text-paper">
-                <div className="font-mono text-[10px] uppercase tracking-wider">MANDATORY</div>
-                <div className="font-display text-4xl font-bold leading-none">{mandatory}</div>
-              </div>
-              <div className="rounded-none border-2 border-ink bg-hazard p-3">
-                <div className="font-mono text-[10px] uppercase tracking-wider">DESIRED</div>
-                <div className="font-display text-4xl font-bold leading-none">{desired}</div>
-              </div>
-              <div className="rounded-none border-2 border-ink bg-bone p-3">
-                <div className="font-mono text-[10px] uppercase tracking-wider">INFORMATIONAL</div>
-                <div className="font-display text-4xl font-bold leading-none">{info}</div>
-              </div>
-              <div className="rounded-none border-2 border-ink bg-paper p-3">
-                <div className="font-mono text-[10px] uppercase tracking-wider">UNPARSED</div>
-                <div className="font-display text-4xl font-bold leading-none">06</div>
-              </div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Bucket label="MANDATORY" n={mandatory} tone="blood" />
+              <Bucket label="DESIRED" n={desired} tone="hazard" />
+              <Bucket label="INFORMATIONAL" n={info} tone="bone" />
+              <Bucket label="UNPARSED" n={6} tone="paper" />
             </div>
 
-            <div className="mt-4 border-2 border-ink bg-bone p-4 font-mono text-xs leading-relaxed">
-              <span className="block font-mono text-[10px] uppercase tracking-widest text-ink/60">
+            <div className="relative mt-4 border-2 border-ink bg-bone p-4 font-mono text-xs leading-relaxed">
+              <span className="absolute -top-3 left-3 bg-ink px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-paper">
                 SOURCE EXCERPT · L.5.2.1
               </span>
               <p className="mt-2">
-                &ldquo;The Offeror <mark className="bg-hazard px-0.5">shall</mark> describe its approach to integrating AI/ML
-                models with shipboard C5ISR systems, including{" "}
-                <mark className="bg-hazard px-0.5">latency targets</mark>, fail-safe modes, and
-                <mark className="bg-hazard px-0.5"> human-on-the-loop</mark> design consistent with
-                DoD Directive 3000.09 and Navy Sea Systems Command policy.&rdquo;
+                &ldquo;The Offeror{" "}
+                <mark className="bg-hazard px-0.5 font-bold">shall</mark> describe its approach to
+                integrating AI/ML models with shipboard C5ISR systems, including{" "}
+                <mark className="bg-hazard px-0.5 font-bold">latency targets</mark>, fail-safe modes,
+                and
+                <mark className="bg-hazard px-0.5 font-bold"> human-on-the-loop</mark> design consistent
+                with DoD Directive 3000.09 and Navy Sea Systems Command policy.&rdquo;
               </p>
             </div>
           </Panel>
@@ -81,10 +83,14 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
                 { f: "FACTOR 3", t: "Past Performance", w: 20 },
                 { f: "FACTOR 4", t: "Price", w: 15 },
               ].map((f) => (
-                <li key={f.f} className="grid grid-cols-[90px_1fr_140px] items-center gap-3 p-3">
+                <li
+                  key={f.f}
+                  className="grid grid-cols-[100px_1fr_140px_60px] items-center gap-3 p-3"
+                >
                   <span className="brut-pill bg-ink text-paper">{f.f}</span>
                   <div className="font-display text-lg font-bold uppercase">{f.t}</div>
                   <BarMeter value={f.w} color="hazard" label="WEIGHT" right={`${f.w}%`} />
+                  <div className="brut-stencil text-right text-3xl leading-none">{f.w}</div>
                 </li>
               ))}
             </ul>
@@ -142,7 +148,9 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
                   </div>
                   <div>
                     <div className="font-mono text-[11px] font-bold uppercase">{f.t}</div>
-                    <div className="font-mono text-[10px] text-ink/60">{f.n} · {f.s}</div>
+                    <div className="font-mono text-[10px] text-ink/60">
+                      {f.n} · {f.s}
+                    </div>
                   </div>
                   <span className={`brut-chip ${f.ok ? "bg-signal" : "bg-hazard"}`}>
                     {f.ok ? "PARSED" : "QUEUED"}
@@ -158,12 +166,27 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
               <button className="brut-btn bg-hazard">REVIEW</button>
               <button className="brut-btn bg-blood text-paper">NO-BID</button>
             </div>
-            <div className="mt-4 flex flex-col gap-2 font-mono text-[11px]">
-              <Score label="STRATEGIC FIT" value={82} color="signal" />
-              <Score label="TECHNICAL READINESS" value={68} color="hazard" />
-              <Score label="PAST PERFORMANCE FIT" value={74} color="signal" />
-              <Score label="PRICE COMPETITIVENESS" value={54} color="hazard" />
-              <Score label="INCUMBENT RISK" value={32} color="blood" />
+
+            <Perforation className="my-4" />
+
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
+                FIT PROFILE
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
+                P(WIN) {sol.pWin}%
+              </span>
+            </div>
+            <div className="h-48">
+              <Radar
+                data={[
+                  { label: "STRAT", value: 82 },
+                  { label: "TECH", value: 68 },
+                  { label: "PP", value: 74 },
+                  { label: "PRICE", value: 54 },
+                  { label: "RISK", value: 32 },
+                ]}
+              />
             </div>
           </Panel>
 
@@ -180,13 +203,15 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
                 <li key={e.d} className="relative">
                   <span
                     className={`absolute -left-[26px] top-1 h-4 w-4 border-2 border-ink ${
-                      e.done ? "bg-ink" : e.hot ? "bg-blood" : "bg-paper"
+                      e.done ? "bg-ink" : e.hot ? "bg-blood animate-pulse__" : "bg-paper"
                     }`}
                   />
                   <div className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
                     {e.d}
                   </div>
-                  <div className={`font-display text-sm font-bold ${e.hot ? "text-blood" : ""}`}>
+                  <div
+                    className={`font-display text-sm font-bold ${e.hot ? "text-blood" : ""}`}
+                  >
                     {e.t}
                   </div>
                 </li>
@@ -199,14 +224,28 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
   );
 }
 
-function Score({ label, value, color }: { label: string; value: number; color: "signal" | "hazard" | "blood" }) {
+function Bucket({
+  label,
+  n,
+  tone,
+}: {
+  label: string;
+  n: number;
+  tone: "blood" | "hazard" | "bone" | "paper";
+}) {
+  const bg =
+    tone === "blood"
+      ? "bg-blood text-paper"
+      : tone === "hazard"
+        ? "bg-hazard text-ink"
+        : tone === "bone"
+          ? "bg-bone"
+          : "bg-paper";
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <span className="uppercase tracking-widest text-[10px]">{label}</span>
-        <span className="font-bold">{value}</span>
-      </div>
-      <BarMeter value={value} color={color} />
+    <div className={`border-2 border-ink p-3 ${bg}`}>
+      <div className="font-mono text-[10px] uppercase tracking-widest opacity-80">{label}</div>
+      <div className="brut-stencil text-5xl leading-none">{n}</div>
+      <div className="mt-1 font-mono text-[9px] uppercase tracking-widest opacity-60">REQS</div>
     </div>
   );
 }

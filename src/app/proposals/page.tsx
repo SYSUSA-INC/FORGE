@@ -18,13 +18,28 @@ const PHASES = [
   "SUBMITTED",
 ];
 
+const PHASE_TONE: Record<string, string> = {
+  PLANNING: "bg-paper",
+  OUTLINING: "bg-bone",
+  DRAFTING: "bg-cobalt text-paper",
+  PINK_TEAM: "bg-[#FF80A8]",
+  REVISING: "bg-hazard",
+  RED_TEAM: "bg-blood text-paper",
+  GOLD_TEAM: "bg-hazard",
+  FINAL_REVIEW: "bg-plum text-paper",
+  PRODUCTION: "bg-ink text-paper",
+  SUBMITTED: "bg-signal",
+};
+
 export default function ProposalsListPage() {
   return (
     <>
       <PageHeader
         eyebrow="PRP // PROPOSAL PIPELINE"
-        title="PROPOSALS"
+        title="PROPOSAL"
         subtitle="Every active proposal across capture, drafting, review, and production."
+        barcode="PRP-LIST-0042"
+        stamp={{ label: "PIPELINE HOT", tone: "blood" }}
         actions={
           <>
             <button className="brut-btn">EXPORT CSV</button>
@@ -41,29 +56,49 @@ export default function ProposalsListPage() {
         ]}
       />
 
-      <Panel title="KANBAN · PHASE VIEW" code="PIPE-01" dense className="mb-6 overflow-hidden">
+      <Panel
+        title="KANBAN · PHASE VIEW"
+        code="PIPE-01"
+        accent="plum"
+        dense
+        className="mb-6 overflow-hidden"
+      >
         <div className="grid grid-cols-10 divide-x-2 divide-ink">
           {PHASES.map((p) => {
             const items = proposals.filter((x) => x.status === p);
+            const tone = PHASE_TONE[p] ?? "bg-bone/40";
             return (
-              <div key={p} className="min-h-[180px] bg-bone/40">
-                <div className="border-b-2 border-ink bg-ink px-2 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-paper">
-                  {p.replace(/_/g, " ")}
-                  <span className="ml-1 opacity-60">·{String(items.length).padStart(2, "0")}</span>
+              <div key={p} className="min-h-[220px] bg-bone/40">
+                <div
+                  className={`flex items-center justify-between border-b-2 border-ink px-2 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest ${tone}`}
+                >
+                  <span>{p.replace(/_/g, " ")}</span>
+                  <span className="opacity-70">{String(items.length).padStart(2, "0")}</span>
                 </div>
                 <div className="flex flex-col gap-2 p-1.5">
                   {items.map((pr) => (
                     <Link
                       key={pr.id}
                       href={`/proposals/${pr.id}/editor`}
-                      className="brut-card-sm block p-2"
+                      className="brut-card-sm block p-2 transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-brut"
                     >
                       <div className="font-mono text-[9px] uppercase text-ink/60">{pr.code}</div>
                       <div className="mt-0.5 font-display text-xs font-bold leading-tight">
                         {pr.title}
                       </div>
-                      <div className="mt-1 font-mono text-[9px] uppercase text-ink/60">
+                      <div
+                        className={`mt-2 inline-block border-2 border-ink px-1.5 py-0.5 font-mono text-[9px] font-bold ${
+                          pr.daysLeft < 5
+                            ? "bg-blood text-paper"
+                            : pr.daysLeft < 15
+                              ? "bg-hazard"
+                              : "bg-paper"
+                        }`}
+                      >
                         T-{pr.daysLeft}D
+                      </div>
+                      <div className="mt-2">
+                        <BarMeter value={pr.progress} color="ink" />
                       </div>
                     </Link>
                   ))}
@@ -109,8 +144,12 @@ export default function ProposalsListPage() {
             <div className="border-r-2 border-ink p-3 font-mono text-[11px]">
               <div className="font-bold uppercase">{p.dueAt.split(" ")[0]}</div>
               <div
-                className={`mt-0.5 border-2 border-ink px-1.5 py-0.5 text-center text-[10px] font-bold uppercase ${
-                  p.daysLeft < 5 ? "bg-blood text-paper" : p.daysLeft < 15 ? "bg-hazard" : "bg-paper"
+                className={`brut-stencil mt-1 border-2 border-ink px-1.5 py-0.5 text-center text-xl leading-none ${
+                  p.daysLeft < 5
+                    ? "bg-blood text-paper"
+                    : p.daysLeft < 15
+                      ? "bg-hazard"
+                      : "bg-paper"
                 }`}
               >
                 T-{p.daysLeft}D
@@ -122,7 +161,9 @@ export default function ProposalsListPage() {
             <div className="border-r-2 border-ink p-3">
               <BarMeter
                 value={p.compliancePct}
-                color={p.compliancePct >= 90 ? "signal" : p.compliancePct >= 70 ? "hazard" : "blood"}
+                color={
+                  p.compliancePct >= 90 ? "signal" : p.compliancePct >= 70 ? "hazard" : "blood"
+                }
                 right={`${p.compliancePct}%`}
               />
             </div>
@@ -130,12 +171,13 @@ export default function ProposalsListPage() {
               <div className="font-bold">
                 {p.pagesEstimated}/{p.pagesLimit}p
               </div>
-              <div className="text-[10px] text-ink/60">
-                AI {p.aiPct}%
-              </div>
+              <div className="text-[10px] text-ink/60">AI {p.aiPct}%</div>
             </div>
             <div className="p-2">
-              <Link href={`/proposals/${p.id}/editor`} className="brut-btn w-full px-2 py-1 text-[10px]">
+              <Link
+                href={`/proposals/${p.id}/editor`}
+                className="brut-btn w-full px-2 py-1 text-[10px]"
+              >
                 OPEN →
               </Link>
             </div>

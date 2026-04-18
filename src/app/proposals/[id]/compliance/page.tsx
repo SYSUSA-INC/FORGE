@@ -2,6 +2,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { BarMeter } from "@/components/ui/BarMeter";
+import { DotMeter } from "@/components/ui/DotMeter";
+import { Perforation } from "@/components/ui/Perforation";
 import { proposals, requirements } from "@/lib/mock";
 
 export default function CompliancePage({ params }: { params: { id: string } }) {
@@ -20,8 +22,13 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
     <>
       <PageHeader
         eyebrow={`CMP // ${p.code} · COMPLIANCE MATRIX`}
-        title="COMPLIANCE"
+        title="COMPLY"
         subtitle="Requirements extracted from Section L/M mapped to proposal sections. Gap analysis live."
+        barcode={`${p.code}-CMP`}
+        stamp={{
+          label: p.compliancePct >= 90 ? "CLEAR TO SUBMIT" : "GAPS FOUND",
+          tone: p.compliancePct >= 90 ? "signal" : "blood",
+        }}
         actions={
           <>
             <button className="brut-btn">RUN AI CHECK</button>
@@ -37,42 +44,78 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
         ]}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
-        {(
-          [
-            ["VERIFIED", "ink"],
-            ["FULLY", "signal"],
-            ["PARTIALLY", "hazard"],
-            ["NOT_ADDRESSED", "blood"],
-            ["NON_COMPLIANT", "blood"],
-            ["N/A", "bone"],
-          ] as const
-        ).map(([k, tone]) => (
-          <div key={k} className="border-2 border-ink bg-paper shadow-brut-sm">
-            <div
-              className={`border-b-2 border-ink px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest ${
-                tone === "signal"
-                  ? "bg-signal"
-                  : tone === "hazard"
-                    ? "bg-hazard"
-                    : tone === "blood"
-                      ? "bg-blood text-paper"
-                      : tone === "ink"
-                        ? "bg-ink text-paper"
-                        : "bg-bone"
-              }`}
-            >
-              {k.replace("_", " ")}
+      {/* HERO COMPLIANCE GAUGE + BUCKET STRIP */}
+      <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_2fr]">
+        <div className="relative border-2 border-ink bg-ink p-6 text-paper shadow-brut-xl">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.3em] text-paper/70">
+            [GAUGE] OVERALL COMPLIANCE
+          </div>
+          <div className="flex items-end justify-between">
+            <div className="brut-stencil text-[140px] leading-[0.82] text-hazard">
+              {p.compliancePct}
             </div>
-            <div className="p-3">
-              <div className="font-display text-4xl font-bold leading-none">
-                {String(buckets[k as keyof typeof buckets]).padStart(2, "0")}
-              </div>
-              <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">REQS</div>
+            <div className="pb-3 font-mono text-sm uppercase tracking-widest text-paper/70">
+              / 100%
             </div>
           </div>
-        ))}
-      </div>
+          <DotMeter
+            value={p.compliancePct}
+            steps={30}
+            filled="bg-hazard"
+            highlight="bg-signal"
+            empty="bg-ink"
+            className="mt-2 border-paper/30 bg-ink"
+          />
+          <div className="mt-4 grid grid-cols-3 gap-2 text-paper">
+            <Gauge k="MANDATORY" n="46/52" tone="hazard" />
+            <Gauge k="CRITICAL GAPS" n="06" tone="blood" />
+            <Gauge k="VERIFIED" n="18" tone="signal" />
+          </div>
+          <span
+            className="pointer-events-none absolute -right-3 -top-3 border-[3px] border-blood bg-paper px-2 py-1 font-display text-[11px] font-black uppercase tracking-[0.22em] text-blood"
+            style={{ transform: "rotate(6deg)" }}
+          >
+            ✦ GO/NO-GO ✦
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          {(
+            [
+              ["VERIFIED", "ink"],
+              ["FULLY", "signal"],
+              ["PARTIALLY", "hazard"],
+              ["NOT_ADDRESSED", "blood"],
+              ["NON_COMPLIANT", "blood"],
+              ["N/A", "bone"],
+            ] as const
+          ).map(([k, tone]) => (
+            <div key={k} className="border-2 border-ink bg-paper shadow-brut-sm">
+              <div
+                className={`border-b-2 border-ink px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest ${
+                  tone === "signal"
+                    ? "bg-signal"
+                    : tone === "hazard"
+                      ? "bg-hazard"
+                      : tone === "blood"
+                        ? "bg-blood text-paper"
+                        : tone === "ink"
+                          ? "bg-ink text-paper"
+                          : "bg-bone"
+                }`}
+              >
+                {k.replace("_", " ")}
+              </div>
+              <div className="p-3">
+                <div className="brut-stencil text-5xl leading-none">
+                  {String(buckets[k as keyof typeof buckets]).padStart(2, "0")}
+                </div>
+                <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">REQS</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
         <Panel title="COMPLIANCE MATRIX" code="MTX" dense>
@@ -89,9 +132,13 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
               key={r.id}
               className={`grid grid-cols-[80px_130px_1fr_180px_130px_120px] border-b-2 border-ink ${
                 i % 2 ? "bg-bone" : "bg-paper"
-              } ${r.compliance === "NOT_ADDRESSED" ? "ring-2 ring-inset ring-blood" : ""}`}
+              } ${
+                r.compliance === "NOT_ADDRESSED" ? "ring-2 ring-inset ring-blood" : ""
+              }`}
             >
-              <div className="border-r-2 border-ink p-3 font-mono text-[11px] font-bold">{r.ref}</div>
+              <div className="border-r-2 border-ink p-3 font-mono text-[11px] font-bold">
+                {r.ref}
+              </div>
               <div className="border-r-2 border-ink p-3">
                 <StatusPill value={r.category} />
               </div>
@@ -109,15 +156,27 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
           <Panel title="GAP ANALYSIS" code="GAP" accent="blood">
             <ul className="flex flex-col gap-2">
               {requirements
-                .filter((r) => r.compliance === "NOT_ADDRESSED" || r.compliance === "PARTIALLY")
+                .filter(
+                  (r) => r.compliance === "NOT_ADDRESSED" || r.compliance === "PARTIALLY",
+                )
                 .map((r) => (
-                  <li key={r.id} className="border-2 border-ink bg-paper p-2 font-mono text-[11px]">
-                    <div className="flex items-center justify-between">
+                  <li
+                    key={r.id}
+                    className="relative border-2 border-ink bg-paper p-2 font-mono text-[11px]"
+                  >
+                    <span
+                      className={`absolute left-0 top-0 h-full w-1.5 ${
+                        r.compliance === "NOT_ADDRESSED" ? "bg-blood" : "bg-hazard"
+                      }`}
+                    />
+                    <div className="flex items-center justify-between pl-2">
                       <span className="font-bold">{r.ref}</span>
                       <StatusPill value={r.compliance} />
                     </div>
-                    <div className="mt-1 text-[11px] leading-snug">{r.text.slice(0, 120)}…</div>
-                    <div className="mt-1 text-[9px] uppercase text-ink/60">{r.section}</div>
+                    <div className="mt-1 pl-2 text-[11px] leading-snug">
+                      {r.text.slice(0, 120)}…
+                    </div>
+                    <div className="mt-1 pl-2 text-[9px] uppercase text-ink/60">{r.section}</div>
                   </li>
                 ))}
             </ul>
@@ -154,6 +213,10 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
                 <BarMeter value={2} color="blood" />
               </div>
             </div>
+            <Perforation className="my-3" />
+            <div className="text-center font-mono text-[10px] uppercase tracking-widest text-ink/60">
+              AVG · {p.compliancePct}%
+            </div>
           </Panel>
 
           <Panel title="FORMAT GATES" code="FMT" accent="ink">
@@ -170,7 +233,9 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
                   className="flex items-center justify-between border-b border-ink/20 py-1"
                 >
                   <span className="uppercase">{g.k}</span>
-                  <span className={`brut-chip ${g.ok ? "bg-signal" : "bg-hazard"}`}>{g.v}</span>
+                  <span className={`brut-chip ${g.ok ? "bg-signal" : "bg-hazard"}`}>
+                    {g.v}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -178,5 +243,20 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
         </aside>
       </div>
     </>
+  );
+}
+
+function Gauge({ k, n, tone }: { k: string; n: string; tone: "hazard" | "blood" | "signal" }) {
+  const bg =
+    tone === "hazard"
+      ? "bg-hazard text-ink"
+      : tone === "blood"
+        ? "bg-blood text-paper"
+        : "bg-signal text-ink";
+  return (
+    <div className={`border-2 border-ink p-2 ${bg}`}>
+      <div className="font-mono text-[9px] uppercase tracking-widest opacity-80">{k}</div>
+      <div className="brut-stencil text-2xl leading-none">{n}</div>
+    </div>
   );
 }

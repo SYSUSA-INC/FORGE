@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono, Inter } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono, Inter, Archivo_Black } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/shell/AppShell";
 
@@ -7,6 +7,12 @@ const display = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-display",
+});
+
+const stencil = Archivo_Black({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-stencil",
 });
 
 const mono = JetBrains_Mono({
@@ -29,7 +35,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${stencil.variable} ${mono.variable} ${body.variable}`}>
       <body>
         <AppShell>{children}</AppShell>
       </body>
