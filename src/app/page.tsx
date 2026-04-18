@@ -22,11 +22,11 @@ export default function DashboardPage() {
         subtitle="Capture operations, proposal velocity, and compliance deltas across the active pipeline."
         actions={
           <>
-            <button className="brut-btn">Refresh</button>
-            <Link href="/solicitations/new" className="brut-btn">
+            <button className="aur-btn">Refresh</button>
+            <Link href="/solicitations/new" className="aur-btn">
               New solicitation
             </Link>
-            <Link href="/proposals/new" className="brut-btn-primary">
+            <Link href="/proposals/new" className="aur-btn-primary">
               New proposal
             </Link>
           </>
@@ -34,39 +34,38 @@ export default function DashboardPage() {
         meta={[
           { label: "Active proposals", value: "04" },
           { label: "In review", value: "02" },
-          { label: "Pipeline value", value: "$185M" },
-          { label: "Next deadline", value: "2d 4h", accent: "blood" },
+          { label: "Pipeline value", value: "$185M", accent: "emerald" },
+          { label: "Next deadline", value: "2d 4h", accent: "rose" },
         ]}
       />
 
-      {/* As-of bar — an enterprise trust signal */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-2 border-ink bg-bone px-4 py-2 font-mono text-[11px] tracking-wide text-ink/70">
-        <span>
-          Data as of{" "}
-          <span className="font-bold text-ink">
-            {new Date().toISOString().slice(0, 10)} · 14:02 UTC
+      <div className="mb-4 aur-card px-4 py-2 font-mono text-[11px] tracking-wide text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>
+            Data as of{" "}
+            <span className="font-semibold text-text">
+              {new Date().toISOString().slice(0, 10)} · 14:02 UTC
+            </span>
+            . Streaming updates every 60 s.
           </span>
-          . Streaming updates every 60 s.
-        </span>
-        <span className="flex items-center gap-3">
-          <span>Owner: J. Calder</span>
-          <span className="text-ink/40">·</span>
-          <span>Org: SYSUSA</span>
-          <span className="text-ink/40">·</span>
-          <span>FY 2026 · Q2</span>
-        </span>
+          <span className="flex items-center gap-3">
+            <span>Owner: J. Calder</span>
+            <span className="text-subtle">·</span>
+            <span>Org: SYSUSA</span>
+            <span className="text-subtle">·</span>
+            <span>FY 2026 · Q2</span>
+          </span>
+        </div>
       </div>
 
-      {/* HERO ROW — priority proposal 2/3, radar + win prob stacked on right */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-        {/* Priority proposal */}
-        <div className="border-2 border-ink bg-paper shadow-brut">
-          <header className="flex items-center justify-between border-b-2 border-ink bg-paper px-4 py-2">
+        <div className="aur-card overflow-hidden">
+          <header className="flex items-center justify-between border-b border-white/10 px-5 py-3">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-ink/70">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-muted">
                 Priority proposal
               </span>
-              <span className="font-mono text-[10px] text-ink/50">
+              <span className="font-mono text-[10px] text-subtle">
                 {hottest?.code}
               </span>
             </div>
@@ -75,19 +74,19 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-[1fr_auto]">
             <div>
-              <div className="font-display text-2xl font-bold leading-tight">
+              <div className="font-display text-2xl font-semibold leading-tight text-text">
                 {hottest?.title}
               </div>
-              <div className="mt-1 font-mono text-[11px] uppercase tracking-wider text-ink/60">
+              <div className="mt-1 font-mono text-[11px] uppercase tracking-wider text-muted">
                 {hottest?.solicitation} · {hottest?.agency}
               </div>
 
-              <div className="mt-5 grid grid-cols-3 gap-4 font-mono text-[11px]">
+              <div className="mt-5 grid grid-cols-3 gap-3 font-mono text-[11px]">
                 <KeyFact
                   label="Due in"
                   value={`${hottest?.daysLeft ?? 0}d`}
                   sub={hottest?.dueAt.split(" ")[0]}
-                  emphasize="blood"
+                  emphasize="rose"
                 />
                 <KeyFact
                   label="Compliance"
@@ -104,13 +103,13 @@ export default function DashboardPage() {
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <Link
                   href={`/proposals/${hottest?.id}/editor`}
-                  className="brut-btn-primary w-full justify-center"
+                  className="aur-btn-primary w-full justify-center"
                 >
                   Open editor
                 </Link>
                 <Link
                   href={`/proposals/${hottest?.id}/compliance`}
-                  className="brut-btn w-full justify-center"
+                  className="aur-btn w-full justify-center"
                 >
                   View compliance
                 </Link>
@@ -118,10 +117,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="hidden w-64 md:block">
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/60">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
                 Readiness by axis
               </div>
-              <div className="mt-1 flex flex-col gap-1 font-mono text-[11px]">
+              <div className="mt-2 flex flex-col gap-1.5 font-mono text-[11px]">
                 {[
                   ["Strategic fit", 82],
                   ["Technical", 68],
@@ -137,7 +136,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right column: radar + win-probability trend stacked */}
         <div className="flex flex-col gap-4">
           <Panel title="Capture readiness">
             <div className="h-[200px]">
@@ -153,108 +151,115 @@ export default function DashboardPage() {
                 ]}
               />
             </div>
-            <div className="mt-3 flex items-center justify-between border-t-2 border-ink pt-2 font-mono text-[11px]">
-              <span className="text-ink/60">Weighted P(win)</span>
-              <span className="font-display text-xl font-bold tabular-nums">54%</span>
+            <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 font-mono text-[11px]">
+              <span className="text-muted">Weighted P(win)</span>
+              <span className="font-display text-xl font-semibold tabular-nums text-text">
+                54%
+              </span>
             </div>
           </Panel>
 
           <Panel title="Win probability · 12 wk">
             <div className="h-14">
-              <Sparkline
-                data={[32, 38, 34, 41, 40, 47, 52, 49, 55, 51, 58, 54]}
-                color="#0A0A0A"
-                fill="#EDE5D3"
-              />
+              <Sparkline data={[32, 38, 34, 41, 40, 47, 52, 49, 55, 51, 58, 54]} />
             </div>
-            <div className="mt-2 flex items-center justify-between border-t-2 border-ink pt-2 font-mono text-[11px]">
-              <span className="text-ink/60">Current · trend</span>
+            <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2 font-mono text-[11px]">
+              <span className="text-muted">Current · trend</span>
               <span className="flex items-center gap-1.5">
-                <span className="font-display text-xl font-bold tabular-nums">54%</span>
-                <span className="bg-signal px-1 font-bold">▲ 6.2</span>
+                <span className="font-display text-xl font-semibold tabular-nums text-text">
+                  54%
+                </span>
+                <span className="rounded-sm bg-emerald/15 px-1 font-semibold text-emerald">
+                  ▲ 6.2
+                </span>
               </span>
             </div>
           </Panel>
         </div>
       </section>
 
-      {/* Pipeline + deadlines */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <Panel
           title="Active pipeline"
           actions={
             <Link
               href="/proposals"
-              className="font-mono text-[10px] font-bold uppercase tracking-widest underline-offset-2 hover:underline"
+              className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted hover:text-text"
             >
               View all
             </Link>
           }
           dense
         >
-          <div className="divide-y-2 divide-ink">
+          <div className="divide-y divide-white/10">
             {activeProposals.map((p) => (
               <Link
                 key={p.id}
                 href={`/proposals/${p.id}/editor`}
-                className="grid grid-cols-[100px_1fr_auto] items-center gap-4 p-4 transition-colors hover:bg-bone/60"
+                className="grid grid-cols-[100px_1fr_auto] items-center gap-4 p-4 transition-colors hover:bg-white/[0.03]"
               >
                 <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink/60">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
                     {p.code}
                   </span>
                   <span
-                    className={`border-2 border-ink px-2 py-1 text-center font-display text-xl font-bold tabular-nums leading-none ${
+                    className={`rounded-md border px-2 py-1 text-center font-display text-xl font-semibold tabular-nums leading-none ${
                       p.daysLeft < 5
-                        ? "bg-blood text-paper"
+                        ? "border-rose/40 bg-rose/15 text-rose"
                         : p.daysLeft < 14
-                          ? "bg-hazard text-ink"
-                          : "bg-paper text-ink"
+                          ? "border-gold/40 bg-gold/15 text-gold"
+                          : "border-white/10 bg-white/5 text-text"
                     }`}
                   >
                     {p.daysLeft}d
                   </span>
-                  <span className="text-center font-mono text-[9px] uppercase tracking-widest text-ink/60">
+                  <span className="text-center font-mono text-[9px] uppercase tracking-widest text-muted">
                     Remaining
                   </span>
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusPill value={p.status} />
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink/60">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
                       {p.solicitation}
                     </span>
                   </div>
-                  <div className="mt-1 font-display text-lg font-bold leading-tight">
+                  <div className="mt-1 font-display text-lg font-semibold leading-tight text-text">
                     {p.title}
                   </div>
-                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink/60">
+                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-muted">
                     {p.agency} · Due {p.dueAt}
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-3">
-                    <BarMeter label="Progress" value={p.progress} color="ink" />
+                    <BarMeter label="Progress" value={p.progress} />
                     <BarMeter
                       label="Compliance"
                       value={p.compliancePct}
-                      color={p.compliancePct >= 90 ? "signal" : p.compliancePct >= 70 ? "hazard" : "blood"}
+                      color={
+                        p.compliancePct >= 90
+                          ? "emerald"
+                          : p.compliancePct >= 70
+                            ? "gold"
+                            : "rose"
+                      }
                     />
                     <BarMeter
                       label="Pages"
                       value={p.pagesEstimated}
                       max={p.pagesLimit}
-                      color={p.pagesEstimated > p.pagesLimit * 0.95 ? "blood" : "ink"}
+                      color={p.pagesEstimated > p.pagesLimit * 0.95 ? "rose" : "violet"}
                       right={`${p.pagesEstimated}/${p.pagesLimit}`}
                     />
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-ink/60">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
                     AI drafted
                   </div>
-                  <div className="font-display text-2xl font-bold tabular-nums leading-none">
+                  <div className="font-display text-2xl font-semibold tabular-nums leading-none text-text">
                     {p.aiPct}%
                   </div>
-                  <div className="brut-chip mt-2 bg-bone">{p.captureManager}</div>
+                  <div className="aur-chip mt-2">{p.captureManager}</div>
                 </div>
               </Link>
             ))}
@@ -262,7 +267,7 @@ export default function DashboardPage() {
         </Panel>
 
         <Panel title="Upcoming deadlines">
-          <div className="mb-3 grid grid-cols-4 border-b-2 border-ink pb-1 font-mono text-[9px] uppercase tracking-wider text-ink/60">
+          <div className="mb-3 grid grid-cols-4 border-b border-white/10 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted">
             <span>Now</span>
             <span>+7d</span>
             <span>+15d</span>
@@ -278,8 +283,8 @@ export default function DashboardPage() {
                 return (
                   <li key={p.id} className="flex flex-col gap-1">
                     <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider">
-                      <span className="font-bold">{p.code}</span>
-                      <span className="tabular-nums text-ink/60">{p.daysLeft}d</span>
+                      <span className="font-semibold text-text">{p.code}</span>
+                      <span className="tabular-nums text-muted">{p.daysLeft}d</span>
                     </div>
                     <GanttRow
                       startPct={0}
@@ -288,10 +293,10 @@ export default function DashboardPage() {
                       label={p.title.slice(0, 26)}
                       color={
                         p.daysLeft < 5
-                          ? "bg-blood"
+                          ? "bg-gradient-to-r from-rose to-rose/60"
                           : p.daysLeft < 15
-                            ? "bg-hazard"
-                            : "bg-ink"
+                            ? "bg-gradient-to-r from-gold to-gold/60"
+                            : "bg-gradient-to-r from-violet to-magenta"
                       }
                     />
                   </li>
@@ -300,21 +305,22 @@ export default function DashboardPage() {
           </ul>
 
           <div className="mt-4 grid grid-cols-2 gap-2 font-mono text-[10px] uppercase">
-            <div className="border-2 border-ink bg-paper p-2">
-              <div className="text-ink/60">Critical (&lt;5d)</div>
-              <div className="font-display text-xl font-bold leading-none text-blood">
+            <div className="rounded-md border border-white/10 bg-white/[0.03] p-2">
+              <div className="text-muted">Critical (&lt;5d)</div>
+              <div className="font-display text-xl font-semibold leading-none text-rose">
                 02
               </div>
             </div>
-            <div className="border-2 border-ink bg-paper p-2">
-              <div className="text-ink/60">Warning (&lt;15d)</div>
-              <div className="font-display text-xl font-bold leading-none">01</div>
+            <div className="rounded-md border border-white/10 bg-white/[0.03] p-2">
+              <div className="text-muted">Warning (&lt;15d)</div>
+              <div className="font-display text-xl font-semibold leading-none text-gold">
+                01
+              </div>
             </div>
           </div>
         </Panel>
       </section>
 
-      {/* Heat + AI + SAM */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
         <Panel title="Agency × phase load">
           <HeatGrid
@@ -346,23 +352,23 @@ export default function DashboardPage() {
 
           <div className="mt-4">
             <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider">
-              <span>Model mix</span>
-              <span className="text-ink/60">Sonnet · Opus · Haiku</span>
+              <span className="text-muted">Model mix</span>
+              <span className="text-subtle">Sonnet · Opus · Haiku</span>
             </div>
-            <div className="flex h-5 w-full border-2 border-ink">
-              <div className="bg-ink" style={{ width: "72%" }} />
-              <div className="bg-hazard" style={{ width: "22%" }} />
-              <div className="bg-bone" style={{ width: "6%" }} />
+            <div className="flex h-2 w-full overflow-hidden rounded-full border border-white/10">
+              <div className="bg-violet" style={{ width: "72%" }} />
+              <div className="bg-gold" style={{ width: "22%" }} />
+              <div className="bg-white/10" style={{ width: "6%" }} />
             </div>
-            <div className="mt-1 font-mono text-[10px] text-ink/60">
+            <div className="mt-1 font-mono text-[10px] text-muted">
               72% Sonnet · 22% Opus · 6% Haiku
             </div>
           </div>
 
           <div className="mt-3">
             <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider">
-              <span>Tokens / hr</span>
-              <span className="text-ink/60">Peak 94k</span>
+              <span className="text-muted">Tokens / hr</span>
+              <span className="text-subtle">Peak 94k</span>
             </div>
             <div className="h-16">
               <BarSpark
@@ -378,7 +384,7 @@ export default function DashboardPage() {
           actions={
             <Link
               href="/solicitations"
-              className="font-mono text-[10px] font-bold uppercase tracking-widest underline-offset-2 hover:underline"
+              className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted hover:text-text"
             >
               Browse
             </Link>
@@ -388,20 +394,20 @@ export default function DashboardPage() {
             {solicitations.slice(0, 4).map((s) => (
               <li
                 key={s.id}
-                className="flex items-start justify-between gap-2 border-2 border-ink bg-paper p-2"
+                className="flex items-start justify-between gap-2 rounded-md border border-white/10 bg-white/[0.02] p-2"
               >
                 <div className="min-w-0">
-                  <div className="font-mono text-[9px] uppercase tracking-widest text-ink/60">
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-muted">
                     {s.agency}
                   </div>
-                  <div className="font-display text-sm font-bold leading-tight">
+                  <div className="font-display text-sm font-semibold leading-tight text-text">
                     {s.title}
                   </div>
-                  <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-ink/60">
+                  <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-subtle">
                     {s.number} · NAICS {s.naics} · {s.setAside}
                   </div>
                   <div className="mt-1">
-                    <DotMeter value={s.pWin} steps={14} filled="bg-ink" />
+                    <DotMeter value={s.pWin} steps={14} />
                   </div>
                 </div>
                 <StatusPill value={s.bidDecision} />
@@ -411,14 +417,13 @@ export default function DashboardPage() {
         </Panel>
       </section>
 
-      {/* Critical comments + Executive summary */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <Panel
           title="Critical review comments"
           actions={
             <Link
               href="/proposals/FRG-0042/review"
-              className="font-mono text-[10px] font-bold uppercase tracking-widest underline-offset-2 hover:underline"
+              className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted hover:text-text"
             >
               Open review
             </Link>
@@ -431,32 +436,32 @@ export default function DashboardPage() {
               .map((c) => (
                 <li
                   key={c.id}
-                  className="relative grid grid-cols-[90px_1fr_auto] gap-3 border-2 border-ink bg-paper p-3"
+                  className="relative grid grid-cols-[90px_1fr_auto] gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3"
                 >
                   <span
-                    className={`absolute left-0 top-0 h-full w-1 ${
-                      c.severity === "CRITICAL" ? "bg-blood" : "bg-hazard"
+                    className={`absolute left-0 top-0 h-full w-1 rounded-l-md ${
+                      c.severity === "CRITICAL" ? "bg-rose" : "bg-gold"
                     }`}
                     aria-hidden
                   />
                   <div className="pl-2">
                     <StatusPill value={c.severity} />
-                    <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">
+                    <div className="mt-1 font-mono text-[10px] uppercase text-muted">
                       {c.cycle} · {c.age}
                     </div>
                   </div>
                   <div>
-                    <div className="font-display text-sm font-bold">{c.section}</div>
-                    <p className="mt-0.5 text-sm leading-snug">{c.comment}</p>
-                    <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">
+                    <div className="font-display text-sm font-semibold text-text">
+                      {c.section}
+                    </div>
+                    <p className="mt-0.5 text-sm leading-snug text-muted">{c.comment}</p>
+                    <div className="mt-1 font-mono text-[10px] uppercase text-muted">
                       {c.reviewer} · Anchor {c.anchor}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className="brut-chip bg-bone">{c.id}</span>
-                    <button className="brut-btn-primary px-2 py-1 text-[10px]">
-                      Open
-                    </button>
+                    <span className="aur-chip">{c.id}</span>
+                    <button className="aur-btn-primary px-2 py-1 text-[10px]">Open</button>
                   </div>
                 </li>
               ))}
@@ -464,27 +469,27 @@ export default function DashboardPage() {
         </Panel>
 
         <Panel title="Daily capture note">
-          <div className="font-mono text-[11px] text-ink/60">
+          <div className="font-mono text-[11px] text-muted">
             Prepared by J. Calder · {new Date().toISOString().slice(0, 10)}
           </div>
-          <ol className="mt-3 ml-5 list-decimal space-y-2 text-[13px] leading-relaxed">
+          <ol className="mt-3 ml-5 list-decimal space-y-2 text-[13px] leading-relaxed text-text">
             <li>
               <b>FRG-0042 §3.2.3 Governance</b> is not yet drafted. Assign today; required by
               Section M.3.1(a).
             </li>
             <li>
               Contract number mismatch on Past Performance #2 —{" "}
-              <span className="bg-hazard px-0.5">verify against CPARS</span> before submission.
+              <span className="text-gold">verify against CPARS</span> before submission.
             </li>
             <li>
               Table 3-1 font is 9 pt; Section L.6.1 requires ≥ 10 pt —{" "}
-              <span className="font-bold text-blood">fails format gate</span>.
+              <span className="font-semibold text-rose">fails format gate</span>.
             </li>
             <li>
               Red Team readiness at 78%. Proceed if FRG-0039 stays green by end of day.
             </li>
           </ol>
-          <div className="mt-4 border-t-2 border-ink pt-3 font-mono text-[10px] uppercase tracking-widest text-ink/60">
+          <div className="mt-4 border-t border-white/10 pt-3 font-mono text-[10px] uppercase tracking-widest text-muted">
             J. Calder · Capture Manager
           </div>
         </Panel>
@@ -502,28 +507,28 @@ function KeyFact({
   label: string;
   value: string;
   sub?: string;
-  emphasize?: "blood" | "hazard" | "signal";
+  emphasize?: "rose" | "gold" | "emerald";
 }) {
   const valueTone =
-    emphasize === "blood"
-      ? "text-blood"
-      : emphasize === "hazard"
-        ? "text-ink"
-        : emphasize === "signal"
-          ? "text-ink"
-          : "text-ink";
+    emphasize === "rose"
+      ? "text-rose"
+      : emphasize === "gold"
+        ? "text-gold"
+        : emphasize === "emerald"
+          ? "text-emerald"
+          : "text-text";
   return (
-    <div className="border-2 border-ink bg-paper px-3 py-2">
-      <div className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
+    <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">
+      <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
         {label}
       </div>
       <div
-        className={`font-display text-3xl font-bold tabular-nums leading-none ${valueTone}`}
+        className={`font-display text-2xl font-semibold tabular-nums leading-none ${valueTone}`}
       >
         {value}
       </div>
       {sub ? (
-        <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-ink/60">
+        <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-muted">
           {sub}
         </div>
       ) : null}
@@ -534,20 +539,25 @@ function KeyFact({
 function AxisRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-28 text-ink/70">{label}</span>
-      <div className="relative h-2 flex-1 border-2 border-ink bg-paper">
-        <div className="h-full bg-ink" style={{ width: `${value}%` }} />
+      <span className="w-28 text-muted">{label}</span>
+      <div className="relative h-1.5 flex-1 overflow-hidden rounded-full border border-white/10 bg-white/[0.04]">
+        <div
+          className="h-full bg-gradient-to-r from-violet to-magenta"
+          style={{ width: `${value}%` }}
+        />
       </div>
-      <span className="w-8 text-right font-bold tabular-nums">{value}</span>
+      <span className="w-8 text-right font-semibold tabular-nums text-text">{value}</span>
     </div>
   );
 }
 
 function SmallKPI({ k, v }: { k: string; v: string }) {
   return (
-    <div className="border-2 border-ink bg-paper p-2">
-      <div className="font-mono text-[9px] uppercase tracking-widest text-ink/60">{k}</div>
-      <div className="font-display text-lg font-bold tabular-nums leading-none">{v}</div>
+    <div className="rounded-md border border-white/10 bg-white/[0.03] p-2">
+      <div className="font-mono text-[9px] uppercase tracking-widest text-muted">{k}</div>
+      <div className="font-display text-lg font-semibold tabular-nums leading-none text-text">
+        {v}
+      </div>
     </div>
   );
 }
