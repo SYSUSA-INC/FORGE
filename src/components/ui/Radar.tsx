@@ -71,10 +71,10 @@ export function Radar({
       {/* Data polygon */}
       <polygon
         points={polygon}
-        fill="#FFD500"
-        fillOpacity={0.55}
+        fill="#0A0A0A"
+        fillOpacity={0.08}
         stroke="#0A0A0A"
-        strokeWidth={2.5}
+        strokeWidth={2}
         strokeLinejoin="miter"
       />
 

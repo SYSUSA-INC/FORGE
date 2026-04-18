@@ -64,11 +64,11 @@ export function SideNav() {
                     <Link
                       href={item.href}
                       className={`relative flex items-center justify-between border-b border-ink/10 px-3 py-2.5 font-mono text-xs uppercase tracking-wider transition-colors ${
-                        active ? "bg-hazard font-bold text-ink" : "hover:bg-bone"
+                        active ? "bg-bone font-bold text-ink" : "hover:bg-bone/60"
                       }`}
                     >
                       {active ? (
-                        <span className="absolute inset-y-0 left-0 w-1 bg-ink" aria-hidden />
+                        <span className="absolute inset-y-0 left-0 w-1 bg-hazard" aria-hidden />
                       ) : null}
                       <span className="flex items-center gap-2">
                         <span
