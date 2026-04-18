@@ -18,16 +18,16 @@ const PHASES = [
   "SUBMITTED",
 ];
 
-const PHASE_TONE: Record<string, string> = {
-  PLANNING: "bg-paper",
+const PHASE_DOT: Record<string, string> = {
+  PLANNING: "bg-bone",
   OUTLINING: "bg-bone",
-  DRAFTING: "bg-cobalt text-paper",
+  DRAFTING: "bg-ink",
   PINK_TEAM: "bg-[#FF80A8]",
   REVISING: "bg-hazard",
-  RED_TEAM: "bg-blood text-paper",
+  RED_TEAM: "bg-blood",
   GOLD_TEAM: "bg-hazard",
-  FINAL_REVIEW: "bg-plum text-paper",
-  PRODUCTION: "bg-ink text-paper",
+  FINAL_REVIEW: "bg-ink",
+  PRODUCTION: "bg-ink",
   SUBMITTED: "bg-signal",
 };
 
@@ -36,7 +36,7 @@ export default function ProposalsListPage() {
     <>
       <PageHeader
         eyebrow="Proposals — Pipeline"
-        title="PROPOSALS"
+        title="Proposals"
         subtitle="Every active proposal across capture, drafting, review, and production."
         actions={
           <>
@@ -58,14 +58,17 @@ export default function ProposalsListPage() {
         <div className="grid grid-cols-10 divide-x-2 divide-ink">
           {PHASES.map((p) => {
             const items = proposals.filter((x) => x.status === p);
-            const tone = PHASE_TONE[p] ?? "bg-bone/40";
+            const dot = PHASE_DOT[p] ?? "bg-bone";
             return (
-              <div key={p} className="min-h-[220px] bg-bone/40">
-                <div
-                  className={`flex items-center justify-between border-b-2 border-ink px-2 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest ${tone}`}
-                >
-                  <span>{p.replace(/_/g, " ")}</span>
-                  <span className="opacity-70">{String(items.length).padStart(2, "0")}</span>
+              <div key={p} className="min-h-[220px] bg-paper">
+                <div className="flex items-center justify-between border-b-2 border-ink bg-paper px-2 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 border border-ink ${dot}`} />
+                    {p.replace(/_/g, " ")}
+                  </span>
+                  <span className="tabular-nums text-ink/60">
+                    {String(items.length).padStart(2, "0")}
+                  </span>
                 </div>
                 <div className="flex flex-col gap-2 p-1.5">
                   {items.map((pr) => (

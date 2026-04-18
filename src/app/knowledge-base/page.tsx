@@ -17,7 +17,7 @@ export default function KnowledgeBasePage() {
     <>
       <PageHeader
         eyebrow="Knowledge base — Corporate memory"
-        title="KNOWLEDGE BASE"
+        title="Knowledge base"
         subtitle="Embedded capabilities, past performance references, personnel, and boilerplate — semantically indexed with pgvector."
         actions={
           <>

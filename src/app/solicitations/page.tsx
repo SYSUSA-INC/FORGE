@@ -18,7 +18,7 @@ export default function SolicitationsListPage() {
     <>
       <PageHeader
         eyebrow="Solicitations — Intake & Triage"
-        title="SOLICITATIONS"
+        title="Solicitations"
         subtitle="Intake raw solicitation documents, extract Section L & M, and assign bid / no-bid decisions."
         actions={
           <>

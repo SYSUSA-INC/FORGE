@@ -10,41 +10,53 @@ export default function ExportPage({ params }: { params: { id: string } }) {
   return (
     <>
       <PageHeader
-        eyebrow={`Export · ${p.code}`}
+        eyebrow={`${p.code} · Export`}
         title="Export"
-        subtitle="PDF / DOCX production with exact formatting. Page limit, font, margin, and image-DPI gates."
+        subtitle="PDF and DOCX production with exact formatting. Page limit, font, margin, and image-DPI gates."
         actions={
           <>
             <button className="brut-btn">Preview</button>
             <button className="brut-btn">Format scan</button>
-            <button className="brut-btn-hazard">Build ZIP</button>
+            <button className="brut-btn-primary">Build ZIP</button>
           </>
         }
         meta={[
           {
             label: "Pages estimated",
             value: `${p.pagesEstimated} / ${p.pagesLimit}`,
-            accent: "hazard",
           },
-          { label: "Font", value: "TNR 12", accent: "signal" },
-          { label: "Margins", value: "1.0″", accent: "signal" },
+          { label: "Font", value: "TNR 12" },
+          { label: "Margins", value: "1.0″" },
           { label: "Image DPI", value: "300", accent: "signal" },
         ]}
       />
 
+      {/* Data-freshness bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-2 border-ink bg-bone px-4 py-2 font-mono text-[11px] text-ink/70">
+        <span>
+          Last production build{" "}
+          <span className="font-bold text-ink">12 min ago</span> · revision{" "}
+          <span className="font-bold text-ink">v12</span> · status{" "}
+          <span className="bg-signal px-1 font-bold text-ink">Pass</span>
+        </span>
+        <span className="flex items-center gap-3">
+          <span>Target submission: {p.dueAt}</span>
+        </span>
+      </div>
+
       {/* Manifest + queue */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
         <div className="border-2 border-ink bg-paper shadow-brut">
-          <div className="flex items-center justify-between border-b-2 border-ink bg-ink px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-paper">
+          <div className="flex items-center justify-between border-b-2 border-ink bg-paper px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em]">
             <span>Proposal manifest</span>
-            <span className="opacity-70">{p.code}</span>
+            <span className="text-ink/50">{p.code}</span>
           </div>
           <div className="grid grid-cols-1 gap-0 p-5 md:grid-cols-2">
             <div className="md:border-r-2 md:border-ink md:pr-5">
               <div className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
                 Proposal code
               </div>
-              <div className="font-display text-4xl font-bold leading-none tracking-tight">
+              <div className="font-display text-3xl font-bold tabular-nums leading-none tracking-tight">
                 {p.code}
               </div>
               <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink/60">
@@ -63,12 +75,12 @@ export default function ExportPage({ params }: { params: { id: string } }) {
               <div className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
                 Page budget
               </div>
-              <div className="flex items-end justify-between">
-                <div className="font-display text-5xl font-bold leading-none">
+              <div className="flex items-end gap-2">
+                <div className="font-display text-5xl font-bold tabular-nums leading-none">
                   {p.pagesEstimated}
                 </div>
-                <div className="pb-2 font-mono text-sm uppercase tracking-widest text-ink/60">
-                  / {p.pagesLimit}p
+                <div className="pb-2 font-display text-lg font-bold text-ink/50">
+                  / {p.pagesLimit}
                 </div>
               </div>
               <DotMeter
@@ -76,11 +88,12 @@ export default function ExportPage({ params }: { params: { id: string } }) {
                 max={p.pagesLimit}
                 steps={30}
                 filled={p.pagesEstimated > p.pagesLimit * 0.95 ? "bg-blood" : "bg-ink"}
+                className="mt-2"
               />
               <div className="mt-4 grid grid-cols-3 gap-1">
                 <Mini k="Revision" v="12" />
                 <Mini k="Volumes" v="05" />
-                <Mini k="Stamps" v="04" />
+                <Mini k="Attachments" v="04" />
               </div>
             </div>
           </div>
@@ -96,15 +109,15 @@ export default function ExportPage({ params }: { params: { id: string } }) {
 
           <div className="mt-4 border-2 border-ink bg-bone p-3 font-mono text-[10px] uppercase tracking-widest">
             <div className="flex items-center justify-between">
-              <span>Worker · 02</span>
+              <span>Worker 02</span>
               <span>3 jobs</span>
             </div>
-            <div className="mt-2 h-14 border-2 border-ink bg-paper">
+            <div className="mt-2 h-4 border-2 border-ink bg-paper">
               <div className="flex h-full">
-                <div className="bg-signal" style={{ width: "42%" }} />
-                <div className="bg-hazard" style={{ width: "18%" }} />
-                <div className="bg-blood" style={{ width: "10%" }} />
-                <div className="bg-bone" style={{ width: "30%" }} />
+                <div className="bg-signal" style={{ width: "42%" }} title="Done" />
+                <div className="bg-hazard" style={{ width: "18%" }} title="Running" />
+                <div className="bg-blood" style={{ width: "10%" }} title="Failed" />
+                <div className="bg-bone" style={{ width: "30%" }} title="Queued" />
               </div>
             </div>
             <div className="mt-1 flex items-center gap-3 text-[9px] text-ink/70">
@@ -159,11 +172,13 @@ export default function ExportPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <div className="font-display text-2xl font-bold leading-none">{b.p}</div>
+                  <div className="font-display text-2xl font-bold tabular-nums leading-none">
+                    {b.p}
+                  </div>
                   <div className="font-mono text-[9px] uppercase text-ink/60">Pages</div>
                 </div>
                 <div
-                  className={`border-2 border-ink px-2 py-1.5 text-center font-mono text-[11px] font-bold uppercase ${
+                  className={`border-2 border-ink px-2 py-1.5 text-center font-mono text-[11px] font-bold ${
                     b.c === "signal"
                       ? "bg-signal"
                       : b.c === "hazard"
@@ -185,36 +200,46 @@ export default function ExportPage({ params }: { params: { id: string } }) {
             <ul className="flex flex-col gap-2">
               {[
                 { k: "Page limit", v: "184 / 200", ok: true },
-                { k: "Font · Serif 12pt", v: "Pass", ok: true },
+                { k: "Font · Serif 12 pt", v: "Pass", ok: true },
                 { k: "Line spacing", v: "Single", ok: true },
                 { k: "Margins", v: "1.0″ all sides", ok: true },
                 { k: "Images · 300 DPI", v: "Pass", ok: true },
-                { k: "Tables · ≥10 pt", v: "Fail · Table 3-1 is 9pt", ok: false },
-                { k: "Headers · consistent", v: "Warn · §4.2 orphan", ok: false },
+                { k: "Tables · ≥10 pt", v: "Fail — Table 3-1 is 9 pt", ok: false },
+                { k: "Headers · consistent", v: "Warn — §4.2 orphan", ok: false },
                 { k: "File size · ≤100 MB", v: "74.2 MB", ok: true },
               ].map((g) => (
                 <li
                   key={g.k}
                   className={`grid grid-cols-[24px_1fr_auto] items-center gap-2 border-2 border-ink p-2 ${
-                    g.ok ? "bg-paper" : "bg-hazard"
+                    g.ok ? "bg-paper" : g.v.startsWith("Fail") ? "bg-paper" : "bg-paper"
                   }`}
                 >
                   <span
                     className={`grid h-5 w-5 place-items-center border-2 border-ink font-mono text-[11px] font-bold ${
-                      g.ok ? "bg-signal" : "bg-blood text-paper"
+                      g.ok
+                        ? "bg-signal"
+                        : g.v.startsWith("Fail")
+                          ? "bg-blood text-paper"
+                          : "bg-hazard"
                     }`}
                   >
-                    {g.ok ? "✓" : "!"}
+                    {g.ok ? "✓" : g.v.startsWith("Fail") ? "✕" : "!"}
                   </span>
                   <span className="font-mono text-[11px]">{g.k}</span>
-                  <span className="font-mono text-[11px] font-bold">{g.v}</span>
+                  <span
+                    className={`font-mono text-[11px] font-bold ${
+                      !g.ok && g.v.startsWith("Fail") ? "text-blood" : ""
+                    }`}
+                  >
+                    {g.v}
+                  </span>
                 </li>
               ))}
             </ul>
           </Panel>
 
           <Panel title="Export history">
-            <ul className="flex flex-col gap-1 font-mono text-[11px]">
+            <ul className="flex flex-col">
               {[
                 { n: "FRG-0042_VolI_v12.pdf", t: "12 min ago", s: "Pass", k: "signal" },
                 { n: "FRG-0042_VolI_v11.pdf", t: "3 h ago", s: "Warn", k: "hazard" },
@@ -223,10 +248,10 @@ export default function ExportPage({ params }: { params: { id: string } }) {
               ].map((h) => (
                 <li
                   key={h.n}
-                  className="grid grid-cols-[1fr_100px_90px] items-center gap-2 border-b border-ink/20 py-1.5"
+                  className="grid grid-cols-[1fr_100px_90px] items-center gap-2 border-b border-ink/15 py-2 font-mono text-[11px]"
                 >
                   <span className="truncate">{h.n}</span>
-                  <span className="text-[10px] text-ink/60">{h.t}</span>
+                  <span className="text-ink/60">{h.t}</span>
                   <span
                     className={`brut-chip ${
                       h.k === "signal"
@@ -253,11 +278,14 @@ export default function ExportPage({ params }: { params: { id: string } }) {
 function Queue({ label, pct }: { label: string; pct: number }) {
   return (
     <div>
-      <div className="flex justify-between">
+      <div className="flex items-center justify-between">
         <span>{label}</span>
-        <span className="font-bold">{pct}%</span>
+        <span className="font-bold tabular-nums">{pct}%</span>
       </div>
-      <BarMeter value={pct} color={pct === 100 ? "signal" : pct > 0 ? "hazard" : "bone"} />
+      <BarMeter
+        value={pct}
+        color={pct === 100 ? "signal" : pct > 0 ? "ink" : "bone"}
+      />
     </div>
   );
 }
@@ -275,7 +303,7 @@ function Mini({ k, v }: { k: string; v: string }) {
   return (
     <div className="border-2 border-ink bg-paper p-2 text-center">
       <div className="font-mono text-[9px] uppercase tracking-widest text-ink/60">{k}</div>
-      <div className="font-display text-xl font-bold leading-none">{v}</div>
+      <div className="font-display text-xl font-bold tabular-nums leading-none">{v}</div>
     </div>
   );
 }
