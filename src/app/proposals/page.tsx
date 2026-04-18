@@ -54,12 +54,7 @@ export default function ProposalsListPage() {
         ]}
       />
 
-      <Panel
-        title="Kanban — phase view"
-        code="PIPE-01"
-        dense
-        className="mb-6 overflow-hidden"
-      >
+      <Panel title="Kanban — phase view" dense className="mb-6 overflow-hidden">
         <div className="grid grid-cols-10 divide-x-2 divide-ink">
           {PHASES.map((p) => {
             const items = proposals.filter((x) => x.status === p);
@@ -106,7 +101,7 @@ export default function ProposalsListPage() {
         </div>
       </Panel>
 
-      <Panel title="Proposal register" code="PR-00" dense>
+      <Panel title="Proposal register" dense>
         <div className="grid grid-cols-[130px_1fr_140px_110px_120px_110px_100px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
           <div className="border-r border-paper/20 p-2">ID · status</div>
           <div className="border-r border-paper/20 p-2">Title / solicitation</div>
@@ -121,7 +116,7 @@ export default function ProposalsListPage() {
             key={p.id}
             className={`grid grid-cols-[130px_1fr_140px_110px_120px_110px_100px] items-center border-b-2 border-ink ${
               i % 2 ? "bg-bone" : "bg-paper"
-            } hover:bg-hazard/30`}
+            } hover:bg-bone/60`}
           >
             <div className="border-r-2 border-ink p-3">
               <div className="font-mono text-[10px] uppercase text-ink/60">{p.code}</div>

@@ -18,7 +18,7 @@ export default function NewProposalPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <Panel title="Link solicitation" code="SOL">
+        <Panel title="Link solicitation">
           <ul className="flex flex-col gap-2">
             {solicitations.slice(0, 4).map((s, i) => (
               <li
@@ -46,7 +46,7 @@ export default function NewProposalPage() {
           </ul>
         </Panel>
 
-        <Panel title="Proposal configuration" code="CFG">
+        <Panel title="Proposal configuration">
           <div className="grid grid-cols-2 gap-3">
             <F label="Proposal code" v="FRG-0043" />
             <F label="Capture manager" v="J. Calder" />

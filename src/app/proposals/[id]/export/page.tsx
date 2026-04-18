@@ -86,7 +86,7 @@ export default function ExportPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        <Panel title="Production queue" code="QUE">
+        <Panel title="Production queue">
           <div className="flex flex-col gap-2 font-mono text-[11px]">
             <Queue label="Puppeteer · HTML → PDF" pct={72} />
             <Queue label="DOCX emitter" pct={48} />
@@ -126,7 +126,7 @@ export default function ExportPage({ params }: { params: { id: string } }) {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <Panel title="Volume builds" code="BLD" dense>
+        <Panel title="Volume builds" dense>
           <div className="divide-y-2 divide-ink">
             {[
               { v: "Vol I", t: "Technical", p: 184, l: 200, s: "Building", c: "hazard" },
@@ -181,7 +181,7 @@ export default function ExportPage({ params }: { params: { id: string } }) {
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Format compliance" code="FMT">
+          <Panel title="Format compliance">
             <ul className="flex flex-col gap-2">
               {[
                 { k: "Page limit", v: "184 / 200", ok: true },
@@ -213,7 +213,7 @@ export default function ExportPage({ params }: { params: { id: string } }) {
             </ul>
           </Panel>
 
-          <Panel title="Export history" code="HST">
+          <Panel title="Export history">
             <ul className="flex flex-col gap-1 font-mono text-[11px]">
               {[
                 { n: "FRG-0042_VolI_v12.pdf", t: "12 min ago", s: "Pass", k: "signal" },

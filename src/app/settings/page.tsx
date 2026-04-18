@@ -28,7 +28,7 @@ export default function SettingsPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Panel title="Organization" code="ORG">
+        <Panel title="Organization">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Legal name" value="SYSUSA Inc." />
             <Field label="DUNS / UEI" value="UEI: J9K8H7L5M2N3" />
@@ -41,7 +41,7 @@ export default function SettingsPage() {
           </div>
         </Panel>
 
-        <Panel title="AI engine" code="AI">
+        <Panel title="AI engine">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Primary model" value="Claude Sonnet 4.6" />
             <Field label="High-stakes model" value="Claude Opus 4.7" accent="bg-hazard" />
@@ -58,7 +58,7 @@ export default function SettingsPage() {
           </div>
         </Panel>
 
-        <Panel title="Integrations" code="INT">
+        <Panel title="Integrations">
           <ul className="flex flex-col gap-2">
             {[
               { n: "SAM.gov", s: "Connected", ok: true },
@@ -84,7 +84,7 @@ export default function SettingsPage() {
           </ul>
         </Panel>
 
-        <Panel title="Users & roles" code="USR">
+        <Panel title="Users & roles">
           <ul className="flex flex-col gap-1 font-mono text-[11px]">
             {[
               ["J. Calder", "Capture manager"],

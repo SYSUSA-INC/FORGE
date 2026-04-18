@@ -20,38 +20,56 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
   return (
     <>
       <PageHeader
-        eyebrow={`Compliance · ${p.code}`}
+        eyebrow={`${p.code} · Compliance`}
         title="Compliance"
         subtitle="Requirements extracted from Section L / M mapped to proposal sections, with live gap analysis."
         actions={
           <>
             <button className="brut-btn">Run AI check</button>
             <button className="brut-btn">Export XLSX</button>
-            <button className="brut-btn-hazard">Auto-assign</button>
+            <button className="brut-btn-primary">Auto-assign</button>
           </>
         }
         meta={[
           { label: "Overall", value: `${p.compliancePct}%`, accent: "signal" },
-          { label: "Mandatory", value: "46 / 52", accent: "hazard" },
+          { label: "Mandatory", value: "46 / 52" },
           { label: "Gaps", value: "06", accent: "blood" },
           { label: "Verified", value: "18" },
         ]}
       />
 
+      {/* Data-freshness bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-2 border-ink bg-bone px-4 py-2 font-mono text-[11px] text-ink/70">
+        <span>
+          Matrix last rebuilt{" "}
+          <span className="font-bold text-ink">4 min ago</span> against solicitation{" "}
+          <span className="font-bold text-ink">{p.solicitation}</span>, amendment 04.
+        </span>
+        <span className="flex items-center gap-3">
+          <span>Target ≥ 95%</span>
+          <span className="text-ink/40">·</span>
+          <span>
+            Trend <span className="bg-signal px-1 font-bold text-ink">▲ +4.1 WoW</span>
+          </span>
+        </span>
+      </div>
+
       {/* Summary row */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_2fr]">
         <div className="border-2 border-ink bg-paper shadow-brut">
-          <header className="flex items-center justify-between border-b-2 border-ink bg-ink px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-paper">
+          <header className="flex items-center justify-between border-b-2 border-ink bg-paper px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em]">
             <span>Overall compliance</span>
-            <span className="opacity-70">GAUGE</span>
+            <span className="text-ink/50">Target ≥ 95%</span>
           </header>
           <div className="p-5">
-            <div className="flex items-end justify-between">
-              <div className="font-display text-7xl font-bold leading-none">
-                {p.compliancePct}%
+            <div className="flex items-end gap-3">
+              <div className="font-display text-6xl font-bold tabular-nums leading-none">
+                {p.compliancePct}
               </div>
-              <div className="pb-2 font-mono text-xs uppercase tracking-widest text-ink/60">
-                Target ≥ 95%
+              <div className="pb-2 font-display text-2xl font-bold text-ink/50">%</div>
+              <div className="ml-auto pb-2 text-right font-mono text-[10px] uppercase tracking-widest text-ink/60">
+                <div>46 / 52 mandatory</div>
+                <div className="mt-0.5">6 open gaps</div>
               </div>
             </div>
             <DotMeter
@@ -59,7 +77,7 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
               steps={30}
               filled="bg-ink"
               empty="bg-paper"
-              className="mt-3"
+              className="mt-4"
             />
             <div className="mt-4 grid grid-cols-3 gap-2">
               <Gauge k="Mandatory" n="46 / 52" />
@@ -94,10 +112,10 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
                           : "bg-bone"
                 }`}
               >
-                {k.replace("_", " ")}
+                {k.replace("_", " ").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())}
               </div>
               <div className="p-3">
-                <div className="font-display text-4xl font-bold leading-none">
+                <div className="font-display text-4xl font-bold tabular-nums leading-none">
                   {String(buckets[k as keyof typeof buckets]).padStart(2, "0")}
                 </div>
                 <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">
@@ -110,7 +128,7 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
-        <Panel title="Compliance matrix" code="MTX" dense>
+        <Panel title="Compliance matrix" dense>
           <div className="grid grid-cols-[80px_130px_1fr_180px_130px_120px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
             <div className="border-r border-paper/20 p-2">Ref</div>
             <div className="border-r border-paper/20 p-2">Category</div>
@@ -143,7 +161,7 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
         </Panel>
 
         <aside className="flex flex-col gap-4">
-          <Panel title="Gap analysis" code="GAP">
+          <Panel title="Gap analysis">
             <ul className="flex flex-col gap-2">
               {requirements
                 .filter(
@@ -175,7 +193,7 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
             </ul>
           </Panel>
 
-          <Panel title="Volume health" code="VOL">
+          <Panel title="Volume health">
             <div className="flex flex-col gap-3 font-mono text-[11px]">
               <div>
                 <div className="flex items-center justify-between">
@@ -208,7 +226,7 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
             </div>
           </Panel>
 
-          <Panel title="Format gates" code="FMT">
+          <Panel title="Format gates">
             <ul className="flex flex-col gap-1 font-mono text-[11px]">
               {[
                 { k: "Page limit · 200", v: "184 · OK", ok: true },

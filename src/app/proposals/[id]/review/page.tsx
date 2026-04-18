@@ -75,7 +75,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
-        <Panel title="Comments · Pink cycle" code="CMT" dense>
+        <Panel title="Comments · Pink cycle" dense>
           <div className="grid grid-cols-[90px_110px_110px_1fr_130px_120px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
             <div className="border-r border-paper/20 p-2">ID</div>
             <div className="border-r border-paper/20 p-2">Severity</div>
@@ -118,7 +118,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
         </Panel>
 
         <aside className="flex flex-col gap-4">
-          <Panel title="Reviewers" code="USR">
+          <Panel title="Reviewers">
             <ul className="flex flex-col gap-2 font-mono text-[11px]">
               {[
                 { i: "AB", n: "A. Brahms", r: "Lead", c: 18 },
@@ -142,7 +142,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
             </ul>
           </Panel>
 
-          <Panel title="Burn-down · 7 days" code="BRN">
+          <Panel title="Burn-down · 7 days">
             <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-widest">
               <span>Open</span>
               <span className="font-bold">−36%</span>
@@ -163,7 +163,7 @@ export default function ReviewPage({ params }: { params: { id: string } }) {
             </div>
           </Panel>
 
-          <Panel title="AI Red Team" code="ARG">
+          <Panel title="AI Red Team">
             <p className="font-mono text-[11px] leading-relaxed">
               Run Claude in <b>Government Evaluator</b> mode against the current draft.
               Produces simulated SSEB findings against Section M criteria.

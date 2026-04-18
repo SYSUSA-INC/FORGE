@@ -68,7 +68,7 @@ export default function KnowledgeBasePage() {
       </div>
 
       <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr_1fr]">
-        <Panel title="Embedding field" code="EMB">
+        <Panel title="Embedding field">
           <EmbeddingField />
           <div className="mt-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-ink/60">
             <span>1,024 dims · down-projected</span>
@@ -76,7 +76,7 @@ export default function KnowledgeBasePage() {
           </div>
         </Panel>
 
-        <Panel title="Corpus map" code="MAP">
+        <Panel title="Corpus map">
           <ul className="flex flex-col gap-2 font-mono text-[11px]">
             {[
               { k: "Capability", v: 144 },
@@ -95,7 +95,7 @@ export default function KnowledgeBasePage() {
           </ul>
         </Panel>
 
-        <Panel title="Vector health" code="VEC">
+        <Panel title="Vector health">
           <div className="flex flex-col gap-3 font-mono text-[11px]">
             <Health label="Index coverage" v={96} color="signal" />
             <Health label="Retrieval hit rate" v={78} color="hazard" />
@@ -115,7 +115,7 @@ export default function KnowledgeBasePage() {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
-        <Panel title="Entries" code="IDX" dense>
+        <Panel title="Entries" dense>
           <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 xl:grid-cols-3">
             {kb.map((e) => (
               <div
@@ -164,7 +164,7 @@ export default function KnowledgeBasePage() {
         </Panel>
 
         <aside className="flex flex-col gap-4">
-          <Panel title="Top tags · 30d" code="TAG">
+          <Panel title="Top tags · 30d">
             <ul className="flex flex-wrap gap-1">
               {[
                 "NAVSEA",
@@ -189,7 +189,7 @@ export default function KnowledgeBasePage() {
             </ul>
           </Panel>
 
-          <Panel title="Recent imports" code="IMP">
+          <Panel title="Recent imports">
             <ul className="flex flex-col gap-1 font-mono text-[11px]">
               {[
                 "Résumé · Dr. H. Bray · 1 h",
@@ -204,7 +204,7 @@ export default function KnowledgeBasePage() {
             </ul>
           </Panel>
 
-          <Panel title="Audit trail" code="AUD">
+          <Panel title="Audit trail">
             <p className="font-mono text-[11px] leading-relaxed">
               Every retrieval is logged with <b>query hash</b>, <b>retrieval set</b>, and{" "}
               <b>confidence</b>, supporting federal AI audit requirements.

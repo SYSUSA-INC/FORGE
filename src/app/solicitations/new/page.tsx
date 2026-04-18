@@ -11,7 +11,7 @@ export default function NewSolicitationPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-        <Panel title="Upload" code="FX">
+        <Panel title="Upload">
           <div className="relative grid place-items-center border-4 border-dashed border-ink bg-bone p-12 text-center">
             <div className="font-display text-3xl font-bold">Drop files here</div>
             <div className="mt-2 font-mono text-[11px] uppercase tracking-widest text-ink/60">
@@ -29,7 +29,7 @@ export default function NewSolicitationPage() {
           </div>
         </Panel>
 
-        <Panel title="Pipeline" code="PL">
+        <Panel title="Pipeline">
           <ol className="relative ml-2 flex flex-col gap-5 border-l-4 border-ink pl-4 font-mono text-[11px]">
             {[
               ["Upload", "Raw files accepted"],

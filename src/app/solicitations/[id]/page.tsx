@@ -44,7 +44,7 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4">
-          <Panel title="Section L · Instructions to offerors" code="L" accent="ink">
+          <Panel title="Section L · Instructions to offerors" accent="ink">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Bucket label="Mandatory" n={mandatory} tone="blood" />
               <Bucket label="Desired" n={desired} tone="hazard" />
@@ -68,7 +68,7 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
             </div>
           </Panel>
 
-          <Panel title="Section M · Evaluation criteria" code="M">
+          <Panel title="Section M · Evaluation criteria">
             <ul className="flex flex-col divide-y-2 divide-ink border-2 border-ink">
               {[
                 { f: "Factor 1", t: "Technical approach", w: 40 },
@@ -91,7 +91,7 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
             </ul>
           </Panel>
 
-          <Panel title="Requirement matrix — preview" code="REQ" dense>
+          <Panel title="Requirement matrix — preview" dense>
             <div className="grid grid-cols-[80px_140px_1fr_160px_140px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
               <div className="border-r border-paper/20 p-2">Ref</div>
               <div className="border-r border-paper/20 p-2">Category</div>
@@ -125,7 +125,7 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
         </div>
 
         <div className="flex flex-col gap-4">
-          <Panel title="File intake" code="FX">
+          <Panel title="File intake">
             <ul className="flex flex-col gap-2">
               {[
                 { n: "RFP_BASE.pdf", t: "Base RFP", s: "4.2 MB", ok: true },
@@ -156,7 +156,7 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
             </ul>
           </Panel>
 
-          <Panel title="Bid decision" code="GO/NO-GO">
+          <Panel title="Bid decision">
             <div className="grid grid-cols-3 gap-2">
               <button className="brut-btn bg-signal text-ink">Bid</button>
               <button className="brut-btn bg-hazard">Review</button>
@@ -184,7 +184,7 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
             </div>
           </Panel>
 
-          <Panel title="Timeline" code="TM">
+          <Panel title="Timeline">
             <ol className="relative ml-2 flex flex-col gap-4 border-l-4 border-ink pl-4">
               {[
                 { d: "Mar 18", t: "Posted to SAM.gov", done: true },

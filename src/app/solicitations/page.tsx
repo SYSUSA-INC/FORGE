@@ -77,7 +77,7 @@ export default function SolicitationsListPage() {
 
       {/* Triptych: P(WIN) spectrum / agency heat / intake velocity */}
       <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Panel title="P(win) distribution" code="PW-01">
+        <Panel title="P(win) distribution">
           <div className="flex items-end gap-2">
             {buckets.map((n, i) => (
               <div key={i} className="flex flex-1 flex-col items-center">
@@ -102,7 +102,7 @@ export default function SolicitationsListPage() {
           </div>
         </Panel>
 
-        <Panel title="Agency × NAICS" code="AX-01">
+        <Panel title="Agency × NAICS">
           <HeatGrid
             rows={["Navy", "Army", "GSA", "DOS", "HHS"]}
             cols={["541511", "541512", "541519", "541330", "Other"]}
@@ -116,7 +116,7 @@ export default function SolicitationsListPage() {
           />
         </Panel>
 
-        <Panel title="Intake velocity · 14d" code="IN-01">
+        <Panel title="Intake velocity · 14d">
           <div className="mb-2 flex items-end justify-between">
             <div className="font-display text-5xl font-bold leading-none">47</div>
             <span className="brut-chip bg-signal">+12 WoW</span>
@@ -152,7 +152,7 @@ export default function SolicitationsListPage() {
         </Panel>
       </section>
 
-      <Panel title="Solicitation register" code="SOL-00" dense>
+      <Panel title="Solicitation register" dense>
         <div className="grid grid-cols-[120px_1fr_140px_100px_120px_120px_100px_110px] items-stretch border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
           <div className="border-r border-paper/20 p-2">Type · ID</div>
           <div className="border-r border-paper/20 p-2">Title / agency</div>
@@ -169,7 +169,7 @@ export default function SolicitationsListPage() {
             key={s.id}
             className={`grid grid-cols-[120px_1fr_140px_100px_120px_120px_100px_110px] items-center border-b-2 border-ink ${
               i % 2 ? "bg-bone" : "bg-paper"
-            } hover:bg-hazard/30`}
+            } hover:bg-bone/60`}
           >
             <div className="border-r-2 border-ink p-3">
               <div className="brut-pill bg-paper">{s.type}</div>
