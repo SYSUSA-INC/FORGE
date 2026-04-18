@@ -35,31 +35,28 @@ export default function ProposalsListPage() {
   return (
     <>
       <PageHeader
-        eyebrow="PRP // PROPOSAL PIPELINE"
-        title="PROPOSAL"
+        eyebrow="Proposals — Pipeline"
+        title="PROPOSALS"
         subtitle="Every active proposal across capture, drafting, review, and production."
-        barcode="PRP-LIST-0042"
-        stamp={{ label: "PIPELINE HOT", tone: "blood" }}
         actions={
           <>
-            <button className="brut-btn">EXPORT CSV</button>
+            <button className="brut-btn">Export CSV</button>
             <Link href="/proposals/new" className="brut-btn-hazard">
-              + NEW PROPOSAL
+              + New proposal
             </Link>
           </>
         }
         meta={[
-          { label: "TOTAL", value: String(proposals.length).padStart(2, "0") },
-          { label: "IN DRAFT", value: "01", accent: "hazard" },
-          { label: "IN REVIEW", value: "02", accent: "signal" },
-          { label: "AT RISK", value: "01", accent: "blood" },
+          { label: "Total", value: String(proposals.length).padStart(2, "0") },
+          { label: "In draft", value: "01", accent: "hazard" },
+          { label: "In review", value: "02", accent: "signal" },
+          { label: "At risk", value: "01", accent: "blood" },
         ]}
       />
 
       <Panel
-        title="KANBAN · PHASE VIEW"
+        title="Kanban — phase view"
         code="PIPE-01"
-        accent="plum"
         dense
         className="mb-6 overflow-hidden"
       >
@@ -95,7 +92,7 @@ export default function ProposalsListPage() {
                               : "bg-paper"
                         }`}
                       >
-                        T-{pr.daysLeft}D
+                        {pr.daysLeft}d
                       </div>
                       <div className="mt-2">
                         <BarMeter value={pr.progress} color="ink" />
@@ -109,15 +106,15 @@ export default function ProposalsListPage() {
         </div>
       </Panel>
 
-      <Panel title="PROPOSAL REGISTER" code="PR-00" dense>
+      <Panel title="Proposal register" code="PR-00" dense>
         <div className="grid grid-cols-[130px_1fr_140px_110px_120px_110px_100px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
-          <div className="border-r border-paper/20 p-2">ID · STATUS</div>
-          <div className="border-r border-paper/20 p-2">TITLE / SOL</div>
-          <div className="border-r border-paper/20 p-2">DUE</div>
-          <div className="border-r border-paper/20 p-2">PROGRESS</div>
-          <div className="border-r border-paper/20 p-2">COMPLIANCE</div>
-          <div className="border-r border-paper/20 p-2">PAGES</div>
-          <div className="p-2">OPEN</div>
+          <div className="border-r border-paper/20 p-2">ID · status</div>
+          <div className="border-r border-paper/20 p-2">Title / solicitation</div>
+          <div className="border-r border-paper/20 p-2">Due</div>
+          <div className="border-r border-paper/20 p-2">Progress</div>
+          <div className="border-r border-paper/20 p-2">Compliance</div>
+          <div className="border-r border-paper/20 p-2">Pages</div>
+          <div className="p-2">Open</div>
         </div>
         {proposals.map((p, i) => (
           <div
@@ -144,7 +141,7 @@ export default function ProposalsListPage() {
             <div className="border-r-2 border-ink p-3 font-mono text-[11px]">
               <div className="font-bold uppercase">{p.dueAt.split(" ")[0]}</div>
               <div
-                className={`brut-stencil mt-1 border-2 border-ink px-1.5 py-0.5 text-center text-xl leading-none ${
+                className={`mt-1 border-2 border-ink px-1.5 py-0.5 text-center font-display text-lg font-bold leading-none ${
                   p.daysLeft < 5
                     ? "bg-blood text-paper"
                     : p.daysLeft < 15
@@ -152,7 +149,7 @@ export default function ProposalsListPage() {
                       : "bg-paper"
                 }`}
               >
-                T-{p.daysLeft}D
+                {p.daysLeft}d
               </div>
             </div>
             <div className="border-r-2 border-ink p-3">
@@ -178,7 +175,7 @@ export default function ProposalsListPage() {
                 href={`/proposals/${p.id}/editor`}
                 className="brut-btn w-full px-2 py-1 text-[10px]"
               >
-                OPEN →
+                Open
               </Link>
             </div>
           </div>

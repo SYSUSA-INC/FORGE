@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/", label: "Command", code: "CMD", group: "ops", hot: true },
+  { href: "/", label: "Command", code: "CMD", group: "ops" },
   { href: "/solicitations", label: "Solicitations", code: "SOL", group: "ops" },
   { href: "/proposals", label: "Proposals", code: "PRP", group: "ops" },
   { href: "/proposals/FRG-0042/editor", label: "Editor", code: "EDT", group: "build" },
-  { href: "/proposals/FRG-0042/compliance", label: "Compliance", code: "CMP", group: "build", hot: true },
+  { href: "/proposals/FRG-0042/compliance", label: "Compliance", code: "CMP", group: "build" },
   { href: "/proposals/FRG-0042/review", label: "Review", code: "RVW", group: "build" },
   { href: "/proposals/FRG-0042/export", label: "Export", code: "EXP", group: "build" },
   { href: "/knowledge-base", label: "Knowledge Base", code: "KB", group: "intel" },
@@ -21,12 +21,6 @@ const GROUPS: Record<string, string> = {
   intel: "INTELLIGENCE",
 };
 
-const GROUP_ACCENT: Record<string, string> = {
-  ops: "bg-ink text-paper",
-  build: "bg-blood text-paper",
-  intel: "bg-cobalt text-paper",
-};
-
 export function SideNav() {
   const pathname = usePathname();
   const groupOrder = ["ops", "build", "intel"];
@@ -36,13 +30,11 @@ export function SideNav() {
       <nav className="flex h-full flex-col">
         {groupOrder.map((g) => (
           <div key={g} className="border-b-2 border-ink">
-            <div
-              className={`flex items-center justify-between border-b-2 border-ink px-3 py-1.5 ${GROUP_ACCENT[g]}`}
-            >
+            <div className="flex items-center justify-between border-b-2 border-ink bg-ink px-3 py-1.5 text-paper">
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em]">
                 {GROUPS[g]}
               </span>
-              <span className="font-mono text-[10px] opacity-60">
+              <span className="font-mono text-[10px] text-paper/60">
                 {NAV.filter((n) => n.group === g).length.toString().padStart(2, "0")}
               </span>
             </div>
@@ -72,24 +64,17 @@ export function SideNav() {
                     <Link
                       href={item.href}
                       className={`relative flex items-center justify-between border-b border-ink/10 px-3 py-2.5 font-mono text-xs uppercase tracking-wider transition-colors ${
-                        active
-                          ? "bg-hazard font-bold text-ink"
-                          : "hover:translate-x-0.5 hover:bg-bone"
+                        active ? "bg-hazard font-bold text-ink" : "hover:bg-bone"
                       }`}
                     >
                       {active ? (
-                        <span className="absolute inset-y-0 left-0 w-1.5 bg-ink" aria-hidden />
+                        <span className="absolute inset-y-0 left-0 w-1 bg-ink" aria-hidden />
                       ) : null}
                       <span className="flex items-center gap-2">
                         <span
-                          className={`h-2 w-2 border border-ink ${
-                            active ? "bg-ink" : "bg-transparent"
-                          }`}
+                          className={`h-2 w-2 border border-ink ${active ? "bg-ink" : "bg-transparent"}`}
                         />
                         {item.label}
-                        {"hot" in item && item.hot ? (
-                          <span className="ml-1 inline-block h-1.5 w-1.5 animate-blink bg-blood" />
-                        ) : null}
                       </span>
                       <span className="text-[10px] text-ink/50">{item.code}</span>
                     </Link>
@@ -101,26 +86,18 @@ export function SideNav() {
         ))}
 
         <div className="mt-auto border-t-2 border-ink p-3">
-          {/* Mini agency load viz */}
-          <div className="brut-label mb-1">AGENCY LOAD</div>
+          <div className="brut-label">Weekly activity</div>
           <div className="grid grid-cols-7 gap-[2px]">
             {[4, 3, 5, 2, 1, 2, 0].map((v, i) => (
               <div
                 key={i}
-                className={`h-6 border border-ink ${
-                  v >= 4 ? "bg-blood" : v >= 2 ? "bg-hazard" : v > 0 ? "bg-bone" : "bg-paper"
-                }`}
-                style={{ opacity: 0.35 + v * 0.15 }}
+                className="h-6 border border-ink bg-ink"
+                style={{ opacity: 0.15 + v * 0.12 }}
               />
             ))}
           </div>
           <div className="mt-2 font-mono text-[9px] uppercase tracking-widest text-ink/60">
-            MON TUE WED THU FRI SAT SUN
-          </div>
-          <div className="brut-diagonal-hazard mt-3 h-5 w-full border-2 border-ink" />
-          <div className="mt-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-ink/60">
-            <span>CLASS · CUI</span>
-            <span>FOUO</span>
+            Mon · Tue · Wed · Thu · Fri · Sat · Sun
           </div>
         </div>
       </nav>

@@ -3,7 +3,6 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { BarMeter } from "@/components/ui/BarMeter";
 import { DotMeter } from "@/components/ui/DotMeter";
-import { Perforation } from "@/components/ui/Perforation";
 import { proposals, requirements } from "@/lib/mock";
 
 export default function CompliancePage({ params }: { params: { id: string } }) {
@@ -21,62 +20,53 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
   return (
     <>
       <PageHeader
-        eyebrow={`CMP // ${p.code} · COMPLIANCE MATRIX`}
-        title="COMPLY"
-        subtitle="Requirements extracted from Section L/M mapped to proposal sections. Gap analysis live."
-        barcode={`${p.code}-CMP`}
-        stamp={{
-          label: p.compliancePct >= 90 ? "CLEAR TO SUBMIT" : "GAPS FOUND",
-          tone: p.compliancePct >= 90 ? "signal" : "blood",
-        }}
+        eyebrow={`Compliance · ${p.code}`}
+        title="Compliance"
+        subtitle="Requirements extracted from Section L / M mapped to proposal sections, with live gap analysis."
         actions={
           <>
-            <button className="brut-btn">RUN AI CHECK</button>
-            <button className="brut-btn">EXPORT XLSX</button>
-            <button className="brut-btn-hazard">AUTO-ASSIGN</button>
+            <button className="brut-btn">Run AI check</button>
+            <button className="brut-btn">Export XLSX</button>
+            <button className="brut-btn-hazard">Auto-assign</button>
           </>
         }
         meta={[
-          { label: "OVERALL", value: `${p.compliancePct}%`, accent: "signal" },
-          { label: "MANDATORY", value: "46/52", accent: "hazard" },
-          { label: "GAPS", value: "06", accent: "blood" },
-          { label: "VERIFIED", value: "18" },
+          { label: "Overall", value: `${p.compliancePct}%`, accent: "signal" },
+          { label: "Mandatory", value: "46 / 52", accent: "hazard" },
+          { label: "Gaps", value: "06", accent: "blood" },
+          { label: "Verified", value: "18" },
         ]}
       />
 
-      {/* HERO COMPLIANCE GAUGE + BUCKET STRIP */}
-      <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_2fr]">
-        <div className="relative border-2 border-ink bg-ink p-6 text-paper shadow-brut-xl">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.3em] text-paper/70">
-            [GAUGE] OVERALL COMPLIANCE
-          </div>
-          <div className="flex items-end justify-between">
-            <div className="brut-stencil text-[140px] leading-[0.82] text-hazard">
-              {p.compliancePct}
+      {/* Summary row */}
+      <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_2fr]">
+        <div className="border-2 border-ink bg-paper shadow-brut">
+          <header className="flex items-center justify-between border-b-2 border-ink bg-ink px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-paper">
+            <span>Overall compliance</span>
+            <span className="opacity-70">GAUGE</span>
+          </header>
+          <div className="p-5">
+            <div className="flex items-end justify-between">
+              <div className="font-display text-7xl font-bold leading-none">
+                {p.compliancePct}%
+              </div>
+              <div className="pb-2 font-mono text-xs uppercase tracking-widest text-ink/60">
+                Target ≥ 95%
+              </div>
             </div>
-            <div className="pb-3 font-mono text-sm uppercase tracking-widest text-paper/70">
-              / 100%
+            <DotMeter
+              value={p.compliancePct}
+              steps={30}
+              filled="bg-ink"
+              empty="bg-paper"
+              className="mt-3"
+            />
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <Gauge k="Mandatory" n="46 / 52" />
+              <Gauge k="Critical gaps" n="06" tone="blood" />
+              <Gauge k="Verified" n="18" tone="signal" />
             </div>
           </div>
-          <DotMeter
-            value={p.compliancePct}
-            steps={30}
-            filled="bg-hazard"
-            highlight="bg-signal"
-            empty="bg-ink"
-            className="mt-2 border-paper/30 bg-ink"
-          />
-          <div className="mt-4 grid grid-cols-3 gap-2 text-paper">
-            <Gauge k="MANDATORY" n="46/52" tone="hazard" />
-            <Gauge k="CRITICAL GAPS" n="06" tone="blood" />
-            <Gauge k="VERIFIED" n="18" tone="signal" />
-          </div>
-          <span
-            className="pointer-events-none absolute -right-3 -top-3 border-[3px] border-blood bg-paper px-2 py-1 font-display text-[11px] font-black uppercase tracking-[0.22em] text-blood"
-            style={{ transform: "rotate(6deg)" }}
-          >
-            ✦ GO/NO-GO ✦
-          </span>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -107,10 +97,12 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
                 {k.replace("_", " ")}
               </div>
               <div className="p-3">
-                <div className="brut-stencil text-5xl leading-none">
+                <div className="font-display text-4xl font-bold leading-none">
                   {String(buckets[k as keyof typeof buckets]).padStart(2, "0")}
                 </div>
-                <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">REQS</div>
+                <div className="mt-1 font-mono text-[10px] uppercase text-ink/60">
+                  requirements
+                </div>
               </div>
             </div>
           ))}
@@ -118,23 +110,21 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
-        <Panel title="COMPLIANCE MATRIX" code="MTX" dense>
+        <Panel title="Compliance matrix" code="MTX" dense>
           <div className="grid grid-cols-[80px_130px_1fr_180px_130px_120px] border-b-2 border-ink bg-ink font-mono text-[10px] uppercase tracking-[0.2em] text-paper">
-            <div className="border-r border-paper/20 p-2">REF</div>
-            <div className="border-r border-paper/20 p-2">CATEGORY</div>
-            <div className="border-r border-paper/20 p-2">REQUIREMENT</div>
-            <div className="border-r border-paper/20 p-2">MAPPED SECTION</div>
-            <div className="border-r border-paper/20 p-2">ASSIGNEE</div>
-            <div className="p-2">COMPLIANCE</div>
+            <div className="border-r border-paper/20 p-2">Ref</div>
+            <div className="border-r border-paper/20 p-2">Category</div>
+            <div className="border-r border-paper/20 p-2">Requirement</div>
+            <div className="border-r border-paper/20 p-2">Mapped section</div>
+            <div className="border-r border-paper/20 p-2">Assignee</div>
+            <div className="p-2">Compliance</div>
           </div>
           {requirements.map((r, i) => (
             <div
               key={r.id}
               className={`grid grid-cols-[80px_130px_1fr_180px_130px_120px] border-b-2 border-ink ${
                 i % 2 ? "bg-bone" : "bg-paper"
-              } ${
-                r.compliance === "NOT_ADDRESSED" ? "ring-2 ring-inset ring-blood" : ""
-              }`}
+              } ${r.compliance === "NOT_ADDRESSED" ? "ring-2 ring-inset ring-blood" : ""}`}
             >
               <div className="border-r-2 border-ink p-3 font-mono text-[11px] font-bold">
                 {r.ref}
@@ -153,7 +143,7 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
         </Panel>
 
         <aside className="flex flex-col gap-4">
-          <Panel title="GAP ANALYSIS" code="GAP" accent="blood">
+          <Panel title="Gap analysis" code="GAP">
             <ul className="flex flex-col gap-2">
               {requirements
                 .filter(
@@ -165,9 +155,10 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
                     className="relative border-2 border-ink bg-paper p-2 font-mono text-[11px]"
                   >
                     <span
-                      className={`absolute left-0 top-0 h-full w-1.5 ${
+                      className={`absolute left-0 top-0 h-full w-1 ${
                         r.compliance === "NOT_ADDRESSED" ? "bg-blood" : "bg-hazard"
                       }`}
+                      aria-hidden
                     />
                     <div className="flex items-center justify-between pl-2">
                       <span className="font-bold">{r.ref}</span>
@@ -176,63 +167,61 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
                     <div className="mt-1 pl-2 text-[11px] leading-snug">
                       {r.text.slice(0, 120)}…
                     </div>
-                    <div className="mt-1 pl-2 text-[9px] uppercase text-ink/60">{r.section}</div>
+                    <div className="mt-1 pl-2 text-[9px] uppercase text-ink/60">
+                      {r.section}
+                    </div>
                   </li>
                 ))}
             </ul>
           </Panel>
 
-          <Panel title="VOLUME HEALTH" code="VOL" accent="hazard">
+          <Panel title="Volume health" code="VOL">
             <div className="flex flex-col gap-3 font-mono text-[11px]">
               <div>
                 <div className="flex items-center justify-between">
-                  <span>VOL I · TECHNICAL</span>
+                  <span>Vol I · Technical</span>
                   <span className="font-bold">78%</span>
                 </div>
                 <BarMeter value={78} color="signal" />
               </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <span>VOL II · MGMT</span>
+                  <span>Vol II · Management</span>
                   <span className="font-bold">84%</span>
                 </div>
                 <BarMeter value={84} color="signal" />
               </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <span>VOL III · PAST PERF</span>
+                  <span>Vol III · Past performance</span>
                   <span className="font-bold">62%</span>
                 </div>
                 <BarMeter value={62} color="hazard" />
               </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <span>VOL IV · PRICE</span>
+                  <span>Vol IV · Price</span>
                   <span className="font-bold">0%</span>
                 </div>
                 <BarMeter value={2} color="blood" />
               </div>
             </div>
-            <Perforation className="my-3" />
-            <div className="text-center font-mono text-[10px] uppercase tracking-widest text-ink/60">
-              AVG · {p.compliancePct}%
-            </div>
           </Panel>
 
-          <Panel title="FORMAT GATES" code="FMT" accent="ink">
+          <Panel title="Format gates" code="FMT">
             <ul className="flex flex-col gap-1 font-mono text-[11px]">
               {[
-                { k: "PAGE LIMIT · 200", v: "184 · OK", ok: true },
-                { k: "FONT · TNR 12", v: "PASS", ok: true },
-                { k: "MARGINS · 1.0in", v: "PASS", ok: true },
-                { k: "TABLE FONT · ≥10", v: "WARN · 9pt in T3-1", ok: false },
-                { k: "IMAGES · 300dpi", v: "PASS", ok: true },
+                { k: "Page limit · 200", v: "184 · OK", ok: true },
+                { k: "Font · TNR 12", v: "Pass", ok: true },
+                { k: "Margins · 1.0 in", v: "Pass", ok: true },
+                { k: "Table font · ≥10", v: "Warn · 9pt in T3-1", ok: false },
+                { k: "Images · 300 dpi", v: "Pass", ok: true },
               ].map((g) => (
                 <li
                   key={g.k}
                   className="flex items-center justify-between border-b border-ink/20 py-1"
                 >
-                  <span className="uppercase">{g.k}</span>
+                  <span>{g.k}</span>
                   <span className={`brut-chip ${g.ok ? "bg-signal" : "bg-hazard"}`}>
                     {g.v}
                   </span>
@@ -246,17 +235,27 @@ export default function CompliancePage({ params }: { params: { id: string } }) {
   );
 }
 
-function Gauge({ k, n, tone }: { k: string; n: string; tone: "hazard" | "blood" | "signal" }) {
+function Gauge({
+  k,
+  n,
+  tone,
+}: {
+  k: string;
+  n: string;
+  tone?: "blood" | "signal" | "hazard";
+}) {
   const bg =
-    tone === "hazard"
-      ? "bg-hazard text-ink"
-      : tone === "blood"
-        ? "bg-blood text-paper"
-        : "bg-signal text-ink";
+    tone === "blood"
+      ? "bg-blood text-paper"
+      : tone === "signal"
+        ? "bg-signal text-ink"
+        : tone === "hazard"
+          ? "bg-hazard text-ink"
+          : "bg-paper text-ink";
   return (
     <div className={`border-2 border-ink p-2 ${bg}`}>
       <div className="font-mono text-[9px] uppercase tracking-widest opacity-80">{k}</div>
-      <div className="brut-stencil text-2xl leading-none">{n}</div>
+      <div className="mt-0.5 font-display text-xl font-bold leading-none">{n}</div>
     </div>
   );
 }

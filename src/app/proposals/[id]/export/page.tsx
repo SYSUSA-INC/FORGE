@@ -2,7 +2,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { BarMeter } from "@/components/ui/BarMeter";
 import { DotMeter } from "@/components/ui/DotMeter";
-import { Perforation } from "@/components/ui/Perforation";
 import { proposals } from "@/lib/mock";
 
 export default function ExportPage({ params }: { params: { id: string } }) {
@@ -11,60 +10,61 @@ export default function ExportPage({ params }: { params: { id: string } }) {
   return (
     <>
       <PageHeader
-        eyebrow={`EXP // ${p.code} · PRODUCTION & FORMAT`}
-        title="EXPORT"
-        subtitle="PDF/DOCX production with exact formatting. Page limit, font, margin, and image-DPI gates."
-        barcode={`${p.code}-PROD`}
-        stamp={{ label: "PRODUCTION HOLD", tone: "hazard" }}
+        eyebrow={`Export · ${p.code}`}
+        title="Export"
+        subtitle="PDF / DOCX production with exact formatting. Page limit, font, margin, and image-DPI gates."
         actions={
           <>
-            <button className="brut-btn">PREVIEW</button>
-            <button className="brut-btn">FORMAT SCAN</button>
-            <button className="brut-btn-hazard">BUILD ZIP</button>
+            <button className="brut-btn">Preview</button>
+            <button className="brut-btn">Format scan</button>
+            <button className="brut-btn-hazard">Build ZIP</button>
           </>
         }
         meta={[
-          { label: "PAGES EST", value: `${p.pagesEstimated}/${p.pagesLimit}`, accent: "hazard" },
-          { label: "FONT", value: "TNR 12", accent: "signal" },
-          { label: "MARGINS", value: "1.0″", accent: "signal" },
-          { label: "DPI", value: "300", accent: "signal" },
+          {
+            label: "Pages estimated",
+            value: `${p.pagesEstimated} / ${p.pagesLimit}`,
+            accent: "hazard",
+          },
+          { label: "Font", value: "TNR 12", accent: "signal" },
+          { label: "Margins", value: "1.0″", accent: "signal" },
+          { label: "Image DPI", value: "300", accent: "signal" },
         ]}
       />
 
-      {/* HERO MANIFEST */}
+      {/* Manifest + queue */}
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <div className="relative overflow-hidden border-2 border-ink bg-paper shadow-brut-xl">
-          <div className="flex items-center justify-between border-b-2 border-ink bg-ink px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.25em] text-paper">
-            <span>▸ PROPOSAL MANIFEST</span>
-            <span>CUSTODY CHAIN · OK</span>
+        <div className="border-2 border-ink bg-paper shadow-brut">
+          <div className="flex items-center justify-between border-b-2 border-ink bg-ink px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-paper">
+            <span>Proposal manifest</span>
+            <span className="opacity-70">{p.code}</span>
           </div>
-          <div className="brut-sprockets h-3 border-b-2 border-ink" />
-
           <div className="grid grid-cols-1 gap-0 p-5 md:grid-cols-2">
             <div className="md:border-r-2 md:border-ink md:pr-5">
               <div className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
-                PROPOSAL CODE
+                Proposal code
               </div>
-              <div className="brut-stencil text-5xl leading-none">{p.code}</div>
+              <div className="font-display text-4xl font-bold leading-none tracking-tight">
+                {p.code}
+              </div>
               <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-ink/60">
-                SOL {p.solicitation}
+                Solicitation {p.solicitation}
               </div>
-
               <div className="mt-4 font-mono text-[11px] leading-relaxed">
-                <Row k="TITLE" v={p.title} />
-                <Row k="AGENCY" v={p.agency} />
-                <Row k="DUE" v={p.dueAt} />
-                <Row k="CAPTURE" v={p.captureManager} />
+                <Row k="Title" v={p.title} />
+                <Row k="Agency" v={p.agency} />
+                <Row k="Due" v={p.dueAt} />
+                <Row k="Capture" v={p.captureManager} />
                 <Row k="PM" v={p.proposalManager} />
-                <Row k="TARGET" v={`${p.pagesLimit}p · TNR 12 · 1.0″`} />
+                <Row k="Target" v={`${p.pagesLimit}p · TNR 12 · 1.0″`} />
               </div>
             </div>
             <div className="mt-5 md:mt-0 md:pl-5">
               <div className="font-mono text-[10px] uppercase tracking-widest text-ink/60">
-                PAGE BUDGET
+                Page budget
               </div>
               <div className="flex items-end justify-between">
-                <div className="brut-stencil text-6xl leading-none">
+                <div className="font-display text-5xl font-bold leading-none">
                   {p.pagesEstimated}
                 </div>
                 <div className="pb-2 font-mono text-sm uppercase tracking-widest text-ink/60">
@@ -75,42 +75,31 @@ export default function ExportPage({ params }: { params: { id: string } }) {
                 value={p.pagesEstimated}
                 max={p.pagesLimit}
                 steps={30}
-                filled={p.pagesEstimated > p.pagesLimit * 0.95 ? "bg-blood" : "bg-hazard"}
+                filled={p.pagesEstimated > p.pagesLimit * 0.95 ? "bg-blood" : "bg-ink"}
               />
-
-              <Perforation className="my-4" />
-
-              <div className="grid grid-cols-3 gap-1">
-                <Mini k="REV" v="12" tone="ink" />
-                <Mini k="VOL" v="05" tone="hazard" />
-                <Mini k="STAMPS" v="04" tone="signal" />
+              <div className="mt-4 grid grid-cols-3 gap-1">
+                <Mini k="Revision" v="12" />
+                <Mini k="Volumes" v="05" />
+                <Mini k="Stamps" v="04" />
               </div>
             </div>
           </div>
-          <span
-            className="pointer-events-none absolute bottom-8 right-8 border-[3px] border-hazard px-3 py-1 font-display text-[11px] font-black uppercase tracking-[0.22em] text-hazard"
-            style={{ transform: "rotate(-6deg)" }}
-          >
-            ✦ PRODUCTION HOLD ✦
-          </span>
         </div>
 
-        <Panel title="PRODUCTION QUEUE" code="QUE" accent="ink">
+        <Panel title="Production queue" code="QUE">
           <div className="flex flex-col gap-2 font-mono text-[11px]">
-            <Queue label="PUPPETEER · HTML→PDF" pct={72} />
-            <Queue label="DOCX EMITTER" pct={48} />
-            <Queue label="COMPLIANCE MATRIX · XLSX" pct={100} />
-            <Queue label="ZIP + MANIFEST" pct={0} />
+            <Queue label="Puppeteer · HTML → PDF" pct={72} />
+            <Queue label="DOCX emitter" pct={48} />
+            <Queue label="Compliance matrix · XLSX" pct={100} />
+            <Queue label="ZIP + manifest" pct={0} />
           </div>
 
           <div className="mt-4 border-2 border-ink bg-bone p-3 font-mono text-[10px] uppercase tracking-widest">
             <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <span className="h-2 w-2 animate-blink bg-blood" /> WORKER · 02
-              </span>
-              <span>3 JOBS</span>
+              <span>Worker · 02</span>
+              <span>3 jobs</span>
             </div>
-            <div className="mt-2 h-16 border-2 border-ink bg-paper">
+            <div className="mt-2 h-14 border-2 border-ink bg-paper">
               <div className="flex h-full">
                 <div className="bg-signal" style={{ width: "42%" }} />
                 <div className="bg-hazard" style={{ width: "18%" }} />
@@ -120,16 +109,16 @@ export default function ExportPage({ params }: { params: { id: string } }) {
             </div>
             <div className="mt-1 flex items-center gap-3 text-[9px] text-ink/70">
               <span className="flex items-center gap-1">
-                <span className="h-2 w-3 bg-signal" /> DONE
+                <span className="h-2 w-3 bg-signal" /> Done
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-2 w-3 bg-hazard" /> RUN
+                <span className="h-2 w-3 bg-hazard" /> Running
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-2 w-3 bg-blood" /> FAIL
+                <span className="h-2 w-3 bg-blood" /> Failed
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-2 w-3 bg-bone" /> QUEUE
+                <span className="h-2 w-3 bg-bone" /> Queued
               </span>
             </div>
           </div>
@@ -137,14 +126,21 @@ export default function ExportPage({ params }: { params: { id: string } }) {
       </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <Panel title="VOLUME BUILDS" code="BLD" dense>
+        <Panel title="Volume builds" code="BLD" dense>
           <div className="divide-y-2 divide-ink">
             {[
-              { v: "VOL I", t: "Technical", p: 184, l: 200, s: "BUILDING", c: "hazard" },
-              { v: "VOL II", t: "Management", p: 62, l: 80, s: "READY", c: "signal" },
-              { v: "VOL III", t: "Past Performance", p: 46, l: 50, s: "READY", c: "signal" },
-              { v: "VOL IV", t: "Price", p: 0, l: 0, s: "PENDING", c: "bone" },
-              { v: "VOL V", t: "Small Business Subcontracting", p: 14, l: 20, s: "READY", c: "signal" },
+              { v: "Vol I", t: "Technical", p: 184, l: 200, s: "Building", c: "hazard" },
+              { v: "Vol II", t: "Management", p: 62, l: 80, s: "Ready", c: "signal" },
+              { v: "Vol III", t: "Past performance", p: 46, l: 50, s: "Ready", c: "signal" },
+              { v: "Vol IV", t: "Price", p: 0, l: 0, s: "Pending", c: "bone" },
+              {
+                v: "Vol V",
+                t: "Small business subcontracting",
+                p: 14,
+                l: 20,
+                s: "Ready",
+                c: "signal",
+              },
             ].map((b) => (
               <div
                 key={b.v}
@@ -152,7 +148,7 @@ export default function ExportPage({ params }: { params: { id: string } }) {
               >
                 <div className="brut-pill bg-ink text-paper">{b.v}</div>
                 <div>
-                  <div className="font-display text-lg font-bold uppercase">{b.t}</div>
+                  <div className="font-display text-lg font-bold">{b.t}</div>
                   <div className="mt-1">
                     <BarMeter
                       value={b.p}
@@ -163,8 +159,8 @@ export default function ExportPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <div className="brut-stencil text-3xl leading-none">{b.p}</div>
-                  <div className="font-mono text-[9px] uppercase text-ink/60">PAGES</div>
+                  <div className="font-display text-2xl font-bold leading-none">{b.p}</div>
+                  <div className="font-mono text-[9px] uppercase text-ink/60">Pages</div>
                 </div>
                 <div
                   className={`border-2 border-ink px-2 py-1.5 text-center font-mono text-[11px] font-bold uppercase ${
@@ -185,17 +181,17 @@ export default function ExportPage({ params }: { params: { id: string } }) {
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <Panel title="FORMAT COMPLIANCE" code="FMT" accent="signal">
+          <Panel title="Format compliance" code="FMT">
             <ul className="flex flex-col gap-2">
               {[
-                { k: "PAGE LIMIT", v: "184/200", ok: true },
-                { k: "FONT · SERIF 12PT", v: "PASS", ok: true },
-                { k: "LINE SPACING", v: "SINGLE", ok: true },
-                { k: "MARGINS", v: "1.0″ ALL", ok: true },
-                { k: "IMAGES · 300DPI", v: "PASS", ok: true },
-                { k: "TABLES · ≥10PT", v: "FAIL · Table 3-1 is 9pt", ok: false },
-                { k: "HEADERS · CONSISTENT", v: "WARN · Sec 4.2 orphan", ok: false },
-                { k: "FILE · ≤100MB", v: "74.2 MB", ok: true },
+                { k: "Page limit", v: "184 / 200", ok: true },
+                { k: "Font · Serif 12pt", v: "Pass", ok: true },
+                { k: "Line spacing", v: "Single", ok: true },
+                { k: "Margins", v: "1.0″ all sides", ok: true },
+                { k: "Images · 300 DPI", v: "Pass", ok: true },
+                { k: "Tables · ≥10 pt", v: "Fail · Table 3-1 is 9pt", ok: false },
+                { k: "Headers · consistent", v: "Warn · §4.2 orphan", ok: false },
+                { k: "File size · ≤100 MB", v: "74.2 MB", ok: true },
               ].map((g) => (
                 <li
                   key={g.k}
@@ -210,27 +206,27 @@ export default function ExportPage({ params }: { params: { id: string } }) {
                   >
                     {g.ok ? "✓" : "!"}
                   </span>
-                  <span className="font-mono text-[11px] uppercase">{g.k}</span>
+                  <span className="font-mono text-[11px]">{g.k}</span>
                   <span className="font-mono text-[11px] font-bold">{g.v}</span>
                 </li>
               ))}
             </ul>
           </Panel>
 
-          <Panel title="EXPORT HISTORY" code="HST">
+          <Panel title="Export history" code="HST">
             <ul className="flex flex-col gap-1 font-mono text-[11px]">
               {[
-                { n: "FRG-0042_VolI_v12.pdf", t: "12 MIN AGO", s: "PASS", k: "signal" },
-                { n: "FRG-0042_VolI_v11.pdf", t: "3H AGO", s: "WARN", k: "hazard" },
-                { n: "FRG-0042_Full_v1.zip", t: "1D AGO", s: "DRAFT", k: "bone" },
-                { n: "FRG-0042_VolI_v10.pdf", t: "2D AGO", s: "FAIL", k: "blood" },
+                { n: "FRG-0042_VolI_v12.pdf", t: "12 min ago", s: "Pass", k: "signal" },
+                { n: "FRG-0042_VolI_v11.pdf", t: "3 h ago", s: "Warn", k: "hazard" },
+                { n: "FRG-0042_Full_v1.zip", t: "1 d ago", s: "Draft", k: "bone" },
+                { n: "FRG-0042_VolI_v10.pdf", t: "2 d ago", s: "Fail", k: "blood" },
               ].map((h) => (
                 <li
                   key={h.n}
-                  className="grid grid-cols-[1fr_90px_90px] items-center gap-2 border-b border-ink/20 py-1.5"
+                  className="grid grid-cols-[1fr_100px_90px] items-center gap-2 border-b border-ink/20 py-1.5"
                 >
                   <span className="truncate">{h.n}</span>
-                  <span className="text-[10px] uppercase text-ink/60">{h.t}</span>
+                  <span className="text-[10px] text-ink/60">{h.t}</span>
                   <span
                     className={`brut-chip ${
                       h.k === "signal"
@@ -258,7 +254,7 @@ function Queue({ label, pct }: { label: string; pct: number }) {
   return (
     <div>
       <div className="flex justify-between">
-        <span className="uppercase tracking-widest">{label}</span>
+        <span>{label}</span>
         <span className="font-bold">{pct}%</span>
       </div>
       <BarMeter value={pct} color={pct === 100 ? "signal" : pct > 0 ? "hazard" : "bone"} />
@@ -275,17 +271,11 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-function Mini({ k, v, tone }: { k: string; v: string; tone: "ink" | "hazard" | "signal" }) {
-  const bg =
-    tone === "ink"
-      ? "bg-ink text-paper"
-      : tone === "hazard"
-        ? "bg-hazard text-ink"
-        : "bg-signal text-ink";
+function Mini({ k, v }: { k: string; v: string }) {
   return (
-    <div className={`border-2 border-ink p-2 text-center ${bg}`}>
-      <div className="font-mono text-[9px] uppercase tracking-widest opacity-80">{k}</div>
-      <div className="brut-stencil text-2xl leading-none">{v}</div>
+    <div className="border-2 border-ink bg-paper p-2 text-center">
+      <div className="font-mono text-[9px] uppercase tracking-widest text-ink/60">{k}</div>
+      <div className="font-display text-xl font-bold leading-none">{v}</div>
     </div>
   );
 }
