@@ -1,8 +1,10 @@
 # FORGE
 
-**Framework for Optimized Response Generation & Execution** — a brutalist-styled
-workspace for responding to government and commercial procurement solicitations
+**Framework for Optimized Response Generation & Execution** — a workspace for
+responding to government and commercial procurement solicitations
 (RFP / RFI / RFQ / Sources Sought).
+
+**Live demo:** https://forge-ten-xi.vercel.app
 
 See [`PLAN.md`](./PLAN.md) for the full product & architecture plan.
 
