@@ -1,82 +1,214 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import type { Proposal } from "@/lib/mock";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { solicitations } from "@/lib/mock";
+import {
+  proposalsStore,
+  makeProposalCode,
+  daysUntil,
+} from "@/lib/proposalsStore";
 
 export default function NewProposalPage() {
+  const router = useRouter();
+  const [form, setForm] = useState({
+    code: "",
+    title: "",
+    solicitation: "",
+    agency: "",
+    captureManager: "",
+    proposalManager: "",
+    dueAt: "",
+    pagesLimit: 200,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const suggestedCode = useMemo(() => makeProposalCode(), []);
+
+  const update = (k: keyof typeof form) => (v: string | number) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.title.trim()) {
+      setError("A title is required.");
+      return;
+    }
+    setSubmitting(true);
+    const code = form.code.trim() || suggestedCode;
+    const proposal: Proposal = {
+      id: code,
+      code,
+      title: form.title.trim(),
+      solicitation: form.solicitation.trim(),
+      agency: form.agency.trim(),
+      status: "PLANNING",
+      captureManager: form.captureManager.trim(),
+      proposalManager: form.proposalManager.trim(),
+      dueAt: form.dueAt,
+      daysLeft: daysUntil(form.dueAt),
+      progress: 0,
+      aiPct: 0,
+      pagesEstimated: 0,
+      pagesLimit: Number(form.pagesLimit) || 200,
+      compliancePct: 0,
+    };
+    proposalsStore.add(proposal);
+    router.push("/proposals");
+  };
+
   return (
     <>
       <PageHeader
         eyebrow="Proposals — Initiate"
         title="New proposal"
-        subtitle="Spin up a proposal from a parsed solicitation. FORGE generates volume structure and assigns sections."
+        subtitle="Create a proposal record. It will appear on the Kanban board and Proposal register; drag to change phase."
         actions={
-          <Link href="/proposals" className="brut-btn">
+          <Link href="/proposals" className="aur-btn">
             Cancel
           </Link>
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <Panel title="Link solicitation">
-          <ul className="flex flex-col gap-2">
-            {solicitations.slice(0, 4).map((s, i) => (
-              <li
-                key={s.id}
-                className={`grid grid-cols-[24px_1fr_100px] items-center gap-2 border-2 border-ink p-3 ${
-                  i === 0 ? "bg-hazard" : "bg-paper"
-                }`}
-              >
-                <div
-                  className={`grid h-5 w-5 place-items-center border-2 border-ink font-mono text-[11px] font-bold ${
-                    i === 0 ? "bg-ink text-paper" : "bg-paper"
-                  }`}
-                >
-                  {i === 0 ? "●" : ""}
-                </div>
-                <div>
-                  <div className="font-display text-sm font-bold leading-tight">{s.title}</div>
-                  <div className="font-mono text-[10px] uppercase text-ink/60">
-                    {s.number} · {s.agency}
-                  </div>
-                </div>
-                <button className="brut-btn-primary px-2 py-1 text-[10px]">Select</button>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
         <Panel title="Proposal configuration">
           <div className="grid grid-cols-2 gap-3">
-            <F label="Proposal code" v="FRG-0043" />
-            <F label="Capture manager" v="J. Calder" />
-            <F label="Proposal manager" v="A. Okafor" />
-            <F label="Due date" v="2026-04-29 14:00 EST" />
-            <F label="Page limit" v="200" />
-            <F label="Volumes" v="I / II / III / IV" />
+            <Field
+              label="Proposal code"
+              value={form.code}
+              onChange={update("code")}
+              placeholder={suggestedCode}
+            />
+            <Field
+              label="Page limit"
+              value={String(form.pagesLimit)}
+              onChange={(v) => update("pagesLimit")(Number(v) || 0)}
+              placeholder="200"
+            />
+            <Field
+              label="Title"
+              value={form.title}
+              onChange={update("title")}
+              placeholder="Short, memorable proposal name"
+              full
+              required
+            />
+            <Field
+              label="Solicitation"
+              value={form.solicitation}
+              onChange={update("solicitation")}
+              placeholder="SOL number (optional)"
+            />
+            <Field
+              label="Agency"
+              value={form.agency}
+              onChange={update("agency")}
+              placeholder="Dept. / bureau"
+            />
+            <Field
+              label="Capture manager"
+              value={form.captureManager}
+              onChange={update("captureManager")}
+              placeholder="Owner"
+            />
+            <Field
+              label="Proposal manager"
+              value={form.proposalManager}
+              onChange={update("proposalManager")}
+              placeholder="Owner"
+            />
+            <Field
+              label="Due date"
+              value={form.dueAt}
+              onChange={update("dueAt")}
+              placeholder="YYYY-MM-DD"
+              type="date"
+            />
           </div>
-          <div className="mt-4 border-2 border-ink bg-bone p-3">
-            <span className="brut-label">Template</span>
-            <div className="grid grid-cols-3 gap-2">
-              {["DoD · Services", "Civilian · IT mod", "Sources Sought"].map((t, i) => (
-                <button key={t} className={`brut-btn ${i === 0 ? "bg-ink text-paper" : ""}`}>
-                  {t}
-                </button>
-              ))}
+
+          {error ? (
+            <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+              {error}
             </div>
+          ) : null}
+
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <Link href="/proposals" className="aur-btn">
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="aur-btn-primary"
+            >
+              {submitting ? "Creating…" : "Create proposal"}
+            </button>
           </div>
-          <button className="brut-btn-hazard mt-4 w-full">Initiate proposal</button>
         </Panel>
-      </div>
+
+        <Panel title="What happens next">
+          <ol className="flex flex-col gap-3 pl-5 text-[13px] leading-relaxed text-muted">
+            <li className="list-decimal">
+              The proposal lands in the <span className="text-text">Planning</span> column of
+              the Kanban board.
+            </li>
+            <li className="list-decimal">
+              Drag it across columns to advance it through the 10 phases (Planning →
+              Submitted).
+            </li>
+            <li className="list-decimal">
+              Every move is recorded for the intelligence layer to learn win / loss
+              patterns by phase duration and progression.
+            </li>
+            <li className="list-decimal">
+              Open the proposal to draft sections, run compliance, and kick off review
+              cycles.
+            </li>
+          </ol>
+          <div className="mt-4 rounded-md border border-dashed border-white/10 px-3 py-2 font-mono text-[11px] text-subtle">
+            Stored locally in your browser. Backend persistence ships with the Postgres
+            migration.
+          </div>
+        </Panel>
+      </form>
     </>
   );
 }
 
-function F({ label, v }: { label: string; v: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  full,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+  full?: boolean;
+  required?: boolean;
+}) {
   return (
-    <div>
-      <div className="brut-label">{label}</div>
-      <input className="brut-input" defaultValue={v} />
-    </div>
+    <label className={full ? "col-span-2" : ""}>
+      <div className="aur-label">
+        {label}
+        {required ? <span className="text-rose"> *</span> : null}
+      </div>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="aur-input"
+      />
+    </label>
   );
 }

@@ -1,15 +1,21 @@
+"use client";
+
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { BarMeter } from "@/components/ui/BarMeter";
 import { KanbanBoard } from "@/components/proposals/KanbanBoard";
-import { proposals } from "@/lib/mock";
+import { useProposals, proposalsStore } from "@/lib/proposalsStore";
 
 export default function ProposalsListPage() {
+  const proposals = useProposals();
+
   const counts = {
     total: proposals.length,
-    draft: proposals.filter((p) => ["OUTLINING", "DRAFTING", "REVISING"].includes(p.status)).length,
+    draft: proposals.filter((p) =>
+      ["OUTLINING", "DRAFTING", "REVISING"].includes(p.status),
+    ).length,
     review: proposals.filter((p) =>
       ["PINK_TEAM", "RED_TEAM", "GOLD_TEAM", "FINAL_REVIEW"].includes(p.status),
     ).length,
@@ -24,7 +30,15 @@ export default function ProposalsListPage() {
         subtitle="Every active proposal across capture, drafting, review, and production. Drag a card to change its phase."
         actions={
           <>
-            <button className="aur-btn">Export CSV</button>
+            <button
+              type="button"
+              className="aur-btn"
+              onClick={() => {
+                if (confirm("Clear all local proposals?")) proposalsStore.clear();
+              }}
+            >
+              Clear all
+            </button>
             <Link href="/proposals/new" className="aur-btn-primary">
               + New proposal
             </Link>
@@ -51,7 +65,7 @@ export default function ProposalsListPage() {
       />
 
       <div className="mb-6">
-        <KanbanBoard initialProposals={proposals} />
+        <KanbanBoard proposals={proposals} />
       </div>
 
       <Panel title="Proposal register" dense>
@@ -92,11 +106,11 @@ export default function ProposalsListPage() {
                     {p.title}
                   </div>
                   <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-                    {p.solicitation} · {p.agency}
+                    {p.solicitation || "—"} · {p.agency || "—"}
                   </div>
                 </div>
                 <div className="border-r border-white/10 p-3 font-mono text-[11px]">
-                  <div className="font-semibold text-text">{p.dueAt.split(" ")[0]}</div>
+                  <div className="font-semibold text-text">{p.dueAt || "—"}</div>
                   <div
                     className={`mt-1 rounded-md border px-1.5 py-0.5 text-center font-display text-sm font-semibold leading-none ${
                       p.daysLeft < 5

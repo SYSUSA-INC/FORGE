@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Proposal } from "@/lib/mock";
 import { BarMeter } from "@/components/ui/BarMeter";
+import { proposalsStore } from "@/lib/proposalsStore";
 
 type Phase = Proposal["status"];
 
@@ -33,8 +34,7 @@ const PHASE_DOT: Record<Phase, string> = {
   SUBMITTED: "bg-emerald",
 };
 
-export function KanbanBoard({ initialProposals }: { initialProposals: Proposal[] }) {
-  const [proposals, setProposals] = useState(initialProposals);
+export function KanbanBoard({ proposals }: { proposals: Proposal[] }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overPhase, setOverPhase] = useState<Phase | null>(null);
 
@@ -63,9 +63,7 @@ export function KanbanBoard({ initialProposals }: { initialProposals: Proposal[]
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain") || dragId;
     if (!id) return;
-    setProposals((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: phase } : p)),
-    );
+    proposalsStore.update(id, { status: phase });
     setDragId(null);
     setOverPhase(null);
     // TODO: await trpc.proposal.updateStatus.mutate({ id, status: phase });
@@ -128,7 +126,6 @@ export function KanbanBoard({ initialProposals }: { initialProposals: Proposal[]
                       href={`/proposals/${p.id}/editor`}
                       className="block"
                       onClick={(e) => {
-                        // Prevent navigation while dragging
                         if (dragId) e.preventDefault();
                       }}
                     >
