@@ -5,6 +5,7 @@ import { Funnel, FunnelLegend } from "@/components/ui/Funnel";
 import { PieChart, PieLegend, type PieSlice } from "@/components/ui/PieChart";
 import { pipelineStages, opportunities, historicalWinLoss } from "@/lib/pipeline";
 
+// Stage colors mirror Funnel STAGE_GRADIENTS (9 entries).
 const STAGE_COLORS: Record<number, string> = {
   0: "#C4B5FD",
   1: "#A78BFA",
@@ -12,18 +13,22 @@ const STAGE_COLORS: Record<number, string> = {
   3: "#7C3AED",
   4: "#D946EF",
   5: "#F5B544",
-  6: "#34D399",
+  6: "#FB923C",
   7: "#FB7185",
+  8: "#34D399", // Stage 9: Won
 };
 
 export default function PipelinePage() {
   const totalItems = pipelineStages.reduce((a, s) => a + s.count, 0);
   const totalValueHigh = pipelineStages.reduce((a, s) => a + s.valueHigh, 0);
-  const wonCount = historicalWinLoss.find((w) => w.key === "Won")?.count ?? 0;
+  const wonStage = pipelineStages.find((s) => s.key === "S9_WON");
+  const wonFromStages = wonStage?.count ?? 0;
+  const wonHistoric = historicalWinLoss.find((w) => w.key === "Won")?.count ?? 0;
+  const totalWon = wonFromStages + wonHistoric;
   const decided = historicalWinLoss
     .filter((w) => ["Won", "Lost"].includes(w.key))
     .reduce((a, w) => a + w.count, 0);
-  const winRate = decided === 0 ? 0 : Math.round((wonCount / decided) * 100);
+  const winRate = decided === 0 ? 0 : Math.round((wonHistoric / decided) * 100);
 
   const slices: PieSlice[] = pipelineStages.map((s, i) => ({
     key: s.key,
@@ -39,7 +44,7 @@ export default function PipelinePage() {
       <PageHeader
         eyebrow="Pipeline"
         title="Opportunity pipeline"
-        subtitle="Every opportunity from identification through submission. The 8-stage funnel template is always visible; counts fill in as opportunities move through."
+        subtitle="Nine stages from identification through award. The template is always visible; counts and values fill in as opportunities progress."
         actions={
           <>
             <Link href="/solicitations/new" className="aur-btn">
@@ -62,25 +67,30 @@ export default function PipelinePage() {
                   : `$${(totalValueHigh / 1_000_000).toFixed(0)}M`,
             accent: totalValueHigh > 0 ? "emerald" : undefined,
           },
-          { label: "Historic win rate", value: decided === 0 ? "—" : `${winRate}%` },
           {
-            label: "Active cycle",
-            value: totalItems === 0 ? "—" : "Multi-stage",
+            label: "Wins (Stage 9 + lifetime)",
+            value: totalWon === 0 ? "—" : String(totalWon),
+            accent: totalWon > 0 ? "emerald" : undefined,
+          },
+          {
+            label: "Historic win rate",
+            value: decided === 0 ? "—" : `${winRate}%`,
+            accent: winRate >= 50 ? "emerald" : undefined,
           },
         ]}
       />
 
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Panel eyebrow="Pipeline funnel" title="By stage">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_260px] lg:items-center">
-            <div className="h-[460px]">
-              <Funnel stages={pipelineStages} width={560} height={460} />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px] lg:items-center">
+            <div className="h-[540px]">
+              <Funnel stages={pipelineStages} width={560} height={540} />
             </div>
             <FunnelLegend stages={pipelineStages} />
           </div>
           {!hasData ? (
             <div className="mt-4 rounded-md border border-dashed border-white/10 px-4 py-3 text-[13px] text-muted">
-              The stage template is shown for reference. Add an opportunity or create
+              The 9-stage template is shown for reference. Add an opportunity or create
               a proposal to start populating the funnel.
             </div>
           ) : null}
@@ -133,10 +143,20 @@ export default function PipelinePage() {
         </Panel>
 
         <aside className="flex flex-col gap-4">
-          <Panel eyebrow="Current win / loss" title="This quarter">
-            <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-[12px] text-muted">
-              No wins or losses to display yet.
+          <Panel eyebrow="Stage 9 · Won" title="In-pipeline wins">
+            <div className="flex items-end gap-3">
+              <div className="font-display text-4xl font-semibold text-emerald">
+                {wonFromStages}
+              </div>
+              <div className="pb-1 font-mono text-[11px] text-muted">
+                opportunities in Stage 9
+              </div>
             </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-muted">
+              Wins that haven’t been archived yet. Once you capture CPARS baselines and
+              retrospective notes, advance them to historical outcomes — the brain uses
+              them as positive training signal.
+            </p>
           </Panel>
 
           <Panel eyebrow="Historical" title="Outcomes (lifetime)">

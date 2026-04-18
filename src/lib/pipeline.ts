@@ -6,7 +6,8 @@ export type PipelineStageKey =
   | "S5_CAPTURE"
   | "S6_PRE_PROPOSAL"
   | "S7_WRITING"
-  | "S8_SUBMITTED";
+  | "S8_SUBMITTED"
+  | "S9_WON";
 
 export type PipelineStage = {
   key: PipelineStageKey;
@@ -18,7 +19,7 @@ export type PipelineStage = {
   checklist: string[];
 };
 
-// Stage definitions are retained so the UI can render the full 8-stage
+// Stage definitions are retained so the UI can render the full 9-stage
 // funnel / checklist template even when no opportunities are in the pipeline.
 export const pipelineStages: PipelineStage[] = [
   {
@@ -144,6 +145,24 @@ export const pipelineStages: PipelineStage[] = [
       "Are we tracking evaluation notice windows?",
       "Is a debrief plan prepared for win or loss?",
       "Are we monitoring GAO / COFC protest windows?",
+    ],
+  },
+  {
+    key: "S9_WON",
+    label: "Won — Award Received",
+    count: 0,
+    valueLow: 0,
+    valueHigh: 0,
+    description:
+      "Contract awarded. Kickoff and transition in motion. CPARS baseline captured. Feed back to the brain as a positive training signal.",
+    checklist: [
+      "Award letter / contract modification received and filed?",
+      "Kickoff meeting scheduled with the customer?",
+      "PM, key personnel, and cleared staff onboarded?",
+      "Transition plan (incumbent handoff, if any) in place?",
+      "Subcontractor agreements and teaming arrangements executed?",
+      "CPARS baseline reporting cadence established?",
+      "Win themes and proposal retrospective captured for the KB?",
     ],
   },
 ];

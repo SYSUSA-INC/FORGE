@@ -13,14 +13,16 @@ const STAGE_GRADIENTS = [
   ["#7C3AED", "#6D28D9"],
   ["#D946EF", "#A21CAF"],
   ["#F5B544", "#D97706"],
-  ["#34D399", "#059669"],
+  ["#FB923C", "#EA580C"],
   ["#FB7185", "#BE123C"],
+  // Stage 9: Won — emerald + gold celebratory gradient
+  ["#6EE7B7", "#F5B544"],
 ];
 
 export function Funnel({
   stages,
   width = 640,
-  height = 480,
+  height = 540,
 }: {
   stages: FunnelStage[];
   width?: number;
