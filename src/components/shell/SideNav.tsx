@@ -53,7 +53,7 @@ export function SideNav() {
             <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
               Organization
             </div>
-            <div className="mt-0.5 font-display text-sm font-semibold">
+            <div className="mt-0.5 font-display text-sm font-semibold text-text">
               Configure in Settings
             </div>
           </div>
@@ -103,27 +103,15 @@ export function SideNav() {
       </nav>
 
       <div className="border-t border-white/10 p-4">
-        <Link
-          href="/intelligence"
-          className="aur-card block p-3 transition-colors hover:border-white/20"
-        >
+        <Link href="/intelligence" className="aur-card block p-3 transition-colors hover:border-white/20">
           <div className="flex items-center justify-between">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-              Brain status
+              Intelligence
             </div>
-            <span className="text-[10px] text-muted">View →</span>
+            <span className="text-[10px] text-violet">Open →</span>
           </div>
-          <div className="mt-2 font-display text-sm font-semibold text-text">
-            Phase A · plumbing
-          </div>
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/5">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: "25%",
-                background: "linear-gradient(90deg, #8B5CF6, #D946EF, #F5B544)",
-              }}
-            />
+          <div className="mt-1 text-[12px] leading-snug text-text">
+            The FORGE brain — learns from every proposal.
           </div>
         </Link>
       </div>

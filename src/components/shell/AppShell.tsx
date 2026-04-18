@@ -32,20 +32,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/settings" className="aur-btn-ghost">
               Settings
             </Link>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1">
+            <Link
+              href="/settings"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1 transition-colors hover:border-white/20"
+            >
               <span
                 className="grid h-7 w-7 place-items-center rounded-full font-mono text-[10px] font-bold text-white"
                 style={{
                   background: "linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)",
                 }}
               >
-                JC
+                ••
               </span>
               <div className="pr-1 font-mono text-[10px] leading-tight">
-                <div className="font-semibold text-text">J. Calder</div>
-                <div className="text-muted">Capture Mgr</div>
+                <div className="font-semibold text-text">Sign in</div>
+                <div className="text-muted">Configure account</div>
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 
