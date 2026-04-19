@@ -24,7 +24,7 @@ export function PageHeader({
           <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
             <span
               className="h-1.5 w-1.5 rounded-full"
-              style={{ background: "linear-gradient(90deg, #8B5CF6, #D946EF)" }}
+              style={{ background: "linear-gradient(90deg, #2DD4BF, #34D399 55%, #EC4899)" }}
             />
             {eyebrow}
           </div>
