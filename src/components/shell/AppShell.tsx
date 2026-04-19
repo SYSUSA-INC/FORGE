@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span
                 className="grid h-7 w-7 place-items-center rounded-full font-mono text-[10px] font-bold text-white"
                 style={{
-                  background: "linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)",
+                  background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
                 }}
               >
                 ••

@@ -32,7 +32,7 @@ export function SideNav() {
       <div className="flex h-14 items-center gap-3 border-b border-white/10 px-5">
         <div
           className="grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow"
-          style={{ background: "linear-gradient(135deg, #8B5CF6, #D946EF 60%, #F5B544 100%)" }}
+          style={{ background: "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)" }}
         >
           F
         </div>
@@ -76,17 +76,17 @@ export function SideNav() {
                       href={item.href}
                       className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                         active
-                          ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(139,92,246,0.25)]"
+                          ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)]"
                           : "text-muted hover:bg-white/[0.04] hover:text-text"
                       }`}
                     >
                       {active && (
-                        <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-violet via-magenta to-gold" />
+                        <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal via-emerald to-magenta" />
                       )}
                       <span
                         className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
                           active
-                            ? "bg-gradient-to-br from-violet/30 to-magenta/20 text-text"
+                            ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
                             : "bg-white/5 text-muted"
                         }`}
                       >
@@ -108,7 +108,7 @@ export function SideNav() {
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
               Intelligence
             </div>
-            <span className="text-[10px] text-violet">Open →</span>
+            <span className="text-[10px] text-teal">Open →</span>
           </div>
           <div className="mt-1 text-[12px] leading-snug text-text">
             The FORGE brain — learns from every proposal.

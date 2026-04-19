@@ -32,13 +32,13 @@ export function Radar({
     <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" aria-hidden>
       <defs>
         <linearGradient id="radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.45" />
-          <stop offset="60%" stopColor="#D946EF" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#F5B544" stopOpacity="0.2" />
+          <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.45" />
+          <stop offset="55%" stopColor="#34D399" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="#EC4899" stopOpacity="0.22" />
         </linearGradient>
         <linearGradient id="radar-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#A78BFA" />
-          <stop offset="100%" stopColor="#D946EF" />
+          <stop offset="0%" stopColor="#5EEAD4" />
+          <stop offset="100%" stopColor="#EC4899" />
         </linearGradient>
       </defs>
 
@@ -83,7 +83,7 @@ export function Radar({
       {data.map((d, i) => {
         const [x, y] = axisPoint(i, Math.max(0, Math.min(1, d.value / max)));
         return (
-          <circle key={d.label + "-dot"} cx={x} cy={y} r={3} fill="#EDE7FF" />
+          <circle key={d.label + "-dot"} cx={x} cy={y} r={3} fill="#E8FAFF" />
         );
       })}
 
@@ -100,7 +100,7 @@ export function Radar({
             fontWeight={600}
             textAnchor={anchor}
             dominantBaseline="middle"
-            fill="#A599C8"
+            fill="#9BC9D9"
             style={{ textTransform: "uppercase", letterSpacing: "0.14em" }}
           >
             {d.label}

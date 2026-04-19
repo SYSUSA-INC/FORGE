@@ -7,15 +7,15 @@ import { pipelineStages, opportunities, historicalWinLoss } from "@/lib/pipeline
 
 // Stage colors mirror Funnel STAGE_GRADIENTS (9 entries).
 const STAGE_COLORS: Record<number, string> = {
-  0: "#C4B5FD",
-  1: "#A78BFA",
-  2: "#8B5CF6",
-  3: "#7C3AED",
-  4: "#D946EF",
-  5: "#F5B544",
-  6: "#FB923C",
-  7: "#FB7185",
-  8: "#34D399", // Stage 9: Won
+  0: "#A5F3FC",
+  1: "#67E8F9",
+  2: "#2DD4BF",
+  3: "#34D399",
+  4: "#8B5CF6",
+  5: "#EC4899",
+  6: "#BE185D",
+  7: "#F472B6",
+  8: "#10B981", // Stage 9: Won
 };
 
 export default function PipelinePage() {
