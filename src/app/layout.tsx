@@ -1,24 +1,12 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono, Inter, Archivo_Black } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/shell/AppShell";
 
-const display = Space_Grotesk({
+const display = Inter({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-display",
-});
-
-const stencil = Archivo_Black({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-stencil",
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-mono",
 });
 
 const body = Inter({
@@ -27,10 +15,22 @@ const body = Inter({
   variable: "--font-body",
 });
 
+const stencil = Inter({
+  subsets: ["latin"],
+  weight: ["700", "800", "900"],
+  variable: "--font-stencil",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
-  title: "FORGE // Proposal Ops",
+  title: "FORGE — Proposal Ops",
   description:
-    "Framework for Optimized Response Generation & Execution — brutalist procurement warfare console.",
+    "Framework for Optimized Response Generation & Execution — capture, compliance, and proposal collaboration for federal and commercial procurement.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

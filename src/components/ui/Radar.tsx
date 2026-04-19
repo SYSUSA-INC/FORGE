@@ -29,12 +29,19 @@ export function Radar({
   const rings = [0.25, 0.5, 0.75, 1];
 
   return (
-    <svg
-      viewBox={`0 0 ${size} ${size}`}
-      className="h-full w-full"
-      aria-hidden
-    >
-      {/* Grid rings as nested polygons for brutalist feel */}
+    <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" aria-hidden>
+      <defs>
+        <linearGradient id="radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.45" />
+          <stop offset="60%" stopColor="#D946EF" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#F5B544" stopOpacity="0.2" />
+        </linearGradient>
+        <linearGradient id="radar-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#A78BFA" />
+          <stop offset="100%" stopColor="#D946EF" />
+        </linearGradient>
+      </defs>
+
       {rings.map((t) => (
         <polygon
           key={t}
@@ -45,13 +52,11 @@ export function Radar({
             })
             .join(" ")}
           fill="none"
-          stroke="#0A0A0A"
-          strokeOpacity={t === 1 ? 1 : 0.2}
-          strokeWidth={t === 1 ? 2 : 1}
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth={1}
         />
       ))}
 
-      {/* Axes */}
       {data.map((d, i) => {
         const [x, y] = axisPoint(i, 1);
         return (
@@ -61,55 +66,42 @@ export function Radar({
             y1={cy}
             x2={x}
             y2={y}
-            stroke="#0A0A0A"
-            strokeOpacity={0.35}
+            stroke="rgba(255,255,255,0.08)"
             strokeWidth={1}
           />
         );
       })}
 
-      {/* Data polygon */}
       <polygon
         points={polygon}
-        fill="#0A0A0A"
-        fillOpacity={0.08}
-        stroke="#0A0A0A"
+        fill="url(#radar-fill)"
+        stroke="url(#radar-stroke)"
         strokeWidth={2}
-        strokeLinejoin="miter"
+        strokeLinejoin="round"
       />
 
-      {/* Data dots */}
       {data.map((d, i) => {
         const [x, y] = axisPoint(i, Math.max(0, Math.min(1, d.value / max)));
         return (
-          <g key={d.label}>
-            <rect
-              x={x - 3}
-              y={y - 3}
-              width={6}
-              height={6}
-              fill="#0A0A0A"
-            />
-          </g>
+          <circle key={d.label + "-dot"} cx={x} cy={y} r={3} fill="#EDE7FF" />
         );
       })}
 
-      {/* Labels */}
       {data.map((d, i) => {
         const [x, y] = axisPoint(i, 1.15);
         const anchor = x < cx - 4 ? "end" : x > cx + 4 ? "start" : "middle";
         return (
           <text
-            key={`lbl-${d.label}`}
+            key={"lbl-" + d.label}
             x={x}
             y={y}
             fontFamily="var(--font-mono)"
             fontSize={9}
-            fontWeight={700}
+            fontWeight={600}
             textAnchor={anchor}
             dominantBaseline="middle"
-            fill="#0A0A0A"
-            style={{ textTransform: "uppercase", letterSpacing: "0.15em" }}
+            fill="#A599C8"
+            style={{ textTransform: "uppercase", letterSpacing: "0.14em" }}
           >
             {d.label}
           </text>
