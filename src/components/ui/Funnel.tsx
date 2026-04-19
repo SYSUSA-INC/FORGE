@@ -7,16 +7,16 @@ export type FunnelStage = {
 };
 
 const STAGE_GRADIENTS = [
-  ["#C4B5FD", "#A78BFA"],
+  ["#A5F3FC", "#67E8F9"],
+  ["#67E8F9", "#22D3EE"],
+  ["#5EEAD4", "#2DD4BF"],
+  ["#34D399", "#10B981"],
   ["#A78BFA", "#8B5CF6"],
-  ["#8B5CF6", "#7C3AED"],
-  ["#7C3AED", "#6D28D9"],
-  ["#D946EF", "#A21CAF"],
-  ["#F5B544", "#D97706"],
-  ["#FB923C", "#EA580C"],
-  ["#FB7185", "#BE123C"],
-  // Stage 9: Won — emerald + gold celebratory gradient
-  ["#6EE7B7", "#F5B544"],
+  ["#F472B6", "#EC4899"],
+  ["#EC4899", "#BE185D"],
+  ["#F472B6", "#A21CAF"],
+  // Stage 9: Won — emerald + teal celebratory gradient
+  ["#6EE7B7", "#2DD4BF"],
 ];
 
 export function Funnel({

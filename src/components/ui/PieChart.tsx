@@ -59,7 +59,7 @@ export function PieChart({
           key={slice.key}
           d={d}
           fill={slice.color}
-          stroke="rgba(10,5,24,0.85)"
+          stroke="rgba(4,24,39,0.9)"
           strokeWidth={2}
         />
       ))}
@@ -69,7 +69,7 @@ export function PieChart({
         textAnchor="middle"
         fontFamily="var(--font-mono)"
         fontSize={10}
-        fill="#A599C8"
+        fill="#9BC9D9"
         style={{ textTransform: "uppercase", letterSpacing: "0.2em" }}
       >
         Total
@@ -81,7 +81,7 @@ export function PieChart({
         fontFamily="var(--font-display)"
         fontSize={22}
         fontWeight={600}
-        fill="#EDE7FF"
+        fill="#E8FAFF"
       >
         {total.toLocaleString()}
       </text>
