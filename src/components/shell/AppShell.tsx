@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SideNav } from "@/components/shell/SideNav";
+import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -8,10 +9,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <SideNav />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-white/10 bg-canvas/70 px-6 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/10 bg-canvas/70 px-4 backdrop-blur-xl md:gap-4 md:px-6">
+          <MobileNav />
+
           <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
             <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-emerald" />
-            FORGE · Live
+            <span className="hidden sm:inline">FORGE · Live</span>
+            <span className="sm:hidden">FORGE</span>
           </div>
 
           <div className="ml-4 hidden min-w-0 flex-1 items-center md:flex">
@@ -27,9 +31,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </label>
           </div>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 md:gap-3">
             <SessionClock />
-            <Link href="/settings" className="aur-btn-ghost">
+            <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
               Settings
             </Link>
             <Link
@@ -44,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 ••
               </span>
-              <div className="pr-1 font-mono text-[10px] leading-tight">
+              <div className="hidden pr-1 font-mono text-[10px] leading-tight sm:block">
                 <div className="font-semibold text-text">Sign in</div>
                 <div className="text-muted">Configure account</div>
               </div>
@@ -52,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="relative min-h-[calc(100vh-3.5rem)] flex-1 overflow-x-hidden px-6 py-8 lg:px-10">
+        <main className="relative min-h-[calc(100vh-3.5rem)] flex-1 overflow-x-hidden px-4 py-6 md:px-6 md:py-8 lg:px-10">
           {children}
           <footer className="mt-16 border-t border-white/10 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
