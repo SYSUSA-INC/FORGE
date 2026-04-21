@@ -17,6 +17,12 @@ export function validateEmail(v: string): ValidationResult {
 export function validatePhone(v: string): ValidationResult {
   const trimmed = v.trim();
   if (!trimmed) return null;
+  if (!/^[+\d(]/.test(trimmed)) {
+    return "Phone must start with a digit, +, or (.";
+  }
+  if (!/[\d)]$/.test(trimmed)) {
+    return "Phone must end with a digit.";
+  }
   if (!PHONE_DIGITS_RE.test(trimmed)) {
     return "Phone can only contain digits, spaces, and + - ( ) .";
   }
