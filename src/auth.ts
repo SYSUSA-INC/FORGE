@@ -2,11 +2,41 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { memberships, users, type Role } from "@/db/schema";
 import { authConfig } from "@/auth.config";
 import { verifyPassword } from "@/lib/passwords";
+
+async function enrichFromDb(userId: string): Promise<{
+  isSuperadmin: boolean;
+  organizationId: string | null;
+  role: Role | null;
+}> {
+  const [user] = await db
+    .select({ isSuperadmin: users.isSuperadmin })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const [membership] = await db
+    .select({
+      organizationId: memberships.organizationId,
+      role: memberships.role,
+      status: memberships.status,
+    })
+    .from(memberships)
+    .where(
+      and(eq(memberships.userId, userId), eq(memberships.status, "active")),
+    )
+    .limit(1);
+
+  return {
+    isSuperadmin: user?.isSuperadmin ?? false,
+    organizationId: membership?.organizationId ?? null,
+    role: membership?.role ?? null,
+  };
+}
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db),
@@ -47,4 +77,28 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     }),
     GitHub,
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt({ token, user }) {
+      if (user?.id) {
+        token.id = user.id;
+      }
+      if (token.id) {
+        const enriched = await enrichFromDb(token.id as string);
+        token.isSuperadmin = enriched.isSuperadmin;
+        token.organizationId = enriched.organizationId;
+        token.role = enriched.role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token.id) {
+        session.user.id = token.id as string;
+        session.user.isSuperadmin = token.isSuperadmin ?? false;
+        session.user.organizationId = token.organizationId ?? null;
+        session.user.role = token.role ?? null;
+      }
+      return session;
+    },
+  },
 });

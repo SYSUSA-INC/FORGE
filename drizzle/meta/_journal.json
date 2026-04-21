@@ -15,6 +15,13 @@
       "when": 1776744630942,
       "tag": "0001_add_password_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776745909723,
+      "tag": "0002_add_is_superadmin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { memberships, organizations, users } from "@/db/schema";
 import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
 import { sendVerificationEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
+import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 
 export const runtime = "nodejs";
 
@@ -53,10 +54,32 @@ export async function POST(req: Request) {
       .set({ passwordHash, name: name || null, updatedAt: new Date() })
       .where(eq(users.id, existing.id));
   } else {
-    await db.insert(users).values({
-      email,
-      name: name || null,
-      passwordHash,
+    await db.transaction(async (tx) => {
+      const [user] = await tx
+        .insert(users)
+        .values({
+          email,
+          name: name || null,
+          passwordHash,
+        })
+        .returning({ id: users.id });
+      if (!user) throw new Error("User insert returned empty");
+
+      const [org] = await tx
+        .insert(organizations)
+        .values({
+          name: defaultOrgName(name),
+          slug: defaultOrgSlug(name),
+        })
+        .returning({ id: organizations.id });
+      if (!org) throw new Error("Organization insert returned empty");
+
+      await tx.insert(memberships).values({
+        userId: user.id,
+        organizationId: org.id,
+        role: "admin",
+        status: "active",
+      });
     });
   }
 
