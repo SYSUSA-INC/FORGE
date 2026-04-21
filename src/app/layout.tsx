@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/shell/AppShell";
 
 const display = Inter({
   subsets: ["latin"],
@@ -35,10 +34,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${stencil.variable} ${mono.variable} ${body.variable}`}>
-      <body>
-        <AppShell>{children}</AppShell>
-      </body>
+    <html
+      lang="en"
+      className={`${display.variable} ${stencil.variable} ${mono.variable} ${body.variable}`}
+    >
+      <body>{children}</body>
     </html>
   );
 }
