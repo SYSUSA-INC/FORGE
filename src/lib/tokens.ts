@@ -3,15 +3,16 @@ import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { verificationTokens } from "@/db/schema";
 
-export type TokenPurpose = "verify-email" | "reset-password";
+export type TokenPurpose = "verify-email" | "reset-password" | "invite";
 
 const LIFETIMES_MS: Record<TokenPurpose, number> = {
   "verify-email": 24 * 60 * 60 * 1000,
   "reset-password": 60 * 60 * 1000,
+  invite: 7 * 24 * 60 * 60 * 1000,
 };
 
-function prefix(purpose: TokenPurpose, email: string): string {
-  return `${purpose}:${email.toLowerCase()}`;
+function prefix(purpose: TokenPurpose, subject: string): string {
+  return `${purpose}:${subject.toLowerCase()}`;
 }
 
 function hashToken(token: string): string {
@@ -20,11 +21,11 @@ function hashToken(token: string): string {
 
 export async function issueToken(
   purpose: TokenPurpose,
-  email: string,
+  subject: string,
 ): Promise<string> {
   const raw = randomBytes(32).toString("base64url");
   const hashed = hashToken(raw);
-  const identifier = prefix(purpose, email);
+  const identifier = prefix(purpose, subject);
   const expires = new Date(Date.now() + LIFETIMES_MS[purpose]);
 
   await db
@@ -42,10 +43,10 @@ export async function issueToken(
 
 export async function consumeToken(
   purpose: TokenPurpose,
-  email: string,
+  subject: string,
   rawToken: string,
 ): Promise<boolean> {
-  const identifier = prefix(purpose, email);
+  const identifier = prefix(purpose, subject);
   const hashed = hashToken(rawToken);
 
   const [row] = await db

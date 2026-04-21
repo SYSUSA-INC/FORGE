@@ -141,3 +141,52 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
     text: `Reset your Forge password by visiting: ${url}\n\nThis link expires in 1 hour.`,
   });
 }
+
+export async function sendInviteEmail(opts: {
+  to: string;
+  inviteId: string;
+  token: string;
+  organizationName: string;
+  inviterName: string;
+  role: string;
+}): Promise<void> {
+  const url = `${baseUrl()}/sign-up?invite=${encodeURIComponent(
+    opts.token,
+  )}&id=${encodeURIComponent(opts.inviteId)}`;
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#e6edf7;">You&#39;re invited to Forge</h1>
+    <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:#94a3b8;">
+      ${escapeHtml(opts.inviterName)} has invited you to join <strong style="color:#e6edf7;">${escapeHtml(
+        opts.organizationName,
+      )}</strong> on Forge as <strong style="color:#e6edf7;">${escapeHtml(
+        opts.role,
+      )}</strong>. Click below to create your account.
+      The link expires in 7 days.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Accept invitation</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#64748b;">
+      If the button doesn&#39;t work, paste this URL in your browser:<br/>
+      <span style="color:#94a3b8;word-break:break-all;">${url}</span>
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:#64748b;">
+      Not expecting this? You can safely ignore this email.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `You're invited to ${opts.organizationName} on Forge`,
+    html: emailShell("You're invited to Forge", body),
+    text: `${opts.inviterName} has invited you to join ${opts.organizationName} on Forge.\nAccept: ${url}\n\nThis link expires in 7 days.`,
+  });
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

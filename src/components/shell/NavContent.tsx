@@ -4,29 +4,39 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/", label: "Command", icon: "▦", group: "ops" },
-  { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops" },
-  { href: "/solicitations", label: "Solicitations", icon: "✦", group: "ops" },
-  { href: "/proposals", label: "Proposals", icon: "❑", group: "ops" },
-  { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel" },
-  { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel" },
-  { href: "/settings", label: "Settings", icon: "⚙", group: "intel" },
+  { href: "/", label: "Command", icon: "▦", group: "ops", admin: false },
+  { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops", admin: false },
+  { href: "/solicitations", label: "Solicitations", icon: "✦", group: "ops", admin: false },
+  { href: "/proposals", label: "Proposals", icon: "❑", group: "ops", admin: false },
+  { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel", admin: false },
+  { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel", admin: false },
+  { href: "/users", label: "Users", icon: "☰", group: "admin", admin: true },
+  { href: "/settings", label: "Settings", icon: "⚙", group: "admin", admin: false },
 ] as const;
 
 const GROUPS: Record<string, string> = {
   ops: "Operations",
   intel: "Intelligence",
+  admin: "Administration",
 };
 
-const GROUP_ORDER = ["ops", "intel"];
+const GROUP_ORDER = ["ops", "intel", "admin"];
 
-export function NavContent({ onNavigate }: { onNavigate?: () => void }) {
+export function NavContent({
+  onNavigate,
+  isOrgAdmin = false,
+}: {
+  onNavigate?: () => void;
+  isOrgAdmin?: boolean;
+}) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname === href || (pathname?.startsWith(href + "/") ?? false);
   };
+
+  const visible = NAV.filter((n) => !n.admin || isOrgAdmin);
 
   return (
     <>
@@ -62,45 +72,49 @@ export function NavContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="mt-6 flex flex-1 flex-col gap-6 overflow-y-auto px-3 pb-6">
-        {GROUP_ORDER.map((g) => (
-          <div key={g}>
-            <div className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-subtle">
-              {GROUPS[g]}
-            </div>
-            <ul className="flex flex-col gap-0.5">
-              {NAV.filter((n) => n.group === g).map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={onNavigate}
-                      className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        active
-                          ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)]"
-                          : "text-muted hover:bg-white/[0.04] hover:text-text"
-                      }`}
-                    >
-                      {active && (
-                        <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal via-emerald to-magenta" />
-                      )}
-                      <span
-                        className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
+        {GROUP_ORDER.map((g) => {
+          const items = visible.filter((n) => n.group === g);
+          if (items.length === 0) return null;
+          return (
+            <div key={g}>
+              <div className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-subtle">
+                {GROUPS[g]}
+              </div>
+              <ul className="flex flex-col gap-0.5">
+                {items.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                           active
-                            ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
-                            : "bg-white/5 text-muted"
+                            ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)]"
+                            : "text-muted hover:bg-white/[0.04] hover:text-text"
                         }`}
                       >
-                        {item.icon}
-                      </span>
-                      <span className="font-medium">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                        {active && (
+                          <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal via-emerald to-magenta" />
+                        )}
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
+                            active
+                              ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
+                              : "bg-white/5 text-muted"
+                          }`}
+                        >
+                          {item.icon}
+                        </span>
+                        <span className="font-medium">{item.label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       <div className="border-t border-white/10 p-4">
