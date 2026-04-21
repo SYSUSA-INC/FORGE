@@ -39,6 +39,7 @@ export async function sendEmail(opts: {
 function baseUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL ?? process.env.AUTH_URL;
   if (explicit) return explicit.replace(/\/+$/, "");
+  if (process.env.VERCEL_ENV === "production") return "https://www.sysgov.com";
   const vercel = process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
   return "https://www.sysgov.com";
@@ -96,7 +97,7 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
       The link expires in 24 hours.
     </p>
     <p style="margin:24px 0;">
-      <a href="${url}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:linear-gradient(135deg,#2DD4BF,#34D399);color:#0b1220;text-decoration:none;font-weight:600;font-size:14px;">Verify email</a>
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Verify email</a>
     </p>
     <p style="margin:0;font-size:12px;color:#64748b;">
       If the button doesn't work, paste this URL in your browser:<br/>
@@ -123,7 +124,7 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
       The link expires in 1 hour.
     </p>
     <p style="margin:24px 0;">
-      <a href="${url}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:linear-gradient(135deg,#2DD4BF,#34D399);color:#0b1220;text-decoration:none;font-weight:600;font-size:14px;">Reset password</a>
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Reset password</a>
     </p>
     <p style="margin:0;font-size:12px;color:#64748b;">
       If the button doesn't work, paste this URL in your browser:<br/>
