@@ -13,6 +13,11 @@ import {
   type PastPerformance,
 } from "@/lib/org-types";
 import {
+  hasErrors,
+  validateOrgProfile,
+  type OrgProfileErrors,
+} from "@/lib/validators";
+import {
   applySamGovSyncAction,
   saveOrgProfileAction,
 } from "./actions";
@@ -47,6 +52,12 @@ export function SettingsClient({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, startSaveTransition] = useTransition();
 
+  const errors: OrgProfileErrors = useMemo(
+    () => validateOrgProfile(draft),
+    [draft],
+  );
+  const invalid = hasErrors(errors);
+
   function update<K extends keyof OrgProfile>(key: K, value: OrgProfile[K]) {
     if (!canEdit) return;
     setDraft((d) => ({ ...d, [key]: value }));
@@ -55,6 +66,10 @@ export function SettingsClient({
 
   function handleSave() {
     if (!canEdit) return;
+    if (invalid) {
+      setSaveError("Fix the highlighted fields before saving.");
+      return;
+    }
     setSaveError(null);
     startSaveTransition(async () => {
       const res = await saveOrgProfileAction(draft);
@@ -96,7 +111,8 @@ export function SettingsClient({
               <button
                 className="aur-btn aur-btn-primary"
                 onClick={handleSave}
-                disabled={!dirty || saving}
+                disabled={!dirty || saving || invalid}
+                title={invalid ? "Fix the highlighted fields first" : undefined}
               >
                 {saving ? "Saving…" : "Save changes"}
               </button>
@@ -128,7 +144,12 @@ export function SettingsClient({
       </nav>
 
       {tab === "organization" && (
-        <OrganizationTab draft={draft} update={update} canEdit={canEdit} />
+        <OrganizationTab
+          draft={draft}
+          update={update}
+          canEdit={canEdit}
+          errors={errors}
+        />
       )}
       {tab === "users" && <PlaceholderTab title="Users & Roles" />}
       {tab === "integrations" && <PlaceholderTab title="Integrations" />}
@@ -141,10 +162,12 @@ function OrganizationTab({
   draft,
   update,
   canEdit,
+  errors,
 }: {
   draft: OrgProfile;
   update: <K extends keyof OrgProfile>(key: K, value: OrgProfile[K]) => void;
   canEdit: boolean;
+  errors: OrgProfileErrors;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -166,6 +189,9 @@ function OrganizationTab({
             value={draft.website}
             onChange={(v) => update("website", v)}
             placeholder="https://example.com"
+            type="url"
+            inputMode="url"
+            error={errors.website}
           />
         </div>
       </Panel>
@@ -184,14 +210,21 @@ function OrganizationTab({
           />
           <TextField
             label="Phone"
+            type="tel"
+            inputMode="tel"
             value={draft.phone}
             onChange={(v) => update("phone", v)}
+            placeholder="(202) 555-0100"
+            error={errors.phone}
           />
           <TextField
             label="Email"
             type="email"
+            inputMode="email"
             value={draft.email}
             onChange={(v) => update("email", v)}
+            placeholder="name@company.com"
+            error={errors.email}
           />
         </div>
       </Panel>
@@ -203,34 +236,46 @@ function OrganizationTab({
             label="Line 1"
             value={draft.address.line1}
             onChange={(v) => update("address", { ...draft.address, line1: v })}
+            error={errors.addressLine1}
           />
           <TextField
             className="md:col-span-3"
             label="Line 2"
             value={draft.address.line2}
             onChange={(v) => update("address", { ...draft.address, line2: v })}
+            error={errors.addressLine2}
           />
           <TextField
             className="md:col-span-2"
             label="City"
             value={draft.address.city}
             onChange={(v) => update("address", { ...draft.address, city: v })}
+            error={errors.city}
           />
           <TextField
             label="State"
             value={draft.address.state}
-            onChange={(v) => update("address", { ...draft.address, state: v })}
+            onChange={(v) =>
+              update("address", { ...draft.address, state: v.toUpperCase() })
+            }
+            autoCapitalize="characters"
+            placeholder="VA"
+            error={errors.state}
           />
           <TextField
             label="ZIP"
             value={draft.address.zip}
             onChange={(v) => update("address", { ...draft.address, zip: v })}
+            inputMode="numeric"
+            placeholder="20001"
+            error={errors.zip}
           />
           <TextField
             className="md:col-span-2"
             label="Country"
             value={draft.address.country}
             onChange={(v) => update("address", { ...draft.address, country: v })}
+            error={errors.country}
           />
         </div>
       </Panel>
@@ -240,17 +285,26 @@ function OrganizationTab({
           <TextField
             label="UEI"
             value={draft.uei}
-            onChange={(v) => update("uei", v)}
+            onChange={(v) => update("uei", v.toUpperCase())}
+            autoCapitalize="characters"
+            placeholder="12-character ID"
+            error={errors.uei}
           />
           <TextField
             label="CAGE code"
             value={draft.cageCode}
-            onChange={(v) => update("cageCode", v)}
+            onChange={(v) => update("cageCode", v.toUpperCase())}
+            autoCapitalize="characters"
+            placeholder="5 characters"
+            error={errors.cageCode}
           />
           <TextField
             label="DUNS"
             value={draft.dunsNumber}
             onChange={(v) => update("dunsNumber", v)}
+            inputMode="numeric"
+            placeholder="9 digits"
+            error={errors.dunsNumber}
           />
         </div>
       </Panel>
@@ -285,6 +339,9 @@ function OrganizationTab({
             label="Primary NAICS"
             value={draft.primaryNaics}
             onChange={(v) => update("primaryNaics", v)}
+            inputMode="numeric"
+            placeholder="6-digit NAICS code"
+            error={errors.primaryNaics}
           />
           <ChipEditor
             label="NAICS list"
@@ -793,6 +850,10 @@ function TextField({
   placeholder,
   type = "text",
   className,
+  error,
+  onBlur,
+  inputMode,
+  autoCapitalize,
 }: {
   label: string;
   value: string;
@@ -800,17 +861,29 @@ function TextField({
   placeholder?: string;
   type?: string;
   className?: string;
+  error?: string | null;
+  onBlur?: () => void;
+  inputMode?: "text" | "email" | "tel" | "url" | "numeric";
+  autoCapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
 }) {
+  const hasError = !!error;
   return (
     <div className={className}>
       <label className="aur-label">{label}</label>
       <input
-        className="aur-input"
+        className={`aur-input ${hasError ? "border-rose/50 focus:border-rose/70" : ""}`}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         placeholder={placeholder}
+        inputMode={inputMode}
+        autoCapitalize={autoCapitalize}
+        aria-invalid={hasError || undefined}
       />
+      {hasError ? (
+        <div className="mt-1 font-mono text-[10px] text-rose">{error}</div>
+      ) : null}
     </div>
   );
 }

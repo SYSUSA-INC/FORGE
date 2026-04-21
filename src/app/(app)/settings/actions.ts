@@ -7,12 +7,21 @@ import { organizations } from "@/db/schema";
 import { requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { fetchSamGovByUei } from "@/lib/samgov";
 import type { OrgProfile } from "@/lib/org-types";
+import { hasErrors, validateOrgProfile } from "@/lib/validators";
 
 export async function saveOrgProfileAction(profile: OrgProfile): Promise<
   { ok: true } | { ok: false; error: string }
 > {
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
+
+  const errors = validateOrgProfile(profile);
+  if (hasErrors(errors)) {
+    const first =
+      Object.values(errors).find((v) => typeof v === "string" && v.length > 0) ??
+      "Invalid input.";
+    return { ok: false, error: first };
+  }
 
   try {
     await db
