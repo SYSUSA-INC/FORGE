@@ -83,7 +83,7 @@ export default function PipelinePage() {
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Panel eyebrow="Pipeline funnel" title="By stage">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px] lg:items-center">
-            <div className="h-[540px]">
+            <div className="relative mx-auto aspect-[560/540] w-full max-w-[560px] overflow-hidden">
               <Funnel stages={pipelineStages} width={560} height={540} />
             </div>
             <FunnelLegend stages={pipelineStages} />
