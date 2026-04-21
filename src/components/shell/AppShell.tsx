@@ -2,8 +2,13 @@ import Link from "next/link";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
+import { UserMenu } from "@/components/auth/UserMenu";
+import { auth } from "@/auth";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const user = session?.user ?? null;
+
   return (
     <div className="flex min-h-screen text-text">
       <SideNav />
@@ -36,23 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
               Settings
             </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1 transition-colors hover:border-white/20"
-            >
-              <span
-                className="grid h-7 w-7 place-items-center rounded-full font-mono text-[10px] font-bold text-white"
-                style={{
-                  background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
-                }}
-              >
-                ••
-              </span>
-              <div className="hidden pr-1 font-mono text-[10px] leading-tight sm:block">
-                <div className="font-semibold text-text">Sign in</div>
-                <div className="text-muted">Configure account</div>
-              </div>
-            </Link>
+            <UserMenu user={user} />
           </div>
         </header>
 
