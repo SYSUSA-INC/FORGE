@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -9,6 +10,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const roleEnum = pgEnum("role", [
   "admin",
@@ -87,6 +89,92 @@ export const organizations = pgTable("organization", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: varchar("slug", { length: 64 }).notNull().unique(),
+  website: text("website").notNull().default(""),
+
+  contactName: text("contact_name").notNull().default(""),
+  contactTitle: text("contact_title").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  email: text("email").notNull().default(""),
+
+  addressLine1: text("address_line1").notNull().default(""),
+  addressLine2: text("address_line2").notNull().default(""),
+  city: text("city").notNull().default(""),
+  state: text("state").notNull().default(""),
+  zip: text("zip").notNull().default(""),
+  country: text("country").notNull().default("USA"),
+
+  uei: text("uei").notNull().default(""),
+  cageCode: text("cage_code").notNull().default(""),
+  dunsNumber: text("duns_number").notNull().default(""),
+
+  companySecurityLevel: text("company_security_level").notNull().default("None"),
+  employeeSecurityLevel: text("employee_security_level").notNull().default("None"),
+  dcaaCompliant: boolean("dcaa_compliant").notNull().default(false),
+
+  primaryNaics: text("primary_naics").notNull().default(""),
+  naicsList: text("naics_list")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  pscCodes: text("psc_codes")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+
+  socioEconomic: jsonb("socio_economic")
+    .$type<{
+      sba8a: boolean;
+      smallBusiness: boolean;
+      sdb: boolean;
+      wosb: boolean;
+      sdvosb: boolean;
+      hubzone: boolean;
+    }>()
+    .notNull()
+    .default({
+      sba8a: false,
+      smallBusiness: false,
+      sdb: false,
+      wosb: false,
+      sdvosb: false,
+      hubzone: false,
+    }),
+
+  contractingVehicles: jsonb("contracting_vehicles")
+    .$type<
+      {
+        id: string;
+        name: string;
+        category: "civilian" | "dow";
+        isCustom: boolean;
+      }[]
+    >()
+    .notNull()
+    .default([]),
+
+  pastPerformance: jsonb("past_performance")
+    .$type<
+      {
+        id: string;
+        customer: string;
+        contract: string;
+        value: string;
+        periodStart: string;
+        periodEnd: string;
+        description: string;
+      }[]
+    >()
+    .notNull()
+    .default([]),
+
+  searchKeywords: text("search_keywords")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+
+  syncSource: text("sync_source").notNull().default("none"),
+  lastSyncedAt: timestamp("last_synced_at"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -22,6 +22,13 @@
       "when": 1776745909723,
       "tag": "0002_add_is_superadmin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776792006711,
+      "tag": "0003_add_org_profile_fields",
+      "breakpoints": true
     }
   ]
 }

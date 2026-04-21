@@ -1,0 +1,26 @@
+ALTER TABLE "organization" ADD COLUMN "website" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "contact_name" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "contact_title" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "phone" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "email" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "address_line1" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "address_line2" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "city" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "state" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "zip" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "country" text DEFAULT 'USA' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "uei" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "cage_code" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "duns_number" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "company_security_level" text DEFAULT 'None' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "employee_security_level" text DEFAULT 'None' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "dcaa_compliant" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "primary_naics" text DEFAULT '' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "naics_list" text[] DEFAULT ARRAY[]::text[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "psc_codes" text[] DEFAULT ARRAY[]::text[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "socio_economic" jsonb DEFAULT '{"sba8a":false,"smallBusiness":false,"sdb":false,"wosb":false,"sdvosb":false,"hubzone":false}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "contracting_vehicles" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "past_performance" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "search_keywords" text[] DEFAULT ARRAY[]::text[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "sync_source" text DEFAULT 'none' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization" ADD COLUMN "last_synced_at" timestamp;

@@ -37,10 +37,11 @@ export function Funnel({
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full w-full">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-full w-full"
+        preserveAspectRatio="xMidYMid meet"
+        className="absolute inset-0 h-full w-full"
         role="img"
         aria-label="Pipeline funnel"
       >
