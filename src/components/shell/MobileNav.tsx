@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavContent } from "@/components/shell/NavContent";
 
-export function MobileNav({ isOrgAdmin = false }: { isOrgAdmin?: boolean }) {
+export function MobileNav({
+  isOrgAdmin = false,
+  isSuperadmin = false,
+}: {
+  isOrgAdmin?: boolean;
+  isSuperadmin?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -72,7 +78,11 @@ export function MobileNav({ isOrgAdmin = false }: { isOrgAdmin?: boolean }) {
         >
           ✕
         </button>
-        <NavContent onNavigate={() => setOpen(false)} isOrgAdmin={isOrgAdmin} />
+        <NavContent
+          onNavigate={() => setOpen(false)}
+          isOrgAdmin={isOrgAdmin}
+          isSuperadmin={isSuperadmin}
+        />
       </aside>
     </>
   );

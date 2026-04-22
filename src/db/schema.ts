@@ -37,6 +37,7 @@ export const users = pgTable("user", {
   image: text("image"),
   passwordHash: text("password_hash"),
   isSuperadmin: boolean("is_superadmin").notNull().default(false),
+  disabledAt: timestamp("disabled_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -174,6 +175,8 @@ export const organizations = pgTable("organization", {
 
   syncSource: text("sync_source").notNull().default("none"),
   lastSyncedAt: timestamp("last_synced_at"),
+
+  disabledAt: timestamp("disabled_at"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
