@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
-export function SignUpForm() {
+type InviteProps = { id: string; token: string; email: string };
+
+export function SignUpForm({ invite }: { invite?: InviteProps }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invite?.email ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,15 +28,29 @@ export function SignUpForm() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          inviteId: invite?.id,
+          inviteToken: invite?.token,
+        }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        verified?: boolean;
+      };
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Something went wrong. Try again.");
         setLoading(false);
         return;
       }
-      router.push("/sign-up?sent=1");
+      if (invite || data.verified) {
+        router.push("/sign-in?verified=1");
+      } else {
+        router.push("/sign-up?sent=1");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Try again.");
       setLoading(false);
@@ -64,7 +80,14 @@ export function SignUpForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          readOnly={!!invite}
+          aria-disabled={!!invite}
         />
+        {invite ? (
+          <div className="mt-1 font-mono text-[10px] text-muted">
+            Tied to the invitation — cannot be changed.
+          </div>
+        ) : null}
       </div>
 
       <div>
@@ -106,7 +129,7 @@ export function SignUpForm() {
         disabled={loading}
         className="aur-btn aur-btn-primary mt-2 flex items-center justify-center py-3 text-sm disabled:opacity-60"
       >
-        {loading ? "Creating account…" : "Create account"}
+        {loading ? "Creating account…" : invite ? "Accept and create account" : "Create account"}
       </button>
     </form>
   );

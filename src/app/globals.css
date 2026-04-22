@@ -127,6 +127,11 @@
   .aur-input {
     @apply w-full border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-sm text-text placeholder:text-subtle focus:border-teal/60 focus:bg-white/[0.06] outline-none;
     border-radius: 10px;
+    color-scheme: dark;
+  }
+  .aur-input option {
+    background-color: #0f172a;
+    color: #e6edf7;
   }
   .brut-input { @apply aur-input; }
 
