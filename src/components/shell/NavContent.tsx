@@ -4,30 +4,34 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/", label: "Command", icon: "▦", group: "ops", admin: false },
-  { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops", admin: false },
-  { href: "/solicitations", label: "Solicitations", icon: "✦", group: "ops", admin: false },
-  { href: "/proposals", label: "Proposals", icon: "❑", group: "ops", admin: false },
-  { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel", admin: false },
-  { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel", admin: false },
-  { href: "/users", label: "Users", icon: "☰", group: "admin", admin: true },
-  { href: "/settings", label: "Settings", icon: "⚙", group: "admin", admin: false },
+  { href: "/", label: "Command", icon: "▦", group: "ops", admin: false, superadmin: false },
+  { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops", admin: false, superadmin: false },
+  { href: "/solicitations", label: "Solicitations", icon: "✦", group: "ops", admin: false, superadmin: false },
+  { href: "/proposals", label: "Proposals", icon: "❑", group: "ops", admin: false, superadmin: false },
+  { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel", admin: false, superadmin: false },
+  { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel", admin: false, superadmin: false },
+  { href: "/users", label: "Users", icon: "☰", group: "admin", admin: true, superadmin: false },
+  { href: "/settings", label: "Settings", icon: "⚙", group: "admin", admin: false, superadmin: false },
+  { href: "/admin", label: "Platform admin", icon: "✱", group: "platform", admin: false, superadmin: true },
 ] as const;
 
 const GROUPS: Record<string, string> = {
   ops: "Operations",
   intel: "Intelligence",
   admin: "Administration",
+  platform: "Platform",
 };
 
-const GROUP_ORDER = ["ops", "intel", "admin"];
+const GROUP_ORDER = ["ops", "intel", "admin", "platform"];
 
 export function NavContent({
   onNavigate,
   isOrgAdmin = false,
+  isSuperadmin = false,
 }: {
   onNavigate?: () => void;
   isOrgAdmin?: boolean;
+  isSuperadmin?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -36,7 +40,11 @@ export function NavContent({
     return pathname === href || (pathname?.startsWith(href + "/") ?? false);
   };
 
-  const visible = NAV.filter((n) => !n.admin || isOrgAdmin);
+  const visible = NAV.filter((n) => {
+    if (n.superadmin && !isSuperadmin) return false;
+    if (n.admin && !isOrgAdmin && !isSuperadmin) return false;
+    return true;
+  });
 
   return (
     <>

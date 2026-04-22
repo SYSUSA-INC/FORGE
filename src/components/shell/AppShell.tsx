@@ -8,15 +8,16 @@ import { auth } from "@/auth";
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const user = session?.user ?? null;
-  const isOrgAdmin = (user?.role === "admin" || user?.isSuperadmin) ?? false;
+  const isSuperadmin = user?.isSuperadmin ?? false;
+  const isOrgAdmin = (user?.role === "admin" || isSuperadmin) ?? false;
 
   return (
     <div className="flex min-h-screen text-text">
-      <SideNav isOrgAdmin={isOrgAdmin} />
+      <SideNav isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/10 bg-canvas/70 px-4 backdrop-blur-xl md:gap-4 md:px-6">
-          <MobileNav isOrgAdmin={isOrgAdmin} />
+          <MobileNav isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
 
           <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
             <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-emerald" />
