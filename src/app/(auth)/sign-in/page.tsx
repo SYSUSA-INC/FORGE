@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { SsoButtons } from "@/components/auth/SsoButtons";
 import { SignInForm } from "./SignInForm";
 
 export default async function SignInPage({
@@ -66,6 +67,16 @@ export default async function SignInPage({
           ) : null}
 
           <SignInForm callbackUrl={searchParams.callbackUrl} />
+
+          <div className="relative my-6 flex items-center">
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="px-3 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              or
+            </span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+
+          <SsoButtons callbackUrl={searchParams.callbackUrl} mode="sign-in" />
 
           <div className="mt-4 flex justify-between font-mono text-[11px]">
             <Link href="/forgot-password" className="text-muted hover:text-text">

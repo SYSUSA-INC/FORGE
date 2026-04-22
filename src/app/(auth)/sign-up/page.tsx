@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { allowlist, organizations } from "@/db/schema";
+import { SsoButtons } from "@/components/auth/SsoButtons";
 import { SignUpForm } from "./SignUpForm";
 
 export const dynamic = "force-dynamic";
@@ -160,6 +161,16 @@ export default async function SignUpPage({
               </p>
 
               <SignUpForm />
+
+              <div className="relative my-6 flex items-center">
+                <span className="h-px flex-1 bg-white/10" />
+                <span className="px-3 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+                  or
+                </span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+
+              <SsoButtons mode="sign-up" />
 
               <p className="mt-6 text-center text-[12px] text-muted">
                 Already have an account?{" "}
