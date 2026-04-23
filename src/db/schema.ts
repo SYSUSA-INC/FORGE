@@ -279,3 +279,64 @@ export const opportunities = pgTable("opportunity", {
 export type Opportunity = typeof opportunities.$inferSelect;
 export type NewOpportunity = typeof opportunities.$inferInsert;
 export type OpportunityStage = (typeof opportunityStageEnum.enumValues)[number];
+
+export const opportunityActivityKindEnum = pgEnum("opportunity_activity_kind", [
+  "note",
+  "meeting",
+  "action",
+  "stage_change",
+  "gate_decision",
+  "evaluation_update",
+  "competitor_update",
+  "owner_change",
+]);
+
+export const opportunityActivities = pgTable("opportunity_activity", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  opportunityId: uuid("opportunity_id")
+    .notNull()
+    .references(() => opportunities.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  kind: opportunityActivityKindEnum("kind").notNull().default("note"),
+  title: text("title").notNull().default(""),
+  body: text("body").notNull().default(""),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const opportunityCompetitors = pgTable("opportunity_competitor", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  opportunityId: uuid("opportunity_id")
+    .notNull()
+    .references(() => opportunities.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  isIncumbent: boolean("is_incumbent").notNull().default(false),
+  pastPerformance: text("past_performance").notNull().default(""),
+  strengths: text("strengths").notNull().default(""),
+  weaknesses: text("weaknesses").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const opportunityEvaluations = pgTable("opportunity_evaluation", {
+  opportunityId: uuid("opportunity_id")
+    .primaryKey()
+    .references(() => opportunities.id, { onDelete: "cascade" }),
+  strategicFit: integer("strategic_fit").notNull().default(0),
+  customerRelationship: integer("customer_relationship").notNull().default(0),
+  competitivePosture: integer("competitive_posture").notNull().default(0),
+  resourceAvailability: integer("resource_availability").notNull().default(0),
+  financialAttractiveness: integer("financial_attractiveness").notNull().default(0),
+  rationale: text("rationale").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type OpportunityActivity = typeof opportunityActivities.$inferSelect;
+export type NewOpportunityActivity = typeof opportunityActivities.$inferInsert;
+export type OpportunityActivityKind =
+  (typeof opportunityActivityKindEnum.enumValues)[number];
+export type OpportunityCompetitor = typeof opportunityCompetitors.$inferSelect;
+export type NewOpportunityCompetitor = typeof opportunityCompetitors.$inferInsert;
+export type OpportunityEvaluation = typeof opportunityEvaluations.$inferSelect;
+export type NewOpportunityEvaluation = typeof opportunityEvaluations.$inferInsert;
