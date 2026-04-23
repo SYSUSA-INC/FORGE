@@ -43,6 +43,13 @@
       "when": 1776950193729,
       "tag": "0005_add_opportunity_table",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776970069255,
+      "tag": "0006_add_evaluation_tables",
+      "breakpoints": true
     }
   ]
 }
