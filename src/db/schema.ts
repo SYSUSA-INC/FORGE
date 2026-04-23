@@ -340,3 +340,92 @@ export type OpportunityCompetitor = typeof opportunityCompetitors.$inferSelect;
 export type NewOpportunityCompetitor = typeof opportunityCompetitors.$inferInsert;
 export type OpportunityEvaluation = typeof opportunityEvaluations.$inferSelect;
 export type NewOpportunityEvaluation = typeof opportunityEvaluations.$inferInsert;
+
+export const proposalStageEnum = pgEnum("proposal_stage", [
+  "draft",
+  "pink_team",
+  "red_team",
+  "gold_team",
+  "white_gloves",
+  "submitted",
+  "awarded",
+  "lost",
+  "no_bid",
+  "archived",
+]);
+
+export const proposalSectionKindEnum = pgEnum("proposal_section_kind", [
+  "executive_summary",
+  "technical",
+  "management",
+  "past_performance",
+  "pricing",
+  "compliance",
+]);
+
+export const proposalSectionStatusEnum = pgEnum("proposal_section_status", [
+  "not_started",
+  "in_progress",
+  "draft_complete",
+  "in_review",
+  "approved",
+]);
+
+export const proposals = pgTable("proposal", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  opportunityId: uuid("opportunity_id")
+    .notNull()
+    .references(() => opportunities.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  stage: proposalStageEnum("stage").notNull().default("draft"),
+  submittedAt: timestamp("submitted_at", { mode: "date" }),
+  proposalManagerUserId: text("proposal_manager_user_id").references(
+    () => users.id,
+    { onDelete: "set null" },
+  ),
+  captureManagerUserId: text("capture_manager_user_id").references(
+    () => users.id,
+    { onDelete: "set null" },
+  ),
+  pricingLeadUserId: text("pricing_lead_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  notes: text("notes").notNull().default(""),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const proposalSections = pgTable("proposal_section", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proposalId: uuid("proposal_id")
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  kind: proposalSectionKindEnum("kind").notNull(),
+  title: text("title").notNull(),
+  ordering: integer("ordering").notNull().default(0),
+  content: text("content").notNull().default(""),
+  status: proposalSectionStatusEnum("status").notNull().default("not_started"),
+  wordCount: integer("word_count").notNull().default(0),
+  pageLimit: integer("page_limit"),
+  authorUserId: text("author_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Proposal = typeof proposals.$inferSelect;
+export type NewProposal = typeof proposals.$inferInsert;
+export type ProposalStage = (typeof proposalStageEnum.enumValues)[number];
+export type ProposalSection = typeof proposalSections.$inferSelect;
+export type NewProposalSection = typeof proposalSections.$inferInsert;
+export type ProposalSectionKind =
+  (typeof proposalSectionKindEnum.enumValues)[number];
+export type ProposalSectionStatus =
+  (typeof proposalSectionStatusEnum.enumValues)[number];

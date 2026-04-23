@@ -1,219 +1,62 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Proposal } from "@/lib/mock";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import {
-  proposalsStore,
-  makeProposalCode,
-  daysUntil,
-} from "@/lib/proposalsStore";
-import { recordProposalCreated } from "@/lib/intelligence";
+  listOpportunitiesForProposal,
+  listProposalTeamCandidates,
+} from "../actions";
+import { NewProposalForm } from "./NewProposalForm";
 
-export default function NewProposalPage() {
-  const router = useRouter();
-  const [form, setForm] = useState({
-    code: "",
-    title: "",
-    solicitation: "",
-    agency: "",
-    captureManager: "",
-    proposalManager: "",
-    dueAt: "",
-    pagesLimit: 200,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+export const dynamic = "force-dynamic";
 
-  const suggestedCode = useMemo(() => makeProposalCode(), []);
-
-  const update = (k: keyof typeof form) => (v: string | number) =>
-    setForm((f) => ({ ...f, [k]: v }));
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      setError("A title is required.");
-      return;
-    }
-    setSubmitting(true);
-    const code = form.code.trim() || suggestedCode;
-    const proposal: Proposal = {
-      id: code,
-      code,
-      title: form.title.trim(),
-      solicitation: form.solicitation.trim(),
-      agency: form.agency.trim(),
-      status: "PLANNING",
-      captureManager: form.captureManager.trim(),
-      proposalManager: form.proposalManager.trim(),
-      dueAt: form.dueAt,
-      daysLeft: daysUntil(form.dueAt),
-      progress: 0,
-      aiPct: 0,
-      pagesEstimated: 0,
-      pagesLimit: Number(form.pagesLimit) || 200,
-      compliancePct: 0,
-    };
-    proposalsStore.add(proposal);
-    recordProposalCreated(proposal);
-    router.push("/proposals");
-  };
+export default async function NewProposalPage({
+  searchParams,
+}: {
+  searchParams: { opportunityId?: string };
+}) {
+  const user = await requireAuth();
+  await requireCurrentOrg();
+  const [opps, team] = await Promise.all([
+    listOpportunitiesForProposal(),
+    listProposalTeamCandidates(),
+  ]);
 
   return (
     <>
       <PageHeader
-        eyebrow="Proposals — Initiate"
+        eyebrow="Proposals"
         title="New proposal"
-        subtitle="Create a proposal record. It will appear on the Kanban board and Proposal register; drag to change phase. The intelligence layer captures each event."
+        subtitle="Create a proposal tied to an opportunity. Default sections and a draft stage will be set up automatically."
         actions={
-          <Link href="/proposals" className="aur-btn">
+          <Link href="/proposals" className="aur-btn aur-btn-ghost">
             Cancel
           </Link>
         }
       />
-
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <Panel title="Proposal configuration">
-          <div className="grid grid-cols-2 gap-3">
-            <Field
-              label="Proposal code"
-              value={form.code}
-              onChange={update("code")}
-              placeholder={suggestedCode}
-            />
-            <Field
-              label="Page limit"
-              value={String(form.pagesLimit)}
-              onChange={(v) => update("pagesLimit")(Number(v) || 0)}
-              placeholder="200"
-            />
-            <Field
-              label="Title"
-              value={form.title}
-              onChange={update("title")}
-              placeholder="Short, memorable proposal name"
-              full
-              required
-            />
-            <Field
-              label="Solicitation"
-              value={form.solicitation}
-              onChange={update("solicitation")}
-              placeholder="SOL number (optional)"
-            />
-            <Field
-              label="Agency"
-              value={form.agency}
-              onChange={update("agency")}
-              placeholder="Dept. / bureau"
-            />
-            <Field
-              label="Capture manager"
-              value={form.captureManager}
-              onChange={update("captureManager")}
-              placeholder="Owner"
-            />
-            <Field
-              label="Proposal manager"
-              value={form.proposalManager}
-              onChange={update("proposalManager")}
-              placeholder="Owner"
-            />
-            <Field
-              label="Due date"
-              value={form.dueAt}
-              onChange={update("dueAt")}
-              placeholder="YYYY-MM-DD"
-              type="date"
-            />
-          </div>
-
-          {error ? (
-            <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="mt-5 flex items-center justify-end gap-2">
-            <Link href="/proposals" className="aur-btn">
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="aur-btn-primary"
+      <Panel title="Proposal setup">
+        {opps.length === 0 ? (
+          <div className="flex flex-col gap-3 font-mono text-[12px] text-muted">
+            <p>
+              You need an opportunity before you can create a proposal. Go create
+              one first.
+            </p>
+            <Link
+              href="/opportunities/new"
+              className="aur-btn aur-btn-primary self-start"
             >
-              {submitting ? "Creating…" : "Create proposal"}
-            </button>
+              Create an opportunity
+            </Link>
           </div>
-        </Panel>
-
-        <Panel title="What happens next">
-          <ol className="flex flex-col gap-3 pl-5 text-[13px] leading-relaxed text-muted">
-            <li className="list-decimal">
-              The proposal lands in the <span className="text-text">Planning</span> column of
-              the Kanban board.
-            </li>
-            <li className="list-decimal">
-              Drag it across columns to advance it through the 10 phases (Planning →
-              Submitted).
-            </li>
-            <li className="list-decimal">
-              The{" "}
-              <Link href="/intelligence" className="underline underline-offset-2">
-                intelligence layer
-              </Link>{" "}
-              records an artifact + signal on create, and a velocity signal per phase move.
-            </li>
-            <li className="list-decimal">
-              Open the proposal to draft sections, run compliance, and kick off review
-              cycles.
-            </li>
-          </ol>
-          <div className="mt-4 rounded-md border border-dashed border-white/10 px-3 py-2 font-mono text-[11px] text-subtle">
-            Stored locally in your browser. Backend persistence ships with the Postgres
-            migration.
-          </div>
-        </Panel>
-      </form>
+        ) : (
+          <NewProposalForm
+            opportunities={opps}
+            teamCandidates={team}
+            currentUserId={user.id}
+            defaultOpportunityId={searchParams.opportunityId}
+          />
+        )}
+      </Panel>
     </>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  full,
-  required,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-  full?: boolean;
-  required?: boolean;
-}) {
-  return (
-    <label className={full ? "col-span-2" : ""}>
-      <div className="aur-label">
-        {label}
-        {required ? <span className="text-rose"> *</span> : null}
-      </div>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="aur-input"
-      />
-    </label>
   );
 }
