@@ -36,6 +36,13 @@
       "when": 1776833849924,
       "tag": "0004_add_disabled_at",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776950193729,
+      "tag": "0005_add_opportunity_table",
+      "breakpoints": true
     }
   ]
 }

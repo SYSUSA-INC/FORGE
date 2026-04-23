@@ -27,6 +27,19 @@ export const membershipStatusEnum = pgEnum("membership_status", [
   "disabled",
 ]);
 
+export const opportunityStageEnum = pgEnum("opportunity_stage", [
+  "identified",
+  "sources_sought",
+  "qualification",
+  "capture",
+  "pre_proposal",
+  "writing",
+  "submitted",
+  "won",
+  "lost",
+  "no_bid",
+]);
+
 export const users = pgTable("user", {
   id: text("id")
     .primaryKey()
@@ -228,3 +241,41 @@ export type Allowlist = typeof allowlist.$inferSelect;
 export type NewAllowlist = typeof allowlist.$inferInsert;
 export type Role = (typeof roleEnum.enumValues)[number];
 export type MembershipStatus = (typeof membershipStatusEnum.enumValues)[number];
+
+export const opportunities = pgTable("opportunity", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  agency: text("agency").notNull().default(""),
+  office: text("office").notNull().default(""),
+  stage: opportunityStageEnum("stage").notNull().default("identified"),
+  solicitationNumber: text("solicitation_number").notNull().default(""),
+  noticeId: text("notice_id").notNull().default(""),
+  valueLow: text("value_low").notNull().default(""),
+  valueHigh: text("value_high").notNull().default(""),
+  releaseDate: timestamp("release_date", { mode: "date" }),
+  responseDueDate: timestamp("response_due_date", { mode: "date" }),
+  awardDate: timestamp("award_date", { mode: "date" }),
+  naicsCode: text("naics_code").notNull().default(""),
+  pscCode: text("psc_code").notNull().default(""),
+  setAside: text("set_aside").notNull().default(""),
+  contractType: text("contract_type").notNull().default(""),
+  placeOfPerformance: text("place_of_performance").notNull().default(""),
+  incumbent: text("incumbent").notNull().default(""),
+  description: text("description").notNull().default(""),
+  pWin: integer("p_win").notNull().default(0),
+  ownerUserId: text("owner_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Opportunity = typeof opportunities.$inferSelect;
+export type NewOpportunity = typeof opportunities.$inferInsert;
+export type OpportunityStage = (typeof opportunityStageEnum.enumValues)[number];
