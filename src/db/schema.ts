@@ -487,3 +487,88 @@ export type Company = typeof companies.$inferSelect;
 export type NewCompany = typeof companies.$inferInsert;
 export type CompanyRelationship =
   (typeof companyRelationshipEnum.enumValues)[number];
+
+export const reviewColorEnum = pgEnum("review_color", [
+  "pink",
+  "red",
+  "gold",
+  "white_gloves",
+]);
+
+export const reviewStatusEnum = pgEnum("review_status", [
+  "scheduled",
+  "in_progress",
+  "complete",
+  "cancelled",
+]);
+
+export const reviewVerdictEnum = pgEnum("review_verdict", [
+  "pass",
+  "conditional",
+  "fail",
+]);
+
+export const proposalReviews = pgTable("proposal_review", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proposalId: uuid("proposal_id")
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  color: reviewColorEnum("color").notNull(),
+  status: reviewStatusEnum("status").notNull().default("scheduled"),
+  verdict: reviewVerdictEnum("verdict"),
+  summary: text("summary").notNull().default(""),
+  dueDate: timestamp("due_date"),
+  startedByUserId: text("started_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  startedAt: timestamp("started_at"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const proposalReviewAssignments = pgTable(
+  "proposal_review_assignment",
+  {
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => proposalReviews.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    verdict: reviewVerdictEnum("verdict"),
+    summary: text("summary").notNull().default(""),
+    submittedAt: timestamp("submitted_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.reviewId, t.userId] }),
+  }),
+);
+
+export const proposalReviewComments = pgTable("proposal_review_comment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reviewId: uuid("review_id")
+    .notNull()
+    .references(() => proposalReviews.id, { onDelete: "cascade" }),
+  sectionId: uuid("section_id").references(() => proposalSections.id, {
+    onDelete: "set null",
+  }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  body: text("body").notNull(),
+  resolved: boolean("resolved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ProposalReview = typeof proposalReviews.$inferSelect;
+export type NewProposalReview = typeof proposalReviews.$inferInsert;
+export type ReviewColor = (typeof reviewColorEnum.enumValues)[number];
+export type ReviewStatus = (typeof reviewStatusEnum.enumValues)[number];
+export type ReviewVerdict = (typeof reviewVerdictEnum.enumValues)[number];
+export type ProposalReviewAssignment =
+  typeof proposalReviewAssignments.$inferSelect;
+export type NewProposalReviewAssignment =
+  typeof proposalReviewAssignments.$inferInsert;
+export type ProposalReviewComment = typeof proposalReviewComments.$inferSelect;
+export type NewProposalReviewComment =
+  typeof proposalReviewComments.$inferInsert;
