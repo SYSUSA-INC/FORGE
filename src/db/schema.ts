@@ -572,3 +572,53 @@ export type NewProposalReviewAssignment =
 export type ProposalReviewComment = typeof proposalReviewComments.$inferSelect;
 export type NewProposalReviewComment =
   typeof proposalReviewComments.$inferInsert;
+
+export const complianceCategoryEnum = pgEnum("compliance_category", [
+  "section_l",
+  "section_m",
+  "section_c",
+  "far_clause",
+  "other",
+]);
+
+export const complianceStatusEnum = pgEnum("compliance_status", [
+  "not_addressed",
+  "partial",
+  "complete",
+  "not_applicable",
+]);
+
+export const complianceItems = pgTable("compliance_item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proposalId: uuid("proposal_id")
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  category: complianceCategoryEnum("category").notNull().default("section_l"),
+  number: text("number").notNull().default(""),
+  requirementText: text("requirement_text").notNull(),
+  volume: text("volume").notNull().default(""),
+  rfpPageReference: text("rfp_page_reference").notNull().default(""),
+  proposalSectionId: uuid("proposal_section_id").references(
+    () => proposalSections.id,
+    { onDelete: "set null" },
+  ),
+  proposalPageReference: text("proposal_page_reference").notNull().default(""),
+  status: complianceStatusEnum("status").notNull().default("not_addressed"),
+  notes: text("notes").notNull().default(""),
+  ordering: integer("ordering").notNull().default(0),
+  ownerUserId: text("owner_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type ComplianceItem = typeof complianceItems.$inferSelect;
+export type NewComplianceItem = typeof complianceItems.$inferInsert;
+export type ComplianceCategory =
+  (typeof complianceCategoryEnum.enumValues)[number];
+export type ComplianceStatus =
+  (typeof complianceStatusEnum.enumValues)[number];
