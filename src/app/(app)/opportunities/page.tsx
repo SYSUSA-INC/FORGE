@@ -72,9 +72,14 @@ export default async function OpportunitiesPage() {
           title="Opportunities"
           subtitle="Track opportunities from identification through submission."
           actions={
-            <Link href="/opportunities/new" className="aur-btn aur-btn-primary">
-              + New opportunity
-            </Link>
+            <>
+              <Link href="/opportunities/import" className="aur-btn aur-btn-ghost">
+                Import from SAM.gov
+              </Link>
+              <Link href="/opportunities/new" className="aur-btn aur-btn-primary">
+                + New opportunity
+              </Link>
+            </>
           }
         />
         <Panel title="No opportunities yet">
