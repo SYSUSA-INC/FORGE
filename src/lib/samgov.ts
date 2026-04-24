@@ -195,3 +195,97 @@ export async function fetchSamGovByUei(
     };
   }
 }
+
+const SAM_OPP_BASE = "https://api.sam.gov/opportunities/v2/search";
+
+export type SamOpportunity = {
+  noticeId: string;
+  title: string;
+  solicitationNumber: string;
+  department: string;
+  subTier: string;
+  office: string;
+  postedDate: string;
+  type: string;
+  baseType: string;
+  archiveType: string;
+  archiveDate: string | null;
+  typeOfSetAsideDescription: string;
+  typeOfSetAside: string;
+  responseDeadLine: string | null;
+  naicsCode: string;
+  classificationCode: string;
+  active: string;
+  placeOfPerformance: { city?: { name?: string }; state?: { name?: string }; country?: { name?: string } } | null;
+  description: string;
+  uiLink: string;
+  award: { number?: string; amount?: string; date?: string } | null;
+};
+
+export type SamOpportunitySearchParams = {
+  naicsCodes?: string[];
+  keyword?: string;
+  postedDaysBack?: number;
+  activeOnly?: boolean;
+  limit?: number;
+};
+
+function mmddyyyy(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+
+export async function searchSamGovOpportunities(
+  input: SamOpportunitySearchParams,
+): Promise<
+  | { ok: true; opportunities: SamOpportunity[]; totalRecords: number }
+  | { ok: false; error: string; status?: number }
+> {
+  const key = process.env.SAMGOV_API_KEY;
+  if (!key) {
+    return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
+  }
+
+  const postedTo = new Date();
+  const postedFrom = new Date();
+  postedFrom.setDate(postedFrom.getDate() - (input.postedDaysBack ?? 30));
+
+  const params = new URLSearchParams({
+    api_key: key,
+    limit: String(input.limit ?? 50),
+    postedFrom: mmddyyyy(postedFrom),
+    postedTo: mmddyyyy(postedTo),
+  });
+  if (input.keyword) params.set("q", input.keyword);
+  if (input.naicsCodes && input.naicsCodes.length > 0) {
+    params.set("ncode", input.naicsCodes.join(","));
+  }
+
+  try {
+    const res = await fetch(`${SAM_OPP_BASE}?${params.toString()}`, {
+      cache: "no-store",
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: text.slice(0, 500),
+        status: res.status,
+      };
+    }
+    const data = JSON.parse(text) as {
+      totalRecords?: number;
+      opportunitiesData?: SamOpportunity[];
+    };
+    const ops = (data.opportunitiesData ?? []).filter((o) =>
+      input.activeOnly === false ? true : o.active === "Yes",
+    );
+    return { ok: true, opportunities: ops, totalRecords: data.totalRecords ?? ops.length };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}

@@ -22,7 +22,9 @@ export default function SolicitationsListPage() {
         subtitle="Intake raw solicitation documents, extract Section L & M, and assign bid / no-bid decisions."
         actions={
           <>
-            <button className="brut-btn">Import from SAM.gov</button>
+            <Link href="/opportunities/import" className="brut-btn">
+              Import from SAM.gov
+            </Link>
             <Link href="/solicitations/new" className="brut-btn-hazard">
               + New solicitation
             </Link>
