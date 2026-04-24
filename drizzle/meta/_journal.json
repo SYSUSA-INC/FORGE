@@ -50,6 +50,13 @@
       "when": 1776970069255,
       "tag": "0006_add_evaluation_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776977262634,
+      "tag": "0007_add_proposal_tables",
+      "breakpoints": true
     }
   ]
 }
