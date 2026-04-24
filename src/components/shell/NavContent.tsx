@@ -9,6 +9,7 @@ const NAV = [
   { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops", admin: false, superadmin: false },
   { href: "/solicitations", label: "Solicitations", icon: "✦", group: "ops", admin: false, superadmin: false },
   { href: "/proposals", label: "Proposals", icon: "❑", group: "ops", admin: false, superadmin: false },
+  { href: "/companies", label: "Companies", icon: "⌬", group: "intel", admin: false, superadmin: false },
   { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel", admin: false, superadmin: false },
   { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel", admin: false, superadmin: false },
   { href: "/users", label: "Users", icon: "☰", group: "admin", admin: true, superadmin: false },
