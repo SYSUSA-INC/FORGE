@@ -12,44 +12,56 @@ export function StatTile({
   value: string;
   delta?: { value: string; up?: boolean };
   hint?: string;
-  accent?: "paper" | "hazard" | "blood" | "signal" | "ink" | "cobalt";
+  accent?: "paper" | "hazard" | "blood" | "signal" | "ink" | "cobalt" | "plum" | "violet" | "emerald" | "gold" | "rose" | "magenta";
   icon?: ReactNode;
 }) {
-  const tone =
-    accent === "hazard"
-      ? "bg-hazard text-ink"
-      : accent === "blood"
-        ? "bg-blood text-paper"
-        : accent === "signal"
-          ? "bg-signal text-ink"
-          : accent === "ink"
-            ? "bg-ink text-paper"
-            : accent === "cobalt"
-              ? "bg-cobalt text-paper"
-              : "bg-paper text-ink";
+  const glow =
+    accent === "hazard" || accent === "gold"
+      ? "shadow-glow-gold"
+      : accent === "signal" || accent === "emerald"
+        ? "shadow-glow-emerald"
+        : accent === "cobalt" || accent === "violet" || accent === "plum" || accent === "magenta"
+          ? "shadow-glow"
+          : "";
+
+  const accentColor =
+    accent === "hazard" || accent === "gold"
+      ? "text-gold"
+      : accent === "blood" || accent === "rose"
+        ? "text-rose"
+        : accent === "signal" || accent === "emerald"
+          ? "text-emerald"
+          : accent === "cobalt" || accent === "violet"
+            ? "text-violet"
+            : accent === "plum" || accent === "magenta"
+              ? "text-magenta"
+              : "text-text";
 
   return (
-    <div className={`relative border-2 border-ink shadow-brut ${tone}`}>
-      <div className="flex items-start justify-between border-b-2 border-current/80 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.25em]">
-        <span>{label}</span>
-        <span className="opacity-60">◼</span>
+    <div className={`aur-card p-4 ${glow}`}>
+      <div className="flex items-start justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          {label}
+        </span>
+        {icon ? <span className="text-muted">{icon}</span> : null}
       </div>
-      <div className="flex items-end justify-between gap-3 px-3 pb-3 pt-2">
-        <div className="font-display text-5xl font-bold leading-none tracking-tight">
-          {value}
-        </div>
-        {icon ? <div className="opacity-70">{icon}</div> : null}
+      <div className={`mt-3 font-display text-3xl font-semibold tabular-nums tracking-tight ${accentColor}`}>
+        {value}
       </div>
-      <div className="flex items-center justify-between border-t-2 border-current/80 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider">
+      <div className="mt-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-muted">
         {delta ? (
-          <span className="flex items-center gap-1">
-            <span>{delta.up ? "▲" : "▼"}</span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className={`rounded-sm px-1 py-0.5 text-[9px] ${delta.up ? "bg-emerald/15 text-emerald" : "bg-rose/15 text-rose"}`}
+            >
+              {delta.up ? "▲" : "▼"}
+            </span>
             {delta.value}
           </span>
         ) : (
-          <span className="opacity-70">{hint ?? "—"}</span>
+          <span>{hint ?? ""}</span>
         )}
-        <span className="opacity-60">{hint && delta ? hint : ""}</span>
+        <span>{hint && delta ? hint : ""}</span>
       </div>
     </div>
   );

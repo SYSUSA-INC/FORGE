@@ -1,78 +1,67 @@
 import Link from "next/link";
-import { Ticker } from "@/components/shell/Ticker";
 import { SideNav } from "@/components/shell/SideNav";
+import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
+import { UserMenu } from "@/components/auth/UserMenu";
+import { auth } from "@/auth";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const user = session?.user ?? null;
+  const isSuperadmin = user?.isSuperadmin ?? false;
+  const isOrgAdmin = (user?.role === "admin" || isSuperadmin) ?? false;
+
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b-2 border-ink bg-paper">
-        <div className="flex items-stretch">
-          <Link
-            href="/"
-            className="group flex items-center gap-3 border-r-2 border-ink bg-ink px-5 py-3 text-paper"
-          >
-            <LogoMark />
-            <div className="leading-none">
-              <div className="font-display text-xl font-bold tracking-tight">FORGE</div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-paper/70">
-                Proposal Ops · v0.1
-              </div>
-            </div>
-          </Link>
+    <div className="flex min-h-screen text-text">
+      <SideNav isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
 
-          <div className="flex flex-1 items-center justify-between gap-4 px-5">
-            <div className="hidden items-center gap-2 lg:flex">
-              <span className="brut-pill bg-signal">● LIVE</span>
-              <span className="brut-pill bg-hazard">SECTION L LOCKED</span>
-              <span className="brut-pill">ORG // SYSUSA</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <SessionClock />
-              <Link href="/settings" className="brut-btn">
-                Settings
-              </Link>
-              <div className="flex items-center gap-2 border-2 border-ink bg-bone px-2 py-1">
-                <div className="grid h-7 w-7 place-items-center border-2 border-ink bg-blood font-mono text-xs font-bold text-paper">
-                  JC
-                </div>
-                <div className="font-mono text-[10px] leading-tight">
-                  <div className="font-bold uppercase">J. Calder</div>
-                  <div className="text-ink/60">Capture Mgr</div>
-                </div>
-              </div>
-            </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/10 bg-canvas/70 px-4 backdrop-blur-xl md:gap-4 md:px-6">
+          <MobileNav isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
+
+          <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
+            <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-emerald" />
+            <span className="hidden sm:inline">FORGE · Live</span>
+            <span className="sm:hidden">FORGE</span>
           </div>
-        </div>
 
-        <Ticker />
-      </header>
+          <div className="ml-4 hidden min-w-0 flex-1 items-center md:flex">
+            <label className="relative flex w-full max-w-md items-center">
+              <span className="pointer-events-none absolute left-3 text-muted">⌕</span>
+              <input
+                placeholder="Search solicitations, proposals, people…"
+                className="aur-input pl-8 font-body text-sm"
+              />
+              <kbd className="absolute right-2 hidden rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted md:inline">
+                ⌘K
+              </kbd>
+            </label>
+          </div>
 
-      <div className="flex">
-        <SideNav />
-        <main className="relative min-h-[calc(100vh-6rem)] flex-1 overflow-x-hidden p-6 lg:p-10">
+          <div className="ml-auto flex items-center gap-2 md:gap-3">
+            <SessionClock />
+            <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
+              Settings
+            </Link>
+            <UserMenu user={user} />
+          </div>
+        </header>
+
+        <main className="relative min-h-[calc(100vh-3.5rem)] flex-1 overflow-x-hidden px-4 py-6 md:px-6 md:py-8 lg:px-10">
           {children}
-          <footer className="mt-14 border-t-2 border-ink pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ink/70">
-              <span>FORGE // FRAMEWORK FOR OPTIMIZED RESPONSE GENERATION &amp; EXECUTION</span>
-              <span>DOCS · SYSTEM STATUS · API</span>
-              <span>BUILD {process.env.NODE_ENV?.toUpperCase()} · {new Date().getFullYear()}</span>
+          <footer className="mt-16 border-t border-white/10 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <span>
+                FORGE · Framework for Optimized Response Generation &amp; Execution
+              </span>
+              <span>Docs · System status · API</span>
+              <span>
+                Build {process.env.NODE_ENV?.toLowerCase()} · {new Date().getFullYear()}
+              </span>
             </div>
           </footer>
         </main>
       </div>
     </div>
-  );
-}
-
-function LogoMark() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden className="shrink-0">
-      <rect x="1" y="1" width="30" height="30" stroke="#F5F1E8" strokeWidth="2" />
-      <path d="M6 8H26" stroke="#FFD500" strokeWidth="3" />
-      <path d="M6 14H20" stroke="#F5F1E8" strokeWidth="3" />
-      <path d="M6 20H24" stroke="#F5F1E8" strokeWidth="3" />
-      <path d="M6 26H14" stroke="#E63026" strokeWidth="3" />
-    </svg>
   );
 }
