@@ -429,3 +429,61 @@ export type ProposalSectionKind =
   (typeof proposalSectionKindEnum.enumValues)[number];
 export type ProposalSectionStatus =
   (typeof proposalSectionStatusEnum.enumValues)[number];
+
+export const companyRelationshipEnum = pgEnum("company_relationship", [
+  "customer",
+  "prime",
+  "subcontractor",
+  "competitor",
+  "teaming_partner",
+  "watchlist",
+]);
+
+export const companies = pgTable("company", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  uei: text("uei").notNull().default(""),
+  cageCode: text("cage_code").notNull().default(""),
+  dunsNumber: text("duns_number").notNull().default(""),
+  website: text("website").notNull().default(""),
+  email: text("email").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  contactName: text("contact_name").notNull().default(""),
+  contactTitle: text("contact_title").notNull().default(""),
+  addressLine1: text("address_line1").notNull().default(""),
+  addressLine2: text("address_line2").notNull().default(""),
+  city: text("city").notNull().default(""),
+  state: text("state").notNull().default(""),
+  zip: text("zip").notNull().default(""),
+  country: text("country").notNull().default("USA"),
+  primaryNaics: text("primary_naics").notNull().default(""),
+  naicsList: text("naics_list")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  sbaCertifications: text("sba_certifications")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  registrationStatus: text("registration_status").notNull().default(""),
+  registrationExpirationDate: timestamp("registration_expiration_date"),
+  relationship: companyRelationshipEnum("relationship")
+    .notNull()
+    .default("watchlist"),
+  notes: text("notes").notNull().default(""),
+  syncSource: text("sync_source").notNull().default("manual"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Company = typeof companies.$inferSelect;
+export type NewCompany = typeof companies.$inferInsert;
+export type CompanyRelationship =
+  (typeof companyRelationshipEnum.enumValues)[number];
