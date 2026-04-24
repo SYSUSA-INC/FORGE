@@ -10,12 +10,18 @@ import {
   type ImportableSamEntity,
 } from "../actions";
 
-export function SearchClient() {
+export function SearchClient({
+  defaultNaics = "",
+  orgNaicsList = [],
+}: {
+  defaultNaics?: string;
+  orgNaicsList?: string[];
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [uei, setUei] = useState("");
   const [cage, setCage] = useState("");
-  const [naics, setNaics] = useState("");
+  const [naics, setNaics] = useState(defaultNaics);
   const [state, setState] = useState("");
   const [defaultRel, setDefaultRel] =
     useState<CompanyRelationship>("watchlist");
@@ -106,6 +112,35 @@ export function SearchClient() {
           />
         </Field>
       </div>
+
+      {orgNaicsList.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            Your NAICS
+          </span>
+          {orgNaicsList.map((code) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => setNaics(code)}
+              className={`rounded-md border px-2 py-1 font-mono text-[11px] tabular-nums transition-colors ${
+                naics === code
+                  ? "border-teal-400 bg-teal-400/10 text-text"
+                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+              }`}
+            >
+              {code}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setNaics("")}
+            className="rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 font-mono text-[11px] text-muted hover:border-white/20"
+          >
+            clear
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Tag imports as">
