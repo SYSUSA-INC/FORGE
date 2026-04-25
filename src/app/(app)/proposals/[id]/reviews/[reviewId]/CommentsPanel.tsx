@@ -4,6 +4,11 @@ import { FormEvent, useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import {
+  MentionTextarea,
+  type MentionMember,
+} from "@/components/mentions/MentionTextarea";
+import { MentionText } from "@/components/mentions/MentionText";
+import {
   addReviewCommentAction,
   deleteReviewCommentAction,
   toggleCommentResolvedAction,
@@ -29,6 +34,7 @@ export function CommentsPanel({
   comments,
   currentUserId,
   isSuperadmin,
+  members,
 }: {
   reviewId: string;
   proposalId: string;
@@ -36,6 +42,7 @@ export function CommentsPanel({
   comments: CommentRow[];
   currentUserId: string;
   isSuperadmin: boolean;
+  members: MentionMember[];
 }) {
   void proposalId;
   const router = useRouter();
@@ -49,6 +56,14 @@ export function CommentsPanel({
   const sectionMap = useMemo(
     () => new Map(sections.map((s) => [s.id, s] as const)),
     [sections],
+  );
+
+  const mentionResolver = useMemo(
+    () =>
+      new Map(
+        members.map((m) => [m.id, m.name ?? m.email.split("@")[0] ?? "user"] as const),
+      ),
+    [members],
   );
 
   const filtered = comments.filter((c) => {
@@ -145,12 +160,18 @@ export function CommentsPanel({
           </div>
         </div>
         <div>
-          <label className="aur-label">Comment</label>
-          <textarea
-            className="aur-input min-h-[80px] resize-y"
+          <label className="aur-label">
+            Comment{" "}
+            <span className="text-subtle">
+              (type @ to tag a teammate — they'll get an email)
+            </span>
+          </label>
+          <MentionTextarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="What needs to change? What's strong? Be specific."
+            onChange={setBody}
+            members={members}
+            placeholder="What needs to change? What's strong? Be specific. Type @ to tag someone."
+            rows={4}
           />
         </div>
         {error ? (
@@ -218,7 +239,7 @@ export function CommentsPanel({
                   </div>
                 </div>
                 <div className="mt-1.5 whitespace-pre-wrap font-body text-[13px] text-text">
-                  {c.body}
+                  <MentionText body={c.body} resolver={mentionResolver} />
                 </div>
               </li>
             );
