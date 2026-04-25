@@ -666,3 +666,113 @@ export const notifications = pgTable("notification", {
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
 export type NotificationKind = (typeof notificationKindEnum.enumValues)[number];
+
+export const proposalOutcomeTypeEnum = pgEnum("proposal_outcome_type", [
+  "won",
+  "lost",
+  "no_bid",
+  "withdrawn",
+]);
+
+export const proposalOutcomeReasonEnum = pgEnum("proposal_outcome_reason", [
+  "price",
+  "technical",
+  "past_performance",
+  "management",
+  "relationship",
+  "schedule",
+  "requirements_fit",
+  "competition",
+  "compliance_gap",
+  "other",
+]);
+
+export const proposalDebriefStatusEnum = pgEnum("proposal_debrief_status", [
+  "not_requested",
+  "requested",
+  "scheduled",
+  "held",
+  "declined_by_govt",
+  "not_offered",
+  "waived",
+]);
+
+export const proposalDebriefFormatEnum = pgEnum("proposal_debrief_format", [
+  "written",
+  "oral",
+  "both",
+  "unknown",
+]);
+
+export const proposalOutcomes = pgTable("proposal_outcome", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proposalId: uuid("proposal_id")
+    .notNull()
+    .unique()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  outcomeType: proposalOutcomeTypeEnum("outcome_type").notNull(),
+  awardValue: text("award_value").notNull().default(""),
+  decisionDate: timestamp("decision_date", { mode: "date" }),
+  reasons: text("reasons")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  summary: text("summary").notNull().default(""),
+  lessonsLearned: text("lessons_learned").notNull().default(""),
+  followUpActions: text("follow_up_actions").notNull().default(""),
+  awardedToCompetitor: text("awarded_to_competitor").notNull().default(""),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const proposalDebriefs = pgTable("proposal_debrief", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proposalId: uuid("proposal_id")
+    .notNull()
+    .unique()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  outcomeId: uuid("outcome_id").references(() => proposalOutcomes.id, {
+    onDelete: "set null",
+  }),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  status: proposalDebriefStatusEnum("status").notNull().default("not_requested"),
+  format: proposalDebriefFormatEnum("format").notNull().default("unknown"),
+  requestedAt: timestamp("requested_at", { mode: "date" }),
+  scheduledFor: timestamp("scheduled_for", { mode: "date" }),
+  heldOn: timestamp("held_on", { mode: "date" }),
+  governmentAttendees: text("government_attendees").notNull().default(""),
+  ourAttendees: text("our_attendees").notNull().default(""),
+  strengths: text("strengths").notNull().default(""),
+  weaknesses: text("weaknesses").notNull().default(""),
+  improvements: text("improvements").notNull().default(""),
+  pastPerformanceCitation: text("past_performance_citation")
+    .notNull()
+    .default(""),
+  notes: text("notes").notNull().default(""),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type ProposalOutcome = typeof proposalOutcomes.$inferSelect;
+export type NewProposalOutcome = typeof proposalOutcomes.$inferInsert;
+export type ProposalOutcomeType =
+  (typeof proposalOutcomeTypeEnum.enumValues)[number];
+export type ProposalOutcomeReason =
+  (typeof proposalOutcomeReasonEnum.enumValues)[number];
+export type ProposalDebrief = typeof proposalDebriefs.$inferSelect;
+export type NewProposalDebrief = typeof proposalDebriefs.$inferInsert;
+export type ProposalDebriefStatus =
+  (typeof proposalDebriefStatusEnum.enumValues)[number];
+export type ProposalDebriefFormat =
+  (typeof proposalDebriefFormatEnum.enumValues)[number];
