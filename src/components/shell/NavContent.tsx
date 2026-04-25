@@ -14,6 +14,7 @@ const NAV = [
   { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel", admin: false, superadmin: false },
   { href: "/users", label: "Users", icon: "☰", group: "admin", admin: true, superadmin: false },
   { href: "/settings", label: "Settings", icon: "⚙", group: "admin", admin: false, superadmin: false },
+  { href: "/help", label: "Help", icon: "?", group: "admin", admin: false, superadmin: false },
   { href: "/admin", label: "Platform admin", icon: "✱", group: "platform", admin: false, superadmin: true },
 ] as const;
 
