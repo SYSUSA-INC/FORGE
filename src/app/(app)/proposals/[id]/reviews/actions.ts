@@ -16,6 +16,25 @@ import {
   type ReviewVerdict,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { extractMentionUserIds } from "@/lib/mentions";
+import {
+  dispatchCommentMentionNotification,
+  dispatchReviewAssignedNotification,
+  dispatchReviewCompletedNotification,
+} from "@/lib/notifications";
+
+const COLOR_LABELS: Record<ReviewColor, string> = {
+  pink: "Pink Team",
+  red: "Red Team",
+  gold: "Gold Team",
+  white_gloves: "White Gloves",
+};
+
+const VERDICT_LABELS: Record<ReviewVerdict, string> = {
+  pass: "Pass",
+  conditional: "Conditional",
+  fail: "Fail",
+};
 
 async function assertProposalOwned(proposalId: string, organizationId: string) {
   const [row] = await db
@@ -51,6 +70,8 @@ export async function startReviewAction(input: {
   color: ReviewColor;
   dueDate?: string | null;
   reviewerUserIds: string[];
+  /** Optional per-reviewer section scope. Keyed by user id. */
+  sectionAssignments?: Record<string, string | null>;
 }): Promise<{ ok: true; reviewId: string } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -75,12 +96,25 @@ export async function startReviewAction(input: {
       .returning({ id: proposalReviews.id });
     if (!review) return { ok: false, error: "Could not create review." };
 
-    await db.insert(proposalReviewAssignments).values(
-      input.reviewerUserIds.map((uid) => ({
-        reviewId: review.id,
-        userId: uid,
+    const assignmentRows = input.reviewerUserIds.map((uid) => ({
+      reviewId: review.id,
+      userId: uid,
+      sectionId: input.sectionAssignments?.[uid] ?? null,
+    }));
+    await db.insert(proposalReviewAssignments).values(assignmentRows);
+
+    await fanOutAssignmentNotifications({
+      organizationId,
+      actorUserId: actor.id,
+      proposalId: input.proposalId,
+      reviewId: review.id,
+      reviewColor: input.color,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+      assignments: assignmentRows.map((a) => ({
+        userId: a.userId,
+        sectionId: a.sectionId,
       })),
-    );
+    });
 
     revalidatePath(`/proposals/${input.proposalId}/reviews`);
     revalidatePath(`/proposals/${input.proposalId}`);
@@ -92,6 +126,65 @@ export async function startReviewAction(input: {
       error: err instanceof Error ? err.message : "Start failed.",
     };
   }
+}
+
+async function fanOutAssignmentNotifications(input: {
+  organizationId: string;
+  actorUserId: string;
+  proposalId: string;
+  reviewId: string;
+  reviewColor: ReviewColor;
+  dueDate: Date | null;
+  assignments: { userId: string; sectionId: string | null }[];
+}): Promise<void> {
+  const [actorRow] = await db
+    .select({ name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.id, input.actorUserId))
+    .limit(1);
+  const starterName =
+    actorRow?.name ?? actorRow?.email ?? "A teammate";
+
+  const [proposalRow] = await db
+    .select({ title: proposals.title })
+    .from(proposals)
+    .where(eq(proposals.id, input.proposalId))
+    .limit(1);
+  const proposalTitle = proposalRow?.title ?? "your proposal";
+
+  const sectionIds = input.assignments
+    .map((a) => a.sectionId)
+    .filter((id): id is string => Boolean(id));
+  const sectionMap = new Map<string, string>();
+  if (sectionIds.length) {
+    const sectionRows = await db
+      .select({
+        id: proposalSections.id,
+        title: proposalSections.title,
+      })
+      .from(proposalSections)
+      .where(inArray(proposalSections.id, sectionIds));
+    for (const s of sectionRows) sectionMap.set(s.id, s.title);
+  }
+
+  await Promise.all(
+    input.assignments
+      .filter((a) => a.userId !== input.actorUserId)
+      .map((a) =>
+        dispatchReviewAssignedNotification({
+          organizationId: input.organizationId,
+          actorUserId: input.actorUserId,
+          recipientUserId: a.userId,
+          proposalId: input.proposalId,
+          proposalTitle,
+          reviewId: input.reviewId,
+          reviewColor: COLOR_LABELS[input.reviewColor],
+          starterName,
+          dueDate: input.dueDate,
+          sectionTitle: a.sectionId ? sectionMap.get(a.sectionId) ?? null : null,
+        }),
+      ),
+  );
 }
 
 export async function startReviewAndGoAction(input: {
@@ -163,30 +256,80 @@ export async function closeReviewAction(input: {
   verdict: ReviewVerdict;
   summary: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await assertReviewOwned(input.reviewId, organizationId))) {
     return { ok: false, error: "Review not found." };
   }
 
   const [review] = await db
-    .select({ proposalId: proposalReviews.proposalId })
+    .select({
+      proposalId: proposalReviews.proposalId,
+      color: proposalReviews.color,
+      proposalTitle: proposals.title,
+      proposalManagerUserId: proposals.proposalManagerUserId,
+    })
     .from(proposalReviews)
+    .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
     .where(eq(proposalReviews.id, input.reviewId))
     .limit(1);
+
+  const summary = input.summary.trim();
 
   await db
     .update(proposalReviews)
     .set({
       status: "complete",
       verdict: input.verdict,
-      summary: input.summary.trim(),
+      summary,
       closedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(proposalReviews.id, input.reviewId));
 
   if (review) {
+    const recipients = new Set<string>();
+    if (
+      review.proposalManagerUserId &&
+      review.proposalManagerUserId !== actor.id
+    ) {
+      recipients.add(review.proposalManagerUserId);
+    }
+    const reviewerRows = await db
+      .select({ userId: proposalReviewAssignments.userId })
+      .from(proposalReviewAssignments)
+      .where(eq(proposalReviewAssignments.reviewId, input.reviewId));
+    for (const r of reviewerRows) {
+      if (r.userId !== actor.id) recipients.add(r.userId);
+    }
+
+    if (recipients.size > 0) {
+      const [closerRow] = await db
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, actor.id))
+        .limit(1);
+      const closerName =
+        closerRow?.name ?? closerRow?.email ?? "A teammate";
+
+      await Promise.all(
+        Array.from(recipients).map((recipientUserId) =>
+          dispatchReviewCompletedNotification({
+            organizationId,
+            actorUserId: actor.id,
+            closerName,
+            recipientUserId,
+            proposalId: review.proposalId,
+            proposalTitle: review.proposalTitle,
+            reviewId: input.reviewId,
+            reviewColor: COLOR_LABELS[review.color],
+            verdict: VERDICT_LABELS[input.verdict],
+            summary,
+          }),
+        ),
+      );
+    }
+
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
     revalidatePath(`/proposals/${review.proposalId}/reviews`);
     revalidatePath(`/proposals/${review.proposalId}`);
@@ -221,8 +364,9 @@ export async function cancelReviewAction(
 export async function assignReviewerAction(input: {
   reviewId: string;
   userId: string;
+  sectionId?: string | null;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await assertReviewOwned(input.reviewId, organizationId))) {
     return { ok: false, error: "Review not found." };
@@ -243,14 +387,33 @@ export async function assignReviewerAction(input: {
   }
   await db
     .insert(proposalReviewAssignments)
-    .values({ reviewId: input.reviewId, userId: input.userId })
+    .values({
+      reviewId: input.reviewId,
+      userId: input.userId,
+      sectionId: input.sectionId ?? null,
+    })
     .onConflictDoNothing();
   const [review] = await db
-    .select({ proposalId: proposalReviews.proposalId })
+    .select({
+      proposalId: proposalReviews.proposalId,
+      color: proposalReviews.color,
+      dueDate: proposalReviews.dueDate,
+    })
     .from(proposalReviews)
     .where(eq(proposalReviews.id, input.reviewId))
     .limit(1);
   if (review) {
+    await fanOutAssignmentNotifications({
+      organizationId,
+      actorUserId: actor.id,
+      proposalId: review.proposalId,
+      reviewId: input.reviewId,
+      reviewColor: review.color,
+      dueDate: review.dueDate,
+      assignments: [
+        { userId: input.userId, sectionId: input.sectionId ?? null },
+      ],
+    });
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
   }
   return { ok: true };
@@ -297,22 +460,82 @@ export async function addReviewCommentAction(input: {
   if (!input.body.trim()) {
     return { ok: false, error: "Comment can't be empty." };
   }
+  const trimmedBody = input.body.trim();
   const [row] = await db
     .insert(proposalReviewComments)
     .values({
       reviewId: input.reviewId,
       sectionId: input.sectionId ?? null,
       userId: actor.id,
-      body: input.body.trim(),
+      body: trimmedBody,
     })
     .returning({ id: proposalReviewComments.id });
 
   const [review] = await db
-    .select({ proposalId: proposalReviews.proposalId })
+    .select({
+      proposalId: proposalReviews.proposalId,
+      color: proposalReviews.color,
+      proposalTitle: proposals.title,
+    })
     .from(proposalReviews)
+    .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
     .where(eq(proposalReviews.id, input.reviewId))
     .limit(1);
-  if (review) {
+
+  if (review && row) {
+    const mentionedIds = extractMentionUserIds(trimmedBody).filter(
+      (id) => id !== actor.id,
+    );
+    if (mentionedIds.length > 0) {
+      const validMembers = await db
+        .select({ userId: memberships.userId })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.organizationId, organizationId),
+            eq(memberships.status, "active"),
+            inArray(memberships.userId, mentionedIds),
+          ),
+        );
+      const validIds = validMembers.map((m) => m.userId);
+
+      let sectionTitle: string | null = null;
+      if (input.sectionId) {
+        const [sec] = await db
+          .select({ title: proposalSections.title })
+          .from(proposalSections)
+          .where(eq(proposalSections.id, input.sectionId))
+          .limit(1);
+        sectionTitle = sec?.title ?? null;
+      }
+
+      const [actorRow] = await db
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, actor.id))
+        .limit(1);
+      const authorName =
+        actorRow?.name ?? actorRow?.email ?? "A teammate";
+
+      await Promise.all(
+        validIds.map((recipientUserId) =>
+          dispatchCommentMentionNotification({
+            organizationId,
+            actorUserId: actor.id,
+            authorName,
+            recipientUserId,
+            proposalId: review.proposalId,
+            proposalTitle: review.proposalTitle,
+            reviewId: input.reviewId,
+            reviewColor: COLOR_LABELS[review.color],
+            commentId: row.id,
+            commentBody: trimmedBody,
+            sectionTitle,
+          }),
+        ),
+      );
+    }
+
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
   }
   return { ok: true, id: row!.id };
