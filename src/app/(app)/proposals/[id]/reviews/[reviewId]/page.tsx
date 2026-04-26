@@ -159,6 +159,11 @@ export default async function ReviewDetailPage({
             sections={sections}
             currentUserId={actor.id}
             isSuperadmin={actor.isSuperadmin}
+            members={reviewers.map((m) => ({
+              id: m.id,
+              name: m.name,
+              email: m.email,
+            }))}
             comments={commentRows.map((c) => ({
               id: c.id,
               sectionId: c.sectionId,

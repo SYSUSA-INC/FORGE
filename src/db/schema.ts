@@ -536,6 +536,9 @@ export const proposalReviewAssignments = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id").references(() => proposalSections.id, {
+      onDelete: "set null",
+    }),
     verdict: reviewVerdictEnum("verdict"),
     summary: text("summary").notNull().default(""),
     submittedAt: timestamp("submitted_at"),
@@ -622,3 +625,44 @@ export type ComplianceCategory =
   (typeof complianceCategoryEnum.enumValues)[number];
 export type ComplianceStatus =
   (typeof complianceStatusEnum.enumValues)[number];
+
+export const notificationKindEnum = pgEnum("notification_kind", [
+  "review_assigned",
+  "review_section_assigned",
+  "review_comment_mentioned",
+  "review_completed",
+]);
+
+export const notifications = pgTable("notification", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  recipientUserId: text("recipient_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  actorUserId: text("actor_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  kind: notificationKindEnum("kind").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull().default(""),
+  linkPath: text("link_path").notNull().default(""),
+  proposalId: uuid("proposal_id").references(() => proposals.id, {
+    onDelete: "cascade",
+  }),
+  reviewId: uuid("review_id").references(() => proposalReviews.id, {
+    onDelete: "cascade",
+  }),
+  commentId: uuid("comment_id").references(() => proposalReviewComments.id, {
+    onDelete: "set null",
+  }),
+  emailSentAt: timestamp("email_sent_at"),
+  emailError: text("email_error").notNull().default(""),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+export type NotificationKind = (typeof notificationKindEnum.enumValues)[number];

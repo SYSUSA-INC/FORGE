@@ -17,6 +17,7 @@ import {
 } from "@/lib/review-types";
 import {
   listOrgReviewers,
+  listProposalSectionsForReview,
   listReviewsForProposal,
 } from "./actions";
 import { StartReviewPanel } from "./StartReviewPanel";
@@ -40,9 +41,10 @@ export default async function ProposalReviewsPage({
     .limit(1);
   if (!p) notFound();
 
-  const [data, reviewers] = await Promise.all([
+  const [data, reviewers, sections] = await Promise.all([
     listReviewsForProposal(params.id),
     listOrgReviewers(),
+    listProposalSectionsForReview(params.id),
   ]);
 
   const assignmentsByReview = new Map<
@@ -198,6 +200,7 @@ export default async function ProposalReviewsPage({
         proposalId={params.id}
         colors={REVIEW_COLORS}
         reviewers={reviewers}
+        sections={sections}
       />
     </div>
   );

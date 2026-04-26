@@ -8,20 +8,26 @@ import { startReviewAction } from "./actions";
 
 type ColorDef = { key: ReviewColor; label: string; color: string; description: string };
 type Reviewer = { id: string; name: string | null; email: string; role: string };
+type SectionRow = { id: string; title: string; ordering: number };
 
 export function StartReviewPanel({
   proposalId,
   colors,
   reviewers,
+  sections = [],
 }: {
   proposalId: string;
   colors: ColorDef[];
   reviewers: Reviewer[];
+  sections?: SectionRow[];
 }) {
   const router = useRouter();
   const [color, setColor] = useState<ReviewColor>("pink");
   const [dueDate, setDueDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sectionAssignments, setSectionAssignments] = useState<
+    Record<string, string>
+  >({});
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -38,14 +44,20 @@ export function StartReviewPanel({
     e.preventDefault();
     setError(null);
     startTransition(async () => {
+      const sectionMap: Record<string, string | null> = {};
+      for (const uid of selected) {
+        sectionMap[uid] = sectionAssignments[uid] || null;
+      }
       const res = await startReviewAction({
         proposalId,
         color,
         dueDate: dueDate || null,
         reviewerUserIds: Array.from(selected),
+        sectionAssignments: sectionMap,
       });
       if (!res.ok) return setError(res.error);
       setSelected(new Set());
+      setSectionAssignments({});
       setDueDate("");
       router.push(`/proposals/${proposalId}/reviews/${res.reviewId}`);
     });
@@ -92,24 +104,53 @@ export function StartReviewPanel({
             </div>
           ) : (
             <ul className="flex flex-col gap-1">
-              {reviewers.map((r) => (
-                <li key={r.id}>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5">
-                    <input
-                      type="checkbox"
-                      className="accent-teal-400"
-                      checked={selected.has(r.id)}
-                      onChange={() => toggle(r.id)}
-                    />
-                    <span className="min-w-0 truncate font-mono text-[12px] text-text">
-                      {r.name ?? r.email}
-                    </span>
-                    <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
-                      {r.role}
-                    </span>
-                  </label>
-                </li>
-              ))}
+              {reviewers.map((r) => {
+                const isSelected = selected.has(r.id);
+                return (
+                  <li key={r.id}>
+                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="accent-teal-400"
+                          checked={isSelected}
+                          onChange={() => toggle(r.id)}
+                        />
+                        <span className="min-w-0 truncate font-mono text-[12px] text-text">
+                          {r.name ?? r.email}
+                        </span>
+                        <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                          {r.role}
+                        </span>
+                      </label>
+                      {isSelected && sections.length > 0 ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+                            Section scope
+                          </span>
+                          <select
+                            className="aur-input flex-1 text-[11px]"
+                            value={sectionAssignments[r.id] ?? ""}
+                            onChange={(e) =>
+                              setSectionAssignments((prev) => ({
+                                ...prev,
+                                [r.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Whole proposal</option>
+                            {sections.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                §{s.ordering}. {s.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

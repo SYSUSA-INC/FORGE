@@ -182,6 +182,136 @@ export async function sendInviteEmail(opts: {
   });
 }
 
+export async function sendReviewAssignedEmail(opts: {
+  to: string;
+  recipientName: string | null;
+  starterName: string;
+  proposalTitle: string;
+  reviewColor: string;
+  proposalId: string;
+  reviewId: string;
+  dueDate: Date | null;
+  sectionTitle: string | null;
+}): Promise<void> {
+  const url = `${baseUrl()}/proposals/${opts.proposalId}/reviews/${opts.reviewId}`;
+  const due = opts.dueDate
+    ? `Due ${opts.dueDate.toISOString().slice(0, 10)}.`
+    : "No due date set.";
+  const scope = opts.sectionTitle
+    ? ` You're assigned to <strong style="color:#e6edf7;">${escapeHtml(
+        opts.sectionTitle,
+      )}</strong>.`
+    : "";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#e6edf7;">${escapeHtml(
+      opts.reviewColor,
+    )} review assigned</h1>
+    <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:#94a3b8;">
+      ${escapeHtml(opts.starterName)} started a ${escapeHtml(
+        opts.reviewColor,
+      )} review on <strong style="color:#e6edf7;">${escapeHtml(
+        opts.proposalTitle,
+      )}</strong> and added you as a reviewer.${scope} ${escapeHtml(due)}
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Open review</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#64748b;">
+      If the button doesn&#39;t work, paste this URL in your browser:<br/>
+      <span style="color:#94a3b8;word-break:break-all;">${url}</span>
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `${opts.reviewColor} review on ${opts.proposalTitle}`,
+    html: emailShell(`${opts.reviewColor} review assigned`, body),
+    text: `${opts.starterName} added you as a reviewer on a ${opts.reviewColor} review of ${opts.proposalTitle}.\n${due}\nOpen: ${url}`,
+  });
+}
+
+export async function sendCommentMentionEmail(opts: {
+  to: string;
+  authorName: string;
+  proposalTitle: string;
+  reviewColor: string;
+  commentBody: string;
+  sectionTitle: string | null;
+  proposalId: string;
+  reviewId: string;
+}): Promise<void> {
+  const url = `${baseUrl()}/proposals/${opts.proposalId}/reviews/${opts.reviewId}`;
+  const where = opts.sectionTitle
+    ? ` on <strong style="color:#e6edf7;">${escapeHtml(opts.sectionTitle)}</strong>`
+    : "";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#e6edf7;">${escapeHtml(
+      opts.authorName,
+    )} mentioned you</h1>
+    <p style="margin:0 0 8px 0;font-size:14px;line-height:1.55;color:#94a3b8;">
+      In a ${escapeHtml(opts.reviewColor)} review comment${where} on
+      <strong style="color:#e6edf7;">${escapeHtml(opts.proposalTitle)}</strong>:
+    </p>
+    <blockquote style="margin:0 0 24px 0;padding:12px 16px;border-left:2px solid #2DD4BF;background:rgba(45,212,191,0.06);font-size:14px;line-height:1.55;color:#e6edf7;">
+      ${escapeHtml(opts.commentBody.slice(0, 600))}${opts.commentBody.length > 600 ? "…" : ""}
+    </blockquote>
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Open review</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#64748b;">
+      If the button doesn&#39;t work, paste this URL in your browser:<br/>
+      <span style="color:#94a3b8;word-break:break-all;">${url}</span>
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `${opts.authorName} mentioned you on ${opts.proposalTitle}`,
+    html: emailShell(`${opts.authorName} mentioned you`, body),
+    text: `${opts.authorName} mentioned you in a ${opts.reviewColor} review comment on ${opts.proposalTitle}.\n\n${opts.commentBody}\n\nOpen: ${url}`,
+  });
+}
+
+export async function sendReviewCompletedEmail(opts: {
+  to: string;
+  closerName: string;
+  proposalTitle: string;
+  reviewColor: string;
+  verdict: string;
+  summary: string;
+  proposalId: string;
+  reviewId: string;
+}): Promise<void> {
+  const url = `${baseUrl()}/proposals/${opts.proposalId}/reviews/${opts.reviewId}`;
+  const summarySnippet = opts.summary
+    ? `<blockquote style="margin:0 0 24px 0;padding:12px 16px;border-left:2px solid #2DD4BF;background:rgba(45,212,191,0.06);font-size:14px;line-height:1.55;color:#e6edf7;">
+        ${escapeHtml(opts.summary.slice(0, 600))}${opts.summary.length > 600 ? "…" : ""}
+      </blockquote>`
+    : "";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#e6edf7;">${escapeHtml(
+      opts.reviewColor,
+    )} review closed — ${escapeHtml(opts.verdict)}</h1>
+    <p style="margin:0 0 8px 0;font-size:14px;line-height:1.55;color:#94a3b8;">
+      ${escapeHtml(opts.closerName)} closed the ${escapeHtml(opts.reviewColor)} review on
+      <strong style="color:#e6edf7;">${escapeHtml(opts.proposalTitle)}</strong> with a verdict of
+      <strong style="color:#e6edf7;">${escapeHtml(opts.verdict)}</strong>.
+    </p>
+    ${summarySnippet}
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Open review</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#64748b;">
+      If the button doesn&#39;t work, paste this URL in your browser:<br/>
+      <span style="color:#94a3b8;word-break:break-all;">${url}</span>
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `${opts.reviewColor} review closed — ${opts.verdict}`,
+    html: emailShell(`${opts.reviewColor} review closed`, body),
+    text: `${opts.closerName} closed the ${opts.reviewColor} review on ${opts.proposalTitle} — verdict ${opts.verdict}.\n\n${opts.summary}\n\nOpen: ${url}`,
+  });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
