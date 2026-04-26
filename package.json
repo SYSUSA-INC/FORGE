@@ -11,7 +11,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:apply": "node scripts/apply-schema.mjs",
+    "db:info": "node scripts/db-info.mjs"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
