@@ -8,6 +8,7 @@ const TABS = [
   { key: "sections", label: "Sections" },
   { key: "reviews", label: "Reviews" },
   { key: "compliance", label: "Compliance" },
+  { key: "outcome", label: "Outcome" },
 ];
 
 export function ProposalTabs({ id }: { id: string }) {

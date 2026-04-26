@@ -29,11 +29,17 @@ export function StageAdvancePanel({
     "archived",
   ];
 
+  const outcomeStages: ProposalStage[] = ["awarded", "lost", "no_bid"];
+
   function doAdvance(target: ProposalStage) {
     setError(null);
     startTransition(async () => {
       const res = await advanceProposalStageAction(proposalId, target);
       if (!res.ok) return setError(res.error);
+      if (outcomeStages.includes(target)) {
+        router.push(`/proposals/${proposalId}/outcome`);
+        return;
+      }
       router.refresh();
     });
   }
