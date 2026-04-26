@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import type {
   ProposalSectionKind,
   ProposalSectionStatus,
+  TipTapDoc,
 } from "@/db/schema";
 import {
   SECTION_KIND_LABELS,
   SECTION_STATUS_COLORS,
   SECTION_STATUS_LABELS,
 } from "@/lib/proposal-types";
+import { fromPlainText } from "@/lib/tiptap-doc";
+import { RichSectionEditor } from "@/components/editor/RichSectionEditor";
 import {
   addCustomSectionAction,
   removeSectionAction,
@@ -23,6 +26,7 @@ type Section = {
   title: string;
   ordering: number;
   content: string;
+  bodyDoc: TipTapDoc;
   status: ProposalSectionStatus;
   wordCount: number;
   pageLimit: number | null;
@@ -172,7 +176,13 @@ function SectionRow({
   const [notice, setNotice] = useState<string | null>(null);
 
   const [title, setTitle] = useState(section.title);
-  const [content, setContent] = useState(section.content);
+  const initialDoc: TipTapDoc =
+    section.bodyDoc?.content?.length
+      ? section.bodyDoc
+      : fromPlainText(section.content);
+  const [bodyDoc, setBodyDoc] = useState<TipTapDoc>(initialDoc);
+  const [plainContent, setPlainContent] = useState(section.content);
+  const [wordCount, setWordCount] = useState(section.wordCount);
   const [status, setStatus] = useState<ProposalSectionStatus>(section.status);
   const [pageLimit, setPageLimit] = useState<string>(
     section.pageLimit === null ? "" : String(section.pageLimit),
@@ -189,7 +199,7 @@ function SectionRow({
         proposalId,
         sectionId: section.id,
         title,
-        content,
+        bodyDoc,
         status,
         pageLimit: pageLimit.trim() === "" ? null : Number(pageLimit),
         authorUserId: authorUserId || null,
@@ -213,7 +223,7 @@ function SectionRow({
     });
   }
 
-  const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const words = wordCount;
 
   return (
     <li className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.02]">
@@ -319,18 +329,22 @@ function SectionRow({
           </div>
 
           <div className="mt-3">
-            <div className="flex items-center justify-between">
-              <label className="aur-label">Content</label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="aur-label mb-0">Content</label>
               <span className="font-mono text-[10px] text-muted">
                 {words} words
               </span>
             </div>
-            <textarea
-              className="aur-input min-h-[320px] resize-y font-body text-[13px] leading-relaxed"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Draft prose here. Markdown-style is fine."
+            <RichSectionEditor
+              doc={bodyDoc}
+              onChange={(doc, plain, count) => {
+                setBodyDoc(doc);
+                setPlainContent(plain);
+                setWordCount(count);
+              }}
+              placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
             />
+            <input type="hidden" value={plainContent} readOnly />
           </div>
 
           {error ? (
