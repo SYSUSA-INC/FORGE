@@ -12,10 +12,53 @@ if (!url) {
   process.exit(1);
 }
 
+function describeTarget(connectionString) {
+  try {
+    const u = new URL(connectionString);
+    const databaseName = u.pathname.replace(/^\//, "") || "(default)";
+    const host = u.hostname;
+    const user = u.username || "(no user)";
+    // Neon hosts look like: ep-misty-water-12345.us-east-2.aws.neon.tech
+    // The "ep-..." segment identifies the Neon BRANCH; everything before is
+    // the project's compute endpoint.
+    const neonBranchEndpoint =
+      host.startsWith("ep-") ? host.split(".")[0] : null;
+    const region = host.includes(".")
+      ? host.split(".").slice(1, -2).join(".") || "(unknown)"
+      : "(local)";
+    return {
+      host,
+      databaseName,
+      user,
+      neonBranchEndpoint,
+      region,
+      isNeon: host.endsWith(".neon.tech"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+const target = describeTarget(url);
+if (target) {
+  console.log("─────────────────────────────────────────────────────────");
+  console.log("  About to apply migrations to:");
+  console.log(`    Host:     ${target.host}`);
+  console.log(`    Database: ${target.databaseName}`);
+  console.log(`    User:     ${target.user}`);
+  if (target.isNeon) {
+    console.log(`    Neon endpoint: ${target.neonBranchEndpoint ?? "(?)"}`);
+    console.log(`    Region:        ${target.region}`);
+  }
+  console.log("─────────────────────────────────────────────────────────");
+} else {
+  console.log("Connecting to:", url.replace(/:[^:@/]+@/, ":***@"));
+}
+
 const client = new pg.Client({ connectionString: url });
 
 await client.connect();
-console.log("Connected to database.");
+console.log("Connected.");
 
 const dir = "drizzle";
 const files = readdirSync(dir)
