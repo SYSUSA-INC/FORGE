@@ -16,6 +16,12 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
+import {
+  EMPTY_DOC,
+  countWords as countTipTapWords,
+  projectToPlain,
+  validateDoc,
+} from "@/lib/tiptap-doc";
 
 async function ownsProposal(id: string, organizationId: string) {
   const [row] = await db
@@ -246,6 +252,7 @@ export async function saveSectionAction(input: {
   sectionId: string;
   title?: string;
   content?: string;
+  bodyDoc?: import("@/db/schema").TipTapDoc;
   status?: ProposalSectionStatus;
   pageLimit?: number | null;
   authorUserId?: string | null;
@@ -259,7 +266,13 @@ export async function saveSectionAction(input: {
   try {
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (input.title !== undefined) update.title = input.title.trim();
-    if (input.content !== undefined) {
+    if (input.bodyDoc !== undefined) {
+      const validated = validateDoc(input.bodyDoc) ?? EMPTY_DOC;
+      const projected = projectToPlain(validated);
+      update.bodyDoc = validated;
+      update.content = projected;
+      update.wordCount = countTipTapWords(validated);
+    } else if (input.content !== undefined) {
       update.content = input.content;
       update.wordCount = countWords(input.content);
     }

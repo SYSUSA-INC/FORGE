@@ -410,6 +410,10 @@ export const proposalSections = pgTable("proposal_section", {
   title: text("title").notNull(),
   ordering: integer("ordering").notNull().default(0),
   content: text("content").notNull().default(""),
+  bodyDoc: jsonb("body_doc")
+    .$type<TipTapDoc>()
+    .notNull()
+    .default({ type: "doc", content: [] }),
   status: proposalSectionStatusEnum("status").notNull().default("not_started"),
   wordCount: integer("word_count").notNull().default(0),
   pageLimit: integer("page_limit"),
@@ -419,6 +423,18 @@ export const proposalSections = pgTable("proposal_section", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export type TipTapDoc = {
+  type: "doc";
+  content: TipTapNode[];
+};
+export type TipTapNode = {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TipTapNode[];
+  text?: string;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+};
 
 export type Proposal = typeof proposals.$inferSelect;
 export type NewProposal = typeof proposals.$inferInsert;
