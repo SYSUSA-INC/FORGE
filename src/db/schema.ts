@@ -9,6 +9,7 @@ import {
   timestamp,
   uuid,
   varchar,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -379,6 +380,7 @@ export const proposals = pgTable("proposal", {
   opportunityId: uuid("opportunity_id")
     .notNull()
     .references(() => opportunities.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id").references((): AnyPgColumn => proposalTemplates.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   stage: proposalStageEnum("stage").notNull().default("draft"),
   submittedAt: timestamp("submitted_at", { mode: "date" }),
@@ -792,3 +794,49 @@ export type ProposalDebriefStatus =
   (typeof proposalDebriefStatusEnum.enumValues)[number];
 export type ProposalDebriefFormat =
   (typeof proposalDebriefFormatEnum.enumValues)[number];
+
+export const proposalTemplates = pgTable("proposal_template", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  isDefault: boolean("is_default").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
+
+  // HTML/CSS template content (for the future PDF chapter)
+  coverHtml: text("cover_html").notNull().default(""),
+  headerHtml: text("header_html").notNull().default(""),
+  footerHtml: text("footer_html").notNull().default(""),
+  pageCss: text("page_css").notNull().default(""),
+
+  // Section seed list — array of { kind, title, ordering }
+  sectionSeed: jsonb("section_seed")
+    .$type<TemplateSectionSeed[]>()
+    .notNull()
+    .default([]),
+
+  // Branding tokens
+  brandPrimary: text("brand_primary").notNull().default("#2DD4BF"),
+  brandAccent: text("brand_accent").notNull().default("#EC4899"),
+  fontDisplay: text("font_display").notNull().default("Inter"),
+  fontBody: text("font_body").notNull().default("Inter"),
+  logoUrl: text("logo_url").notNull().default(""),
+
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type TemplateSectionSeed = {
+  kind: ProposalSectionKind;
+  title: string;
+  ordering: number;
+  pageLimit?: number | null;
+};
+
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+export type NewProposalTemplate = typeof proposalTemplates.$inferInsert;

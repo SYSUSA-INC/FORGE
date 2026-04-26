@@ -6,6 +6,7 @@ import {
   listOpportunitiesForProposal,
   listProposalTeamCandidates,
 } from "../actions";
+import { listActiveTemplatesForPickerAction } from "../../settings/templates/actions";
 import { NewProposalForm } from "./NewProposalForm";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,10 @@ export default async function NewProposalPage({
 }) {
   const user = await requireAuth();
   await requireCurrentOrg();
-  const [opps, team] = await Promise.all([
+  const [opps, team, templates] = await Promise.all([
     listOpportunitiesForProposal(),
     listProposalTeamCandidates(),
+    listActiveTemplatesForPickerAction(),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function NewProposalPage({
           <NewProposalForm
             opportunities={opps}
             teamCandidates={team}
+            templates={templates}
             currentUserId={user.id}
             defaultOpportunityId={searchParams.opportunityId}
           />
