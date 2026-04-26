@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { auth } from "@/auth";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
@@ -40,6 +42,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ml-auto flex items-center gap-2 md:gap-3">
             <SessionClock />
+            {user ? (
+              <Suspense fallback={<NotificationBellFallback />}>
+                <NotificationBell />
+              </Suspense>
+            ) : null}
             <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
               Settings
             </Link>
@@ -63,5 +70,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+function NotificationBellFallback() {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-9 w-9 rounded-md border border-white/10 bg-white/[0.03]"
+    />
   );
 }
