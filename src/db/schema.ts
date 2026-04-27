@@ -871,3 +871,121 @@ export const proposalPdfRenders = pgTable("proposal_pdf_render", {
 
 export type ProposalPdfRender = typeof proposalPdfRenders.$inferSelect;
 export type NewProposalPdfRender = typeof proposalPdfRenders.$inferInsert;
+
+export const solicitationParseStatusEnum = pgEnum("solicitation_parse_status", [
+  "uploaded",
+  "parsing",
+  "parsed",
+  "failed",
+]);
+
+export const solicitationTypeEnum = pgEnum("solicitation_type", [
+  "rfp",
+  "rfi",
+  "rfq",
+  "sources_sought",
+  "other",
+]);
+
+export const solicitations = pgTable("solicitation", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull().default(""),
+  agency: text("agency").notNull().default(""),
+  office: text("office").notNull().default(""),
+  type: solicitationTypeEnum("type").notNull().default("other"),
+  solicitationNumber: text("solicitation_number").notNull().default(""),
+  noticeId: text("notice_id").notNull().default(""),
+  naicsCode: text("naics_code").notNull().default(""),
+  setAside: text("set_aside").notNull().default(""),
+  responseDueDate: timestamp("response_due_date", { mode: "date" }),
+  postedDate: timestamp("posted_date", { mode: "date" }),
+  source: text("source").notNull().default("uploaded"),
+
+  // File metadata
+  fileName: text("file_name").notNull().default(""),
+  fileSize: integer("file_size").notNull().default(0),
+  contentType: text("content_type").notNull().default(""),
+  storagePath: text("storage_path").notNull().default(""),
+
+  // Parsing state
+  parseStatus: solicitationParseStatusEnum("parse_status")
+    .notNull()
+    .default("uploaded"),
+  parseError: text("parse_error").notNull().default(""),
+  rawText: text("raw_text").notNull().default(""),
+
+  // AI-extracted summaries
+  sectionLSummary: text("section_l_summary").notNull().default(""),
+  sectionMSummary: text("section_m_summary").notNull().default(""),
+  extractedRequirements: jsonb("extracted_requirements")
+    .$type<
+      {
+        kind: "shall" | "should" | "may";
+        text: string;
+        ref: string;
+      }[]
+    >()
+    .notNull()
+    .default([]),
+
+  // Link to created opportunity, if converted
+  opportunityId: uuid("opportunity_id").references(() => opportunities.id, {
+    onDelete: "set null",
+  }),
+
+  uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Solicitation = typeof solicitations.$inferSelect;
+export type NewSolicitation = typeof solicitations.$inferInsert;
+export type SolicitationParseStatus =
+  (typeof solicitationParseStatusEnum.enumValues)[number];
+export type SolicitationType =
+  (typeof solicitationTypeEnum.enumValues)[number];
+
+export const knowledgeKindEnum = pgEnum("knowledge_kind", [
+  "capability",
+  "past_performance",
+  "personnel",
+  "boilerplate",
+]);
+
+export const knowledgeEntries = pgTable("knowledge_entry", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  kind: knowledgeKindEnum("kind").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  tags: text("tags")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  // Used for past_performance / personnel / capability metadata; opaque jsonb.
+  metadata: jsonb("metadata")
+    .$type<Record<string, string | number | boolean>>()
+    .notNull()
+    .default({}),
+  // Light reuse counter — increments any time the entry is referenced from a
+  // proposal section drafter / template. Keeps the autonomy ladder honest
+  // about which assets actually get used.
+  reuseCount: integer("reuse_count").notNull().default(0),
+  archivedAt: timestamp("archived_at"),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
+export type NewKnowledgeEntry = typeof knowledgeEntries.$inferInsert;
+export type KnowledgeKind = (typeof knowledgeKindEnum.enumValues)[number];

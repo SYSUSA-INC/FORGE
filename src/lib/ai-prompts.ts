@@ -1,5 +1,74 @@
 import type { AIMessage } from "@/lib/ai";
 
+export type SolicitationExtractionResult = {
+  title: string;
+  agency: string;
+  office: string;
+  solicitationNumber: string;
+  type: "rfp" | "rfi" | "rfq" | "sources_sought" | "other";
+  naicsCode: string;
+  setAside: string;
+  responseDueDate: string | null;
+  sectionLSummary: string;
+  sectionMSummary: string;
+  requirements: { kind: "shall" | "should" | "may"; text: string; ref: string }[];
+};
+
+const SOLICITATION_EXTRACT_SYSTEM = `You are a federal solicitation analyst inside FORGE — a proposal operations platform. You read raw RFP/RFI/RFQ/SS text and return structured facts as strict JSON.
+
+Rules:
+- Return ONLY a single JSON object matching the schema below. No commentary, no markdown fences.
+- Use empty string "" for any field you cannot find. Use null for missing dates.
+- Date format: YYYY-MM-DD. Convert any encountered date format to that.
+- Type must be one of: rfp, rfi, rfq, sources_sought, other.
+- Requirement kind must be one of: shall, should, may.
+- Each requirement.ref should be a section reference if available (e.g., "L.5.2.1", "M-1", "C.3"); otherwise empty string.
+- Limit requirements to the 25 most important shall/should/may statements you can find. Prefer Section L (instructions) and Section M (evaluation criteria) over Section C boilerplate.
+- Section L summary: 2–4 sentences describing what offerors must submit, page caps, and format requirements you found.
+- Section M summary: 2–4 sentences describing evaluation factors and weights you found.
+- If the document is clearly not a federal solicitation, set title to "" and return mostly empty fields.
+
+Schema:
+{
+  "title": string,
+  "agency": string,
+  "office": string,
+  "solicitationNumber": string,
+  "type": "rfp" | "rfi" | "rfq" | "sources_sought" | "other",
+  "naicsCode": string,
+  "setAside": string,
+  "responseDueDate": string | null,
+  "sectionLSummary": string,
+  "sectionMSummary": string,
+  "requirements": [{ "kind": "shall" | "should" | "may", "text": string, "ref": string }]
+}`;
+
+export function buildSolicitationExtractPrompt(
+  rawText: string,
+): { system: string; messages: AIMessage[] } {
+  // Trim to a manageable size — first 80k chars covers the front matter
+  // (cover sheet + Section L + Section M) of nearly every RFP.
+  const trimmed = rawText.slice(0, 80_000);
+  const userPrompt = [
+    `Extract structured facts from the following solicitation text.`,
+    ``,
+    `Raw text:`,
+    "```",
+    trimmed,
+    "```",
+    ``,
+    rawText.length > trimmed.length
+      ? `(Text was trimmed from ${rawText.length} chars to first ${trimmed.length}.)`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    system: SOLICITATION_EXTRACT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
 export type SectionDraftMode = "draft" | "improve" | "tighten";
 
 export type SectionDraftSnapshot = {
