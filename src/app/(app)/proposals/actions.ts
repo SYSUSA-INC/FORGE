@@ -8,11 +8,13 @@ import {
   memberships,
   opportunities,
   proposalSections,
+  proposalTemplates,
   proposals,
   users,
   type ProposalSectionKind,
   type ProposalSectionStatus,
   type ProposalStage,
+  type TemplateSectionSeed,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
@@ -22,6 +24,7 @@ import {
   projectToPlain,
   validateDoc,
 } from "@/lib/tiptap-doc";
+import { getDefaultTemplate } from "@/app/(app)/settings/templates/actions";
 
 async function ownsProposal(id: string, organizationId: string) {
   const [row] = await db
@@ -86,6 +89,7 @@ export async function listProposalTeamCandidates() {
 export async function createProposalAction(input: {
   opportunityId: string;
   title?: string;
+  templateId?: string | null;
   proposalManagerUserId?: string | null;
   captureManagerUserId?: string | null;
   pricingLeadUserId?: string | null;
@@ -111,12 +115,53 @@ export async function createProposalAction(input: {
     256,
   );
 
+  // Resolve the template the user picked, or fall back to the org's default,
+  // or fall back to the built-in DEFAULT_SECTIONS list.
+  let templateId: string | null = input.templateId ?? null;
+  let seedSections: { kind: ProposalSectionKind; title: string; ordering: number; pageLimit?: number | null }[] =
+    DEFAULT_SECTIONS.map((s) => ({ ...s, pageLimit: null }));
+
+  try {
+    if (templateId) {
+      const [t] = await db
+        .select({
+          id: proposalTemplates.id,
+          sectionSeed: proposalTemplates.sectionSeed,
+        })
+        .from(proposalTemplates)
+        .where(
+          and(
+            eq(proposalTemplates.id, templateId),
+            eq(proposalTemplates.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+      if (t) {
+        seedSections = (t.sectionSeed as TemplateSectionSeed[] | null) ?? seedSections;
+      } else {
+        templateId = null; // ignore stale id
+      }
+    } else {
+      // Fall back to org default if one is set.
+      const fallback = await getDefaultTemplate(organizationId);
+      if (fallback) {
+        templateId = fallback.id;
+        seedSections =
+          (fallback.sectionSeed as TemplateSectionSeed[] | null) ?? seedSections;
+      }
+    }
+  } catch (err) {
+    console.warn("[createProposalAction] template lookup failed", err);
+    templateId = null;
+  }
+
   try {
     const [row] = await db
       .insert(proposals)
       .values({
         organizationId,
         opportunityId: input.opportunityId,
+        templateId,
         title,
         proposalManagerUserId: input.proposalManagerUserId ?? actor.id,
         captureManagerUserId: input.captureManagerUserId ?? null,
@@ -127,11 +172,12 @@ export async function createProposalAction(input: {
     if (!row) return { ok: false, error: "Could not create proposal." };
 
     await db.insert(proposalSections).values(
-      DEFAULT_SECTIONS.map((s) => ({
+      seedSections.map((s) => ({
         proposalId: row.id,
         kind: s.kind,
         title: s.title,
         ordering: s.ordering,
+        pageLimit: s.pageLimit ?? null,
       })),
     );
 
@@ -149,6 +195,7 @@ export async function createProposalAction(input: {
 export async function createProposalAndGoAction(input: {
   opportunityId: string;
   title?: string;
+  templateId?: string | null;
   proposalManagerUserId?: string | null;
   captureManagerUserId?: string | null;
   pricingLeadUserId?: string | null;
