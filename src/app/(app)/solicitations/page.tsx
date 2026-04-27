@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DotMeter } from "@/components/ui/DotMeter";
 import { HeatGrid } from "@/components/ui/HeatGrid";
@@ -36,6 +37,11 @@ export default function SolicitationsListPage() {
           { label: "Under review", value: "02", accent: "hazard" },
           { label: "Amendments · 7d", value: "07" },
         ]}
+      />
+      <PreviewBanner
+        title="Preview · sample data"
+        message="The solicitations shown below are sample mock data, not your real records. Solicitation intake (raw RFP upload + Section L/M extraction) is still in design. Use Opportunities for live pursuit tracking today."
+        roadmap="Real solicitation intake ships after the v1 MVP authoring chapter."
       />
 
       {/* Filter row with big search */}
