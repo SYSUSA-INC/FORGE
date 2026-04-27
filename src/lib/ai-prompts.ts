@@ -1,5 +1,77 @@
 import type { AIMessage } from "@/lib/ai";
 
+export type SectionDraftMode = "draft" | "improve" | "tighten";
+
+export type SectionDraftSnapshot = {
+  organizationName: string;
+  proposal: {
+    title: string;
+    agency: string;
+    solicitationNumber: string;
+    naicsCode: string;
+    setAside: string;
+    incumbent: string;
+    opportunityDescription: string;
+  };
+  section: {
+    title: string;
+    kind: string;
+    pageLimit: number | null;
+    currentBodyPlain: string;
+    currentWordCount: number;
+  };
+  pastPerformance: {
+    customer: string;
+    contract: string;
+    description: string;
+  }[];
+};
+
+const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
+
+Style rules:
+- Plain prose. No markdown headings, no bullet markers like "*". Use real paragraphs and, when appropriate, indented sub-points.
+- Speak with confidence and specificity. Avoid filler ("we are pleased to", "world-class", "best-in-class", "robust").
+- Match section conventions: Executive Summary → 1–2 punchy paragraphs; Technical → numbered approach steps + how-it-mitigates-risk; Management → roles + governance + risk register; Past Performance → CPARS-style references; Pricing → assumptions + cost model; Compliance → traceability statements.
+- Cite the customer (agency, office, mission) and the solicitation number when context is provided.
+- Reuse facts from the snapshot exactly as given. Do NOT invent contract numbers, dates, dollar values, customer names, or staff bios.
+- If the snapshot is sparse, write what you can with general best practices and explicitly mark TBD placeholders in [BRACKETS] for the human author to fill.`;
+
+const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
+  draft:
+    "The author wants a fresh first draft. Use the section's title and kind plus the proposal context to produce a complete draft suitable as a starting point. Aim for the section's page cap if one is given (assume 350 words/page for prose sections).",
+  improve:
+    "The author has a draft and wants you to strengthen it. Keep the structure but tighten the prose, add specificity, surface win themes, and fix weak phrasing. Do NOT change facts. Preserve TBD placeholders in [BRACKETS] when present.",
+  tighten:
+    "The author needs the draft reduced to fit. Cut filler aggressively, merge paragraphs, remove redundant sentences. Preserve every concrete fact, citation, and number. Aim for the section's page cap if one is given (assume 350 words/page).",
+};
+
+export function buildSectionDraftPrompt(
+  mode: SectionDraftMode,
+  snapshot: SectionDraftSnapshot,
+): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Mode: ${mode}.`,
+    MODE_INSTRUCTIONS[mode],
+    ``,
+    `Section + proposal snapshot (JSON):`,
+    "```json",
+    JSON.stringify(snapshot, null, 2),
+    "```",
+    ``,
+    mode === "draft"
+      ? `Produce the section body. Output ONLY the body text — no title, no preamble, no commentary about your process.`
+      : mode === "improve"
+        ? `Return the improved body. Output ONLY the body text — no diff, no commentary about what you changed.`
+        : `Return the tightened body. Output ONLY the body text — no commentary about what you cut.`,
+  ].join("\n");
+
+  return {
+    system: SECTION_DRAFT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
 export type PipelineSnapshot = {
   organizationName: string;
   asOf: string;
