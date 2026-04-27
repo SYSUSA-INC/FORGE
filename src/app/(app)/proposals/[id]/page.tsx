@@ -7,6 +7,8 @@ import { Panel } from "@/components/ui/Panel";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { StageAdvancePanel } from "./StageAdvancePanel";
+import { ExportPanel } from "./pdf/ExportPanel";
+import { listRecentRendersAction, getProviderStatusAction } from "./pdf/actions";
 import { listProposalTeamCandidates } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +48,11 @@ export default async function ProposalOverviewPage({
   const totalWords = sections.reduce((a, s) => a + s.wordCount, 0);
   const approved = sections.filter((s) => s.status === "approved").length;
 
+  const [recentRenders, providerStatus] = await Promise.all([
+    listRecentRendersAction(params.id, 5),
+    getProviderStatusAction(),
+  ]);
+
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="xl:col-span-2">
@@ -66,6 +73,13 @@ export default async function ProposalOverviewPage({
 
       <div className="flex flex-col gap-4">
         <StageAdvancePanel proposalId={p.id} currentStage={p.stage} />
+
+        <ExportPanel
+          proposalId={p.id}
+          initialRenders={recentRenders}
+          pdfStatus={providerStatus.pdf.active}
+          storageStatus={providerStatus.storage.active}
+        />
 
         <Panel title="Sections" eyebrow={`${approved}/${sections.length} approved · ${totalWords} words`}>
           <ul className="flex flex-col gap-1.5">

@@ -840,3 +840,34 @@ export type TemplateSectionSeed = {
 
 export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
 export type NewProposalTemplate = typeof proposalTemplates.$inferInsert;
+
+export const proposalPdfRenders = pgTable("proposal_pdf_render", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  proposalId: uuid("proposal_id")
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id").references(() => proposalTemplates.id, {
+    onDelete: "set null",
+  }),
+  renderedByUserId: text("rendered_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  /** Where the rendered artifact lives (R2 object key, or "stub:<id>" for stub mode). */
+  storagePath: text("storage_path").notNull(),
+  /** "pdf" for live renders, "html" for stub-mode renders. */
+  contentType: text("content_type").notNull().default("pdf"),
+  byteSize: integer("byte_size").notNull().default(0),
+  pageCount: integer("page_count").notNull().default(0),
+  /** Provider that produced this render: "browserless" / "stub". */
+  provider: text("provider").notNull().default("stub"),
+  /** Optional URL stored at render time (signed URL or public path). Used for download. */
+  downloadUrl: text("download_url").notNull().default(""),
+  expiresAt: timestamp("expires_at"),
+  renderedAt: timestamp("rendered_at").notNull().defaultNow(),
+});
+
+export type ProposalPdfRender = typeof proposalPdfRenders.$inferSelect;
+export type NewProposalPdfRender = typeof proposalPdfRenders.$inferInsert;
