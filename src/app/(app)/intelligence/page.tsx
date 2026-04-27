@@ -3,12 +3,13 @@ import { getAIProviderStatus } from "@/lib/ai";
 import IntelligenceVisionDemo from "./IntelligenceVisionDemo";
 import { PipelineBriefPanel } from "./PipelineBriefPanel";
 import { ProviderStatusPanel } from "./ProviderStatusPanel";
+import { OutcomeInsightsPanel } from "./OutcomeInsightsPanel";
 
 export const dynamic = "force-dynamic";
 
 export default async function IntelligencePage() {
   await requireAuth();
-  await requireCurrentOrg();
+  const { organizationId } = await requireCurrentOrg();
   const providerStatus = getAIProviderStatus();
 
   return (
@@ -19,6 +20,10 @@ export default async function IntelligencePage() {
           active={providerStatus.active}
           all={providerStatus.all}
         />
+      </section>
+
+      <section className="mb-8">
+        <OutcomeInsightsPanel organizationId={organizationId} />
       </section>
 
       <IntelligenceVisionDemo />
