@@ -14,6 +14,7 @@ import {
 } from "@/lib/proposal-types";
 import { fromPlainText } from "@/lib/tiptap-doc";
 import { RichSectionEditor } from "@/components/editor/RichSectionEditor";
+import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import {
   addCustomSectionAction,
   removeSectionAction,
@@ -328,8 +329,17 @@ function SectionRow({
             </div>
           </div>
 
-          <div className="mt-3">
-            <div className="mb-2 flex items-center justify-between">
+          <div className="mt-3 flex flex-col gap-2">
+            <AiAssistantPanel
+              sectionId={section.id}
+              hasContent={plainContent.trim().length > 0}
+              onAccept={(doc, plain, count) => {
+                setBodyDoc(doc);
+                setPlainContent(plain);
+                setWordCount(count);
+              }}
+            />
+            <div className="flex items-center justify-between">
               <label className="aur-label mb-0">Content</label>
               <span className="font-mono text-[10px] text-muted">
                 {words} words
