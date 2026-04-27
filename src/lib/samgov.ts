@@ -1,5 +1,12 @@
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 
+/**
+ * SAM.gov Entity Management API hard-caps `size` at 10 records per
+ * request. Going higher returns HTTP 400 with errorCode SCE.
+ * (The Opportunities API on a different endpoint allows up to 1000.)
+ */
+export const MAX_ENTITY_SEARCH_SIZE = 10;
+
 type SamRawEntity = {
   entityRegistration?: {
     legalBusinessName?: string;
@@ -177,7 +184,11 @@ export async function fetchSamGovByUei(
     const res = await fetch(`${SAM_BASE}?${params.toString()}`, { cache: "no-store" });
     const text = await res.text();
     if (!res.ok) {
-      return { ok: false, error: text.slice(0, 500), status: res.status };
+      return {
+        ok: false,
+        error: friendlySamError(text, res.status),
+        status: res.status,
+      };
     }
     const data = JSON.parse(text) as {
       totalRecords?: number;
@@ -236,6 +247,35 @@ function mmddyyyy(d: Date): string {
   return `${mm}/${dd}/${d.getFullYear()}`;
 }
 
+/**
+ * SAM.gov returns errors as JSON like
+ *   { httpStatus, title, detail, type, errorCode, source }
+ * Surface that in a human-readable line; fall back to the raw body
+ * (truncated) if the response isn't JSON. Keeps the UI from showing
+ * a wall of unparsed JSON to end users when SAM.gov rejects a query.
+ */
+function friendlySamError(body: string, httpStatus: number): string {
+  try {
+    const j = JSON.parse(body) as {
+      title?: string;
+      detail?: string;
+      errorCode?: string;
+      source?: string;
+    };
+    const parts = [
+      j.detail ?? j.title ?? "",
+      j.errorCode ? `[${j.errorCode}]` : "",
+      j.source ? `· ${j.source}` : "",
+    ]
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length) return parts.join(" ");
+  } catch {
+    // Not JSON; fall through.
+  }
+  return `SAM.gov ${httpStatus}: ${body.slice(0, 300)}`;
+}
+
 export async function searchSamGovOpportunities(
   input: SamOpportunitySearchParams,
 ): Promise<
@@ -270,7 +310,7 @@ export async function searchSamGovOpportunities(
     if (!res.ok) {
       return {
         ok: false,
-        error: text.slice(0, 500),
+        error: friendlySamError(text, res.status),
         status: res.status,
       };
     }
@@ -340,7 +380,10 @@ export async function searchSamGovEntities(
     api_key: key,
     samRegistered: "Yes",
     registrationStatus: "A",
-    size: String(input.limit ?? 50),
+    // SAM.gov Entity Management API caps `size` at 10 per request and
+    // returns HTTP 400 ("Size Cannot Exceed 10 Records") above that.
+    // Distinct from the Opportunities API which allows up to 1000.
+    size: String(Math.min(input.limit ?? MAX_ENTITY_SEARCH_SIZE, MAX_ENTITY_SEARCH_SIZE)),
     page: "0",
   });
   if (input.legalBusinessName) {
@@ -357,7 +400,11 @@ export async function searchSamGovEntities(
     });
     const text = await res.text();
     if (!res.ok) {
-      return { ok: false, error: text.slice(0, 500), status: res.status };
+      return {
+        ok: false,
+        error: friendlySamError(text, res.status),
+        status: res.status,
+      };
     }
     const data = JSON.parse(text) as {
       totalRecords?: number;
