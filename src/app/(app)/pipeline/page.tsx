@@ -1,185 +1,317 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { opportunities } from "@/db/schema";
+import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { Funnel, FunnelLegend } from "@/components/ui/Funnel";
-import { PieChart, PieLegend, type PieSlice } from "@/components/ui/PieChart";
-import { pipelineStages, opportunities, historicalWinLoss } from "@/lib/pipeline";
+import { STAGES, STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
 
-// Stage colors mirror Funnel STAGE_GRADIENTS (9 entries).
-const STAGE_COLORS: Record<number, string> = {
-  0: "#A5F3FC",
-  1: "#67E8F9",
-  2: "#2DD4BF",
-  3: "#34D399",
-  4: "#8B5CF6",
-  5: "#EC4899",
-  6: "#BE185D",
-  7: "#F472B6",
-  8: "#10B981", // Stage 9: Won
-};
+export const dynamic = "force-dynamic";
 
-export default function PipelinePage() {
-  const totalItems = pipelineStages.reduce((a, s) => a + s.count, 0);
-  const totalValueHigh = pipelineStages.reduce((a, s) => a + s.valueHigh, 0);
-  const wonStage = pipelineStages.find((s) => s.key === "S9_WON");
-  const wonFromStages = wonStage?.count ?? 0;
-  const wonHistoric = historicalWinLoss.find((w) => w.key === "Won")?.count ?? 0;
-  const totalWon = wonFromStages + wonHistoric;
-  const decided = historicalWinLoss
-    .filter((w) => ["Won", "Lost"].includes(w.key))
-    .reduce((a, w) => a + w.count, 0);
-  const winRate = decided === 0 ? 0 : Math.round((wonHistoric / decided) * 100);
+const ACTIVE_STAGES = [
+  "identified",
+  "sources_sought",
+  "qualification",
+  "capture",
+  "pre_proposal",
+  "writing",
+  "submitted",
+] as const;
 
-  const slices: PieSlice[] = pipelineStages.map((s, i) => ({
-    key: s.key,
-    label: `Stage ${i + 1}: ${s.label}`,
-    value: s.count,
-    color: STAGE_COLORS[i],
-  }));
+export default async function PipelinePage() {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
 
-  const hasData = totalItems > 0 || opportunities.length > 0;
+  const rows = await db
+    .select({
+      id: opportunities.id,
+      title: opportunities.title,
+      agency: opportunities.agency,
+      stage: opportunities.stage,
+      pWin: opportunities.pWin,
+      valueLow: opportunities.valueLow,
+      valueHigh: opportunities.valueHigh,
+      responseDueDate: opportunities.responseDueDate,
+    })
+    .from(opportunities)
+    .where(eq(opportunities.organizationId, organizationId));
+
+  const byStage = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const list = byStage.get(r.stage) ?? [];
+    list.push(r);
+    byStage.set(r.stage, list);
+  }
+
+  const total = rows.length;
+  const active = rows.filter((r) =>
+    (ACTIVE_STAGES as readonly string[]).includes(r.stage),
+  ).length;
+  const won = byStage.get("won")?.length ?? 0;
+  const lost = byStage.get("lost")?.length ?? 0;
+  const decisive = won + lost;
+  const winRate = decisive > 0 ? Math.round((won / decisive) * 100) : null;
+
+  const totalHigh = rows.reduce(
+    (acc, r) => acc + parseDollars(r.valueHigh ?? ""),
+    0,
+  );
 
   return (
     <>
       <PageHeader
         eyebrow="Pipeline"
         title="Opportunity pipeline"
-        subtitle="Nine stages from identification through award. The template is always visible; counts and values fill in as opportunities progress."
+        subtitle="Live counts across the ten stages, computed from your opportunities table."
         actions={
           <>
-            <Link href="/solicitations/new" className="aur-btn">
-              Ingest solicitation
+            <Link href="/opportunities/import" className="aur-btn">
+              Import from SAM.gov
             </Link>
-            <Link href="/proposals/new" className="aur-btn-primary">
-              + Add opportunity
+            <Link href="/opportunities/new" className="aur-btn aur-btn-primary">
+              + New opportunity
             </Link>
           </>
         }
         meta={[
-          { label: "Items in pipeline", value: totalItems.toLocaleString() },
+          { label: "Total", value: String(total).padStart(2, "0") },
+          {
+            label: "Active",
+            value: String(active).padStart(2, "0"),
+            accent: active > 0 ? "magenta" : undefined,
+          },
+          {
+            label: "Win rate",
+            value: winRate === null ? "—" : `${winRate}%`,
+            accent:
+              winRate !== null && winRate >= 40
+                ? "emerald"
+                : winRate !== null && winRate >= 20
+                  ? "gold"
+                  : undefined,
+          },
           {
             label: "Est. value (high)",
             value:
-              totalValueHigh === 0
+              totalHigh === 0
                 ? "—"
-                : totalValueHigh >= 1_000_000_000
-                  ? `$${(totalValueHigh / 1_000_000_000).toFixed(2)}B`
-                  : `$${(totalValueHigh / 1_000_000).toFixed(0)}M`,
-            accent: totalValueHigh > 0 ? "emerald" : undefined,
-          },
-          {
-            label: "Wins (Stage 9 + lifetime)",
-            value: totalWon === 0 ? "—" : String(totalWon),
-            accent: totalWon > 0 ? "emerald" : undefined,
-          },
-          {
-            label: "Historic win rate",
-            value: decided === 0 ? "—" : `${winRate}%`,
-            accent: winRate >= 50 ? "emerald" : undefined,
+                : totalHigh >= 1_000_000_000
+                  ? `$${(totalHigh / 1_000_000_000).toFixed(2)}B`
+                  : totalHigh >= 1_000_000
+                    ? `$${(totalHigh / 1_000_000).toFixed(0)}M`
+                    : `$${totalHigh.toLocaleString()}`,
           },
         ]}
       />
 
-      <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Panel eyebrow="Pipeline funnel" title="By stage">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px] lg:items-center">
-            <div className="relative mx-auto aspect-[560/540] w-full max-w-[560px] overflow-hidden">
-              <Funnel stages={pipelineStages} width={560} height={540} />
-            </div>
-            <FunnelLegend stages={pipelineStages} />
-          </div>
-          {!hasData ? (
-            <div className="mt-4 rounded-md border border-dashed border-white/10 px-4 py-3 text-[13px] text-muted">
-              The 9-stage template is shown for reference. Add an opportunity or create
-              a proposal to start populating the funnel.
-            </div>
-          ) : null}
-        </Panel>
-
-        <Panel eyebrow="Distribution" title="Pipeline by stage">
-          <div className="grid grid-cols-[220px_1fr] items-center gap-4">
-            <div className="h-[220px]">
-              <PieChart slices={slices} />
-            </div>
-            <PieLegend slices={slices} />
+      {total === 0 ? (
+        <Panel title="Empty pipeline">
+          <p className="font-body text-[14px] leading-relaxed text-muted">
+            No opportunities yet. Create one manually or import a batch from
+            SAM.gov to populate the pipeline.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <Link href="/opportunities/new" className="aur-btn aur-btn-primary">
+              + New opportunity
+            </Link>
+            <Link href="/opportunities/import" className="aur-btn">
+              Import from SAM.gov
+            </Link>
           </div>
         </Panel>
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
-        <Panel
-          eyebrow="Opportunities"
-          title={`Pipeline detail · ${opportunities.length}`}
-          dense
-        >
-          {opportunities.length === 0 ? (
-            <div className="flex flex-col items-start gap-2 px-5 py-8 text-[13px] text-muted">
-              <span>No opportunities yet.</span>
-              <Link href="/proposals/new" className="aur-btn-ghost px-0 py-0 text-[12px]">
-                Add the first one →
-              </Link>
-            </div>
-          ) : (
-            <ul className="divide-y divide-white/10">
-              {opportunities.map((o) => (
-                <li key={o.id}>
-                  <Link
-                    href={`/pipeline/${o.id}`}
-                    className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-white/[0.03]"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="font-display text-[15px] font-semibold text-text">
-                        {o.title}
+      ) : (
+        <>
+          <Panel title="Stage funnel" eyebrow={`${total} total`}>
+            <ul className="flex flex-col gap-2">
+              {STAGES.map((s) => {
+                const items = byStage.get(s.key) ?? [];
+                const pct =
+                  total === 0 ? 0 : Math.round((items.length / total) * 100);
+                const color = STAGE_COLORS[s.key];
+                return (
+                  <li key={s.key}>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-40 shrink-0 truncate font-mono text-[11px] uppercase tracking-widest"
+                        style={{ color }}
+                      >
+                        {s.label}
+                      </span>
+                      <div className="relative h-6 flex-1 overflow-hidden rounded-md border border-white/10 bg-white/[0.02]">
+                        <div
+                          className="h-full transition-all"
+                          style={{
+                            width: `${Math.max(pct, items.length > 0 ? 6 : 0)}%`,
+                            background: `${color}40`,
+                            borderRight: items.length
+                              ? `2px solid ${color}`
+                              : undefined,
+                          }}
+                        />
+                        <span className="absolute inset-y-0 left-2 flex items-center font-mono text-[10px] tabular-nums text-text">
+                          {items.length}
+                        </span>
                       </div>
-                      <div className="mt-0.5 font-mono text-[11px] text-muted">
-                        {o.solicitationNumber} · {o.agency}
-                      </div>
+                      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-subtle">
+                        {pct}%
+                      </span>
                     </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <aside className="flex flex-col gap-4">
-          <Panel eyebrow="Stage 9 · Won" title="In-pipeline wins">
-            <div className="flex items-end gap-3">
-              <div className="font-display text-4xl font-semibold text-emerald">
-                {wonFromStages}
-              </div>
-              <div className="pb-1 font-mono text-[11px] text-muted">
-                opportunities in Stage 9
-              </div>
-            </div>
-            <p className="mt-2 text-[12px] leading-relaxed text-muted">
-              Wins that haven’t been archived yet. Once you capture CPARS baselines and
-              retrospective notes, advance them to historical outcomes — the brain uses
-              them as positive training signal.
-            </p>
-          </Panel>
-
-          <Panel eyebrow="Historical" title="Outcomes (lifetime)">
-            {historicalWinLoss.length === 0 ? (
-              <div className="rounded-md border border-dashed border-white/10 px-3 py-3 text-[12px] text-muted">
-                Outcomes will accrue as proposals close.
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-2 font-mono text-[11px]">
-                {historicalWinLoss.map((w) => (
-                  <li
-                    key={w.key}
-                    className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
-                  >
-                    <span className="text-muted">{w.key}</span>
-                    <span className="tabular-nums text-text">{w.count}</span>
                   </li>
-                ))}
-              </ul>
-            )}
+                );
+              })}
+            </ul>
           </Panel>
-        </aside>
-      </section>
+
+          <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Panel title="Active opportunities" eyebrow={`${active} live`}>
+              {active === 0 ? (
+                <p className="font-mono text-[11px] text-muted">
+                  Nothing active.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {rows
+                    .filter((r) =>
+                      (ACTIVE_STAGES as readonly string[]).includes(r.stage),
+                    )
+                    .sort(
+                      (a, b) =>
+                        (a.responseDueDate?.getTime() ?? Infinity) -
+                        (b.responseDueDate?.getTime() ?? Infinity),
+                    )
+                    .slice(0, 10)
+                    .map((r) => (
+                      <li key={r.id}>
+                        <Link
+                          href={`/opportunities/${r.id}`}
+                          className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 hover:border-white/20"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-display text-[13px] text-text">
+                              {r.title}
+                            </div>
+                            <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                              {r.agency || "—"}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3 font-mono text-[10px]">
+                            <span
+                              style={{
+                                color:
+                                  STAGE_COLORS[r.stage as keyof typeof STAGE_COLORS] ??
+                                  "#9BC9D9",
+                              }}
+                            >
+                              {STAGE_LABELS[r.stage as keyof typeof STAGE_LABELS] ??
+                                r.stage}
+                            </span>
+                            {r.responseDueDate ? (
+                              <span className="text-subtle">
+                                due{" "}
+                                {r.responseDueDate.toISOString().slice(0, 10)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel
+              title="Outcome split"
+              eyebrow={
+                decisive === 0
+                  ? "no closed pursuits yet"
+                  : `${decisive} closed`
+              }
+            >
+              {decisive === 0 ? (
+                <p className="font-body text-[13px] text-muted">
+                  Mark opportunities as Won / Lost / No Bid to see the outcome
+                  split here.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  <Row label="Won" count={won} color="#10B981" total={decisive} />
+                  <Row label="Lost" count={lost} color="#EF4444" total={decisive} />
+                  <Row
+                    label="No-bid"
+                    count={byStage.get("no_bid")?.length ?? 0}
+                    color="#64748B"
+                    total={decisive}
+                  />
+                </ul>
+              )}
+              {decisive > 0 ? (
+                <p className="mt-3 font-mono text-[10px] text-subtle">
+                  Win rate excludes no-bid from the denominator. For richer
+                  insights — top reasons, lessons learned —{" "}
+                  <Link href="/intelligence" className="text-teal underline">
+                    open Intelligence
+                  </Link>
+                  .
+                </p>
+              ) : null}
+            </Panel>
+          </section>
+        </>
+      )}
     </>
   );
+}
+
+function Row({
+  label,
+  count,
+  color,
+  total,
+}: {
+  label: string;
+  count: number;
+  color: string;
+  total: number;
+}) {
+  const pct = total === 0 ? 0 : Math.round((count / total) * 100);
+  return (
+    <li className="flex items-center gap-3">
+      <span
+        className="w-20 shrink-0 font-mono text-[11px] uppercase tracking-widest"
+        style={{ color }}
+      >
+        {label}
+      </span>
+      <div className="relative h-3 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, background: color, opacity: 0.8 }}
+        />
+      </div>
+      <span
+        className="w-8 text-right font-mono text-[11px] tabular-nums"
+        style={{ color }}
+      >
+        {count}
+      </span>
+    </li>
+  );
+}
+
+function parseDollars(s: string): number {
+  if (!s) return 0;
+  const trimmed = s.trim().replace(/[$,]/g, "");
+  const m = trimmed.match(/^([\d.]+)\s*([kKmMbB])?$/);
+  if (!m) {
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : 0;
+  }
+  const base = Number(m[1]);
+  if (!Number.isFinite(base)) return 0;
+  const suffix = (m[2] ?? "").toLowerCase();
+  if (suffix === "k") return base * 1_000;
+  if (suffix === "m") return base * 1_000_000;
+  if (suffix === "b") return base * 1_000_000_000;
+  return base;
 }

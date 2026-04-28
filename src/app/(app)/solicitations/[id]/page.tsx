@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { BarMeter } from "@/components/ui/BarMeter";
 import { Radar } from "@/components/ui/Radar";
@@ -40,6 +41,10 @@ export default function SolicitationDetail({ params }: { params: { id: string } 
             accent: "hazard",
           },
         ]}
+      />
+      <PreviewBanner
+        title="Preview · sample data"
+        message="This detail view shows mock data only. Live solicitation intake + Section L/M extraction is in design."
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">

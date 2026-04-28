@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
 import { BarMeter } from "@/components/ui/BarMeter";
 import { DotMeter } from "@/components/ui/DotMeter";
 import { BarSpark } from "@/components/ui/Sparkline";
@@ -32,6 +33,11 @@ export default function KnowledgeBasePage() {
           { label: "Reuse · 30d", value: "1,204", accent: "hazard" },
           { label: "Stale >90d", value: "18", accent: "blood" },
         ]}
+      />
+      <PreviewBanner
+        title="Preview · sample data"
+        message="The knowledge-base entries shown below are mock data, not yours. Embedding-backed corporate memory (pgvector index over capabilities, past performance, personnel, boilerplate) ships with the autonomous-intelligence chapter."
+        roadmap="Needs an embeddings provider (e.g., Voyage AI) + pgvector + a background indexing job. Past performance from the Settings page is the seed for this — the Phase 5b /intelligence panel already surfaces lessons-learned."
       />
 
       <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr_1fr_1fr]">

@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { PreviewBanner } from "@/components/ui/PreviewBanner";
 
 export default function NewSolicitationPage() {
   return (
@@ -9,6 +11,22 @@ export default function NewSolicitationPage() {
         title="New solicitation"
         subtitle="Upload a raw RFP, RFI, RFQ, or Sources Sought notice. FORGE parses Section L / M, extracts requirements, and builds the compliance matrix."
       />
+      <PreviewBanner
+        title="Preview · not yet wired"
+        message="This page is the design for solicitation intake. The Select Files button, dropzone, and pipeline steps are scaffolding — uploading does not currently parse or extract anything. To start a real proposal today, create an opportunity (manually or by importing from SAM.gov), then build a proposal against it."
+        roadmap="Real intake (PDF/DOCX upload → OCR → Section L/M extraction → requirement mining → compliance matrix auto-assembly) needs Browserless / file storage / a parsing pipeline. It's slated after the v1 MVP authoring chapter ships."
+      />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Link href="/opportunities/new" className="aur-btn aur-btn-primary">
+          + Create opportunity manually
+        </Link>
+        <Link href="/opportunities/import" className="aur-btn">
+          Import from SAM.gov
+        </Link>
+        <Link href="/proposals/new" className="aur-btn aur-btn-ghost">
+          New proposal
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <Panel title="Upload">
