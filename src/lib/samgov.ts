@@ -239,7 +239,24 @@ export type SamOpportunitySearchParams = {
   postedDaysBack?: number;
   activeOnly?: boolean;
   limit?: number;
+  /**
+   * Restrict to a specific contracting department, matched against
+   * SAM.gov's `deptname` parameter. For GSA-issued opportunities use
+   * "General Services Administration" exactly.
+   */
+  department?: string;
+  /**
+   * Free-text keywords to OR-merge into the `q` parameter. We use this
+   * to bias toward GSA contract vehicles (Polaris, OASIS+, STARS III,
+   * etc.) without forcing the user to remember exact strings.
+   */
+  extraKeywords?: string[];
 };
+
+// GSA vehicle list lives in @/lib/gsa-vehicles so it can be safely
+// imported from client components without dragging the SAM.gov fetch
+// code into the browser bundle.
+export { GSA_VEHICLES, type GSAVehicle } from "@/lib/gsa-vehicles";
 
 function mmddyyyy(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -297,9 +314,26 @@ export async function searchSamGovOpportunities(
     postedFrom: mmddyyyy(postedFrom),
     postedTo: mmddyyyy(postedTo),
   });
-  if (input.keyword) params.set("q", input.keyword);
+
+  // SAM.gov's `q` is a single string. To bias the search toward GSA
+  // vehicles (Polaris, OASIS+, …) we OR-merge them with the user's own
+  // keyword. Quoted vehicle names keep multi-word phrases intact.
+  const keywordParts: string[] = [];
+  if (input.keyword) keywordParts.push(input.keyword);
+  if (input.extraKeywords && input.extraKeywords.length > 0) {
+    const quoted = input.extraKeywords
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .map((k) => (k.includes(" ") ? `"${k}"` : k));
+    if (quoted.length > 0) keywordParts.push(`(${quoted.join(" OR ")})`);
+  }
+  if (keywordParts.length > 0) params.set("q", keywordParts.join(" "));
+
   if (input.naicsCodes && input.naicsCodes.length > 0) {
     params.set("ncode", input.naicsCodes.join(","));
+  }
+  if (input.department && input.department.trim()) {
+    params.set("deptname", input.department.trim());
   }
 
   try {
