@@ -6,9 +6,12 @@ import { db } from "@/db";
 import { opportunities, organizations } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import {
+  GSA_VEHICLES,
   searchSamGovOpportunities,
   type SamOpportunity,
 } from "@/lib/samgov";
+
+const GSA_DEPARTMENT = "General Services Administration";
 
 export type ImportableOpportunity = SamOpportunity & {
   alreadyImported: boolean;
@@ -18,6 +21,10 @@ export async function loadSamGovOpportunitiesAction(input?: {
   naicsCodes?: string[];
   keyword?: string;
   postedDaysBack?: number;
+  /** Restrict to GSA-issued opportunities (sets SAM.gov deptname). */
+  gsaOnly?: boolean;
+  /** GSA vehicle ids from GSA_VEHICLES — adds vehicle keywords to the query. */
+  vehicleIds?: string[];
 }): Promise<
   | {
       ok: true;
@@ -51,11 +58,21 @@ export async function loadSamGovOpportunitiesAction(input?: {
     );
   }
 
-  if (naicsCodes.length === 0 && !input?.keyword) {
+  const vehicleIds = input?.vehicleIds ?? [];
+  const vehicleKeywords = vehicleIds
+    .map((id) => GSA_VEHICLES.find((v) => v.id === id)?.keyword ?? "")
+    .filter(Boolean);
+
+  // GSA-scoped queries (department filter or vehicle keywords) carry
+  // their own scope, so an empty NAICS list isn't a hard error there.
+  const hasGsaFilter =
+    input?.gsaOnly === true || vehicleKeywords.length > 0;
+
+  if (naicsCodes.length === 0 && !input?.keyword && !hasGsaFilter) {
     return {
       ok: false,
       error:
-        "No NAICS codes configured. Add them under Settings → Classification, or enter a keyword to search SAM.gov.",
+        "No NAICS codes configured. Add them under Settings → Classification, or enter a keyword / pick a GSA vehicle.",
     };
   }
 
@@ -63,6 +80,8 @@ export async function loadSamGovOpportunitiesAction(input?: {
     naicsCodes,
     keyword: input?.keyword,
     postedDaysBack: input?.postedDaysBack ?? 30,
+    department: input?.gsaOnly ? GSA_DEPARTMENT : undefined,
+    extraKeywords: vehicleKeywords,
   });
   if (!result.ok) return { ok: false, error: result.error };
 
