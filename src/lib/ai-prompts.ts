@@ -1,5 +1,74 @@
 import type { AIMessage } from "@/lib/ai";
 
+export type EbuyExtractionResult = {
+  title: string;
+  rfqNumber: string;
+  /** Buying agency for which GSA is fronting the RFQ (e.g., "Department of Veterans Affairs"). */
+  buyingAgency: string;
+  /** GSA contract vehicle the RFQ runs against (e.g., "MAS", "Polaris", "OASIS+"). */
+  vehicle: string;
+  naicsCode: string;
+  setAside: string;
+  /** ISO date YYYY-MM-DD of when quotes are due, or null. */
+  responseDueDate: string | null;
+  placeOfPerformance: string;
+  /** Summary of the work scope — 2-4 sentences. */
+  scopeSummary: string;
+  /** Bulleted CLIN / line-item summary or "" if none parseable. */
+  clinSummary: string;
+  /** Free-text notes the model thinks the buyer should know (page caps, eval criteria, etc.). */
+  notes: string;
+};
+
+const EBUY_EXTRACT_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform — reading a GSA eBuy RFQ that a Schedule holder has pasted in. The text may be the RFQ description copied from eBuy, the body of a forwarded eBuy notification email, or a mix.
+
+Return ONLY a single JSON object matching the schema below. No commentary, no markdown fences.
+
+Rules:
+- Use empty string "" for any field you cannot find. Use null for missing dates.
+- Date format: YYYY-MM-DD. Convert any encountered date format to that.
+- buyingAgency: the agency the GOODS or SERVICES are FOR — not GSA itself unless GSA is the literal end user. eBuy RFQs are typically posted by an Ordering Agency that bought through GSA's vehicles.
+- vehicle: identify the GSA vehicle if mentioned (MAS, OASIS+, Polaris, Alliant 2, STARS III, VETS 2, EIS, 2GIT, ASCEND). Use "MAS" if it's an unnamed Schedule order. Use "" if you genuinely can't tell.
+- naicsCode: 6-digit NAICS if present; otherwise "".
+- setAside: e.g., "Total Small Business", "8(a)", "WOSB", "SDVOSB", "HUBZone", "Unrestricted", or "".
+- scopeSummary: 2–4 sentences in plain prose describing what's being bought. No marketing language.
+- clinSummary: bulleted CLINs if present (use "- " prefix on each line). Otherwise "".
+- notes: short list of anything a quoter must know (page caps, evaluation factors, period of performance, ROM/firm-fixed-price hints, security requirements). Free text, 1-3 sentences.
+- If the text is clearly NOT an RFQ (e.g., admin email, unrelated content), set title to "" and return mostly empty fields.
+
+Schema:
+{
+  "title": string,
+  "rfqNumber": string,
+  "buyingAgency": string,
+  "vehicle": string,
+  "naicsCode": string,
+  "setAside": string,
+  "responseDueDate": string | null,
+  "placeOfPerformance": string,
+  "scopeSummary": string,
+  "clinSummary": string,
+  "notes": string
+}`;
+
+export function buildEbuyExtractPrompt(rawText: string): {
+  system: string;
+  messages: AIMessage[];
+} {
+  // eBuy RFQ bodies are short — 30k chars covers any realistic paste.
+  const trimmed = rawText.slice(0, 30_000);
+  const userPrompt = [
+    `Extract structured facts from this eBuy RFQ text:`,
+    "```",
+    trimmed,
+    "```",
+  ].join("\n");
+  return {
+    system: EBUY_EXTRACT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
 export type SectionDraftMode = "draft" | "improve" | "tighten";
 
 export type SectionDraftSnapshot = {
