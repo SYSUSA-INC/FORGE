@@ -3,17 +3,16 @@
  *
  *   bytes (PDF) → text (pdf-parse) → AI gateway → structured JSON
  *
- * Intentionally flat — no queueing, no background workers in v1.
- * The upload action calls this synchronously and updates the
- * solicitation row. For larger files / scanned PDFs we'd add an
- * OCR step (Tesseract) and move parsing to a background job;
- * leaving that as an explicit follow-up.
+ * If text extraction returns no usable text (scanned PDF, image-only),
+ * we fall through to a vision pass that hands the raw PDF to the AI
+ * provider as a document block. Anthropic does the OCR natively.
  */
 import {
   buildSolicitationExtractPrompt,
+  buildSolicitationVisionPrompt,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
-import { complete } from "@/lib/ai";
+import { complete, getAIProviderStatus } from "@/lib/ai";
 
 export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   // pdf-parse-fork is a CommonJS module that exports a function. Different
@@ -86,6 +85,75 @@ export async function aiExtractSolicitation(
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI extraction failed.",
+    };
+  }
+}
+
+/**
+ * Vision fallback for scanned-image / unreadable PDFs. Attaches the PDF
+ * directly to the prompt and lets the model OCR + extract in one pass.
+ *
+ * Only Anthropic accepts inline PDF documents today. If the configured
+ * provider isn't Anthropic, we fail with a clear error so the caller
+ * can surface "OCR needs Anthropic; configure ANTHROPIC_API_KEY".
+ */
+export async function aiExtractSolicitationFromPdf(
+  bytes: Uint8Array,
+  fileName: string,
+): Promise<
+  | { ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean }
+  | { ok: false; error: string }
+> {
+  const status = getAIProviderStatus();
+  if (status.active.name !== "anthropic") {
+    return {
+      ok: false,
+      error:
+        status.active.name === "stub"
+          ? "Vision OCR needs a real AI provider. Set ANTHROPIC_API_KEY to enable scanned-PDF intake."
+          : `Vision OCR currently requires Anthropic; active provider is ${status.active.name}.`,
+    };
+  }
+  // Anthropic caps document blocks at 32 MB on the wire (base64 inflates
+  // ~33%). Refuse early to avoid a confusing 400 from upstream.
+  const RAW_LIMIT = 24 * 1024 * 1024;
+  if (bytes.byteLength > RAW_LIMIT) {
+    return {
+      ok: false,
+      error: `Scanned PDF is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB — vision OCR caps at ${RAW_LIMIT / 1024 / 1024} MB. Split the document and re-upload.`,
+    };
+  }
+
+  try {
+    const prompt = buildSolicitationVisionPrompt();
+    const ai = await complete({
+      system: prompt.system,
+      messages: prompt.messages,
+      maxTokens: 2400,
+      temperature: 0.1,
+      cacheSystem: true,
+      documents: [
+        { name: fileName, mediaType: "application/pdf", bytes },
+      ],
+    });
+    if (ai.stubbed) {
+      // Shouldn't happen given the provider check above, but stay safe.
+      return { ok: false, error: "AI provider unexpectedly returned stub mode." };
+    }
+    const cleaned = stripCodeFences(ai.text);
+    const parsed = JSON.parse(cleaned) as SolicitationExtractionResult;
+    return {
+      ok: true,
+      provider: ai.provider,
+      model: ai.model,
+      stubbed: false,
+      data: normalizeExtraction(parsed),
+    };
+  } catch (err) {
+    console.error("[aiExtractSolicitationFromPdf]", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Vision OCR failed.",
     };
   }
 }

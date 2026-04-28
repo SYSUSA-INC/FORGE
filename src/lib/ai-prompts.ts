@@ -69,6 +69,28 @@ export function buildSolicitationExtractPrompt(
   };
 }
 
+/**
+ * Vision-mode variant. The PDF bytes are attached as a document block on
+ * the user turn (handled by the AI gateway). The model OCRs the document
+ * directly — used as a fallback when pdf-parse returns no text.
+ */
+export function buildSolicitationVisionPrompt(): {
+  system: string;
+  messages: AIMessage[];
+} {
+  const userPrompt = [
+    `The attached PDF is a federal solicitation. The document may be a scanned image,`,
+    `a mixed text/image PDF, or a born-digital PDF whose text layer is unreadable.`,
+    `Read the document directly and extract structured facts per the schema in the system prompt.`,
+    ``,
+    `Return ONLY the JSON object. No commentary.`,
+  ].join(" ");
+  return {
+    system: SOLICITATION_EXTRACT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
 export type SectionDraftMode = "draft" | "improve" | "tighten";
 
 export type SectionDraftSnapshot = {

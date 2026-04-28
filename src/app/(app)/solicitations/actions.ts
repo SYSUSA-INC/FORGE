@@ -16,6 +16,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getStorageProvider } from "@/lib/storage";
 import {
   aiExtractSolicitation,
+  aiExtractSolicitationFromPdf,
   extractTextFromPdf,
 } from "@/lib/solicitation-extract";
 
@@ -130,6 +131,10 @@ export async function uploadSolicitationAndGoAction(
   throw new Error(res.ok ? "unreachable" : res.error);
 }
 
+// Below this many extracted characters we treat the PDF as effectively
+// empty (likely scanned-image) and fall through to vision OCR.
+const TEXT_LAYER_MIN_CHARS = 200;
+
 async function parseSolicitationFromBytes(
   solicitationId: string,
   bytes: Uint8Array,
@@ -139,35 +144,61 @@ async function parseSolicitationFromBytes(
     .set({ parseStatus: "parsing", parseError: "", updatedAt: new Date() })
     .where(eq(solicitations.id, solicitationId));
 
+  // First try the cheap path: pdf-parse text layer.
   let rawText = "";
   try {
     rawText = await extractTextFromPdf(bytes);
   } catch (err) {
-    await db
-      .update(solicitations)
-      .set({
-        parseStatus: "failed",
-        parseError:
-          err instanceof Error
-            ? `PDF text extraction failed: ${err.message}`
-            : "PDF text extraction failed.",
-        updatedAt: new Date(),
-      })
-      .where(eq(solicitations.id, solicitationId));
-    return;
+    // Soft-fail: log but still try the vision fallback below. Some PDFs
+    // crash pdf-parse but Claude reads them just fine.
+    console.warn(
+      "[parseSolicitationFromBytes] pdf-parse failed, will try vision",
+      err,
+    );
   }
 
-  if (!rawText.trim()) {
+  // If the text layer is empty or near-empty, hand the PDF to vision OCR.
+  if (rawText.trim().length < TEXT_LAYER_MIN_CHARS) {
+    const fileName = (await getFileName(solicitationId)) || "solicitation.pdf";
+    const visionRes = await aiExtractSolicitationFromPdf(bytes, fileName);
+    if (!visionRes.ok) {
+      await db
+        .update(solicitations)
+        .set({
+          parseStatus: "failed",
+          parseError: visionRes.error,
+          rawText: rawText.slice(0, 500_000),
+          updatedAt: new Date(),
+        })
+        .where(eq(solicitations.id, solicitationId));
+      return;
+    }
+    const d = visionRes.data;
     await db
       .update(solicitations)
       .set({
-        parseStatus: "failed",
-        parseError:
-          "No text extracted. The document may be a scanned image — OCR is not yet supported.",
-        rawText: "",
+        parseStatus: "parsed",
+        parseError: "",
+        rawText: rawText.slice(0, 500_000),
+        title: d.title || stripExt(fileName),
+        agency: d.agency,
+        office: d.office,
+        type: d.type as SolicitationType,
+        solicitationNumber: d.solicitationNumber,
+        naicsCode: d.naicsCode,
+        setAside: d.setAside,
+        responseDueDate: d.responseDueDate ? new Date(d.responseDueDate) : null,
+        sectionLSummary:
+          d.sectionLSummary +
+          (d.sectionLSummary
+            ? "\n\n[Extracted via vision OCR — text layer was unreadable.]"
+            : "[Extracted via vision OCR — text layer was unreadable.]"),
+        sectionMSummary: d.sectionMSummary,
+        extractedRequirements: d.requirements,
         updatedAt: new Date(),
       })
       .where(eq(solicitations.id, solicitationId));
+    revalidatePath(`/solicitations/${solicitationId}`);
     return;
   }
 
