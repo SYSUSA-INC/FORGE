@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
+import { GSA_VEHICLES } from "@/lib/gsa-vehicles";
 import {
   importSamGovOpportunitiesAction,
   loadSamGovOpportunitiesAction,
@@ -14,6 +15,8 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
   const [naicsInput, setNaicsInput] = useState(defaultNaics.join(", "));
   const [keyword, setKeyword] = useState("");
   const [postedDaysBack, setPostedDaysBack] = useState(30);
+  const [gsaOnly, setGsaOnly] = useState(false);
+  const [vehicleIds, setVehicleIds] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<ImportableOpportunity[] | null>(null);
   const [totalRecords, setTotalRecords] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -46,6 +49,8 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
         naicsCodes: parsedNaics(),
         keyword: keyword.trim() || undefined,
         postedDaysBack,
+        gsaOnly,
+        vehicleIds: Array.from(vehicleIds),
       });
       if (!res.ok) {
         setError(res.error);
@@ -53,6 +58,15 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
       }
       setResults(res.opportunities);
       setTotalRecords(res.totalRecords);
+    });
+  }
+
+  function toggleVehicle(id: string) {
+    setVehicleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }
 
@@ -108,6 +122,51 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
   return (
     <div className="flex flex-col gap-4">
       <Panel title="Search SAM.gov" eyebrow="Active solicitations">
+        <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.015] p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-text">
+              <input
+                type="checkbox"
+                className="accent-teal-400"
+                checked={gsaOnly}
+                onChange={(e) => setGsaOnly(e.target.checked)}
+              />
+              GSA-issued only
+            </label>
+            <div className="font-mono text-[10px] text-muted">
+              Restricts to opportunities where GSA is the contracting agency
+              (MAS, OASIS+, GWACs, FEDSIM-assisted acquisitions).
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="aur-label">GSA vehicle hint</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {GSA_VEHICLES.map((v) => {
+                const active = vehicleIds.has(v.id);
+                return (
+                  <button
+                    type="button"
+                    key={v.id}
+                    onClick={() => toggleVehicle(v.id)}
+                    title={v.scope}
+                    className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                      active
+                        ? "border-teal-400 bg-teal-400/15 text-teal"
+                        : "border-white/15 bg-white/[0.02] text-muted hover:border-white/30 hover:text-text"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1 font-mono text-[10px] text-muted">
+              Adds vehicle keywords to the SAM.gov query. eBuy RFQs aren&rsquo;t
+              indexed by SAM.gov &mdash; for those, paste from eBuy on the
+              next page (coming soon).
+            </div>
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
           <div>
             <label className="aur-label">NAICS codes</label>
