@@ -6,10 +6,15 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   proposalTemplates,
+  type ProposalTemplateKind,
   type TemplateSectionSeed,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import { getStorageProvider } from "@/lib/storage";
+import { isLikelyDocx, scanDocxForVariables } from "@/lib/docx-template";
 import { STARTER_TEMPLATES } from "@/lib/template-types";
+
+const DOCX_MAX_BYTES = 25 * 1024 * 1024;
 
 export type TemplateRow = {
   id: string;
@@ -123,7 +128,13 @@ export async function createTemplateAction(input: {
         name,
         description: input.description?.trim() ?? "",
         isDefault: false,
+        // New templates default to docx — the user uploads a Word
+        // template on the next screen. They can flip to legacy HTML/CSS
+        // if they really want to.
+        kind: "docx",
         sectionSeed: starter!.sectionSeed,
+        // Keep the HTML starter content available so the legacy mode
+        // is non-empty when the user flips back to it.
         coverHtml: starter!.coverHtml,
         headerHtml: starter!.headerHtml,
         footerHtml: starter!.footerHtml,
@@ -309,6 +320,176 @@ export async function unarchiveTemplateAction(
       error: err instanceof Error ? err.message : "Unarchive failed.",
     };
   }
+}
+
+/**
+ * Switch a template between html (legacy) and docx (preferred). Used
+ * when a user wants to migrate a template they previously authored as
+ * HTML/CSS over to a Word file.
+ */
+export async function setTemplateKindAction(
+  id: string,
+  kind: ProposalTemplateKind,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  await db
+    .update(proposalTemplates)
+    .set({ kind, updatedAt: new Date() })
+    .where(
+      and(
+        eq(proposalTemplates.id, id),
+        eq(proposalTemplates.organizationId, organizationId),
+      ),
+    );
+  revalidatePath("/settings/templates");
+  revalidatePath(`/settings/templates/${id}`);
+  return { ok: true };
+}
+
+export type DocxUploadResult =
+  | {
+      ok: true;
+      variables: string[];
+      warnings: string[];
+      fileName: string;
+      fileSize: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Upload a .docx as the source-of-truth for a template. We store the
+ * bytes via the storage provider, scan for {placeholder} variables,
+ * and surface any warnings (broken splits, no placeholders found).
+ *
+ * The actual rendering happens in Phase 12b — for now we just persist
+ * the file + the detected variable list so the editor UI can show
+ * the user which placeholders FORGE will substitute on render.
+ */
+export async function uploadTemplateDocxAction(
+  templateId: string,
+  formData: FormData,
+): Promise<DocxUploadResult> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "Pick a Word file (.docx) to upload." };
+  }
+  if (file.size === 0) return { ok: false, error: "File is empty." };
+  if (file.size > DOCX_MAX_BYTES) {
+    return {
+      ok: false,
+      error: `Template is larger than ${DOCX_MAX_BYTES / 1024 / 1024} MB. Trim or compress before uploading.`,
+    };
+  }
+  if (!isLikelyDocx(file.type, file.name)) {
+    return {
+      ok: false,
+      error: "Only .docx (Word) templates are supported. Save as Word format and re-upload.",
+    };
+  }
+
+  // Confirm the template exists in this org.
+  const [tpl] = await db
+    .select({ id: proposalTemplates.id })
+    .from(proposalTemplates)
+    .where(
+      and(
+        eq(proposalTemplates.id, templateId),
+        eq(proposalTemplates.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!tpl) return { ok: false, error: "Template not found." };
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  // Scan for placeholders BEFORE storing — if the file is corrupt,
+  // we'd rather fail fast with a clear error.
+  const scan = await scanDocxForVariables(bytes);
+
+  // Persist bytes via the storage provider.
+  const storage = getStorageProvider();
+  const key = `org/${organizationId}/template/${templateId}/${file.name}`;
+  let storagePath = "";
+  try {
+    const stored = await storage.put({
+      key,
+      bytes,
+      contentType:
+        file.type ||
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    storagePath = stored.storagePath;
+  } catch (err) {
+    console.error("[uploadTemplateDocx] storage", err);
+    return {
+      ok: false,
+      error: "Saved scan results, but storing the file bytes failed. Try again.",
+    };
+  }
+
+  await db
+    .update(proposalTemplates)
+    .set({
+      kind: "docx",
+      docxStoragePath: storagePath,
+      docxFileName: file.name,
+      docxFileSize: file.size,
+      docxUploadedAt: new Date(),
+      variablesDetected: scan.variables,
+      updatedAt: new Date(),
+    })
+    .where(eq(proposalTemplates.id, templateId));
+
+  revalidatePath("/settings/templates");
+  revalidatePath(`/settings/templates/${templateId}`);
+
+  return {
+    ok: true,
+    variables: scan.variables,
+    warnings: scan.warnings,
+    fileName: file.name,
+    fileSize: file.size,
+  };
+}
+
+/**
+ * Remove the uploaded .docx for a template (e.g. user wants to switch
+ * to a different file). Resets fields but leaves the kind alone so the
+ * user stays in docx mode.
+ */
+export async function clearTemplateDocxAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  await db
+    .update(proposalTemplates)
+    .set({
+      docxStoragePath: "",
+      docxFileName: "",
+      docxFileSize: 0,
+      docxUploadedAt: null,
+      variablesDetected: [],
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(proposalTemplates.id, id),
+        eq(proposalTemplates.organizationId, organizationId),
+      ),
+    );
+  revalidatePath("/settings/templates");
+  revalidatePath(`/settings/templates/${id}`);
+  return { ok: true };
 }
 
 export async function listActiveTemplatesForPickerAction(): Promise<

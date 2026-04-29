@@ -1,12 +1,23 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { FormEvent, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
-import type { ProposalSectionKind, TemplateSectionSeed } from "@/db/schema";
+import type {
+  ProposalSectionKind,
+  ProposalTemplateKind,
+  TemplateSectionSeed,
+} from "@/db/schema";
 import { SECTION_KIND_LABELS } from "@/lib/proposal-types";
-import { setDefaultTemplateAction, updateTemplateAction } from "../actions";
+import { KNOWN_TEMPLATE_VARIABLES } from "@/lib/docx-template";
+import {
+  clearTemplateDocxAction,
+  setDefaultTemplateAction,
+  setTemplateKindAction,
+  updateTemplateAction,
+  uploadTemplateDocxAction,
+} from "../actions";
 
 const SECTION_KINDS: ProposalSectionKind[] = [
   "executive_summary",
@@ -20,10 +31,15 @@ const SECTION_KINDS: ProposalSectionKind[] = [
 type Initial = {
   name: string;
   description: string;
+  kind: ProposalTemplateKind;
   coverHtml: string;
   headerHtml: string;
   footerHtml: string;
   pageCss: string;
+  docxFileName: string;
+  docxFileSize: number;
+  docxUploadedAt: string | null;
+  variablesDetected: string[];
   sectionSeed: TemplateSectionSeed[];
   brandPrimary: string;
   brandAccent: string;
@@ -58,6 +74,86 @@ export function EditTemplateClient({
   const [footerHtml, setFooterHtml] = useState(initial.footerHtml);
   const [pageCss, setPageCss] = useState(initial.pageCss);
   const [seed, setSeed] = useState<TemplateSectionSeed[]>(initial.sectionSeed);
+
+  const [kind, setKind] = useState<ProposalTemplateKind>(initial.kind);
+  const [docxFileName, setDocxFileName] = useState(initial.docxFileName);
+  const [docxFileSize, setDocxFileSize] = useState(initial.docxFileSize);
+  const [docxUploadedAt, setDocxUploadedAt] = useState<string | null>(
+    initial.docxUploadedAt,
+  );
+  const [variablesDetected, setVariablesDetected] = useState<string[]>(
+    initial.variablesDetected,
+  );
+  const [docxWarnings, setDocxWarnings] = useState<string[]>([]);
+  const [uploading, startUploading] = useTransition();
+  const [docxError, setDocxError] = useState<string | null>(null);
+  const [docxNotice, setDocxNotice] = useState<string | null>(null);
+
+  function handleDocxFile(file: File | null | undefined) {
+    if (!file) return;
+    setDocxError(null);
+    setDocxNotice(null);
+    setDocxWarnings([]);
+    const fd = new FormData();
+    fd.append("file", file);
+    startUploading(async () => {
+      const res = await uploadTemplateDocxAction(id, fd);
+      if (!res.ok) {
+        setDocxError(res.error);
+        return;
+      }
+      setKind("docx");
+      setDocxFileName(res.fileName);
+      setDocxFileSize(res.fileSize);
+      setDocxUploadedAt(new Date().toISOString());
+      setVariablesDetected(res.variables);
+      setDocxWarnings(res.warnings);
+      setDocxNotice(
+        res.variables.length > 0
+          ? `Uploaded — found ${res.variables.length} placeholder${res.variables.length === 1 ? "" : "s"}.`
+          : "Uploaded. No placeholders detected — see warnings below.",
+      );
+    });
+  }
+
+  async function clearDocx() {
+    if (
+      !window.confirm(
+        "Remove the uploaded Word template? You can upload another after.",
+      )
+    ) {
+      return;
+    }
+    setDocxError(null);
+    setDocxNotice(null);
+    setDocxWarnings([]);
+    startUploading(async () => {
+      await clearTemplateDocxAction(id);
+      setDocxFileName("");
+      setDocxFileSize(0);
+      setDocxUploadedAt(null);
+      setVariablesDetected([]);
+      setDocxNotice("Removed.");
+    });
+  }
+
+  async function switchKind(next: ProposalTemplateKind) {
+    setDocxError(null);
+    setDocxNotice(null);
+    startUploading(async () => {
+      const res = await setTemplateKindAction(id, next);
+      if (!("ok" in res) || res.ok !== true) {
+        setDocxError("error" in res ? res.error : "Could not switch mode.");
+        return;
+      }
+      setKind(next);
+      setDocxNotice(
+        next === "docx"
+          ? "Switched to Word template mode."
+          : "Switched to legacy HTML/CSS mode.",
+      );
+    });
+  }
 
   function updateSeedItem(idx: number, patch: Partial<TemplateSectionSeed>) {
     setSeed((prev) =>
@@ -292,62 +388,105 @@ export function EditTemplateClient({
           </div>
         </Panel>
 
-        <Panel title="HTML / CSS" eyebrow="Used by the PDF renderer (PR-7c)">
-          <div className="flex flex-col gap-3">
-            <div>
-              <label className="aur-label" htmlFor="t-cover">
-                Cover HTML
-              </label>
-              <textarea
-                id="t-cover"
-                rows={6}
-                value={coverHtml}
-                onChange={(e) => setCoverHtml(e.target.value)}
-                className="aur-input min-h-[120px] resize-y font-mono text-[12px]"
-              />
-              <p className="mt-1 font-mono text-[10px] text-subtle">
-                Variables: <code>{`{{organizationName}}`}</code>, <code>{`{{proposalTitle}}`}</code>, <code>{`{{solicitationNumber}}`}</code>, <code>{`{{agency}}`}</code>, <code>{`{{submittedDate}}`}</code>, <code>{`{{logoUrl}}`}</code>.
-              </p>
+        <Panel
+          title="Template source"
+          eyebrow={kind === "docx" ? "Word template" : "Legacy HTML / CSS"}
+          actions={
+            <div className="inline-flex rounded-full border border-white/10 p-0.5 text-[10px]">
+              {(["docx", "html"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => switchKind(k)}
+                  disabled={uploading || k === kind}
+                  className={`rounded-full px-2.5 py-0.5 font-mono uppercase tracking-widest transition-colors disabled:opacity-100 ${
+                    kind === k
+                      ? "bg-teal-400/15 text-teal"
+                      : "text-muted hover:text-text"
+                  }`}
+                >
+                  {k === "docx" ? "Word" : "HTML/CSS (legacy)"}
+                </button>
+              ))}
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="aur-label" htmlFor="t-header">
-                  Page header HTML
-                </label>
-                <textarea
-                  id="t-header"
-                  rows={3}
-                  value={headerHtml}
-                  onChange={(e) => setHeaderHtml(e.target.value)}
-                  className="aur-input min-h-[80px] resize-y font-mono text-[12px]"
-                />
+          }
+        >
+          {kind === "docx" ? (
+            <DocxPanel
+              docxFileName={docxFileName}
+              docxFileSize={docxFileSize}
+              docxUploadedAt={docxUploadedAt}
+              variablesDetected={variablesDetected}
+              docxWarnings={docxWarnings}
+              uploading={uploading}
+              error={docxError}
+              notice={docxNotice}
+              onFile={handleDocxFile}
+              onClear={clearDocx}
+            />
+          ) : (
+            <details className="flex flex-col gap-3" open>
+              <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+                Legacy HTML/CSS panels — kept for templates created before
+                Word-template support
+              </summary>
+              <div className="mt-3 flex flex-col gap-3">
+                <div>
+                  <label className="aur-label" htmlFor="t-cover">
+                    Cover HTML
+                  </label>
+                  <textarea
+                    id="t-cover"
+                    rows={6}
+                    value={coverHtml}
+                    onChange={(e) => setCoverHtml(e.target.value)}
+                    className="aur-input min-h-[120px] resize-y font-mono text-[12px]"
+                  />
+                  <p className="mt-1 font-mono text-[10px] text-subtle">
+                    Variables: <code>{`{{organizationName}}`}</code>, <code>{`{{proposalTitle}}`}</code>, <code>{`{{solicitationNumber}}`}</code>, <code>{`{{agency}}`}</code>, <code>{`{{submittedDate}}`}</code>, <code>{`{{logoUrl}}`}</code>.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="aur-label" htmlFor="t-header">
+                      Page header HTML
+                    </label>
+                    <textarea
+                      id="t-header"
+                      rows={3}
+                      value={headerHtml}
+                      onChange={(e) => setHeaderHtml(e.target.value)}
+                      className="aur-input min-h-[80px] resize-y font-mono text-[12px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="aur-label" htmlFor="t-footer">
+                      Page footer HTML
+                    </label>
+                    <textarea
+                      id="t-footer"
+                      rows={3}
+                      value={footerHtml}
+                      onChange={(e) => setFooterHtml(e.target.value)}
+                      className="aur-input min-h-[80px] resize-y font-mono text-[12px]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="aur-label" htmlFor="t-css">
+                    Page CSS
+                  </label>
+                  <textarea
+                    id="t-css"
+                    rows={10}
+                    value={pageCss}
+                    onChange={(e) => setPageCss(e.target.value)}
+                    className="aur-input min-h-[200px] resize-y font-mono text-[12px]"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="aur-label" htmlFor="t-footer">
-                  Page footer HTML
-                </label>
-                <textarea
-                  id="t-footer"
-                  rows={3}
-                  value={footerHtml}
-                  onChange={(e) => setFooterHtml(e.target.value)}
-                  className="aur-input min-h-[80px] resize-y font-mono text-[12px]"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="aur-label" htmlFor="t-css">
-                Page CSS
-              </label>
-              <textarea
-                id="t-css"
-                rows={10}
-                value={pageCss}
-                onChange={(e) => setPageCss(e.target.value)}
-                className="aur-input min-h-[200px] resize-y font-mono text-[12px]"
-              />
-            </div>
-          </div>
+            </details>
+          )}
         </Panel>
       </div>
 
@@ -495,5 +634,235 @@ export function EditTemplateClient({
         </div>
       </div>
     </form>
+  );
+}
+
+
+function DocxPanel({
+  docxFileName,
+  docxFileSize,
+  docxUploadedAt,
+  variablesDetected,
+  docxWarnings,
+  uploading,
+  error,
+  notice,
+  onFile,
+  onClear,
+}: {
+  docxFileName: string;
+  docxFileSize: number;
+  docxUploadedAt: string | null;
+  variablesDetected: string[];
+  docxWarnings: string[];
+  uploading: boolean;
+  error: string | null;
+  notice: string | null;
+  onFile: (f: File | null | undefined) => void;
+  onClear: () => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const known = new Set(KNOWN_TEMPLATE_VARIABLES.map((v) => v.key));
+  const recognized: string[] = [];
+  const unrecognized: string[] = [];
+  for (const v of variablesDetected) {
+    const trimmed = v.replace(/^[#\/^]/, "");
+    if (known.has(trimmed)) recognized.push(v);
+    else unrecognized.push(v);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          onFile(e.dataTransfer.files?.[0]);
+        }}
+        className={`grid cursor-pointer place-items-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+          dragOver
+            ? "border-teal-400 bg-teal-400/5"
+            : "border-white/15 bg-white/[0.015] hover:border-white/30"
+        }`}
+      >
+        {docxFileName ? (
+          <>
+            <div className="font-display text-lg font-semibold text-text">
+              {docxFileName}
+            </div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              {Math.max(1, Math.round(docxFileSize / 1024))} KB · uploaded{" "}
+              {docxUploadedAt
+                ? new Date(docxUploadedAt).toLocaleDateString()
+                : ""}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  inputRef.current?.click();
+                }}
+                disabled={uploading}
+                className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+              >
+                Replace file
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+                disabled={uploading}
+                className="aur-btn aur-btn-ghost text-[11px] text-rose-300 disabled:opacity-60"
+              >
+                Remove
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="font-display text-2xl font-semibold text-text">
+              Drop a Word template here
+            </div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              .docx · 25 MB cap · header / footer / cover / TOC / graphics
+              all preserved
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                inputRef.current?.click();
+              }}
+              disabled={uploading}
+              className="aur-btn aur-btn-primary mt-4 disabled:opacity-60"
+            >
+              {uploading ? "Uploading…" : "Select Word file"}
+            </button>
+          </>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="sr-only"
+          onChange={(e) => onFile(e.target.files?.[0])}
+        />
+      </div>
+
+      {error ? (
+        <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+          {error}
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="rounded-md border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 font-mono text-[11px] text-emerald">
+          {notice}
+        </div>
+      ) : null}
+
+      {variablesDetected.length > 0 ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.015] p-4">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            Detected placeholders
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-emerald-300">
+                FORGE will fill ({recognized.length})
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {recognized.length === 0 ? (
+                  <span className="font-mono text-[10px] text-muted">
+                    None recognized.
+                  </span>
+                ) : (
+                  recognized.map((v) => (
+                    <code
+                      key={v}
+                      className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300"
+                    >
+                      {v}
+                    </code>
+                  ))
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-amber-200">
+                You'll fill manually ({unrecognized.length})
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {unrecognized.length === 0 ? (
+                  <span className="font-mono text-[10px] text-muted">
+                    None — all detected variables are recognized.
+                  </span>
+                ) : (
+                  unrecognized.map((v) => (
+                    <code
+                      key={v}
+                      className="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-200"
+                      title="Not a known FORGE variable — leave a placeholder note in the doc, or rename to a known key."
+                    >
+                      {v}
+                    </code>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {docxWarnings.length > 0 ? (
+        <div className="rounded-md border border-amber-400/30 bg-amber-400/5 px-3 py-2 font-mono text-[11px] text-amber-200">
+          <div className="mb-1 font-semibold uppercase tracking-widest">
+            Warnings
+          </div>
+          <ul className="list-disc pl-4">
+            {docxWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <details className="rounded-lg border border-white/10 bg-white/[0.015] p-3">
+        <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          Available placeholders ({KNOWN_TEMPLATE_VARIABLES.length}) — drop
+          these into your Word template using <code>&#123;variableName&#125;</code>
+        </summary>
+        <ul className="mt-3 grid grid-cols-1 gap-1 md:grid-cols-2">
+          {KNOWN_TEMPLATE_VARIABLES.map((v) => (
+            <li
+              key={v.key}
+              className="flex items-center justify-between gap-2 rounded border border-white/5 bg-white/[0.01] px-2 py-1 font-mono text-[10px]"
+            >
+              <code className="text-text">&#123;{v.key}&#125;</code>
+              <span className="text-muted">{v.description}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 font-mono text-[10px] text-muted">
+          Loop pattern for proposal sections:{" "}
+          <code>&#123;#sections&#125;&#123;title&#125; &#123;body&#125;&#123;/sections&#125;</code>
+          {" "}— each section in the proposal will repeat this block.
+        </p>
+      </details>
+
+      <div className="rounded-md border border-white/10 bg-white/[0.015] px-3 py-2 font-mono text-[10px] text-muted">
+        Note: rendering will run on download in Phase 12b. For now, the
+        upload + variable detection ensures the template is well-formed.
+      </div>
+    </div>
   );
 }

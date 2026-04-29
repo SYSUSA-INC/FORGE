@@ -32,10 +32,17 @@ export default async function EditTemplatePage({
         initial={{
           name: t.name,
           description: t.description,
+          kind: t.kind,
           coverHtml: t.coverHtml,
           headerHtml: t.headerHtml,
           footerHtml: t.footerHtml,
           pageCss: t.pageCss,
+          docxFileName: t.docxFileName,
+          docxFileSize: t.docxFileSize,
+          docxUploadedAt: t.docxUploadedAt
+            ? t.docxUploadedAt.toISOString()
+            : null,
+          variablesDetected: t.variablesDetected ?? [],
           sectionSeed: t.sectionSeed ?? [],
           brandPrimary: t.brandPrimary,
           brandAccent: t.brandAccent,
