@@ -8,7 +8,11 @@ import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-typ
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { StageAdvancePanel } from "./StageAdvancePanel";
 import { ExportPanel } from "./pdf/ExportPanel";
-import { listRecentRendersAction, getProviderStatusAction } from "./pdf/actions";
+import {
+  getProposalExportCapabilityAction,
+  getProviderStatusAction,
+  listRecentRendersAction,
+} from "./pdf/actions";
 import { listProposalTeamCandidates } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -48,9 +52,10 @@ export default async function ProposalOverviewPage({
   const totalWords = sections.reduce((a, s) => a + s.wordCount, 0);
   const approved = sections.filter((s) => s.status === "approved").length;
 
-  const [recentRenders, providerStatus] = await Promise.all([
+  const [recentRenders, providerStatus, exportCapability] = await Promise.all([
     listRecentRendersAction(params.id, 5),
     getProviderStatusAction(),
+    getProposalExportCapabilityAction(params.id),
   ]);
 
   return (
@@ -79,6 +84,7 @@ export default async function ProposalOverviewPage({
           initialRenders={recentRenders}
           pdfStatus={providerStatus.pdf.active}
           storageStatus={providerStatus.storage.active}
+          exportCapability={exportCapability}
         />
 
         <Panel title="Sections" eyebrow={`${approved}/${sections.length} approved · ${totalWords} words`}>

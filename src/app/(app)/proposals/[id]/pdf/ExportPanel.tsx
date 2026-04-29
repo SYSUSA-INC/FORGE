@@ -5,19 +5,27 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import {
+  renderProposalDocxAction,
   renderProposalPdfAction,
+  type DocxRenderActionResult,
   type PdfRenderResult,
   type RecentRenderRow,
 } from "./actions";
 import type { PdfProviderStatus, StorageProviderStatus } from "./status-types";
 
 type SuccessResult = Extract<PdfRenderResult, { ok: true }>;
+type DocxSuccess = Extract<DocxRenderActionResult, { ok: true }>;
 
 type Props = {
   proposalId: string;
   initialRenders: RecentRenderRow[];
   pdfStatus: PdfProviderStatus;
   storageStatus: StorageProviderStatus;
+  exportCapability: {
+    hasDocxTemplate: boolean;
+    hasHtmlTemplate: boolean;
+    templateName: string;
+  };
 };
 
 export function ExportPanel({
@@ -25,14 +33,18 @@ export function ExportPanel({
   initialRenders,
   pdfStatus,
   storageStatus,
+  exportCapability,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<SuccessResult | null>(null);
+  const [recentDocx, setRecentDocx] = useState<DocxSuccess | null>(null);
 
   function generate() {
     setError(null);
+    setRecent(null);
+    setRecentDocx(null);
     startTransition(async () => {
       const res = await renderProposalPdfAction(proposalId);
       if (!res.ok) {
@@ -40,6 +52,21 @@ export function ExportPanel({
         return;
       }
       setRecent(res);
+      router.refresh();
+    });
+  }
+
+  function generateDocx() {
+    setError(null);
+    setRecent(null);
+    setRecentDocx(null);
+    startTransition(async () => {
+      const res = await renderProposalDocxAction(proposalId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setRecentDocx(res);
       router.refresh();
     });
   }
@@ -89,14 +116,42 @@ export function ExportPanel({
           </div>
         ) : null}
 
-        <button
-          type="button"
-          onClick={generate}
-          disabled={pending}
-          className="aur-btn aur-btn-primary"
-        >
-          {pending ? "Generating…" : "Generate"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {exportCapability.hasDocxTemplate ? (
+            <button
+              type="button"
+              onClick={generateDocx}
+              disabled={pending}
+              className="aur-btn aur-btn-primary"
+              title={`Render via Word template "${exportCapability.templateName}"`}
+            >
+              {pending ? "Generating…" : "Download as Word"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={generate}
+            disabled={pending}
+            className={`aur-btn ${exportCapability.hasDocxTemplate ? "aur-btn-ghost" : "aur-btn-primary"}`}
+          >
+            {pending && !exportCapability.hasDocxTemplate
+              ? "Generating…"
+              : exportCapability.hasDocxTemplate
+                ? "Download as PDF"
+                : "Generate"}
+          </button>
+        </div>
+
+        {!exportCapability.hasDocxTemplate &&
+        !exportCapability.hasHtmlTemplate ? (
+          <div className="rounded-md border border-amber-400/30 bg-amber-400/5 px-3 py-2 font-mono text-[11px] text-amber-200">
+            No template assigned. Pick one under{" "}
+            <Link href="/settings/templates" className="underline">
+              Settings → Templates
+            </Link>{" "}
+            for a branded output.
+          </div>
+        ) : null}
 
         {recent ? (
           <div className="rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">
@@ -111,6 +166,21 @@ export function ExportPanel({
               className="mt-1 inline-block text-emerald underline hover:no-underline"
             >
               Download →
+            </a>
+          </div>
+        ) : null}
+
+        {recentDocx ? (
+          <div className="rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">
+            <div>
+              Word document ready —{" "}
+              {Math.max(1, Math.round(recentDocx.byteSize / 1024))} KB.
+            </div>
+            <a
+              href={recentDocx.downloadUrl}
+              className="mt-1 inline-block text-emerald underline hover:no-underline"
+            >
+              Download .docx →
             </a>
           </div>
         ) : null}
@@ -132,7 +202,11 @@ export function ExportPanel({
                 >
                   <div className="min-w-0 flex-1 truncate">
                     <span className="text-text">
-                      {r.contentType === "pdf" ? "PDF" : "HTML"}
+                      {r.contentType === "pdf"
+                        ? "PDF"
+                        : r.contentType === "docx"
+                          ? "DOCX"
+                          : "HTML"}
                     </span>{" "}
                     · {Math.max(1, Math.round(r.byteSize / 1024))}KB ·{" "}
                     {new Date(r.renderedAt).toLocaleString()}
