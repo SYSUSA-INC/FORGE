@@ -365,3 +365,103 @@ export function buildPipelineBriefPrompt(
     messages: [{ role: "user", content: userPrompt }],
   };
 }
+
+/**
+ * Phase 10c — Brain knowledge extraction.
+ *
+ * Reads an artifact's raw text and proposes structured KB candidates
+ * across the four kinds: capability, past_performance, personnel,
+ * boilerplate. The model is told to be conservative — better to
+ * propose nothing than to fabricate. Each candidate carries the
+ * artifact text excerpt that supported it so reviewers can verify.
+ */
+export type KnowledgeKindEnumLike =
+  | "capability"
+  | "past_performance"
+  | "personnel"
+  | "boilerplate";
+
+export type KnowledgeExtractionCandidateOutput = {
+  kind: KnowledgeKindEnumLike;
+  title: string;
+  body: string;
+  tags: string[];
+  sourceExcerpt: string;
+  metadata?: Record<string, string | number | boolean>;
+};
+
+export type KnowledgeExtractionPromptResult = {
+  candidates: KnowledgeExtractionCandidateOutput[];
+  notes: string;
+};
+
+const KNOWLEDGE_EXTRACT_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform — building "corporate memory". You read a single artifact (an old proposal, RFP we responded to, contract, debrief, capability brief, resume, brochure, white paper, technical note, etc.) and propose structured knowledge entries the company should keep in its searchable knowledge base.
+
+You are STRICT and CONSERVATIVE. It is far better to propose nothing than to fabricate facts. Every candidate must trace back to evidence in the artifact text via the sourceExcerpt field.
+
+Output ONLY a single JSON object matching the schema below. No commentary, no markdown fences, no preamble.
+
+Four candidate kinds:
+- "capability" — descriptions of what the company does (services, tech stacks, methodologies, certifications, compliance work). Title should be a short capability label ("Cloud migration to AWS GovCloud", "Zero-trust architecture for shipboard C5ISR"). Body 2-5 sentences in the company voice.
+- "past_performance" — references to specific past contracts. Title should be the contract or customer name. Body must include at least one of: customer/agency, contract or PIID number, period of performance, value, or scope. If the artifact only mentions a contract by name without details, propose with what you have but mark missing fields in metadata.
+- "personnel" — named key staff. Title is the person's name. Body is their role, qualifications, certifications, clearances. Only propose when an actual name is present in the text.
+- "boilerplate" — reusable corporate text blocks (corporate intro, mission statement, security overview, EEO statement, Section 508 commitment, quality management approach). Title is a short label; body is the actual reusable text, lightly cleaned up.
+
+Rules:
+- Propose AT MOST 12 candidates total per artifact. Pick the highest-value ones.
+- Each candidate's sourceExcerpt MUST be a verbatim slice of the artifact text (≤ 600 characters), copy-paste accurate. Do not paraphrase.
+- title ≤ 200 chars. body ≤ 2500 chars. tags ≤ 8 items, each ≤ 32 chars, lowercase, hyphenated where appropriate.
+- If the artifact contains no extractable corporate-memory content, return { "candidates": [], "notes": "..." }.
+- Do NOT invent contract numbers, dollar values, dates, customer names, or staff bios that aren't in the text.
+- Do NOT use governance/risk/compliance jargon unless it's already in the artifact. Speak the artifact's voice.
+
+Schema:
+{
+  "candidates": [
+    {
+      "kind": "capability" | "past_performance" | "personnel" | "boilerplate",
+      "title": string,
+      "body": string,
+      "tags": string[],
+      "sourceExcerpt": string,
+      "metadata": object   // optional; flat key-value
+    }
+  ],
+  "notes": string
+}`;
+
+export function buildKnowledgeExtractPrompt(input: {
+  artifactKind: string;
+  artifactTitle: string;
+  artifactTags: string[];
+  rawText: string;
+}): { system: string; messages: AIMessage[] } {
+  // Hard cap on text we send to the model. 60k chars covers virtually
+  // any single artifact's worthwhile content without blowing context.
+  const trimmed = input.rawText.slice(0, 60_000);
+
+  const userPrompt = [
+    `Artifact metadata:`,
+    `- kind: ${input.artifactKind}`,
+    `- title: ${input.artifactTitle}`,
+    `- tags: ${input.artifactTags.length > 0 ? input.artifactTags.join(", ") : "(none)"}`,
+    ``,
+    `Artifact text:`,
+    "```",
+    trimmed,
+    "```",
+    ``,
+    input.rawText.length > trimmed.length
+      ? `(Text was trimmed from ${input.rawText.length} chars to first ${trimmed.length}.)`
+      : "",
+    ``,
+    `Propose knowledge candidates per the schema in the system prompt. Be strict; nothing without evidence.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    system: KNOWLEDGE_EXTRACT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
