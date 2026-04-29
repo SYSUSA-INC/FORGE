@@ -16,15 +16,14 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getStorageProvider } from "@/lib/storage";
 import {
   aiExtractSolicitation,
+  aiExtractSolicitationFromImage,
   aiExtractSolicitationFromPdf,
-  extractTextFromPdf,
+  extractTextFromAny,
 } from "@/lib/solicitation-extract";
+import { detectFormat } from "@/lib/text-extract";
+import type { AIDocumentMedia } from "@/lib/ai";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB cap for v1.
-const ACCEPTED_CONTENT_TYPES = new Set([
-  "application/pdf",
-  "application/octet-stream", // some browsers send this for .pdf
-]);
 
 export type UploadResult =
   | { ok: true; id: string }
@@ -49,21 +48,21 @@ export async function uploadSolicitationAction(
       error: `File is larger than ${MAX_BYTES / 1024 / 1024} MB. Trim or split the document first.`,
     };
   }
-  // Browsers vary; trust the filename suffix as a fallback.
-  const lower = file.name.toLowerCase();
-  const isPdf =
-    ACCEPTED_CONTENT_TYPES.has(file.type) || lower.endsWith(".pdf");
-  if (!isPdf) {
+  const format = detectFormat(file.type, file.name);
+  if (!format) {
     return {
       ok: false,
       error:
-        "Only PDF uploads are supported in v1. DOCX / XLSX / OCR for scans coming next.",
+        "Unsupported file type. Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD, or image (JPEG/PNG/WebP/GIF).",
     };
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
 
   // Insert the row first so the user sees an entry immediately.
+  const resolvedContentType =
+    file.type || guessContentTypeFromFormat(format);
+
   const [row] = await db
     .insert(solicitations)
     .values({
@@ -71,7 +70,7 @@ export async function uploadSolicitationAction(
       title: stripExt(file.name),
       fileName: file.name,
       fileSize: file.size,
-      contentType: file.type || "application/pdf",
+      contentType: resolvedContentType,
       parseStatus: "uploaded",
       uploadedByUserId: user.id,
       source: "uploaded",
@@ -86,7 +85,7 @@ export async function uploadSolicitationAction(
     const stored = await storage.put({
       key,
       bytes,
-      contentType: file.type || "application/pdf",
+      contentType: resolvedContentType,
     });
     await db
       .update(solicitations)
@@ -144,22 +143,77 @@ async function parseSolicitationFromBytes(
     .set({ parseStatus: "parsing", parseError: "", updatedAt: new Date() })
     .where(eq(solicitations.id, solicitationId));
 
-  // First try the cheap path: pdf-parse text layer.
+  // Look up the file's stored name + content type so we can dispatch.
+  const meta = await getFileMeta(solicitationId);
+  const fileName = meta.fileName || "solicitation";
+  const contentType = meta.contentType || "";
+
+  // Format-aware text extraction. PDF/DOCX/XLSX/PPTX/text get a cheap
+  // local pass; images skip straight to vision.
   let rawText = "";
+  let format: ReturnType<typeof detectFormat> = null;
   try {
-    rawText = await extractTextFromPdf(bytes);
+    const res = await extractTextFromAny(bytes, contentType, fileName);
+    rawText = res.text;
+    format = res.format;
   } catch (err) {
-    // Soft-fail: log but still try the vision fallback below. Some PDFs
-    // crash pdf-parse but Claude reads them just fine.
     console.warn(
-      "[parseSolicitationFromBytes] pdf-parse failed, will try vision",
+      "[parseSolicitationFromBytes] text extraction failed, will try vision if applicable",
       err,
     );
+    format = detectFormat(contentType, fileName);
   }
 
-  // If the text layer is empty or near-empty, hand the PDF to vision OCR.
-  if (rawText.trim().length < TEXT_LAYER_MIN_CHARS) {
-    const fileName = (await getFileName(solicitationId)) || "solicitation.pdf";
+  // Image: vision is the ONLY path. No text layer to fall back to.
+  if (format === "image") {
+    const mediaType = (contentType || "image/png") as AIDocumentMedia;
+    const visionRes = await aiExtractSolicitationFromImage(
+      bytes,
+      fileName,
+      mediaType,
+    );
+    if (!visionRes.ok) {
+      await db
+        .update(solicitations)
+        .set({
+          parseStatus: "failed",
+          parseError: visionRes.error,
+          updatedAt: new Date(),
+        })
+        .where(eq(solicitations.id, solicitationId));
+      return;
+    }
+    const d = visionRes.data;
+    await db
+      .update(solicitations)
+      .set({
+        parseStatus: "parsed",
+        parseError: "",
+        title: d.title || stripExt(fileName),
+        agency: d.agency,
+        office: d.office,
+        type: d.type as SolicitationType,
+        solicitationNumber: d.solicitationNumber,
+        naicsCode: d.naicsCode,
+        setAside: d.setAside,
+        responseDueDate: d.responseDueDate ? new Date(d.responseDueDate) : null,
+        sectionLSummary:
+          (d.sectionLSummary || "") +
+          "\n\n[Extracted from image via vision OCR.]",
+        sectionMSummary: d.sectionMSummary,
+        extractedRequirements: d.requirements,
+        updatedAt: new Date(),
+      })
+      .where(eq(solicitations.id, solicitationId));
+    revalidatePath(`/solicitations/${solicitationId}`);
+    return;
+  }
+
+  // PDF: if the text layer is sparse, fall back to vision OCR.
+  if (
+    format === "pdf" &&
+    rawText.trim().length < TEXT_LAYER_MIN_CHARS
+  ) {
     const visionRes = await aiExtractSolicitationFromPdf(bytes, fileName);
     if (!visionRes.ok) {
       await db
@@ -189,16 +243,31 @@ async function parseSolicitationFromBytes(
         setAside: d.setAside,
         responseDueDate: d.responseDueDate ? new Date(d.responseDueDate) : null,
         sectionLSummary:
-          d.sectionLSummary +
-          (d.sectionLSummary
-            ? "\n\n[Extracted via vision OCR — text layer was unreadable.]"
-            : "[Extracted via vision OCR — text layer was unreadable.]"),
+          (d.sectionLSummary || "") +
+          "\n\n[Extracted via vision OCR — text layer was unreadable.]",
         sectionMSummary: d.sectionMSummary,
         extractedRequirements: d.requirements,
         updatedAt: new Date(),
       })
       .where(eq(solicitations.id, solicitationId));
     revalidatePath(`/solicitations/${solicitationId}`);
+    return;
+  }
+
+  // DOCX / XLSX / PPTX / TEXT — text-layer is reliable. If extraction
+  // returned nothing usable, the document is likely empty or corrupted.
+  if (
+    format !== "pdf" &&
+    rawText.trim().length < TEXT_LAYER_MIN_CHARS
+  ) {
+    await db
+      .update(solicitations)
+      .set({
+        parseStatus: "failed",
+        parseError: `${format?.toUpperCase() ?? "Document"} appears to have no extractable text. Confirm the file isn't password-protected or empty.`,
+        updatedAt: new Date(),
+      })
+      .where(eq(solicitations.id, solicitationId));
     return;
   }
 
@@ -223,7 +292,7 @@ async function parseSolicitationFromBytes(
       parseStatus: "parsed",
       parseError: "",
       rawText: rawText.slice(0, 500_000),
-      title: d.title || stripExt((await getFileName(solicitationId)) || ""),
+      title: d.title || stripExt(fileName),
       agency: d.agency,
       office: d.office,
       type: d.type as SolicitationType,
@@ -240,17 +309,46 @@ async function parseSolicitationFromBytes(
   revalidatePath(`/solicitations/${solicitationId}`);
 }
 
-async function getFileName(id: string): Promise<string> {
+async function getFileMeta(
+  id: string,
+): Promise<{ fileName: string; contentType: string }> {
   const [row] = await db
-    .select({ fileName: solicitations.fileName })
+    .select({
+      fileName: solicitations.fileName,
+      contentType: solicitations.contentType,
+    })
     .from(solicitations)
     .where(eq(solicitations.id, id))
     .limit(1);
-  return row?.fileName ?? "";
+  return {
+    fileName: row?.fileName ?? "",
+    contentType: row?.contentType ?? "",
+  };
 }
 
 function stripExt(name: string): string {
   return name.replace(/\.[^./]+$/, "");
+}
+
+function guessContentTypeFromFormat(
+  format: ReturnType<typeof detectFormat>,
+): string {
+  switch (format) {
+    case "pdf":
+      return "application/pdf";
+    case "docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    case "pptx":
+      return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "image":
+      return "image/png";
+    case "text":
+      return "text/plain";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 /**

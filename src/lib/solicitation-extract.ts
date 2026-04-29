@@ -1,18 +1,27 @@
 /**
  * Solicitation extraction pipeline.
  *
- *   bytes (PDF) → text (pdf-parse) → AI gateway → structured JSON
+ *   bytes (PDF/DOCX/XLSX/PPTX/image/text) → text → AI gateway → structured JSON
  *
- * If text extraction returns no usable text (scanned PDF, image-only),
- * we fall through to a vision pass that hands the raw PDF to the AI
- * provider as a document block. Anthropic does the OCR natively.
+ * The text extraction step dispatches by file format. PDFs use
+ * pdf-parse-fork with a vision-OCR fallback for scans. DOCX uses
+ * mammoth, XLSX uses exceljs, PPTX is parsed as zipped XML, images
+ * route straight to vision OCR via the AI gateway.
  */
 import {
   buildSolicitationExtractPrompt,
   buildSolicitationVisionPrompt,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
-import { complete, getAIProviderStatus } from "@/lib/ai";
+import { complete, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
+import {
+  detectFormat,
+  extractTextFromDocx,
+  extractTextFromPlainText,
+  extractTextFromPptx,
+  extractTextFromXlsx,
+  type ExtractFormat,
+} from "@/lib/text-extract";
 
 export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   // pdf-parse-fork is a CommonJS module that exports a function. Different
@@ -27,6 +36,36 @@ export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   const buf = Buffer.from(bytes);
   const result = await candidate(buf);
   return (result?.text ?? "").trim();
+}
+
+/**
+ * Format-aware text extraction. Returns the format we used so callers
+ * can branch (e.g. images skip the cheap-text path and go straight to
+ * vision OCR).
+ */
+export async function extractTextFromAny(
+  bytes: Uint8Array,
+  contentType: string,
+  fileName: string,
+): Promise<{ format: ExtractFormat | null; text: string }> {
+  const format = detectFormat(contentType, fileName);
+  if (!format) return { format: null, text: "" };
+
+  switch (format) {
+    case "pdf":
+      return { format, text: await extractTextFromPdf(bytes) };
+    case "docx":
+      return { format, text: await extractTextFromDocx(bytes) };
+    case "xlsx":
+      return { format, text: await extractTextFromXlsx(bytes) };
+    case "pptx":
+      return { format, text: await extractTextFromPptx(bytes) };
+    case "text":
+      return { format, text: await extractTextFromPlainText(bytes) };
+    case "image":
+      // Images skip text extraction — caller should route to vision.
+      return { format, text: "" };
+  }
 }
 
 export async function aiExtractSolicitation(
@@ -154,6 +193,70 @@ export async function aiExtractSolicitationFromPdf(
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Vision OCR failed.",
+    };
+  }
+}
+
+/**
+ * Vision pass for image uploads (jpeg/png/webp/gif). Mirrors the PDF
+ * vision path but emits an image content block instead of a document
+ * block. Useful for one-pagers, scanned cover sheets, or photographs
+ * of printed RFQs.
+ */
+export async function aiExtractSolicitationFromImage(
+  bytes: Uint8Array,
+  fileName: string,
+  mediaType: AIDocumentMedia,
+): Promise<
+  | { ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean }
+  | { ok: false; error: string }
+> {
+  const status = getAIProviderStatus();
+  if (status.active.name !== "anthropic") {
+    return {
+      ok: false,
+      error:
+        status.active.name === "stub"
+          ? "Image vision needs a real AI provider. Set ANTHROPIC_API_KEY to enable image intake."
+          : `Image vision currently requires Anthropic; active provider is ${status.active.name}.`,
+    };
+  }
+  // Anthropic caps image content blocks at 5 MB on the wire.
+  const RAW_LIMIT = 5 * 1024 * 1024;
+  if (bytes.byteLength > RAW_LIMIT) {
+    return {
+      ok: false,
+      error: `Image is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB — vision caps at ${RAW_LIMIT / 1024 / 1024} MB. Compress or shrink before re-uploading.`,
+    };
+  }
+
+  try {
+    const prompt = buildSolicitationVisionPrompt();
+    const ai = await complete({
+      system: prompt.system,
+      messages: prompt.messages,
+      maxTokens: 2400,
+      temperature: 0.1,
+      cacheSystem: true,
+      documents: [{ name: fileName, mediaType, bytes }],
+    });
+    if (ai.stubbed) {
+      return { ok: false, error: "AI provider unexpectedly returned stub mode." };
+    }
+    const cleaned = stripCodeFences(ai.text);
+    const parsed = JSON.parse(cleaned) as SolicitationExtractionResult;
+    return {
+      ok: true,
+      provider: ai.provider,
+      model: ai.model,
+      stubbed: false,
+      data: normalizeExtraction(parsed),
+    };
+  } catch (err) {
+    console.error("[aiExtractSolicitationFromImage]", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Image vision failed.",
     };
   }
 }
