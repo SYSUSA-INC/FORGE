@@ -149,48 +149,77 @@ export async function brainSuggestForSectionAction(
     console.warn("[brainSuggest] corpus query failed", err);
   }
 
-  // For knowledge_entry we don't currently index embeddings (they
-  // were curated by hand, not chunked). Score them via a lightweight
-  // text overlap signal so they still surface alongside the corpus
-  // when relevant. Phase 10f can backfill embeddings on entries.
+  // Phase 10f: knowledge_entry rows now carry embeddings, so we can
+  // run real cosine similarity instead of token overlap. We
+  // gracefully fall back to overlap if no entries are embedded yet
+  // (e.g. backfill hasn't run on a fresh deploy).
   try {
-    const all = await db
-      .select({
-        id: knowledgeEntries.id,
-        kind: knowledgeEntries.kind,
-        title: knowledgeEntries.title,
-        body: knowledgeEntries.body,
-      })
-      .from(knowledgeEntries)
-      .where(eq(knowledgeEntries.organizationId, organizationId))
-      .limit(200);
-
-    const queryLower = composed.toLowerCase();
-    const tokens = Array.from(
-      new Set(
-        queryLower
-          .match(/[a-z0-9]{3,}/g)
-          ?.filter((t) => !STOPWORDS.has(t)) ?? [],
-      ),
-    );
-    if (tokens.length > 0) {
-      entryRows = all
-        .map((e) => ({
-          id: e.id,
-          kind: e.kind,
-          title: e.title,
-          body: e.body,
-          similarity: scoreOverlap(
-            (e.title + " " + e.body).toLowerCase(),
-            tokens,
-          ),
-        }))
-        .filter((e) => e.similarity > 0)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 6);
-    }
+    const r2 = await db.execute(sql`
+      SELECT
+        id,
+        kind,
+        title,
+        body,
+        1 - (embedding <=> ${literal}::vector) AS similarity
+      FROM knowledge_entry
+      WHERE organization_id = ${organizationId}
+        AND archived_at IS NULL
+        AND embedding IS NOT NULL
+      ORDER BY embedding <=> ${literal}::vector
+      LIMIT 6
+    `);
+    entryRows = ((r2 as unknown as { rows?: typeof entryRows }).rows ??
+      (r2 as unknown as typeof entryRows)) as typeof entryRows;
+    entryRows = entryRows.map((e) => ({
+      ...e,
+      similarity:
+        typeof e.similarity === "string" ? Number(e.similarity) : e.similarity,
+    }));
   } catch (err) {
-    console.warn("[brainSuggest] entry query failed", err);
+    console.warn("[brainSuggest] entry vector query failed, falling back to token overlap", err);
+  }
+
+  if (entryRows.length === 0) {
+    // Fallback: token-overlap on un-embedded entries.
+    try {
+      const all = await db
+        .select({
+          id: knowledgeEntries.id,
+          kind: knowledgeEntries.kind,
+          title: knowledgeEntries.title,
+          body: knowledgeEntries.body,
+        })
+        .from(knowledgeEntries)
+        .where(eq(knowledgeEntries.organizationId, organizationId))
+        .limit(200);
+
+      const queryLower = composed.toLowerCase();
+      const tokens = Array.from(
+        new Set(
+          queryLower
+            .match(/[a-z0-9]{3,}/g)
+            ?.filter((t) => !STOPWORDS.has(t)) ?? [],
+        ),
+      );
+      if (tokens.length > 0) {
+        entryRows = all
+          .map((e) => ({
+            id: e.id,
+            kind: e.kind,
+            title: e.title,
+            body: e.body,
+            similarity: scoreOverlap(
+              (e.title + " " + e.body).toLowerCase(),
+              tokens,
+            ),
+          }))
+          .filter((e) => e.similarity > 0)
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 6);
+      }
+    } catch (err) {
+      console.warn("[brainSuggest] entry overlap query failed", err);
+    }
   }
 
   // Merge + rank. Curated entries get a +0.05 bonus to break ties in
