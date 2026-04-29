@@ -253,13 +253,23 @@ export async function updateProposalAction(
 export async function advanceProposalStageAction(
   id: string,
   nextStage: ProposalStage,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; harvestStarted?: boolean } | { ok: false; error: string }> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(id, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
   try {
+    // Detect "transition into submitted" so we only kick off the
+    // harvest when the proposal moves INTO submitted, not on every
+    // touch while already there.
+    const [before] = await db
+      .select({ stage: proposals.stage })
+      .from(proposals)
+      .where(eq(proposals.id, id))
+      .limit(1);
+    const wasNotSubmitted = before && before.stage !== "submitted";
+
     await db
       .update(proposals)
       .set({
@@ -271,7 +281,22 @@ export async function advanceProposalStageAction(
       .where(eq(proposals.id, id));
     revalidatePath(`/proposals/${id}`);
     revalidatePath("/proposals");
-    return { ok: true };
+
+    // Phase 10f: harvest into the corpus on transition to submitted.
+    // Best-effort, fire-and-forget — failures don't block the stage
+    // change. Users can re-run via the "Harvest now" button.
+    let harvestStarted = false;
+    if (nextStage === "submitted" && wasNotSubmitted) {
+      harvestStarted = true;
+      const { harvestProposalToCorpusAction } = await import(
+        "./[id]/harvest-actions"
+      );
+      void harvestProposalToCorpusAction(id).catch((err) => {
+        console.warn("[advanceProposalStage] harvest failed", err);
+      });
+    }
+
+    return { ok: true, harvestStarted };
   } catch (err) {
     console.error("[advanceProposalStageAction]", err);
     return {

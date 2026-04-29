@@ -16,6 +16,7 @@ import {
   KNOWLEDGE_EXTRACT_PROMPT_VERSION,
   aiExtractKnowledgeFromArtifact,
 } from "@/lib/knowledge-extract";
+import { embedKnowledgeEntry } from "@/lib/knowledge-entry-embed";
 
 export type StartExtractionResult =
   | {
@@ -311,6 +312,13 @@ export async function approveCandidateAction(
       updatedAt: new Date(),
     })
     .where(eq(knowledgeExtractionCandidates.id, c.id));
+
+  // Embed the new entry so Brain Suggest can rank it via real cosine
+  // similarity. Best-effort: failures don't block the approval — the
+  // backfill action can fix it later.
+  await embedKnowledgeEntry(entry.id, finalTitle, finalBody).catch((err) => {
+    console.warn("[approveCandidateAction] embed failed (non-fatal)", err);
+  });
 
   revalidatePath("/knowledge-base");
   revalidatePath(`/knowledge-base/import/${c.artifactId}`);

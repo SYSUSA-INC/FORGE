@@ -6,6 +6,10 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { knowledgeEntries, type KnowledgeKind } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  backfillEntryEmbeddings,
+  embedKnowledgeEntry,
+} from "@/lib/knowledge-entry-embed";
 
 const KINDS: KnowledgeKind[] = [
   "capability",
@@ -99,17 +103,26 @@ export async function createKnowledgeEntryAction(input: {
   }
 
   try {
+    const finalTitle = input.title.trim();
+    const finalBody = input.body?.trim() ?? "";
     const [row] = await db
       .insert(knowledgeEntries)
       .values({
         organizationId,
         kind: input.kind,
-        title: input.title.trim(),
-        body: input.body?.trim() ?? "",
+        title: finalTitle,
+        body: finalBody,
         tags: dedupTags(input.tags ?? []),
         createdByUserId: user.id,
       })
       .returning({ id: knowledgeEntries.id });
+    if (row) {
+      // Embed best-effort so Brain Suggest can rank this entry. Don't
+      // block creation if it fails — backfill can patch later.
+      await embedKnowledgeEntry(row.id, finalTitle, finalBody).catch((err) => {
+        console.warn("[createKnowledgeEntryAction] embed failed", err);
+      });
+    }
     revalidatePath("/knowledge-base");
     return { ok: true, id: row!.id };
   } catch (err) {
@@ -162,6 +175,27 @@ export async function updateKnowledgeEntryAction(
           eq(knowledgeEntries.organizationId, organizationId),
         ),
       );
+
+    // Re-embed when title or body changed so the vector matches the
+    // current content. Tag-only edits don't need re-embedding.
+    if (input.title !== undefined || input.body !== undefined) {
+      const [latest] = await db
+        .select({
+          title: knowledgeEntries.title,
+          body: knowledgeEntries.body,
+        })
+        .from(knowledgeEntries)
+        .where(eq(knowledgeEntries.id, id))
+        .limit(1);
+      if (latest) {
+        await embedKnowledgeEntry(id, latest.title, latest.body).catch(
+          (err) => {
+            console.warn("[updateKnowledgeEntryAction] re-embed failed", err);
+          },
+        );
+      }
+    }
+
     revalidatePath("/knowledge-base");
     revalidatePath(`/knowledge-base/${id}`);
     return { ok: true };
@@ -239,4 +273,28 @@ function dedupTags(tags: string[]): string[] {
     out.push(t);
   }
   return out.slice(0, 32);
+}
+
+/**
+ * Phase 10f: backfill embeddings for every entry in the org that
+ * doesn't yet have one. Safe to run repeatedly. Used by the
+ * "Embed missing entries" button in the corpus header.
+ */
+export async function backfillKnowledgeEntryEmbeddingsAction(): Promise<
+  | { ok: true; embedded: number; skipped: number }
+  | { ok: false; error: string }
+> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  try {
+    const result = await backfillEntryEmbeddings(organizationId);
+    revalidatePath("/knowledge-base");
+    return { ok: true, ...result };
+  } catch (err) {
+    console.error("[backfillKnowledgeEntryEmbeddingsAction]", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Backfill failed.",
+    };
+  }
 }
