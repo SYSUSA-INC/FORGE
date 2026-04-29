@@ -1338,3 +1338,47 @@ export type NewKnowledgeExtractionCandidate =
   typeof knowledgeExtractionCandidates.$inferInsert;
 export type KnowledgeExtractionDecision =
   (typeof knowledgeExtractionDecisionEnum.enumValues)[number];
+
+/**
+ * Phase 10d — semantic search across the corpus.
+ *
+ * Each artifact's raw_text is split into ~2k-char chunks with overlap
+ * and each chunk gets a 1536-dim embedding (OpenAI text-embedding-3-
+ * small in live mode; deterministic stub vectors in stub mode so the
+ * UI is testable without an API key).
+ *
+ * Cosine similarity queries run via raw SQL using pgvector's `<=>`
+ * operator. The migration enables the extension and creates an
+ * IVFFlat index. Drizzle treats the `embedding` column as text on
+ * the JS side and we serialize/deserialize the array ourselves.
+ */
+export const KNOWLEDGE_EMBEDDING_DIM = 1536;
+
+export const knowledgeArtifactChunks = pgTable("knowledge_artifact_chunk", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  artifactId: uuid("artifact_id")
+    .notNull()
+    .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
+  chunkIndex: integer("chunk_index").notNull(),
+  content: text("content").notNull(),
+  // Stored as text on the Drizzle side because pgvector isn't a
+  // first-class drizzle type. The actual column type is
+  // `vector(1536)` — the migration creates it. Reads parse JSON;
+  // writes serialize via `[1.0,2.0,...]::vector` casts in raw SQL.
+  embedding: text("embedding"),
+  tokenCount: integer("token_count").notNull().default(0),
+  charStart: integer("char_start").notNull().default(0),
+  charEnd: integer("char_end").notNull().default(0),
+  embeddingProvider: text("embedding_provider").notNull().default(""),
+  embeddingModel: text("embedding_model").notNull().default(""),
+  embeddedAt: timestamp("embedded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type KnowledgeArtifactChunk =
+  typeof knowledgeArtifactChunks.$inferSelect;
+export type NewKnowledgeArtifactChunk =
+  typeof knowledgeArtifactChunks.$inferInsert;
