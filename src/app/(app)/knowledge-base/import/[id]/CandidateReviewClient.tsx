@@ -13,6 +13,7 @@ import {
   type CandidateRow,
   type RunRow,
 } from "./actions";
+import { embedArtifactAction } from "../embed-actions";
 
 const KIND_LABELS: Record<CandidateRow["kind"], string> = {
   capability: "Capability",
@@ -81,6 +82,22 @@ export function CandidateReviewClient({
     });
   }
 
+  function embedNow() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await embedArtifactAction(artifactId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setNotice(
+        `Embedded ${res.chunks} chunk${res.chunks === 1 ? "" : "s"} via ${res.provider}${res.stubbed ? " (stub)" : ""}.`,
+      );
+      router.refresh();
+    });
+  }
+
   function approveAll() {
     if (pendingCandidates.length === 0) return;
     if (
@@ -143,6 +160,15 @@ export function CandidateReviewClient({
               Approve all {pendingCandidates.length}
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={embedNow}
+            disabled={!canRun}
+            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+            title="Index this artifact for semantic search."
+          >
+            {pending ? "…" : "Embed for search"}
+          </button>
         </div>
       }
     >
