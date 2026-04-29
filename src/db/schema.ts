@@ -1127,6 +1127,12 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   // proposal section drafter / template. Keeps the autonomy ladder honest
   // about which assets actually get used.
   reuseCount: integer("reuse_count").notNull().default(0),
+  // Phase 10f: real embedding for semantic Brain Suggest. Stored as
+  // text on the JS side; the actual column type is `vector(1536)` —
+  // see drizzle/0023 migration. Same provider/dim as the chunk
+  // table so we don't have to recreate the column to swap.
+  embedding: text("embedding"),
+  embeddedAt: timestamp("embedded_at"),
   archivedAt: timestamp("archived_at"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
