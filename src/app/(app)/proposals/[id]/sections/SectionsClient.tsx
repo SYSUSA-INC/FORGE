@@ -15,6 +15,7 @@ import {
 import { fromPlainText } from "@/lib/tiptap-doc";
 import { RichSectionEditor } from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
+import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import {
   addCustomSectionAction,
   removeSectionAction,
@@ -337,6 +338,18 @@ function SectionRow({
                 setBodyDoc(doc);
                 setPlainContent(plain);
                 setWordCount(count);
+              }}
+            />
+            <BrainSuggestPanel
+              sectionId={section.id}
+              onInsert={(text) => {
+                const next = plainContent
+                  ? plainContent.replace(/\s+$/, "") + "\n\n" + text
+                  : text;
+                const doc = fromPlainText(next);
+                setBodyDoc(doc);
+                setPlainContent(next);
+                setWordCount(next.split(/\s+/).filter(Boolean).length);
               }}
             />
             <div className="flex items-center justify-between">
