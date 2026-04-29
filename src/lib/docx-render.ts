@@ -23,6 +23,7 @@ import type {
   TipTapDoc,
   TipTapNode,
 } from "@/db/schema";
+import { tiptapDocToOoxml } from "@/lib/tiptap-to-ooxml";
 
 export type DocxRenderInput = {
   template: ProposalTemplate;
@@ -141,14 +142,17 @@ function buildTemplateData(input: DocxRenderInput): Record<string, unknown> {
     primaryContactPhone: organization.phone,
     primaryContactEmail: organization.email,
 
-    // Sections — used by the loop pattern
-    // {#sections}{title}{body}{/sections}
+    // Sections — used by the loop pattern. Two body fields per item:
+    //   {body}     — escaped plain text (safe to drop in {body})
+    //   {@bodyXml} — raw OOXML (preserves headings, bold, lists, etc.).
+    //               Use {@bodyXml} when you want real Word formatting.
     sections: sections
       .slice()
       .sort((a, b) => a.ordering - b.ordering)
       .map((s) => ({
         title: s.title,
         body: tiptapDocToPlainText(s.bodyDoc as TipTapDoc),
+        bodyXml: tiptapDocToOoxml(s.bodyDoc as TipTapDoc),
         kind: s.kind,
         ordering: s.ordering,
       })),

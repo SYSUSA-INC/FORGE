@@ -857,6 +857,14 @@ function DocxPanel({
           <code>&#123;#sections&#125;&#123;title&#125; &#123;body&#125;&#123;/sections&#125;</code>
           {" "}— each section in the proposal will repeat this block.
         </p>
+        <p className="mt-2 font-mono text-[10px] text-muted">
+          For rich Word formatting (headings, bold, lists from the editor),
+          use{" "}
+          <code>&#123;#sections&#125;&#123;title&#125; &#123;@bodyXml&#125;&#123;/sections&#125;</code>
+          {" "}instead of <code>&#123;body&#125;</code>. The <code>@</code>{" "}
+          prefix injects raw OOXML; without it, formatting is stripped to
+          plain text.
+        </p>
       </details>
 
       <div className="rounded-md border border-white/10 bg-white/[0.015] px-3 py-2 font-mono text-[10px] text-muted">
