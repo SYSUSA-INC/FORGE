@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import {
   renderProposalDocxAction,
+  renderProposalDocxAsPdfAction,
   renderProposalPdfAction,
+  type DocxAsPdfResult,
   type DocxRenderActionResult,
   type PdfRenderResult,
   type RecentRenderRow,
@@ -15,6 +17,7 @@ import type { PdfProviderStatus, StorageProviderStatus } from "./status-types";
 
 type SuccessResult = Extract<PdfRenderResult, { ok: true }>;
 type DocxSuccess = Extract<DocxRenderActionResult, { ok: true }>;
+type DocxPdfSuccess = Extract<DocxAsPdfResult, { ok: true }>;
 
 type Props = {
   proposalId: string;
@@ -26,6 +29,7 @@ type Props = {
     hasHtmlTemplate: boolean;
     templateName: string;
   };
+  docxToPdfProvider?: "cloudconvert" | "stub";
 };
 
 export function ExportPanel({
@@ -34,18 +38,38 @@ export function ExportPanel({
   pdfStatus,
   storageStatus,
   exportCapability,
+  docxToPdfProvider,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<SuccessResult | null>(null);
   const [recentDocx, setRecentDocx] = useState<DocxSuccess | null>(null);
+  const [recentDocxPdf, setRecentDocxPdf] = useState<DocxPdfSuccess | null>(null);
 
-  function generate() {
+  function clearAll() {
     setError(null);
     setRecent(null);
     setRecentDocx(null);
+    setRecentDocxPdf(null);
+  }
+
+  function generate() {
+    clearAll();
     startTransition(async () => {
+      // When the template is a Word file, the "Download as PDF"
+      // button hits the docx-to-pdf path so the user gets the same
+      // header/footer/cover/TOC fidelity in their PDF.
+      if (exportCapability.hasDocxTemplate) {
+        const res = await renderProposalDocxAsPdfAction(proposalId);
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        setRecentDocxPdf(res);
+        router.refresh();
+        return;
+      }
       const res = await renderProposalPdfAction(proposalId);
       if (!res.ok) {
         setError(res.error);
@@ -57,9 +81,7 @@ export function ExportPanel({
   }
 
   function generateDocx() {
-    setError(null);
-    setRecent(null);
-    setRecentDocx(null);
+    clearAll();
     startTransition(async () => {
       const res = await renderProposalDocxAction(proposalId);
       if (!res.ok) {
@@ -182,6 +204,40 @@ export function ExportPanel({
             >
               Download .docx →
             </a>
+          </div>
+        ) : null}
+
+        {recentDocxPdf ? (
+          <div
+            className={`rounded-md border px-3 py-2 font-mono text-[11px] ${
+              recentDocxPdf.stubbed
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                : "border-emerald/40 bg-emerald/10 text-emerald"
+            }`}
+          >
+            <div>
+              {recentDocxPdf.stubbed
+                ? "DOCX→PDF in stub mode — set CLOUDCONVERT_API_KEY for real PDF. Downloading .docx for now."
+                : `PDF ready (${recentDocxPdf.provider}) — ${Math.max(1, Math.round(recentDocxPdf.byteSize / 1024))} KB.`}
+            </div>
+            <a
+              href={recentDocxPdf.downloadUrl}
+              className={`mt-1 inline-block underline hover:no-underline ${
+                recentDocxPdf.stubbed ? "text-amber-200" : "text-emerald"
+              }`}
+            >
+              Download {recentDocxPdf.contentType === "pdf" ? ".pdf" : ".docx"} →
+            </a>
+          </div>
+        ) : null}
+
+        {exportCapability.hasDocxTemplate &&
+        docxToPdfProvider === "stub" &&
+        !recentDocxPdf ? (
+          <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[10px] text-muted">
+            DOCX→PDF conversion is in stub mode. Set{" "}
+            <code className="text-text">CLOUDCONVERT_API_KEY</code> on Vercel to
+            get real PDFs from your Word template.
           </div>
         ) : null}
 
