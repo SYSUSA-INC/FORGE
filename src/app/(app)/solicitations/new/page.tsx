@@ -1,90 +1,104 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { PreviewBanner } from "@/components/ui/PreviewBanner";
+import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { UploadSolicitationForm } from "./UploadSolicitationForm";
 
-export default function NewSolicitationPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewSolicitationPage() {
+  await requireAuth();
+  await requireCurrentOrg();
+
   return (
     <>
       <PageHeader
-        eyebrow="Solicitations — Intake"
+        eyebrow="Solicitations · Intake"
         title="New solicitation"
-        subtitle="Upload a raw RFP, RFI, RFQ, or Sources Sought notice. FORGE parses Section L / M, extracts requirements, and builds the compliance matrix."
+        subtitle="Upload an RFP / RFI / RFQ / Sources Sought PDF. FORGE extracts the text, asks the AI gateway to pull Section L summary, Section M summary, and the top shall / should / may statements, then stamps the result onto a record you can convert into an opportunity."
+        actions={
+          <Link href="/solicitations" className="aur-btn aur-btn-ghost">
+            All solicitations
+          </Link>
+        }
       />
-      <PreviewBanner
-        title="Preview · not yet wired"
-        message="This page is the design for solicitation intake. The Select Files button, dropzone, and pipeline steps are scaffolding — uploading does not currently parse or extract anything. To start a real proposal today, create an opportunity (manually or by importing from SAM.gov), then build a proposal against it."
-        roadmap="Real intake (PDF/DOCX upload → OCR → Section L/M extraction → requirement mining → compliance matrix auto-assembly) needs Browserless / file storage / a parsing pipeline. It's slated after the v1 MVP authoring chapter ships."
-      />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Link href="/opportunities/new" className="aur-btn aur-btn-primary">
-          + Create opportunity manually
-        </Link>
-        <Link href="/opportunities/import" className="aur-btn">
-          Import from SAM.gov
-        </Link>
-        <Link href="/proposals/new" className="aur-btn aur-btn-ghost">
-          New proposal
-        </Link>
-      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-        <Panel title="Upload">
-          <div className="relative grid place-items-center border-4 border-dashed border-ink bg-bone p-12 text-center">
-            <div className="font-display text-3xl font-bold">Drop files here</div>
-            <div className="mt-2 font-mono text-[11px] uppercase tracking-widest text-ink/60">
-              PDF · DOCX · XLSX · ZIP · max 500 MB
-            </div>
-            <button className="brut-btn-primary mt-4">Select files</button>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Field label="Solicitation number" placeholder="N00024-25-R-0094" />
-            <Field label="Agency" placeholder="Dept. of Navy / NAVSEA" />
-            <Field label="Type" placeholder="RFP" />
-            <Field label="NAICS" placeholder="541512" />
-            <Field label="Set-aside" placeholder="SB / 8(a) / WOSB / —" />
-            <Field label="Due date" placeholder="2026-04-29 14:00 EST" />
-          </div>
-        </Panel>
+        <UploadSolicitationForm />
 
-        <Panel title="Pipeline">
-          <ol className="relative ml-2 flex flex-col gap-5 border-l-4 border-ink pl-4 font-mono text-[11px]">
-            {[
-              ["Upload", "Raw files accepted"],
-              ["OCR & parse", "pdf-parse · Tesseract"],
-              ["Section L / M", "Claude extract"],
-              ["Requirement mining", "shall / should / may"],
-              ["Evaluation criteria", "Factor / subfactor"],
-              ["Embedding", "pgvector index"],
-              ["Compliance matrix", "Auto-assembled"],
-            ].map((step, i) => (
-              <li key={step[0]} className="relative">
-                <span
-                  className={`absolute -left-[26px] top-0.5 h-4 w-4 border-2 border-ink ${
-                    i < 2 ? "bg-ink" : i === 2 ? "bg-hazard" : "bg-paper"
-                  }`}
-                />
-                <div className="flex items-center justify-between">
-                  <div className="font-display text-sm font-bold">{step[0]}</div>
-                  <span className="font-mono text-[9px] uppercase text-ink/50">
-                    0{i + 1}
-                  </span>
+        <Panel title="What happens next" eyebrow="Pipeline">
+          <ol className="flex flex-col gap-3 font-body text-[13px] text-muted">
+            <li className="flex gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
+                01
+              </span>
+              <div>
+                <div className="font-display text-[13px] font-semibold text-text">
+                  Upload
                 </div>
-                <div className="text-[10px] uppercase text-ink/60">{step[1]}</div>
-              </li>
-            ))}
+                <div className="mt-0.5">
+                  PDF stored via the configured storage provider (memory in
+                  dev, R2 when wired up).
+                </div>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
+                02
+              </span>
+              <div>
+                <div className="font-display text-[13px] font-semibold text-text">
+                  Text extraction
+                </div>
+                <div className="mt-0.5">
+                  pdf-parse pulls the text layer. Scanned-image-only PDFs
+                  fail with an explicit message — OCR comes next.
+                </div>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
+                03
+              </span>
+              <div>
+                <div className="font-display text-[13px] font-semibold text-text">
+                  AI extraction
+                </div>
+                <div className="mt-0.5">
+                  AI gateway returns Section L summary, Section M summary,
+                  agency / office / NAICS / set-aside / due date, plus the
+                  top 25 shall/should/may statements with section refs.
+                </div>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
+                04
+              </span>
+              <div>
+                <div className="font-display text-[13px] font-semibold text-text">
+                  Convert to opportunity
+                </div>
+                <div className="mt-0.5">
+                  One click stamps the metadata into a real Opportunity
+                  with the right title / agency / NAICS / due date so you
+                  can run a qualification scorecard against it.
+                </div>
+              </div>
+            </li>
           </ol>
+          <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/[0.06] p-3">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-amber-300">
+              Heads-up
+            </div>
+            <p className="mt-1 font-body text-[12px] leading-relaxed text-muted">
+              25 MB cap per PDF in v1. Set <code>ANTHROPIC_API_KEY</code>{" "}
+              on Vercel to enable AI extraction (otherwise the upload
+              succeeds but the extracted summaries stay empty).
+            </p>
+          </div>
         </Panel>
       </div>
     </>
-  );
-}
-
-function Field({ label, placeholder }: { label: string; placeholder: string }) {
-  return (
-    <div>
-      <div className="brut-label">{label}</div>
-      <input className="brut-input" placeholder={placeholder} />
-    </div>
   );
 }

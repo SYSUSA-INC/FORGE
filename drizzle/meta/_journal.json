@@ -113,6 +113,13 @@
       "when": 1777248535185,
       "tag": "0015_add_proposal_pdf_renders",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777323114005,
+      "tag": "0017_add_solicitations_and_knowledge",
+      "breakpoints": true
     }
   ]
 }

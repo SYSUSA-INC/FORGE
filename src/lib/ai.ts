@@ -21,6 +21,20 @@ export type AIMessage = {
   content: string;
 };
 
+/**
+ * A binary document attached to the user turn. Currently only Anthropic
+ * supports inline PDF input via document content blocks; other providers
+ * receive the user prompt without the attachment and the caller should
+ * gracefully degrade.
+ */
+export type AIDocument = {
+  /** Filesystem-style hint for the model — surfaced inside the prompt. */
+  name?: string;
+  mediaType: "application/pdf";
+  /** Raw bytes — the gateway base64-encodes per provider. */
+  bytes: Uint8Array;
+};
+
 export type AICompleteOptions = {
   system?: string;
   messages: AIMessage[];
@@ -33,6 +47,12 @@ export type AICompleteOptions = {
    * the prompt cache.
    */
   cacheSystem?: boolean;
+  /**
+   * Documents attached to the FIRST user message. Anthropic-only for
+   * now (PDF document blocks). Other providers receive a synthesized
+   * note in place of the document.
+   */
+  documents?: AIDocument[];
 };
 
 export type AICompleteResult = {
@@ -67,13 +87,29 @@ class AnthropicProvider implements AIProvider {
 
   async complete(opts: AICompleteOptions): Promise<AICompleteResult> {
     const model = opts.model ?? this.defaultModel;
+    const docs = opts.documents ?? [];
+    let firstUserSeen = false;
+    const messages = opts.messages.map((m) => {
+      if (m.role === "user" && !firstUserSeen && docs.length > 0) {
+        firstUserSeen = true;
+        const blocks: unknown[] = docs.map((d) => ({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: d.mediaType,
+            data: bytesToBase64(d.bytes),
+          },
+          ...(d.name ? { title: d.name } : {}),
+        }));
+        blocks.push({ type: "text", text: m.content });
+        return { role: m.role, content: blocks };
+      }
+      return { role: m.role, content: m.content };
+    });
     const body: Record<string, unknown> = {
       model,
       max_tokens: opts.maxTokens ?? 1024,
-      messages: opts.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      messages,
     };
     if (typeof opts.temperature === "number") body.temperature = opts.temperature;
     if (opts.system) {
@@ -264,6 +300,12 @@ class StubProvider implements AIProvider {
 function readEnv(name: string): string | null {
   const v = process.env[name];
   return v && v.trim() ? v : null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  // Buffer is the safe path on Node; chunked to avoid stack issues for big
+  // PDFs (~10 MB). The Anthropic API caps documents at 32 MB anyway.
+  return Buffer.from(bytes).toString("base64");
 }
 
 /**
