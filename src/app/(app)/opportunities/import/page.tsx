@@ -38,9 +38,18 @@ export default async function ImportPage() {
         title="Import from SAM.gov"
         subtitle="Search live solicitations from SAM.gov matching your organization's NAICS codes and pull them into your opportunities."
         actions={
-          <Link href="/opportunities" className="aur-btn aur-btn-ghost">
-            Back to opportunities
-          </Link>
+          <>
+            <Link
+              href="/opportunities/import/ebuy"
+              className="aur-btn aur-btn-ghost"
+              title="Paste an eBuy RFQ. eBuy isn't on SAM.gov."
+            >
+              Paste from eBuy
+            </Link>
+            <Link href="/opportunities" className="aur-btn aur-btn-ghost">
+              Back to opportunities
+            </Link>
+          </>
         }
       />
 

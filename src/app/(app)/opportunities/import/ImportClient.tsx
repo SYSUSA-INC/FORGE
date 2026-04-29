@@ -162,8 +162,14 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
             </div>
             <div className="mt-1 font-mono text-[10px] text-muted">
               Adds vehicle keywords to the SAM.gov query. eBuy RFQs aren&rsquo;t
-              indexed by SAM.gov &mdash; for those, paste from eBuy on the
-              next page (coming soon).
+              indexed by SAM.gov &mdash; for those, use{" "}
+              <a
+                href="/opportunities/import/ebuy"
+                className="text-teal hover:underline"
+              >
+                Paste from eBuy
+              </a>
+              .
             </div>
           </div>
         </div>
