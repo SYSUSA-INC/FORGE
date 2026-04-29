@@ -320,3 +320,90 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/**
+ * Send-for-review request — capture manager pings a teammate (or
+ * external email) for a Bid / No-bid / More-info call. The link is
+ * token-authed so external reviewers can answer without a login.
+ */
+export async function sendOpportunityReviewRequestEmail(opts: {
+  to: string;
+  reviewerName: string;
+  senderName: string;
+  organizationName: string;
+  opportunityTitle: string;
+  agency: string;
+  naics: string;
+  setAside: string;
+  dueDate: string; // already formatted
+  synopsis: string;
+  note: string;
+  token: string;
+}): Promise<void> {
+  const url = `${baseUrl()}/review/${encodeURIComponent(opts.token)}`;
+  const noteBlock = opts.note
+    ? `<div style="margin:20px 0;padding:14px 16px;border-left:3px solid #2DD4BF;background:rgba(45,212,191,0.06);border-radius:6px;">
+        <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#2DD4BF;margin-bottom:6px;">Note from ${escapeHtml(opts.senderName)}</div>
+        <div style="font-size:13px;color:#e6edf7;line-height:1.5;">${escapeHtml(opts.note)}</div>
+      </div>`
+    : "";
+  const synopsisBlock = opts.synopsis
+    ? `<p style="margin:16px 0;font-size:13px;line-height:1.6;color:#94a3b8;">${escapeHtml(opts.synopsis).slice(0, 800)}</p>`
+    : "";
+  const greeting = opts.reviewerName
+    ? `Hi ${escapeHtml(opts.reviewerName.split(" ")[0] ?? opts.reviewerName)},`
+    : "Hi,";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#e6edf7;">Review request</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:#94a3b8;">
+      ${greeting}
+    </p>
+    <p style="margin:0 0 16px 0;font-size:14px;line-height:1.55;color:#94a3b8;">
+      <strong style="color:#e6edf7;">${escapeHtml(opts.senderName)}</strong>
+      from ${escapeHtml(opts.organizationName)} would like your quick read on this opportunity:
+    </p>
+    <div style="margin:18px 0;padding:16px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;background:rgba(255,255,255,0.02);">
+      <div style="font-size:15px;font-weight:600;color:#e6edf7;margin-bottom:8px;">${escapeHtml(opts.opportunityTitle)}</div>
+      <table role="presentation" cellspacing="0" cellpadding="0" style="font-size:11px;color:#94a3b8;width:100%;">
+        <tr>
+          <td style="padding:2px 0;">Agency</td>
+          <td style="padding:2px 0;color:#e6edf7;">${escapeHtml(opts.agency || "—")}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 0;">NAICS</td>
+          <td style="padding:2px 0;color:#e6edf7;">${escapeHtml(opts.naics || "—")}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 0;">Set-aside</td>
+          <td style="padding:2px 0;color:#e6edf7;">${escapeHtml(opts.setAside || "—")}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 0;">Due</td>
+          <td style="padding:2px 0;color:#e6edf7;">${escapeHtml(opts.dueDate || "—")}</td>
+        </tr>
+      </table>
+    </div>
+    ${synopsisBlock}
+    ${noteBlock}
+    <p style="margin:24px 0 8px 0;font-size:14px;color:#94a3b8;">
+      Open the link below to recommend <strong style="color:#34D399;">Bid</strong>,
+      <strong style="color:#EC4899;">No-bid</strong>, or
+      <strong style="color:#e6edf7;">More info</strong>:
+    </p>
+    <p style="margin:8px 0 24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#2DD4BF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Review opportunity</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#64748b;">
+      Link is good for 14 days. If the button doesn&rsquo;t work, paste this URL:<br/>
+      <span style="color:#94a3b8;word-break:break-all;">${url}</span>
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `[FORGE] Review request — ${opts.opportunityTitle}`.slice(0, 120),
+    html: emailShell(`Review request — ${opts.opportunityTitle}`, body),
+    text: `${opts.senderName} would like your read on "${opts.opportunityTitle}" (${opts.agency}, due ${opts.dueDate}).${
+      opts.note ? `\n\nNote: ${opts.note}` : ""
+    }\n\nOpen to recommend Bid / No-bid / More info: ${url}\n\nLink expires in 14 days.`,
+  });
+}
