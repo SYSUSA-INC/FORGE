@@ -7,6 +7,8 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { SolicitationActions } from "./SolicitationActions";
+import { TeamPanel } from "./TeamPanel";
+import { listSolicitationAssignmentsAction } from "./team-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,7 @@ export default async function SolicitationDetail({
   if (!row) notFound();
   const s = row.s;
   const statusColor = STATUS_COLOR[s.parseStatus] ?? "#9BC9D9";
+  const assignments = await listSolicitationAssignmentsAction(s.id);
 
   return (
     <>
@@ -223,6 +226,8 @@ export default async function SolicitationDetail({
         </div>
 
         <div className="flex flex-col gap-4">
+          <TeamPanel solicitationId={s.id} initial={assignments} />
+
           <Panel title="Extracted facts">
             <dl className="flex flex-col gap-1.5 font-mono text-[11px]">
               <Row label="Title" value={s.title} />
