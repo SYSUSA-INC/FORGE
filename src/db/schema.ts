@@ -702,6 +702,7 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "review_comment_mentioned",
   "review_completed",
   "opportunity_review_completed",
+  "solicitation_role_assigned",
 ]);
 
 export const notifications = pgTable("notification", {
