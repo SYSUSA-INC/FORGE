@@ -146,7 +146,7 @@ export async function uploadKnowledgeArtifactAction(
 
   // Extract text inline (fast for most formats; images skip — Phase 10c
   // will run the AI vision pass async).
-  await extractAndIndex(row.id, bytes, format);
+  await extractAndIndex(row.id, bytes, format, contentType, file.name);
 
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
@@ -157,6 +157,8 @@ async function extractAndIndex(
   id: string,
   bytes: Uint8Array,
   format: ExtractFormat,
+  contentType: string,
+  fileName: string,
 ): Promise<void> {
   await db
     .update(knowledgeArtifacts)
@@ -185,12 +187,30 @@ async function extractAndIndex(
       case "text":
         rawText = await extractTextFromPlainText(bytes);
         break;
-      case "image":
-        // Skip — image artifacts get their text from a vision pass in
-        // Phase 10c. For now the artifact just exists in the corpus
-        // with status=indexed and empty raw_text.
-        rawText = "";
+      case "image": {
+        // Phase 10g: hand the image to Claude vision. Returns plain
+        // text the corpus can index + Brain Extraction can mine.
+        // Falls back gracefully when AI provider isn't configured —
+        // the artifact still lands but with an explanatory note.
+        const ocr = await extractTextFromImageViaVision({
+          bytes,
+          mediaType: (contentType || "image/png") as AIDocumentMedia,
+          fileName,
+        });
+        if (ocr.ok) {
+          rawText = ocr.text;
+        } else {
+          rawText = "";
+          await db
+            .update(knowledgeArtifacts)
+            .set({
+              statusError: ocr.error,
+              updatedAt: new Date(),
+            })
+            .where(eq(knowledgeArtifacts.id, id));
+        }
         break;
+      }
     }
   } catch (err) {
     console.error("[knowledge-artifact extract]", err);
@@ -353,4 +373,79 @@ function guessContentType(format: ExtractFormat): string {
     case "text":
       return "text/plain";
   }
+}
+
+/**
+ * Phase 10g: re-run text extraction on an existing artifact.
+ *
+ * Useful when:
+ *   - An image artifact was uploaded before ANTHROPIC_API_KEY was
+ *     configured and now needs OCR run against it.
+ *   - Vision OCR produced a poor result and the user wants to retry.
+ *   - A future format extractor improves and we want to re-process.
+ *
+ * Loads bytes from the storage provider and calls the same
+ * extractAndIndex used at upload time. Idempotent — safe to re-run.
+ */
+export async function reextractArtifactTextAction(
+  artifactId: string,
+): Promise<{ ok: true; chars: number } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const [artifact] = await db
+    .select()
+    .from(knowledgeArtifacts)
+    .where(
+      and(
+        eq(knowledgeArtifacts.id, artifactId),
+        eq(knowledgeArtifacts.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!artifact) return { ok: false, error: "Artifact not found." };
+  if (!artifact.storagePath) {
+    return {
+      ok: false,
+      error:
+        "No file bytes in storage for this artifact. Re-upload the original.",
+    };
+  }
+
+  const storage = getStorageProvider();
+  const obj = await storage.get(artifact.storagePath);
+  if (!obj) {
+    return {
+      ok: false,
+      error:
+        "Storage no longer has the file bytes (likely after a redeploy of the memory-mode stub). Re-upload to retry.",
+    };
+  }
+
+  const format = detectFormat(artifact.contentType, artifact.fileName);
+  if (!format) {
+    return {
+      ok: false,
+      error: "Unrecognized file format. Cannot re-extract.",
+    };
+  }
+
+  await extractAndIndex(
+    artifact.id,
+    obj.bytes,
+    format,
+    artifact.contentType,
+    artifact.fileName,
+  );
+
+  // Reload to return the new char count.
+  const [updated] = await db
+    .select({ rawText: knowledgeArtifacts.rawText })
+    .from(knowledgeArtifacts)
+    .where(eq(knowledgeArtifacts.id, artifactId))
+    .limit(1);
+
+  revalidatePath(`/knowledge-base/import/${artifactId}`);
+  revalidatePath("/knowledge-base/import");
+  return { ok: true, chars: updated?.rawText?.length ?? 0 };
 }
