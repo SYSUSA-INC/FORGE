@@ -22,15 +22,22 @@ export type AIMessage = {
 };
 
 /**
- * A binary document attached to the user turn. Currently only Anthropic
- * supports inline PDF input via document content blocks; other providers
- * receive the user prompt without the attachment and the caller should
- * gracefully degrade.
+ * A binary document attached to the user turn. Anthropic supports PDF
+ * via document content blocks and images (jpeg/png/webp/gif) via image
+ * content blocks. Other providers receive the user prompt without the
+ * attachment and should gracefully degrade.
  */
+export type AIDocumentMedia =
+  | "application/pdf"
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/gif";
+
 export type AIDocument = {
   /** Filesystem-style hint for the model — surfaced inside the prompt. */
   name?: string;
-  mediaType: "application/pdf";
+  mediaType: AIDocumentMedia;
   /** Raw bytes — the gateway base64-encodes per provider. */
   bytes: Uint8Array;
 };
@@ -92,15 +99,29 @@ class AnthropicProvider implements AIProvider {
     const messages = opts.messages.map((m) => {
       if (m.role === "user" && !firstUserSeen && docs.length > 0) {
         firstUserSeen = true;
-        const blocks: unknown[] = docs.map((d) => ({
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: d.mediaType,
-            data: bytesToBase64(d.bytes),
-          },
-          ...(d.name ? { title: d.name } : {}),
-        }));
+        const blocks: unknown[] = docs.map((d) => {
+          // Anthropic uses different block types for PDF vs image.
+          // PDFs go through "document"; images through "image".
+          if (d.mediaType === "application/pdf") {
+            return {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: d.mediaType,
+                data: bytesToBase64(d.bytes),
+              },
+              ...(d.name ? { title: d.name } : {}),
+            };
+          }
+          return {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: d.mediaType,
+              data: bytesToBase64(d.bytes),
+            },
+          };
+        });
         blocks.push({ type: "text", text: m.content });
         return { role: m.role, content: blocks };
       }

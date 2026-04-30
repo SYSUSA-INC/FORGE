@@ -37,7 +37,7 @@ export function UploadSolicitationForm() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!file) {
-      setError("Pick a PDF first.");
+      setError("Pick a file first.");
       return;
     }
     setError(null);
@@ -54,7 +54,7 @@ export function UploadSolicitationForm() {
   }
 
   return (
-    <Panel title="Upload" eyebrow="PDF · 25 MB cap (v1)">
+    <Panel title="Upload" eyebrow="PDF · DOCX · XLSX · PPTX · TXT · Image · 25 MB cap">
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <div
           onClick={pickFile}
@@ -75,7 +75,7 @@ export function UploadSolicitationForm() {
           }`}
         >
           <div className="font-display text-2xl font-semibold text-text">
-            {file ? file.name : "Drop a PDF here"}
+            {file ? file.name : "Drop a file here"}
           </div>
           <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
             {file
@@ -95,7 +95,7 @@ export function UploadSolicitationForm() {
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.txt,.md,text/plain,text/markdown,image/jpeg,image/jpg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
             className="sr-only"
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
