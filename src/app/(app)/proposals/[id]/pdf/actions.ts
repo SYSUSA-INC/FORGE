@@ -20,6 +20,10 @@ import {
 } from "@/lib/storage";
 import { renderProposalHtml } from "@/lib/pdf-template-render";
 import { renderProposalToDocx } from "@/lib/docx-render";
+import {
+  getDocxToPdfProvider,
+  getDocxToPdfProviderStatus,
+} from "@/lib/docx-to-pdf";
 
 export type PdfRenderResult =
   | {
@@ -412,6 +416,199 @@ export async function renderProposalDocxAction(
     downloadUrl,
     renderedAt: new Date().toISOString(),
   };
+}
+
+export type DocxAsPdfResult =
+  | {
+      ok: true;
+      id: string;
+      contentType: "pdf" | "docx";
+      byteSize: number;
+      downloadUrl: string;
+      renderedAt: string;
+      provider: string;
+      stubbed: boolean;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Phase 12d — render the proposal through the Word template AND
+ * convert the resulting .docx into a .pdf using the docx-to-pdf
+ * provider gateway. Preserves all the Word fidelity (header, footer,
+ * cover page, TOC, page numbering) since the conversion runs through
+ * an Office-grade renderer (CloudConvert / LibreOffice).
+ *
+ * If the conversion provider is in stub mode, we record + return the
+ * .docx bytes so the user still gets a usable file and the UI can
+ * tell them to set CLOUDCONVERT_API_KEY.
+ */
+export async function renderProposalDocxAsPdfAction(
+  proposalId: string,
+): Promise<DocxAsPdfResult> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  // Reuse the same loaders as the docx render. Inline duplication
+  // would be cleaner if extracted, but keeping symmetry with the
+  // existing docx flow makes this PR small and reviewable.
+  const [propRow] = await db
+    .select({ proposal: proposals, opportunity: opportunities })
+    .from(proposals)
+    .innerJoin(opportunities, eq(opportunities.id, proposals.opportunityId))
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!propRow) return { ok: false, error: "Proposal not found." };
+
+  if (!propRow.proposal.templateId) {
+    return {
+      ok: false,
+      error:
+        "This proposal has no template assigned. Pick a Word template under Settings → Templates first.",
+    };
+  }
+
+  const [template] = await db
+    .select()
+    .from(proposalTemplates)
+    .where(eq(proposalTemplates.id, propRow.proposal.templateId))
+    .limit(1);
+  if (!template) return { ok: false, error: "Template not found." };
+  if (template.kind !== "docx") {
+    return {
+      ok: false,
+      error:
+        "This template is in legacy HTML/CSS mode. Use the regular Generate button for HTML→PDF.",
+    };
+  }
+  if (!template.docxStoragePath) {
+    return {
+      ok: false,
+      error:
+        "Template has no .docx file uploaded yet. Upload one on the template settings page.",
+    };
+  }
+
+  const [orgRow] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!orgRow) return { ok: false, error: "Organization not found." };
+
+  const sections = await db
+    .select()
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId))
+    .orderBy(asc(proposalSections.ordering));
+
+  // Pull the template .docx bytes and render the proposal-as-docx.
+  const storage = getStorageProvider();
+  const templateObj = await storage.get(template.docxStoragePath);
+  if (!templateObj) {
+    return {
+      ok: false,
+      error:
+        "Template file bytes are no longer in storage — re-upload the .docx on the template settings page.",
+    };
+  }
+
+  const docxResult = renderProposalToDocx({
+    template,
+    templateBytes: templateObj.bytes,
+    proposal: propRow.proposal,
+    opportunity: propRow.opportunity,
+    organization: orgRow,
+    sections,
+  });
+  if (!docxResult.ok) return { ok: false, error: docxResult.error };
+
+  // Hand the rendered .docx to the conversion provider.
+  let converted;
+  try {
+    const provider = getDocxToPdfProvider();
+    converted = await provider.convert({
+      docxBytes: docxResult.bytes,
+      fileName: `${proposalId}.docx`,
+    });
+  } catch (err) {
+    console.error("[renderProposalDocxAsPdfAction] convert failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "DOCX→PDF conversion failed.",
+    };
+  }
+
+  // Persist whichever bytes we got. Stub mode returns the .docx —
+  // we mark contentType accordingly so the download endpoint serves
+  // it with the right MIME + extension.
+  const isPdf = converted.contentType === "application/pdf";
+  const renderId = crypto.randomUUID();
+  const ext = isPdf ? "pdf" : "docx";
+  const storageKey = `org/${organizationId}/proposal/${proposalId}/render/${renderId}.${ext}`;
+
+  let stored;
+  try {
+    stored = await storage.put({
+      key: storageKey,
+      bytes: converted.bytes,
+      contentType: converted.contentType,
+    });
+  } catch (err) {
+    console.error("[renderProposalDocxAsPdfAction] storage.put failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Storage write failed.",
+    };
+  }
+
+  const downloadUrl = `/api/proposals/${proposalId}/pdf/${renderId}`;
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60_000);
+
+  try {
+    await db.insert(proposalPdfRenders).values({
+      id: renderId,
+      proposalId,
+      organizationId,
+      templateId: template.id,
+      renderedByUserId: user.id,
+      storagePath: stored.storagePath,
+      contentType: ext,
+      byteSize: stored.byteSize,
+      pageCount: converted.pageCount ?? 0,
+      provider: converted.provider,
+      downloadUrl,
+      expiresAt,
+    });
+  } catch (err) {
+    console.error("[renderProposalDocxAsPdfAction] insert failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to record render.",
+    };
+  }
+
+  revalidatePath(`/proposals/${proposalId}`);
+  return {
+    ok: true,
+    id: renderId,
+    contentType: ext,
+    byteSize: stored.byteSize,
+    downloadUrl,
+    renderedAt: new Date().toISOString(),
+    provider: converted.provider,
+    stubbed: converted.stubbed,
+  };
+}
+
+/** DOCX→PDF provider status for the export panel banner. */
+export async function getDocxToPdfStatusAction() {
+  await requireAuth();
+  return getDocxToPdfProviderStatus();
 }
 
 /**
