@@ -1003,6 +1003,66 @@ export type SolicitationParseStatus =
 export type SolicitationType =
   (typeof solicitationTypeEnum.enumValues)[number];
 
+/**
+ * Per-solicitation team roles. Distinct from the org-level membership
+ * role (admin/capture/proposal/etc.) — these describe what a person
+ * does on THIS specific solicitation. A user can hold multiple
+ * solicitation roles on the same solicitation.
+ */
+export const solicitationRoleEnum = pgEnum("solicitation_role", [
+  "capture_lead",
+  "proposal_manager",
+  "technical_lead",
+  "pricing_lead",
+  "compliance_reviewer",
+  "color_team_reviewer",
+  "subject_matter_expert",
+  "contributor",
+  "observer",
+]);
+
+/**
+ * Phase 13a: solicitation team assignments.
+ *
+ * Capture managers assemble a team per solicitation — capture lead,
+ * tech lead, pricing lead, reviewers, SMEs. Each row links a user to
+ * a solicitation with a role and optional notes.
+ *
+ * Composite primary key on (solicitation_id, user_id, role) so the
+ * same user can hold multiple roles on one solicitation but not the
+ * same role twice.
+ */
+export const solicitationAssignments = pgTable(
+  "solicitation_assignment",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: solicitationRoleEnum("role").notNull(),
+    notes: text("notes").notNull().default(""),
+    assignedByUserId: text("assigned_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.solicitationId, t.userId, t.role] }),
+  }),
+);
+
+export type SolicitationAssignment =
+  typeof solicitationAssignments.$inferSelect;
+export type NewSolicitationAssignment =
+  typeof solicitationAssignments.$inferInsert;
+export type SolicitationRole =
+  (typeof solicitationRoleEnum.enumValues)[number];
+
 export const knowledgeKindEnum = pgEnum("knowledge_kind", [
   "capability",
   "past_performance",
