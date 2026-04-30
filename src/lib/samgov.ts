@@ -251,6 +251,12 @@ export type SamOpportunitySearchParams = {
    * etc.) without forcing the user to remember exact strings.
    */
   extraKeywords?: string[];
+  /**
+   * SAM.gov sometimes returns description as a URL pointing to a
+   * noticedesc endpoint. When true (default), we resolve those URLs
+   * into actual descriptions before returning.
+   */
+  enrichDescriptions?: boolean;
 };
 
 // GSA vehicle list lives in @/lib/gsa-vehicles so it can be safely
@@ -315,11 +321,13 @@ export async function searchSamGovOpportunities(
     postedTo: mmddyyyy(postedTo),
   });
 
-  // SAM.gov's `q` is a single string. To bias the search toward GSA
-  // vehicles (Polaris, OASIS+, …) we OR-merge them with the user's own
-  // keyword. Quoted vehicle names keep multi-word phrases intact.
+  // SAM.gov's `q` is a single string. We default to AND semantics on
+  // multi-word keywords by prefixing each token with "+" (Lucene-style
+  // required term). Multi-word phrases stay quoted so we don't break
+  // them apart. Vehicle hints OR into the same query.
+  const userKeyword = input.keyword?.trim() ?? "";
   const keywordParts: string[] = [];
-  if (input.keyword) keywordParts.push(input.keyword);
+  if (userKeyword) keywordParts.push(buildAndKeyword(userKeyword));
   if (input.extraKeywords && input.extraKeywords.length > 0) {
     const quoted = input.extraKeywords
       .map((k) => k.trim())
@@ -352,16 +360,199 @@ export async function searchSamGovOpportunities(
       totalRecords?: number;
       opportunitiesData?: SamOpportunity[];
     };
-    const ops = (data.opportunitiesData ?? []).filter((o) =>
+    let ops = (data.opportunitiesData ?? []).filter((o) =>
       input.activeOnly === false ? true : o.active === "Yes",
     );
-    return { ok: true, opportunities: ops, totalRecords: data.totalRecords ?? ops.length };
+
+    // SAM.gov frequently returns the description as a URL pointing to
+    // /v1/noticedesc?noticeid=… instead of inline text. Enrich those
+    // entries by fetching the actual description so the UI doesn't show
+    // a raw URL and downstream relevance filtering has something to
+    // work with. Limit concurrency so we don't hammer the upstream.
+    if (input.enrichDescriptions !== false) {
+      ops = await enrichDescriptions(ops, key);
+    }
+
+    // Post-fetch relevance gate. SAM.gov's `q` fuzzy-matches and often
+    // returns weakly-related results when only a NAICS is set. If the
+    // caller passed a keyword, drop entries whose title + description +
+    // agency don't actually contain ALL of the search tokens.
+    let totalAfterFilter = data.totalRecords ?? ops.length;
+    if (userKeyword) {
+      const before = ops.length;
+      ops = filterByKeywordRelevance(ops, userKeyword);
+      totalAfterFilter = ops.length;
+      if (before !== ops.length) {
+        // Soft-log; not user-facing here.
+        console.info(
+          `[samgov] keyword "${userKeyword}" filtered ${before - ops.length} of ${before} results`,
+        );
+      }
+    }
+
+    return {
+      ok: true,
+      opportunities: ops,
+      totalRecords: totalAfterFilter,
+    };
   } catch (err) {
     return {
       ok: false,
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/**
+ * Compose a Lucene-style AND query from a user keyword. Quoted phrases
+ * stay quoted (`"zero trust" deployment` becomes `+"zero trust" +deployment`).
+ * Single tokens get a leading `+` so SAM.gov requires them.
+ */
+function buildAndKeyword(input: string): string {
+  // Pull out quoted phrases first.
+  const tokens: string[] = [];
+  const trimmed = input.trim();
+  const quotedRegex = /"([^"]+)"/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = quotedRegex.exec(trimmed)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push(...trimmed.slice(lastIndex, match.index).trim().split(/\s+/));
+    }
+    tokens.push(`"${match[1]}"`);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < trimmed.length) {
+    tokens.push(...trimmed.slice(lastIndex).trim().split(/\s+/));
+  }
+
+  const cleaned = tokens
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+    .map((t) => (t.startsWith("+") || t.startsWith("-") ? t : `+${t}`));
+  return cleaned.join(" ");
+}
+
+/**
+ * Resolve description URLs into actual descriptions. Caps concurrency
+ * at 4 so large result sets don't fan out into 50 requests at once.
+ */
+async function enrichDescriptions(
+  ops: SamOpportunity[],
+  apiKey: string,
+): Promise<SamOpportunity[]> {
+  const needsFetch = ops
+    .map((op, i) => ({ op, i }))
+    .filter(({ op }) => isUrl(op.description));
+
+  if (needsFetch.length === 0) return ops;
+
+  const out = ops.slice();
+  const queue = needsFetch.slice();
+  const concurrency = 4;
+
+  async function worker(): Promise<void> {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item) return;
+      try {
+        const fetched = await fetchNoticeDescription(item.op, apiKey);
+        if (fetched) {
+          out[item.i] = { ...item.op, description: fetched };
+        } else {
+          // Couldn't resolve — drop the URL so the UI doesn't show it.
+          out[item.i] = { ...item.op, description: "" };
+        }
+      } catch (err) {
+        console.warn("[samgov] noticedesc fetch failed", err);
+        out[item.i] = { ...item.op, description: "" };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  return out;
+}
+
+function isUrl(s: string | null | undefined): boolean {
+  if (!s) return false;
+  return /^https?:\/\//i.test(s.trim());
+}
+
+async function fetchNoticeDescription(
+  op: SamOpportunity,
+  apiKey: string,
+): Promise<string> {
+  // Two paths: the description field IS the URL, or we synthesize one
+  // from noticeId. Some payloads only give us the URL.
+  const url = op.description?.trim();
+  let target = "";
+  if (url && isUrl(url)) {
+    // Append api_key if not present.
+    target = url.includes("api_key=")
+      ? url
+      : url + (url.includes("?") ? "&" : "?") + "api_key=" + encodeURIComponent(apiKey);
+  } else if (op.noticeId) {
+    target = `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=${encodeURIComponent(op.noticeId)}&api_key=${encodeURIComponent(apiKey)}`;
+  } else {
+    return "";
+  }
+
+  const res = await fetch(target, { cache: "no-store" });
+  if (!res.ok) return "";
+  const body = await res.text();
+  // Response shape: { description: "..." } — sometimes plain text.
+  try {
+    const json = JSON.parse(body) as { description?: string };
+    return (json.description ?? "").trim();
+  } catch {
+    return body.trim();
+  }
+}
+
+/**
+ * Drop results that don't actually contain the user's keyword tokens
+ * in title / description / agency. Quoted phrases must appear verbatim;
+ * single tokens just need to appear somewhere in the searchable text.
+ */
+function filterByKeywordRelevance(
+  ops: SamOpportunity[],
+  keyword: string,
+): SamOpportunity[] {
+  const tokens = parseKeywordTokens(keyword);
+  if (tokens.length === 0) return ops;
+
+  return ops.filter((op) => {
+    const haystack = [
+      op.title ?? "",
+      op.description ?? "",
+      op.department ?? "",
+      op.subTier ?? "",
+      op.office ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return tokens.every((t) => haystack.includes(t.toLowerCase()));
+  });
+}
+
+function parseKeywordTokens(keyword: string): string[] {
+  const tokens: string[] = [];
+  const quotedRegex = /"([^"]+)"/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = quotedRegex.exec(keyword)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push(...keyword.slice(lastIndex, match.index).trim().split(/\s+/));
+    }
+    tokens.push(match[1]!);
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < keyword.length) {
+    tokens.push(...keyword.slice(lastIndex).trim().split(/\s+/));
+  }
+  return tokens.map((t) => t.trim()).filter((t) => t.length > 1);
 }
 
 export type SamEntitySearchResult = {
