@@ -143,7 +143,26 @@ export const KNOWN_TEMPLATE_VARIABLES: { key: string; description: string }[] = 
   { key: "primaryContactPhone", description: "POC phone" },
   { key: "primaryContactEmail", description: "POC email" },
 
-  { key: "sections", description: "Loop variable: {#sections}{title}{body}{/sections}" },
+  {
+    key: "sections",
+    description:
+      "Loop variable. Use {body} for plain text or {@bodyXml} for rich Word formatting (headings, bold, lists).",
+  },
+  {
+    key: "title",
+    description:
+      "Inside {#sections}…{/sections}: the section title (escape-safe).",
+  },
+  {
+    key: "body",
+    description:
+      "Inside {#sections}…{/sections}: plain-text body (escape-safe).",
+  },
+  {
+    key: "@bodyXml",
+    description:
+      "Inside {#sections}…{/sections}: rich Word body — preserves headings, bold/italic, and lists.",
+  },
 ];
 
 /**
