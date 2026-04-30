@@ -849,6 +849,20 @@ export type ProposalDebriefStatus =
 export type ProposalDebriefFormat =
   (typeof proposalDebriefFormatEnum.enumValues)[number];
 
+/**
+ * Templates can be either:
+ *   - "docx": user uploads a real Word template (header, footer,
+ *     graphics, cover page, TOC, page numbers all baked into the
+ *     .docx). Variables substitute via docxtemplater on render.
+ *     This is the v2 / preferred path.
+ *   - "html": legacy HTML/CSS rendered through the PDF pipeline.
+ *     Kept for backwards-compat; new templates default to docx.
+ */
+export const proposalTemplateKindEnum = pgEnum("proposal_template_kind", [
+  "html",
+  "docx",
+]);
+
 export const proposalTemplates = pgTable("proposal_template", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -859,11 +873,29 @@ export const proposalTemplates = pgTable("proposal_template", {
   isDefault: boolean("is_default").notNull().default(false),
   archivedAt: timestamp("archived_at"),
 
-  // HTML/CSS template content (for the future PDF chapter)
+  kind: proposalTemplateKindEnum("kind").notNull().default("html"),
+
+  // === HTML/CSS path (legacy) ===
+  // Kept for templates created before the docx pipeline. New templates
+  // should pick `kind: "docx"` and leave these empty.
   coverHtml: text("cover_html").notNull().default(""),
   headerHtml: text("header_html").notNull().default(""),
   footerHtml: text("footer_html").notNull().default(""),
   pageCss: text("page_css").notNull().default(""),
+
+  // === DOCX path (preferred) ===
+  // Storage path of the uploaded .docx, plus original filename + size
+  // for display. variablesDetected lists the {placeholder} names we
+  // pulled from the document on upload — surfaced in the UI as a
+  // "variables found" check so the user knows what'll be substituted.
+  docxStoragePath: text("docx_storage_path").notNull().default(""),
+  docxFileName: text("docx_file_name").notNull().default(""),
+  docxFileSize: integer("docx_file_size").notNull().default(0),
+  docxUploadedAt: timestamp("docx_uploaded_at"),
+  variablesDetected: jsonb("variables_detected")
+    .$type<string[]>()
+    .notNull()
+    .default([]),
 
   // Section seed list — array of { kind, title, ordering }
   sectionSeed: jsonb("section_seed")
@@ -871,7 +903,7 @@ export const proposalTemplates = pgTable("proposal_template", {
     .notNull()
     .default([]),
 
-  // Branding tokens
+  // Branding tokens (still useful for HTML kind + PDF wrapper).
   brandPrimary: text("brand_primary").notNull().default("#2DD4BF"),
   brandAccent: text("brand_accent").notNull().default("#EC4899"),
   fontDisplay: text("font_display").notNull().default("Inter"),
@@ -884,6 +916,9 @@ export const proposalTemplates = pgTable("proposal_template", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export type ProposalTemplateKind =
+  (typeof proposalTemplateKindEnum.enumValues)[number];
 
 export type TemplateSectionSeed = {
   kind: ProposalSectionKind;
