@@ -14,6 +14,7 @@ import {
   type RunRow,
 } from "./actions";
 import { embedArtifactAction } from "../embed-actions";
+import { reextractArtifactTextAction } from "../actions";
 
 const KIND_LABELS: Record<CandidateRow["kind"], string> = {
   capability: "Capability",
@@ -98,6 +99,24 @@ export function CandidateReviewClient({
     });
   }
 
+  function reextract() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await reextractArtifactTextAction(artifactId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setNotice(
+        res.chars === 0
+          ? "Re-extracted — no text was produced. Check the artifact contents."
+          : `Re-extracted ${res.chars.toLocaleString()} characters.`,
+      );
+      router.refresh();
+    });
+  }
+
   function approveAll() {
     if (pendingCandidates.length === 0) return;
     if (
@@ -149,6 +168,15 @@ export function CandidateReviewClient({
             }
           >
             {pending ? "Working…" : lastRun ? "Re-run extraction" : "Run extraction"}
+          </button>
+          <button
+            type="button"
+            onClick={reextract}
+            disabled={pending}
+            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+            title="Re-run text extraction (useful for image artifacts whose first OCR pass failed, or when ANTHROPIC_API_KEY was added after upload)."
+          >
+            Re-extract text
           </button>
           {pendingCandidates.length > 0 ? (
             <button
