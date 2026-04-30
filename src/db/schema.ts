@@ -243,6 +243,45 @@ export type NewAllowlist = typeof allowlist.$inferInsert;
 export type Role = (typeof roleEnum.enumValues)[number];
 export type MembershipStatus = (typeof membershipStatusEnum.enumValues)[number];
 
+/**
+ * Phase 13c — OAuth email-from-sender.
+ *
+ * Stores OAuth credentials so a user can send platform emails (review
+ * requests, assignment pings, debrief invites) from their own Gmail
+ * or Microsoft mailbox instead of the platform's noreply address.
+ *
+ * Tokens are encrypted at rest via AES-256-GCM using EMAIL_ENCRYPTION_KEY.
+ * Never read these columns in plain SQL — always go through
+ * src/lib/email-oauth.ts which handles encrypt/decrypt + refresh.
+ */
+export const emailOauthProviderEnum = pgEnum("email_oauth_provider", [
+  "google",
+  "microsoft",
+]);
+
+export const emailOauthAccounts = pgTable("email_oauth_account", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: emailOauthProviderEnum("provider").notNull(),
+  emailAddress: text("email_address").notNull(),
+  // base64(iv + tag + ciphertext) — never log these.
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  refreshTokenEncrypted: text("refresh_token_encrypted").notNull().default(""),
+  scope: text("scope").notNull().default(""),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  isDefault: boolean("is_default").notNull().default(false),
+  connectedAt: timestamp("connected_at").notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at"),
+  lastError: text("last_error").notNull().default(""),
+});
+
+export type EmailOauthAccount = typeof emailOauthAccounts.$inferSelect;
+export type NewEmailOauthAccount = typeof emailOauthAccounts.$inferInsert;
+export type EmailOauthProvider =
+  (typeof emailOauthProviderEnum.enumValues)[number];
+
 export const opportunities = pgTable("opportunity", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
