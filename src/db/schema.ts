@@ -305,6 +305,58 @@ export const opportunityActivities = pgTable("opportunity_activity", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const opportunityReviewRecommendationEnum = pgEnum(
+  "opportunity_review_recommendation",
+  ["pending", "bid", "no_bid", "more_info"],
+);
+
+/**
+ * Quick-action review request — capture manager sends an opportunity
+ * to a teammate (or external email) for a Bid / No-bid / More-info
+ * recommendation. The token-authed magic link works without a login
+ * so external reviewers can answer too.
+ */
+export const opportunityReviewRequests = pgTable(
+  "opportunity_review_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    senderUserId: text("sender_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // Set when reviewer is an in-platform user. Nullable for external.
+    reviewerUserId: text("reviewer_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // Always populated — used for both in-platform and external addressing.
+    reviewerEmail: text("reviewer_email").notNull(),
+    reviewerName: text("reviewer_name").notNull().default(""),
+    // Opaque random token. Index is unique so lookups can be cheap.
+    token: text("token").notNull().unique(),
+    note: text("note").notNull().default(""),
+    expiresAt: timestamp("expires_at").notNull(),
+    completedAt: timestamp("completed_at"),
+    recommendation: opportunityReviewRecommendationEnum("recommendation")
+      .notNull()
+      .default("pending"),
+    comment: text("comment").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);
+
+export type OpportunityReviewRequest =
+  typeof opportunityReviewRequests.$inferSelect;
+export type NewOpportunityReviewRequest =
+  typeof opportunityReviewRequests.$inferInsert;
+export type OpportunityReviewRecommendation =
+  (typeof opportunityReviewRecommendationEnum.enumValues)[number];
+
 export const opportunityCompetitors = pgTable("opportunity_competitor", {
   id: uuid("id").primaryKey().defaultRandom(),
   opportunityId: uuid("opportunity_id")
@@ -649,6 +701,7 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "review_section_assigned",
   "review_comment_mentioned",
   "review_completed",
+  "opportunity_review_completed",
 ]);
 
 export const notifications = pgTable("notification", {

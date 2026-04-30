@@ -23,6 +23,9 @@ export const authConfig = {
       if (pathname.startsWith("/api/forgot-password")) return true;
       if (pathname.startsWith("/api/reset-password")) return true;
       if (pathname.startsWith("/api/samgov/health")) return true;
+      // Token-authed public review page — opportunity review requests
+      // can be answered by reviewers who don't have a FORGE account.
+      if (pathname.startsWith("/review/")) return true;
 
       return !!auth?.user;
     },

@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
 import { OpportunityTabs } from "./OpportunityTabs";
 import { DeleteOpportunityButton } from "./DeleteOpportunityButton";
+import { SendForReviewButton } from "./review/SendForReviewButton";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function OpportunityDetailLayout({
             <Link href="/opportunities" className="aur-btn aur-btn-ghost">
               Back
             </Link>
+            <SendForReviewButton opportunityId={opp.id} />
             <DeleteOpportunityButton id={opp.id} title={opp.title} />
           </>
         }

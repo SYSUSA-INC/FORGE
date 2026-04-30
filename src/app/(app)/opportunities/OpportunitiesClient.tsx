@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { OpportunityStage } from "@/db/schema";
+import { SendForReviewButton } from "./[id]/review/SendForReviewButton";
 
 type Opp = {
   id: string;
@@ -173,11 +174,8 @@ function OppRow({ o }: { o: Opp }) {
     : null;
 
   return (
-    <Link
-      href={`/opportunities/${o.id}`}
-      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 transition-colors hover:border-white/20 md:grid-cols-[1fr_auto_auto_auto_auto]"
-    >
-      <div className="min-w-0">
+    <div className="grid grid-cols-1 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 transition-colors hover:border-white/20 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+      <Link href={`/opportunities/${o.id}`} className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">
           {o.title}
         </div>
@@ -185,7 +183,7 @@ function OppRow({ o }: { o: Opp }) {
           {o.agency || "—"}
           {o.solicitationNumber ? ` · ${o.solicitationNumber}` : ""}
         </div>
-      </div>
+      </Link>
       <span
         className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em]"
         style={{
@@ -210,6 +208,7 @@ function OppRow({ o }: { o: Opp }) {
           {o.owner ? (o.owner.name ?? o.owner.email) : "Unassigned"}
         </div>
       </div>
-    </Link>
+      <SendForReviewButton opportunityId={o.id} size="sm" />
+    </div>
   );
 }
