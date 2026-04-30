@@ -19,6 +19,7 @@ import {
   getStorageProviderStatus,
 } from "@/lib/storage";
 import { renderProposalHtml } from "@/lib/pdf-template-render";
+import { renderProposalToDocx } from "@/lib/docx-render";
 
 export type PdfRenderResult =
   | {
@@ -250,5 +251,209 @@ export async function getProviderStatusAction() {
   return {
     pdf: getPdfProviderStatus(),
     storage: getStorageProviderStatus(),
+  };
+}
+
+export type DocxRenderActionResult =
+  | {
+      ok: true;
+      id: string;
+      byteSize: number;
+      downloadUrl: string;
+      renderedAt: string;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Generate a .docx export of the proposal using the template's
+ * uploaded Word file (Phase 12a). docxtemplater fills the placeholders
+ * and we persist + return a download URL through the existing
+ * proposal_pdf_render row + /api/proposals/.../pdf/... route. The
+ * route already content-type-switches by the row's `contentType`.
+ */
+export async function renderProposalDocxAction(
+  proposalId: string,
+): Promise<DocxRenderActionResult> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  // Pull proposal + opportunity inline; we need the opportunity for
+  // agency / NAICS / set-aside variables.
+  const [propRow] = await db
+    .select({ proposal: proposals, opportunity: opportunities })
+    .from(proposals)
+    .innerJoin(opportunities, eq(opportunities.id, proposals.opportunityId))
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!propRow) return { ok: false, error: "Proposal not found." };
+
+  if (!propRow.proposal.templateId) {
+    return {
+      ok: false,
+      error:
+        "This proposal has no template assigned. Pick a Word template under Settings → Templates first.",
+    };
+  }
+
+  const [template] = await db
+    .select()
+    .from(proposalTemplates)
+    .where(eq(proposalTemplates.id, propRow.proposal.templateId))
+    .limit(1);
+  if (!template) return { ok: false, error: "Template not found." };
+
+  if (template.kind !== "docx") {
+    return {
+      ok: false,
+      error:
+        "This template is in legacy HTML/CSS mode. Switch it to Word and upload a .docx, then try again.",
+    };
+  }
+  if (!template.docxStoragePath) {
+    return {
+      ok: false,
+      error:
+        "Template has no .docx file uploaded yet. Upload one on the template settings page.",
+    };
+  }
+
+  const [orgRow] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!orgRow) return { ok: false, error: "Organization not found." };
+
+  const sections = await db
+    .select()
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId))
+    .orderBy(asc(proposalSections.ordering));
+
+  // Pull template bytes from storage. If the storage provider is the
+  // memory stub and the bytes are gone (post-deploy), surface a clear
+  // error rather than crashing.
+  const storage = getStorageProvider();
+  const templateObj = await storage.get(template.docxStoragePath);
+  if (!templateObj) {
+    return {
+      ok: false,
+      error:
+        "Template file bytes are no longer in storage — re-upload the .docx on the template settings page. (Memory storage doesn't survive redeploys.)",
+    };
+  }
+
+  // Render. Synchronous + cheap (docxtemplater runs in-memory).
+  const result = renderProposalToDocx({
+    template,
+    templateBytes: templateObj.bytes,
+    proposal: propRow.proposal,
+    opportunity: propRow.opportunity,
+    organization: orgRow,
+    sections,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  // Persist to storage so downloads can be served via the same route.
+  const renderId = crypto.randomUUID();
+  const storageKey = `org/${organizationId}/proposal/${proposalId}/render/${renderId}.docx`;
+  let stored;
+  try {
+    stored = await storage.put({
+      key: storageKey,
+      bytes: result.bytes,
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+  } catch (err) {
+    console.error("[renderProposalDocxAction] storage.put failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Storage write failed.",
+    };
+  }
+
+  const downloadUrl = `/api/proposals/${proposalId}/pdf/${renderId}`;
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60_000);
+
+  try {
+    await db.insert(proposalPdfRenders).values({
+      id: renderId,
+      proposalId,
+      organizationId,
+      templateId: template.id,
+      renderedByUserId: user.id,
+      storagePath: stored.storagePath,
+      contentType: "docx",
+      byteSize: stored.byteSize,
+      pageCount: 0, // Word doesn't expose final page count without rendering; left as 0.
+      provider: "docxtemplater",
+      downloadUrl,
+      expiresAt,
+    });
+  } catch (err) {
+    console.error("[renderProposalDocxAction] insert failed", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to record render.",
+    };
+  }
+
+  revalidatePath(`/proposals/${proposalId}`);
+  return {
+    ok: true,
+    id: renderId,
+    byteSize: stored.byteSize,
+    downloadUrl,
+    renderedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Lightweight check for the export panel — tells the UI whether the
+ * proposal's template supports the .docx render path so we can show
+ * the right buttons.
+ */
+export async function getProposalExportCapabilityAction(
+  proposalId: string,
+): Promise<{
+  hasDocxTemplate: boolean;
+  hasHtmlTemplate: boolean;
+  templateName: string;
+}> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const [row] = await db
+    .select({
+      kind: proposalTemplates.kind,
+      docxStoragePath: proposalTemplates.docxStoragePath,
+      name: proposalTemplates.name,
+    })
+    .from(proposals)
+    .innerJoin(
+      proposalTemplates,
+      eq(proposalTemplates.id, proposals.templateId),
+    )
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  if (!row) {
+    return { hasDocxTemplate: false, hasHtmlTemplate: false, templateName: "" };
+  }
+  return {
+    hasDocxTemplate: row.kind === "docx" && row.docxStoragePath !== "",
+    hasHtmlTemplate: row.kind === "html",
+    templateName: row.name,
   };
 }

@@ -48,16 +48,31 @@ export async function GET(
     );
   }
 
-  const isPdf = row.contentType === "pdf";
-  const contentType = isPdf ? "application/pdf" : "text/html; charset=utf-8";
-  const filename = `proposal-${row.proposalId}-${row.id}.${isPdf ? "pdf" : "html"}`;
+  const ct = row.contentType;
+  const map: Record<
+    string,
+    { contentType: string; ext: string }
+  > = {
+    pdf: { contentType: "application/pdf", ext: "pdf" },
+    html: { contentType: "text/html; charset=utf-8", ext: "html" },
+    docx: {
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ext: "docx",
+    },
+  };
+  const meta = map[ct] ?? map.html!;
+  const filename = `proposal-${row.proposalId}-${row.id}.${meta.ext}`;
+  // Word docs need to download (not render inline) to behave well in
+  // the browser. PDFs render inline.
+  const disposition = ct === "docx" ? "attachment" : "inline";
 
   return new NextResponse(Buffer.from(obj.bytes), {
     status: 200,
     headers: {
-      "content-type": contentType,
+      "content-type": meta.contentType,
       "content-length": String(row.byteSize),
-      "content-disposition": `inline; filename="${filename}"`,
+      "content-disposition": `${disposition}; filename="${filename}"`,
       "cache-control": "private, no-store",
     },
   });
