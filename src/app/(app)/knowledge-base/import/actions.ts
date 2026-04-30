@@ -18,6 +18,8 @@ import {
   type ExtractFormat,
 } from "@/lib/text-extract";
 import { extractTextFromPdf } from "@/lib/solicitation-extract";
+import { extractTextFromImageViaVision } from "@/lib/image-ocr";
+import type { AIDocumentMedia } from "@/lib/ai";
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB cap; corpus runs bigger than solicitations.
 const RAW_TEXT_CAP = 500_000;
