@@ -1127,6 +1127,12 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   // proposal section drafter / template. Keeps the autonomy ladder honest
   // about which assets actually get used.
   reuseCount: integer("reuse_count").notNull().default(0),
+  // Phase 10f: real embedding for semantic Brain Suggest. Stored as
+  // text on the JS side; the actual column type is `vector(1536)` —
+  // see drizzle/0023 migration. Same provider/dim as the chunk
+  // table so we don't have to recreate the column to swap.
+  embedding: text("embedding"),
+  embeddedAt: timestamp("embedded_at"),
   archivedAt: timestamp("archived_at"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
@@ -1230,3 +1236,155 @@ export type KnowledgeArtifactSource =
   (typeof knowledgeArtifactSourceEnum.enumValues)[number];
 export type KnowledgeArtifactStatus =
   (typeof knowledgeArtifactStatusEnum.enumValues)[number];
+
+/**
+ * Phase 10c — Brain extraction pipeline.
+ *
+ * The Brain reads each knowledge_artifact and proposes structured
+ * knowledge_entry candidates (capabilities, past performance, named
+ * personnel, boilerplate). Candidates land in a review queue; the
+ * user approves or rejects each one. Approved candidates are promoted
+ * to knowledge_entry rows so the existing UI surfaces them.
+ *
+ * extraction_run captures one AI pass over an artifact (prompt
+ * version, model, status, count) so we can re-run when a prompt
+ * improves and see what changed.
+ */
+export const knowledgeExtractionRunStatusEnum = pgEnum(
+  "knowledge_extraction_run_status",
+  ["queued", "running", "completed", "failed"],
+);
+
+export const knowledgeExtractionDecisionEnum = pgEnum(
+  "knowledge_extraction_decision",
+  ["pending", "approved", "rejected", "merged"],
+);
+
+export const knowledgeExtractionRuns = pgTable("knowledge_extraction_run", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  artifactId: uuid("artifact_id")
+    .notNull()
+    .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
+  status: knowledgeExtractionRunStatusEnum("status")
+    .notNull()
+    .default("queued"),
+  promptVersion: text("prompt_version").notNull().default("v1"),
+  provider: text("provider").notNull().default(""),
+  model: text("model").notNull().default(""),
+  candidateCount: integer("candidate_count").notNull().default(0),
+  errorMessage: text("error_message").notNull().default(""),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  startedByUserId: text("started_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const knowledgeExtractionCandidates = pgTable(
+  "knowledge_extraction_candidate",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => knowledgeExtractionRuns.id, { onDelete: "cascade" }),
+    artifactId: uuid("artifact_id")
+      .notNull()
+      .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
+    // Mirrors knowledge_kind so approved candidates can be promoted
+    // straight into knowledge_entry without translation.
+    kind: knowledgeKindEnum("kind").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    // The slice of artifact text the AI used as evidence — surfaced in
+    // the review UI so reviewers can verify before approving.
+    sourceExcerpt: text("source_excerpt").notNull().default(""),
+    decision: knowledgeExtractionDecisionEnum("decision")
+      .notNull()
+      .default("pending"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at"),
+    // Once approved + promoted to a knowledge_entry, this records the
+    // resulting entry id so we can avoid double-promotion and link
+    // back from the review UI.
+    promotedEntryId: uuid("promoted_entry_id").references(
+      () => knowledgeEntries.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);
+
+export type KnowledgeExtractionRun =
+  typeof knowledgeExtractionRuns.$inferSelect;
+export type NewKnowledgeExtractionRun =
+  typeof knowledgeExtractionRuns.$inferInsert;
+export type KnowledgeExtractionRunStatus =
+  (typeof knowledgeExtractionRunStatusEnum.enumValues)[number];
+export type KnowledgeExtractionCandidate =
+  typeof knowledgeExtractionCandidates.$inferSelect;
+export type NewKnowledgeExtractionCandidate =
+  typeof knowledgeExtractionCandidates.$inferInsert;
+export type KnowledgeExtractionDecision =
+  (typeof knowledgeExtractionDecisionEnum.enumValues)[number];
+
+/**
+ * Phase 10d — semantic search across the corpus.
+ *
+ * Each artifact's raw_text is split into ~2k-char chunks with overlap
+ * and each chunk gets a 1536-dim embedding (OpenAI text-embedding-3-
+ * small in live mode; deterministic stub vectors in stub mode so the
+ * UI is testable without an API key).
+ *
+ * Cosine similarity queries run via raw SQL using pgvector's `<=>`
+ * operator. The migration enables the extension and creates an
+ * IVFFlat index. Drizzle treats the `embedding` column as text on
+ * the JS side and we serialize/deserialize the array ourselves.
+ */
+export const KNOWLEDGE_EMBEDDING_DIM = 1536;
+
+export const knowledgeArtifactChunks = pgTable("knowledge_artifact_chunk", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  artifactId: uuid("artifact_id")
+    .notNull()
+    .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
+  chunkIndex: integer("chunk_index").notNull(),
+  content: text("content").notNull(),
+  // Stored as text on the Drizzle side because pgvector isn't a
+  // first-class drizzle type. The actual column type is
+  // `vector(1536)` — the migration creates it. Reads parse JSON;
+  // writes serialize via `[1.0,2.0,...]::vector` casts in raw SQL.
+  embedding: text("embedding"),
+  tokenCount: integer("token_count").notNull().default(0),
+  charStart: integer("char_start").notNull().default(0),
+  charEnd: integer("char_end").notNull().default(0),
+  embeddingProvider: text("embedding_provider").notNull().default(""),
+  embeddingModel: text("embedding_model").notNull().default(""),
+  embeddedAt: timestamp("embedded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type KnowledgeArtifactChunk =
+  typeof knowledgeArtifactChunks.$inferSelect;
+export type NewKnowledgeArtifactChunk =
+  typeof knowledgeArtifactChunks.$inferInsert;

@@ -4,6 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import type { KnowledgeKind } from "@/db/schema";
 import { listKnowledgeEntriesAction } from "./actions";
+import { EmbedMissingEntriesButton } from "./EmbedMissingEntriesButton";
 import { KnowledgeBaseClient } from "./KnowledgeBaseClient";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export default async function KnowledgeBasePage({
         subtitle="Capabilities, past performance references, named personnel, and boilerplate text — searchable and tag-filtered. Used as grounding when the AI section drafter writes against your real assets."
         actions={
           <>
+            <EmbedMissingEntriesButton />
             <Link
               href="/knowledge-base/import"
               className="aur-btn aur-btn-ghost"
