@@ -17,6 +17,14 @@ import {
   validateOrgProfile,
   type OrgProfileErrors,
 } from "@/lib/validators";
+import type {
+  AIEngineStatus,
+  IntegrationStatus,
+  MembersSummary,
+} from "@/lib/settings-status";
+import { AIEngineTab } from "./AIEngineTab";
+import { IntegrationsTab } from "./IntegrationsTab";
+import { UsersRolesTab } from "./UsersRolesTab";
 import {
   applySamGovSyncAction,
   saveOrgProfileAction,
@@ -41,9 +49,15 @@ function newId(prefix: string): string {
 export function SettingsClient({
   initialProfile,
   canEdit,
+  members,
+  integrations,
+  aiStatus,
 }: {
   initialProfile: OrgProfile;
   canEdit: boolean;
+  members: MembersSummary;
+  integrations: IntegrationStatus[];
+  aiStatus: AIEngineStatus;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("organization");
@@ -151,9 +165,11 @@ export function SettingsClient({
           errors={errors}
         />
       )}
-      {tab === "users" && <PlaceholderTab title="Users & Roles" />}
-      {tab === "integrations" && <PlaceholderTab title="Integrations" />}
-      {tab === "ai" && <PlaceholderTab title="AI Engine" />}
+      {tab === "users" && <UsersRolesTab members={members} />}
+      {tab === "integrations" && (
+        <IntegrationsTab integrations={integrations} />
+      )}
+      {tab === "ai" && <AIEngineTab status={aiStatus} />}
     </>
   );
 }
@@ -829,16 +845,6 @@ function PastPerformancePanel({
           ))}
         </ul>
       )}
-    </Panel>
-  );
-}
-
-function PlaceholderTab({ title }: { title: string }) {
-  return (
-    <Panel title={title} eyebrow="Coming soon">
-      <div className="font-mono text-[12px] text-muted">
-        This area will be configured in a later phase.
-      </div>
     </Panel>
   );
 }
