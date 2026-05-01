@@ -31,7 +31,7 @@ export type SendReviewRequestResult =
   | { ok: false; error: string };
 
 const TOKEN_BYTES = 24; // ~32 chars after base64url
-const TOKEN_TTL_DAYS = 14;
+const TOKEN_TTL_HOURS = 72;
 
 export async function sendOpportunityReviewRequestAction(
   input: SendReviewRequestInput,
@@ -97,8 +97,7 @@ export async function sendOpportunityReviewRequestAction(
     .limit(1);
 
   const token = randomBytes(TOKEN_BYTES).toString("base64url");
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + TOKEN_TTL_DAYS);
+  const expiresAt = new Date(Date.now() + TOKEN_TTL_HOURS * 60 * 60 * 1000);
 
   const note = (input.note ?? "").trim().slice(0, 2000);
 
@@ -139,6 +138,7 @@ export async function sendOpportunityReviewRequestAction(
       to: reviewerEmail,
       reviewerName,
       senderName: sender.name ?? sender.email ?? "A teammate",
+      senderEmail: sender.email ?? "",
       organizationName: org?.name ?? "your organization",
       opportunityTitle: opp.title,
       agency: opp.agency,
