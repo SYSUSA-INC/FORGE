@@ -4,6 +4,8 @@ import { FormEvent, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import type { AuditEvent } from "@/lib/admin-audit";
+import { AuditLogTab } from "./AuditLogTab";
 import {
   createOrganizationAction,
   deleteOrganizationAction,
@@ -48,18 +50,20 @@ type Stats = {
   pendingAdminInvites: number;
 };
 
-type Tab = "overview" | "organizations" | "users";
+type Tab = "overview" | "organizations" | "users" | "audit";
 
 export function AdminClient({
   currentUserId,
   orgs,
   users,
   stats,
+  auditEvents,
 }: {
   currentUserId: string;
   orgs: OrgRow[];
   users: UserRow[];
   stats: Stats;
+  auditEvents: AuditEvent[];
 }) {
   const [tab, setTab] = useState<Tab>("organizations");
 
@@ -67,6 +71,7 @@ export function AdminClient({
     { key: "overview", label: "Overview" },
     { key: "organizations", label: "Organizations" },
     { key: "users", label: "Platform users" },
+    { key: "audit", label: "Audit log" },
   ];
 
   return (
@@ -108,6 +113,7 @@ export function AdminClient({
         <OrganizationsTab orgs={orgs} currentUserId={currentUserId} />
       )}
       {tab === "users" && <UsersTab users={users} currentUserId={currentUserId} />}
+      {tab === "audit" && <AuditLogTab events={auditEvents} />}
     </>
   );
 }
@@ -120,9 +126,6 @@ function OverviewTab({ stats }: { stats: Stats }) {
         <StatTile label="Active orgs" value={stats.activeOrgs} />
         <StatTile label="Users" value={stats.userCount} />
         <StatTile label="Active users" value={stats.activeUsers} />
-      </div>
-      <div className="mt-4 rounded-md border border-dashed border-white/10 px-3 py-2 font-mono text-[11px] text-muted">
-        Audit log and cross-org activity feed ship in a later release.
       </div>
     </Panel>
   );
