@@ -427,16 +427,15 @@ export async function sendOpportunityReviewRequestEmail(opts: {
     </p>
   `;
 
-  // From line: keep the platform domain (DKIM-aligned) but personalize
-  // the display name so the reviewer sees who it's actually from. Set
-  // Reply-To to the sender's real email so replies land on the human.
-  const fromName = `${opts.senderName} (via FORGE)`.replace(/[<>"]/g, "");
+  // From line: platform brand. The sender's identity is conveyed in
+  // the body ("[Sender Name] from [Sender Company] would like..."),
+  // and Reply-To routes replies to the human's real address.
   const fromAddr = process.env.EMAIL_FROM_ADDRESS ?? "noreply@sysgov.com";
-  const personalizedFrom = `${fromName} <${fromAddr}>`;
+  const platformFrom = `"FORGE" <${fromAddr}>`;
 
   await sendEmail({
     to: opts.to,
-    from: personalizedFrom,
+    from: platformFrom,
     replyTo: opts.senderEmail || undefined,
     subject: `[FORGE] Review request — ${opts.opportunityTitle}`.slice(0, 120),
     html: emailShell(`Review request — ${opts.opportunityTitle}`, body),
