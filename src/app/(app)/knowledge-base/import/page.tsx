@@ -7,11 +7,16 @@ import {
   type ListedArtifact,
 } from "./actions";
 import { ArtifactRow } from "./ArtifactRow";
+import { SemanticSearchClient } from "./SemanticSearchClient";
+import { getEmbeddingsStatusAction } from "./embed-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function CorpusImportPage() {
-  const artifacts = await listKnowledgeArtifactsAction();
+  const [artifacts, embedStatus] = await Promise.all([
+    listKnowledgeArtifactsAction(),
+    getEmbeddingsStatusAction(),
+  ]);
   const active = artifacts.filter((a) => !a.archivedAt);
   const totalChars = active.reduce((acc, a) => acc + a.charCount, 0);
 
@@ -32,12 +37,20 @@ export default async function CorpusImportPage() {
             label: "Indexed text",
             value: formatChars(totalChars),
           },
+          {
+            label: "Embedded chunks",
+            value: embedStatus.chunkCount.toLocaleString(),
+          },
         ]}
       />
 
-      <Panel title="Upload" eyebrow="Multi-file · 50 MB each">
-        <CorpusUploader />
-      </Panel>
+      <SemanticSearchClient initialStatus={embedStatus} />
+
+      <div className="mt-4">
+        <Panel title="Upload" eyebrow="Multi-file · 50 MB each">
+          <CorpusUploader />
+        </Panel>
+      </div>
 
       <div className="mt-4">
         <Panel
