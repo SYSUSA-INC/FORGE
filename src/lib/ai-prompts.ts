@@ -162,6 +162,37 @@ export function buildEbuyExtractPrompt(rawText: string): {
 
 export type SectionDraftMode = "draft" | "improve" | "tighten";
 
+/**
+ * Phase 14d — pattern intel attached to the snapshot.
+ *
+ * The drafter reads:
+ *   - winningPatterns:  top corpus excerpts from won proposals matching
+ *                       this section kind (filtered by Phase 14a outcome)
+ *   - lostPatterns:     a smaller sample from lost proposals so the
+ *                       model can avoid repeating known-bad phrasing
+ *   - complianceGaps:   pre-flight (Phase 14c) verdicts for items
+ *                       mapped to this section that are not_addressed
+ *                       or partial — the draft MUST address these
+ *   - sectionSignal:    Phase 14b pass-rate for this section kind in
+ *                       wins vs losses, so the model knows where the
+ *                       reviewer bar sits
+ */
+export type SectionDraftPatternIntel = {
+  winningPatterns: { excerpt: string; provenance: string }[];
+  lostPatterns: { excerpt: string }[];
+  complianceGaps: {
+    requirementNumber: string;
+    requirementText: string;
+    gap: string;
+    suggestion: string;
+  }[];
+  sectionSignal: {
+    wonPassRate: number | null;
+    lostPassRate: number | null;
+    sampleSize: number;
+  } | null;
+};
+
 export type SectionDraftSnapshot = {
   organizationName: string;
   proposal: {
@@ -185,6 +216,8 @@ export type SectionDraftSnapshot = {
     contract: string;
     description: string;
   }[];
+  /** Phase 14d — optional. Drafter falls back to non-pattern-guided when omitted. */
+  patternIntel?: SectionDraftPatternIntel;
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -195,7 +228,13 @@ Style rules:
 - Match section conventions: Executive Summary → 1–2 punchy paragraphs; Technical → numbered approach steps + how-it-mitigates-risk; Management → roles + governance + risk register; Past Performance → CPARS-style references; Pricing → assumptions + cost model; Compliance → traceability statements.
 - Cite the customer (agency, office, mission) and the solicitation number when context is provided.
 - Reuse facts from the snapshot exactly as given. Do NOT invent contract numbers, dates, dollar values, customer names, or staff bios.
-- If the snapshot is sparse, write what you can with general best practices and explicitly mark TBD placeholders in [BRACKETS] for the human author to fill.`;
+- If the snapshot is sparse, write what you can with general best practices and explicitly mark TBD placeholders in [BRACKETS] for the human author to fill.
+
+Phase 14d — pattern guidance:
+- When the snapshot includes \`patternIntel.winningPatterns\`, treat them as known-effective shapes for THIS section kind on similar work. Internalize their structure, level of specificity, and tone. Do NOT copy sentences verbatim — paraphrase and adapt to the current opportunity's facts.
+- When \`patternIntel.lostPatterns\` is present, those are excerpts from past losses. Avoid the patterns they exhibit (vague verbs, missing metrics, generic capability claims).
+- When \`patternIntel.complianceGaps\` is non-empty, every entry MUST be addressed in the draft. For each gap, write a concrete sentence or paragraph that satisfies the requirement. Reference the requirement number inline in [BRACKETS] so the reviewer can see traceability — e.g. "[L.5.2.1]".
+- When \`patternIntel.sectionSignal\` shows the won pass rate is well above the lost pass rate for this section kind, hold the bar high — the reviewer rubric is reliable here. When the deltas are negligible, the rubric isn't predictive, so prioritize crisp specificity over rubric-speak.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
