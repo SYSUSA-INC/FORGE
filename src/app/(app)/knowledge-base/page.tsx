@@ -54,6 +54,13 @@ export default async function KnowledgeBasePage({
               Import corpus
             </Link>
             <Link
+              href="/knowledge-base/usaspending"
+              className="aur-btn aur-btn-ghost"
+              title="Pull federal contracts you've won from USAspending.gov as past-performance entries."
+            >
+              From USAspending
+            </Link>
+            <Link
               href="/knowledge-base/new"
               className="aur-btn aur-btn-primary"
             >
