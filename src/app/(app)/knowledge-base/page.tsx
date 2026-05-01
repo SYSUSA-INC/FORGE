@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import type { KnowledgeKind } from "@/db/schema";
+import type { KnowledgeKind, KnowledgeOutcomeLabel } from "@/db/schema";
 import { listKnowledgeEntriesAction } from "./actions";
 import { EmbedMissingEntriesButton } from "./EmbedMissingEntriesButton";
 import { KnowledgeBaseClient } from "./KnowledgeBaseClient";
@@ -17,20 +17,35 @@ const KINDS: { key: KnowledgeKind | "all"; label: string }[] = [
   { key: "boilerplate", label: "Boilerplate" },
 ];
 
+const OUTCOME_OPTIONS: (KnowledgeOutcomeLabel | "all")[] = [
+  "all",
+  "won",
+  "lost",
+  "no_bid",
+  "withdrawn",
+  "none",
+];
+
 export default async function KnowledgeBasePage({
   searchParams,
 }: {
-  searchParams: { q?: string; kind?: string };
+  searchParams: { q?: string; kind?: string; outcome?: string };
 }) {
   await requireAuth();
   await requireCurrentOrg();
 
   const kind =
     (searchParams.kind as KnowledgeKind | "all" | undefined) ?? "all";
+  const outcomeRaw = searchParams.outcome ?? "all";
+  const outcome = (
+    OUTCOME_OPTIONS.includes(outcomeRaw as KnowledgeOutcomeLabel | "all")
+      ? outcomeRaw
+      : "all"
+  ) as KnowledgeOutcomeLabel | "all";
   const search = searchParams.q?.trim() ?? "";
 
   const all = await listKnowledgeEntriesAction({});
-  const filtered = await listKnowledgeEntriesAction({ search, kind });
+  const filtered = await listKnowledgeEntriesAction({ search, kind, outcome });
 
   const counts = {
     capability: all.filter((e) => e.kind === "capability").length,
@@ -111,6 +126,7 @@ export default async function KnowledgeBasePage({
           entries={filtered}
           totalAcrossKinds={all.length}
           activeKind={kind}
+          activeOutcome={outcome}
           search={search}
           kinds={KINDS}
         />

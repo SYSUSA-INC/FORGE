@@ -4,7 +4,11 @@ import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { knowledgeEntries, type KnowledgeKind } from "@/db/schema";
+import {
+  knowledgeEntries,
+  type KnowledgeKind,
+  type KnowledgeOutcomeLabel,
+} from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import {
   backfillEntryEmbeddings,
@@ -21,6 +25,7 @@ const KINDS: KnowledgeKind[] = [
 export async function listKnowledgeEntriesAction(options: {
   search?: string;
   kind?: KnowledgeKind | "all";
+  outcome?: KnowledgeOutcomeLabel | "all";
   includeArchived?: boolean;
 } = {}) {
   await requireAuth();
@@ -29,6 +34,9 @@ export async function listKnowledgeEntriesAction(options: {
   const filters = [eq(knowledgeEntries.organizationId, organizationId)];
   if (options.kind && options.kind !== "all") {
     filters.push(eq(knowledgeEntries.kind, options.kind));
+  }
+  if (options.outcome && options.outcome !== "all") {
+    filters.push(eq(knowledgeEntries.outcomeLabel, options.outcome));
   }
   if (!options.includeArchived) {
     filters.push(sql`${knowledgeEntries.archivedAt} IS NULL`);
@@ -51,6 +59,7 @@ export async function listKnowledgeEntriesAction(options: {
       body: knowledgeEntries.body,
       tags: knowledgeEntries.tags,
       reuseCount: knowledgeEntries.reuseCount,
+      outcomeLabel: knowledgeEntries.outcomeLabel,
       archivedAt: knowledgeEntries.archivedAt,
       updatedAt: knowledgeEntries.updatedAt,
     })
@@ -66,6 +75,7 @@ export async function listKnowledgeEntriesAction(options: {
     body: r.body,
     tags: r.tags ?? [],
     reuseCount: r.reuseCount,
+    outcomeLabel: r.outcomeLabel,
     archivedAt: r.archivedAt ? r.archivedAt.toISOString() : null,
     updatedAt: r.updatedAt.toISOString(),
   }));
