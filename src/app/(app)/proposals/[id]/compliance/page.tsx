@@ -61,6 +61,8 @@ export default async function ProposalCompliancePage({
       ownerEmail: users.email,
       sectionTitle: proposalSections.title,
       sectionOrdering: proposalSections.ordering,
+      aiAssessment: complianceItems.aiAssessment,
+      aiAssessedAt: complianceItems.aiAssessedAt,
     })
     .from(complianceItems)
     .leftJoin(users, eq(users.id, complianceItems.ownerUserId))
@@ -157,6 +159,10 @@ export default async function ProposalCompliancePage({
           ownerEmail: i.ownerEmail,
           sectionTitle: i.sectionTitle ?? null,
           sectionOrdering: i.sectionOrdering ?? null,
+          aiAssessment: i.aiAssessment ?? null,
+          aiAssessedAt: i.aiAssessedAt
+            ? i.aiAssessedAt.toISOString()
+            : null,
         }))}
       />
     </div>

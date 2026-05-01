@@ -465,3 +465,97 @@ export function buildKnowledgeExtractPrompt(input: {
     messages: [{ role: "user", content: userPrompt }],
   };
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Phase 14c — Compliance pre-flight
+// ────────────────────────────────────────────────────────────────────
+
+export type CompliancePreflightItem = {
+  id: string;
+  number: string; // e.g. "L.5.2.1"
+  category: string; // section_l / section_m / etc.
+  requirementText: string;
+};
+
+export type CompliancePreflightInput = {
+  sectionTitle: string;
+  sectionKind: string;
+  sectionBody: string;
+  items: CompliancePreflightItem[];
+};
+
+export type CompliancePreflightVerdict = {
+  itemId: string;
+  suggestedStatus:
+    | "complete"
+    | "partial"
+    | "not_addressed"
+    | "not_applicable";
+  confidence: "high" | "medium" | "low";
+  gap: string; // 1-2 sentences identifying what's missing
+  suggestion: string; // 1-2 sentences proposing how to close the gap
+};
+
+const COMPLIANCE_PREFLIGHT_SYSTEM = `You are a federal proposal compliance reviewer inside FORGE. You read a section of a proposal draft and a list of solicitation requirements (Section L instructions or Section M evaluation criteria) the section is supposed to address, and you judge each requirement against the draft.
+
+Output rules (STRICT JSON, no prose):
+{
+  "verdicts": [
+    {
+      "itemId": "<echo the supplied id>",
+      "suggestedStatus": "complete" | "partial" | "not_addressed" | "not_applicable",
+      "confidence": "high" | "medium" | "low",
+      "gap": "<one or two sentences identifying what's missing or weak>",
+      "suggestion": "<one or two sentences proposing how to close the gap>"
+    }
+  ]
+}
+
+Status calibration:
+- complete: the section explicitly addresses the requirement with concrete content. The reviewer would mark this PASS without rework.
+- partial: the section gestures at the requirement but is vague, missing a sub-element, or buries the response. Reviewer would write a comment.
+- not_addressed: the section does NOT address this requirement. The proposal would be docked or non-compliant.
+- not_applicable: the requirement does not apply to this section kind (rare — only mark if the requirement clearly belongs to a different volume).
+
+Confidence:
+- high: clear evidence in the section text either way.
+- medium: judgment call; another reviewer could disagree.
+- low: section text is too short or too generic to be sure.
+
+Hard rules:
+- Echo the itemId exactly. Never invent ids.
+- Return one verdict per supplied item, in the same order.
+- gap and suggestion together must be ≤ 350 characters each. Plain prose, no markdown.
+- Do NOT propose a "complete" status if any sub-requirement is unaddressed — use "partial".
+- If the section body is empty, every status is "not_addressed" with confidence "high".`;
+
+export function buildCompliancePreflightPrompt(
+  input: CompliancePreflightInput,
+): { system: string; messages: AIMessage[] } {
+  const trimmedBody = input.sectionBody.slice(0, 12000);
+  const userPrompt = [
+    `Section: "${input.sectionTitle}" (kind: ${input.sectionKind})`,
+    `Section body word count: ${input.sectionBody.split(/\s+/).filter(Boolean).length}`,
+    trimmedBody.length < input.sectionBody.length
+      ? `(Body trimmed from ${input.sectionBody.length} to ${trimmedBody.length} chars.)`
+      : "",
+    ``,
+    `Section body:`,
+    trimmedBody || "(empty)",
+    ``,
+    `Requirements assigned to this section (${input.items.length}):`,
+    ...input.items.map(
+      (it) =>
+        `- id=${it.id} | number=${it.number || "(unset)"} | category=${it.category} | text="${it.requirementText.replace(/"/g, '\\"').slice(0, 600)}"`,
+    ),
+    ``,
+    `Return strict JSON per the schema in the system prompt.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    system: COMPLIANCE_PREFLIGHT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}

@@ -661,6 +661,21 @@ export const complianceStatusEnum = pgEnum("compliance_status", [
   "not_applicable",
 ]);
 
+/**
+ * Phase 14c — compliance pre-flight AI assessment.
+ *
+ * Stored alongside the human-set `status` so the AI never overwrites
+ * a reviewer's call. The UI surfaces this as a "Pre-flight says…"
+ * chip with a one-click "Accept" action.
+ */
+export type ComplianceAIAssessment = {
+  suggestedStatus: ComplianceStatus;
+  confidence: "high" | "medium" | "low";
+  gap: string;
+  suggestion: string;
+  model: string;
+};
+
 export const complianceItems = pgTable("compliance_item", {
   id: uuid("id").primaryKey().defaultRandom(),
   proposalId: uuid("proposal_id")
@@ -685,6 +700,9 @@ export const complianceItems = pgTable("compliance_item", {
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
+  // Phase 14c — last AI pre-flight result for this item.
+  aiAssessment: jsonb("ai_assessment").$type<ComplianceAIAssessment | null>(),
+  aiAssessedAt: timestamp("ai_assessed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -8,9 +8,12 @@ import type {
   ComplianceStatus,
 } from "@/db/schema";
 import {
+  acceptComplianceAIAssessmentAction,
   bulkImportComplianceItemsAction,
   createComplianceItemAction,
   deleteComplianceItemAction,
+  dismissComplianceAIAssessmentAction,
+  runCompliancePreflightAction,
   updateComplianceItemAction,
 } from "./actions";
 
@@ -23,6 +26,14 @@ type CategoryDef = {
 type StatusDef = { key: ComplianceStatus; label: string; color: string };
 type SectionLite = { id: string; title: string; ordering: number };
 type TeamMember = { id: string; name: string | null; email: string };
+
+type AIAssessment = {
+  suggestedStatus: ComplianceStatus;
+  confidence: "high" | "medium" | "low";
+  gap: string;
+  suggestion: string;
+  model: string;
+} | null;
 
 type ItemRow = {
   id: string;
@@ -40,6 +51,8 @@ type ItemRow = {
   ownerEmail: string | null;
   sectionTitle: string | null;
   sectionOrdering: number | null;
+  aiAssessment: AIAssessment;
+  aiAssessedAt: string | null;
 };
 
 export function ComplianceClient({
@@ -90,6 +103,10 @@ export function ComplianceClient({
 
   return (
     <div className="flex flex-col gap-4">
+      <PreflightBar
+        proposalId={proposalId}
+        items={items}
+      />
       <BulkImport proposalId={proposalId} categories={categories} />
       <AddItem
         proposalId={proposalId}
@@ -655,6 +672,15 @@ function ItemRowCard({
                 {item.notes}
               </div>
             ) : null}
+            {item.aiAssessment ? (
+              <AIAssessmentRow
+                proposalId={proposalId}
+                itemId={item.id}
+                assessment={item.aiAssessment}
+                statusLabels={statusLabels}
+                statusColors={statusColors}
+              />
+            ) : null}
           </div>
 
           <div className="flex flex-col items-end gap-2">
@@ -852,5 +878,213 @@ function ItemRowCard({
         </button>
       </div>
     </li>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Phase 14c — pre-flight bar + per-row AI chip
+// ─────────────────────────────────────────────────────────────────
+
+function PreflightBar({
+  proposalId,
+  items,
+}: {
+  proposalId: string;
+  items: ItemRow[];
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const mapped = items.filter((i) => !!i.proposalSectionId).length;
+  const unmapped = items.length - mapped;
+  const assessed = items.filter((i) => !!i.aiAssessment).length;
+
+  function runPreflight() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await runCompliancePreflightAction(proposalId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      const stubNote = res.stubbed ? " (stub mode)" : "";
+      const unmappedNote =
+        res.unmapped > 0
+          ? ` ${res.unmapped} item${res.unmapped === 1 ? "" : "s"} skipped (no section mapped).`
+          : "";
+      setNotice(
+        `Pre-flight complete. Assessed ${res.assessed} item${res.assessed === 1 ? "" : "s"}.${unmappedNote}${stubNote}`,
+      );
+      router.refresh();
+    });
+  }
+
+  return (
+    <Panel
+      title="Pre-flight (Phase 14c)"
+      eyebrow="AI scans your draft against each requirement"
+      actions={
+        <button
+          type="button"
+          onClick={runPreflight}
+          disabled={pending || mapped === 0}
+          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          title={
+            mapped === 0
+              ? "Map at least one compliance item to a section first."
+              : "Run the AI pre-flight against every mapped item."
+          }
+        >
+          {pending ? "Scanning…" : "Run pre-flight"}
+        </button>
+      }
+    >
+      <p className="font-body text-[13px] leading-relaxed text-muted">
+        For each item that&apos;s mapped to a section, the AI reads the
+        section&apos;s draft and judges whether it actually addresses the
+        requirement. Verdicts appear inline on each row with a one-click
+        Accept. Items without a mapped section are skipped — map them
+        first, then re-run.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-[11px]">
+        <span className="text-muted">
+          Mapped <span className="text-foreground">{mapped}</span>
+        </span>
+        <span className="text-muted">
+          Unmapped <span className="text-amber-200">{unmapped}</span>
+        </span>
+        <span className="text-muted">
+          Pre-flight verdicts pending review{" "}
+          <span className="text-teal-300">{assessed}</span>
+        </span>
+      </div>
+      {error ? (
+        <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+          {error}
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="mt-3 rounded-md border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 font-mono text-[11px] text-emerald">
+          {notice}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+const CONFIDENCE_TONES = {
+  high: "bg-emerald-400/10 text-emerald-300 border-emerald-400/30",
+  medium: "bg-amber-400/10 text-amber-200 border-amber-400/30",
+  low: "bg-white/5 text-muted border-white/10",
+} as const;
+
+function AIAssessmentRow({
+  proposalId,
+  itemId,
+  assessment,
+  statusLabels,
+  statusColors,
+}: {
+  proposalId: string;
+  itemId: string;
+  assessment: NonNullable<ItemRow["aiAssessment"]>;
+  statusLabels: Record<ComplianceStatus, string>;
+  statusColors: Record<ComplianceStatus, string>;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const sColor = statusColors[assessment.suggestedStatus];
+
+  function accept() {
+    setError(null);
+    startTransition(async () => {
+      const res = await acceptComplianceAIAssessmentAction(proposalId, itemId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function dismiss() {
+    setError(null);
+    startTransition(async () => {
+      const res = await dismissComplianceAIAssessmentAction(
+        proposalId,
+        itemId,
+      );
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-teal-400/30 bg-teal-400/[0.04] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest">
+        <span className="text-teal-300">Pre-flight</span>
+        <span
+          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+          style={{
+            color: sColor,
+            backgroundColor: `${sColor}1A`,
+            border: `1px solid ${sColor}40`,
+          }}
+        >
+          {statusLabels[assessment.suggestedStatus]}
+        </span>
+        <span
+          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${CONFIDENCE_TONES[assessment.confidence]}`}
+        >
+          {assessment.confidence} confidence
+        </span>
+      </div>
+      {assessment.gap ? (
+        <div className="mt-1 font-body text-[12px] leading-relaxed text-foreground">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">
+            Gap:{" "}
+          </span>
+          {assessment.gap}
+        </div>
+      ) : null}
+      {assessment.suggestion ? (
+        <div className="mt-1 font-body text-[12px] leading-relaxed text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">
+            Suggestion:{" "}
+          </span>
+          {assessment.suggestion}
+        </div>
+      ) : null}
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={accept}
+          disabled={pending}
+          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          title="Apply the AI's suggested status to this item."
+        >
+          Accept
+        </button>
+        <button
+          type="button"
+          onClick={dismiss}
+          disabled={pending}
+          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          title="Dismiss this AI suggestion without changing the human-set status."
+        >
+          Dismiss
+        </button>
+      </div>
+      {error ? (
+        <div className="mt-2 font-mono text-[11px] text-rose">{error}</div>
+      ) : null}
+    </div>
   );
 }
