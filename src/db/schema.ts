@@ -1124,6 +1124,29 @@ export const knowledgeKindEnum = pgEnum("knowledge_kind", [
   "boilerplate",
 ]);
 
+/**
+ * Phase 14a — outcome-aware Brain.
+ *
+ * Each knowledge artifact (and the entries derived from it) carries
+ * the proposal outcome the artifact came from. Lets the section
+ * drafter prefer "won" content when retrieving via embeddings, and
+ * lets the /knowledge-base UI filter by outcome.
+ *
+ * Default `none` covers entries that aren't tied to a proposal
+ * outcome (manually authored boilerplate, historical capability
+ * briefs uploaded as standalone artifacts, etc.).
+ */
+export const knowledgeOutcomeLabelEnum = pgEnum("knowledge_outcome_label", [
+  "none",
+  "won",
+  "lost",
+  "no_bid",
+  "withdrawn",
+]);
+
+export type KnowledgeOutcomeLabel =
+  (typeof knowledgeOutcomeLabelEnum.enumValues)[number];
+
 export const knowledgeEntries = pgTable("knowledge_entry", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -1145,6 +1168,12 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   // proposal section drafter / template. Keeps the autonomy ladder honest
   // about which assets actually get used.
   reuseCount: integer("reuse_count").notNull().default(0),
+  // Phase 14a — outcome-aware Brain. Inherited from the source artifact
+  // when promoted via the extraction queue; remains `none` for manually
+  // authored entries until an admin tags them.
+  outcomeLabel: knowledgeOutcomeLabelEnum("outcome_label")
+    .notNull()
+    .default("none"),
   // Phase 10f: real embedding for semantic Brain Suggest. Stored as
   // text on the JS side; the actual column type is `vector(1536)` —
   // see drizzle/0023 migration. Same provider/dim as the chunk
@@ -1232,6 +1261,13 @@ export const knowledgeArtifacts = pgTable("knowledge_artifact", {
   // Set when text extraction completes; later set when chunks are
   // embedded once the embeddings ladder ships.
   indexedAt: timestamp("indexed_at"),
+  // Phase 14a — outcome-aware Brain. For artifacts harvested from a
+  // submitted proposal (source='mined_from_proposal'), this gets set
+  // to the proposal's outcome when the outcome is recorded. Defaults
+  // to 'none' for everything else.
+  outcomeLabel: knowledgeOutcomeLabelEnum("outcome_label")
+    .notNull()
+    .default("none"),
   // Opaque metadata: ai-suggested kind, ai-suggested tags, source URL,
   // page count, etc.
   metadata: jsonb("metadata")

@@ -13,6 +13,7 @@ import {
   type ProposalOutcomeType,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
 import { OUTCOME_REASONS } from "@/lib/proposal-outcome-types";
 
 const OUTCOME_TYPES: ProposalOutcomeType[] = [
@@ -134,9 +135,19 @@ export async function saveOutcomeAction(
         .where(eq(proposals.id, proposalId));
     }
 
+    // Phase 14a: propagate the outcome to the harvested artifact and
+    // any entries promoted from it. Best-effort — don't fail the save
+    // if the corpus update errors, since the outcome row is the
+    // source of truth.
+    try {
+      await propagateOutcomeToCorpus(proposalId, outcomeType);
+    } catch (err) {
+      console.warn("[saveOutcomeAction] propagateOutcomeToCorpus failed", err);
+    }
     revalidatePath(`/proposals/${proposalId}`);
     revalidatePath(`/proposals/${proposalId}/outcome`);
     revalidatePath(`/proposals`);
+    revalidatePath(`/knowledge-base`);
     return { ok: true };
   } catch (err) {
     console.error("[saveOutcomeAction]", err);

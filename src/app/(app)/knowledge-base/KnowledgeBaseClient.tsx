@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Panel } from "@/components/ui/Panel";
 
+type OutcomeLabel = "none" | "won" | "lost" | "no_bid" | "withdrawn";
+
 type Entry = {
   id: string;
   kind: string;
@@ -12,6 +14,7 @@ type Entry = {
   body: string;
   tags: string[];
   reuseCount: number;
+  outcomeLabel: OutcomeLabel;
   archivedAt: string | null;
   updatedAt: string;
 };
@@ -30,16 +33,41 @@ const KIND_LABEL: Record<string, string> = {
   boilerplate: "Boilerplate",
 };
 
+const OUTCOME_TONES: Record<OutcomeLabel, string> = {
+  none: "",
+  won: "bg-emerald-400/15 text-emerald-300 border-emerald-400/40",
+  lost: "bg-rose/15 text-rose border-rose/40",
+  no_bid: "bg-white/5 text-muted border-white/10",
+  withdrawn: "bg-amber-400/10 text-amber-200 border-amber-400/30",
+};
+
+const OUTCOME_LABELS: Record<OutcomeLabel, string> = {
+  none: "—",
+  won: "won",
+  lost: "lost",
+  no_bid: "no-bid",
+  withdrawn: "withdrawn",
+};
+
+const OUTCOMES: { key: "all" | OutcomeLabel; label: string }[] = [
+  { key: "all", label: "All outcomes" },
+  { key: "won", label: "Won" },
+  { key: "lost", label: "Lost" },
+  { key: "none", label: "Untagged" },
+];
+
 export function KnowledgeBaseClient({
   entries,
   totalAcrossKinds,
   activeKind,
+  activeOutcome,
   search,
   kinds,
 }: {
   entries: Entry[];
   totalAcrossKinds: number;
   activeKind: string;
+  activeOutcome: "all" | OutcomeLabel;
   search: string;
   kinds: { key: string; label: string }[];
 }) {
@@ -47,11 +75,15 @@ export function KnowledgeBaseClient({
   const params = useSearchParams();
   const [q, setQ] = useState(search);
 
-  function applyFilter(next: { kind?: string; q?: string }) {
+  function applyFilter(next: { kind?: string; outcome?: string; q?: string }) {
     const sp = new URLSearchParams(params?.toString() ?? "");
     if (next.kind !== undefined) {
       if (!next.kind || next.kind === "all") sp.delete("kind");
       else sp.set("kind", next.kind);
+    }
+    if (next.outcome !== undefined) {
+      if (!next.outcome || next.outcome === "all") sp.delete("outcome");
+      else sp.set("outcome", next.outcome);
     }
     if (next.q !== undefined) {
       if (!next.q) sp.delete("q");
@@ -98,6 +130,28 @@ export function KnowledgeBaseClient({
             );
           })}
         </div>
+        <div
+          className="flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-white/[0.02] p-1"
+          title="Phase 14a — filter by the outcome of the proposal each entry came from."
+        >
+          {OUTCOMES.map((o) => {
+            const active = o.key === activeOutcome;
+            return (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => applyFilter({ outcome: o.key })}
+                className={`rounded px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                  active
+                    ? "bg-white/10 text-text"
+                    : "text-muted hover:text-text"
+                }`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <Panel
@@ -119,16 +173,26 @@ export function KnowledgeBaseClient({
               return (
                 <li key={e.id} className="aur-card flex flex-col gap-2 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span
-                      className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
-                      style={{
-                        color,
-                        backgroundColor: `${color}1A`,
-                        border: `1px solid ${color}50`,
-                      }}
-                    >
-                      {KIND_LABEL[e.kind] ?? e.kind}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span
+                        className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        style={{
+                          color,
+                          backgroundColor: `${color}1A`,
+                          border: `1px solid ${color}50`,
+                        }}
+                      >
+                        {KIND_LABEL[e.kind] ?? e.kind}
+                      </span>
+                      {e.outcomeLabel !== "none" ? (
+                        <span
+                          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${OUTCOME_TONES[e.outcomeLabel]}`}
+                          title={`Came from a proposal that was ${OUTCOME_LABELS[e.outcomeLabel]}.`}
+                        >
+                          {OUTCOME_LABELS[e.outcomeLabel]}
+                        </span>
+                      ) : null}
+                    </div>
                     <span className="font-mono text-[10px] text-subtle">
                       {new Date(e.updatedAt).toISOString().slice(0, 10)}
                     </span>

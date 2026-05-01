@@ -19,10 +19,31 @@ export type BrainHit = {
   artifactTitle?: string;
   artifactKind?: string;
   entryKind?: "capability" | "past_performance" | "personnel" | "boilerplate";
+  /** Phase 14a — provenance signal so the writer can prefer winning content. */
+  outcomeLabel?: "none" | "won" | "lost" | "no_bid" | "withdrawn";
   title: string;
   content: string;
   similarity: number;
 };
+
+/**
+ * Phase 14a — outcome-aware retrieval bonus.
+ *
+ * Bumps content from won proposals to the top, slightly demotes
+ * content from lost proposals so a known-loser sentence doesn't
+ * shoulder out an equally-similar neutral one. no_bid / withdrawn /
+ * none stay neutral — they don't carry signal about what wins.
+ */
+function outcomeBoost(label: string | null | undefined): number {
+  switch (label) {
+    case "won":
+      return 0.1;
+    case "lost":
+      return -0.05;
+    default:
+      return 0;
+  }
+}
 
 export type BrainSuggestResult =
   | { ok: true; hits: BrainHit[]; provider: string; stubbed: boolean }
@@ -115,6 +136,7 @@ export async function brainSuggestForSectionAction(
     artifact_id: string;
     artifact_title: string;
     artifact_kind: string;
+    artifact_outcome: string;
     content: string;
     similarity: number;
   }> = [];
@@ -123,17 +145,19 @@ export async function brainSuggestForSectionAction(
     kind: "capability" | "past_performance" | "personnel" | "boilerplate";
     title: string;
     body: string;
+    outcome_label: string;
     similarity: number;
   }> = [];
 
   try {
     const r1 = await db.execute(sql`
       SELECT
-        c.id           AS chunk_id,
-        c.content      AS content,
-        a.id           AS artifact_id,
-        a.title        AS artifact_title,
-        a.kind         AS artifact_kind,
+        c.id              AS chunk_id,
+        c.content         AS content,
+        a.id              AS artifact_id,
+        a.title           AS artifact_title,
+        a.kind            AS artifact_kind,
+        a.outcome_label   AS artifact_outcome,
         1 - (c.embedding <=> ${literal}::vector) AS similarity
       FROM knowledge_artifact_chunk c
       INNER JOIN knowledge_artifact a ON a.id = c.artifact_id
@@ -160,6 +184,7 @@ export async function brainSuggestForSectionAction(
         kind,
         title,
         body,
+        outcome_label,
         1 - (embedding <=> ${literal}::vector) AS similarity
       FROM knowledge_entry
       WHERE organization_id = ${organizationId}
@@ -188,6 +213,7 @@ export async function brainSuggestForSectionAction(
           kind: knowledgeEntries.kind,
           title: knowledgeEntries.title,
           body: knowledgeEntries.body,
+          outcomeLabel: knowledgeEntries.outcomeLabel,
         })
         .from(knowledgeEntries)
         .where(eq(knowledgeEntries.organizationId, organizationId))
@@ -208,6 +234,7 @@ export async function brainSuggestForSectionAction(
             kind: e.kind,
             title: e.title,
             body: e.body,
+            outcome_label: e.outcomeLabel,
             similarity: scoreOverlap(
               (e.title + " " + e.body).toLowerCase(),
               tokens,
@@ -223,7 +250,9 @@ export async function brainSuggestForSectionAction(
   }
 
   // Merge + rank. Curated entries get a +0.05 bonus to break ties in
-  // their favor when a corpus chunk and an entry score equally.
+  // their favor when a corpus chunk and an entry score equally. On
+  // top of that, Phase 14a applies an outcome boost so won content
+  // surfaces ahead of equally-similar neutral content.
   const hits: BrainHit[] = [
     ...corpusRows.map<BrainHit>((r) => ({
       source: "corpus",
@@ -231,18 +260,22 @@ export async function brainSuggestForSectionAction(
       artifactId: r.artifact_id,
       artifactTitle: r.artifact_title,
       artifactKind: r.artifact_kind,
+      outcomeLabel: (r.artifact_outcome ?? "none") as BrainHit["outcomeLabel"],
       title: r.artifact_title || "(untitled artifact)",
       content: r.content,
       similarity:
-        typeof r.similarity === "string" ? Number(r.similarity) : r.similarity,
+        (typeof r.similarity === "string"
+          ? Number(r.similarity)
+          : r.similarity) + outcomeBoost(r.artifact_outcome),
     })),
     ...entryRows.map<BrainHit>((r) => ({
       source: "entry",
       id: r.id,
       entryKind: r.kind,
+      outcomeLabel: (r.outcome_label ?? "none") as BrainHit["outcomeLabel"],
       title: r.title,
       content: r.body,
-      similarity: r.similarity + 0.05,
+      similarity: r.similarity + 0.05 + outcomeBoost(r.outcome_label),
     })),
   ]
     .sort((a, b) => b.similarity - a.similarity)
