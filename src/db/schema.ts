@@ -1230,3 +1230,111 @@ export type KnowledgeArtifactSource =
   (typeof knowledgeArtifactSourceEnum.enumValues)[number];
 export type KnowledgeArtifactStatus =
   (typeof knowledgeArtifactStatusEnum.enumValues)[number];
+
+/**
+ * Phase 10c — Brain extraction pipeline.
+ *
+ * The Brain reads each knowledge_artifact and proposes structured
+ * knowledge_entry candidates (capabilities, past performance, named
+ * personnel, boilerplate). Candidates land in a review queue; the
+ * user approves or rejects each one. Approved candidates are promoted
+ * to knowledge_entry rows so the existing UI surfaces them.
+ *
+ * extraction_run captures one AI pass over an artifact (prompt
+ * version, model, status, count) so we can re-run when a prompt
+ * improves and see what changed.
+ */
+export const knowledgeExtractionRunStatusEnum = pgEnum(
+  "knowledge_extraction_run_status",
+  ["queued", "running", "completed", "failed"],
+);
+
+export const knowledgeExtractionDecisionEnum = pgEnum(
+  "knowledge_extraction_decision",
+  ["pending", "approved", "rejected", "merged"],
+);
+
+export const knowledgeExtractionRuns = pgTable("knowledge_extraction_run", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  artifactId: uuid("artifact_id")
+    .notNull()
+    .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
+  status: knowledgeExtractionRunStatusEnum("status")
+    .notNull()
+    .default("queued"),
+  promptVersion: text("prompt_version").notNull().default("v1"),
+  provider: text("provider").notNull().default(""),
+  model: text("model").notNull().default(""),
+  candidateCount: integer("candidate_count").notNull().default(0),
+  errorMessage: text("error_message").notNull().default(""),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  startedByUserId: text("started_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const knowledgeExtractionCandidates = pgTable(
+  "knowledge_extraction_candidate",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => knowledgeExtractionRuns.id, { onDelete: "cascade" }),
+    artifactId: uuid("artifact_id")
+      .notNull()
+      .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
+    // Mirrors knowledge_kind so approved candidates can be promoted
+    // straight into knowledge_entry without translation.
+    kind: knowledgeKindEnum("kind").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    // The slice of artifact text the AI used as evidence — surfaced in
+    // the review UI so reviewers can verify before approving.
+    sourceExcerpt: text("source_excerpt").notNull().default(""),
+    decision: knowledgeExtractionDecisionEnum("decision")
+      .notNull()
+      .default("pending"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at"),
+    // Once approved + promoted to a knowledge_entry, this records the
+    // resulting entry id so we can avoid double-promotion and link
+    // back from the review UI.
+    promotedEntryId: uuid("promoted_entry_id").references(
+      () => knowledgeEntries.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);
+
+export type KnowledgeExtractionRun =
+  typeof knowledgeExtractionRuns.$inferSelect;
+export type NewKnowledgeExtractionRun =
+  typeof knowledgeExtractionRuns.$inferInsert;
+export type KnowledgeExtractionRunStatus =
+  (typeof knowledgeExtractionRunStatusEnum.enumValues)[number];
+export type KnowledgeExtractionCandidate =
+  typeof knowledgeExtractionCandidates.$inferSelect;
+export type NewKnowledgeExtractionCandidate =
+  typeof knowledgeExtractionCandidates.$inferInsert;
+export type KnowledgeExtractionDecision =
+  (typeof knowledgeExtractionDecisionEnum.enumValues)[number];

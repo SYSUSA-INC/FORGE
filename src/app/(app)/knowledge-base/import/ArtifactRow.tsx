@@ -87,6 +87,13 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
         ) : null}
       </div>
       <div className="flex shrink-0 gap-1">
+        <a
+          href={`/knowledge-base/import/${artifact.id}`}
+          className="aur-btn aur-btn-primary text-[10px]"
+          title="Run Brain extraction on this artifact"
+        >
+          Open
+        </a>
         <button
           type="button"
           onClick={archive}
