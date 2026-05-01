@@ -7,6 +7,8 @@ import { Panel } from "@/components/ui/Panel";
 import {
   SOLICITATION_ROLE_LABELS,
   SOLICITATION_ROLES,
+} from "@/lib/solicitation-roles";
+import {
   assignSolicitationRoleAction,
   listAssignableMembersAction,
   unassignSolicitationRoleAction,
