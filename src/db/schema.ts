@@ -1138,3 +1138,95 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
 export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
 export type NewKnowledgeEntry = typeof knowledgeEntries.$inferInsert;
 export type KnowledgeKind = (typeof knowledgeKindEnum.enumValues)[number];
+
+/**
+ * Knowledge artifacts — the raw corpus the FORGE Brain reads to build
+ * its intelligence. Anything that gives historical context about the
+ * organization belongs here: old proposals, RFPs we responded to,
+ * contracts, debriefs, CPARS reports, capability briefs, resumes,
+ * brochures, white papers, customer emails, technical specs, notes.
+ *
+ * Derived structured knowledge (knowledgeEntries) extracts from
+ * artifacts. The artifact is the receipt; the entry is the polished
+ * output. knowledgeEntries.sourceArtifactId carries the provenance
+ * link so every derived entry can trace back to its origin.
+ */
+export const knowledgeArtifactKindEnum = pgEnum("knowledge_artifact_kind", [
+  "proposal",
+  "rfp",
+  "contract",
+  "cpars",
+  "debrief",
+  "capability_brief",
+  "resume",
+  "brochure",
+  "whitepaper",
+  "email",
+  "note",
+  "image",
+  "spreadsheet",
+  "deck",
+  "other",
+]);
+
+export const knowledgeArtifactSourceEnum = pgEnum("knowledge_artifact_source", [
+  "uploaded",
+  "mined_from_proposal",
+  "inbound_email",
+  "imported",
+]);
+
+export const knowledgeArtifactStatusEnum = pgEnum("knowledge_artifact_status", [
+  "uploaded",
+  "extracting_text",
+  "indexed",
+  "failed",
+]);
+
+export const knowledgeArtifacts = pgTable("knowledge_artifact", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  kind: knowledgeArtifactKindEnum("kind").notNull().default("other"),
+  source: knowledgeArtifactSourceEnum("source").notNull().default("uploaded"),
+  title: text("title").notNull().default(""),
+  // Free-form tags chosen by the user OR proposed by the AI on ingest.
+  tags: text("tags")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  // File metadata — null for artifacts created from inline pastes.
+  fileName: text("file_name").notNull().default(""),
+  fileSize: integer("file_size").notNull().default(0),
+  contentType: text("content_type").notNull().default(""),
+  storagePath: text("storage_path").notNull().default(""),
+  // Extracted plain text from the file. Capped at 500 KB on insert.
+  rawText: text("raw_text").notNull().default(""),
+  status: knowledgeArtifactStatusEnum("status").notNull().default("uploaded"),
+  statusError: text("status_error").notNull().default(""),
+  // Set when text extraction completes; later set when chunks are
+  // embedded once the embeddings ladder ships.
+  indexedAt: timestamp("indexed_at"),
+  // Opaque metadata: ai-suggested kind, ai-suggested tags, source URL,
+  // page count, etc.
+  metadata: jsonb("metadata")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
+  uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type KnowledgeArtifact = typeof knowledgeArtifacts.$inferSelect;
+export type NewKnowledgeArtifact = typeof knowledgeArtifacts.$inferInsert;
+export type KnowledgeArtifactKind =
+  (typeof knowledgeArtifactKindEnum.enumValues)[number];
+export type KnowledgeArtifactSource =
+  (typeof knowledgeArtifactSourceEnum.enumValues)[number];
+export type KnowledgeArtifactStatus =
+  (typeof knowledgeArtifactStatusEnum.enumValues)[number];

@@ -45,12 +45,21 @@ export default async function KnowledgeBasePage({
         title="Knowledge base"
         subtitle="Capabilities, past performance references, named personnel, and boilerplate text — searchable and tag-filtered. Used as grounding when the AI section drafter writes against your real assets."
         actions={
-          <Link
-            href="/knowledge-base/new"
-            className="aur-btn aur-btn-primary"
-          >
-            + New entry
-          </Link>
+          <>
+            <Link
+              href="/knowledge-base/import"
+              className="aur-btn aur-btn-ghost"
+              title="Drop old proposals, RFPs, contracts — anything historical — and let the Brain extract knowledge from them."
+            >
+              Import corpus
+            </Link>
+            <Link
+              href="/knowledge-base/new"
+              className="aur-btn aur-btn-primary"
+            >
+              + New entry
+            </Link>
+          </>
         }
         meta={[
           {
