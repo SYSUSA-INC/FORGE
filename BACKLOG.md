@@ -78,7 +78,6 @@ Sequence on disk after recent merges: `0000`–`0015`, `0017`, `0019`, `0020`, `
 
 ## 5. Roadmap (not yet started)
 
-- **Phase 13c** — OAuth email-from-sender (WIP branch exists; needs API routes + UI + wiring). After this merges, opportunity review-request emails can be sent from a connected Google account instead of `noreply@sysgov.com`.
 - **Chapter 14 — Autonomous proposal intelligence:**
   - 14a outcome-aware Brain
   - 14b section-level signals
@@ -86,6 +85,34 @@ Sequence on disk after recent merges: `0000`–`0015`, `0017`, `0019`, `0020`, `
   - 14d pattern-guided drafter
   - 14e auto-draft full proposal
   - 14f proposal-vs-winner scoring
+
+- **SBIR/STTR opportunity integration** — pull federal Small Business
+  Innovation Research and Small Business Technology Transfer
+  solicitations and awards alongside the existing SAM.gov +
+  USAspending sources. Realistic data sources:
+  - **SBIR.gov public API** (`https://www.sbir.gov/api`) — exposes
+    open solicitations, closed solicitations, and awarded contracts.
+    No auth, similar shape to the USAspending pattern we already use.
+  - **DSIP (DoD SBIR/STTR Innovation Portal)** — DoD-specific
+    solicitations (Air Force, Army, Navy, etc.). Separate site, may
+    need scraping or a manual paste flow like the eBuy ingester.
+  - **SAM.gov notice types** — SBIR/STTR opportunities also surface
+    in SAM.gov under specific notice-type codes; we already have the
+    SAM.gov client wired and could just add an "SBIR/STTR" filter
+    pill to the existing importer at `/opportunities/import`.
+
+  Suggested first slice (one PR): mirror the USAspending pattern.
+  Build `src/lib/sbir.ts` (search by topic / agency / phase + keyword),
+  add `searchSbirOpportunitiesAction` + `importSbirOpportunitiesAction`,
+  ship `/opportunities/sbir` page with multi-select import, idempotent
+  on the SBIR topic code via tags. Future slices: DSIP scraper, awards
+  → past-performance import, eligibility pre-check from org profile
+  (small-business / 8(a) / SDVOSB filters).
+
+- **Phase 13c v2** — Microsoft Graph for OAuth email-from-sender
+  (the schema enum already accepts `microsoft` but the helper is not
+  built). Lower priority now that the platform-brand From + Reply-To
+  approach (PR #74) covers the main goal.
 
 ## 6. Conventions (do not violate without explicit permission)
 

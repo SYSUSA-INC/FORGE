@@ -1,6 +1,5 @@
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getAIProviderStatus } from "@/lib/ai";
-import IntelligenceVisionDemo from "./IntelligenceVisionDemo";
 import { PipelineBriefPanel } from "./PipelineBriefPanel";
 import { ProviderStatusPanel } from "./ProviderStatusPanel";
 import { OutcomeInsightsPanel } from "./OutcomeInsightsPanel";
@@ -30,8 +29,6 @@ export default async function IntelligencePage() {
       <section className="mb-8">
         <SectionSignalsPanel organizationId={organizationId} />
       </section>
-
-      <IntelligenceVisionDemo />
     </>
   );
 }
