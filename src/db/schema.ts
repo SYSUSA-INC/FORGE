@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -7,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
   type AnyPgColumn,
@@ -1388,3 +1390,43 @@ export type KnowledgeArtifactChunk =
   typeof knowledgeArtifactChunks.$inferSelect;
 export type NewKnowledgeArtifactChunk =
   typeof knowledgeArtifactChunks.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// Email OAuth (Phase 13c) — per-user connected mailbox for outbound mail
+// ────────────────────────────────────────────────────────────────────
+
+export const emailOauthProviderEnum = pgEnum("email_oauth_provider", [
+  "google",
+  "microsoft",
+]);
+
+export type EmailOauthProvider = (typeof emailOauthProviderEnum.enumValues)[number];
+
+export const emailOauthAccounts = pgTable(
+  "email_oauth_account",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: emailOauthProviderEnum("provider").notNull(),
+    emailAddress: text("email_address").notNull(),
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    refreshTokenEncrypted: text("refresh_token_encrypted").notNull().default(""),
+    scope: text("scope").notNull().default(""),
+    tokenExpiresAt: timestamp("token_expires_at"),
+    isDefault: boolean("is_default").notNull().default(false),
+    connectedAt: timestamp("connected_at").notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at"),
+    lastError: text("last_error").notNull().default(""),
+  },
+  (t) => ({
+    byUserIdx: index("email_oauth_account_user_id_idx").on(t.userId),
+    uniquePerUserProviderEmail: uniqueIndex(
+      "email_oauth_account_user_provider_email_unique",
+    ).on(t.userId, t.provider, t.emailAddress),
+  }),
+);
+
+export type EmailOauthAccount = typeof emailOauthAccounts.$inferSelect;
+export type NewEmailOauthAccount = typeof emailOauthAccounts.$inferInsert;

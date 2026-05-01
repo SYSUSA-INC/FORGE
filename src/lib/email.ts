@@ -339,6 +339,13 @@ export async function sendOpportunityReviewRequestEmail(opts: {
   synopsis: string;
   note: string;
   token: string;
+  /**
+   * If supplied, FORGE first tries to send through the user's connected
+   * OAuth mailbox (Phase 13c) so the email comes from a real address at
+   * the sender's organization. Falls back to the platform Resend pipeline
+   * if the user hasn't connected one or the connected provider fails.
+   */
+  senderUserId?: string;
 }): Promise<void> {
   const url = `${baseUrl()}/review/${encodeURIComponent(opts.token)}`;
   const noteBlock = opts.note
@@ -398,12 +405,40 @@ export async function sendOpportunityReviewRequestEmail(opts: {
       <span style="color:#94a3b8;word-break:break-all;">${url}</span>
     </p>
   `;
-  await sendEmail({
-    to: opts.to,
-    subject: `[FORGE] Review request — ${opts.opportunityTitle}`.slice(0, 120),
-    html: emailShell(`Review request — ${opts.opportunityTitle}`, body),
-    text: `${opts.senderName} would like your read on "${opts.opportunityTitle}" (${opts.agency}, due ${opts.dueDate}).${
-      opts.note ? `\n\nNote: ${opts.note}` : ""
-    }\n\nOpen to recommend Bid / No-bid / More info: ${url}\n\nLink expires in 14 days.`,
-  });
+  const subject = `[FORGE] Review request — ${opts.opportunityTitle}`.slice(0, 120);
+  const html = emailShell(`Review request — ${opts.opportunityTitle}`, body);
+  const text = `${opts.senderName} would like your read on "${opts.opportunityTitle}" (${opts.agency}, due ${opts.dueDate}).${
+    opts.note ? `\n\nNote: ${opts.note}` : ""
+  }\n\nOpen to recommend Bid / No-bid / More info: ${url}\n\nLink expires in 14 days.`;
+
+  // Phase 13c: try the sender's connected OAuth mailbox first so the
+  // reviewer sees a real human address. Fall back to platform Resend
+  // if no account is connected, or if the connected provider errors
+  // (we don't want a transient OAuth blip to silently drop a review
+  // request — Resend is the safety net).
+  if (opts.senderUserId) {
+    try {
+      const { sendEmailFromUser } = await import("./email-oauth");
+      const result = await sendEmailFromUser({
+        userId: opts.senderUserId,
+        to: opts.to,
+        subject,
+        html,
+        text,
+      });
+      if (result.ok) return;
+      if (result.reason !== "no-account") {
+        console.warn(
+          `[email] OAuth send failed (${result.reason}) — falling back to Resend.`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[email] OAuth send threw — falling back to Resend.`,
+        err,
+      );
+    }
+  }
+
+  await sendEmail({ to: opts.to, subject, html, text });
 }

@@ -150,6 +150,7 @@ export async function sendOpportunityReviewRequestAction(
       synopsis: opp.description.slice(0, 800),
       note,
       token,
+      senderUserId: sender.id,
     });
     emailSent = true;
   } catch (err) {
