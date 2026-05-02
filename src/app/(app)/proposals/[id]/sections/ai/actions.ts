@@ -15,6 +15,7 @@ import {
   type SectionDraftMode,
   type SectionDraftSnapshot,
 } from "@/lib/ai-prompts";
+import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
 import { fromPlainText, projectToPlain } from "@/lib/tiptap-doc";
 
 export type SectionDraftResult =
@@ -83,6 +84,24 @@ export async function generateSectionDraftAction(input: {
       description: (p.description ?? "").slice(0, 400),
     }));
 
+  // Phase 14d — pattern intel. Best-effort; failures degrade to no
+  // intel rather than blocking the draft.
+  let patternIntel: SectionDraftSnapshot["patternIntel"];
+  try {
+    patternIntel = await gatherPatternIntelForSection({
+      sectionId: input.sectionId,
+      organizationId,
+      sectionTitle: row.section.title,
+      sectionKind: row.section.kind,
+      agency: row.agency ?? "",
+      naicsCode: row.naicsCode ?? "",
+      opportunityDescription: row.opportunityDescription ?? "",
+    });
+  } catch (err) {
+    console.warn("[generateSectionDraftAction] pattern intel failed", err);
+    patternIntel = undefined;
+  }
+
   const snapshot: SectionDraftSnapshot = {
     organizationName: orgRow?.name ?? "your organization",
     proposal: {
@@ -102,6 +121,7 @@ export async function generateSectionDraftAction(input: {
       currentWordCount: row.section.wordCount,
     },
     pastPerformance,
+    patternIntel,
   };
 
   // Improve / tighten require existing content to be useful.
