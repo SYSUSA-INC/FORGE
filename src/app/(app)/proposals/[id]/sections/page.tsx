@@ -5,6 +5,7 @@ import { proposalSections, proposals, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { listProposalTeamCandidates } from "../../actions";
+import { AutoDraftButton } from "./ai/AutoDraftButton";
 import { SectionsClient } from "./SectionsClient";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,11 @@ export default async function ProposalSectionsPage({
   const team = await listProposalTeamCandidates();
 
   return (
-    <Panel title="Sections" eyebrow="Author the proposal">
+    <Panel
+      title="Sections"
+      eyebrow="Author the proposal"
+      actions={<AutoDraftButton proposalId={params.id} />}
+    >
       <SectionsClient
         proposalId={params.id}
         sections={sectionRows.map((s) => ({
