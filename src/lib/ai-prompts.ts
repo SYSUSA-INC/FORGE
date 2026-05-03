@@ -506,6 +506,117 @@ export function buildKnowledgeExtractPrompt(input: {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// Phase 14f — Proposal-vs-winner analysis
+// ────────────────────────────────────────────────────────────────────
+
+export type WinnerAnalysisInput = {
+  proposalTitle: string;
+  agency: string;
+  solicitationNumber: string;
+  naicsCode: string;
+  setAside: string;
+  /** Plain-text summary of our submission — section titles + first 800 chars each. */
+  ourSubmissionSummary: string;
+  /** Snapshots of our recorded outcome + debrief. */
+  outcome: {
+    awardValue: string;
+    decisionDate: string;
+    summary: string;
+    lessonsLearned: string;
+    awardedToCompetitor: string;
+  };
+  debrief: {
+    strengths: string;
+    weaknesses: string;
+    improvements: string;
+    pastPerformanceCitation: string;
+    notes: string;
+  } | null;
+  /** Up to 8 USAspending award rows for the competitor, summarized. */
+  competitorAwards: {
+    piid: string;
+    agency: string;
+    value: string;
+    periodStart: string;
+    periodEnd: string;
+    description: string;
+  }[];
+};
+
+export type WinnerAnalysisVerdict = {
+  winnerProfileSummary: string;
+  gapsWeHad: string;
+  ourStrengthsUnrecognized: string;
+  recommendations: string;
+};
+
+const WINNER_ANALYSIS_SYSTEM = `You are a federal capture analyst inside FORGE. A proposal was lost; the team is now reviewing why. You have access to (a) a summary of what we submitted, (b) the government's debrief, and (c) recent USAspending awards the winning competitor has received. You synthesize a candid, evidence-grounded side-by-side that helps the team beat this competitor next time.
+
+Output rules (STRICT JSON, no prose):
+{
+  "winnerProfileSummary": "<2-4 sentences characterizing the winner's recent past performance — agencies they serve, contract sizes, work types, scale. Pull SPECIFICS from competitorAwards.>",
+  "gapsWeHad": "<2-5 bullet-style sentences identifying concrete gaps between our submission and what the agency apparently rewarded. Cite debrief weaknesses verbatim when they connect to a competitor strength. No generic advice.>",
+  "ourStrengthsUnrecognized": "<2-4 sentences naming strengths in our submission the debrief did NOT credit, with a brief argument for why they should have. Useful for protests or repositioning. If the debrief credited everything, say so explicitly.>",
+  "recommendations": "<3-6 specific actions the team should take before the next bid against this competitor. Reference real names from the inputs (agency, NAICS, vehicle, capability area). No 'leverage' or 'world-class'.>"
+}
+
+Hard rules:
+- Reuse facts exactly as given. Do NOT invent contract numbers, dollar values, dates, names, or capabilities.
+- If competitorAwards is empty, say so directly in winnerProfileSummary — don't fabricate.
+- If debrief is null, work from outcome.summary + outcome.lessonsLearned only and note that the debrief wasn't held.
+- Each field's text ≤ 1200 characters. Plain prose, no markdown.
+- No diplomatic hedging. The team is reviewing a loss; they need a useful read, not flattery.`;
+
+export function buildWinnerAnalysisPrompt(
+  input: WinnerAnalysisInput,
+): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Proposal context:`,
+    `- Title: ${input.proposalTitle}`,
+    `- Agency: ${input.agency || "(unknown)"}`,
+    `- Solicitation: ${input.solicitationNumber || "(unknown)"}`,
+    `- NAICS: ${input.naicsCode || "(unknown)"}`,
+    `- Set-aside: ${input.setAside || "(unrestricted)"}`,
+    ``,
+    `Our submission (sections, trimmed):`,
+    input.ourSubmissionSummary || "(no draft text recorded)",
+    ``,
+    `Our recorded outcome:`,
+    `- Award value: ${input.outcome.awardValue || "(unknown)"}`,
+    `- Decision date: ${input.outcome.decisionDate || "(unknown)"}`,
+    `- Awarded to: ${input.outcome.awardedToCompetitor || "(unknown competitor)"}`,
+    `- Internal summary: ${input.outcome.summary || "(none)"}`,
+    `- Lessons learned: ${input.outcome.lessonsLearned || "(none)"}`,
+    ``,
+    input.debrief
+      ? [
+          `Government debrief:`,
+          `- Strengths cited: ${input.debrief.strengths || "(none)"}`,
+          `- Weaknesses cited: ${input.debrief.weaknesses || "(none)"}`,
+          `- Improvements suggested: ${input.debrief.improvements || "(none)"}`,
+          `- Past performance citation: ${input.debrief.pastPerformanceCitation || "(none)"}`,
+          `- Other notes: ${input.debrief.notes || "(none)"}`,
+        ].join("\n")
+      : `Government debrief: NOT HELD or not yet recorded.`,
+    ``,
+    `Competitor's USAspending awards (${input.competitorAwards.length}):`,
+    ...input.competitorAwards.map(
+      (a) =>
+        `  - ${a.piid} | ${a.agency} | ${a.value} | ${a.periodStart}—${a.periodEnd} | ${a.description.slice(0, 240)}`,
+    ),
+    ``,
+    `Return strict JSON per the schema in the system prompt.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    system: WINNER_ANALYSIS_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Phase 14c — Compliance pre-flight
 // ────────────────────────────────────────────────────────────────────
 
