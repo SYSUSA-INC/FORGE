@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SsoButtons } from "@/components/auth/SsoButtons";
+import { safeRedirectTarget } from "@/lib/safe-redirect";
 import { SignInForm } from "./SignInForm";
 
 export default async function SignInPage({
@@ -9,9 +10,14 @@ export default async function SignInPage({
 }: {
   searchParams: { error?: string; callbackUrl?: string; verified?: string };
 }) {
+  // Validate callbackUrl — only allow same-origin relative paths.
+  // Anything off-origin / protocol-relative / pointing at an API
+  // route falls back to "/". Prevents phishing redirects.
+  const safeCallback = safeRedirectTarget(searchParams.callbackUrl);
+
   const session = await auth();
   if (session?.user) {
-    redirect(searchParams.callbackUrl ?? "/");
+    redirect(safeCallback);
   }
 
   const verified = searchParams.verified === "1";
@@ -66,7 +72,7 @@ export default async function SignInPage({
             </div>
           ) : null}
 
-          <SignInForm callbackUrl={searchParams.callbackUrl} />
+          <SignInForm callbackUrl={safeCallback} />
 
           <div className="relative my-6 flex items-center">
             <span className="h-px flex-1 bg-white/10" />
@@ -76,7 +82,7 @@ export default async function SignInPage({
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          <SsoButtons callbackUrl={searchParams.callbackUrl} mode="sign-in" />
+          <SsoButtons callbackUrl={safeCallback} mode="sign-in" />
 
           <div className="mt-4 flex justify-between font-mono text-[11px]">
             <Link href="/forgot-password" className="text-muted hover:text-text">
