@@ -19,6 +19,7 @@ import {
   type CompliancePreflightVerdict,
 } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { projectToPlain } from "@/lib/tiptap-doc";
 
 async function ownsProposal(id: string, organizationId: string) {
@@ -300,6 +301,21 @@ export async function runCompliancePreflightAction(
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
+  }
+
+  // Rate limit per proposal — pre-flight is expensive (one AI call
+  // per section group). 10 runs/hour per proposal is generous for
+  // legitimate iteration but stops a stuck client retry loop.
+  const limit = await enforceRateLimit({
+    key: `preflight:proposal:${proposalId}`,
+    limit: 10,
+    windowSeconds: 3600,
+  });
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: `Pre-flight limit (10/hour) reached for this proposal. Retry in ${Math.ceil(limit.retryAfter / 60)} min.`,
+    };
   }
 
   // Pull every mapped item + the section it's mapped to.

@@ -6,6 +6,7 @@ import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
 import { sendVerificationEmail } from "@/lib/email";
 import { consumeToken, issueToken } from "@/lib/tokens";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
+import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 import {
   anySignupAllowed,
   selfServiceRegistrationAllowed,
@@ -173,6 +174,30 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: "Sign-up is currently disabled." },
         { status: 403 },
+      );
+    }
+
+    // Rate limit per source IP. Belt-and-suspenders against bot signup
+    // bursts even when SIGNUP_MODE=invite_only — the invite path still
+    // counts toward this bucket so attackers can't enumerate live
+    // invite ids by spamming the endpoint.
+    const ip = ipFromRequest(req);
+    const limit = await enforceRateLimit({
+      key: `register:ip:${ip}`,
+      limit: 5,
+      windowSeconds: 3600,
+    });
+    if (!limit.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Too many sign-up attempts from this network. Try again in an hour.",
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(limit.retryAfter) },
+        },
       );
     }
 
