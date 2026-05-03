@@ -30,6 +30,29 @@ async function ownsProposal(id: string, organizationId: string) {
   return !!row;
 }
 
+/**
+ * Verify that a proposalSectionId (if provided) belongs to the given
+ * proposal. Prevents cross-proposal/cross-tenant section references
+ * being injected into compliance item rows.
+ */
+async function sectionBelongsToProposal(
+  sectionId: string | null | undefined,
+  proposalId: string,
+): Promise<boolean> {
+  if (!sectionId) return true;
+  const [row] = await db
+    .select({ id: proposalSections.id })
+    .from(proposalSections)
+    .where(
+      and(
+        eq(proposalSections.id, sectionId),
+        eq(proposalSections.proposalId, proposalId),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
 export type ComplianceItemInput = {
   category: ComplianceCategory;
   number: string;
@@ -54,6 +77,12 @@ export async function createComplianceItemAction(
   }
   if (!input.requirementText.trim()) {
     return { ok: false, error: "Requirement text is required." };
+  }
+  if (!(await sectionBelongsToProposal(input.proposalSectionId, proposalId))) {
+    return {
+      ok: false,
+      error: "Section does not belong to this proposal.",
+    };
   }
 
   try {
@@ -104,6 +133,15 @@ export async function updateComplianceItemAction(
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
+  }
+  if (
+    input.proposalSectionId !== undefined &&
+    !(await sectionBelongsToProposal(input.proposalSectionId, proposalId))
+  ) {
+    return {
+      ok: false,
+      error: "Section does not belong to this proposal.",
+    };
   }
 
   try {

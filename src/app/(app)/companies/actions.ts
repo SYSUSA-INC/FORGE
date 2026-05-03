@@ -118,7 +118,7 @@ export async function updateCompanyAction(
     await db
       .update(companies)
       .set({ ...toRow(input), updatedAt: new Date() })
-      .where(eq(companies.id, id));
+      .where(and(eq(companies.id, id), eq(companies.organizationId, organizationId)));
     revalidatePath("/companies");
     revalidatePath(`/companies/${id}`);
     return { ok: true };
@@ -139,7 +139,9 @@ export async function deleteCompanyAction(
   if (!(await ownsCompany(id, organizationId))) {
     return { ok: false, error: "Company not found." };
   }
-  await db.delete(companies).where(eq(companies.id, id));
+  await db
+    .delete(companies)
+    .where(and(eq(companies.id, id), eq(companies.organizationId, organizationId)));
   revalidatePath("/companies");
   return { ok: true };
 }

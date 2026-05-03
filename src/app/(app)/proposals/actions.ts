@@ -238,7 +238,7 @@ export async function updateProposalAction(
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         updatedAt: new Date(),
       })
-      .where(eq(proposals.id, id));
+      .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
     revalidatePath(`/proposals/${id}`);
     return { ok: true };
   } catch (err) {
@@ -266,7 +266,7 @@ export async function advanceProposalStageAction(
     const [before] = await db
       .select({ stage: proposals.stage })
       .from(proposals)
-      .where(eq(proposals.id, id))
+      .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)))
       .limit(1);
     const wasNotSubmitted = before && before.stage !== "submitted";
 
@@ -278,7 +278,7 @@ export async function advanceProposalStageAction(
           nextStage === "submitted" ? new Date() : undefined,
         updatedAt: new Date(),
       })
-      .where(eq(proposals.id, id));
+      .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
     revalidatePath(`/proposals/${id}`);
     revalidatePath("/proposals");
 
@@ -314,7 +314,9 @@ export async function deleteProposalAction(
   if (!(await ownsProposal(id, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
-  await db.delete(proposals).where(eq(proposals.id, id));
+  await db
+    .delete(proposals)
+    .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
   revalidatePath("/proposals");
   return { ok: true };
 }
