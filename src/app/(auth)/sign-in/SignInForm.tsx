@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
+import { safeRedirectTarget } from "@/lib/safe-redirect";
 
 export function SignInForm({ callbackUrl }: { callbackUrl?: string }) {
   const [email, setEmail] = useState("");
@@ -24,7 +25,9 @@ export function SignInForm({ callbackUrl }: { callbackUrl?: string }) {
         setLoading(false);
         return;
       }
-      window.location.href = callbackUrl ?? "/";
+      // Server validates the callbackUrl too, but defense-in-depth: never
+      // hand window.location an attacker-controlled string.
+      window.location.href = safeRedirectTarget(callbackUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Try again.");
       setLoading(false);
