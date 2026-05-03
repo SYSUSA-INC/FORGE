@@ -6,6 +6,15 @@ import remarkGfm from "remark-gfm";
 export function MarkdownRenderer({ source }: { source: string }) {
   return (
     <ReactMarkdown
+      // Defense-in-depth: explicitly disable raw HTML rendering. By default,
+      // react-markdown without rehype-raw already escapes HTML (so this is
+      // belt-and-suspenders), but stating it makes the intent obvious and
+      // prevents a silent regression if anyone later adds rehype-raw to the
+      // remarkPlugins/rehypePlugins arrays. The /help pages render trusted
+      // bundled markdown today, but this component may be reused for
+      // user-authored content (knowledge entries, debrief notes) where
+      // unsafe HTML would be a real XSS vector.
+      skipHtml
       remarkPlugins={[remarkGfm]}
       components={{
         h1: ({ children }) => (
