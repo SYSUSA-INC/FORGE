@@ -72,33 +72,69 @@ export async function embedArtifactAction(
   let model = "stub";
   let stubbed = true;
 
-  for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
-    const slice = chunks.slice(i, i + EMBED_BATCH);
-    const texts = slice.map((c) => c.content);
-    const result = await embedBatch(texts);
-    provider = result.provider;
-    model = result.model;
-    stubbed = result.stubbed;
+  // The whole insert loop is wrapped so any mid-batch failure (network
+  // hiccup on a single insert, embedding provider returning fewer
+  // vectors than chunks, etc.) results in a clean slate rather than a
+  // half-embedded artifact. On error we delete every chunk for the
+  // artifact (including the ones we just inserted) and propagate the
+  // error to the caller. The caller (harvest, manual re-embed) treats
+  // the failure as best-effort and the user can re-run.
+  try {
+    for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
+      const slice = chunks.slice(i, i + EMBED_BATCH);
+      const texts = slice.map((c) => c.content);
+      const result = await embedBatch(texts);
+      provider = result.provider;
+      model = result.model;
+      stubbed = result.stubbed;
 
-    // Insert sequentially with raw cast to vector. Done one-at-a-time
-    // because pgvector text-cast on bulk inserts is awkward through
-    // Drizzle's parameter binding; chunk counts are small (<200).
-    for (let j = 0; j < slice.length; j++) {
-      const c = slice[j]!;
-      const vec = result.vectors[j]!;
-      const literal = vectorToPgLiteral(vec);
-      await db.execute(sql`
-        INSERT INTO knowledge_artifact_chunk
-          (organization_id, artifact_id, chunk_index, content,
-           embedding, token_count, char_start, char_end,
-           embedding_provider, embedding_model, embedded_at)
-        VALUES
-          (${organizationId}, ${artifactId}, ${c.index}, ${c.content},
-           ${literal}::vector, ${approxTokenCount(c.content)},
-           ${c.charStart}, ${c.charEnd},
-           ${result.provider}, ${result.model}, now())
-      `);
+      if (result.vectors.length !== slice.length) {
+        throw new Error(
+          `Embedding provider returned ${result.vectors.length} vectors for ${slice.length} chunks.`,
+        );
+      }
+
+      // Insert sequentially with raw cast to vector. Done one-at-a-time
+      // because pgvector text-cast on bulk inserts is awkward through
+      // Drizzle's parameter binding; chunk counts are small (<200).
+      for (let j = 0; j < slice.length; j++) {
+        const c = slice[j]!;
+        const vec = result.vectors[j]!;
+        const literal = vectorToPgLiteral(vec);
+        await db.execute(sql`
+          INSERT INTO knowledge_artifact_chunk
+            (organization_id, artifact_id, chunk_index, content,
+             embedding, token_count, char_start, char_end,
+             embedding_provider, embedding_model, embedded_at)
+          VALUES
+            (${organizationId}, ${artifactId}, ${c.index}, ${c.content},
+             ${literal}::vector, ${approxTokenCount(c.content)},
+             ${c.charStart}, ${c.charEnd},
+             ${result.provider}, ${result.model}, now())
+        `);
+      }
     }
+  } catch (err) {
+    // Roll back any partial inserts so the artifact has either ALL
+    // chunks or NONE — never a partial set. The delete is best-effort:
+    // if it fails too, we at least logged the original failure.
+    await db
+      .delete(knowledgeArtifactChunks)
+      .where(eq(knowledgeArtifactChunks.artifactId, artifactId))
+      .catch((cleanupErr) => {
+        console.error(
+          "[embedArtifactAction] partial chunks could not be rolled back",
+          cleanupErr,
+        );
+      });
+    console.error("[embedArtifactAction] chunk insert failed", err);
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Embedding failed mid-batch; please retry.",
+    };
   }
 
   revalidatePath(`/knowledge-base/import/${artifactId}`);

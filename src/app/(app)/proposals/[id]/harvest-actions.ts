@@ -95,28 +95,34 @@ export async function harvestProposalToCorpusAction(
   }
 
   // Look for an existing harvest artifact for this proposal — reuse
-  // it so re-runs don't pile up duplicates.
-  const existing = await db
-    .select({
-      id: knowledgeArtifacts.id,
-      metadata: knowledgeArtifacts.metadata,
-    })
-    .from(knowledgeArtifacts)
-    .where(
-      and(
-        eq(knowledgeArtifacts.organizationId, organizationId),
-        eq(knowledgeArtifacts.source, "mined_from_proposal"),
-      ),
+  // it so re-runs don't pile up duplicates. The unique index added in
+  // migration 0029 enforces this at the database level too, so if a
+  // concurrent run sneaks in between our SELECT and INSERT, the
+  // INSERT will fail with code 23505 and we re-read.
+  async function findExisting() {
+    const rows = await db
+      .select({
+        id: knowledgeArtifacts.id,
+        metadata: knowledgeArtifacts.metadata,
+      })
+      .from(knowledgeArtifacts)
+      .where(
+        and(
+          eq(knowledgeArtifacts.organizationId, organizationId),
+          eq(knowledgeArtifacts.source, "mined_from_proposal"),
+        ),
+      );
+    return rows.find(
+      (e) => (e.metadata as Record<string, unknown>)?.proposalId === proposalId,
     );
-  const match = existing.find(
-    (e) => (e.metadata as Record<string, unknown>)?.proposalId === proposalId,
-  );
+  }
 
+  const existing = await findExisting();
   let artifactId: string;
   let reused = false;
 
-  if (match) {
-    artifactId = match.id;
+  if (existing) {
+    artifactId = existing.id;
     reused = true;
     await db
       .update(knowledgeArtifacts)
@@ -128,43 +134,68 @@ export async function harvestProposalToCorpusAction(
         indexedAt: new Date(),
         updatedAt: new Date(),
         metadata: {
-          ...(typeof match.metadata === "object" && match.metadata
-            ? match.metadata
+          ...(typeof existing.metadata === "object" && existing.metadata
+            ? existing.metadata
             : {}),
           proposalId,
           opportunityId: propRow.proposal.opportunityId,
           harvestedAt: new Date().toISOString(),
         },
       })
-      .where(eq(knowledgeArtifacts.id, artifactId));
+      .where(
+        and(
+          eq(knowledgeArtifacts.id, artifactId),
+          eq(knowledgeArtifacts.organizationId, organizationId),
+        ),
+      );
   } else {
-    const [created] = await db
-      .insert(knowledgeArtifacts)
-      .values({
-        organizationId,
-        kind: "proposal",
-        source: "mined_from_proposal",
-        title: harvestTitle(propRow.proposal.title),
-        tags: composeTags(propRow),
-        fileName: "",
-        fileSize: composed.length,
-        contentType: "text/plain",
-        storagePath: "",
-        rawText: composed.slice(0, RAW_TEXT_CAP),
-        status: "indexed",
-        indexedAt: new Date(),
-        uploadedByUserId: user.id,
-        metadata: {
-          proposalId,
-          opportunityId: propRow.proposal.opportunityId,
-          harvestedAt: new Date().toISOString(),
-        },
-      })
-      .returning({ id: knowledgeArtifacts.id });
-    if (!created) {
-      return { ok: false, error: "Could not create harvest artifact." };
+    try {
+      const [created] = await db
+        .insert(knowledgeArtifacts)
+        .values({
+          organizationId,
+          kind: "proposal",
+          source: "mined_from_proposal",
+          title: harvestTitle(propRow.proposal.title),
+          tags: composeTags(propRow),
+          fileName: "",
+          fileSize: composed.length,
+          contentType: "text/plain",
+          storagePath: "",
+          rawText: composed.slice(0, RAW_TEXT_CAP),
+          status: "indexed",
+          indexedAt: new Date(),
+          uploadedByUserId: user.id,
+          metadata: {
+            proposalId,
+            opportunityId: propRow.proposal.opportunityId,
+            harvestedAt: new Date().toISOString(),
+          },
+        })
+        .returning({ id: knowledgeArtifacts.id });
+      if (!created) {
+        return { ok: false, error: "Could not create harvest artifact." };
+      }
+      artifactId = created.id;
+    } catch (err) {
+      // Another concurrent run beat us to the insert. Re-read and
+      // treat as reuse — same end-state, no duplicate row.
+      const code = (err as { code?: string }).code;
+      if (code === "23505") {
+        const after = await findExisting();
+        if (!after) {
+          return {
+            ok: false,
+            error:
+              "Concurrent harvest collision detected but no existing artifact found. Try again.",
+          };
+        }
+        artifactId = after.id;
+        reused = true;
+      } else {
+        throw err;
+      }
     }
-    artifactId = created.id;
   }
 
   // Embed for semantic search. Best-effort — the user can re-run

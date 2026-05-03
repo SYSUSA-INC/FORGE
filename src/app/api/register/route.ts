@@ -133,16 +133,32 @@ async function acceptInvite(opts: {
     )
     .limit(1);
 
+  // Membership insert MUST succeed before we mark the invite consumed.
+  // Otherwise a transient DB error would burn the invite token without
+  // creating the membership — the user couldn't retry (token gone) and
+  // couldn't sign in (no membership). On failure we surface the error
+  // and leave the allowlist row consumable.
   if (!existingMembership) {
-    await db.insert(memberships).values({
-      userId,
-      organizationId: inv.organizationId,
-      role: inv.role,
-      status: "active",
-      title: inv.title,
-    });
+    try {
+      await db.insert(memberships).values({
+        userId,
+        organizationId: inv.organizationId,
+        role: inv.role,
+        status: "active",
+        title: inv.title,
+      });
+    } catch (err) {
+      console.error("[acceptInvite] membership insert failed", err);
+      return {
+        ok: false,
+        error:
+          "Could not finish creating your account — please try again or contact support.",
+        status: 500,
+      };
+    }
   }
 
+  // Only now is it safe to mark the invite consumed.
   await db
     .update(allowlist)
     .set({ consumedAt: new Date() })
