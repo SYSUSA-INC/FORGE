@@ -868,6 +868,67 @@ export type ProposalDebriefFormat =
   (typeof proposalDebriefFormatEnum.enumValues)[number];
 
 /**
+ * Phase 14f — proposal-vs-winner analysis.
+ *
+ * After a loss with awardedToCompetitor set + a debrief, the AI
+ * compares our submission to what we know about the winner and
+ * stores a structured side-by-side. Read once, render the panel,
+ * and re-run when new debrief details arrive.
+ *
+ * One row per proposal — re-runs UPDATE in place.
+ */
+export const proposalWinnerAnalyses = pgTable(
+  "proposal_winner_analysis",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .unique()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    competitorName: text("competitor_name").notNull().default(""),
+    /** AI-summarized profile of the winner — past performance, vehicles, agencies, scale. */
+    winnerProfileSummary: text("winner_profile_summary").notNull().default(""),
+    /** Concrete capability or evidence gaps the AI judges contributed to the loss. */
+    gapsWeHad: text("gaps_we_had").notNull().default(""),
+    /** Strengths in our submission the debrief didn't credit — useful for protests / future bids. */
+    ourStrengthsUnrecognized: text("our_strengths_unrecognized")
+      .notNull()
+      .default(""),
+    /** Specific actions the team should take before the next bid against this competitor. */
+    recommendations: text("recommendations").notNull().default(""),
+    /** USAspending evidence rows the AI was shown — JSON array of competitor awards. */
+    sourceUsaspending: jsonb("source_usaspending")
+      .$type<
+        {
+          piid: string;
+          agency: string;
+          value: string;
+          periodStart: string;
+          periodEnd: string;
+          description: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    model: text("model").notNull().default(""),
+    stubbed: boolean("stubbed").notNull().default(false),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);
+
+export type ProposalWinnerAnalysis =
+  typeof proposalWinnerAnalyses.$inferSelect;
+export type NewProposalWinnerAnalysis =
+  typeof proposalWinnerAnalyses.$inferInsert;
+
+/**
  * Templates can be either:
  *   - "docx": user uploads a real Word template (header, footer,
  *     graphics, cover page, TOC, page numbers all baked into the

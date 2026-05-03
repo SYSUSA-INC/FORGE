@@ -19,6 +19,7 @@ import {
   OUTCOME_TYPE_LABELS,
 } from "@/lib/proposal-outcome-types";
 import { saveDebriefAction, saveOutcomeAction } from "./actions";
+import { WinnerAnalysisPanel } from "./WinnerAnalysisPanel";
 
 type OutcomeForm = {
   outcomeType: ProposalOutcomeType;
@@ -105,6 +106,13 @@ export function OutcomeClient({
           hasOutcome={Boolean(outcome)}
           debrief={debrief}
         />
+        {outcome?.outcomeType === "lost" ? (
+          <WinnerAnalysisPanel
+            proposalId={proposalId}
+            outcomeType={outcome.outcomeType}
+            awardedToCompetitor={outcome.awardedToCompetitor ?? ""}
+          />
+        ) : null}
       </div>
       <SidebarPanel
         currentStage={currentStage}
