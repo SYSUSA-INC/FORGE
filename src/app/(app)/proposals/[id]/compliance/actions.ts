@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -456,7 +456,11 @@ export async function runCompliancePreflightAction(
         model: provider,
       };
 
-      await db
+      // Concurrent-write guard: only overwrite if the row's previous
+      // aiAssessedAt is null or older than 5 seconds. Stops a double-
+      // clicked pre-flight run from clobbering an in-flight result and
+      // burning tokens on conflicting verdicts.
+      const result = await db
         .update(complianceItems)
         .set({
           aiAssessment: assessment,
@@ -467,9 +471,13 @@ export async function runCompliancePreflightAction(
           and(
             eq(complianceItems.id, v.itemId),
             eq(complianceItems.proposalId, proposalId),
+            sql`(${complianceItems.aiAssessedAt} IS NULL OR ${complianceItems.aiAssessedAt} < now() - interval '5 seconds')`,
           ),
-        );
-      assessed += 1;
+        )
+        .returning({ id: complianceItems.id });
+      // If the guard prevented the update (concurrent run already won),
+      // result is empty — that's fine, we just skip the count.
+      if (result.length > 0) assessed += 1;
     }
   }
 
