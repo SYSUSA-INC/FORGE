@@ -6,6 +6,10 @@ import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
 import { sendVerificationEmail } from "@/lib/email";
 import { consumeToken, issueToken } from "@/lib/tokens";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
+import {
+  anySignupAllowed,
+  selfServiceRegistrationAllowed,
+} from "@/lib/signup-mode";
 
 export const runtime = "nodejs";
 
@@ -149,6 +153,13 @@ async function acceptInvite(opts: {
 
 export async function POST(req: Request) {
   try {
+    if (!anySignupAllowed()) {
+      return NextResponse.json(
+        { ok: false, error: "Sign-up is currently disabled." },
+        { status: 403 },
+      );
+    }
+
     let payload: {
       email?: unknown;
       password?: unknown;
@@ -179,6 +190,8 @@ export async function POST(req: Request) {
     const passwordHash = await hashPassword(password);
 
     // Invite path — email is taken from allowlist, email is pre-verified.
+    // Always allowed (when sign-up isn't fully disabled), regardless of
+    // SIGNUP_MODE — the allowlist + token IS the authorization.
     if (inviteId && inviteToken) {
       const res = await acceptInvite({
         inviteId,
@@ -193,6 +206,20 @@ export async function POST(req: Request) {
         );
       }
       return NextResponse.json({ ok: true, verified: true });
+    }
+
+    // Self-service signup path. Gated behind SIGNUP_MODE=open. Default
+    // (invite_only) rejects with 403 — bots and unsolicited public signup
+    // can't auto-provision orgs.
+    if (!selfServiceRegistrationAllowed()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Public sign-up is disabled. Ask your organization admin for an invitation, or contact support@sysgov.com.",
+        },
+        { status: 403 },
+      );
     }
 
     // Self-service signup path — auto-creates org, requires email verification.
