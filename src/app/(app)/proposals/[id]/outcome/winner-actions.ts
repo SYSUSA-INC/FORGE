@@ -18,6 +18,7 @@ import {
   type WinnerAnalysisVerdict,
 } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { searchAwardsByRecipientName } from "@/lib/usaspending";
 
@@ -101,6 +102,20 @@ export async function runWinnerAnalysisAction(
 ): Promise<RunWinnerAnalysisResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // Rate limit: winner analysis is expensive (USAspending fetch + AI).
+  // 5 runs/hour per proposal is plenty for normal iteration.
+  const limit = await enforceRateLimit({
+    key: `winner-analysis:proposal:${proposalId}`,
+    limit: 5,
+    windowSeconds: 3600,
+  });
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: `Winner analysis limit (5/hour) reached for this proposal. Retry in ${Math.ceil(limit.retryAfter / 60)} min.`,
+    };
+  }
 
   // Verify ownership + load proposal + opportunity context.
   const [propRow] = await db

@@ -9,6 +9,7 @@ import {
   type TipTapDoc,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   countWords as countTipTapWords,
   fromPlainText,
@@ -110,8 +111,36 @@ export async function autoDraftSingleSectionAction(input: {
   /** Whether to overwrite an existing non-empty section. Defaults to false. */
   overwrite?: boolean;
 }): Promise<AutoDraftSectionResult> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // Rate-limit AI draft calls. Two buckets: per-user (catches a user
+  // who scripts the action) and per-org (catches an org-wide runaway).
+  // Both must pass; whichever's tighter wins.
+  const userLimit = await enforceRateLimit({
+    key: `ai-draft:user:${user.id}`,
+    limit: 30,
+    windowSeconds: 3600,
+  });
+  if (!userLimit.ok) {
+    return {
+      ok: false,
+      sectionId: input.sectionId,
+      error: `You've hit the AI draft limit (30/hour). Retry in ${Math.ceil(userLimit.retryAfter / 60)} min.`,
+    };
+  }
+  const orgLimit = await enforceRateLimit({
+    key: `ai-draft:org:${organizationId}`,
+    limit: 200,
+    windowSeconds: 86400,
+  });
+  if (!orgLimit.ok) {
+    return {
+      ok: false,
+      sectionId: input.sectionId,
+      error: `Your org hit the daily AI draft limit (200/day). Retry tomorrow.`,
+    };
+  }
 
   const [section] = await db
     .select({

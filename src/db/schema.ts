@@ -1520,3 +1520,23 @@ export type KnowledgeArtifactChunk =
   typeof knowledgeArtifactChunks.$inferSelect;
 export type NewKnowledgeArtifactChunk =
   typeof knowledgeArtifactChunks.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// Rate limiting (audit PR-5)
+// ────────────────────────────────────────────────────────────────────
+
+export const rateLimitCounters = pgTable(
+  "rate_limit_counter",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start").notNull(),
+    count: integer("count").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.key, t.windowStart] }),
+    updatedAtIdx: index("rate_limit_counter_updated_at_idx").on(t.updatedAt),
+  }),
+);
+
+export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;

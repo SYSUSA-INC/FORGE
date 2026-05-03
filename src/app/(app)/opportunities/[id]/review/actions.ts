@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { sendOpportunityReviewRequestEmail } from "@/lib/email";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export type SendReviewRequestInput = {
   opportunityId: string;
@@ -41,6 +42,21 @@ export async function sendOpportunityReviewRequestAction(
 
   if (!input.opportunityId) {
     return { ok: false, error: "Missing opportunity." };
+  }
+
+  // Rate limit per org. Stops a malicious member (or a runaway
+  // automation) from spamming external reviewers / cost-bombing
+  // outbound email.
+  const limit = await enforceRateLimit({
+    key: `review-request:org:${organizationId}`,
+    limit: 20,
+    windowSeconds: 3600,
+  });
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: `Your org has hit the review-request limit (20/hour). Try again in ${Math.ceil(limit.retryAfter / 60)} minutes.`,
+    };
   }
 
   // Resolve reviewer — must be either an in-org user OR an email.
