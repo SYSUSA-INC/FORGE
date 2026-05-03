@@ -165,7 +165,7 @@ export const organizations = pgTable("organization", {
       }[]
     >()
     .notNull()
-    .default([]),
+    .default(sql`'[]'::jsonb`),
 
   pastPerformance: jsonb("past_performance")
     .$type<
@@ -180,7 +180,7 @@ export const organizations = pgTable("organization", {
       }[]
     >()
     .notNull()
-    .default([]),
+    .default(sql`'[]'::jsonb`),
 
   searchKeywords: text("search_keywords")
     .array()
@@ -912,7 +912,7 @@ export const proposalWinnerAnalyses = pgTable(
         }[]
       >()
       .notNull()
-      .default([]),
+      .default(sql`'[]'::jsonb`),
     model: text("model").notNull().default(""),
     stubbed: boolean("stubbed").notNull().default(false),
     createdByUserId: text("created_by_user_id").references(() => users.id, {
@@ -974,13 +974,13 @@ export const proposalTemplates = pgTable("proposal_template", {
   variablesDetected: jsonb("variables_detected")
     .$type<string[]>()
     .notNull()
-    .default([]),
+    .default(sql`'[]'::jsonb`),
 
   // Section seed list — array of { kind, title, ordering }
   sectionSeed: jsonb("section_seed")
     .$type<TemplateSectionSeed[]>()
     .notNull()
-    .default([]),
+    .default(sql`'[]'::jsonb`),
 
   // Branding tokens (still useful for HTML kind + PDF wrapper).
   brandPrimary: text("brand_primary").notNull().default("#2DD4BF"),
@@ -1097,7 +1097,7 @@ export const solicitations = pgTable("solicitation", {
       }[]
     >()
     .notNull()
-    .default([]),
+    .default(sql`'[]'::jsonb`),
 
   // Link to created opportunity, if converted
   opportunityId: uuid("opportunity_id").references(() => opportunities.id, {
