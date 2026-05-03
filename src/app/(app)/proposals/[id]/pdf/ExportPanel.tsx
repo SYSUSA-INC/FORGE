@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
+import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
   renderProposalDocxAction,
   renderProposalDocxAsPdfAction,
@@ -100,37 +101,30 @@ export function ExportPanel({
       title="Export"
       eyebrow="Generate PDF"
       actions={
-        <span
-          className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
-            stubMode
-              ? "border border-rose/40 bg-rose/10 text-rose"
-              : "border border-emerald/40 bg-emerald/10 text-emerald"
-          }`}
-        >
-          {stubMode ? "stub" : "live"}
-        </span>
+        stubMode ? (
+          <StubModeBanner variant="pill" />
+        ) : (
+          <span className="rounded border border-emerald/40 bg-emerald/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald">
+            live
+          </span>
+        )
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="font-body text-[12px] leading-relaxed text-muted">
-          {stubMode ? (
-            <>
-              Stub mode — clicking <span className="text-text">Generate</span>{" "}
-              builds the rendered HTML using the proposal's template; the
-              download is the HTML doc, not a PDF. Set{" "}
-              <code className="text-teal">BROWSERLESS_API_KEY</code> on Vercel
-              to flip to real PDFs.
-            </>
-          ) : (
-            <>
-              Live mode — clicking <span className="text-text">Generate</span>{" "}
-              composes the proposal + template, hands the HTML to{" "}
-              {pdfStatus.name === "browserless" ? "Browserless" : pdfStatus.name},
-              and stores the result via{" "}
-              {storageStatus.name === "r2" ? "Cloudflare R2" : storageStatus.name}.
-            </>
-          )}
-        </p>
+        {stubMode ? (
+          <StubModeBanner
+            envVar="BROWSERLESS_API_KEY"
+            message="Clicking Generate builds the rendered HTML using the proposal's template; the download is the HTML doc, not a real PDF."
+          />
+        ) : (
+          <p className="font-body text-[12px] leading-relaxed text-muted">
+            Live mode — clicking <span className="text-text">Generate</span>{" "}
+            composes the proposal + template, hands the HTML to{" "}
+            {pdfStatus.name === "browserless" ? "Browserless" : pdfStatus.name},
+            and stores the result via{" "}
+            {storageStatus.name === "r2" ? "Cloudflare R2" : storageStatus.name}.
+          </p>
+        )}
 
         {error ? (
           <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">

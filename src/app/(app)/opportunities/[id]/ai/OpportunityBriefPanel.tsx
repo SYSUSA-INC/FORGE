@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
   generateOpportunityBriefAction,
   type OpportunityBriefError,
@@ -104,9 +105,7 @@ function BriefMeta({ brief }: { brief: OpportunityBriefResult }) {
 
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 pt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
-      {brief.stubbed ? (
-        <span className="text-rose">stub mode (no AI provider configured)</span>
-      ) : null}
+      {brief.stubbed ? <StubModeBanner variant="inline" /> : null}
       {meta.map((m) => (
         <span key={m.label}>
           <span className="text-muted">{m.label}:</span>{" "}

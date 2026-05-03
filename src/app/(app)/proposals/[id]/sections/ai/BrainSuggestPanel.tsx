@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
   brainSuggestForSectionAction,
   type BrainHit,
@@ -74,12 +75,12 @@ export function BrainSuggestPanel({
               {pending ? "Thinking…" : "Suggest"}
             </button>
           </div>
-          <div className="mt-1 font-mono text-[10px] text-muted">
-            Searches the corpus + curated entries using the section's title,
-            kind, and opportunity context.
-            {stubbed
-              ? " · Stub mode — set OPENAI_API_KEY for real semantic match."
-              : ""}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] text-muted">
+            <span>
+              Searches the corpus + curated entries using the section&apos;s
+              title, kind, and opportunity context.
+            </span>
+            {stubbed ? <StubModeBanner variant="inline" /> : null}
           </div>
 
           {error ? (

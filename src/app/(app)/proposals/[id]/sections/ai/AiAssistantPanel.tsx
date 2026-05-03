@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import type { TipTapDoc } from "@/db/schema";
 import {
   generateSectionDraftAction,
@@ -153,9 +154,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-subtle">
             <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {result.stubbed ? (
-                <span className="text-rose">stub mode</span>
-              ) : null}
+              {result.stubbed ? <StubModeBanner variant="inline" /> : null}
               <span>{result.provider}</span>
               <span>{result.model}</span>
               {typeof result.inputTokens === "number" ? (
