@@ -82,6 +82,33 @@ export async function startReviewAction(input: {
     return { ok: false, error: "Assign at least one reviewer." };
   }
 
+  // Validate any per-reviewer section assignments belong to this proposal
+  // — prevents injecting section ids from another org's proposal.
+  const requestedSectionIds = Array.from(
+    new Set(
+      Object.values(input.sectionAssignments ?? {}).filter(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      ),
+    ),
+  );
+  if (requestedSectionIds.length > 0) {
+    const validSections = await db
+      .select({ id: proposalSections.id })
+      .from(proposalSections)
+      .where(
+        and(
+          eq(proposalSections.proposalId, input.proposalId),
+          inArray(proposalSections.id, requestedSectionIds),
+        ),
+      );
+    if (validSections.length !== requestedSectionIds.length) {
+      return {
+        ok: false,
+        error: "One or more assigned sections do not belong to this proposal.",
+      };
+    }
+  }
+
   try {
     const [review] = await db
       .insert(proposalReviews)
