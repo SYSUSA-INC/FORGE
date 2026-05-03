@@ -9,6 +9,7 @@ import { memberships, organizations, users, type Role } from "@/db/schema";
 import { authConfig } from "@/auth.config";
 import { verifyPassword } from "@/lib/passwords";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
+import { selfServiceRegistrationAllowed } from "@/lib/signup-mode";
 
 async function enrichFromDb(userId: string): Promise<{
   isSuperadmin: boolean;
@@ -135,6 +136,29 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   events: {
     async createUser({ user }) {
       if (!user.id) return;
+
+      // Security gate: the OAuth providers' "auto-create on first sign-in"
+      // is itself a public signup vector. Without this check, anyone with a
+      // Google/Microsoft account can hit /sign-in and silently get an org
+      // provisioned. SIGNUP_MODE=invite_only blocks that — we delete the
+      // user immediately so the next sign-in attempt doesn't see a half-
+      // created account.
+      if (!selfServiceRegistrationAllowed()) {
+        try {
+          await db.delete(users).where(eq(users.id, user.id));
+        } catch (err) {
+          console.error(
+            "[events.createUser] failed to delete unauthorized user",
+            err,
+          );
+        }
+        console.warn(
+          "[events.createUser] blocked OAuth signup (SIGNUP_MODE != open):",
+          user.email ?? user.id,
+        );
+        return;
+      }
+
       try {
         await provisionOrgForUser(user.id, user.name);
       } catch (err) {
@@ -142,10 +166,14 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
     },
     async signIn({ user }) {
-      // Belt-and-suspenders: for OAuth sign-ins that didn't trigger createUser
-      // (e.g., account linking into an existing user with no org), ensure a
-      // workspace exists.
+      // Belt-and-suspenders: for OAuth sign-ins that didn't trigger
+      // createUser (e.g., account linking into an existing user with no
+      // org), ensure a workspace exists. Same gate — only when
+      // SIGNUP_MODE=open. Existing users with existing orgs aren't
+      // affected because provisionOrgForUser is a no-op when they already
+      // have a membership.
       if (!user?.id) return;
+      if (!selfServiceRegistrationAllowed()) return;
       try {
         await provisionOrgForUser(user.id, user.name);
       } catch (err) {

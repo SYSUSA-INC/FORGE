@@ -5,6 +5,10 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { allowlist, organizations } from "@/db/schema";
 import { SsoButtons } from "@/components/auth/SsoButtons";
+import {
+  anySignupAllowed,
+  selfServiceRegistrationAllowed,
+} from "@/lib/signup-mode";
 import { SignUpForm } from "./SignUpForm";
 
 export const dynamic = "force-dynamic";
@@ -150,6 +154,56 @@ export default async function SignUpPage({
                   email: invite.email,
                 }}
               />
+            </>
+          ) : !anySignupAllowed() ? (
+            <>
+              <h1 className="mt-8 font-display text-2xl font-semibold tracking-tight text-text">
+                Sign-up is disabled
+              </h1>
+              <p className="mt-2 text-sm text-muted">
+                Account creation is currently turned off. If you have an
+                existing account, sign in below. If you need access, contact{" "}
+                <a
+                  href="mailto:support@sysgov.com"
+                  className="text-teal hover:underline"
+                >
+                  support@sysgov.com
+                </a>
+                .
+              </p>
+              <Link
+                href="/sign-in"
+                className="aur-btn aur-btn-primary mt-6 flex w-full items-center justify-center py-3 text-sm"
+              >
+                Sign in
+              </Link>
+            </>
+          ) : !selfServiceRegistrationAllowed() ? (
+            <>
+              <h1 className="mt-8 font-display text-2xl font-semibold tracking-tight text-text">
+                Invitation required
+              </h1>
+              <p className="mt-2 text-sm text-muted">
+                FORGE is currently invite-only. If your organization is on the
+                platform, ask an admin to send you an invite — the link they
+                send will land you on this page with everything filled in.
+              </p>
+              <p className="mt-4 text-sm text-muted">
+                If you&apos;re evaluating FORGE for your organization, contact{" "}
+                <a
+                  href="mailto:support@sysgov.com"
+                  className="text-teal hover:underline"
+                >
+                  support@sysgov.com
+                </a>
+                .
+              </p>
+              <Link
+                href="/sign-in"
+                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+              >
+                Already have an account? Sign in
+              </Link>
             </>
           ) : (
             <>
