@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -275,7 +276,9 @@ export const opportunities = pgTable("opportunity", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  organizationIdIdx: index("opportunity_organization_id_idx").on(t.organizationId),
+}));
 
 export type Opportunity = typeof opportunities.$inferSelect;
 export type NewOpportunity = typeof opportunities.$inferInsert;
@@ -453,7 +456,9 @@ export const proposals = pgTable("proposal", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  organizationIdIdx: index("proposal_organization_id_idx").on(t.organizationId),
+}));
 
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -476,7 +481,9 @@ export const proposalSections = pgTable("proposal_section", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  proposalIdIdx: index("proposal_section_proposal_id_idx").on(t.proposalId),
+}));
 
 export type TipTapDoc = {
   type: "doc";
@@ -551,7 +558,9 @@ export const companies = pgTable("company", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  organizationIdIdx: index("company_organization_id_idx").on(t.organizationId),
+}));
 
 export type Company = typeof companies.$inferSelect;
 export type NewCompany = typeof companies.$inferInsert;
@@ -705,7 +714,9 @@ export const complianceItems = pgTable("compliance_item", {
   aiAssessedAt: timestamp("ai_assessed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  proposalIdIdx: index("compliance_item_proposal_id_idx").on(t.proposalId),
+}));
 
 export type ComplianceItem = typeof complianceItems.$inferSelect;
 export type NewComplianceItem = typeof complianceItems.$inferInsert;
@@ -751,7 +762,9 @@ export const notifications = pgTable("notification", {
   emailError: text("email_error").notNull().default(""),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  recipientUserIdIdx: index("notification_recipient_user_id_idx").on(t.recipientUserId),
+}));
 
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
@@ -1247,7 +1260,9 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  organizationIdIdx: index("knowledge_entry_organization_id_idx").on(t.organizationId),
+}));
 
 export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
 export type NewKnowledgeEntry = typeof knowledgeEntries.$inferInsert;
@@ -1341,7 +1356,9 @@ export const knowledgeArtifacts = pgTable("knowledge_artifact", {
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  organizationIdIdx: index("knowledge_artifact_organization_id_idx").on(t.organizationId),
+}));
 
 export type KnowledgeArtifact = typeof knowledgeArtifacts.$inferSelect;
 export type NewKnowledgeArtifact = typeof knowledgeArtifacts.$inferInsert;
