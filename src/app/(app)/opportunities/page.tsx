@@ -1,17 +1,21 @@
 import Link from "next/link";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { opportunities, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { STAGES, STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
+import {
+  buildStageStats,
+  type StageStat,
+} from "./stage-stats";
 import { OpportunitiesClient } from "./OpportunitiesClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function OpportunitiesPage() {
-  const user = await requireAuth();
+  await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const rows = await db
@@ -35,11 +39,10 @@ export default async function OpportunitiesPage() {
     .where(eq(opportunities.organizationId, organizationId))
     .orderBy(desc(opportunities.updatedAt));
 
-  void user;
-  void and;
-
-  const counts: Record<string, number> = {};
-  for (const r of rows) counts[r.stage] = (counts[r.stage] ?? 0) + 1;
+  // Stage aggregates: count + due-date proximity per stage. Computed
+  // server-side so the client widgets render with real numbers, not
+  // a flicker of zeros while client-side aggregation runs.
+  const stats: Record<string, StageStat> = buildStageStats(rows);
 
   const list = rows.map((r) => ({
     id: r.id,
@@ -86,7 +89,7 @@ export default async function OpportunitiesPage() {
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted">
               Add your first opportunity to start tracking. You can enter details
-              manually or paste a SAM.gov notice ID (sync coming in a later phase).
+              manually or paste a SAM.gov notice ID.
             </p>
             <Link
               href="/opportunities/new"
@@ -103,7 +106,7 @@ export default async function OpportunitiesPage() {
   return (
     <OpportunitiesClient
       opportunities={list}
-      stageCounts={counts}
+      stageStats={stats}
       stages={STAGES}
     />
   );

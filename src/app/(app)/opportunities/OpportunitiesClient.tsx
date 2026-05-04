@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { OpportunityStage } from "@/db/schema";
 import { SendForReviewButton } from "./[id]/review/SendForReviewButton";
+import { StageWidget, spellOutStageCode } from "./StageWidget";
+import { formatDueProximity, type StageStat } from "./stage-stats";
 
 type Opp = {
   id: string;
@@ -32,11 +34,12 @@ type StageConfig = {
 
 export function OpportunitiesClient({
   opportunities,
-  stageCounts,
+  stageStats,
   stages,
 }: {
   opportunities: Opp[];
-  stageCounts: Record<string, number>;
+  /** Map of stage key → server-aggregated stats. Missing keys = zero. */
+  stageStats: Record<string, StageStat>;
   stages: StageConfig[];
 }) {
   const [filter, setFilter] = useState("");
@@ -58,6 +61,16 @@ export function OpportunitiesClient({
   }, [opportunities, filter, stageFilter]);
 
   const total = opportunities.length;
+  const captureCount =
+    (stageStats.identified?.count ?? 0) +
+    (stageStats.sources_sought?.count ?? 0) +
+    (stageStats.qualification?.count ?? 0) +
+    (stageStats.capture?.count ?? 0);
+  const proposalCount =
+    (stageStats.pre_proposal?.count ?? 0) +
+    (stageStats.writing?.count ?? 0) +
+    (stageStats.submitted?.count ?? 0);
+  const wonCount = stageStats.won?.count ?? 0;
 
   return (
     <>
@@ -77,67 +90,78 @@ export function OpportunitiesClient({
         }
         meta={[
           { label: "Total", value: String(total) },
-          {
-            label: "In capture",
-            value: String(
-              (stageCounts.identified ?? 0) +
-                (stageCounts.sources_sought ?? 0) +
-                (stageCounts.qualification ?? 0) +
-                (stageCounts.capture ?? 0),
-            ),
-          },
-          {
-            label: "In proposal",
-            value: String(
-              (stageCounts.pre_proposal ?? 0) +
-                (stageCounts.writing ?? 0) +
-                (stageCounts.submitted ?? 0),
-            ),
-          },
+          { label: "In capture", value: String(captureCount) },
+          { label: "In proposal", value: String(proposalCount) },
           {
             label: "Won",
-            value: String(stageCounts.won ?? 0),
-            accent: stageCounts.won ? "emerald" : undefined,
+            value: String(wonCount),
+            accent: wonCount ? "emerald" : undefined,
           },
         ]}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      {/* Widget grid: 10 stages, click to filter. The "All" tile is
+          a sibling so the click target for "no filter" is consistent
+          in style with the rest. */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         <button
+          type="button"
           onClick={() => setStageFilter("all")}
-          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+          aria-pressed={stageFilter === "all"}
+          className={`flex flex-col gap-2 rounded-lg border bg-white/[0.02] p-3 text-left transition-colors ${
             stageFilter === "all"
-              ? "border-teal-400 bg-teal-400/10 text-text"
-              : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+              ? "border-2 border-white/40 bg-white/[0.06]"
+              : "border-white/10 hover:border-white/30"
           }`}
         >
-          All {total}
+          <div className="flex items-center justify-between">
+            <div className="rounded-sm border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
+              All
+            </div>
+            <div className="font-display text-2xl font-semibold leading-none tabular-nums text-text">
+              {total}
+            </div>
+          </div>
+          <div className="font-display text-[14px] font-semibold text-text leading-tight">
+            Everything
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            All stages
+          </div>
         </button>
+
         {stages.map((s) => {
-          const n = stageCounts[s.key] ?? 0;
-          const active = stageFilter === s.key;
+          const stat = stageStats[s.key] ?? {
+            count: 0,
+            soonestDue: null,
+            pastDueCount: 0,
+          };
+          const dueDate = stat.soonestDue ? new Date(stat.soonestDue) : null;
           return (
-            <button
+            <StageWidget
               key={s.key}
+              shortLabel={s.shortLabel}
+              descriptiveLabel={s.label}
+              spellOut={spellOutStageCode(s.shortLabel)}
+              count={stat.count}
+              color={s.color}
+              dueProximity={formatDueProximity(dueDate)}
+              pastDueCount={stat.pastDueCount}
+              active={stageFilter === s.key}
               onClick={() => setStageFilter(s.key)}
-              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
-                active
-                  ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
-              }`}
-            >
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: s.color }}
-              />
-              {s.shortLabel} · {n}
-            </button>
+            />
           );
         })}
       </div>
 
       <Panel
-        title={stageFilter === "all" ? "All opportunities" : `Stage · ${stages.find((s) => s.key === stageFilter)?.label ?? ""}`}
+        title={
+          stageFilter === "all"
+            ? "All opportunities"
+            : `${spellOutStageCode(
+                stages.find((s) => s.key === stageFilter)?.shortLabel ?? "",
+              )} · ${stages.find((s) => s.key === stageFilter)?.label ?? ""}`
+        }
         eyebrow={`${filtered.length} of ${total}`}
         actions={
           <input
