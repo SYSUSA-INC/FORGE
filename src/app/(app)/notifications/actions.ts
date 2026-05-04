@@ -9,6 +9,7 @@ import {
   type NotificationKind,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { log } from "@/lib/log";
 
 export type NotificationRow = {
   id: string;
@@ -119,7 +120,7 @@ export async function markNotificationsReadAction(
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (err) {
-    console.error("[markNotificationsReadAction]", err);
+    log.error("[markNotificationsReadAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to mark read.",
@@ -148,7 +149,7 @@ export async function markAllNotificationsReadAction(): Promise<
     revalidatePath("/", "layout");
     return { ok: true, count: updated.length };
   } catch (err) {
-    console.error("[markAllNotificationsReadAction]", err);
+    log.error("[markAllNotificationsReadAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to mark all read.",

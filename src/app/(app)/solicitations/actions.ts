@@ -21,6 +21,7 @@ import {
 } from "@/lib/solicitation-extract";
 import { detectFormat } from "@/lib/text-extract";
 import type { AIDocumentMedia } from "@/lib/ai";
+import { log } from "@/lib/log";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB cap for v1.
 
@@ -94,7 +95,7 @@ export async function uploadSolicitationAction(
       })
       .where(eq(solicitations.id, row.id));
   } catch (err) {
-    console.error("[uploadSolicitationAction] storage", err);
+    log.error("[uploadSolicitationAction]", "storage", { error: err });
     await db
       .update(solicitations)
       .set({
@@ -114,7 +115,7 @@ export async function uploadSolicitationAction(
   // record on the redirect. Failures are recorded on the row and shown
   // on the detail page; the upload itself still succeeds.
   void parseSolicitationFromBytes(row.id, bytes).catch((err) =>
-    console.error("[uploadSolicitationAction] inline parse failed", err),
+    log.error("[uploadSolicitationAction]", "inline parse failed", { error: err }),
   );
 
   revalidatePath("/solicitations");
@@ -148,9 +149,10 @@ async function parseSolicitationFromBytes(
     rawText = res.text;
     format = res.format;
   } catch (err) {
-    console.warn(
-      "[parseSolicitationFromBytes] text extraction failed, will try vision if applicable",
-      err,
+    log.warn(
+      "[parseSolicitationFromBytes]",
+      "text extraction failed, will try vision if applicable",
+      { error: err },
     );
     format = detectFormat(contentType, fileName);
   }
@@ -379,7 +381,7 @@ export async function reparseSolicitationAction(
     };
 
   void parseSolicitationFromBytes(id, obj.bytes).catch((err) =>
-    console.error("[reparseSolicitationAction] parse failed", err),
+    log.error("[reparseSolicitationAction]", "parse failed", { error: err }),
   );
   return { ok: true };
 }
@@ -473,7 +475,7 @@ export async function convertToOpportunityAction(
     revalidatePath(`/opportunities/${opp.id}`);
     return { ok: true, opportunityId: opp.id };
   } catch (err) {
-    console.error("[convertToOpportunityAction]", err);
+    log.error("[convertToOpportunityAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Convert failed.",

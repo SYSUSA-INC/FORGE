@@ -14,6 +14,7 @@ import {
   type EbuyExtractionResult,
 } from "@/lib/ai-prompts";
 import { complete } from "@/lib/ai";
+import { log } from "@/lib/log";
 
 export type EbuyExtractOk = {
   ok: true;
@@ -77,7 +78,7 @@ export async function aiExtractEbuy(
     const cleaned = stripCodeFences(ai.text);
     const parseResult = parseAiJson(cleaned, ebuyExtractionSchema);
     if (!parseResult.ok) {
-      console.error("[aiExtractEbuy] parse", parseResult.error);
+      log.error("[aiExtractEbuy]", "parse", { error: parseResult.error });
       return { ok: false, error: parseResult.error };
     }
     return {
@@ -88,7 +89,7 @@ export async function aiExtractEbuy(
       data: normalize(parseResult.data),
     };
   } catch (err) {
-    console.error("[aiExtractEbuy]", err);
+    log.error("[aiExtractEbuy]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI extraction failed.",

@@ -15,6 +15,7 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
 import { OUTCOME_REASONS } from "@/lib/proposal-outcome-types";
+import { log } from "@/lib/log";
 
 const OUTCOME_TYPES: ProposalOutcomeType[] = [
   "won",
@@ -142,7 +143,7 @@ export async function saveOutcomeAction(
     try {
       await propagateOutcomeToCorpus(proposalId, outcomeType);
     } catch (err) {
-      console.warn("[saveOutcomeAction] propagateOutcomeToCorpus failed", err);
+      log.warn("[saveOutcomeAction]", "propagateOutcomeToCorpus failed", { error: err });
     }
     revalidatePath(`/proposals/${proposalId}`);
     revalidatePath(`/proposals/${proposalId}/outcome`);
@@ -150,7 +151,7 @@ export async function saveOutcomeAction(
     revalidatePath(`/knowledge-base`);
     return { ok: true };
   } catch (err) {
-    console.error("[saveOutcomeAction]", err);
+    log.error("[saveOutcomeAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to save outcome.",
@@ -224,7 +225,7 @@ export async function saveDebriefAction(
     revalidatePath(`/proposals/${proposalId}/outcome`);
     return { ok: true };
   } catch (err) {
-    console.error("[saveDebriefAction]", err);
+    log.error("[saveDebriefAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to save debrief.",

@@ -10,6 +10,7 @@ import {
   type OpportunityStage,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { log } from "@/lib/log";
 
 export type OpportunityInput = {
   title: string;
@@ -89,7 +90,7 @@ export async function createOpportunityAction(
     revalidatePath("/opportunities");
     return { ok: true, id: row.id };
   } catch (err) {
-    console.error("[createOpportunityAction]", err);
+    log.error("[createOpportunityAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
@@ -122,7 +123,7 @@ export async function updateOpportunityAction(
     revalidatePath(`/opportunities/${id}`);
     return { ok: true };
   } catch (err) {
-    console.error("[updateOpportunityAction]", err);
+    log.error("[updateOpportunityAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
@@ -151,7 +152,7 @@ export async function setOpportunityStageAction(
     revalidatePath(`/opportunities/${id}`);
     return { ok: true };
   } catch (err) {
-    console.error("[setOpportunityStageAction]", err);
+    log.error("[setOpportunityStageAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Stage change failed.",
@@ -177,7 +178,7 @@ export async function deleteOpportunityAction(
     revalidatePath("/opportunities");
     return { ok: true };
   } catch (err) {
-    console.error("[deleteOpportunityAction]", err);
+    log.error("[deleteOpportunityAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Delete failed.",

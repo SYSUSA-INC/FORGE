@@ -14,6 +14,7 @@ import {
   vectorToPgLiteral,
 } from "@/lib/embeddings";
 import { approxTokenCount, chunkText } from "@/lib/text-chunk";
+import { log } from "@/lib/log";
 
 const EMBED_BATCH = 32;
 
@@ -122,12 +123,13 @@ export async function embedArtifactAction(
       .delete(knowledgeArtifactChunks)
       .where(eq(knowledgeArtifactChunks.artifactId, artifactId))
       .catch((cleanupErr) => {
-        console.error(
-          "[embedArtifactAction] partial chunks could not be rolled back",
-          cleanupErr,
+        log.error(
+          "[embedArtifactAction]",
+          "partial chunks could not be rolled back",
+          { error: cleanupErr },
         );
       });
-    console.error("[embedArtifactAction] chunk insert failed", err);
+    log.error("[embedArtifactAction]", "chunk insert failed", { error: err });
     return {
       ok: false,
       error:
@@ -241,7 +243,7 @@ export async function semanticSearchAction(
     rows = ((result as unknown as { rows?: typeof rows }).rows ??
       (result as unknown as typeof rows)) as typeof rows;
   } catch (err) {
-    console.error("[semanticSearchAction] query failed", err);
+    log.error("[semanticSearchAction]", "query failed", { error: err });
     return {
       ok: false,
       error:

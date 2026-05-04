@@ -8,6 +8,7 @@ import { requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { fetchSamGovByUei } from "@/lib/samgov";
 import type { OrgProfile } from "@/lib/org-types";
 import { hasErrors, validateOrgProfile } from "@/lib/validators";
+import { log } from "@/lib/log";
 
 export async function saveOrgProfileAction(profile: OrgProfile): Promise<
   { ok: true } | { ok: false; error: string }
@@ -60,7 +61,7 @@ export async function saveOrgProfileAction(profile: OrgProfile): Promise<
     revalidatePath("/settings");
     return { ok: true };
   } catch (err) {
-    console.error("[saveOrgProfileAction] failed", err);
+    log.error("[saveOrgProfileAction]", "failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to save changes.",
@@ -113,7 +114,7 @@ export async function applySamGovSyncAction(uei: string): Promise<
     revalidatePath("/settings");
     return { ok: true };
   } catch (err) {
-    console.error("[applySamGovSyncAction] failed", err);
+    log.error("[applySamGovSyncAction]", "failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to apply SAM.gov data.",

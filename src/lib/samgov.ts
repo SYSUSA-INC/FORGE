@@ -1,3 +1,5 @@
+import { log } from "@/lib/log";
+
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 
 /**
@@ -384,9 +386,11 @@ export async function searchSamGovOpportunities(
       totalAfterFilter = ops.length;
       if (before !== ops.length) {
         // Soft-log; not user-facing here.
-        console.info(
-          `[samgov] keyword "${userKeyword}" filtered ${before - ops.length} of ${before} results`,
-        );
+        log.info("[samgov]", "keyword filtered results", {
+          userKeyword,
+          before,
+          after: ops.length,
+        });
       }
     }
 
@@ -464,7 +468,7 @@ async function enrichDescriptions(
           out[item.i] = { ...item.op, description: "" };
         }
       } catch (err) {
-        console.warn("[samgov] noticedesc fetch failed", err);
+        log.warn("[samgov]", "noticedesc fetch failed", { error: err });
         out[item.i] = { ...item.op, description: "" };
       }
     }

@@ -6,6 +6,7 @@ import { opportunities, opportunityActivities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { aiExtractEbuy } from "@/lib/ebuy-extract";
 import type { EbuyExtractionResult } from "@/lib/ai-prompts";
+import { log } from "@/lib/log";
 
 export type EbuyParseResult =
   | {
@@ -132,7 +133,7 @@ export async function createOpportunityFromEbuyAction(
     revalidatePath(`/opportunities/${opp.id}`);
     return { ok: true, opportunityId: opp.id };
   } catch (err) {
-    console.error("[createOpportunityFromEbuyAction]", err);
+    log.error("[createOpportunityFromEbuyAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",

@@ -15,6 +15,7 @@ import { sendInviteEmail, sendPasswordResetEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
 import { defaultOrgSlug } from "@/lib/org-defaults";
 import { validateEmail } from "@/lib/validators";
+import { log } from "@/lib/log";
 
 export async function createOrganizationAction(input: {
   orgName: string;
@@ -75,7 +76,7 @@ export async function createOrganizationAction(input: {
       role: "admin",
     });
   } catch (err) {
-    console.error("[createOrganizationAction] sendInviteEmail failed", err);
+    log.error("[createOrganizationAction]", "sendInviteEmail failed", { error: err });
     return {
       ok: false,
       error:
@@ -154,7 +155,7 @@ export async function forcePasswordResetAction(
   try {
     await sendPasswordResetEmail(user.email, token);
   } catch (err) {
-    console.error("[forcePasswordResetAction] send failed", err);
+    log.error("[forcePasswordResetAction]", "send failed", { error: err });
     return { ok: false, error: "Could not send reset email." };
   }
 
@@ -193,7 +194,7 @@ export async function resendOrgAdminInviteAction(
       role: inv.role,
     });
   } catch (err) {
-    console.error("[resendOrgAdminInviteAction] send failed", err);
+    log.error("[resendOrgAdminInviteAction]", "send failed", { error: err });
     return { ok: false, error: "Could not resend invite." };
   }
 

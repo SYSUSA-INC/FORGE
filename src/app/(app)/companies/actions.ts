@@ -10,6 +10,7 @@ import {
   searchSamGovEntities,
   type SamEntitySearchResult,
 } from "@/lib/samgov";
+import { log } from "@/lib/log";
 
 export type CompanyInput = {
   name: string;
@@ -88,7 +89,7 @@ export async function createCompanyAction(
     revalidatePath("/companies");
     return { ok: true, id: row.id };
   } catch (err) {
-    console.error("[createCompanyAction]", err);
+    log.error("[createCompanyAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
@@ -114,7 +115,7 @@ export async function updateCompanyAction(
     revalidatePath(`/companies/${id}`);
     return { ok: true };
   } catch (err) {
-    console.error("[updateCompanyAction]", err);
+    log.error("[updateCompanyAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
@@ -192,7 +193,7 @@ export async function refreshCompanyFromSamGovAction(
     revalidatePath("/companies");
     return { ok: true };
   } catch (err) {
-    console.error("[refreshCompanyFromSamGovAction]", err);
+    log.error("[refreshCompanyFromSamGovAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "SAM.gov sync failed.",
@@ -312,7 +313,7 @@ export async function importSamGovCompanyAction(
     revalidatePath("/companies");
     return { ok: true, id: row.id };
   } catch (err) {
-    console.error("[importSamGovCompanyAction]", err);
+    log.error("[importSamGovCompanyAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Import failed.",

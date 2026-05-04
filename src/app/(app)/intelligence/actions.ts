@@ -22,6 +22,7 @@ import {
   buildPipelineBriefPrompt,
   type PipelineSnapshot,
 } from "@/lib/ai-prompts";
+import { log } from "@/lib/log";
 
 export type PipelineBriefResult = {
   ok: true;
@@ -200,7 +201,7 @@ export async function generatePipelineBriefAction(
     briefCache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
     return result;
   } catch (err) {
-    console.error("[generatePipelineBriefAction]", err);
+    log.error("[generatePipelineBriefAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI request failed.",

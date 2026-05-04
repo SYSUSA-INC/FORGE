@@ -23,6 +23,7 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { projectToPlain } from "@/lib/tiptap-doc";
+import { log } from "@/lib/log";
 
 async function ownsProposal(id: string, organizationId: string) {
   const [row] = await db
@@ -119,7 +120,7 @@ export async function createComplianceItemAction(
     revalidatePath(`/proposals/${proposalId}/compliance`);
     return { ok: true, id: row.id };
   } catch (err) {
-    console.error("[createComplianceItemAction]", err);
+    log.error("[createComplianceItemAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
@@ -178,7 +179,7 @@ export async function updateComplianceItemAction(
     revalidatePath(`/proposals/${proposalId}/compliance`);
     return { ok: true };
   } catch (err) {
-    console.error("[updateComplianceItemAction]", err);
+    log.error("[updateComplianceItemAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
@@ -437,17 +438,16 @@ export async function runCompliancePreflightAction(
       stubbed = stubbed || res.stubbed;
       provider = res.provider;
     } catch (err) {
-      console.warn("[runCompliancePreflightAction] AI call failed", err);
+      log.warn("[runCompliancePreflightAction]", "AI call failed", { error: err });
       continue;
     }
 
     const parseResult = parseAiJson(raw, compliancePreflightResponseSchema);
     if (!parseResult.ok) {
-      console.warn(
-        "[runCompliancePreflightAction] JSON parse failed",
-        parseResult.error,
-        raw.slice(0, 240),
-      );
+      log.warn("[runCompliancePreflightAction]", "JSON parse failed", {
+        parseError: parseResult.error,
+        rawSnippet: raw.slice(0, 240),
+      });
       continue;
     }
     const verdicts: CompliancePreflightVerdict[] = parseResult.data.verdicts;

@@ -16,6 +16,7 @@ import {
   type OpportunitySnapshot,
 } from "@/lib/ai-prompts";
 import { STAGE_LABELS } from "@/lib/opportunity-types";
+import { log } from "@/lib/log";
 
 export type OpportunityBriefResult = {
   ok: true;
@@ -203,7 +204,7 @@ export async function generateOpportunityBriefAction(
     briefCache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
     return result;
   } catch (err) {
-    console.error("[generateOpportunityBriefAction]", err);
+    log.error("[generateOpportunityBriefAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI request failed.",

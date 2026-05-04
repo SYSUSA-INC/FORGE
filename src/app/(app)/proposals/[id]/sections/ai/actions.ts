@@ -17,6 +17,7 @@ import {
 } from "@/lib/ai-prompts";
 import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
 import { fromPlainText, projectToPlain } from "@/lib/tiptap-doc";
+import { log } from "@/lib/log";
 
 export type SectionDraftResult =
   | {
@@ -98,7 +99,7 @@ export async function generateSectionDraftAction(input: {
       opportunityDescription: row.opportunityDescription ?? "",
     });
   } catch (err) {
-    console.warn("[generateSectionDraftAction] pattern intel failed", err);
+    log.warn("[generateSectionDraftAction]", "pattern intel failed", { error: err });
     patternIntel = undefined;
   }
 
@@ -166,7 +167,7 @@ export async function generateSectionDraftAction(input: {
       generatedAt: new Date().toISOString(),
     };
   } catch (err) {
-    console.error("[generateSectionDraftAction]", err);
+    log.error("[generateSectionDraftAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI request failed.",

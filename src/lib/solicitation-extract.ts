@@ -24,6 +24,7 @@ import {
   extractTextFromXlsx,
   type ExtractFormat,
 } from "@/lib/text-extract";
+import { log } from "@/lib/log";
 
 export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   // pdf-parse-fork is a CommonJS module that exports a function. Different
@@ -113,7 +114,7 @@ export async function aiExtractSolicitation(
     const cleaned = stripCodeFences(ai.text);
     const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
     if (!parseResult.ok) {
-      console.error("[aiExtractSolicitation] parse", parseResult.error);
+      log.error("[aiExtractSolicitation]", "parse", { error: parseResult.error });
       return { ok: false, error: parseResult.error };
     }
 
@@ -125,7 +126,7 @@ export async function aiExtractSolicitation(
       data: normalizeExtraction(parseResult.data),
     };
   } catch (err) {
-    console.error("[aiExtractSolicitation]", err);
+    log.error("[aiExtractSolicitation]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI extraction failed.",
@@ -187,7 +188,7 @@ export async function aiExtractSolicitationFromPdf(
     const cleaned = stripCodeFences(ai.text);
     const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
     if (!parseResult.ok) {
-      console.error("[aiExtractSolicitationFromPdf] parse", parseResult.error);
+      log.error("[aiExtractSolicitationFromPdf]", "parse", { error: parseResult.error });
       return { ok: false, error: parseResult.error };
     }
     return {
@@ -198,7 +199,7 @@ export async function aiExtractSolicitationFromPdf(
       data: normalizeExtraction(parseResult.data),
     };
   } catch (err) {
-    console.error("[aiExtractSolicitationFromPdf]", err);
+    log.error("[aiExtractSolicitationFromPdf]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Vision OCR failed.",
@@ -255,7 +256,7 @@ export async function aiExtractSolicitationFromImage(
     const cleaned = stripCodeFences(ai.text);
     const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
     if (!parseResult.ok) {
-      console.error("[aiExtractSolicitationVision] parse", parseResult.error);
+      log.error("[aiExtractSolicitationVision]", "parse", { error: parseResult.error });
       return { ok: false, error: parseResult.error };
     }
     return {
@@ -266,7 +267,7 @@ export async function aiExtractSolicitationFromImage(
       data: normalizeExtraction(parseResult.data),
     };
   } catch (err) {
-    console.error("[aiExtractSolicitationFromImage]", err);
+    log.error("[aiExtractSolicitationFromImage]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Image vision failed.",

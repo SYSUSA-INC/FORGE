@@ -13,6 +13,7 @@ import {
   backfillEntryEmbeddings,
   embedKnowledgeEntry,
 } from "@/lib/knowledge-entry-embed";
+import { log } from "@/lib/log";
 
 const KINDS: KnowledgeKind[] = [
   "capability",
@@ -129,13 +130,13 @@ export async function createKnowledgeEntryAction(input: {
       // Embed best-effort so Brain Suggest can rank this entry. Don't
       // block creation if it fails — backfill can patch later.
       await embedKnowledgeEntry(row.id, finalTitle, finalBody).catch((err) => {
-        console.warn("[createKnowledgeEntryAction] embed failed", err);
+        log.warn("[createKnowledgeEntryAction]", "embed failed", { error: err });
       });
     }
     revalidatePath("/knowledge-base");
     return { ok: true, id: row!.id };
   } catch (err) {
-    console.error("[createKnowledgeEntryAction]", err);
+    log.error("[createKnowledgeEntryAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
@@ -188,7 +189,7 @@ export async function updateKnowledgeEntryAction(
       if (latest) {
         await embedKnowledgeEntry(id, latest.title, latest.body).catch(
           (err) => {
-            console.warn("[updateKnowledgeEntryAction] re-embed failed", err);
+            log.warn("[updateKnowledgeEntryAction]", "re-embed failed", { error: err });
           },
         );
       }
@@ -198,7 +199,7 @@ export async function updateKnowledgeEntryAction(
     revalidatePath(`/knowledge-base/${id}`);
     return { ok: true };
   } catch (err) {
-    console.error("[updateKnowledgeEntryAction]", err);
+    log.error("[updateKnowledgeEntryAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
@@ -289,7 +290,7 @@ export async function backfillKnowledgeEntryEmbeddingsAction(): Promise<
     revalidatePath("/knowledge-base");
     return { ok: true, ...result };
   } catch (err) {
-    console.error("[backfillKnowledgeEntryEmbeddingsAction]", err);
+    log.error("[backfillKnowledgeEntryEmbeddingsAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Backfill failed.",

@@ -13,6 +13,7 @@ import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-help
 import { getStorageProvider } from "@/lib/storage";
 import { isLikelyDocx, scanDocxForVariables } from "@/lib/docx-template";
 import { STARTER_TEMPLATES } from "@/lib/template-types";
+import { log } from "@/lib/log";
 
 const DOCX_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -150,7 +151,7 @@ export async function createTemplateAction(input: {
     revalidatePath("/settings/templates");
     return { ok: true, id: row!.id };
   } catch (err) {
-    console.error("[createTemplateAction]", err);
+    log.error("[createTemplateAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
@@ -219,7 +220,7 @@ export async function updateTemplateAction(
     revalidatePath(`/settings/templates/${id}`);
     return { ok: true };
   } catch (err) {
-    console.error("[updateTemplateAction]", err);
+    log.error("[updateTemplateAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
@@ -258,7 +259,7 @@ export async function setDefaultTemplateAction(
     revalidatePath("/settings/templates");
     return { ok: true };
   } catch (err) {
-    console.error("[setDefaultTemplateAction]", err);
+    log.error("[setDefaultTemplateAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to set default.",
@@ -286,7 +287,7 @@ export async function archiveTemplateAction(
     revalidatePath("/settings/templates");
     return { ok: true };
   } catch (err) {
-    console.error("[archiveTemplateAction]", err);
+    log.error("[archiveTemplateAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Archive failed.",
@@ -314,7 +315,7 @@ export async function unarchiveTemplateAction(
     revalidatePath("/settings/templates");
     return { ok: true };
   } catch (err) {
-    console.error("[unarchiveTemplateAction]", err);
+    log.error("[unarchiveTemplateAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Unarchive failed.",
@@ -427,7 +428,7 @@ export async function uploadTemplateDocxAction(
     });
     storagePath = stored.storagePath;
   } catch (err) {
-    console.error("[uploadTemplateDocx] storage", err);
+    log.error("[uploadTemplateDocx]", "storage", { error: err });
     return {
       ok: false,
       error: "Saved scan results, but storing the file bytes failed. Try again.",

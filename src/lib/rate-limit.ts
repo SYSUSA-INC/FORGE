@@ -36,6 +36,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { log } from "@/lib/log";
 
 export type RateLimitOptions = {
   /**
@@ -118,7 +119,7 @@ export async function enforceRateLimit(
     };
   } catch (err) {
     // Fail-open. Log and allow.
-    console.error("[rate-limit] DB error, failing open", err);
+    log.error("[rate-limit]", "DB error, failing open", { error: err });
     return { ok: true, remaining: opts.limit, resetIn };
   }
 }

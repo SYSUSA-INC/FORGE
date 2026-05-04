@@ -17,6 +17,7 @@ import {
   aiExtractKnowledgeFromArtifact,
 } from "@/lib/knowledge-extract";
 import { embedKnowledgeEntry } from "@/lib/knowledge-entry-embed";
+import { log } from "@/lib/log";
 
 export type StartExtractionResult =
   | {
@@ -317,7 +318,7 @@ export async function approveCandidateAction(
   // similarity. Best-effort: failures don't block the approval — the
   // backfill action can fix it later.
   await embedKnowledgeEntry(entry.id, finalTitle, finalBody).catch((err) => {
-    console.warn("[approveCandidateAction] embed failed (non-fatal)", err);
+    log.warn("[approveCandidateAction]", "embed failed (non-fatal)", { error: err });
   });
 
   revalidatePath("/knowledge-base");

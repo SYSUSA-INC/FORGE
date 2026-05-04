@@ -1,3 +1,5 @@
+import { log } from "@/lib/log";
+
 /**
  * Boot-time environment validation.
  *
@@ -97,30 +99,29 @@ export function validateEnvOrWarn(): void {
   }
 
   if (missingRequired.length > 0) {
-    const msg =
-      `[env-check] FATAL — required environment variables are missing:\n` +
-      missingRequired
-        .map((s) => `  - ${s.name}: ${s.purpose}`)
-        .join("\n");
+    const detail = missingRequired
+      .map((s) => `${s.name} (${s.purpose})`)
+      .join(", ");
     if (process.env.NODE_ENV === "production") {
-      console.error(msg);
-      throw new Error(
-        `Missing required env vars: ${missingRequired.map((s) => s.name).join(", ")}`,
-      );
+      log.error("[env-check]", "required environment variables are missing", {
+        missing: missingRequired.map((s) => s.name),
+      });
+      throw new Error(`Missing required env vars: ${detail}`);
     }
-    console.warn(msg);
+    log.warn("[env-check]", "required environment variables are missing", {
+      missing: missingRequired.map((s) => s.name),
+    });
   }
 
   if (missingOptional.length > 0) {
-    console.warn(
-      `[env-check] ${missingOptional.length} optional integration${
-        missingOptional.length === 1 ? "" : "s"
-      } unconfigured — feature(s) will run in stub mode:\n` +
-        missingOptional
-          .map((s) => `  - ${s.name}: ${s.purpose}`)
-          .join("\n"),
+    log.warn(
+      "[env-check]",
+      `${missingOptional.length} optional integration(s) unconfigured — feature(s) will run in stub mode`,
+      {
+        missing: missingOptional.map((s) => s.name),
+      },
     );
   } else if (missingRequired.length === 0) {
-    console.log("[env-check] all required + optional env vars present");
+    log.info("[env-check]", "all required + optional env vars present");
   }
 }

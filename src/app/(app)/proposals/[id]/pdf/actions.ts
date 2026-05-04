@@ -24,6 +24,7 @@ import {
   getDocxToPdfProvider,
   getDocxToPdfProviderStatus,
 } from "@/lib/docx-to-pdf";
+import { log } from "@/lib/log";
 
 export type PdfRenderResult =
   | {
@@ -126,7 +127,7 @@ export async function renderProposalPdfAction(
     const provider = getPdfProvider();
     rendered = await provider.render(html);
   } catch (err) {
-    console.error("[renderProposalPdfAction] provider.render failed", err);
+    log.error("[renderProposalPdfAction]", "provider.render failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "PDF render failed.",
@@ -147,7 +148,7 @@ export async function renderProposalPdfAction(
       contentType: rendered.contentType,
     });
   } catch (err) {
-    console.error("[renderProposalPdfAction] storage.put failed", err);
+    log.error("[renderProposalPdfAction]", "storage.put failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Storage write failed.",
@@ -175,7 +176,7 @@ export async function renderProposalPdfAction(
       expiresAt,
     });
   } catch (err) {
-    console.error("[renderProposalPdfAction] insert failed", err);
+    log.error("[renderProposalPdfAction]", "insert failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to record render.",
@@ -375,7 +376,7 @@ export async function renderProposalDocxAction(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
   } catch (err) {
-    console.error("[renderProposalDocxAction] storage.put failed", err);
+    log.error("[renderProposalDocxAction]", "storage.put failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Storage write failed.",
@@ -401,7 +402,7 @@ export async function renderProposalDocxAction(
       expiresAt,
     });
   } catch (err) {
-    console.error("[renderProposalDocxAction] insert failed", err);
+    log.error("[renderProposalDocxAction]", "insert failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to record render.",
@@ -536,7 +537,7 @@ export async function renderProposalDocxAsPdfAction(
       fileName: `${proposalId}.docx`,
     });
   } catch (err) {
-    console.error("[renderProposalDocxAsPdfAction] convert failed", err);
+    log.error("[renderProposalDocxAsPdfAction]", "convert failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "DOCX→PDF conversion failed.",
@@ -559,7 +560,7 @@ export async function renderProposalDocxAsPdfAction(
       contentType: converted.contentType,
     });
   } catch (err) {
-    console.error("[renderProposalDocxAsPdfAction] storage.put failed", err);
+    log.error("[renderProposalDocxAsPdfAction]", "storage.put failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Storage write failed.",
@@ -585,7 +586,7 @@ export async function renderProposalDocxAsPdfAction(
       expiresAt,
     });
   } catch (err) {
-    console.error("[renderProposalDocxAsPdfAction] insert failed", err);
+    log.error("[renderProposalDocxAsPdfAction]", "insert failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to record render.",

@@ -34,6 +34,7 @@ import { getSectionSignals } from "@/lib/section-signals";
 import type {
   SectionDraftPatternIntel,
 } from "@/lib/ai-prompts";
+import { log } from "@/lib/log";
 
 const TOP_WIN = 4;
 const TOP_LOSS = 2;
@@ -94,7 +95,7 @@ async function retrieveCorpusByOutcome(
     if (r.stubbed) return []; // no signal in stub vectors
     queryVec = r.vectors[0]!;
   } catch (err) {
-    console.warn("[14d] embedding failed", err);
+    log.warn("[14d]", "embedding failed", { error: err });
     return [];
   }
   const literal = vectorToPgLiteral(queryVec);
@@ -127,7 +128,7 @@ async function retrieveCorpusByOutcome(
       provenance: `${row.artifact_kind ?? "artifact"} · ${row.artifact_title ?? "(untitled)"}`,
     }));
   } catch (err) {
-    console.warn(`[14d] ${outcomeLabel} retrieval failed`, err);
+    log.warn("[14d]", "retrieval failed", { outcomeLabel, error: err });
     return [];
   }
 }
@@ -196,7 +197,7 @@ async function gatherSectionSignal(
       sampleSize: row.totalSignals,
     };
   } catch (err) {
-    console.warn("[14d] section signal lookup failed", err);
+    log.warn("[14d]", "section signal lookup failed", { error: err });
     return null;
   }
 }

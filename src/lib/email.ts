@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { log } from "@/lib/log";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.EMAIL_FROM ?? "Forge <noreply@sysgov.com>";
@@ -26,9 +27,10 @@ export async function sendEmail(opts: {
   replyTo?: string;
 }): Promise<void> {
   if (!apiKey) {
-    console.warn(
-      `[email] RESEND_API_KEY not set — would have sent "${opts.subject}" to ${opts.to}`,
-    );
+    log.warn("[email]", "RESEND_API_KEY not set — email skipped (stub mode)", {
+      subject: opts.subject,
+      to: opts.to,
+    });
     return;
   }
   await getClient().emails.send({

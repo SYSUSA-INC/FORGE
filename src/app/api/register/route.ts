@@ -11,6 +11,7 @@ import {
   anySignupAllowed,
   selfServiceRegistrationAllowed,
 } from "@/lib/signup-mode";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -149,7 +150,7 @@ async function acceptInvite(opts: {
         title: inv.title,
       });
     } catch (err) {
-      console.error("[acceptInvite] membership insert failed", err);
+      log.error("[acceptInvite]", "membership insert failed", { error: err });
       return {
         ok: false,
         error:
@@ -298,7 +299,7 @@ export async function POST(req: Request) {
       try {
         await provisionUserAndOrg({ email, name, passwordHash });
       } catch (err) {
-        console.error("[register] provisionUserAndOrg failed", err);
+        log.error("[register]", "provisionUserAndOrg failed", { error: err });
         return NextResponse.json(
           {
             ok: false,
@@ -315,7 +316,7 @@ export async function POST(req: Request) {
     try {
       await sendVerificationEmail(email, token);
     } catch (err) {
-      console.error("[register] sendVerificationEmail failed", err);
+      log.error("[register]", "sendVerificationEmail failed", { error: err });
       return NextResponse.json(
         {
           ok: false,
@@ -328,7 +329,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[register] unhandled error", err);
+    log.error("[register]", "unhandled error", { error: err });
     return NextResponse.json(
       { ok: false, error: "Unexpected server error. Please try again." },
       { status: 500 },

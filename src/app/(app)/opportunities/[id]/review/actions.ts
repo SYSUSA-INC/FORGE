@@ -17,6 +17,7 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { sendOpportunityReviewRequestEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
 
 export type SendReviewRequestInput = {
   opportunityId: string;
@@ -169,7 +170,7 @@ export async function sendOpportunityReviewRequestAction(
     });
     emailSent = true;
   } catch (err) {
-    console.error("[sendOpportunityReviewRequest] email", err);
+    log.error("[sendOpportunityReviewRequest]", "email", { error: err });
   }
 
   revalidatePath(`/opportunities/${opp.id}`);

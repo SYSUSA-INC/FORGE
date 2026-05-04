@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
+import { log } from "@/lib/log";
 
 export type BrainHit = {
   source: "corpus" | "entry";
@@ -170,7 +171,7 @@ export async function brainSuggestForSectionAction(
     corpusRows = ((r1 as unknown as { rows?: typeof corpusRows }).rows ??
       (r1 as unknown as typeof corpusRows)) as typeof corpusRows;
   } catch (err) {
-    console.warn("[brainSuggest] corpus query failed", err);
+    log.warn("[brainSuggest]", "corpus query failed", { error: err });
   }
 
   // Phase 10f: knowledge_entry rows now carry embeddings, so we can
@@ -201,7 +202,7 @@ export async function brainSuggestForSectionAction(
         typeof e.similarity === "string" ? Number(e.similarity) : e.similarity,
     }));
   } catch (err) {
-    console.warn("[brainSuggest] entry vector query failed, falling back to token overlap", err);
+    log.warn("[brainSuggest]", "entry vector query failed, falling back to token overlap", { error: err });
   }
 
   if (entryRows.length === 0) {
@@ -245,7 +246,7 @@ export async function brainSuggestForSectionAction(
           .slice(0, 6);
       }
     } catch (err) {
-      console.warn("[brainSuggest] entry overlap query failed", err);
+      log.warn("[brainSuggest]", "entry overlap query failed", { error: err });
     }
   }
 
