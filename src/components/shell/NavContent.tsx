@@ -7,83 +7,134 @@ import { useEffect, useState } from "react";
 type NavItem = {
   href: string;
   label: string;
-  icon: string;
-  group: GroupId;
+  /** Visible only to org admins (or superadmins). */
   admin?: boolean;
-  superadmin?: boolean;
 };
 
-type GroupId =
-  | "ops"
-  | "proposals"
-  | "intel"
-  | "admin"
-  | "platform";
+type NavGroup = {
+  id: string;
+  label: string;
+  icon: string;
+  /** When set, the group has no expand affordance — it IS a link itself. */
+  href?: string;
+  /** Group visible only to org admins (or superadmins). */
+  admin?: boolean;
+  /** Group visible only to superadmins. */
+  superadmin?: boolean;
+  children?: NavItem[];
+};
 
-const NAV: NavItem[] = [
-  // Capture & pursuit — the top of the funnel
-  { href: "/", label: "Command", icon: "▦", group: "ops" },
-  { href: "/opportunities", label: "Opportunities", icon: "✸", group: "ops" },
-  { href: "/pipeline", label: "Pipeline", icon: "⧨", group: "ops" },
-  { href: "/companies", label: "Companies", icon: "⌬", group: "ops" },
-
-  // Execution — solicitations + proposals
-  { href: "/solicitations", label: "Solicitations", icon: "✦", group: "proposals" },
-  { href: "/proposals", label: "Proposals", icon: "❑", group: "proposals" },
-  { href: "/settings/templates", label: "Templates", icon: "▤", group: "proposals", admin: true },
-
-  // Intelligence — the brain & knowledge corpus
-  { href: "/intelligence", label: "Intelligence", icon: "◈", group: "intel" },
-  { href: "/knowledge-base", label: "Knowledge", icon: "❈", group: "intel" },
-
-  // Administration — per-tenant
-  { href: "/users", label: "Users", icon: "☰", group: "admin", admin: true },
-  { href: "/notifications", label: "Notifications", icon: "✺", group: "admin" },
-  { href: "/settings", label: "Settings", icon: "⚙", group: "admin" },
-  { href: "/help", label: "Help", icon: "?", group: "admin" },
-
-  // Platform — superadmin only
-  { href: "/admin", label: "Platform admin", icon: "✱", group: "platform", superadmin: true },
+// Six top-level entries per the platform spec.
+//
+// Operations Management consolidates the per-tenant admin surface
+// (Settings, Users & Roles, Integrations, AI Engine, Templates,
+// Notifications, Audit Log). Settings/Integrations/AI Engine are
+// tabs of a single page today, so we deep-link via `?tab=` until a
+// real route split is warranted.
+//
+// Platform Administration is super-admin only — every link must
+// 404 (or hard-redirect) for non-superadmins. The nav already hides
+// the group, but defense in depth: each route under /platform/*
+// re-checks `isSuperadmin` server-side.
+const NAV: NavGroup[] = [
+  {
+    id: "command",
+    label: "Command Center",
+    icon: "▦",
+    href: "/",
+  },
+  {
+    id: "ops",
+    label: "Operations Management",
+    icon: "⚙",
+    admin: true,
+    children: [
+      { href: "/settings", label: "Settings" },
+      { href: "/users", label: "Users & Roles" },
+      { href: "/settings?tab=integrations", label: "Integrations" },
+      { href: "/settings?tab=ai", label: "AI Engine" },
+      { href: "/settings/templates", label: "Templates" },
+      { href: "/notifications", label: "Notifications" },
+      { href: "/audit-log", label: "Audit Log" },
+    ],
+  },
+  {
+    id: "opps",
+    label: "Opportunities",
+    icon: "✸",
+    children: [
+      { href: "/opportunities", label: "Dashboard" },
+      { href: "/pipeline", label: "Pipeline" },
+      { href: "/opportunities/new", label: "New Opportunity" },
+      { href: "/solicitations", label: "Solicitations" },
+      { href: "/proposals", label: "Proposals" },
+    ],
+  },
+  {
+    id: "intel",
+    label: "Platform Intelligence",
+    icon: "◈",
+    children: [
+      { href: "/companies", label: "Company Search" },
+      { href: "/intelligence", label: "FORGE Brain" },
+      { href: "/knowledge-base", label: "Knowledge" },
+    ],
+  },
+  {
+    id: "help",
+    label: "Help",
+    icon: "?",
+    children: [
+      { href: "/help/user", label: "User guide" },
+      { href: "/help/admin", label: "Admin guide", admin: true },
+      { href: "/help/faq", label: "FAQ" },
+    ],
+  },
+  {
+    id: "platform",
+    label: "Platform Administration",
+    icon: "✱",
+    superadmin: true,
+    children: [
+      { href: "/platform/configuration", label: "Platform Configuration" },
+      { href: "/platform/subscriptions", label: "Subscriptions" },
+      { href: "/platform/tenants", label: "Tenant Administration" },
+      { href: "/platform/audit-log", label: "Platform Audit Log" },
+    ],
+  },
 ];
 
-const GROUPS: Record<GroupId, string> = {
-  ops: "Capture & pursuit",
-  proposals: "Proposal operations",
-  intel: "Intelligence",
-  admin: "Administration",
-  platform: "Platform",
-};
+const COLLAPSED_KEY = "forge.nav.collapsed.v2";
 
-const GROUP_ORDER: GroupId[] = ["ops", "proposals", "intel", "admin", "platform"];
-
-const COLLAPSED_KEY = "forge.nav.collapsed.v1";
-
-/**
- * Read collapsed-group state from localStorage. Falls back to an
- * empty set on SSR / first-paint (browsers without localStorage,
- * incognito, etc.) — that means every group renders expanded by
- * default, which matches our pre-Ch16 behavior.
- */
-function readCollapsed(): Set<GroupId> {
+function readCollapsed(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
     const raw = window.localStorage.getItem(COLLAPSED_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((g): g is GroupId => typeof g === "string"));
+    return new Set(arr.filter((g): g is string => typeof g === "string"));
   } catch {
     return new Set();
   }
 }
 
-function writeCollapsed(set: Set<GroupId>): void {
+function writeCollapsed(set: Set<string>): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set]));
   } catch {
-    // Quota exceeded / private mode — silently swallow.
+    // Quota / private mode — silently swallow.
   }
+}
+
+function hrefMatches(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  // Strip query string for comparison — `?tab=integrations` is a
+  // tab hint, not a different page.
+  const cleanHref = href.split("?")[0]!;
+  if (cleanHref === "/") return pathname === "/";
+  return pathname === cleanHref || pathname.startsWith(cleanHref + "/");
 }
 
 export function NavContent({
@@ -96,16 +147,15 @@ export function NavContent({
   isSuperadmin?: boolean;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState<Set<GroupId>>(() => new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 
-  // Hydrate from localStorage after mount. We do this in an effect
-  // (not in useState's initializer) so SSR + first client render
-  // produce identical markup — avoids a hydration mismatch warning.
+  // Hydrate from localStorage after mount. SSR + first client render
+  // produce identical markup, avoiding hydration mismatch warnings.
   useEffect(() => {
     setCollapsed(readCollapsed());
   }, []);
 
-  function toggle(g: GroupId) {
+  function toggle(g: string) {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(g)) next.delete(g);
@@ -115,16 +165,19 @@ export function NavContent({
     });
   }
 
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname === href || (pathname?.startsWith(href + "/") ?? false);
-  };
-
-  const visible = NAV.filter((n) => {
-    if (n.superadmin && !isSuperadmin) return false;
-    if (n.admin && !isOrgAdmin && !isSuperadmin) return false;
+  const visibleGroups = NAV.filter((g) => {
+    if (g.superadmin && !isSuperadmin) return false;
+    if (g.admin && !isOrgAdmin && !isSuperadmin) return false;
     return true;
   });
+
+  function visibleChildren(group: NavGroup): NavItem[] {
+    if (!group.children) return [];
+    return group.children.filter((c) => {
+      if (c.admin && !isOrgAdmin && !isSuperadmin) return false;
+      return true;
+    });
+  }
 
   return (
     <>
@@ -143,86 +196,105 @@ export function NavContent({
         </div>
       </div>
 
-      <div className="px-4 pt-4">
-        <Link
-          href="/settings"
-          onClick={onNavigate}
-          className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-white/20"
-        >
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Organization</div>
-            <div className="mt-0.5 font-display text-sm font-semibold text-text">
-              Configure in Settings
-            </div>
-          </div>
-          <span className="text-muted">→</span>
-        </Link>
-      </div>
+      <nav className="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-6">
+        {visibleGroups.map((g) => {
+          const children = visibleChildren(g);
+          const groupActive = g.href
+            ? hrefMatches(pathname, g.href)
+            : children.some((c) => hrefMatches(pathname, c.href));
+          const isCollapsed = collapsed.has(g.id);
+          // If the active page lives inside this group, force it open
+          // — collapsing the active context out of view is hostile.
+          const showChildren = !!children.length && (!isCollapsed || groupActive);
 
-      <nav className="mt-6 flex flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6">
-        {GROUP_ORDER.map((g) => {
-          const items = visible.filter((n) => n.group === g);
-          if (items.length === 0) return null;
-          const isCollapsed = collapsed.has(g);
-          // If any descendant is the active page, force the group open
-          // — collapsing the active page out of view is hostile UX.
-          const hasActiveChild = items.some((it) => isActive(it.href));
-          const showItems = !isCollapsed || hasActiveChild;
+          // Standalone link group (Command Center) — no expand affordance.
+          if (g.href && children.length === 0) {
+            const active = hrefMatches(pathname, g.href);
+            return (
+              <Link
+                key={g.id}
+                href={g.href}
+                onClick={onNavigate}
+                className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)]"
+                    : "text-muted hover:bg-white/[0.04] hover:text-text"
+                }`}
+              >
+                {active && (
+                  <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal via-emerald to-magenta" />
+                )}
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
+                    active
+                      ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
+                      : "bg-white/5 text-muted"
+                  }`}
+                >
+                  {g.icon}
+                </span>
+                <span className="font-medium">{g.label}</span>
+              </Link>
+            );
+          }
 
+          // Expandable group with children.
           return (
-            <div key={g}>
+            <div key={g.id} className="flex flex-col">
               <button
                 type="button"
-                onClick={() => toggle(g)}
-                className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left transition-colors hover:bg-white/[0.03]"
-                aria-expanded={showItems}
+                onClick={() => toggle(g.id)}
+                aria-expanded={showChildren}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  groupActive
+                    ? "text-text"
+                    : "text-muted hover:bg-white/[0.04] hover:text-text"
+                }`}
               >
-                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-subtle">
-                  {GROUPS[g]}
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
+                    groupActive
+                      ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
+                      : "bg-white/5 text-muted"
+                  }`}
+                >
+                  {g.icon}
                 </span>
+                <span className="flex-1 font-medium">{g.label}</span>
                 <span
                   aria-hidden
-                  className={`font-mono text-[10px] text-muted transition-transform ${
-                    showItems ? "rotate-90" : ""
+                  className={`font-mono text-[10px] text-subtle transition-transform ${
+                    showChildren ? "rotate-90" : ""
                   }`}
                 >
                   ▸
                 </span>
               </button>
-              {showItems ? (
-                <ul className="mt-1 flex flex-col gap-0.5">
-                  {items.map((item) => {
-                    const active = isActive(item.href);
+              {showChildren && (
+                <ul className="ml-9 mt-0.5 flex flex-col gap-0.5 border-l border-white/[0.06] pl-2">
+                  {children.map((c) => {
+                    const active = hrefMatches(pathname, c.href);
                     return (
-                      <li key={item.href}>
+                      <li key={c.href}>
                         <Link
-                          href={item.href}
+                          href={c.href}
                           onClick={onNavigate}
-                          className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          className={`relative block rounded-md px-3 py-1.5 text-[13px] transition-colors ${
                             active
-                              ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)]"
+                              ? "bg-white/10 text-text"
                               : "text-muted hover:bg-white/[0.04] hover:text-text"
                           }`}
                         >
                           {active && (
-                            <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal via-emerald to-magenta" />
+                            <span className="absolute -left-2 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full bg-teal" />
                           )}
-                          <span
-                            className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
-                              active
-                                ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
-                                : "bg-white/5 text-muted"
-                            }`}
-                          >
-                            {item.icon}
-                          </span>
-                          <span className="font-medium">{item.label}</span>
+                          {c.label}
                         </Link>
                       </li>
                     );
                   })}
                 </ul>
-              ) : null}
+              )}
             </div>
           );
         })}
@@ -236,12 +308,12 @@ export function NavContent({
         >
           <div className="flex items-center justify-between">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-              Intelligence
+              FORGE Brain
             </div>
             <span className="text-[10px] text-teal">Open →</span>
           </div>
           <div className="mt-1 text-[12px] leading-snug text-text">
-            The FORGE brain — learns from every proposal.
+            Learns from every proposal you ship.
           </div>
         </Link>
       </div>

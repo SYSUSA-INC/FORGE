@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import {
@@ -60,7 +60,18 @@ export function SettingsClient({
   aiStatus: AIEngineStatus;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<TabKey>("organization");
+
+  // Deep-link support: nav items under Operations Management point at
+  // `/settings?tab=integrations` (etc.) so each one highlights as a
+  // distinct destination. Sync the local tab state to the URL.
+  useEffect(() => {
+    const t = searchParams?.get("tab");
+    if (t === "users" || t === "integrations" || t === "ai" || t === "organization") {
+      setTab(t);
+    }
+  }, [searchParams]);
   const [draft, setDraft] = useState<OrgProfile>(initialProfile);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
