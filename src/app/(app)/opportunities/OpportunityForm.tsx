@@ -24,12 +24,16 @@ export function OpportunityForm({
   initial,
   owners,
   defaultOwnerUserId,
+  afterCreate,
 }: {
   mode: "create" | "edit";
   id?: string;
   initial?: InitialOpportunity;
   owners: Owner[];
   defaultOwnerUserId?: string;
+  /** When set to "proposal", redirect into the proposal launcher
+   *  with this new opportunity preselected after a successful create. */
+  afterCreate?: "proposal";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -99,7 +103,15 @@ export function OpportunityForm({
       if (mode === "create") {
         const res = await createOpportunityAction(payload);
         if (!res.ok) return setError(res.error);
-        router.push(`/opportunities/${res.id}`);
+        // The "create from scratch" flow on the proposal launcher
+        // routes here with `?afterCreate=proposal` so we know to chain
+        // the user back into proposal creation. Default behavior is to
+        // open the opportunity detail.
+        if (afterCreate === "proposal") {
+          router.push(`/proposals/new?opportunityId=${res.id}`);
+        } else {
+          router.push(`/opportunities/${res.id}`);
+        }
       } else if (mode === "edit" && id) {
         const res = await updateOpportunityAction(id, payload);
         if (!res.ok) return setError(res.error);
