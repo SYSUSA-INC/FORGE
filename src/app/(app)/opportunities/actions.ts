@@ -2,7 +2,6 @@
 
 import { and, asc, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   memberships,
@@ -184,14 +183,6 @@ export async function deleteOpportunityAction(
       error: err instanceof Error ? err.message : "Delete failed.",
     };
   }
-}
-
-export async function createOpportunityAndGoAction(
-  input: OpportunityInput,
-): Promise<void> {
-  const res = await createOpportunityAction(input);
-  if (res.ok) redirect(`/opportunities/${res.id}`);
-  throw new Error(res.ok ? "unreachable" : res.error);
 }
 
 export async function listOpportunityOwners(): Promise<

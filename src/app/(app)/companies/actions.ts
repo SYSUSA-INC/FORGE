@@ -2,7 +2,6 @@
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { companies, type CompanyRelationship } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
@@ -95,14 +94,6 @@ export async function createCompanyAction(
       error: err instanceof Error ? err.message : "Create failed.",
     };
   }
-}
-
-export async function createCompanyAndGoAction(
-  input: CompanyInput,
-): Promise<void> {
-  const res = await createCompanyAction(input);
-  if (res.ok) redirect(`/companies/${res.id}`);
-  throw new Error(res.ok ? "unreachable" : res.error);
 }
 
 export async function updateCompanyAction(

@@ -2,7 +2,6 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   opportunities,
@@ -120,14 +119,6 @@ export async function uploadSolicitationAction(
 
   revalidatePath("/solicitations");
   return { ok: true, id: row.id };
-}
-
-export async function uploadSolicitationAndGoAction(
-  formData: FormData,
-): Promise<void> {
-  const res = await uploadSolicitationAction(formData);
-  if (res.ok) redirect(`/solicitations/${res.id}`);
-  throw new Error(res.ok ? "unreachable" : res.error);
 }
 
 // Below this many extracted characters we treat the PDF as effectively

@@ -10,6 +10,8 @@
  */
 import {
   buildKnowledgeExtractPrompt,
+  knowledgeExtractionSchema,
+  parseAiJson,
   type KnowledgeExtractionCandidateOutput,
   type KnowledgeKindEnumLike,
 } from "@/lib/ai-prompts";
@@ -80,18 +82,19 @@ export async function aiExtractKnowledgeFromArtifact(input: {
     }
 
     const cleaned = stripCodeFences(ai.text);
-    const parsed = JSON.parse(cleaned) as {
-      candidates?: KnowledgeExtractionCandidateOutput[];
-      notes?: string;
-    };
+    const parseResult = parseAiJson(cleaned, knowledgeExtractionSchema);
+    if (!parseResult.ok) {
+      console.error("[aiExtractKnowledgeFromArtifact] parse", parseResult.error);
+      return { ok: false, error: parseResult.error };
+    }
 
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      candidates: normalizeCandidates(parsed.candidates ?? []),
-      notes: typeof parsed.notes === "string" ? parsed.notes.slice(0, 1000) : "",
+      candidates: normalizeCandidates(parseResult.data.candidates),
+      notes: parseResult.data.notes.slice(0, 1000),
     };
   } catch (err) {
     console.error("[aiExtractKnowledgeFromArtifact]", err);

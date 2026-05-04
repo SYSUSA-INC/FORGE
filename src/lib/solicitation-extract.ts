@@ -11,6 +11,8 @@
 import {
   buildSolicitationExtractPrompt,
   buildSolicitationVisionPrompt,
+  parseAiJson,
+  solicitationExtractionSchema,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
 import { complete, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
@@ -108,16 +110,19 @@ export async function aiExtractSolicitation(
       };
     }
 
-    // Strip code-fences if the model decided to wrap the JSON.
     const cleaned = stripCodeFences(ai.text);
-    const parsed = JSON.parse(cleaned) as SolicitationExtractionResult;
+    const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
+    if (!parseResult.ok) {
+      console.error("[aiExtractSolicitation] parse", parseResult.error);
+      return { ok: false, error: parseResult.error };
+    }
 
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(parsed),
+      data: normalizeExtraction(parseResult.data),
     };
   } catch (err) {
     console.error("[aiExtractSolicitation]", err);
@@ -180,13 +185,17 @@ export async function aiExtractSolicitationFromPdf(
       return { ok: false, error: "AI provider unexpectedly returned stub mode." };
     }
     const cleaned = stripCodeFences(ai.text);
-    const parsed = JSON.parse(cleaned) as SolicitationExtractionResult;
+    const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
+    if (!parseResult.ok) {
+      console.error("[aiExtractSolicitationFromPdf] parse", parseResult.error);
+      return { ok: false, error: parseResult.error };
+    }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(parsed),
+      data: normalizeExtraction(parseResult.data),
     };
   } catch (err) {
     console.error("[aiExtractSolicitationFromPdf]", err);
@@ -244,13 +253,17 @@ export async function aiExtractSolicitationFromImage(
       return { ok: false, error: "AI provider unexpectedly returned stub mode." };
     }
     const cleaned = stripCodeFences(ai.text);
-    const parsed = JSON.parse(cleaned) as SolicitationExtractionResult;
+    const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
+    if (!parseResult.ok) {
+      console.error("[aiExtractSolicitationVision] parse", parseResult.error);
+      return { ok: false, error: parseResult.error };
+    }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(parsed),
+      data: normalizeExtraction(parseResult.data),
     };
   } catch (err) {
     console.error("[aiExtractSolicitationFromImage]", err);

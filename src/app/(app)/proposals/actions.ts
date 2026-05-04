@@ -2,7 +2,6 @@
 
 import { and, asc, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   memberships,
@@ -190,19 +189,6 @@ export async function createProposalAction(input: {
       error: err instanceof Error ? err.message : "Create failed.",
     };
   }
-}
-
-export async function createProposalAndGoAction(input: {
-  opportunityId: string;
-  title?: string;
-  templateId?: string | null;
-  proposalManagerUserId?: string | null;
-  captureManagerUserId?: string | null;
-  pricingLeadUserId?: string | null;
-}): Promise<void> {
-  const res = await createProposalAction(input);
-  if (res.ok) redirect(`/proposals/${res.id}`);
-  throw new Error(res.ok ? "unreachable" : res.error);
 }
 
 export async function updateProposalAction(
