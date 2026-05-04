@@ -20,6 +20,7 @@ import {
 import { extractTextFromPdf } from "@/lib/solicitation-extract";
 import { extractTextFromImageViaVision } from "@/lib/image-ocr";
 import type { AIDocumentMedia } from "@/lib/ai";
+import { log } from "@/lib/log";
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB cap; corpus runs bigger than solicitations.
 const RAW_TEXT_CAP = 500_000;
@@ -128,7 +129,7 @@ export async function uploadKnowledgeArtifactAction(
       .set({ storagePath: stored.storagePath, updatedAt: new Date() })
       .where(eq(knowledgeArtifacts.id, row.id));
   } catch (err) {
-    console.error("[uploadKnowledgeArtifact] storage", err);
+    log.error("[uploadKnowledgeArtifact]", "storage", { error: err });
     await db
       .update(knowledgeArtifacts)
       .set({
@@ -213,7 +214,7 @@ async function extractAndIndex(
       }
     }
   } catch (err) {
-    console.error("[knowledge-artifact extract]", err);
+    log.error("[knowledge-artifact extract]", "error", { error: err });
     await db
       .update(knowledgeArtifacts)
       .set({

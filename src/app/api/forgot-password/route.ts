@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     try {
       await sendPasswordResetEmail(email, token);
     } catch (err) {
-      console.error("[forgot-password] sendPasswordResetEmail failed", err);
+      log.error("[forgot-password]", "sendPasswordResetEmail failed", { error: err });
     }
   }
 

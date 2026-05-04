@@ -11,6 +11,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
+import { log } from "@/lib/log";
 
 const BATCH = 64;
 
@@ -91,7 +92,7 @@ export async function backfillEntryEmbeddings(
       const result = await embedBatch(valid.map((v) => v.text));
       vectors = result.vectors;
     } catch (err) {
-      console.error("[backfillEntryEmbeddings] batch failed", err);
+      log.error("[backfillEntryEmbeddings]", "batch failed", { error: err });
       skipped += slice.length;
       continue;
     }
@@ -107,10 +108,10 @@ export async function backfillEntryEmbeddings(
         `);
         embedded += 1;
       } catch (err) {
-        console.error(
-          `[backfillEntryEmbeddings] update ${valid[j]!.row.id} failed`,
-          err,
-        );
+        log.error("[backfillEntryEmbeddings]", "update failed", {
+          rowId: valid[j]!.row.id,
+          error: err,
+        });
         skipped += 1;
       }
     }

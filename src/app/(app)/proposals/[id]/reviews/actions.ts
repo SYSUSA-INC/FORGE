@@ -22,6 +22,7 @@ import {
   dispatchReviewAssignedNotification,
   dispatchReviewCompletedNotification,
 } from "@/lib/notifications";
+import { log } from "@/lib/log";
 
 const COLOR_LABELS: Record<ReviewColor, string> = {
   pink: "Pink Team",
@@ -147,7 +148,7 @@ export async function startReviewAction(input: {
     revalidatePath(`/proposals/${input.proposalId}`);
     return { ok: true, reviewId: review.id };
   } catch (err) {
-    console.error("[startReviewAction]", err);
+    log.error("[startReviewAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Start failed.",

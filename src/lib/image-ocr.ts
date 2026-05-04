@@ -12,6 +12,7 @@
  * stub or non-Anthropic mode.
  */
 import { complete, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
+import { log } from "@/lib/log";
 
 export type ImageOcrResult =
   | {
@@ -91,7 +92,7 @@ export async function extractTextFromImageViaVision(input: {
       stubbed: false,
     };
   } catch (err) {
-    console.error("[extractTextFromImageViaVision]", err);
+    log.error("[extractTextFromImageViaVision]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Vision OCR failed.",

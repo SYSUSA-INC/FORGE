@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { SOLICITATION_ROLE_LABELS } from "@/lib/solicitation-roles";
+import { log } from "@/lib/log";
 
 export type AssignmentRow = {
   userId: string;
@@ -155,7 +156,7 @@ export async function assignSolicitationRoleAction(input: {
           ),
         );
     } else {
-      console.error("[assignSolicitationRole]", err);
+      log.error("[assignSolicitationRole]", "error", { error: err });
       return {
         ok: false,
         error: err instanceof Error ? err.message : "Assign failed.",

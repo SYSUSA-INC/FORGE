@@ -10,6 +10,7 @@ import { authConfig } from "@/auth.config";
 import { verifyPassword } from "@/lib/passwords";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { selfServiceRegistrationAllowed } from "@/lib/signup-mode";
+import { log } from "@/lib/log";
 
 async function enrichFromDb(userId: string): Promise<{
   isSuperadmin: boolean;
@@ -75,7 +76,7 @@ async function provisionOrgForUser(userId: string, name: string | null | undefin
       status: "active",
     });
   } catch (err) {
-    console.error("[provisionOrgForUser] membership insert failed", err);
+    log.error("[provisionOrgForUser]", "membership insert failed", { error: err });
     await db
       .delete(organizations)
       .where(eq(organizations.id, org.id))
@@ -147,22 +148,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         try {
           await db.delete(users).where(eq(users.id, user.id));
         } catch (err) {
-          console.error(
-            "[events.createUser] failed to delete unauthorized user",
-            err,
-          );
+          log.error("[events.createUser]", "failed to delete unauthorized user", {
+            error: err,
+          });
         }
-        console.warn(
-          "[events.createUser] blocked OAuth signup (SIGNUP_MODE != open):",
-          user.email ?? user.id,
-        );
+        log.warn("[events.createUser]", "blocked OAuth signup (SIGNUP_MODE != open)", {
+          identity: user.email ?? user.id,
+        });
         return;
       }
 
       try {
         await provisionOrgForUser(user.id, user.name);
       } catch (err) {
-        console.error("[events.createUser] org provisioning failed", err);
+        log.error("[events.createUser]", "org provisioning failed", { error: err });
       }
     },
     async signIn({ user }) {
@@ -177,7 +176,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       try {
         await provisionOrgForUser(user.id, user.name);
       } catch (err) {
-        console.error("[events.signIn] org provisioning failed", err);
+        log.error("[events.signIn]", "org provisioning failed", { error: err });
       }
     },
   },

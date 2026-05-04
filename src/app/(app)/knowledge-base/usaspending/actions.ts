@@ -9,6 +9,7 @@ import {
   searchAwardsByRecipientName,
   type UsaspendingAward,
 } from "@/lib/usaspending";
+import { log } from "@/lib/log";
 
 export type SearchResult =
   | {
@@ -139,7 +140,7 @@ export async function importUsaspendingAwardsAction(
       });
       imported += 1;
     } catch (err) {
-      console.error("[importUsaspendingAwards] insert", err);
+      log.error("[importUsaspendingAwards]", "insert", { error: err });
       skipped += 1;
     }
   }

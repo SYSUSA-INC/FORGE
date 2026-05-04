@@ -22,6 +22,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { searchAwardsByRecipientName } from "@/lib/usaspending";
+import { log } from "@/lib/log";
 
 export type WinnerAnalysisRow = {
   competitorName: string;
@@ -220,7 +221,7 @@ export async function runWinnerAnalysisAction(
       }));
     }
   } catch (err) {
-    console.warn("[winner-analysis] usaspending failed", err);
+    log.warn("[winner-analysis]", "usaspending failed", { error: err });
   }
 
   // AI call.
@@ -267,7 +268,7 @@ export async function runWinnerAnalysisAction(
     model = `${res.provider}:${res.model}`;
     stubbed = res.stubbed;
   } catch (err) {
-    console.error("[winner-analysis] AI call failed", err);
+    log.error("[winner-analysis]", "AI call failed", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "AI call failed.",
@@ -276,11 +277,10 @@ export async function runWinnerAnalysisAction(
 
   const parseResult = parseAiJson(raw, winnerAnalysisSchema);
   if (!parseResult.ok) {
-    console.warn(
-      "[winner-analysis] JSON parse failed",
-      parseResult.error,
-      raw.slice(0, 240),
-    );
+    log.warn("[winner-analysis]", "JSON parse failed", {
+      parseError: parseResult.error,
+      rawSnippet: raw.slice(0, 240),
+    });
     return {
       ok: false,
       error: `${parseResult.error} Re-run, or check the API key.`,

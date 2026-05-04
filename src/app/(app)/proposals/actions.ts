@@ -24,6 +24,7 @@ import {
   validateDoc,
 } from "@/lib/tiptap-doc";
 import { getDefaultTemplate } from "@/app/(app)/settings/templates/actions";
+import { log } from "@/lib/log";
 
 async function ownsProposal(id: string, organizationId: string) {
   const [row] = await db
@@ -150,7 +151,7 @@ export async function createProposalAction(input: {
       }
     }
   } catch (err) {
-    console.warn("[createProposalAction] template lookup failed", err);
+    log.warn("[createProposalAction]", "template lookup failed", { error: err });
     templateId = null;
   }
 
@@ -183,7 +184,7 @@ export async function createProposalAction(input: {
     revalidatePath("/proposals");
     return { ok: true, id: row.id };
   } catch (err) {
-    console.error("[createProposalAction]", err);
+    log.error("[createProposalAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
@@ -228,7 +229,7 @@ export async function updateProposalAction(
     revalidatePath(`/proposals/${id}`);
     return { ok: true };
   } catch (err) {
-    console.error("[updateProposalAction]", err);
+    log.error("[updateProposalAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
@@ -278,13 +279,13 @@ export async function advanceProposalStageAction(
         "./[id]/harvest-actions"
       );
       void harvestProposalToCorpusAction(id).catch((err) => {
-        console.warn("[advanceProposalStage] harvest failed", err);
+        log.warn("[advanceProposalStage]", "harvest failed", { error: err });
       });
     }
 
     return { ok: true, harvestStarted };
   } catch (err) {
-    console.error("[advanceProposalStageAction]", err);
+    log.error("[advanceProposalStageAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Stage change failed.",
@@ -354,7 +355,7 @@ export async function saveSectionAction(input: {
     revalidatePath(`/proposals/${input.proposalId}`);
     return { ok: true };
   } catch (err) {
-    console.error("[saveSectionAction]", err);
+    log.error("[saveSectionAction]", "error", { error: err });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Save failed.",

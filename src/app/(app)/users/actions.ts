@@ -18,6 +18,7 @@ import {
 import { sendInviteEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
 import { validateEmail } from "@/lib/validators";
+import { log } from "@/lib/log";
 
 const ASSIGNABLE_ROLES: Role[] = [
   "admin",
@@ -125,7 +126,7 @@ export async function inviteUserAction(input: {
       role: input.role,
     });
   } catch (err) {
-    console.error("[inviteUserAction] sendInviteEmail failed", err);
+    log.error("[inviteUserAction]", "sendInviteEmail failed", { error: err });
     return { ok: false, error: "Could not send invite email. Try again." };
   }
 
@@ -192,7 +193,7 @@ export async function resendInviteAction(
       role: inv.role,
     });
   } catch (err) {
-    console.error("[resendInviteAction] sendInviteEmail failed", err);
+    log.error("[resendInviteAction]", "sendInviteEmail failed", { error: err });
     return { ok: false, error: "Could not send invite email. Try again." };
   }
 

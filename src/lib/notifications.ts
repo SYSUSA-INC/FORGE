@@ -11,6 +11,7 @@ import {
   sendReviewAssignedEmail,
   sendReviewCompletedEmail,
 } from "@/lib/email";
+import { log } from "@/lib/log";
 
 type DispatchInput = {
   kind: NotificationKind;
@@ -50,7 +51,7 @@ async function persist(input: DispatchInput): Promise<string | null> {
       .returning({ id: notifications.id });
     return row?.id ?? null;
   } catch (err) {
-    console.error("[notifications.persist]", err);
+    log.error("[notifications.persist]", "error", { error: err });
     return null;
   }
 }
@@ -72,7 +73,7 @@ async function markEmailResult(
         .where(eq(notifications.id, id));
     }
   } catch (err) {
-    console.error("[notifications.markEmailResult]", err);
+    log.error("[notifications.markEmailResult]", "error", { error: err });
   }
 }
 
@@ -140,7 +141,7 @@ export async function dispatchReviewAssignedNotification(input: {
         ok: false,
         error: err instanceof Error ? err.message : "send failed",
       });
-    console.error("[dispatchReviewAssignedNotification]", err);
+    log.error("[dispatchReviewAssignedNotification]", "error", { error: err });
   }
 }
 
@@ -195,7 +196,7 @@ export async function dispatchCommentMentionNotification(input: {
         ok: false,
         error: err instanceof Error ? err.message : "send failed",
       });
-    console.error("[dispatchCommentMentionNotification]", err);
+    log.error("[dispatchCommentMentionNotification]", "error", { error: err });
   }
 }
 
@@ -248,6 +249,6 @@ export async function dispatchReviewCompletedNotification(input: {
         ok: false,
         error: err instanceof Error ? err.message : "send failed",
       });
-    console.error("[dispatchReviewCompletedNotification]", err);
+    log.error("[dispatchReviewCompletedNotification]", "error", { error: err });
   }
 }

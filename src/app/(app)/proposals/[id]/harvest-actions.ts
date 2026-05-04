@@ -14,6 +14,7 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { startKnowledgeExtractionAction } from "../../knowledge-base/import/[id]/actions";
 import { embedArtifactAction } from "../../knowledge-base/import/embed-actions";
+import { log } from "@/lib/log";
 
 const RAW_TEXT_CAP = 500_000;
 
@@ -206,7 +207,7 @@ export async function harvestProposalToCorpusAction(
     const r = await embedArtifactAction(artifactId);
     if (r.ok) embeddedChunks = r.chunks;
   } catch (err) {
-    console.warn("[harvestProposalToCorpus] embed failed", err);
+    log.warn("[harvestProposalToCorpus]", "embed failed", { error: err });
   }
 
   // Run Brain extraction so candidate knowledge entries land in the
@@ -217,7 +218,7 @@ export async function harvestProposalToCorpusAction(
     const r = await startKnowledgeExtractionAction(artifactId);
     if (r.ok) candidateCount = r.candidateCount;
   } catch (err) {
-    console.warn("[harvestProposalToCorpus] extraction failed", err);
+    log.warn("[harvestProposalToCorpus]", "extraction failed", { error: err });
   }
 
   revalidatePath("/knowledge-base");
