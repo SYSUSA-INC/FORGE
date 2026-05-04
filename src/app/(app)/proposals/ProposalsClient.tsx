@@ -24,6 +24,26 @@ type ProposalRow = {
   updatedAt: string;
 };
 
+// Two top-level workspaces. "In-flight" = anything actively being
+// authored or color-team reviewed. "Submitted" = past the launch
+// button — submitted, awarded, lost, no_bid, archived.
+const IN_FLIGHT_STAGES = new Set<ProposalStage>([
+  "draft",
+  "pink_team",
+  "red_team",
+  "gold_team",
+  "white_gloves",
+]);
+const SUBMITTED_STAGES = new Set<ProposalStage>([
+  "submitted",
+  "awarded",
+  "lost",
+  "no_bid",
+  "archived",
+]);
+
+type Tab = "in_flight" | "submitted";
+
 export function ProposalsClient({
   proposals,
   stageCounts,
@@ -31,12 +51,40 @@ export function ProposalsClient({
   proposals: ProposalRow[];
   stageCounts: Record<string, number>;
 }) {
+  const [tab, setTab] = useState<Tab>("in_flight");
   const [filter, setFilter] = useState("");
   const [stageFilter, setStageFilter] = useState<ProposalStage | "all">("all");
 
+  // When a user switches tabs, drop any stage filter — its options
+  // change with the tab, so carrying it across is jarring.
+  function selectTab(t: Tab) {
+    setTab(t);
+    setStageFilter("all");
+  }
+
+  const stagesForTab = useMemo(
+    () =>
+      STAGES.filter((s) =>
+        tab === "in_flight"
+          ? IN_FLIGHT_STAGES.has(s.key)
+          : SUBMITTED_STAGES.has(s.key),
+      ),
+    [tab],
+  );
+
+  const inTab = useMemo(
+    () =>
+      proposals.filter((p) =>
+        tab === "in_flight"
+          ? IN_FLIGHT_STAGES.has(p.stage)
+          : SUBMITTED_STAGES.has(p.stage),
+      ),
+    [proposals, tab],
+  );
+
   const filtered = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    return proposals.filter((p) => {
+    return inTab.filter((p) => {
       if (stageFilter !== "all" && p.stage !== stageFilter) return false;
       if (!f) return true;
       return (
@@ -48,7 +96,24 @@ export function ProposalsClient({
         (p.pmEmail ?? "").toLowerCase().includes(f)
       );
     });
-  }, [proposals, filter, stageFilter]);
+  }, [inTab, filter, stageFilter]);
+
+  const inFlightCount = useMemo(
+    () =>
+      [...IN_FLIGHT_STAGES].reduce(
+        (sum, s) => sum + (stageCounts[s] ?? 0),
+        0,
+      ),
+    [stageCounts],
+  );
+  const submittedCount = useMemo(
+    () =>
+      [...SUBMITTED_STAGES].reduce(
+        (sum, s) => sum + (stageCounts[s] ?? 0),
+        0,
+      ),
+    [stageCounts],
+  );
 
   const inReview =
     (stageCounts.pink_team ?? 0) +
@@ -79,6 +144,21 @@ export function ProposalsClient({
         ]}
       />
 
+      <div className="mb-3 flex items-center gap-1 border-b border-white/10">
+        <TabButton
+          active={tab === "in_flight"}
+          onClick={() => selectTab("in_flight")}
+          label="In flight"
+          count={inFlightCount}
+        />
+        <TabButton
+          active={tab === "submitted"}
+          onClick={() => selectTab("submitted")}
+          label="Submitted"
+          count={submittedCount}
+        />
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setStageFilter("all")}
@@ -88,9 +168,9 @@ export function ProposalsClient({
               : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
           }`}
         >
-          All {proposals.length}
+          All {inTab.length}
         </button>
-        {STAGES.map((s) => {
+        {stagesForTab.map((s) => {
           const n = stageCounts[s.key] ?? 0;
           if (n === 0 && stageFilter !== s.key) return null;
           const active = stageFilter === s.key;
@@ -115,8 +195,14 @@ export function ProposalsClient({
       </div>
 
       <Panel
-        title={stageFilter === "all" ? "All proposals" : STAGES.find((s) => s.key === stageFilter)?.label}
-        eyebrow={`${filtered.length} of ${proposals.length}`}
+        title={
+          stageFilter === "all"
+            ? tab === "in_flight"
+              ? "In-flight proposals"
+              : "Submitted proposals"
+            : STAGES.find((s) => s.key === stageFilter)?.label
+        }
+        eyebrow={`${filtered.length} of ${inTab.length}`}
         actions={
           <input
             className="aur-input w-64 text-[12px]"
@@ -139,6 +225,39 @@ export function ProposalsClient({
         )}
       </Panel>
     </>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative -mb-px px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
+        active
+          ? "border-b-2 border-teal text-text"
+          : "border-b-2 border-transparent text-muted hover:text-text"
+      }`}
+    >
+      {label}
+      <span
+        className={`ml-2 rounded px-1.5 py-0.5 text-[10px] ${
+          active ? "bg-teal/15 text-teal" : "bg-white/5 text-muted"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
   );
 }
 
