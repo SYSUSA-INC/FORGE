@@ -522,6 +522,41 @@ guide. Tracked as continuous work, not a single PR.
 
 ---
 
+### BL-22 — Nav v2 — collapsible icon rail + visual refresh
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** —
+
+Sourced from a design reference shared by the user. Brings the nav
+in line with modern SaaS patterns: a collapsible icon rail, clearer
+expand/collapse affordance on groups, tree-connector lines under
+sub-items, and a user identity card pinned at the bottom replacing
+the FORGE Brain promo.
+
+**Scope:**
+- Two-state aside: collapsed (60px icon rail) ↔ expanded (240px
+  full sidebar). State persists in localStorage
+  (`forge.nav.rail.v1`)
+- Toggle button in the nav header (chevron-left in expanded, chevron-
+  right in collapsed)
+- Icon rail collapsing logic: single click on a group icon expands
+  the rail AND opens that group, so the user reaches their
+  destination in one action
+- Replaced chevron-rotation with a `+` / `−` icon in a small bordered
+  square — clearer state communication
+- Tree-connector lines on sub-items: vertical trunk via left-border on
+  the `<ul>`, horizontal hooks via `::before` pseudo-elements
+- New `UserAvatar` component pinned at the bottom of the nav showing
+  avatar (or initials), name, email, and a green online dot. Compact
+  variant when rail is collapsed (avatar + dot only, tooltip shows
+  name+email)
+- Sign out remains in the topbar `UserMenu` — bottom card is identity
+  only (matches the design reference)
+
+**Acceptance:** click the toggle → rail collapses to icons; click any
+group icon → rail expands AND that group opens; reload page → state
+persists; non-admin users still see only the groups they should.
+
+---
+
 ## Effort summary
 
 | Category | Items | Total effort |

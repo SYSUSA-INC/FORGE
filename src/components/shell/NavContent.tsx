@@ -24,23 +24,22 @@ type NavGroup = {
   children?: NavItem[];
 };
 
+type NavUser = {
+  name: string | null;
+  email: string;
+  image: string | null;
+};
+
 // Six top-level entries per the platform spec.
 //
 // Operations Management consolidates the per-tenant admin surface
 // (Settings, Users & Roles, Integrations, AI Engine, Templates,
-// Notifications). Settings/Integrations/AI Engine are tabs of a
-// single page today, so we deep-link via `?tab=` until BL-14 splits
-// them into real routes.
+// Notifications). Settings/Integrations/AI Engine deep-link via
+// `?tab=` until BL-14 splits them into real routes.
 //
-// Platform Administration today is the existing /admin page (legacy
-// super-admin view of orgs, users, activity). Once BL-15 / BL-16 /
-// BL-17 / BL-18 ship, this becomes a parent group with sub-items
-// (Tenant Administration, Platform Configuration, Subscriptions,
-// Platform Audit Log). Hidden from non-superadmins server-side.
-//
-// Items not yet in the menu (waiting on their backing BL):
-//   - Operations Management → Audit Log (BL-12)
-//   - Platform Administration → 4 sub-items (BL-15..BL-18)
+// Items waiting on their backing BL: Audit Log (BL-12), Platform
+// Administration sub-items (BL-15..BL-18). They re-appear here as
+// each ships.
 const NAV: NavGroup[] = [
   {
     id: "command",
@@ -103,12 +102,13 @@ const NAV: NavGroup[] = [
   },
 ];
 
-const COLLAPSED_KEY = "forge.nav.collapsed.v2";
+const COLLAPSED_GROUPS_KEY = "forge.nav.collapsed.v2";
+const NAV_RAIL_COLLAPSED_KEY = "forge.nav.rail.v1";
 
-function readCollapsed(): Set<string> {
+function readCollapsedGroups(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    const raw = window.localStorage.getItem(COLLAPSED_KEY);
+    const raw = window.localStorage.getItem(COLLAPSED_GROUPS_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
@@ -118,48 +118,112 @@ function readCollapsed(): Set<string> {
   }
 }
 
-function writeCollapsed(set: Set<string>): void {
+function writeCollapsedGroups(set: Set<string>): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set]));
+    window.localStorage.setItem(
+      COLLAPSED_GROUPS_KEY,
+      JSON.stringify([...set]),
+    );
   } catch {
-    // Quota / private mode — silently swallow.
+    /* private mode, quota — silently swallow */
+  }
+}
+
+function readRailCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(NAV_RAIL_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeRailCollapsed(collapsed: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      NAV_RAIL_COLLAPSED_KEY,
+      collapsed ? "1" : "0",
+    );
+  } catch {
+    /* swallow */
   }
 }
 
 function hrefMatches(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
-  // Strip query string for comparison — `?tab=integrations` is a
-  // tab hint, not a different page.
   const cleanHref = href.split("?")[0]!;
   if (cleanHref === "/") return pathname === "/";
   return pathname === cleanHref || pathname.startsWith(cleanHref + "/");
+}
+
+function initialsFor(name: string | null, email: string): string {
+  const seed = name?.trim() || email;
+  return (
+    seed
+      .split(/\s+|@/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((x) => x[0]?.toUpperCase() ?? "")
+      .join("") || "·"
+  );
 }
 
 export function NavContent({
   onNavigate,
   isOrgAdmin = false,
   isSuperadmin = false,
+  user,
+  /** When true, parent shell can disable the rail toggle — useful in the
+   *  mobile drawer where the nav is always full-width. */
+  hideRailToggle = false,
 }: {
   onNavigate?: () => void;
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
+  user: NavUser | null;
+  hideRailToggle?: boolean;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [railCollapsed, setRailCollapsedState] = useState(false);
 
   // Hydrate from localStorage after mount. SSR + first client render
-  // produce identical markup, avoiding hydration mismatch warnings.
+  // produce identical markup (avoids hydration mismatch warnings).
   useEffect(() => {
-    setCollapsed(readCollapsed());
+    setCollapsedGroups(readCollapsedGroups());
+    setRailCollapsedState(readRailCollapsed());
   }, []);
 
-  function toggle(g: string) {
-    setCollapsed((prev) => {
+  // Notify the parent shell when the rail collapses so it can resize
+  // its sticky aside (60px ↔ 256px). The parent listens via a custom
+  // event fired on window.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("forge:nav-rail", {
+        detail: { collapsed: railCollapsed },
+      }),
+    );
+  }, [railCollapsed]);
+
+  function toggleGroup(g: string) {
+    setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(g)) next.delete(g);
       else next.add(g);
-      writeCollapsed(next);
+      writeCollapsedGroups(next);
+      return next;
+    });
+  }
+
+  function toggleRail() {
+    setRailCollapsedState((prev) => {
+      const next = !prev;
+      writeRailCollapsed(next);
       return next;
     });
   }
@@ -178,35 +242,147 @@ export function NavContent({
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  // Collapsed rail variant — icons only, ~60px wide.
+  // ─────────────────────────────────────────────────────────────────
+  if (railCollapsed) {
+    return (
+      <>
+        <div className="flex h-14 items-center justify-center border-b border-white/10">
+          <div
+            className="grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow"
+            style={{
+              background:
+                "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)",
+            }}
+          >
+            F
+          </div>
+        </div>
+
+        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-3">
+          {visibleGroups.map((g) => {
+            const children = visibleChildren(g);
+            const groupActive = g.href
+              ? hrefMatches(pathname, g.href)
+              : children.some((c) => hrefMatches(pathname, c.href));
+
+            // Standalone link (Command Center, Platform Administration when
+            // it's a leaf) — direct navigation.
+            if (g.href && children.length === 0) {
+              return (
+                <Link
+                  key={g.id}
+                  href={g.href}
+                  onClick={onNavigate}
+                  title={g.label}
+                  aria-label={g.label}
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
+                    groupActive
+                      ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.4)]"
+                      : "text-muted hover:bg-white/[0.05] hover:text-text"
+                  }`}
+                >
+                  {g.icon}
+                </Link>
+              );
+            }
+
+            // Group with children — clicking expands the rail and reveals
+            // the children. Tooltip shows the group label.
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => {
+                  // Force the group open and expand the rail in one shot
+                  // — otherwise the user has to click twice to get to
+                  // their destination.
+                  if (collapsedGroups.has(g.id)) toggleGroup(g.id);
+                  toggleRail();
+                }}
+                title={g.label}
+                aria-label={g.label}
+                className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
+                  groupActive
+                    ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.4)]"
+                    : "text-muted hover:bg-white/[0.05] hover:text-text"
+                }`}
+              >
+                {g.icon}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex flex-col items-center gap-2 border-t border-white/10 py-3">
+          {!hideRailToggle && (
+            <button
+              type="button"
+              onClick={toggleRail}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/[0.05] hover:text-text"
+            >
+              {/* simple chevron-right */}
+              <span aria-hidden className="font-mono text-[14px]">›</span>
+            </button>
+          )}
+          {user ? <UserAvatar user={user} compact /> : null}
+        </div>
+      </>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // Expanded sidebar — full hierarchy with +/- toggles, tree connectors.
+  // ─────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="flex h-14 items-center gap-3 border-b border-white/10 px-5">
         <div
           className="grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow"
-          style={{ background: "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)" }}
+          style={{
+            background:
+              "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)",
+          }}
         >
           F
         </div>
-        <div className="leading-none">
-          <div className="font-display text-[15px] font-semibold tracking-tight">FORGE</div>
+        <div className="flex-1 leading-none">
+          <div className="font-display text-[15px] font-semibold tracking-tight">
+            FORGE
+          </div>
           <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
             Proposal Ops
           </div>
         </div>
+        {!hideRailToggle && (
+          <button
+            type="button"
+            onClick={toggleRail}
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-white/[0.05] hover:text-text"
+          >
+            <span aria-hidden className="font-mono text-[14px]">‹</span>
+          </button>
+        )}
       </div>
 
-      <nav className="mt-4 flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-6">
+      <nav className="mt-3 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-4">
         {visibleGroups.map((g) => {
           const children = visibleChildren(g);
           const groupActive = g.href
             ? hrefMatches(pathname, g.href)
             : children.some((c) => hrefMatches(pathname, c.href));
-          const isCollapsed = collapsed.has(g.id);
-          // If the active page lives inside this group, force it open
-          // — collapsing the active context out of view is hostile.
-          const showChildren = !!children.length && (!isCollapsed || groupActive);
+          const isCollapsedGroup = collapsedGroups.has(g.id);
+          // Force the group open if the active page lives inside it.
+          const showChildren =
+            !!children.length && (!isCollapsedGroup || groupActive);
 
-          // Standalone link group (Command Center) — no expand affordance.
+          // Standalone link group (Command Center, Platform Administration
+          // as leaf) — no expand affordance.
           if (g.href && children.length === 0) {
             const active = hrefMatches(pathname, g.href);
             return (
@@ -237,12 +413,14 @@ export function NavContent({
             );
           }
 
-          // Expandable group with children.
+          // Expandable group with children. Header is a button that
+          // shows +/- on the right. Children render with a tree
+          // connector line + horizontal hook into each item.
           return (
             <div key={g.id} className="flex flex-col">
               <button
                 type="button"
-                onClick={() => toggle(g.id)}
+                onClick={() => toggleGroup(g.id)}
                 aria-expanded={showChildren}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                   groupActive
@@ -262,31 +440,34 @@ export function NavContent({
                 <span className="flex-1 font-medium">{g.label}</span>
                 <span
                   aria-hidden
-                  className={`font-mono text-[10px] text-subtle transition-transform ${
-                    showChildren ? "rotate-90" : ""
-                  }`}
+                  className="grid h-5 w-5 place-items-center rounded-md border border-white/10 bg-white/[0.03] font-mono text-[12px] text-muted"
                 >
-                  ▸
+                  {showChildren ? "−" : "+"}
                 </span>
               </button>
               {showChildren && (
-                <ul className="ml-9 mt-0.5 flex flex-col gap-0.5 border-l border-white/[0.06] pl-2">
+                <ul
+                  // Tree-connector line: the ul has a left border that
+                  // forms the vertical trunk; each li uses a small ::before
+                  // to draw the horizontal branch hook.
+                  className="ml-[1.4rem] mt-0.5 flex flex-col border-l border-white/[0.08] pl-0"
+                >
                   {children.map((c) => {
                     const active = hrefMatches(pathname, c.href);
                     return (
-                      <li key={c.href}>
+                      <li
+                        key={c.href}
+                        className="relative pl-3 before:absolute before:left-0 before:top-1/2 before:h-px before:w-2.5 before:bg-white/[0.08]"
+                      >
                         <Link
                           href={c.href}
                           onClick={onNavigate}
-                          className={`relative block rounded-md px-3 py-1.5 text-[13px] transition-colors ${
+                          className={`relative block rounded-md px-2 py-1.5 text-[13px] transition-colors ${
                             active
                               ? "bg-white/10 text-text"
                               : "text-muted hover:bg-white/[0.04] hover:text-text"
                           }`}
                         >
-                          {active && (
-                            <span className="absolute -left-2 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full bg-teal" />
-                          )}
                           {c.label}
                         </Link>
                       </li>
@@ -299,23 +480,89 @@ export function NavContent({
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <Link
-          href="/intelligence"
-          onClick={onNavigate}
-          className="aur-card block p-3 transition-colors hover:border-white/20"
-        >
-          <div className="flex items-center justify-between">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-              FORGE Brain
-            </div>
-            <span className="text-[10px] text-teal">Open →</span>
-          </div>
-          <div className="mt-1 text-[12px] leading-snug text-text">
-            Learns from every proposal you ship.
-          </div>
-        </Link>
+      <div className="border-t border-white/10 px-3 py-3">
+        {user ? <UserAvatar user={user} compact={false} /> : null}
       </div>
     </>
+  );
+}
+
+function UserAvatar({
+  user,
+  compact,
+}: {
+  user: NavUser;
+  compact: boolean;
+}) {
+  const label = user.name ?? user.email;
+  const initials = initialsFor(user.name, user.email);
+
+  if (compact) {
+    return (
+      <div
+        title={`${label}\n${user.email}`}
+        className="relative h-9 w-9 overflow-visible"
+      >
+        {user.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.image}
+            alt=""
+            className="h-9 w-9 rounded-full"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span
+            className="grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white"
+            style={{
+              background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
+            }}
+          >
+            {initials}
+          </span>
+        )}
+        <span
+          aria-hidden
+          className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-canvas bg-emerald"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+      <div className="relative h-9 w-9 shrink-0">
+        {user.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.image}
+            alt=""
+            className="h-9 w-9 rounded-full"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span
+            className="grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white"
+            style={{
+              background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
+            }}
+          >
+            {initials}
+          </span>
+        )}
+        <span
+          aria-hidden
+          className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-canvas bg-emerald"
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-display text-[13px] font-semibold text-text leading-tight">
+          {user.name ?? user.email.split("@")[0]}
+        </div>
+        <div className="truncate font-mono text-[10px] text-muted">
+          {user.email}
+        </div>
+      </div>
+    </div>
   );
 }

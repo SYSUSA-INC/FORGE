@@ -13,13 +13,31 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const isSuperadmin = user?.isSuperadmin ?? false;
   const isOrgAdmin = (user?.role === "admin" || isSuperadmin) ?? false;
 
+  // Trim down to what the nav needs — avoid passing the full session
+  // user object across the client boundary.
+  const navUser = user
+    ? {
+        name: user.name ?? null,
+        email: user.email ?? "",
+        image: user.image ?? null,
+      }
+    : null;
+
   return (
     <div className="flex min-h-screen text-text">
-      <SideNav isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
+      <SideNav
+        isOrgAdmin={isOrgAdmin}
+        isSuperadmin={isSuperadmin}
+        user={navUser}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/10 bg-canvas/70 px-4 backdrop-blur-xl md:gap-4 md:px-6">
-          <MobileNav isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
+          <MobileNav
+            isOrgAdmin={isOrgAdmin}
+            isSuperadmin={isSuperadmin}
+            user={navUser}
+          />
 
           <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
             <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-emerald" />
