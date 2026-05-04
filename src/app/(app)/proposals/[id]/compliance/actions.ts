@@ -15,6 +15,8 @@ import {
 import { complete } from "@/lib/ai";
 import {
   buildCompliancePreflightPrompt,
+  compliancePreflightResponseSchema,
+  parseAiJson,
   type CompliancePreflightItem,
   type CompliancePreflightVerdict,
 } from "@/lib/ai-prompts";
@@ -439,20 +441,20 @@ export async function runCompliancePreflightAction(
       continue;
     }
 
-    let parsed: { verdicts?: CompliancePreflightVerdict[] };
-    try {
-      parsed = JSON.parse(extractJson(raw));
-    } catch (err) {
-      console.warn("[runCompliancePreflightAction] JSON parse failed", err, raw.slice(0, 240));
+    const parseResult = parseAiJson(raw, compliancePreflightResponseSchema);
+    if (!parseResult.ok) {
+      console.warn(
+        "[runCompliancePreflightAction] JSON parse failed",
+        parseResult.error,
+        raw.slice(0, 240),
+      );
       continue;
     }
-    if (!parsed.verdicts || !Array.isArray(parsed.verdicts)) continue;
+    const verdicts: CompliancePreflightVerdict[] = parseResult.data.verdicts;
 
     // Apply each verdict back to its item, sequentially per Neon rule.
-    for (const v of parsed.verdicts) {
+    for (const v of verdicts) {
       if (
-        !v ||
-        typeof v.itemId !== "string" ||
         !PREFLIGHT_VERDICT_STATUSES.has(v.suggestedStatus) ||
         !PREFLIGHT_CONFIDENCE.has(v.confidence)
       ) {
@@ -466,9 +468,8 @@ export async function runCompliancePreflightAction(
       const assessment: ComplianceAIAssessment = {
         suggestedStatus: v.suggestedStatus,
         confidence: v.confidence,
-        gap: typeof v.gap === "string" ? v.gap.slice(0, 600) : "",
-        suggestion:
-          typeof v.suggestion === "string" ? v.suggestion.slice(0, 600) : "",
+        gap: v.gap.slice(0, 600),
+        suggestion: v.suggestion.slice(0, 600),
         model: provider,
       };
 
@@ -579,18 +580,6 @@ export async function dismissComplianceAIAssessmentAction(
     );
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
-}
-
-/**
- * Pull a JSON object out of a model response. Models occasionally
- * wrap output in markdown fences or add a leading sentence; this
- * helper trims to the outermost {...} block.
- */
-function extractJson(raw: string): string {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) return raw;
-  return raw.slice(start, end + 1);
 }
 
 export async function listProposalSectionsLite(proposalId: string) {

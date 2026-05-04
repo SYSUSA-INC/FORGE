@@ -7,7 +7,12 @@
  * the AI gateway to produce structured fields suitable for creating
  * an Opportunity.
  */
-import { buildEbuyExtractPrompt, type EbuyExtractionResult } from "@/lib/ai-prompts";
+import {
+  buildEbuyExtractPrompt,
+  ebuyExtractionSchema,
+  parseAiJson,
+  type EbuyExtractionResult,
+} from "@/lib/ai-prompts";
 import { complete } from "@/lib/ai";
 
 export type EbuyExtractOk = {
@@ -70,13 +75,17 @@ export async function aiExtractEbuy(
     }
 
     const cleaned = stripCodeFences(ai.text);
-    const parsed = JSON.parse(cleaned) as EbuyExtractionResult;
+    const parseResult = parseAiJson(cleaned, ebuyExtractionSchema);
+    if (!parseResult.ok) {
+      console.error("[aiExtractEbuy] parse", parseResult.error);
+      return { ok: false, error: parseResult.error };
+    }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalize(parsed),
+      data: normalize(parseResult.data),
     };
   } catch (err) {
     console.error("[aiExtractEbuy]", err);

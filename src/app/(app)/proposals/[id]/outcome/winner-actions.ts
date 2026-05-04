@@ -15,7 +15,8 @@ import {
 import { complete } from "@/lib/ai";
 import {
   buildWinnerAnalysisPrompt,
-  type WinnerAnalysisVerdict,
+  parseAiJson,
+  winnerAnalysisSchema,
 } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -273,19 +274,21 @@ export async function runWinnerAnalysisAction(
     };
   }
 
-  let parsed: Partial<WinnerAnalysisVerdict> = {};
-  try {
-    parsed = JSON.parse(extractJson(raw));
-  } catch (err) {
-    console.warn("[winner-analysis] JSON parse failed", err, raw.slice(0, 240));
+  const parseResult = parseAiJson(raw, winnerAnalysisSchema);
+  if (!parseResult.ok) {
+    console.warn(
+      "[winner-analysis] JSON parse failed",
+      parseResult.error,
+      raw.slice(0, 240),
+    );
     return {
       ok: false,
-      error: "AI response wasn't valid JSON. Re-run, or check the API key.",
+      error: `${parseResult.error} Re-run, or check the API key.`,
     };
   }
+  const parsed = parseResult.data;
 
-  const cap = (s: unknown, n = 1200) =>
-    typeof s === "string" ? s.slice(0, n) : "";
+  const cap = (s: string, n = 1200) => s.slice(0, n);
 
   const analysisValues = {
     organizationId,
@@ -339,9 +342,3 @@ export async function runWinnerAnalysisAction(
   };
 }
 
-function extractJson(raw: string): string {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) return raw;
-  return raw.slice(start, end + 1);
-}

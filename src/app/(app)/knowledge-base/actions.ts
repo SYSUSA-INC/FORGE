@@ -2,7 +2,6 @@
 
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
   knowledgeEntries,
@@ -142,17 +141,6 @@ export async function createKnowledgeEntryAction(input: {
       error: err instanceof Error ? err.message : "Create failed.",
     };
   }
-}
-
-export async function createKnowledgeEntryAndGoAction(input: {
-  kind: KnowledgeKind;
-  title: string;
-  body?: string;
-  tags?: string[];
-}): Promise<void> {
-  const res = await createKnowledgeEntryAction(input);
-  if (res.ok) redirect(`/knowledge-base/${res.id}`);
-  throw new Error(res.ok ? "unreachable" : res.error);
 }
 
 export async function updateKnowledgeEntryAction(

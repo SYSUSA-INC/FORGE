@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
 
 export type SolicitationExtractionResult = {
@@ -708,4 +709,130 @@ export function buildCompliancePreflightPrompt(
     system: COMPLIANCE_PREFLIGHT_SYSTEM,
     messages: [{ role: "user", content: userPrompt }],
   };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Zod schemas — runtime guards on AI JSON
+//
+// We trust prompts to ask for the right shape, but the model is the
+// model: it occasionally returns extra fields, swaps a string for a
+// number, or drops an enum case. These schemas turn "the AI lied" from
+// a 500 into a structured error that the action layer can present.
+//
+// All schemas are permissive on extras (zod's default) — we only fail
+// if a required field is missing or wrong-typed. Use `.parse()` to
+// throw, or `.safeParse()` to branch.
+// ────────────────────────────────────────────────────────────────────
+
+export const solicitationExtractionSchema = z.object({
+  title: z.string(),
+  agency: z.string(),
+  office: z.string(),
+  solicitationNumber: z.string(),
+  type: z.enum(["rfp", "rfi", "rfq", "sources_sought", "other"]),
+  naicsCode: z.string(),
+  setAside: z.string(),
+  responseDueDate: z.string().nullable(),
+  sectionLSummary: z.string(),
+  sectionMSummary: z.string(),
+  requirements: z.array(
+    z.object({
+      kind: z.enum(["shall", "should", "may"]),
+      text: z.string(),
+      ref: z.string(),
+    }),
+  ),
+});
+
+export const ebuyExtractionSchema = z.object({
+  title: z.string(),
+  rfqNumber: z.string(),
+  buyingAgency: z.string(),
+  vehicle: z.string(),
+  naicsCode: z.string(),
+  setAside: z.string(),
+  responseDueDate: z.string().nullable(),
+  placeOfPerformance: z.string(),
+  scopeSummary: z.string(),
+  clinSummary: z.string(),
+  notes: z.string(),
+});
+
+export const knowledgeExtractionSchema = z.object({
+  candidates: z.array(
+    z.object({
+      kind: z.enum(["capability", "past_performance", "personnel", "boilerplate"]),
+      title: z.string(),
+      body: z.string(),
+      tags: z.array(z.string()),
+      sourceExcerpt: z.string(),
+      metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+    }),
+  ),
+  notes: z.string(),
+});
+
+export const winnerAnalysisSchema = z.object({
+  winnerProfileSummary: z.string(),
+  gapsWeHad: z.string(),
+  ourStrengthsUnrecognized: z.string(),
+  recommendations: z.string(),
+});
+
+export const compliancePreflightVerdictSchema = z.object({
+  itemId: z.string(),
+  suggestedStatus: z.enum([
+    "complete",
+    "partial",
+    "not_addressed",
+    "not_applicable",
+  ]),
+  confidence: z.enum(["high", "medium", "low"]),
+  gap: z.string(),
+  suggestion: z.string(),
+});
+
+/** The compliance prompt returns `{ verdicts: [...] }`. */
+export const compliancePreflightResponseSchema = z.object({
+  verdicts: z.array(compliancePreflightVerdictSchema),
+});
+
+/**
+ * Zod-parse a JSON-ish string from the AI. Strips any leading/trailing
+ * prose by clipping to the first `{` and last `}` before parsing —
+ * the same forgiveness the existing call sites apply.
+ *
+ * Returns `{ ok: true, data }` on success or `{ ok: false, error }` on
+ * any failure (parse error, schema violation). Never throws.
+ */
+export function parseAiJson<T>(
+  raw: string,
+  schema: z.ZodType<T>,
+): { ok: true; data: T } | { ok: false; error: string } {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  const slice = start === -1 || end < start ? raw : raw.slice(start, end + 1);
+
+  let json: unknown;
+  try {
+    json = JSON.parse(slice);
+  } catch {
+    return {
+      ok: false,
+      error: "AI response was not valid JSON.",
+    };
+  }
+
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .slice(0, 3)
+      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+      .join("; ");
+    return {
+      ok: false,
+      error: `AI response didn't match the expected shape (${issues}).`,
+    };
+  }
+  return { ok: true, data: parsed.data };
 }
