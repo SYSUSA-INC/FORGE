@@ -4,12 +4,20 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavContent } from "@/components/shell/NavContent";
 
+type NavUser = {
+  name: string | null;
+  email: string;
+  image: string | null;
+};
+
 export function MobileNav({
   isOrgAdmin = false,
   isSuperadmin = false,
+  user,
 }: {
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
+  user: NavUser | null;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -82,6 +90,8 @@ export function MobileNav({
           onNavigate={() => setOpen(false)}
           isOrgAdmin={isOrgAdmin}
           isSuperadmin={isSuperadmin}
+          user={user}
+          hideRailToggle
         />
       </aside>
     </>
