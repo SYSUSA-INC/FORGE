@@ -12,6 +12,7 @@ export function HelpTabs({ canSeeAdmin }: { canSeeAdmin: boolean }) {
       {canSeeAdmin && (
         <Tab href="/help/admin" label="Admin guide" active={pathname.startsWith("/help/admin")} />
       )}
+      <Tab href="/help/faq" label="FAQ" active={pathname.startsWith("/help/faq")} />
     </div>
   );
 }
