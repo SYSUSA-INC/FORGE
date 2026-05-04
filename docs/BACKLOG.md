@@ -523,7 +523,7 @@ guide. Tracked as continuous work, not a single PR.
 ---
 
 ### BL-22 — Nav v2 — collapsible icon rail + visual refresh
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** —
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Merged #103
 
 Sourced from a design reference shared by the user. Brings the nav
 in line with modern SaaS patterns: a collapsible icon rail, clearer
@@ -531,29 +531,114 @@ expand/collapse affordance on groups, tree-connector lines under
 sub-items, and a user identity card pinned at the bottom replacing
 the FORGE Brain promo.
 
-**Scope:**
-- Two-state aside: collapsed (60px icon rail) ↔ expanded (240px
-  full sidebar). State persists in localStorage
-  (`forge.nav.rail.v1`)
-- Toggle button in the nav header (chevron-left in expanded, chevron-
-  right in collapsed)
-- Icon rail collapsing logic: single click on a group icon expands
-  the rail AND opens that group, so the user reaches their
-  destination in one action
-- Replaced chevron-rotation with a `+` / `−` icon in a small bordered
-  square — clearer state communication
-- Tree-connector lines on sub-items: vertical trunk via left-border on
-  the `<ul>`, horizontal hooks via `::before` pseudo-elements
-- New `UserAvatar` component pinned at the bottom of the nav showing
-  avatar (or initials), name, email, and a green online dot. Compact
-  variant when rail is collapsed (avatar + dot only, tooltip shows
-  name+email)
-- Sign out remains in the topbar `UserMenu` — bottom card is identity
-  only (matches the design reference)
+---
 
-**Acceptance:** click the toggle → rail collapses to icons; click any
-group icon → rail expands AND that group opens; reload page → state
-persists; non-admin users still see only the groups they should.
+### BL-23 — AI document review + Capability Matrix + Question Generator
+**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-10 (Knowledge ingestion improvements — needed for capability data source)
+
+When a user uploads RFP / RFI / Sources Sought / RFQ documents to a
+solicitation, FORGE should provide an AI-driven review pipeline with
+three actions surfaced as a button group on the solicitation detail
+page (and visible on the linked opportunity if one exists):
+
+1. **Initiate Review** — kicks off a deep AI read of every uploaded
+   attachment. Extracts structured requirements (Section L
+   instructions + Section M evaluation factors), capability
+   areas needed, evaluation weights, period of performance, place
+   of performance, mandatory certifications, set-aside details, and
+   anything else the model can pin down. Persists the result so the
+   review can be re-opened without re-running.
+
+2. **Create Capability Matrix** *(disabled until review completes)* —
+   takes the review output and joins it against the org's Knowledge
+   entries (capabilities + past performance from `/knowledge-base`).
+   Produces a matrix: each requirement on one axis, each candidate
+   capability/past-perf on the other, with cell-level scoring (Strong
+   / Partial / Gap / Not addressed) plus citations to the knowledge
+   entries that support each cell. Output drives a recommended PWIN
+   contribution: how confident the org should feel about responding
+   to each requirement based on its real evidence base.
+
+3. **Generate Questions** *(disabled until review completes)* —
+   takes the review output and produces a comprehensive list of
+   clarification questions the team should ask the contracting
+   office. Categorized: scope ambiguity, evaluation criteria,
+   submission logistics, technical constraints, security/clearance,
+   subcontracting / set-aside applicability. Each question cites the
+   document section that prompted it. Exportable as plain text or
+   Word for the team to send back to the CO.
+
+**Why this matters:** Current solicitation extraction (the prompt
+in `solicitation-extract.ts`) returns a thin summary — title, due
+date, NAICS, a short list of requirements. The user is asking for a
+deeper, decision-grade analysis tied directly to PWIN scoring and
+question-asking workflows that capture managers run today by hand.
+
+**Where it lives in the UI:**
+- Primary surface: solicitation detail page
+  (`/solicitations/[id]`) — three-button header right after the file
+  metadata, plus dedicated panels for the review output, capability
+  matrix, and question list once they exist
+- Mirror surface: opportunity detail page (when a solicitation is
+  linked to an opportunity) — same three-button group, same three
+  panels, scoped to all attached solicitation documents
+
+**Schema:**
+- `solicitation_review` (id, organization_id, solicitation_id,
+  status [pending / running / complete / failed], result jsonb
+  [extracted requirements, capability buckets, evaluation factors,
+  open questions surfaced during review], model, stubbed, created_by,
+  created_at, completed_at)
+- `solicitation_capability_matrix` (id, organization_id,
+  solicitation_review_id, cells jsonb [{ requirementId, capabilityRef,
+  status, citation, narrative }], pwin_recommendation_low,
+  pwin_recommendation_high, model, stubbed, created_at)
+- `solicitation_question_set` (id, organization_id,
+  solicitation_review_id, questions jsonb [{ category, text,
+  rationale, sectionRef }], model, stubbed, created_at)
+
+**Server actions:**
+- `runSolicitationReviewAction(solicitationId)` — full doc read +
+  extraction. Rate-limited (5/hour per solicitation). Sets
+  `solicitation_review.status` to running, then complete on finish.
+  Idempotent — re-running UPSERTs.
+- `runCapabilityMatrixAction(solicitationId)` — requires a complete
+  review. Pulls Knowledge entries, runs scoring prompt. UPSERT.
+- `runQuestionGeneratorAction(solicitationId)` — requires a complete
+  review. UPSERT.
+- `getReviewStatusAction(solicitationId)` — returns the trio of
+  states for the UI to enable/disable the buttons.
+
+**Client UX:**
+- "Initiate Review" → shows progress (uses existing notification or
+  a dedicated panel state). Re-enables once complete.
+- "Create Capability Matrix" + "Generate Questions" disabled with
+  tooltip "Run document review first" until status === complete.
+- Each output panel is collapsible; matrix supports cell drill-in
+  to view the citing Knowledge entry; question list supports export.
+
+**Acceptance:**
+- Upload an RFP PDF, click Initiate Review, see progress, then a
+  populated review panel with extracted requirements + evaluation
+  factors visible
+- Other two buttons are disabled before review, enabled after
+- Capability Matrix renders a real matrix (rows × columns) with
+  cell statuses citing actual Knowledge entries
+- Question Generator returns categorized questions citing source
+  document sections
+- All three outputs persist — reload the page, they're still there
+
+**Effort breakdown:**
+- Schema + migration: 0.5 day
+- Server actions + AI prompts (3 prompts): 2 days
+- UI: button group, three result panels, status polling: 2 days
+- Knowledge join logic for capability matrix: 1 day
+- Stub-mode handling + tests: 0.5 day
+- Total: ~6 days (1 week)
+
+---
+
+
 
 ---
 
@@ -561,37 +646,42 @@ persists; non-admin users still see only the groups they should.
 
 | Category | Items | Total effort |
 |---|---|---|
-| Cleanup / debt | BL-1, BL-2 | ~1 day |
+| Cleanup / debt | BL-1, BL-2 (shipped) | ~1 day |
 | Capture & pursuit | BL-3, BL-4, BL-5, BL-6, BL-7 | ~10 days |
-| Proposal operations | BL-8, BL-9 (XL) | 4-6 weeks + 1 day |
+| Proposal operations | BL-8, BL-9 (XL), BL-23 | 4-6 weeks + 1.5 weeks |
 | Platform intelligence | BL-10, BL-11 | ~2 weeks |
 | Operations Management | BL-12, BL-13, BL-14 | ~2.5 weeks |
 | Platform Administration | BL-15, BL-16, BL-17, BL-18 | ~5 weeks |
+| UX | BL-22 (shipped) | ~2 days |
 | Foundation | BL-19, BL-20, BL-21 | ~2 days + ongoing |
-| **Total** | **21 backlog items** | **~10–12 weeks** |
+| **Total** | **23 backlog items** | **~12–14 weeks** |
 
 ## Recommended execution order
 
 Strict P0 / P1 / P2 ordering, with parallelism where dependencies allow:
 
-1. **BL-1, BL-2** — close the placeholder debt before starting anything new
-2. **BL-3** — small, ships visible polish (stage widgets)
-3. **BL-7** — tied to BL-3; wire the same widgets to Command Center
-4. **BL-4** — pipeline funnel (visible win)
-5. **BL-5** — GSA paste (mirrors existing eBuy paste; well-trodden)
-6. **BL-6** — Add Source extensibility
-7. **BL-12** — Tenant Audit Log (P0; foundation for BL-15, BL-18, BL-20)
-8. **BL-19** — isolation test suite (P0; can ship in parallel with BL-12)
-9. **BL-13** — Notifications rules engine
-10. **BL-14** — Settings route split
-11. **BL-8** — In-flight/New menu finalization
-12. **BL-15** — Tenant Administration
-13. **BL-16** — Platform Configuration / tier model
-14. **BL-17** — Subscriptions module
-15. **BL-18** — Platform Audit Log
-16. **BL-20** — Auth decision logging
-17. **BL-10, BL-11** — Brain & Knowledge improvements
-18. **BL-9 (XL)** — Word-level collab editor (the big one)
+1. ~~**BL-1, BL-2**~~ — placeholder debt closed (PR #102)
+2. ~~**BL-22**~~ — nav v2 visual refresh (PR #103)
+3. **BL-3** — small, ships visible polish (stage widgets) ← **next**
+4. **BL-7** — tied to BL-3; wire the same widgets to Command Center
+5. **BL-4** — pipeline funnel (visible win)
+6. **BL-5** — GSA paste (mirrors existing eBuy paste; well-trodden)
+7. **BL-6** — Add Source extensibility
+8. **BL-23** — AI document review + Capability Matrix + Question Generator
+   *(could move earlier — high user value; depends partly on BL-10 for capability join data)*
+9. **BL-12** — Tenant Audit Log (P0; foundation for BL-15, BL-18, BL-20)
+10. **BL-19** — isolation test suite (P0; can ship in parallel with BL-12)
+11. **BL-13** — Notifications rules engine
+12. **BL-14** — Settings route split
+13. **BL-8** — In-flight/New menu finalization
+14. **BL-10** — Knowledge ingestion improvements (unblocks BL-23 capability matrix data quality)
+15. **BL-15** — Tenant Administration
+16. **BL-16** — Platform Configuration / tier model
+17. **BL-17** — Subscriptions module
+18. **BL-18** — Platform Audit Log
+19. **BL-20** — Auth decision logging
+20. **BL-11** — Brain self-improvement loop
+21. **BL-9 (XL)** — Word-level collab editor (the big one)
 19. **BL-21** — Help content refresh (continuous)
 
 This document is the single source of truth for backlog items.
