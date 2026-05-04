@@ -42,41 +42,24 @@ Effort key:
 
 ## Cleanup / debt
 
-### BL-1 — Hide unbuilt nav items
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** —
+### BL-1 + BL-2 — Hide unbuilt nav items + delete placeholder pages — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ Combined and delivered
 
 PR #99 shipped 5 stub pages. Per the no-placeholder rule, those nav
-links must be hidden until each backing feature ships complete.
+items + stub pages were removed atomically.
 
-**Scope:**
-- Add `disabled?: boolean` flag on `NavItem` and `NavGroup`
-- Hide disabled items from rendering (server-side checks already
-  exist on the route files)
-- Items to hide initially: Audit Log, Platform Configuration,
-  Subscriptions, Tenant Administration, Platform Audit Log
-- Keep the `/platform/*` route files in place so direct URLs
-  show the `requireSuperadmin` guard cleanly (no 404 surprise)
-- As each backing BL ships, un-disable the corresponding nav item in
-  that PR
+**Delivered:**
+- 5 stub pages deleted: `/audit-log`, `/platform/{configuration,
+  subscriptions,tenants,audit-log}`
+- `ComingSoonStub` component deleted
+- Operations Management → Audit Log nav item removed (re-added with
+  BL-12)
+- Platform Administration converted from parent-with-stub-children to
+  a leaf link pointing to the existing `/admin` page; will become a
+  parent group again when BL-15 / BL-16 / BL-17 / BL-18 ship
 
-**Acceptance:** menu shows only working features. `/audit-log`
-direct-URL still 200s with the existing stub (delete the stub when
-BL-12 ships).
-
----
-
-### BL-2 — Delete `ComingSoonStub` + 5 stub pages
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-1
-
-After BL-1 hides them from nav, drop the stub component + the 5
-placeholder route files. Each is replaced by the real implementation
-in its corresponding BL. No need to keep them around — the nav
-won't link to them anymore.
-
-**Acceptance:** `src/components/ui/ComingSoonStub.tsx` deleted;
-`src/app/(app)/audit-log/`, `src/app/(app)/platform/*/` directories
-deleted. Direct URLs 404. Each BL listed below recreates the route
-when it ships.
+**Re-introduction plan:** each subsequent BL that adds a new top-
+level menu item updates `NavContent.tsx` in the same PR.
 
 ---
 
