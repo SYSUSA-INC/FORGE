@@ -28,14 +28,19 @@ type NavGroup = {
 //
 // Operations Management consolidates the per-tenant admin surface
 // (Settings, Users & Roles, Integrations, AI Engine, Templates,
-// Notifications, Audit Log). Settings/Integrations/AI Engine are
-// tabs of a single page today, so we deep-link via `?tab=` until a
-// real route split is warranted.
+// Notifications). Settings/Integrations/AI Engine are tabs of a
+// single page today, so we deep-link via `?tab=` until BL-14 splits
+// them into real routes.
 //
-// Platform Administration is super-admin only — every link must
-// 404 (or hard-redirect) for non-superadmins. The nav already hides
-// the group, but defense in depth: each route under /platform/*
-// re-checks `isSuperadmin` server-side.
+// Platform Administration today is the existing /admin page (legacy
+// super-admin view of orgs, users, activity). Once BL-15 / BL-16 /
+// BL-17 / BL-18 ship, this becomes a parent group with sub-items
+// (Tenant Administration, Platform Configuration, Subscriptions,
+// Platform Audit Log). Hidden from non-superadmins server-side.
+//
+// Items not yet in the menu (waiting on their backing BL):
+//   - Operations Management → Audit Log (BL-12)
+//   - Platform Administration → 4 sub-items (BL-15..BL-18)
 const NAV: NavGroup[] = [
   {
     id: "command",
@@ -55,7 +60,6 @@ const NAV: NavGroup[] = [
       { href: "/settings?tab=ai", label: "AI Engine" },
       { href: "/settings/templates", label: "Templates" },
       { href: "/notifications", label: "Notifications" },
-      { href: "/audit-log", label: "Audit Log" },
     ],
   },
   {
@@ -94,13 +98,8 @@ const NAV: NavGroup[] = [
     id: "platform",
     label: "Platform Administration",
     icon: "✱",
+    href: "/admin",
     superadmin: true,
-    children: [
-      { href: "/platform/configuration", label: "Platform Configuration" },
-      { href: "/platform/subscriptions", label: "Subscriptions" },
-      { href: "/platform/tenants", label: "Tenant Administration" },
-      { href: "/platform/audit-log", label: "Platform Audit Log" },
-    ],
   },
 ];
 
