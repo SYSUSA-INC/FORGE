@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
+import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
   createOpportunityFromEbuyAction,
   parseEbuyTextAction,
@@ -112,11 +113,11 @@ export function EbuyPasteClient() {
           </span>
         </div>
         {stubbed ? (
-          <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 font-mono text-[11px] text-amber-200">
-            AI is in stub mode (provider: {provider}). Set
-            <code className="mx-1 rounded bg-black/20 px-1">ANTHROPIC_API_KEY</code>
-            on Vercel for live extraction. You can still fill the fields by
-            hand and create the opportunity.
+          <div className="mt-3">
+            <StubModeBanner
+              envVar="ANTHROPIC_API_KEY"
+              message={`AI extraction is using the stub provider (${provider}). Field detection is heuristic, not model-driven. You can still fill the fields by hand and create the opportunity.`}
+            />
           </div>
         ) : null}
         {error ? (

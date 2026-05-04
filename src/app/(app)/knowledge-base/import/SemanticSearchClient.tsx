@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
   reembedMissingArtifactsAction,
   semanticSearchAction,
@@ -69,9 +70,7 @@ export function SemanticSearchClient({
         <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           Semantic search
           {initialStatus.stub ? (
-            <span className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] text-amber-200">
-              stub mode — set OPENAI_API_KEY for real embeddings
-            </span>
+            <StubModeBanner variant="pill" className="ml-2" />
           ) : (
             <span className="ml-2 rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] text-emerald">
               live · {initialStatus.provider}
@@ -138,9 +137,13 @@ export function SemanticSearchClient({
             </div>
           ) : (
             <>
-              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
-                {hits.length} match{hits.length === 1 ? "" : "es"}
-                {searchStubbed ? " · stub mode (results not semantic)" : ""}
+              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+                <span>
+                  {hits.length} match{hits.length === 1 ? "" : "es"}
+                </span>
+                {searchStubbed ? (
+                  <StubModeBanner variant="inline" />
+                ) : null}
               </div>
               <ul className="flex flex-col gap-2">
                 {hits.map((h) => (
