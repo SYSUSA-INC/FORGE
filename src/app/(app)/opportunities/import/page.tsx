@@ -6,6 +6,8 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { ImportClient } from "./ImportClient";
+import { listOwnSourceRequestsAction } from "./source-requests/actions";
+import { SourceRequestPanel } from "./source-requests/SourceRequestPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,8 @@ export default async function ImportPage() {
       ),
     ),
   );
+
+  const ownRequests = await listOwnSourceRequestsAction();
 
   return (
     <>
@@ -77,6 +81,10 @@ export default async function ImportPage() {
       ) : (
         <ImportClient defaultNaics={naics} />
       )}
+
+      <div className="mt-6">
+        <SourceRequestPanel initialOwnRequests={ownRequests} />
+      </div>
     </>
   );
 }

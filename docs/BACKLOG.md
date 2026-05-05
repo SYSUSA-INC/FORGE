@@ -159,25 +159,40 @@ sources sought, generic GSA acquisition emails.
 
 ---
 
-### BL-6 — "Add Source" extensibility
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-5
+### BL-6 — "Add Source" extensibility — **shipped**
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Delivered
 
-Per spec: customers can suggest additional opportunity-import sources.
-Suggestions roll up so the platform team learns what to build next.
+Customers suggest additional opportunity-import sources; super-admin
+triages and reports back with status. Closes the "we will also
+include an Add Source option" ask in the original spec.
 
-**Scope:**
-- New schema: `opportunity_source_request` (id, org_id, requester_user_id,
-  source_name, description, sample_text, status, votes, created_at)
-- UI form on `/solicitations/import` titled "Don't see your source?"
-- Optional sample paste so we can prototype
-- Per-tenant view of own requests + status (pending / under review /
-  shipped)
-- Super-admin view (cross-tenant) under Platform Administration to
-  triage requests, dedupe, prioritize
+**Delivered:**
+- Migration `0032_opportunity_source_request.sql` — new table with
+  status enum (pending / under_review / shipped / rejected) and two
+  indexes (org-scoped + status-scoped)
+- Tenant UI: collapsible "Don't see your source?" panel on
+  `/opportunities/import` with form (source name, description,
+  optional sample paste) + list of own previous requests with status
+  + platform-team replies
+- Super-admin UI: `/admin/source-requests` triage queue with status
+  filter, search, expandable rows for full description + sample +
+  inline status/notes edit
+- Server actions: `createSourceRequestAction`,
+  `listOwnSourceRequestsAction`, `listAllSourceRequestsAction`,
+  `updateSourceRequestAction` (super-admin only)
+- Rate limit: 10 submissions per org per 24 hours so a single tenant
+  can't flood the queue
+- "Source requests →" header link added to `/admin` for discovery
 
-**Acceptance:** customer submits a source request → admin sees it in
-Platform Administration → marks it "under review" → customer sees
-status update in their tenant view.
+**Files:**
+- `drizzle/0032_opportunity_source_request.sql`
+- `src/db/schema.ts` — new `opportunitySourceRequests` + enum
+- `src/app/(app)/opportunities/import/source-requests/actions.ts`
+- `src/app/(app)/opportunities/import/source-requests/SourceRequestPanel.tsx`
+- `src/app/(app)/opportunities/import/page.tsx` — embed panel
+- `src/app/(app)/admin/source-requests/page.tsx`
+- `src/app/(app)/admin/source-requests/SourceRequestTriageClient.tsx`
+- `src/app/(app)/admin/AdminClient.tsx` — header link to triage
 
 ---
 

@@ -1540,3 +1540,55 @@ export const rateLimitCounters = pgTable(
 );
 
 export type RateLimitCounter = typeof rateLimitCounters.$inferSelect;
+
+// ────────────────────────────────────────────────────────────────────
+// Customer-suggested opportunity sources (BL-6)
+// ────────────────────────────────────────────────────────────────────
+
+export const opportunitySourceRequestStatusEnum = pgEnum(
+  "opportunity_source_request_status",
+  ["pending", "under_review", "shipped", "rejected"],
+);
+
+export type OpportunitySourceRequestStatus =
+  (typeof opportunitySourceRequestStatusEnum.enumValues)[number];
+
+export const opportunitySourceRequests = pgTable(
+  "opportunity_source_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    requesterUserId: text("requester_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    sourceName: text("source_name").notNull().default(""),
+    description: text("description").notNull().default(""),
+    /** Optional sample paste so the platform team can prototype against a real example. */
+    sampleText: text("sample_text").notNull().default(""),
+    status: opportunitySourceRequestStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    /** Platform-side triage notes. Super-admin only writes to this. */
+    platformNotes: text("platform_notes").notNull().default(""),
+    /** Set whenever status changes; powers "moved to under_review 3d ago". */
+    statusChangedAt: timestamp("status_changed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("opportunity_source_request_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    statusCreatedIdx: index(
+      "opportunity_source_request_status_created_idx",
+    ).on(t.status, t.createdAt),
+  }),
+);
+
+export type OpportunitySourceRequest =
+  typeof opportunitySourceRequests.$inferSelect;
+export type NewOpportunitySourceRequest =
+  typeof opportunitySourceRequests.$inferInsert;
