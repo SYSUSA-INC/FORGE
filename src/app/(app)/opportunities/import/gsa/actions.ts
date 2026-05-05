@@ -10,6 +10,7 @@ import {
   type SolicitationType,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { aiExtractGsa } from "@/lib/gsa-extract";
 import type { GsaExtractionResult } from "@/lib/ai-prompts";
 import { getStorageProvider } from "@/lib/storage";
@@ -275,6 +276,20 @@ export async function createOpportunityFromGsaAction(
       });
     }
   }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.create_from_gsa",
+    resourceType: "opportunity",
+    resourceId: opportunityId,
+    metadata: {
+      title,
+      noticeType,
+      attachments: solicitationIds.length,
+      attachmentsSkipped: attachmentsSkipped.length,
+    },
+  });
 
   revalidatePath("/opportunities");
   revalidatePath(`/opportunities/${opportunityId}`);

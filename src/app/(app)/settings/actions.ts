@@ -4,7 +4,12 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { organizations } from "@/db/schema";
-import { requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import {
+  requireAuth,
+  requireCurrentOrg,
+  requireOrgAdmin,
+} from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { fetchSamGovByUei } from "@/lib/samgov";
 import type { OrgProfile } from "@/lib/org-types";
 import { hasErrors, validateOrgProfile } from "@/lib/validators";
@@ -13,6 +18,7 @@ import { log } from "@/lib/log";
 export async function saveOrgProfileAction(profile: OrgProfile): Promise<
   { ok: true } | { ok: false; error: string }
 > {
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -58,6 +64,15 @@ export async function saveOrgProfileAction(profile: OrgProfile): Promise<
       })
       .where(eq(organizations.id, organizationId));
 
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "settings.update",
+      resourceType: "organization",
+      resourceId: organizationId,
+      metadata: { name: profile.name },
+    });
+
     revalidatePath("/settings");
     return { ok: true };
   } catch (err) {
@@ -73,6 +88,7 @@ export async function applySamGovSyncAction(uei: string): Promise<
   | { ok: true }
   | { ok: false; error: string }
 > {
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -110,6 +126,15 @@ export async function applySamGovSyncAction(uei: string): Promise<
         updatedAt: new Date(),
       })
       .where(eq(organizations.id, organizationId));
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "settings.samgov_sync",
+      resourceType: "organization",
+      resourceId: organizationId,
+      metadata: { uei },
+    });
 
     revalidatePath("/settings");
     return { ok: true };

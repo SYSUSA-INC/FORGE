@@ -10,6 +10,7 @@ import {
   type OpportunityStage,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 
 export type OpportunityInput = {
@@ -87,6 +88,15 @@ export async function createOpportunityAction(
       .returning({ id: opportunities.id });
     if (!row) return { ok: false, error: "Could not create opportunity." };
 
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.create",
+      resourceType: "opportunity",
+      resourceId: row.id,
+      metadata: { title: input.title, stage: input.stage ?? "identified" },
+    });
+
     revalidatePath("/opportunities");
     revalidatePath("/");
     return { ok: true, id: row.id };
@@ -103,7 +113,7 @@ export async function updateOpportunityAction(
   id: string,
   input: OpportunityInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   if (!input.title?.trim()) {
@@ -120,6 +130,14 @@ export async function updateOpportunityAction(
           eq(opportunities.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.update",
+      resourceType: "opportunity",
+      resourceId: id,
+      metadata: { title: input.title },
+    });
     revalidatePath("/opportunities");
     revalidatePath(`/opportunities/${id}`);
     revalidatePath("/");
@@ -137,7 +155,7 @@ export async function setOpportunityStageAction(
   id: string,
   stage: OpportunityStage,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   try {
@@ -150,6 +168,14 @@ export async function setOpportunityStageAction(
           eq(opportunities.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.advance_stage",
+      resourceType: "opportunity",
+      resourceId: id,
+      metadata: { stage },
+    });
     revalidatePath("/opportunities");
     revalidatePath(`/opportunities/${id}`);
     revalidatePath("/");
@@ -166,7 +192,7 @@ export async function setOpportunityStageAction(
 export async function deleteOpportunityAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   try {
@@ -178,6 +204,13 @@ export async function deleteOpportunityAction(
           eq(opportunities.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.delete",
+      resourceType: "opportunity",
+      resourceId: id,
+    });
     revalidatePath("/opportunities");
     revalidatePath("/");
     return { ok: true };

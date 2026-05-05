@@ -59,6 +59,7 @@ const NAV: NavGroup[] = [
       { href: "/settings?tab=ai", label: "AI Engine" },
       { href: "/settings/templates", label: "Templates" },
       { href: "/notifications", label: "Notifications" },
+      { href: "/audit-log", label: "Audit Log" },
     ],
   },
   {

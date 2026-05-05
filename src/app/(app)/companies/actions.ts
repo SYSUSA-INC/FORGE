@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { companies, type CompanyRelationship } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import {
   fetchSamGovByUei,
   searchSamGovEntities,
@@ -86,6 +87,14 @@ export async function createCompanyAction(
       })
       .returning({ id: companies.id });
     if (!row) return { ok: false, error: "Could not create company." };
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "company.create",
+      resourceType: "company",
+      resourceId: row.id,
+      metadata: { name: input.name, relationship: input.relationship },
+    });
     revalidatePath("/companies");
     return { ok: true, id: row.id };
   } catch (err) {
@@ -101,7 +110,7 @@ export async function updateCompanyAction(
   id: string,
   input: CompanyInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsCompany(id, organizationId))) {
     return { ok: false, error: "Company not found." };
@@ -111,6 +120,14 @@ export async function updateCompanyAction(
       .update(companies)
       .set({ ...toRow(input), updatedAt: new Date() })
       .where(and(eq(companies.id, id), eq(companies.organizationId, organizationId)));
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "company.update",
+      resourceType: "company",
+      resourceId: id,
+      metadata: { name: input.name },
+    });
     revalidatePath("/companies");
     revalidatePath(`/companies/${id}`);
     return { ok: true };
@@ -126,7 +143,7 @@ export async function updateCompanyAction(
 export async function deleteCompanyAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsCompany(id, organizationId))) {
     return { ok: false, error: "Company not found." };
@@ -134,6 +151,13 @@ export async function deleteCompanyAction(
   await db
     .delete(companies)
     .where(and(eq(companies.id, id), eq(companies.organizationId, organizationId)));
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "company.delete",
+    resourceType: "company",
+    resourceId: id,
+  });
   revalidatePath("/companies");
   return { ok: true };
 }
@@ -141,7 +165,7 @@ export async function deleteCompanyAction(
 export async function refreshCompanyFromSamGovAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsCompany(id, organizationId))) {
     return { ok: false, error: "Company not found." };
@@ -189,6 +213,13 @@ export async function refreshCompanyFromSamGovAction(
         updatedAt: new Date(),
       })
       .where(eq(companies.id, id));
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "company.refresh_samgov",
+      resourceType: "company",
+      resourceId: id,
+    });
     revalidatePath(`/companies/${id}`);
     revalidatePath("/companies");
     return { ok: true };

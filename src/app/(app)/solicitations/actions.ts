@@ -12,6 +12,7 @@ import {
   type SolicitationType,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import {
   aiExtractSolicitation,
@@ -117,6 +118,19 @@ export async function uploadSolicitationAction(
   void parseSolicitationFromBytes(row.id, bytes).catch((err) =>
     log.error("[uploadSolicitationAction]", "inline parse failed", { error: err }),
   );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "solicitation.upload",
+    resourceType: "solicitation",
+    resourceId: row.id,
+    metadata: {
+      fileName: file.name,
+      fileSize: file.size,
+      contentType: resolvedContentType,
+    },
+  });
 
   revalidatePath("/solicitations");
   return { ok: true, id: row.id };

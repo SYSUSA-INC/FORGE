@@ -1786,3 +1786,59 @@ export type SolicitationQuestionSet =
   typeof solicitationQuestionSets.$inferSelect;
 export type NewSolicitationQuestionSet =
   typeof solicitationQuestionSets.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// Tenant-scoped audit log (BL-12)
+// ────────────────────────────────────────────────────────────────────
+
+export const auditLogs = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * Email snapshot at time of action — survives later deletion of
+     * the actor, so the log stays readable even after offboarding.
+     */
+    actorEmailSnapshot: text("actor_email_snapshot").notNull().default(""),
+    /**
+     * Free-form action verb. Convention: "<resource>.<verb>", e.g.
+     *   opportunity.create, proposal.advance_stage, settings.update,
+     *   user.invite, solicitation.upload, knowledge_entry.delete
+     */
+    action: text("action").notNull(),
+    resourceType: text("resource_type").notNull().default(""),
+    resourceId: text("resource_id").notNull().default(""),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    ip: text("ip").notNull().default(""),
+    userAgent: text("user_agent").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("audit_log_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    orgResourceIdx: index("audit_log_org_resource_idx").on(
+      t.organizationId,
+      t.resourceType,
+      t.resourceId,
+    ),
+    orgActorIdx: index("audit_log_org_actor_idx").on(
+      t.organizationId,
+      t.actorUserId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;

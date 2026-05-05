@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { opportunities, opportunityActivities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { aiExtractEbuy } from "@/lib/ebuy-extract";
 import type { EbuyExtractionResult } from "@/lib/ai-prompts";
 import { log } from "@/lib/log";
@@ -127,6 +128,19 @@ export async function createOpportunityFromEbuyAction(
       title: "Created from eBuy paste",
       body: input.rawText.slice(0, 50_000),
       metadata: { source: "ebuy-paste" },
+    });
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.create_from_ebuy",
+      resourceType: "opportunity",
+      resourceId: opp.id,
+      metadata: {
+        title: input.title,
+        rfqNumber: input.rfqNumber,
+        agency: input.buyingAgency,
+      },
     });
 
     revalidatePath("/opportunities");

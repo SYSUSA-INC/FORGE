@@ -13,6 +13,7 @@ import {
   requireCurrentOrg,
   requireSuperadmin,
 } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
 
@@ -101,6 +102,15 @@ export async function createSourceRequestAction(
       })
       .returning({ id: opportunitySourceRequests.id });
     if (!row) return { ok: false, error: "Could not record request." };
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "source_request.create",
+      resourceType: "source_request",
+      resourceId: row.id,
+      metadata: { sourceName },
+    });
 
     revalidatePath("/opportunities/import");
     return { ok: true, id: row.id };
@@ -259,7 +269,7 @@ export type UpdateSourceRequestResult =
 export async function updateSourceRequestAction(
   input: UpdateSourceRequestInput,
 ): Promise<UpdateSourceRequestResult> {
-  await requireSuperadmin();
+  const actor = await requireSuperadmin();
 
   if (
     !["pending", "under_review", "shipped", "rejected"].includes(input.status)
@@ -292,6 +302,28 @@ export async function updateSourceRequestAction(
         updatedAt: now,
       })
       .where(eq(opportunitySourceRequests.id, input.id));
+
+    // Audit log against the requesting org (so tenants can see
+    // platform-team actions that touch their requests too).
+    const [reqRow] = await db
+      .select({ organizationId: opportunitySourceRequests.organizationId })
+      .from(opportunitySourceRequests)
+      .where(eq(opportunitySourceRequests.id, input.id))
+      .limit(1);
+    if (reqRow) {
+      await recordAudit({
+        organizationId: reqRow.organizationId,
+        actor: { userId: actor.id, email: actor.email },
+        action: "source_request.update_status",
+        resourceType: "source_request",
+        resourceId: input.id,
+        metadata: {
+          fromStatus: existing.status,
+          toStatus: input.status,
+          superadmin: true,
+        },
+      });
+    }
 
     revalidatePath("/admin/source-requests");
     revalidatePath("/opportunities/import");
