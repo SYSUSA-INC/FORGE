@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -80,6 +81,14 @@ export function AdminClient({
         eyebrow="Platform admin"
         title="SuperAdmin portal"
         subtitle="Onboard organizations, manage platform users, and control access globally."
+        actions={
+          <Link
+            href="/admin/source-requests"
+            className="aur-btn aur-btn-ghost text-[11px]"
+          >
+            Source requests →
+          </Link>
+        }
         meta={[
           { label: "Organizations", value: String(stats.orgCount) },
           { label: "Active orgs", value: String(stats.activeOrgs), accent: "emerald" },
