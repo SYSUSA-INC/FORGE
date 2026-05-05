@@ -389,6 +389,12 @@ export async function submitOpportunityReviewAction(
   }
 
   revalidatePath(`/opportunities/${row.opportunityId}`);
+  // Auto-advance via Bid recommendation can change the org's
+  // stage-stat aggregates; refresh the dashboard + Command Center.
+  if (input.recommendation === "bid") {
+    revalidatePath("/opportunities");
+    revalidatePath("/");
+  }
   return { ok: true };
 }
 

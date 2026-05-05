@@ -36,14 +36,20 @@ export function OpportunitiesClient({
   opportunities,
   stageStats,
   stages,
+  initialStageFilter = "all",
 }: {
   opportunities: Opp[];
   /** Map of stage key → server-aggregated stats. Missing keys = zero. */
   stageStats: Record<string, StageStat>;
   stages: StageConfig[];
+  /** Pre-applied stage filter from URL (?stage=capture). Used when
+   *  drilled into from the Command Center tiles. */
+  initialStageFilter?: OpportunityStage | "all";
 }) {
   const [filter, setFilter] = useState("");
-  const [stageFilter, setStageFilter] = useState<OpportunityStage | "all">("all");
+  const [stageFilter, setStageFilter] = useState<OpportunityStage | "all">(
+    initialStageFilter,
+  );
 
   const filtered = useMemo(() => {
     const f = filter.trim().toLowerCase();

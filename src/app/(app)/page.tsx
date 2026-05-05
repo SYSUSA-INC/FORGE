@@ -1,125 +1,47 @@
 import Link from "next/link";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { db } from "@/db";
-import {
-  opportunities,
-  proposalReviews,
-  proposals,
-} from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { STAGE_LABELS as OPP_STAGE_LABELS } from "@/lib/opportunity-types";
+import { getOrganizationSnapshot } from "@/lib/org-snapshot";
+import { STAGES, STAGE_LABELS as OPP_STAGE_LABELS } from "@/lib/opportunity-types";
 import { STAGE_LABELS as PROP_STAGE_LABELS } from "@/lib/proposal-types";
+import { CommandCenterStageGrid } from "./CommandCenterStageGrid";
 
 export const dynamic = "force-dynamic";
 
-const ACTIVE_OPP_STAGES = [
-  "identified",
-  "sources_sought",
-  "qualification",
-  "capture",
-  "pre_proposal",
-  "writing",
-  "submitted",
-];
-
-const ACTIVE_PROPOSAL_STAGES = [
-  "draft",
-  "pink",
-  "red",
-  "gold",
-  "white_gloves",
-  "submitted",
-];
-
+/**
+ * The Command Center reads from the same `getOrganizationSnapshot()`
+ * helper that drives `/opportunities` so the numbers always match
+ * (BL-7 spec: "data has to sync across"). Tile widgets here mirror
+ * the dashboard exactly, but click navigates rather than filters —
+ * the dashboard is where you go to drill in.
+ */
 export default async function DashboardPage() {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const now = new Date();
+  const snap = await getOrganizationSnapshot(organizationId);
 
-  const [oppRows, propRows, reviewRows] = await Promise.all([
-    db
-      .select({
-        id: opportunities.id,
-        title: opportunities.title,
-        agency: opportunities.agency,
-        stage: opportunities.stage,
-        responseDueDate: opportunities.responseDueDate,
-        pWin: opportunities.pWin,
-      })
-      .from(opportunities)
-      .where(eq(opportunities.organizationId, organizationId)),
-    db
-      .select({
-        id: proposals.id,
-        title: proposals.title,
-        stage: proposals.stage,
-        updatedAt: proposals.updatedAt,
-      })
-      .from(proposals)
-      .where(eq(proposals.organizationId, organizationId)),
-    db
-      .select({ id: proposalReviews.id })
-      .from(proposalReviews)
-      .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
-      .where(
-        and(
-          eq(proposals.organizationId, organizationId),
-          eq(proposalReviews.status, "in_progress"),
-        ),
-      ),
-  ]);
+  const totalActiveOpps = STAGES.filter(
+    (s) => s.phase !== "closed",
+  ).reduce((sum, s) => sum + (snap.oppStageStats[s.key]?.count ?? 0), 0);
+  const activeProposals = snap.activeProposalRows.length;
+  const recentProposals = snap.activeProposalRows.slice(0, 5);
 
-  const activeOpps = oppRows.filter((o) =>
-    ACTIVE_OPP_STAGES.includes(o.stage),
-  );
-  const activeProposals = propRows.filter((p) =>
-    ACTIVE_PROPOSAL_STAGES.includes(p.stage),
-  );
-
-  // Most-pressing opportunity: smallest positive days-to-due.
-  const upcoming = activeOpps
-    .filter((o) => o.responseDueDate && o.responseDueDate.getTime() >= now.getTime())
-    .sort(
-      (a, b) =>
-        (a.responseDueDate?.getTime() ?? 0) -
-        (b.responseDueDate?.getTime() ?? 0),
-    );
-  const nextDue = upcoming[0] ?? null;
-  const nextDueDays = nextDue?.responseDueDate
-    ? Math.max(
-        0,
-        Math.ceil(
-          (nextDue.responseDueDate.getTime() - now.getTime()) /
-            (24 * 60 * 60_000),
-        ),
-      )
-    : null;
-
-  // Counts by stage
-  const oppByStage: Record<string, number> = {};
-  for (const o of activeOpps) {
-    const k = OPP_STAGE_LABELS[o.stage as keyof typeof OPP_STAGE_LABELS] ?? o.stage;
-    oppByStage[k] = (oppByStage[k] ?? 0) + 1;
-  }
+  // Derived counts for the proposal-stage panel — same shape the page
+  // had before, computed from the snapshot's already-active list.
   const propByStage: Record<string, number> = {};
-  for (const p of activeProposals) {
+  for (const p of snap.activeProposalRows) {
     const k =
       PROP_STAGE_LABELS[p.stage as keyof typeof PROP_STAGE_LABELS] ?? p.stage;
     propByStage[k] = (propByStage[k] ?? 0) + 1;
   }
 
-  const recentProposals = [...propRows]
-    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    .slice(0, 5);
-
   return (
     <>
       <PageHeader
         eyebrow="Command"
-        title="Command"
+        title="Command Center"
         subtitle="Live snapshot of your active pursuits, proposals in flight, and the next deadline coming up."
         actions={
           <>
@@ -134,33 +56,43 @@ export default async function DashboardPage() {
         meta={[
           {
             label: "Active opportunities",
-            value: String(activeOpps.length).padStart(2, "0"),
+            value: String(totalActiveOpps).padStart(2, "0"),
           },
           {
             label: "Active proposals",
-            value: String(activeProposals.length).padStart(2, "0"),
+            value: String(activeProposals).padStart(2, "0"),
           },
           {
             label: "In review",
-            value: String(reviewRows.length).padStart(2, "0"),
-            accent: reviewRows.length > 0 ? "magenta" : undefined,
+            value: String(snap.proposalsInReview).padStart(2, "0"),
+            accent: snap.proposalsInReview > 0 ? "magenta" : undefined,
           },
           {
             label: "Next deadline",
-            value: nextDueDays === null ? "—" : `${nextDueDays}d`,
-            accent: nextDueDays !== null && nextDueDays <= 7 ? "rose" : undefined,
+            value: snap.nextDue ? `${snap.nextDue.daysToDue}d` : "—",
+            accent:
+              snap.nextDue && snap.nextDue.daysToDue <= 7 ? "rose" : undefined,
           },
         ]}
       />
 
+      {/* Stage widget grid — same data + visuals as /opportunities so
+          the two pages can never disagree. Click a tile to drill into
+          the dashboard already filtered to that stage. */}
+      <section className="mb-6">
+        <CommandCenterStageGrid stageStats={snap.oppStageStats} />
+      </section>
+
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-        {nextDue ? (
+        {snap.nextDue ? (
           <Panel
             title="Next deadline"
-            eyebrow={`${nextDueDays} day${nextDueDays === 1 ? "" : "s"} remaining`}
+            eyebrow={`${snap.nextDue.daysToDue} day${
+              snap.nextDue.daysToDue === 1 ? "" : "s"
+            } remaining`}
             actions={
               <Link
-                href={`/opportunities/${nextDue.id}`}
+                href={`/opportunities/${snap.nextDue.id}`}
                 className="aur-btn aur-btn-ghost text-[11px]"
               >
                 Open opportunity
@@ -168,26 +100,24 @@ export default async function DashboardPage() {
             }
           >
             <div className="font-display text-2xl font-semibold text-text">
-              {nextDue.title}
+              {snap.nextDue.title}
             </div>
             <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-              {nextDue.agency || "—"}{" "}
-              {nextDue.responseDueDate ? (
-                <span className="text-subtle">
-                  · due {nextDue.responseDueDate.toISOString().slice(0, 10)}
-                </span>
-              ) : null}
+              {snap.nextDue.agency || "—"}{" "}
+              <span className="text-subtle">
+                · due {snap.nextDue.responseDueDate.toISOString().slice(0, 10)}
+              </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px]">
                 Stage:{" "}
                 <span className="text-text">
-                  {OPP_STAGE_LABELS[nextDue.stage as keyof typeof OPP_STAGE_LABELS] ?? nextDue.stage}
+                  {OPP_STAGE_LABELS[snap.nextDue.stage]}
                 </span>
               </span>
-              {nextDue.pWin > 0 ? (
+              {snap.nextDue.pWin > 0 ? (
                 <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px]">
-                  PWin: <span className="text-text">{nextDue.pWin}%</span>
+                  PWin: <span className="text-text">{snap.nextDue.pWin}%</span>
                 </span>
               ) : null}
             </div>
@@ -211,14 +141,17 @@ export default async function DashboardPage() {
           </Panel>
         )}
 
-        <Panel title="By stage" eyebrow="Active opportunities">
-          {activeOpps.length === 0 ? (
+        <Panel
+          title="Proposal stages"
+          eyebrow={`${activeProposals} active`}
+        >
+          {activeProposals === 0 ? (
             <p className="font-body text-[13px] text-muted">
-              No active opportunities.
+              No active proposals.
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
-              {Object.entries(oppByStage).map(([stage, count]) => (
+              {Object.entries(propByStage).map(([stage, count]) => (
                 <li
                   key={stage}
                   className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5"
@@ -288,77 +221,63 @@ export default async function DashboardPage() {
           )}
         </Panel>
 
-        <Panel title="Proposal stages" eyebrow={`${activeProposals.length} active`}>
-          {activeProposals.length === 0 ? (
-            <p className="font-body text-[13px] text-muted">
-              No active proposals.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1.5">
-              {Object.entries(propByStage).map(([stage, count]) => (
-                <li
-                  key={stage}
-                  className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5"
-                >
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-muted">
-                    {stage}
-                  </span>
-                  <span className="font-display tabular-nums text-text">
-                    {count}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </section>
-
-      <section>
         <Panel title="Quick links">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="flex flex-col gap-2">
             <Link
-              href="/opportunities/import"
-              className="aur-card px-3 py-3 text-center transition-colors hover:border-white/20"
+              href="/opportunities"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
             >
-              <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
-                SAM.gov
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                  Drill in
+                </div>
+                <div className="mt-0.5 font-display text-[13px] text-text">
+                  Open Opportunities Dashboard
+                </div>
               </div>
-              <div className="mt-1 font-display text-[13px] text-text">
-                Import opportunities
-              </div>
+              <span className="text-teal">→</span>
             </Link>
             <Link
-              href="/proposals"
-              className="aur-card px-3 py-3 text-center transition-colors hover:border-white/20"
+              href="/opportunities/import"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
             >
-              <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
-                Proposals
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                  SAM.gov
+                </div>
+                <div className="mt-0.5 font-display text-[13px] text-text">
+                  Import opportunities
+                </div>
               </div>
-              <div className="mt-1 font-display text-[13px] text-text">
-                Browse pipeline
-              </div>
+              <span className="text-teal">→</span>
             </Link>
             <Link
               href="/intelligence"
-              className="aur-card px-3 py-3 text-center transition-colors hover:border-white/20"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
             >
-              <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
-                Intelligence
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                  Intelligence
+                </div>
+                <div className="mt-0.5 font-display text-[13px] text-text">
+                  AI brief + insights
+                </div>
               </div>
-              <div className="mt-1 font-display text-[13px] text-text">
-                AI brief + insights
-              </div>
+              <span className="text-teal">→</span>
             </Link>
             <Link
               href="/notifications"
-              className="aur-card px-3 py-3 text-center transition-colors hover:border-white/20"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
             >
-              <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
-                Inbox
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                  Inbox
+                </div>
+                <div className="mt-0.5 font-display text-[13px] text-text">
+                  Notifications
+                </div>
               </div>
-              <div className="mt-1 font-display text-[13px] text-text">
-                Notifications
-              </div>
+              <span className="text-teal">→</span>
             </Link>
           </div>
         </Panel>

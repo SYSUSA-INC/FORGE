@@ -182,6 +182,7 @@ export async function createProposalAction(input: {
     );
 
     revalidatePath("/proposals");
+    revalidatePath("/");
     return { ok: true, id: row.id };
   } catch (err) {
     log.error("[createProposalAction]", "error", { error: err });
@@ -268,6 +269,7 @@ export async function advanceProposalStageAction(
       .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
     revalidatePath(`/proposals/${id}`);
     revalidatePath("/proposals");
+    revalidatePath("/");
 
     // Phase 10f: harvest into the corpus on transition to submitted.
     // Best-effort, fire-and-forget — failures don't block the stage
@@ -305,6 +307,7 @@ export async function deleteProposalAction(
     .delete(proposals)
     .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
   revalidatePath("/proposals");
+  revalidatePath("/");
   return { ok: true };
 }
 
