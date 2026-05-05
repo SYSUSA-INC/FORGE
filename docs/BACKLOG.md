@@ -89,25 +89,36 @@ group by stage` per the org.
 
 ---
 
-### BL-4 — Pipeline funnel diagram
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** —
+### BL-4 — Pipeline funnel diagram — **shipped**
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Delivered
 
-Per spec: `/pipeline` shows a sales-funnel visualization. Today the
-page exists but is a list. Replace with a real funnel.
+Per spec: `/pipeline` shows a sales-funnel visualization. Was a list,
+now a real funnel.
 
-**Scope:**
-- Funnel shape: stacked horizontal bars (or trapezoidal funnel) with
-  stage label + count on each segment
-- Conversion-rate annotations between stages (% that advanced)
-- Drill-in: click a segment → opens the existing list filtered to
-  that stage
-- Time window selector (last 30 / 90 / 365 days, all time)
-- Optional toggle: count vs. weighted value (count × PWin × midpoint
-  of value range)
+**Delivered:**
+- Trapezoid-style horizontal-bar funnel — width tapers based on the
+  metric, peak normalized to 100%
+- Click any segment → drills into `/opportunities?stage=<key>` with
+  the dashboard pre-filtered (BL-7 deep-link support)
+- Conversion-rate annotation between segments (snapshot ratio of
+  next stage to current; tooltip explains it's not yet historical
+  conversion since stage history isn't tracked)
+- Time-window pills: 30d / 90d / 365d / All time, defaults to 90d.
+  State on the URL via `?days=…` for shareability + reload safety
+- Mode toggle: Count / Weighted value (PWin% × midpoint(low,high))
+  on the URL via `?mode=count|value`
+- Outcome split (Won / Lost / No-bid) renders below the active funnel
+  with the same metric, plus a win-rate annotation in the eyebrow
+- Empty state when window has no opportunities — suggests widening
+  the window or seeding pursuits
 
-**Acceptance:** funnel renders with non-zero data on a real org;
-conversion rates compute correctly; clicking a segment scrolls to or
-filters the list below.
+**Files:**
+- `src/app/(app)/pipeline/page.tsx` (rewritten)
+- `src/app/(app)/pipeline/funnel-stats.ts` (new — `buildFunnelData`,
+  `parseDollars`, `formatDollars`)
+- `src/app/(app)/pipeline/PipelineFunnel.tsx` (new — server component)
+- `src/app/(app)/pipeline/PipelineFilters.tsx` (new — client component
+  for the toggles, updates URL params via `router.push`)
 
 ---
 
