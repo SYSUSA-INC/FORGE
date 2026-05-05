@@ -46,6 +46,13 @@ export default async function ImportPage() {
             >
               Paste from eBuy
             </Link>
+            <Link
+              href="/opportunities/import/gsa"
+              className="aur-btn aur-btn-ghost"
+              title="Paste any forwarded GSA opportunity email — RFP, RFQ, sources sought. Optionally attach the RFP file."
+            >
+              Paste GSA email
+            </Link>
             <Link href="/opportunities" className="aur-btn aur-btn-ghost">
               Back to opportunities
             </Link>

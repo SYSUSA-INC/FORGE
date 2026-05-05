@@ -161,6 +161,102 @@ export function buildEbuyExtractPrompt(rawText: string): {
   };
 }
 
+// ────────────────────────────────────────────────────────────────────
+// GSA email paste — broader than eBuy.
+//
+// Handles any forwarded GSA email about an upcoming or open
+// contracting opportunity. eBuy is one source; others include GSA
+// Schedule sub-CO notifications, OASIS+ task order announcements,
+// Polaris/Alliant 2/STARS III RFP forwards, sources sought emails,
+// and so on. The output shape mirrors eBuy where possible but adds
+// `noticeType` so downstream code can branch on RFP vs RFQ vs RFI.
+// ────────────────────────────────────────────────────────────────────
+
+export type GsaExtractionResult = {
+  title: string;
+  /** "rfp" | "rfq" | "rfi" | "sources_sought" | "task_order" | "other" */
+  noticeType: string;
+  /** RFQ / RFP / solicitation number, if surfaced. */
+  solicitationNumber: string;
+  /** End customer agency the goods/services are for. */
+  buyingAgency: string;
+  office: string;
+  /** GSA vehicle if mentioned (MAS, Polaris, OASIS+, etc.). "" if unclear. */
+  vehicle: string;
+  naicsCode: string;
+  setAside: string;
+  /** YYYY-MM-DD or null. */
+  responseDueDate: string | null;
+  placeOfPerformance: string;
+  /** 2-4 sentence scope summary. */
+  scopeSummary: string;
+  /** Free-text notes — page caps, evaluation criteria, security clearance, etc. */
+  notes: string;
+};
+
+const GSA_EXTRACT_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform — reading a forwarded email from GSA that announces a contracting opportunity. The email may be:
+
+- A GSA eBuy RFQ description copy or notification
+- A GSA Schedule sub-CO opportunity forward
+- An OASIS+, Polaris, Alliant 2, STARS III, VETS 2, EIS, 2GIT, or ASCEND task order announcement
+- A sources sought / RFI from any GSA-fronted vehicle
+- A general GSA acquisition email pointing the recipient at a SAM.gov or eBuy posting
+
+Return ONLY a single JSON object matching the schema below. No commentary, no markdown fences.
+
+Rules:
+- Use empty string "" for any field you cannot find. Use null for missing dates.
+- Date format: YYYY-MM-DD. Convert any encountered date format to that.
+- noticeType: one of "rfp", "rfq", "rfi", "sources_sought", "task_order", "other". Choose based on the email's strongest signal — if the email says "RFQ" use "rfq", if it says "Sources Sought" use "sources_sought", if uncertain use "other".
+- buyingAgency: the agency the goods/services are FOR. NOT GSA itself unless GSA is the literal end user. GSA is almost always just the contracting vehicle host.
+- office: sub-organization within the buying agency if mentioned (e.g. "PEO EIS", "VA OIT").
+- vehicle: identify the GSA vehicle if mentioned (MAS, OASIS+, Polaris, Alliant 2, STARS III, VETS 2, EIS, 2GIT, ASCEND). Use "MAS" if it's an unnamed Schedule order. Use "" if the email doesn't reference a specific vehicle.
+- naicsCode: 6-digit NAICS if present; otherwise "".
+- setAside: "Total Small Business", "8(a)", "WOSB", "SDVOSB", "HUBZone", "Unrestricted", or "".
+- scopeSummary: 2–4 sentences in plain prose describing what's being bought. No marketing language. If the email is just a notification with no scope detail, summarize what the recipient is being told to expect (e.g. "GSA notifies SCHEDULE holders that VA is releasing an RFQ for cloud migration services next week.")
+- notes: short list of anything a quoter must know — page caps, evaluation factors, period of performance, security/clearance requirements, ROM/firm-fixed-price hints, key dates other than the response due date. 1-3 sentences.
+- If the email is clearly NOT an opportunity announcement (admin email, password reset, unrelated content), set title to "" and return mostly empty fields.
+
+Schema:
+{
+  "title": string,
+  "noticeType": "rfp" | "rfq" | "rfi" | "sources_sought" | "task_order" | "other",
+  "solicitationNumber": string,
+  "buyingAgency": string,
+  "office": string,
+  "vehicle": string,
+  "naicsCode": string,
+  "setAside": string,
+  "responseDueDate": string | null,
+  "placeOfPerformance": string,
+  "scopeSummary": string,
+  "notes": string
+}`;
+
+export function buildGsaExtractPrompt(rawText: string): {
+  system: string;
+  messages: AIMessage[];
+} {
+  const trimmed = rawText.slice(0, 50_000);
+  const userPrompt = [
+    `Extract structured fields from the following forwarded GSA email.`,
+    ``,
+    `Email body:`,
+    "```",
+    trimmed,
+    "```",
+    rawText.length > trimmed.length
+      ? `(Email was trimmed from ${rawText.length} chars to first ${trimmed.length}.)`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    system: GSA_EXTRACT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
 export type SectionDraftMode = "draft" | "improve" | "tighten";
 
 /**
@@ -755,6 +851,21 @@ export const ebuyExtractionSchema = z.object({
   placeOfPerformance: z.string(),
   scopeSummary: z.string(),
   clinSummary: z.string(),
+  notes: z.string(),
+});
+
+export const gsaExtractionSchema = z.object({
+  title: z.string(),
+  noticeType: z.string(),
+  solicitationNumber: z.string(),
+  buyingAgency: z.string(),
+  office: z.string(),
+  vehicle: z.string(),
+  naicsCode: z.string(),
+  setAside: z.string(),
+  responseDueDate: z.string().nullable(),
+  placeOfPerformance: z.string(),
+  scopeSummary: z.string(),
   notes: z.string(),
 });
 

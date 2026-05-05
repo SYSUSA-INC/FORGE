@@ -122,24 +122,40 @@ now a real funnel.
 
 ---
 
-### BL-5 — GSA email paste (Solicitations)
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** —
+### BL-5 — GSA email paste (Solicitations) — **shipped**
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Delivered
 
-Mirror of the existing eBuy paste flow, for GSA Schedule notification
-emails. User pastes the forwarded GSA email; AI extracts the
-opportunity fields; user reviews + creates the opportunity.
+Mirror of the existing eBuy paste flow, broader to handle any
+forwarded GSA opportunity email — eBuy RFQs, Schedule sub-CO
+notifications, OASIS+/Polaris/Alliant 2 task order announcements,
+sources sought, generic GSA acquisition emails.
 
-**Scope:**
-- New route `/solicitations/import/gsa` (or under /opportunities/import)
-- Reuse the eBuy AI prompt scaffolding; new prompt tailored to GSA
-  Schedule notification email format
-- Attachment upload (the user said "and add attachments")
-- Same review-then-create UX as eBuy paste
-- Wire under Operations Management and Solicitations menu
+**Delivered:**
+- New AI prompt + zod schema in `ai-prompts.ts`
+  (`buildGsaExtractPrompt`, `gsaExtractionSchema`,
+  `GsaExtractionResult`) covering 6 notice types: rfp / rfq / rfi /
+  sources_sought / task_order / other
+- New extractor lib `src/lib/gsa-extract.ts` mirroring `aiExtractEbuy`
+  with stub-mode handling + zod parse
+- New route `/opportunities/import/gsa` with paste UI, parsed-fields
+  review, and **multi-file attachment upload** (up to 5 files,
+  25 MB each — PDF / DOCX / XLSX / PPTX / TXT / image)
+- Each accepted attachment becomes a Solicitation row linked to the
+  new opportunity, parsed in the background by the existing
+  solicitation pipeline
+- "Paste GSA email" link added to the import page header next to the
+  existing "Paste from eBuy"
+- Stub-mode banner via the unified component when AI is in stub mode
+- Per-file size + format validation; oversize/wrong-format files
+  surface an "attachmentsSkipped" report on the destination page
 
-**Acceptance:** paste a real GSA Schedule notification email →
-extracted fields populate → user creates an opportunity → opp
-appears on dashboard with attachments linked.
+**Files:**
+- `src/lib/ai-prompts.ts` — new GSA prompt + schema
+- `src/lib/gsa-extract.ts` (new)
+- `src/app/(app)/opportunities/import/gsa/page.tsx` (new)
+- `src/app/(app)/opportunities/import/gsa/GsaPasteClient.tsx` (new)
+- `src/app/(app)/opportunities/import/gsa/actions.ts` (new)
+- `src/app/(app)/opportunities/import/page.tsx` — added "Paste GSA email" header link
 
 ---
 
