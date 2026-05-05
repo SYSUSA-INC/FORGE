@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
   type AnyPgColumn,
@@ -1592,3 +1593,196 @@ export type OpportunitySourceRequest =
   typeof opportunitySourceRequests.$inferSelect;
 export type NewOpportunitySourceRequest =
   typeof opportunitySourceRequests.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// AI document review + Capability Matrix + Question Generator (BL-23)
+// ────────────────────────────────────────────────────────────────────
+
+export const solicitationReviewStatusEnum = pgEnum(
+  "solicitation_review_status",
+  ["pending", "running", "complete", "failed"],
+);
+
+export type SolicitationReviewStatus =
+  (typeof solicitationReviewStatusEnum.enumValues)[number];
+
+/**
+ * Structured AI output stored on solicitation_review.result.
+ * Mirrors the shape returned by the review prompt; consumed by both
+ * the matrix and the question-set actions.
+ */
+export type SolicitationReviewResult = {
+  /** 1-2 paragraph plain-prose synopsis. */
+  summary: string;
+  /** Section L (instructions) bullet points. */
+  sectionL: string[];
+  /** Section M (evaluation factors) bullet points with weights when stated. */
+  sectionM: string[];
+  /** Discrete requirements with kind + citation. */
+  requirements: {
+    id: string;
+    kind: "shall" | "should" | "may";
+    text: string;
+    sectionRef: string;
+    capabilityArea: string;
+  }[];
+  /** Capability buckets the model surfaces — used as the rows of the matrix. */
+  capabilityAreas: string[];
+  evaluationFactors: { name: string; weight: string; notes: string }[];
+  periodOfPerformance: string;
+  placeOfPerformance: string;
+  setAside: string;
+  /** Mandatory certifications / clearance requirements. */
+  mandatoryCertifications: string[];
+  /** Questions the model itself flagged during the review (separate from the question generator output). */
+  flaggedQuestions: string[];
+};
+
+export const solicitationReviews = pgTable(
+  "solicitation_review",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    status: solicitationReviewStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    result: jsonb("result")
+      .$type<SolicitationReviewResult>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    error: text("error").notNull().default(""),
+    model: text("model").notNull().default(""),
+    stubbed: boolean("stubbed").notNull().default(false),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSolicitationUq: uniqueIndex(
+      "solicitation_review_org_solicitation_uq",
+    ).on(t.organizationId, t.solicitationId),
+    statusIdx: index("solicitation_review_status_idx").on(
+      t.organizationId,
+      t.status,
+    ),
+  }),
+);
+
+export type SolicitationReview = typeof solicitationReviews.$inferSelect;
+export type NewSolicitationReview = typeof solicitationReviews.$inferInsert;
+
+/** One cell in the capability matrix. */
+export type CapabilityMatrixCell = {
+  requirementId: string;
+  /** "knowledge:<entryId>" or "" if no supporting evidence found. */
+  capabilityRef: string;
+  status: "strong" | "partial" | "gap" | "not_addressed";
+  /** Verbatim slice from the supporting knowledge entry, if any. */
+  citation: string;
+  /** 1-2 sentence narrative explaining the fit (or the gap). */
+  narrative: string;
+};
+
+export const solicitationCapabilityMatrices = pgTable(
+  "solicitation_capability_matrix",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    solicitationReviewId: uuid("solicitation_review_id")
+      .notNull()
+      .references(() => solicitationReviews.id, { onDelete: "cascade" }),
+    cells: jsonb("cells")
+      .$type<CapabilityMatrixCell[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    pwinRecommendationLow: integer("pwin_recommendation_low")
+      .notNull()
+      .default(0),
+    pwinRecommendationHigh: integer("pwin_recommendation_high")
+      .notNull()
+      .default(0),
+    model: text("model").notNull().default(""),
+    stubbed: boolean("stubbed").notNull().default(false),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSolicitationUq: uniqueIndex(
+      "solicitation_capability_matrix_org_solicitation_uq",
+    ).on(t.organizationId, t.solicitationId),
+  }),
+);
+
+export type SolicitationCapabilityMatrix =
+  typeof solicitationCapabilityMatrices.$inferSelect;
+export type NewSolicitationCapabilityMatrix =
+  typeof solicitationCapabilityMatrices.$inferInsert;
+
+/** One question in a generated question set. */
+export type SolicitationQuestion = {
+  id: string;
+  category:
+    | "scope_ambiguity"
+    | "evaluation_criteria"
+    | "submission_logistics"
+    | "technical_constraints"
+    | "security_clearance"
+    | "subcontracting";
+  text: string;
+  rationale: string;
+  /** e.g. "L.5.2.1", "M-3", "C.3" — references back into the source doc. */
+  sectionRef: string;
+};
+
+export const solicitationQuestionSets = pgTable(
+  "solicitation_question_set",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    solicitationReviewId: uuid("solicitation_review_id")
+      .notNull()
+      .references(() => solicitationReviews.id, { onDelete: "cascade" }),
+    questions: jsonb("questions")
+      .$type<SolicitationQuestion[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    model: text("model").notNull().default(""),
+    stubbed: boolean("stubbed").notNull().default(false),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSolicitationUq: uniqueIndex(
+      "solicitation_question_set_org_solicitation_uq",
+    ).on(t.organizationId, t.solicitationId),
+  }),
+);
+
+export type SolicitationQuestionSet =
+  typeof solicitationQuestionSets.$inferSelect;
+export type NewSolicitationQuestionSet =
+  typeof solicitationQuestionSets.$inferInsert;

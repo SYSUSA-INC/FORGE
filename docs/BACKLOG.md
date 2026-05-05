@@ -575,8 +575,8 @@ the FORGE Brain promo.
 
 ---
 
-### BL-23 — AI document review + Capability Matrix + Question Generator
-**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-10 (Knowledge ingestion improvements — needed for capability data source)
+### BL-23 — AI document review + Capability Matrix + Question Generator — **shipped (primary surface)**
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Primary surface delivered. Opportunity-mirror surface tracked as **BL-23b**.
 
 When a user uploads RFP / RFI / Sources Sought / RFQ documents to a
 solicitation, FORGE should provide an AI-driven review pipeline with
@@ -677,6 +677,50 @@ question-asking workflows that capture managers run today by hand.
 - Knowledge join logic for capability matrix: 1 day
 - Stub-mode handling + tests: 0.5 day
 - Total: ~6 days (1 week)
+
+**Delivered files:**
+- `drizzle/0033_solicitation_review_matrix_questions.sql`
+- `src/db/schema.ts` — three new tables (`solicitationReviews`,
+  `solicitationCapabilityMatrices`, `solicitationQuestionSets`),
+  `solicitationReviewStatusEnum`, four new types
+- `src/lib/ai-prompts-bl23.ts` — three prompts + zod schemas
+- `src/lib/ai-prompts.ts` — re-exports BL-23 prompts
+- `src/lib/solicitation-ai-review.ts` — three AI runners with stub-mode
+  payloads
+- `src/app/(app)/solicitations/[id]/review-actions.ts` — server
+  actions: `runSolicitationReviewAction`, `runCapabilityMatrixAction`,
+  `runQuestionGeneratorAction`, `getReviewStatusAction`
+- `src/app/(app)/solicitations/[id]/SolicitationReviewPanel.tsx` —
+  client orchestrator with three-button group + collapsible result
+  sections (review output, capability matrix, question list)
+- `src/app/(app)/solicitations/[id]/page.tsx` — load review state +
+  embed panel above existing layout
+
+---
+
+### BL-23b — AI doc review: opportunity-mirror surface
+**Priority:** P2  ·  **Effort:** M  ·  **Depends on:** BL-23
+
+The original BL-23 spec asks for a mirror of the three-button workflow
+on the opportunity detail page when a solicitation is linked. BL-23
+shipped the primary surface (solicitation detail). This follow-up
+adds the mirror, scoped to all solicitations attached to the opp.
+
+**Scope:**
+- New panel on `/opportunities/[id]` titled "Documents & AI review"
+- Lists every solicitation attached to this opportunity with status
+  indicators (review done / matrix done / questions done)
+- For each, a compact three-button cluster mirroring BL-23 + a
+  click-through to the full solicitation detail page for the panel
+- When the opp has exactly one linked solicitation, render the full
+  panel inline (no aggregation needed)
+- When the opp has 2+ solicitations, aggregate counts in a header
+  ("3 reviews complete · 2 matrices · 1 question set") + per-doc rows
+
+**Acceptance:** open an opportunity with linked solicitations →
+see review status for each → can run any of the three actions
+without leaving the opportunity page → outputs match what shows on
+the solicitation detail page.
 
 ---
 
