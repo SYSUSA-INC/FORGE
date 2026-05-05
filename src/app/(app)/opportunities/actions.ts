@@ -88,6 +88,7 @@ export async function createOpportunityAction(
     if (!row) return { ok: false, error: "Could not create opportunity." };
 
     revalidatePath("/opportunities");
+    revalidatePath("/");
     return { ok: true, id: row.id };
   } catch (err) {
     log.error("[createOpportunityAction]", "error", { error: err });
@@ -121,6 +122,7 @@ export async function updateOpportunityAction(
       );
     revalidatePath("/opportunities");
     revalidatePath(`/opportunities/${id}`);
+    revalidatePath("/");
     return { ok: true };
   } catch (err) {
     log.error("[updateOpportunityAction]", "error", { error: err });
@@ -150,6 +152,7 @@ export async function setOpportunityStageAction(
       );
     revalidatePath("/opportunities");
     revalidatePath(`/opportunities/${id}`);
+    revalidatePath("/");
     return { ok: true };
   } catch (err) {
     log.error("[setOpportunityStageAction]", "error", { error: err });
@@ -176,6 +179,7 @@ export async function deleteOpportunityAction(
         ),
       );
     revalidatePath("/opportunities");
+    revalidatePath("/");
     return { ok: true };
   } catch (err) {
     log.error("[deleteOpportunityAction]", "error", { error: err });

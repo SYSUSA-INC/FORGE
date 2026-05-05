@@ -1,50 +1,33 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { opportunities, users } from "@/db/schema";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import type { OpportunityStage } from "@/db/schema";
+import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
-import {
-  buildStageStats,
-  type StageStat,
-} from "./stage-stats";
 import { OpportunitiesClient } from "./OpportunitiesClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function OpportunitiesPage() {
+const VALID_STAGES = new Set(STAGES.map((s) => s.key));
+
+export default async function OpportunitiesPage({
+  searchParams,
+}: {
+  searchParams: { stage?: string };
+}) {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const rows = await db
-    .select({
-      id: opportunities.id,
-      title: opportunities.title,
-      agency: opportunities.agency,
-      stage: opportunities.stage,
-      solicitationNumber: opportunities.solicitationNumber,
-      valueLow: opportunities.valueLow,
-      valueHigh: opportunities.valueHigh,
-      responseDueDate: opportunities.responseDueDate,
-      pWin: opportunities.pWin,
-      ownerUserId: opportunities.ownerUserId,
-      ownerName: users.name,
-      ownerEmail: users.email,
-      updatedAt: opportunities.updatedAt,
-    })
-    .from(opportunities)
-    .leftJoin(users, eq(users.id, opportunities.ownerUserId))
-    .where(eq(opportunities.organizationId, organizationId))
-    .orderBy(desc(opportunities.updatedAt));
+  // Deep-link from Command Center tiles: /opportunities?stage=capture
+  const requestedStage =
+    searchParams.stage && VALID_STAGES.has(searchParams.stage as OpportunityStage)
+      ? (searchParams.stage as OpportunityStage)
+      : null;
 
-  // Stage aggregates: count + due-date proximity per stage. Computed
-  // server-side so the client widgets render with real numbers, not
-  // a flicker of zeros while client-side aggregation runs.
-  const stats: Record<string, StageStat> = buildStageStats(rows);
+  const snapshot = await getOrganizationSnapshot(organizationId);
 
-  const list = rows.map((r) => ({
+  const list = snapshot.oppRows.map((r) => ({
     id: r.id,
     title: r.title,
     agency: r.agency,
@@ -106,8 +89,9 @@ export default async function OpportunitiesPage() {
   return (
     <OpportunitiesClient
       opportunities={list}
-      stageStats={stats}
+      stageStats={snapshot.oppStageStats}
       stages={STAGES}
+      initialStageFilter={requestedStage ?? "all"}
     />
   );
 }
