@@ -2,11 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { solicitations, users } from "@/db/schema";
+import {
+  knowledgeEntries,
+  solicitationCapabilityMatrices,
+  solicitationQuestionSets,
+  solicitationReviews,
+  solicitations,
+  users,
+} from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { SolicitationActions } from "./SolicitationActions";
+import { SolicitationReviewPanel } from "./SolicitationReviewPanel";
 import { TeamPanel } from "./TeamPanel";
 import { listSolicitationAssignmentsAction } from "./team-actions";
 
@@ -60,6 +68,82 @@ export default async function SolicitationDetail({
   const s = row.s;
   const statusColor = STATUS_COLOR[s.parseStatus] ?? "#9BC9D9";
   const assignments = await listSolicitationAssignmentsAction(s.id);
+
+  // BL-23: review + matrix + question state for the review panel.
+  const [reviewRow, matrixRow, questionRow, knowledgeRows] =
+    await Promise.all([
+      db
+        .select()
+        .from(solicitationReviews)
+        .where(
+          and(
+            eq(solicitationReviews.solicitationId, s.id),
+            eq(solicitationReviews.organizationId, organizationId),
+          ),
+        )
+        .limit(1)
+        .then((r) => r[0] ?? null),
+      db
+        .select()
+        .from(solicitationCapabilityMatrices)
+        .where(
+          and(
+            eq(solicitationCapabilityMatrices.solicitationId, s.id),
+            eq(
+              solicitationCapabilityMatrices.organizationId,
+              organizationId,
+            ),
+          ),
+        )
+        .limit(1)
+        .then((r) => r[0] ?? null),
+      db
+        .select()
+        .from(solicitationQuestionSets)
+        .where(
+          and(
+            eq(solicitationQuestionSets.solicitationId, s.id),
+            eq(solicitationQuestionSets.organizationId, organizationId),
+          ),
+        )
+        .limit(1)
+        .then((r) => r[0] ?? null),
+      db
+        .select({
+          id: knowledgeEntries.id,
+          title: knowledgeEntries.title,
+          kind: knowledgeEntries.kind,
+        })
+        .from(knowledgeEntries)
+        .where(eq(knowledgeEntries.organizationId, organizationId)),
+    ]);
+
+  const reviewState = {
+    status: reviewRow?.status ?? ("none" as const),
+    result: reviewRow?.result ?? null,
+    error: reviewRow?.error ?? "",
+    stubbed: reviewRow?.stubbed ?? false,
+    model: reviewRow?.model ?? "",
+    completedAt: reviewRow?.completedAt
+      ? reviewRow.completedAt.toISOString()
+      : null,
+  };
+  const matrixState = matrixRow
+    ? {
+        cells: matrixRow.cells,
+        pwinLow: matrixRow.pwinRecommendationLow,
+        pwinHigh: matrixRow.pwinRecommendationHigh,
+        stubbed: matrixRow.stubbed,
+        createdAt: matrixRow.createdAt.toISOString(),
+      }
+    : null;
+  const questionState = questionRow
+    ? {
+        questions: questionRow.questions,
+        stubbed: questionRow.stubbed,
+        createdAt: questionRow.createdAt.toISOString(),
+      }
+    : null;
 
   return (
     <>
@@ -137,6 +221,17 @@ export default async function SolicitationDetail({
             View linked opportunity →
           </Link>
         ) : null}
+      </div>
+
+      <div className="mb-4">
+        <SolicitationReviewPanel
+          solicitationId={s.id}
+          initialReview={reviewState}
+          initialMatrix={matrixState}
+          initialQuestions={questionState}
+          knowledgeIndex={knowledgeRows}
+          hasRawText={!!s.rawText && s.rawText.trim().length > 0}
+        />
       </div>
 
       {s.parseStatus === "failed" && s.parseError ? (

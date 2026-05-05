@@ -1,6 +1,20 @@
 import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
 
+// BL-23 prompts live in a sibling file; re-exported here so call
+// sites can import everything ai-prompt-related from one place.
+export {
+  buildCapabilityMatrixPrompt,
+  buildQuestionGeneratorPrompt,
+  buildSolicitationReviewPrompt,
+  capabilityMatrixSchema,
+  questionSetSchema,
+  solicitationReviewSchema,
+  type CapabilityMatrixVerdict,
+  type QuestionSetVerdict,
+  type SolicitationReviewVerdict,
+} from "@/lib/ai-prompts-bl23";
+
 export type SolicitationExtractionResult = {
   title: string;
   agency: string;
