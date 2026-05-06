@@ -1842,3 +1842,156 @@ export const auditLogs = pgTable(
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────
+// Notifications rules engine (BL-13)
+// ────────────────────────────────────────────────────────────────────
+
+export const notificationRuleEventKindEnum = pgEnum(
+  "notification_rule_event_kind",
+  [
+    "opportunity_due_soon",
+    "proposal_section_overdue",
+    "review_request_pending",
+    "audit_anomaly",
+    "opportunity_stage_advance",
+    "proposal_stage_advance",
+    "solicitation_review_complete",
+  ],
+);
+
+export type NotificationRuleEventKind =
+  (typeof notificationRuleEventKindEnum.enumValues)[number];
+
+export const notificationRecipientStrategyEnum = pgEnum(
+  "notification_recipient_strategy",
+  [
+    "specific_users",
+    "role",
+    "proposal_owner",
+    "opportunity_owner",
+    "all_admins",
+  ],
+);
+
+export type NotificationRecipientStrategy =
+  (typeof notificationRecipientStrategyEnum.enumValues)[number];
+
+export const notificationFrequencyEnum = pgEnum("notification_frequency", [
+  "immediate",
+  "daily_digest",
+  "weekly_digest",
+]);
+
+export type NotificationFrequency =
+  (typeof notificationFrequencyEnum.enumValues)[number];
+
+export const notificationDeliveryStatusEnum = pgEnum(
+  "notification_delivery_status",
+  ["pending", "sent", "failed", "sla_breached", "acknowledged"],
+);
+
+export type NotificationDeliveryStatus =
+  (typeof notificationDeliveryStatusEnum.enumValues)[number];
+
+export const notificationRules = pgTable(
+  "notification_rule",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull().default(""),
+    description: text("description").notNull().default(""),
+    eventKind: notificationRuleEventKindEnum("event_kind").notNull(),
+    /** Structured match conditions against the event payload. Empty
+     *  object = match every event of that kind. */
+    matchFilter: jsonb("match_filter")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    recipientStrategy:
+      notificationRecipientStrategyEnum("recipient_strategy").notNull(),
+    recipientUserIds: text("recipient_user_ids")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    recipientRoles: text("recipient_roles")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    channels: text("channels")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['in_app']::text[]`),
+    frequency: notificationFrequencyEnum("frequency")
+      .notNull()
+      .default("immediate"),
+    /** 0 = no SLA. */
+    slaSeconds: integer("sla_seconds").notNull().default(0),
+    escalationUserIds: text("escalation_user_ids")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    active: boolean("active").notNull().default(true),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgEventIdx: index("notification_rule_org_event_idx").on(
+      t.organizationId,
+      t.eventKind,
+      t.active,
+    ),
+  }),
+);
+
+export type NotificationRule = typeof notificationRules.$inferSelect;
+export type NewNotificationRule = typeof notificationRules.$inferInsert;
+
+export const notificationDeliveries = pgTable(
+  "notification_delivery",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id")
+      .notNull()
+      .references(() => notificationRules.id, { onDelete: "cascade" }),
+    recipientUserId: text("recipient_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(),
+    status: notificationDeliveryStatusEnum("status")
+      .notNull()
+      .default("pending"),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    linkPath: text("link_path").notNull().default(""),
+    notificationId: uuid("notification_id").references(() => notifications.id, {
+      onDelete: "set null",
+    }),
+    slaDueAt: timestamp("sla_due_at"),
+    sentAt: timestamp("sent_at"),
+    ackedAt: timestamp("acked_at"),
+    slaBreachedAt: timestamp("sla_breached_at"),
+    error: text("error").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("notification_delivery_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type NotificationDelivery =
+  typeof notificationDeliveries.$inferSelect;
+export type NewNotificationDelivery =
+  typeof notificationDeliveries.$inferInsert;
