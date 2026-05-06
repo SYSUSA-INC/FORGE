@@ -47,7 +47,7 @@ export async function verifyMigrationsOrWarn(): Promise<void> {
     if (!exists) {
       log.error(
         "[migration-check]",
-        "Migration ledger table missing — apply-schema has never run on this DB. Run `npm run build` (auto-runs migrations) or `npm run db:apply` directly.",
+        "Migration ledger table missing — schema has never been initialized. Sign in as super-admin and click /admin/migrations to apply.",
         { expectedLatest: EXPECTED_LATEST_MIGRATION },
       );
       return;
@@ -63,7 +63,7 @@ export async function verifyMigrationsOrWarn(): Promise<void> {
     if (latestRow.rows.length === 0) {
       log.error(
         "[migration-check]",
-        "DB is behind the deployed code — latest migration not applied. Pages that query new tables will crash. Run `npm run db:apply`.",
+        "DB is behind the deployed code — latest migration not applied. Sign in as super-admin and click /admin/migrations to apply pending migrations.",
         { expectedLatest: EXPECTED_LATEST_MIGRATION },
       );
       return;
