@@ -11,6 +11,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { safeQuery } from "@/lib/schema-resilience";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { SolicitationActions } from "./SolicitationActions";
@@ -70,44 +71,61 @@ export default async function SolicitationDetail({
   const assignments = await listSolicitationAssignmentsAction(s.id);
 
   // BL-23: review + matrix + question state for the review panel.
+  // Wrapped in safeQuery so a missing 0033 migration on a deployed
+  // DB degrades to "no review yet" rather than crashing the page.
   const [reviewRow, matrixRow, questionRow, knowledgeRows] =
     await Promise.all([
-      db
-        .select()
-        .from(solicitationReviews)
-        .where(
-          and(
-            eq(solicitationReviews.solicitationId, s.id),
-            eq(solicitationReviews.organizationId, organizationId),
-          ),
-        )
-        .limit(1)
-        .then((r) => r[0] ?? null),
-      db
-        .select()
-        .from(solicitationCapabilityMatrices)
-        .where(
-          and(
-            eq(solicitationCapabilityMatrices.solicitationId, s.id),
-            eq(
-              solicitationCapabilityMatrices.organizationId,
-              organizationId,
-            ),
-          ),
-        )
-        .limit(1)
-        .then((r) => r[0] ?? null),
-      db
-        .select()
-        .from(solicitationQuestionSets)
-        .where(
-          and(
-            eq(solicitationQuestionSets.solicitationId, s.id),
-            eq(solicitationQuestionSets.organizationId, organizationId),
-          ),
-        )
-        .limit(1)
-        .then((r) => r[0] ?? null),
+      safeQuery(
+        () =>
+          db
+            .select()
+            .from(solicitationReviews)
+            .where(
+              and(
+                eq(solicitationReviews.solicitationId, s.id),
+                eq(solicitationReviews.organizationId, organizationId),
+              ),
+            )
+            .limit(1)
+            .then((r) => r[0] ?? null),
+        null,
+        { tag: "solicitationReviews" },
+      ),
+      safeQuery(
+        () =>
+          db
+            .select()
+            .from(solicitationCapabilityMatrices)
+            .where(
+              and(
+                eq(solicitationCapabilityMatrices.solicitationId, s.id),
+                eq(
+                  solicitationCapabilityMatrices.organizationId,
+                  organizationId,
+                ),
+              ),
+            )
+            .limit(1)
+            .then((r) => r[0] ?? null),
+        null,
+        { tag: "solicitationCapabilityMatrices" },
+      ),
+      safeQuery(
+        () =>
+          db
+            .select()
+            .from(solicitationQuestionSets)
+            .where(
+              and(
+                eq(solicitationQuestionSets.solicitationId, s.id),
+                eq(solicitationQuestionSets.organizationId, organizationId),
+              ),
+            )
+            .limit(1)
+            .then((r) => r[0] ?? null),
+        null,
+        { tag: "solicitationQuestionSets" },
+      ),
       db
         .select({
           id: knowledgeEntries.id,
