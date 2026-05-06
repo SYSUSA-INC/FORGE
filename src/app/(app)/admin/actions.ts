@@ -11,6 +11,7 @@ import {
   type Role,
 } from "@/db/schema";
 import { requireAuth, requireSuperadmin } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { sendInviteEmail, sendPasswordResetEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
 import { defaultOrgSlug } from "@/lib/org-defaults";
@@ -84,6 +85,15 @@ export async function createOrganizationAction(input: {
     };
   }
 
+  await recordAudit({
+    organizationId: org.id,
+    actor: { userId: actor.id, email: actor.email },
+    action: "org.create",
+    resourceType: "organization",
+    resourceId: org.id,
+    metadata: { name: orgName, primaryAdminEmail: adminEmail, superadmin: true },
+  });
+
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -92,11 +102,19 @@ export async function setOrgDisabledAction(
   orgId: string,
   disabled: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireSuperadmin();
+  const actor = await requireSuperadmin();
   await db
     .update(organizations)
     .set({ disabledAt: disabled ? new Date() : null, updatedAt: new Date() })
     .where(eq(organizations.id, orgId));
+  await recordAudit({
+    organizationId: orgId,
+    actor: { userId: actor.id, email: actor.email },
+    action: disabled ? "org.disable" : "org.restore",
+    resourceType: "organization",
+    resourceId: orgId,
+    metadata: { superadmin: true },
+  });
   revalidatePath("/admin");
   return { ok: true };
 }

@@ -15,6 +15,7 @@ import {
   type SolicitationReviewStatus,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   aiRunCapabilityMatrix,
@@ -335,6 +336,19 @@ export async function runSolicitationReviewAction(
     )
     .limit(1);
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "solicitation.review.run",
+    resourceType: "solicitation",
+    resourceId: solicitationId,
+    metadata: {
+      reviewId: row!.id,
+      requirementCount: result.data.requirements.length,
+      stubbed: result.stubbed,
+    },
+  });
+
   revalidatePath(`/solicitations/${solicitationId}`);
   log.info("[runSolicitationReviewAction]", "complete", {
     solicitationId,
@@ -518,6 +532,21 @@ export async function runCapabilityMatrixAction(
     matrixId = row.id;
   }
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "solicitation.matrix.run",
+    resourceType: "solicitation",
+    resourceId: solicitationId,
+    metadata: {
+      matrixId,
+      cellCount: cells.length,
+      pwinLow,
+      pwinHigh,
+      stubbed: result.stubbed,
+    },
+  });
+
   revalidatePath(`/solicitations/${solicitationId}`);
   return {
     ok: true,
@@ -649,6 +678,19 @@ export async function runQuestionGeneratorAction(
     if (!row) return { ok: false, error: "Could not save question set." };
     questionSetId = row.id;
   }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "solicitation.questions.run",
+    resourceType: "solicitation",
+    resourceId: solicitationId,
+    metadata: {
+      questionSetId,
+      questionCount: questions.length,
+      stubbed: result.stubbed,
+    },
+  });
 
   revalidatePath(`/solicitations/${solicitationId}`);
   return {

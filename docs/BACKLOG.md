@@ -324,8 +324,8 @@ multi-proposal window; A/B comparisons capture and persist.
 
 ## Operations Management (per-tenant admin)
 
-### BL-12 — Tenant-scoped Audit Log
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —
+### BL-12 — Tenant-scoped Audit Log — **shipped (foundation + critical path coverage)**
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ Foundation + ~30 critical mutations audited. Long-tail sweep tracked as **BL-12b**.
 
 Per spec: "tenant-specific audit logs for customer admins to see who
 accesses, when, and what they did."
@@ -348,6 +348,63 @@ accesses, when, and what they did."
 **Acceptance:** every action (create / update / delete / share /
 export) generates a row; UI filters work; CSV export downloads
 correctly with proper escaping.
+
+**Delivered in BL-12 PR:**
+- `drizzle/0034_audit_log.sql` — table with 3 indexes (org+created
+  desc, org+resource, org+actor)
+- `src/db/schema.ts` — `auditLogs` table + types
+- `src/lib/audit-log.ts` — `recordAudit()` helper that grabs IP
+  + user-agent from request headers, fail-open on DB errors
+- `src/app/(app)/audit-log/{page,actions,AuditLogClient}.tsx` —
+  filterable table, CSV export, drill-into-detail rows showing full
+  metadata + user-agent + IP
+- Nav: re-added Audit Log under Operations Management
+- ~30 critical mutations audited across 13 action files:
+  opportunities (CRUD + stage), proposals (CRUD + stage), companies
+  (CRUD + samgov refresh), users (invite/revoke/role/status/remove),
+  settings (profile + samgov sync), templates (create/update),
+  solicitations (upload), solicitation reviews (BL-23 review/
+  matrix/questions), opportunity imports (eBuy + GSA + source-
+  request CRUD), admin (org create/disable)
+
+---
+
+### BL-12b — Tenant Audit Log: long-tail mutation coverage
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-12
+
+Sweep `recordAudit()` calls into the remaining ~20 mutating server
+actions not covered by BL-12's critical-path scope:
+
+**Files:**
+- `proposals/actions.ts` — section save / add / remove
+- `proposals/[id]/compliance/actions.ts` — compliance items
+- `proposals/[id]/outcome/actions.ts` — record outcome / debrief
+- `proposals/[id]/outcome/winner-actions.ts` — winner analysis
+- `proposals/[id]/reviews/actions.ts` — review create / comment
+- `proposals/[id]/harvest-actions.ts` — manual harvest
+- `proposals/[id]/sections/ai/auto-draft-actions.ts` — auto-draft save
+- `solicitations/[id]/team-actions.ts` — assign / unassign
+- `opportunities/[id]/review/actions.ts` — send / submit
+- `opportunities/[id]/evaluation-actions.ts` — evaluation criteria
+- `knowledge-base/actions.ts` — entry create / update / delete
+- `knowledge-base/import/actions.ts` — artifact upload
+- `knowledge-base/import/[id]/actions.ts` — extract candidates
+- `notifications/actions.ts` — mark read, dismiss
+- `settings/templates/actions.ts` — setDefault, archive, unarchive
+- `admin/actions.ts` — setUserSuperadmin, setUserDisabled,
+  forcePasswordReset, resendOrgAdminInvite, deleteOrganization
+
+Plus `recordRead()` on sensitive reads:
+- PDF / DOCX render + download (proposals/[id]/pdf/actions.ts)
+- Share-link generation (opportunity review request, etc.)
+- USAspending lookups (knowledge-base/usaspending/actions.ts)
+
+Plus retention configuration UI: per-tenant 365-day default with an
+admin-configurable cap.
+
+**Acceptance:** every mutating server action across `src/app/(app)`
+records an audit row. Sensitive reads similarly recorded. Retention
+configurable per tenant.
 
 ---
 

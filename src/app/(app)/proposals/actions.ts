@@ -16,6 +16,7 @@ import {
   type TemplateSectionSeed,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
 import {
   EMPTY_DOC,
@@ -181,6 +182,19 @@ export async function createProposalAction(input: {
       })),
     );
 
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.create",
+      resourceType: "proposal",
+      resourceId: row.id,
+      metadata: {
+        title: input.title,
+        opportunityId: input.opportunityId,
+        sectionCount: seedSections.length,
+      },
+    });
+
     revalidatePath("/proposals");
     revalidatePath("/");
     return { ok: true, id: row.id };
@@ -203,7 +217,7 @@ export async function updateProposalAction(
     notes?: string;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(id, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -227,6 +241,16 @@ export async function updateProposalAction(
         updatedAt: new Date(),
       })
       .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.update",
+      resourceType: "proposal",
+      resourceId: id,
+      metadata: {
+        fields: Object.keys(input),
+      },
+    });
     revalidatePath(`/proposals/${id}`);
     return { ok: true };
   } catch (err) {
@@ -242,7 +266,7 @@ export async function advanceProposalStageAction(
   id: string,
   nextStage: ProposalStage,
 ): Promise<{ ok: true; harvestStarted?: boolean } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(id, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -267,6 +291,14 @@ export async function advanceProposalStageAction(
         updatedAt: new Date(),
       })
       .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.advance_stage",
+      resourceType: "proposal",
+      resourceId: id,
+      metadata: { fromStage: before?.stage ?? "unknown", toStage: nextStage },
+    });
     revalidatePath(`/proposals/${id}`);
     revalidatePath("/proposals");
     revalidatePath("/");
@@ -298,7 +330,7 @@ export async function advanceProposalStageAction(
 export async function deleteProposalAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(id, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -306,6 +338,13 @@ export async function deleteProposalAction(
   await db
     .delete(proposals)
     .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.delete",
+    resourceType: "proposal",
+    resourceId: id,
+  });
   revalidatePath("/proposals");
   revalidatePath("/");
   return { ok: true };

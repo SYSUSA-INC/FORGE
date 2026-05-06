@@ -10,6 +10,7 @@ import {
   type TemplateSectionSeed,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { isLikelyDocx, scanDocxForVariables } from "@/lib/docx-template";
 import { STARTER_TEMPLATES } from "@/lib/template-types";
@@ -148,6 +149,14 @@ export async function createTemplateAction(input: {
         createdByUserId: user.id,
       })
       .returning({ id: proposalTemplates.id });
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "template.create",
+      resourceType: "template",
+      resourceId: row!.id,
+      metadata: { name: input.name },
+    });
     revalidatePath("/settings/templates");
     return { ok: true, id: row!.id };
   } catch (err) {
@@ -186,7 +195,7 @@ export async function updateTemplateAction(
     logoUrl?: string;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -216,6 +225,14 @@ export async function updateTemplateAction(
           eq(proposalTemplates.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "template.update",
+      resourceType: "template",
+      resourceId: id,
+      metadata: { fields: Object.keys(input) },
+    });
     revalidatePath("/settings/templates");
     revalidatePath(`/settings/templates/${id}`);
     return { ok: true };

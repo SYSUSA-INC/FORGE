@@ -15,6 +15,7 @@ import {
   requireCurrentOrg,
   requireOrgAdmin,
 } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { sendInviteEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
 import { validateEmail } from "@/lib/validators";
@@ -130,6 +131,15 @@ export async function inviteUserAction(input: {
     return { ok: false, error: "Could not send invite email. Try again." };
   }
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "user.invite",
+    resourceType: "user",
+    resourceId: inviteId,
+    metadata: { invitedEmail: email, role: input.role },
+  });
+
   revalidatePath("/users");
   return { ok: true };
 }
@@ -137,6 +147,7 @@ export async function inviteUserAction(input: {
 export async function revokeInviteAction(
   inviteId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -149,6 +160,14 @@ export async function revokeInviteAction(
         eq(allowlist.organizationId, organizationId),
       ),
     );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.invite_revoke",
+    resourceType: "user",
+    resourceId: inviteId,
+  });
 
   revalidatePath("/users");
   return { ok: true };
@@ -231,6 +250,15 @@ export async function changeMemberRoleAction(
       ),
     );
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.role_change",
+    resourceType: "user",
+    resourceId: memberUserId,
+    metadata: { role },
+  });
+
   revalidatePath("/users");
   return { ok: true };
 }
@@ -256,6 +284,15 @@ export async function setMemberStatusAction(
         eq(memberships.organizationId, organizationId),
       ),
     );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: status === "disabled" ? "user.disable" : "user.enable",
+    resourceType: "user",
+    resourceId: memberUserId,
+    metadata: { status },
+  });
 
   revalidatePath("/users");
   return { ok: true };
@@ -293,6 +330,14 @@ export async function removeMemberAction(
         eq(memberships.organizationId, organizationId),
       ),
     );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.remove",
+    resourceType: "user",
+    resourceId: memberUserId,
+  });
 
   revalidatePath("/users");
   return { ok: true };
