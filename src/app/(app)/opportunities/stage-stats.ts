@@ -65,3 +65,21 @@ export function formatDueProximity(soonest: Date | null): string | null {
   if (days <= 14) return `due in ${days} days`;
   return `due ${soonest.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 }
+
+/**
+ * Spell-out helper: "S1" → "Stage 1", "S7" → "Stage 7", and pass-
+ * through for closed-state codes (W → "Won", L → "Lost", NB → "No Bid").
+ *
+ * Lives in this file (not StageWidget.tsx) so server components can
+ * import it. Putting it next to a "use client" boundary turns the
+ * import into a Client Component reference at build time — calling
+ * it from a server-rendered tree throws "n is not a function" during
+ * the RSC payload toJSON pass.
+ */
+export function spellOutStageCode(shortLabel: string): string {
+  if (/^S\d+$/.test(shortLabel)) return `Stage ${shortLabel.slice(1)}`;
+  if (shortLabel === "W") return "Won";
+  if (shortLabel === "L") return "Lost";
+  if (shortLabel === "NB") return "No Bid";
+  return shortLabel;
+}
