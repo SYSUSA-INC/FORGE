@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, memberships, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { safeQuery } from "@/lib/schema-resilience";
 
 const PAGE_SIZE = 100;
 
@@ -89,31 +90,58 @@ export async function listAuditEventsAction(
   const page = Math.max(1, filter.page ?? 1);
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(auditLogs)
-    .where(where);
+  // safeQuery wraps to handle missing audit_log table cleanly when
+  // a tenant's DB is behind the deployed code. Without this the
+  // page server-side renders blow up with relation-does-not-exist.
+  const countResult = await safeQuery(
+    () =>
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(auditLogs)
+        .where(where),
+    [{ count: 0 }],
+    { tag: "auditLogs.count" },
+  );
+  const count = countResult[0]?.count ?? 0;
 
-  const rows = await db
-    .select({
-      id: auditLogs.id,
-      actorUserId: auditLogs.actorUserId,
-      actorEmailSnapshot: auditLogs.actorEmailSnapshot,
-      actorName: users.name,
-      action: auditLogs.action,
-      resourceType: auditLogs.resourceType,
-      resourceId: auditLogs.resourceId,
-      metadata: auditLogs.metadata,
-      ip: auditLogs.ip,
-      userAgent: auditLogs.userAgent,
-      createdAt: auditLogs.createdAt,
-    })
-    .from(auditLogs)
-    .leftJoin(users, eq(users.id, auditLogs.actorUserId))
-    .where(where)
-    .orderBy(desc(auditLogs.createdAt))
-    .limit(PAGE_SIZE)
-    .offset(offset);
+  type AuditRowQuery = {
+    id: string;
+    actorUserId: string | null;
+    actorEmailSnapshot: string;
+    actorName: string | null;
+    action: string;
+    resourceType: string;
+    resourceId: string;
+    metadata: Record<string, unknown>;
+    ip: string;
+    userAgent: string;
+    createdAt: Date;
+  };
+  const rows = await safeQuery<AuditRowQuery[]>(
+    () =>
+      db
+        .select({
+          id: auditLogs.id,
+          actorUserId: auditLogs.actorUserId,
+          actorEmailSnapshot: auditLogs.actorEmailSnapshot,
+          actorName: users.name,
+          action: auditLogs.action,
+          resourceType: auditLogs.resourceType,
+          resourceId: auditLogs.resourceId,
+          metadata: auditLogs.metadata,
+          ip: auditLogs.ip,
+          userAgent: auditLogs.userAgent,
+          createdAt: auditLogs.createdAt,
+        })
+        .from(auditLogs)
+        .leftJoin(users, eq(users.id, auditLogs.actorUserId))
+        .where(where)
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(PAGE_SIZE)
+        .offset(offset),
+    [],
+    { tag: "auditLogs.list" },
+  );
 
   return {
     rows: rows.map((r) => ({

@@ -82,12 +82,21 @@ export function AdminClient({
         title="SuperAdmin portal"
         subtitle="Onboard organizations, manage platform users, and control access globally."
         actions={
-          <Link
-            href="/admin/source-requests"
-            className="aur-btn aur-btn-ghost text-[11px]"
-          >
-            Source requests →
-          </Link>
+          <>
+            <Link
+              href="/admin/migrations"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Apply pending DB migrations"
+            >
+              Migrations →
+            </Link>
+            <Link
+              href="/admin/source-requests"
+              className="aur-btn aur-btn-ghost text-[11px]"
+            >
+              Source requests →
+            </Link>
+          </>
         }
         meta={[
           { label: "Organizations", value: String(stats.orgCount) },
