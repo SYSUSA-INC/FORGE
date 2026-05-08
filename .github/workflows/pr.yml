@@ -1,0 +1,115 @@
+name: PR Checks
+
+# Required-status checks for every pull request and pushes to main.
+# These gates exist because we shipped four production hotfixes in
+# rapid succession and the actual root cause (an RSC boundary bug
+# that `next build` catches but no one ran locally) only surfaced
+# in production. Never again.
+#
+# Gates:
+#   - typecheck: tsc --noEmit
+#   - build:     next build (CRITICAL — this catches RSC boundary
+#                bugs like the one in PR #115 that crashed prod with
+#                `TypeError: n is not a function`)
+#   - rsc:      static check for server components importing non-
+#                component named exports from "use client" files
+#   - migrate:   fresh-DB migration verification — applies every
+#                migration to an empty Postgres + verifies idempotency
+#
+# All four are required. None is allowed to be flaky. If any becomes
+# flaky, fix the underlying issue rather than disabling the check.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs when a new commit lands on the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run typecheck
+
+  build:
+    name: Next build
+    runs-on: ubuntu-latest
+    # Build needs to resolve "use client" boundaries. Without a real
+    # DATABASE_URL in build scope it still completes — Next builds
+    # the app graph and serializes RSC payloads at request time, not
+    # build time. The RSC boundary bug from PR #115 is caught here.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+        env:
+          # Stub values so Next can resolve env reads in module init.
+          # Real values aren't needed: build doesn't execute request
+          # handlers, just compiles the app graph.
+          DATABASE_URL: "postgres://stub:stub@localhost:5432/stub"
+          AUTH_SECRET: "ci-stub-secret-not-used-at-runtime"
+          NEXTAUTH_URL: "http://localhost:3000"
+
+  rsc-boundaries:
+    name: RSC boundary check
+    runs-on: ubuntu-latest
+    # Static check — no DB, no build needed. Catches the bug pattern
+    # where a server component imports a plain helper function from
+    # a "use client" file. At build time, that import becomes a
+    # Client Component reference. Calling it on the server throws
+    # `TypeError: n is not a function` during RSC payload toJSON.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/check-rsc-boundaries.mjs
+
+  migrations-fresh:
+    name: Fresh-DB migration verification
+    runs-on: ubuntu-latest
+    # Boots an ephemeral Postgres, applies every migration from
+    # scratch, and verifies a re-run is a no-op. Catches accidental
+    # cross-migration dependencies on prior state — those pass on a
+    # developer's already-migrated DB but break a fresh production /
+    # staging deploy.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: forge
+          POSTGRES_PASSWORD: forge
+          POSTGRES_DB: forge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: node scripts/check-migrations-fresh.mjs
+        env:
+          DATABASE_URL: "postgres://forge:forge@localhost:5432/forge_ci"

@@ -13,7 +13,10 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:apply": "node scripts/apply-schema.mjs",
-    "db:info": "node scripts/db-info.mjs"
+    "db:info": "node scripts/db-info.mjs",
+    "check:rsc": "node scripts/check-rsc-boundaries.mjs",
+    "check:migrations": "node scripts/check-migrations-fresh.mjs",
+    "check:all": "npm run typecheck && npm run check:rsc && npm run build"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
