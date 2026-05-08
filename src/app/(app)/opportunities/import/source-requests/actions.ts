@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { safeQuery } from "@/lib/schema-resilience";
 import { log } from "@/lib/log";
 
 // ────────────────────────────────────────────────────────────────────
@@ -144,20 +145,37 @@ export async function listOwnSourceRequestsAction(): Promise<
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const rows = await db
-    .select({
-      id: opportunitySourceRequests.id,
-      sourceName: opportunitySourceRequests.sourceName,
-      description: opportunitySourceRequests.description,
-      sampleText: opportunitySourceRequests.sampleText,
-      status: opportunitySourceRequests.status,
-      platformNotes: opportunitySourceRequests.platformNotes,
-      createdAt: opportunitySourceRequests.createdAt,
-      statusChangedAt: opportunitySourceRequests.statusChangedAt,
-    })
-    .from(opportunitySourceRequests)
-    .where(eq(opportunitySourceRequests.organizationId, organizationId))
-    .orderBy(desc(opportunitySourceRequests.createdAt));
+  // safeQuery so a missing migration 0032 on the deployed DB
+  // degrades to "no requests yet" rather than crashing the page.
+  type SourceRow = {
+    id: string;
+    sourceName: string;
+    description: string;
+    sampleText: string;
+    status: OpportunitySourceRequestStatus;
+    platformNotes: string;
+    createdAt: Date;
+    statusChangedAt: Date | null;
+  };
+  const rows = await safeQuery<SourceRow[]>(
+    () =>
+      db
+        .select({
+          id: opportunitySourceRequests.id,
+          sourceName: opportunitySourceRequests.sourceName,
+          description: opportunitySourceRequests.description,
+          sampleText: opportunitySourceRequests.sampleText,
+          status: opportunitySourceRequests.status,
+          platformNotes: opportunitySourceRequests.platformNotes,
+          createdAt: opportunitySourceRequests.createdAt,
+          statusChangedAt: opportunitySourceRequests.statusChangedAt,
+        })
+        .from(opportunitySourceRequests)
+        .where(eq(opportunitySourceRequests.organizationId, organizationId))
+        .orderBy(desc(opportunitySourceRequests.createdAt)),
+    [],
+    { tag: "opportunitySourceRequests.listOwn" },
+  );
 
   return rows.map((r) => ({
     id: r.id,
@@ -206,32 +224,52 @@ export async function listAllSourceRequestsAction(): Promise<
   // bundle which doesn't need it.
   const { organizations } = await import("@/db/schema");
 
-  const rows = await db
-    .select({
-      id: opportunitySourceRequests.id,
-      organizationId: opportunitySourceRequests.organizationId,
-      organizationName: organizations.name,
-      sourceName: opportunitySourceRequests.sourceName,
-      description: opportunitySourceRequests.description,
-      sampleText: opportunitySourceRequests.sampleText,
-      status: opportunitySourceRequests.status,
-      platformNotes: opportunitySourceRequests.platformNotes,
-      requesterUserId: opportunitySourceRequests.requesterUserId,
-      requesterName: users.name,
-      requesterEmail: users.email,
-      createdAt: opportunitySourceRequests.createdAt,
-      statusChangedAt: opportunitySourceRequests.statusChangedAt,
-    })
-    .from(opportunitySourceRequests)
-    .leftJoin(
-      organizations,
-      eq(organizations.id, opportunitySourceRequests.organizationId),
-    )
-    .leftJoin(
-      users,
-      eq(users.id, opportunitySourceRequests.requesterUserId),
-    )
-    .orderBy(desc(opportunitySourceRequests.createdAt));
+  type AdminRow = {
+    id: string;
+    organizationId: string;
+    organizationName: string | null;
+    sourceName: string;
+    description: string;
+    sampleText: string;
+    status: OpportunitySourceRequestStatus;
+    platformNotes: string;
+    requesterUserId: string | null;
+    requesterName: string | null;
+    requesterEmail: string | null;
+    createdAt: Date;
+    statusChangedAt: Date | null;
+  };
+  const rows = await safeQuery<AdminRow[]>(
+    () =>
+      db
+        .select({
+          id: opportunitySourceRequests.id,
+          organizationId: opportunitySourceRequests.organizationId,
+          organizationName: organizations.name,
+          sourceName: opportunitySourceRequests.sourceName,
+          description: opportunitySourceRequests.description,
+          sampleText: opportunitySourceRequests.sampleText,
+          status: opportunitySourceRequests.status,
+          platformNotes: opportunitySourceRequests.platformNotes,
+          requesterUserId: opportunitySourceRequests.requesterUserId,
+          requesterName: users.name,
+          requesterEmail: users.email,
+          createdAt: opportunitySourceRequests.createdAt,
+          statusChangedAt: opportunitySourceRequests.statusChangedAt,
+        })
+        .from(opportunitySourceRequests)
+        .leftJoin(
+          organizations,
+          eq(organizations.id, opportunitySourceRequests.organizationId),
+        )
+        .leftJoin(
+          users,
+          eq(users.id, opportunitySourceRequests.requesterUserId),
+        )
+        .orderBy(desc(opportunitySourceRequests.createdAt)),
+    [],
+    { tag: "opportunitySourceRequests.listAll" },
+  );
 
   return rows.map((r) => ({
     id: r.id,
