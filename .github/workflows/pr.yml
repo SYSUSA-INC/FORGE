@@ -91,7 +91,12 @@ jobs:
     # staging deploy.
     services:
       postgres:
-        image: postgres:16-alpine
+        # pgvector/pgvector image because migration 0022 calls
+        # `CREATE EXTENSION vector`. Vanilla `postgres:16` doesn't
+        # ship the binary, so the migration would fail with
+        # `extension "vector" is not available`. Track the same
+        # major version production runs on Neon (16).
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: forge
           POSTGRES_PASSWORD: forge
