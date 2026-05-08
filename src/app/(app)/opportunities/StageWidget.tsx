@@ -99,18 +99,7 @@ export function StageWidget({
   );
 }
 
-/**
- * Spell-out helper: "S1" → "Stage 1", "S7" → "Stage 7", and pass-
- * through for closed-state codes (W → "Won", L → "Lost", NB → "No Bid").
- *
- * The closed states keep their full name rather than getting numbered
- * because the user explicitly listed those codes (W, L, NB) alongside
- * the stage numbers and wanted them spelled out.
- */
-export function spellOutStageCode(shortLabel: string): string {
-  if (/^S\d+$/.test(shortLabel)) return `Stage ${shortLabel.slice(1)}`;
-  if (shortLabel === "W") return "Won";
-  if (shortLabel === "L") return "Lost";
-  if (shortLabel === "NB") return "No Bid";
-  return shortLabel;
-}
+// `spellOutStageCode` moved to ./stage-stats.ts so server
+// components can import it. Re-exported here for backwards
+// compatibility with any caller that imports it from this module.
+export { spellOutStageCode } from "./stage-stats";

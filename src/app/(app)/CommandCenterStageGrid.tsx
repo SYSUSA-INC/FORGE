@@ -2,9 +2,9 @@ import Link from "next/link";
 import { STAGES } from "@/lib/opportunity-types";
 import {
   formatDueProximity,
+  spellOutStageCode,
   type StageStat,
 } from "./opportunities/stage-stats";
-import { spellOutStageCode } from "./opportunities/StageWidget";
 
 /**
  * Read-only counterpart to the StageWidget grid on /opportunities.
