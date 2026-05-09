@@ -203,3 +203,161 @@ function yearsAgo(n: number): string {
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+// ────────────────────────────────────────────────────────────────────
+// BD intel — search by NAICS / agency / keyword (not recipient).
+// Same upstream endpoint, different filter shape. Used by
+// /intelligence/awards to surface incumbents and recompete signals
+// for capture managers.
+// ────────────────────────────────────────────────────────────────────
+
+export type AwardsSearchCriteria = {
+  naicsCodes?: string[];
+  /** Toptier awarding agency name, e.g. "Department of Defense". */
+  awardingAgencyName?: string;
+  /** Subtier awarding agency name, e.g. "U.S. Army". */
+  awardingSubAgencyName?: string;
+  /** Free-text keyword search across description / PIID / etc. */
+  keyword?: string;
+  /** Defaults to A/B/C/D (no IDV vehicles). */
+  awardTypeCodes?: string[];
+  /** Result-side filter on Period of Performance Current End Date (YYYY-MM-DD). */
+  endDateBefore?: string | null;
+  /** Result-side filter on Period of Performance Current End Date (YYYY-MM-DD). */
+  endDateAfter?: string | null;
+  /** action_date lower bound. Defaults to 7 fiscal years ago. */
+  timePeriodStart?: string;
+  /** action_date upper bound. Defaults to today. */
+  timePeriodEnd?: string;
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: "asc" | "desc";
+};
+
+export async function searchAwardsByCriteria(
+  criteria: AwardsSearchCriteria,
+): Promise<UsaspendingSearchResult> {
+  const naics = (criteria.naicsCodes ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const keyword = (criteria.keyword ?? "").trim();
+  const agency = (criteria.awardingAgencyName ?? "").trim();
+  const subAgency = (criteria.awardingSubAgencyName ?? "").trim();
+
+  if (!naics.length && !keyword && !agency && !subAgency) {
+    return {
+      ok: false,
+      error:
+        "Provide at least one of: NAICS code, keyword, awarding agency, or sub-agency.",
+    };
+  }
+
+  const codes = (criteria.awardTypeCodes ?? [...CONTRACT_TYPE_CODES]).filter(
+    Boolean,
+  );
+
+  const filters: Record<string, unknown> = {
+    award_type_codes: codes,
+    time_period: [
+      {
+        start_date: criteria.timePeriodStart ?? yearsAgo(7),
+        end_date: criteria.timePeriodEnd ?? today(),
+      },
+    ],
+  };
+  if (naics.length) filters.naics_codes = naics;
+  if (keyword) filters.keywords = [keyword];
+  const agencies: Array<{ type: string; tier: string; name: string }> = [];
+  if (agency)
+    agencies.push({ type: "awarding", tier: "toptier", name: agency });
+  if (subAgency)
+    agencies.push({ type: "awarding", tier: "subtier", name: subAgency });
+  if (agencies.length) filters.agencies = agencies;
+
+  const body = {
+    filters,
+    fields: FIELDS,
+    sort: criteria.sort ?? "Period of Performance Current End Date",
+    order: criteria.order ?? "asc",
+    limit: Math.min(100, criteria.limit ?? 50),
+    page: criteria.page ?? 1,
+  };
+
+  let result: UsaspendingSearchResult;
+  try {
+    const res = await fetch(`${BASE}/search/spending_by_award/`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      return {
+        ok: false,
+        error: `USAspending ${res.status}: ${errBody.slice(0, 240)}`,
+      };
+    }
+    const data = (await res.json()) as {
+      results?: Record<string, unknown>[];
+      page_metadata?: { total: number };
+    };
+    const rows = data.results ?? [];
+    result = {
+      ok: true,
+      totalRecords: data.page_metadata?.total ?? rows.length,
+      awards: rows.map(normalize).filter((a): a is UsaspendingAward => !!a),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // USAspending's time_period filter is on action_date, not on
+  // period_of_performance_current_end_date. The BD use case needs the
+  // latter ("incumbents nearing recompete"), so we narrow client-side.
+  if (result.ok && (criteria.endDateBefore || criteria.endDateAfter)) {
+    const before = criteria.endDateBefore ?? null;
+    const after = criteria.endDateAfter ?? null;
+    result = {
+      ok: true,
+      totalRecords: result.totalRecords,
+      awards: result.awards.filter((a) => {
+        if (!a.endDate) return false;
+        if (before && a.endDate > before) return false;
+        if (after && a.endDate < after) return false;
+        return true;
+      }),
+    };
+  }
+  return result;
+}
+
+/**
+ * Heuristic: end date is within `withinDays` of today (and not lapsed
+ * by more than 30 days), and the award type is a definitive contract
+ * or delivery order (the recompete-able shapes).
+ */
+export function isLikelyRecompete(
+  award: UsaspendingAward,
+  withinDays = 365,
+): boolean {
+  if (!award.endDate) return false;
+  const end = new Date(award.endDate).getTime();
+  if (Number.isNaN(end)) return false;
+  const now = Date.now();
+  const horizon = now + withinDays * 24 * 60 * 60 * 1000;
+  const lapsedTooLong = now - 30 * 24 * 60 * 60 * 1000;
+  if (end > horizon) return false;
+  if (end < lapsedTooLong) return false;
+  const t = (award.awardType || "").toUpperCase();
+  return (
+    t === "C" ||
+    t === "D" ||
+    t.includes("DEFINITIVE") ||
+    t.includes("DELIVERY ORDER")
+  );
+}
