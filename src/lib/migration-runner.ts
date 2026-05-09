@@ -149,13 +149,26 @@ export async function runMigrations(): Promise<
       await db.execute(sql.raw("BEGIN"));
 
       let aborted = false;
-      for (const stmt of statements) {
+      for (let i = 0; i < statements.length; i++) {
+        const stmt = statements[i];
+        // SAVEPOINT per statement so the duplicate-skip below can
+        // continue. Without a savepoint, a single failed statement
+        // aborts the whole Postgres transaction — every subsequent
+        // statement (including the ledger insert) returns
+        // "current transaction is aborted". With a savepoint we
+        // ROLLBACK TO it and the transaction stays healthy.
+        const sp = `s${i}`;
+        await db.execute(sql.raw(`SAVEPOINT ${sp}`));
         try {
           await db.execute(sql.raw(stmt));
+          await db.execute(sql.raw(`RELEASE SAVEPOINT ${sp}`));
           stmtsRun += 1;
         } catch (err) {
           const code = (err as { code?: string }).code;
           if (code && DUPLICATE_PG_CODES.has(code)) {
+            await db
+              .execute(sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`))
+              .catch(() => undefined);
             stmtsSkipped += 1;
             continue;
           }

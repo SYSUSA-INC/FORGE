@@ -148,9 +148,20 @@ for (const file of files) {
   let stmtsSkipped = 0;
   try {
     await client.query("BEGIN");
-    for (const stmt of statements) {
+    for (let i = 0; i < statements.length; i++) {
+      const stmt = statements[i];
+      // SAVEPOINT per statement: required for the duplicate-skip
+      // logic below to work. Without a savepoint, a single failed
+      // statement aborts the entire enclosing transaction in
+      // Postgres — every subsequent statement (including the
+      // ledger insert) returns "current transaction is aborted".
+      // With a savepoint, we can ROLLBACK TO the savepoint and
+      // keep the transaction healthy.
+      const sp = `s${i}`;
+      await client.query(`SAVEPOINT ${sp}`);
       try {
         await client.query(stmt);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
         stmtsRun++;
       } catch (e) {
         // 42P07 = duplicate_table
@@ -158,9 +169,6 @@ for (const file of files) {
         // 42701 = duplicate_column
         // 42P06 = duplicate_schema
         // 42723 = duplicate_function
-        // 42P10 = invalid_column_reference (occurs with re-applied
-        //         CREATE INDEX on missing column — surfaces only
-        //         from genuinely broken state, not bootstrap)
         if (
           e.code === "42P07" ||
           e.code === "42710" ||
@@ -168,6 +176,7 @@ for (const file of files) {
           e.code === "42P06" ||
           e.code === "42723"
         ) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
           stmtsSkipped++;
           continue;
         }
