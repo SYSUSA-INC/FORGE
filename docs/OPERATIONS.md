@@ -122,15 +122,24 @@ point at staging Postgres instead of production Postgres.
 3. For each of these vars, set the **Preview** value to the staging value
    (do NOT change the Production value):
    - `DATABASE_URL` → staging Neon connection string from step A
-   - `NEXTAUTH_URL` → leave unset for Preview; Vercel sets `VERCEL_URL`
-     dynamically (see step 4 for how the app reads it)
+   - `AUTH_URL` / `NEXT_PUBLIC_APP_URL` → leave **unset** on Preview. See
+     step 4 for how the app handles this without them.
    - `RESEND_API_KEY` → if you want preview emails, point at a Resend
-     sandbox / test domain. Otherwise unset (so emails are no-ops in preview).
+     sandbox / test domain. Otherwise unset — `src/lib/email.ts` no-ops
+     when the key is missing (logs the send, returns).
    - All other secrets: copy production values to Preview unless you have
      a reason not to.
-4. The app reads `process.env.NEXTAUTH_URL ?? process.env.VERCEL_URL` in
-   `src/lib/auth-config.ts` (already done) so preview deploys auto-pick the
-   ephemeral preview URL.
+4. How preview URLs work without `AUTH_URL` set:
+   - **OAuth callbacks (NextAuth v5):** `src/auth.config.ts` sets
+     `trustHost: true`, so NextAuth derives the callback host from
+     request headers (Vercel sets `X-Forwarded-Host` to the preview
+     hostname). OAuth round-trips therefore resolve to the preview URL
+     automatically.
+   - **Email links:** `baseUrl()` in `src/lib/email.ts` resolves to
+     `https://${VERCEL_URL}` on preview deploys (Vercel sets `VERCEL_URL`
+     to the preview hostname automatically), to `https://www.sysgov.com`
+     when `VERCEL_ENV === "production"`, or to `NEXT_PUBLIC_APP_URL` /
+     `AUTH_URL` if either is explicitly set.
 
 #### C. Wire branch protection to wait on Vercel
 
