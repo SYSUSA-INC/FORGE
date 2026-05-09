@@ -278,8 +278,12 @@ export async function searchAwardsByCriteria(
   const body = {
     filters,
     fields: FIELDS,
-    sort: criteria.sort ?? "Period of Performance Current End Date",
-    order: criteria.order ?? "asc",
+    // USAspending only allows a small set of fields as sort keys for
+    // Contract Awards — "Period of Performance Current End Date" is
+    // returnable but not sortable, so sort by amount and surface
+    // recompete-relevant rows in the UI via isLikelyRecompete().
+    sort: criteria.sort ?? "Award Amount",
+    order: criteria.order ?? "desc",
     limit: Math.min(100, criteria.limit ?? 50),
     page: criteria.page ?? 1,
   };
