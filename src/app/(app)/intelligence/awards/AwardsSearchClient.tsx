@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { downloadCsv } from "@/lib/csv-export";
 import {
   isLikelyRecompete,
   setAsideLabel,
@@ -9,7 +10,20 @@ import {
   type SetAsideGroupKey,
   type UsaspendingAward,
 } from "@/lib/usaspending";
-import { searchAwardsIntelAction } from "./actions";
+import { normalizeFirmName } from "@/lib/sba-8a";
+import {
+  lookupSba8aChipsAction,
+  searchAwardsIntelAction,
+  type Sba8aChipWire,
+} from "./actions";
+import {
+  saveSavedSearchAction,
+  type SavedSearchSaveInput,
+} from "../saved-searches/actions";
+import {
+  listWatchedExternalIdsAction,
+  saveWatchlistItemAction,
+} from "../watchlist/actions";
 
 const AWARD_TYPE_CHOICES = [
   { code: "A", label: "BPA Call" },
@@ -33,19 +47,39 @@ const SORT_CHOICES: { key: SortKey; label: string }[] = [
   { key: "agency_asc", label: "Agency (A–Z)" },
 ];
 
-export function AwardsSearchClient() {
+export function AwardsSearchClient({
+  initialCriteria,
+}: {
+  initialCriteria?: Record<string, unknown> | null;
+}) {
   // Search-form (server-side) state.
-  const [naics, setNaics] = useState("");
-  const [agency, setAgency] = useState("");
-  const [subAgency, setSubAgency] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [endDateBefore, setEndDateBefore] = useState("");
-  const [endDateAfter, setEndDateAfter] = useState("");
+  const [naics, setNaics] = useState(arrayToInput(initialCriteria?.naicsCodes));
+  const [agency, setAgency] = useState(
+    pickStr(initialCriteria?.awardingAgencyName),
+  );
+  const [subAgency, setSubAgency] = useState(
+    pickStr(initialCriteria?.awardingSubAgencyName),
+  );
+  const [keyword, setKeyword] = useState(pickStr(initialCriteria?.keyword));
+  const [endDateBefore, setEndDateBefore] = useState(
+    pickStr(initialCriteria?.endDateBefore),
+  );
+  const [endDateAfter, setEndDateAfter] = useState(
+    pickStr(initialCriteria?.endDateAfter),
+  );
   const [types, setTypes] = useState<Set<string>>(
-    new Set(AWARD_TYPE_CHOICES.map((t) => t.code)),
+    initialCriteria?.awardTypeCodes &&
+      Array.isArray(initialCriteria.awardTypeCodes) &&
+      (initialCriteria.awardTypeCodes as unknown[]).length > 0
+      ? new Set(
+          (initialCriteria.awardTypeCodes as string[]).filter(
+            (c): c is string => typeof c === "string",
+          ),
+        )
+      : new Set(AWARD_TYPE_CHOICES.map((t) => t.code)),
   );
   const [setAsideGroups, setSetAsideGroups] = useState<Set<SetAsideGroupKey>>(
-    new Set(),
+    hydrateSetAsideGroups(initialCriteria?.setAsideCodes),
   );
 
   // Result-list state.
@@ -58,6 +92,24 @@ export function AwardsSearchClient() {
   const [sortKey, setSortKey] = useState<SortKey>("amount_desc");
   const [resultAgencyFilter, setResultAgencyFilter] = useState("");
   const [recompeteOnly, setRecompeteOnly] = useState(false);
+
+  // BD intel additions: watchlist + 8(a) chip + save-search.
+  const [watchedAwardIds, setWatchedAwardIds] = useState<Set<string>>(new Set());
+  const [sba8aIndex, setSba8aIndex] = useState<Map<string, Sba8aChipWire>>(
+    new Map(),
+  );
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState("");
+  const [saveSearchShared, setSaveSearchShared] = useState(false);
+  const [saveSearchError, setSaveSearchError] = useState<string | null>(null);
+  const [saveSearchTick, setSaveSearchTick] = useState(false);
+  const [savingSearch, startSaveSearch] = useTransition();
+
+  // Auto-run when arriving via saved-search deep link.
+  useEffect(() => {
+    if (initialCriteria) search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function toggleType(code: string) {
     setTypes((prev) => {
@@ -77,28 +129,36 @@ export function AwardsSearchClient() {
     });
   }
 
+  function buildCriteria() {
+    const naicsCodes = naics
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const setAsideCodes = SET_ASIDE_GROUPS.filter((g) =>
+      setAsideGroups.has(g.key),
+    ).flatMap((g) => g.codes as readonly string[]);
+    return {
+      naicsCodes,
+      awardingAgencyName: agency,
+      awardingSubAgencyName: subAgency,
+      keyword,
+      awardTypeCodes: [...types],
+      setAsideCodes,
+      endDateBefore: endDateBefore || null,
+      endDateAfter: endDateAfter || null,
+    };
+  }
+
   function search() {
     setError(null);
     setResults(null);
     setResultAgencyFilter("");
     setRecompeteOnly(false);
+    setWatchedAwardIds(new Set());
+    setSba8aIndex(new Map());
     startSearch(async () => {
-      const naicsCodes = naics
-        .split(/[,\s]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const setAsideCodes = SET_ASIDE_GROUPS.filter((g) =>
-        setAsideGroups.has(g.key),
-      ).flatMap((g) => g.codes as readonly string[]);
       const res = await searchAwardsIntelAction({
-        naicsCodes,
-        awardingAgencyName: agency,
-        awardingSubAgencyName: subAgency,
-        keyword,
-        awardTypeCodes: [...types],
-        setAsideCodes,
-        endDateBefore: endDateBefore || null,
-        endDateAfter: endDateAfter || null,
+        ...buildCriteria(),
         limit: 100,
       });
       if (!res.ok) {
@@ -107,6 +167,120 @@ export function AwardsSearchClient() {
       }
       setResults(res.awards);
       setTotal(res.totalRecords);
+
+      // Fire watchlist + 8(a) lookups in parallel — they're decorative
+      // so they shouldn't block the primary result render.
+      const awardIds = res.awards
+        .map((a) => internalIdFromAward(a))
+        .filter(Boolean);
+      const recipients = res.awards.map((a) => ({
+        uei: a.recipientUei,
+        name: a.recipientName,
+      }));
+
+      const [watched, chips] = await Promise.all([
+        awardIds.length
+          ? listWatchedExternalIdsAction("award", awardIds)
+          : Promise.resolve([] as string[]),
+        recipients.length
+          ? lookupSba8aChipsAction(recipients)
+          : Promise.resolve([] as Sba8aChipWire[]),
+      ]);
+      setWatchedAwardIds(new Set(watched));
+      setSba8aIndex(new Map(chips.map((c) => [c.key, c])));
+    });
+  }
+
+  function chipFor(award: UsaspendingAward): Sba8aChipWire | undefined {
+    const key =
+      (award.recipientUei || "").toUpperCase().trim() ||
+      normalizeFirmName(award.recipientName || "");
+    return sba8aIndex.get(key);
+  }
+
+  function toggleWatch(award: UsaspendingAward) {
+    const id = internalIdFromAward(award);
+    if (!id || watchedAwardIds.has(id)) return;
+    setWatchedAwardIds((prev) => new Set(prev).add(id));
+    const chip = chipFor(award);
+    void (async () => {
+      const res = await saveWatchlistItemAction({
+        kind: "award",
+        externalId: id,
+        label: `${award.recipientName || "—"} · ${award.awardId}`,
+        metadata: {
+          awardId: award.awardId,
+          recipientName: award.recipientName,
+          amount: award.amount,
+          awardingAgency: award.awardingAgency,
+          awardingSubAgency: award.awardingSubAgency,
+          endDate: award.endDate ?? "",
+          naicsCode: award.naicsCode,
+          setAsideCode: award.setAsideCode,
+          sba8aStatus: chip?.status ?? "",
+        },
+      });
+      if (!res.ok) {
+        setError(res.error);
+        setWatchedAwardIds((prev) => {
+          const n = new Set(prev);
+          n.delete(id);
+          return n;
+        });
+      }
+    })();
+  }
+
+  function exportCsv() {
+    if (!results) return;
+    const list = filteredResults ?? results;
+    downloadCsv("awards.csv", list, [
+      { header: "Award ID", get: (a) => a.awardId },
+      { header: "Recipient", get: (a) => a.recipientName },
+      { header: "UEI", get: (a) => a.recipientUei },
+      { header: "Amount", get: (a) => a.amount },
+      { header: "Awarding Agency", get: (a) => a.awardingAgency },
+      { header: "Sub-Agency", get: (a) => a.awardingSubAgency },
+      { header: "Type", get: (a) => a.awardType },
+      { header: "Start Date", get: (a) => a.startDate ?? "" },
+      { header: "End Date", get: (a) => a.endDate ?? "" },
+      { header: "NAICS", get: (a) => a.naicsCode },
+      { header: "PSC", get: (a) => a.pscCode },
+      { header: "Set-Aside", get: (a) => setAsideLabel(a.setAsideCode) },
+      { header: "8(a) Status", get: (a) => chipFor(a)?.status ?? "" },
+      {
+        header: "8(a) Exit Date",
+        get: (a) => chipFor(a)?.certExitDate ?? "",
+      },
+      { header: "USAspending URL", get: (a) => a.uiUrl },
+      { header: "Description", get: (a) => a.description },
+    ]);
+  }
+
+  function saveCurrentSearch() {
+    setSaveSearchError(null);
+    const name = saveSearchName.trim();
+    if (!name) {
+      setSaveSearchError("Name is required.");
+      return;
+    }
+    const input: SavedSearchSaveInput = {
+      name,
+      kind: "awards",
+      criteria: buildCriteria(),
+      shared: saveSearchShared,
+    };
+    startSaveSearch(async () => {
+      const res = await saveSavedSearchAction(input);
+      if (!res.ok) {
+        setSaveSearchError(res.error);
+        return;
+      }
+      setSaveSearchTick(true);
+      setSaveSearchOpen(false);
+      setSaveSearchName("");
+      setSaveSearchShared(false);
+      setTimeout(() => setSaveSearchTick(false), 1500);
     });
   }
 
@@ -272,7 +446,14 @@ export function AwardsSearchClient() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-end">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setSaveSearchOpen((v) => !v)}
+            className="aur-btn aur-btn-ghost text-[11px]"
+          >
+            ★ Save search
+          </button>
           <button
             type="button"
             onClick={search}
@@ -282,6 +463,47 @@ export function AwardsSearchClient() {
             {searching ? "Searching…" : "Search awards"}
           </button>
         </div>
+
+        {saveSearchOpen ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-2">
+            <input
+              className="aur-input min-w-[200px] flex-1"
+              placeholder="Name this search"
+              value={saveSearchName}
+              onChange={(e) => setSaveSearchName(e.target.value)}
+            />
+            <label className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
+              <input
+                type="checkbox"
+                checked={saveSearchShared}
+                onChange={(e) => setSaveSearchShared(e.target.checked)}
+              />
+              Share with org
+            </label>
+            <button
+              type="button"
+              onClick={saveCurrentSearch}
+              disabled={savingSearch}
+              className="aur-btn aur-btn-primary text-[11px]"
+            >
+              {savingSearch ? "Saving…" : "Save"}
+            </button>
+            {saveSearchError ? (
+              <span className="font-mono text-[11px] text-rose-300">
+                {saveSearchError}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {saveSearchTick ? (
+          <div className="mt-3 rounded border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-200">
+            Saved. View at{" "}
+            <a href="/intelligence/saved-searches" className="underline">
+              /intelligence/saved-searches
+            </a>
+            .
+          </div>
+        ) : null}
 
         {error ? (
           <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
@@ -294,6 +516,16 @@ export function AwardsSearchClient() {
         <Panel
           title="Results"
           eyebrow={`${filteredResults.length} shown · ${total.toLocaleString()} total · ${recompeteCount} recompete-soon`}
+          actions={
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={filteredResults.length === 0}
+              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+            >
+              ⤓ Export CSV
+            </button>
+          }
         >
           <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
@@ -346,9 +578,21 @@ export function AwardsSearchClient() {
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
-              {filteredResults.map((a) => (
-                <AwardRow key={a.awardId} award={a} />
-              ))}
+              {filteredResults.map((a) => {
+                const internalId = internalIdFromAward(a);
+                return (
+                  <AwardRow
+                    key={a.awardId}
+                    award={a}
+                    chip={chipFor(a)}
+                    watched={
+                      internalId ? watchedAwardIds.has(internalId) : false
+                    }
+                    canWatch={!!internalId}
+                    onWatch={() => toggleWatch(a)}
+                  />
+                );
+              })}
             </ul>
           )}
         </Panel>
@@ -357,7 +601,19 @@ export function AwardsSearchClient() {
   );
 }
 
-function AwardRow({ award }: { award: UsaspendingAward }) {
+function AwardRow({
+  award,
+  chip,
+  watched,
+  canWatch,
+  onWatch,
+}: {
+  award: UsaspendingAward;
+  chip: Sba8aChipWire | undefined;
+  watched: boolean;
+  canWatch: boolean;
+  onWatch: () => void;
+}) {
   const recompete = isLikelyRecompete(award);
   const period =
     award.startDate && award.endDate
@@ -391,6 +647,26 @@ function AwardRow({ award }: { award: UsaspendingAward }) {
             {setAside ? (
               <span className="rounded bg-teal-400/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">
                 {setAside}
+              </span>
+            ) : null}
+            {chip ? (
+              <span
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                  chip.status === "graduated"
+                    ? "bg-amber-500/15 text-amber-200"
+                    : chip.status === "active"
+                      ? "bg-teal-500/15 text-teal-200"
+                      : "bg-white/5 text-muted"
+                }`}
+                title={
+                  chip.matchedBy === "name"
+                    ? "8(a) match via firm name (no UEI available)"
+                    : "8(a) match via UEI"
+                }
+              >
+                8(a) {chip.status}
+                {chip.certExitDate ? ` · ${chip.certExitDate.slice(0, 7)}` : ""}
+                {chip.matchedBy === "name" ? " ~" : ""}
               </span>
             ) : null}
           </div>
@@ -427,10 +703,63 @@ function AwardRow({ award }: { award: UsaspendingAward }) {
               View on USAspending ↗
             </a>
           ) : null}
+          {canWatch ? (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={onWatch}
+                disabled={watched}
+                className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-[0.18em] disabled:text-emerald-300"
+                title={watched ? "Already on watchlist" : "Save to watchlist"}
+              >
+                {watched ? "★ Saved" : "☆ Save"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </li>
   );
+}
+
+/**
+ * Extract the USAspending generated_internal_id from a normalised
+ * award's uiUrl. We use that as the stable watchlist key — it survives
+ * piid renames and is what USAspending uses as the deeplink primary
+ * key. Returns "" when uiUrl is missing/unparseable.
+ */
+function internalIdFromAward(a: UsaspendingAward): string {
+  if (!a.uiUrl) return "";
+  const m = a.uiUrl.match(/\/award\/([^/?#]+)/);
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
+function pickStr(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function arrayToInput(v: unknown): string {
+  if (!Array.isArray(v)) return "";
+  return v
+    .filter((x): x is string => typeof x === "string")
+    .join(" ")
+    .trim();
+}
+
+function hydrateSetAsideGroups(v: unknown): Set<SetAsideGroupKey> {
+  if (!Array.isArray(v)) return new Set();
+  const codes = new Set(
+    v
+      .filter((x): x is string => typeof x === "string")
+      .map((s) => s.toUpperCase()),
+  );
+  const out = new Set<SetAsideGroupKey>();
+  for (const g of SET_ASIDE_GROUPS) {
+    if ((g.codes as readonly string[]).some((c) => codes.has(c))) {
+      out.add(g.key);
+    }
+  }
+  return out;
 }
 
 function formatUsd(n: number): string {

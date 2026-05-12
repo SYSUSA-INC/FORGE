@@ -2,11 +2,16 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { loadSavedSearchAction } from "../saved-searches/actions";
 import { AwardsSearchClient } from "./AwardsSearchClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function AwardsIntelPage() {
+export default async function AwardsIntelPage({
+  searchParams,
+}: {
+  searchParams: { savedSearch?: string };
+}) {
   await requireAuth();
   await requireCurrentOrg();
 
@@ -25,7 +30,9 @@ export default async function AwardsIntelPage() {
         }
       />
       {enabled ? (
-        <AwardsSearchClient />
+        <AwardsSearchClient
+          initialCriteria={await loadInitial(searchParams.savedSearch)}
+        />
       ) : (
         <Panel
           title="Preview feature"
@@ -45,4 +52,13 @@ export default async function AwardsIntelPage() {
       )}
     </>
   );
+}
+
+async function loadInitial(
+  id: string | undefined,
+): Promise<Record<string, unknown> | null> {
+  if (!id) return null;
+  const loaded = await loadSavedSearchAction(id);
+  if (!loaded || loaded.kind !== "awards") return null;
+  return loaded.criteria;
 }
