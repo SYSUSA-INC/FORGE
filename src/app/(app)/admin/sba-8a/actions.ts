@@ -31,6 +31,11 @@ export async function pullSba8aFromSamAction(params: {
       rowsUpserted: number;
       nextPage: number | null;
       totalRecords: number;
+      /** Populated only when no rows came back — surfaces the raw SAM
+       *  response so the operator can diagnose tier limits / shape
+       *  changes without server-log access. */
+      debugSample: string | null;
+      debugTopLevelKeys: string[] | null;
     }
   | { ok: false; error: string }
 > {
@@ -61,6 +66,8 @@ export async function pullSba8aFromSamAction(params: {
   let totalRecords = 0;
   let nextPage: number | null = null;
   let pagesActuallyPulled = 0;
+  let lastDebugSample: string | null = null;
+  let lastDebugKeys: string[] | null = null;
 
   try {
     for (let i = 0; i < pages; i++) {
@@ -76,8 +83,12 @@ export async function pullSba8aFromSamAction(params: {
         await upsertParticipant(r);
         rowsUpserted += 1;
       }
-      // Empty page = past the end of the dataset. Stop the loop.
+      // Empty page = either past the end of the dataset OR a tier-
+      // limited empty response. Capture the raw sample so we can tell
+      // them apart from the UI.
       if (res.rows.length === 0) {
+        lastDebugSample = res.debugRawSample;
+        lastDebugKeys = res.debugTopLevelKeys;
         nextPage = null;
         break;
       }
@@ -111,6 +122,8 @@ export async function pullSba8aFromSamAction(params: {
       rowsUpserted,
       nextPage,
       totalRecords,
+      debugSample: rowsUpserted === 0 ? lastDebugSample : null,
+      debugTopLevelKeys: rowsUpserted === 0 ? lastDebugKeys : null,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

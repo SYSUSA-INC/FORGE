@@ -65,7 +65,21 @@ export type Sba8aRow = {
 };
 
 export type Sba8aFetchResult =
-  | { ok: true; rows: Sba8aRow[]; totalRecords: number }
+  | {
+      ok: true;
+      rows: Sba8aRow[];
+      totalRecords: number;
+      /**
+       * First ~1KB of the raw upstream response body. Surfaced through
+       * the admin UI when `rows` is empty so the operator (and the
+       * developer reading their report) can see exactly what SAM.gov
+       * returned — invaluable for diagnosing tier-related empty
+       * responses where the request succeeds but yields no data.
+       */
+      debugRawSample: string;
+      /** Detected top-level keys in the JSON envelope, for diagnostics. */
+      debugTopLevelKeys: string[];
+    }
   | { ok: false; error: string };
 
 /**
@@ -159,13 +173,19 @@ export async function fetchSba8aPage(
       error: `SAM.gov ${res.status}: ${body.slice(0, 240)}`,
     };
   }
+  // Read once as text so we can include a sample in debug output even
+  // when JSON parsing succeeds — needed to diagnose the empty-data
+  // tier-limit case.
+  const rawText = await res.text();
   let data: unknown;
   try {
-    data = await res.json();
+    data = JSON.parse(rawText);
   } catch (err) {
     return {
       ok: false,
-      error: `SAM.gov returned non-JSON: ${err instanceof Error ? err.message : String(err)}`,
+      error:
+        `SAM.gov returned non-JSON: ${err instanceof Error ? err.message : String(err)}. ` +
+        `Body sample: ${rawText.slice(0, 240)}`,
     };
   }
   const envelope = data as {
@@ -175,10 +195,16 @@ export async function fetchSba8aPage(
   const rows = (envelope.entityData ?? [])
     .map((e) => normalizeSamEntity(e))
     .filter((r): r is Sba8aRow => !!r);
+  const debugTopLevelKeys =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? Object.keys(data as Record<string, unknown>)
+      : [];
   return {
     ok: true,
     rows,
     totalRecords: envelope.totalRecords ?? rows.length,
+    debugRawSample: rawText.slice(0, 1024),
+    debugTopLevelKeys,
   };
 }
 
