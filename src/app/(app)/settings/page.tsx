@@ -7,7 +7,6 @@ import { rowToOrgProfile } from "@/lib/org-types";
 import {
   getAIEngineStatus,
   getIntegrationStatuses,
-  getMembersSummary,
 } from "@/lib/settings-status";
 import { SettingsClient } from "./SettingsClient";
 
@@ -33,17 +32,13 @@ export default async function SettingsPage() {
   const profile = rowToOrgProfile(org);
   const canEdit = user.role === "admin" || user.isSuperadmin;
 
-  const [members, integrations, aiStatus] = await Promise.all([
-    getMembersSummary(user.organizationId),
-    Promise.resolve(getIntegrationStatuses()),
-    Promise.resolve(getAIEngineStatus()),
-  ]);
+  const integrations = getIntegrationStatuses();
+  const aiStatus = getAIEngineStatus();
 
   return (
     <SettingsClient
       initialProfile={profile}
       canEdit={canEdit}
-      members={members}
       integrations={integrations}
       aiStatus={aiStatus}
     />
