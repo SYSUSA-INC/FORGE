@@ -7,6 +7,7 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "evaluation", label: "Evaluation" },
   { key: "competitors", label: "Competitors" },
+  { key: "similar", label: "Similar awards" },
   { key: "activity", label: "Activity" },
 ];
 
