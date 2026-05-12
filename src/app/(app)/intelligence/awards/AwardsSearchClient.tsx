@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { isLikelyRecompete, type UsaspendingAward } from "@/lib/usaspending";
+import {
+  isLikelyRecompete,
+  setAsideLabel,
+  SET_ASIDE_GROUPS,
+  type SetAsideGroupKey,
+  type UsaspendingAward,
+} from "@/lib/usaspending";
 import { searchAwardsIntelAction } from "./actions";
 
 const AWARD_TYPE_CHOICES = [
@@ -12,7 +18,23 @@ const AWARD_TYPE_CHOICES = [
   { code: "D", label: "Definitive Contract" },
 ];
 
+type SortKey =
+  | "amount_desc"
+  | "amount_asc"
+  | "end_asc"
+  | "end_desc"
+  | "agency_asc";
+
+const SORT_CHOICES: { key: SortKey; label: string }[] = [
+  { key: "amount_desc", label: "Amount $ (high → low)" },
+  { key: "amount_asc", label: "Amount $ (low → high)" },
+  { key: "end_asc", label: "End date (soonest → latest)" },
+  { key: "end_desc", label: "End date (latest → soonest)" },
+  { key: "agency_asc", label: "Agency (A–Z)" },
+];
+
 export function AwardsSearchClient() {
+  // Search-form (server-side) state.
   const [naics, setNaics] = useState("");
   const [agency, setAgency] = useState("");
   const [subAgency, setSubAgency] = useState("");
@@ -22,10 +44,20 @@ export function AwardsSearchClient() {
   const [types, setTypes] = useState<Set<string>>(
     new Set(AWARD_TYPE_CHOICES.map((t) => t.code)),
   );
+  const [setAsideGroups, setSetAsideGroups] = useState<Set<SetAsideGroupKey>>(
+    new Set(),
+  );
+
+  // Result-list state.
   const [results, setResults] = useState<UsaspendingAward[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
+
+  // Client-side controls applied to the rendered result list.
+  const [sortKey, setSortKey] = useState<SortKey>("amount_desc");
+  const [resultAgencyFilter, setResultAgencyFilter] = useState("");
+  const [recompeteOnly, setRecompeteOnly] = useState(false);
 
   function toggleType(code: string) {
     setTypes((prev) => {
@@ -36,20 +68,35 @@ export function AwardsSearchClient() {
     });
   }
 
+  function toggleSetAside(key: SetAsideGroupKey) {
+    setSetAsideGroups((prev) => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+
   function search() {
     setError(null);
     setResults(null);
+    setResultAgencyFilter("");
+    setRecompeteOnly(false);
     startSearch(async () => {
       const naicsCodes = naics
         .split(/[,\s]+/)
         .map((s) => s.trim())
         .filter(Boolean);
+      const setAsideCodes = SET_ASIDE_GROUPS.filter((g) =>
+        setAsideGroups.has(g.key),
+      ).flatMap((g) => g.codes as readonly string[]);
       const res = await searchAwardsIntelAction({
         naicsCodes,
         awardingAgencyName: agency,
         awardingSubAgencyName: subAgency,
         keyword,
         awardTypeCodes: [...types],
+        setAsideCodes,
         endDateBefore: endDateBefore || null,
         endDateAfter: endDateAfter || null,
         limit: 100,
@@ -62,6 +109,57 @@ export function AwardsSearchClient() {
       setTotal(res.totalRecords);
     });
   }
+
+  const agenciesInResults = useMemo(() => {
+    if (!results) return [] as string[];
+    const seen = new Set<string>();
+    for (const r of results) {
+      const a = r.awardingAgency;
+      if (a && !seen.has(a)) seen.add(a);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  }, [results]);
+
+  const filteredResults = useMemo(() => {
+    if (!results) return null;
+    let list = results;
+    if (resultAgencyFilter) {
+      list = list.filter((r) => r.awardingAgency === resultAgencyFilter);
+    }
+    if (recompeteOnly) {
+      list = list.filter((r) => isLikelyRecompete(r));
+    }
+    const sorted = [...list];
+    switch (sortKey) {
+      case "amount_desc":
+        sorted.sort((a, b) => b.amount - a.amount);
+        break;
+      case "amount_asc":
+        sorted.sort((a, b) => a.amount - b.amount);
+        break;
+      case "end_asc":
+        sorted.sort((a, b) => {
+          // null end dates pushed to the bottom of "soonest first"
+          const av = a.endDate ?? "9999-12-31";
+          const bv = b.endDate ?? "9999-12-31";
+          return av.localeCompare(bv);
+        });
+        break;
+      case "end_desc":
+        sorted.sort((a, b) => {
+          const av = a.endDate ?? "";
+          const bv = b.endDate ?? "";
+          return bv.localeCompare(av);
+        });
+        break;
+      case "agency_asc":
+        sorted.sort((a, b) =>
+          (a.awardingAgency || "").localeCompare(b.awardingAgency || ""),
+        );
+        break;
+    }
+    return sorted;
+  }, [results, resultAgencyFilter, recompeteOnly, sortKey]);
 
   const recompeteCount = (results ?? []).filter((a) => isLikelyRecompete(a))
     .length;
@@ -149,6 +247,31 @@ export function AwardsSearchClient() {
           </div>
         </div>
 
+        <div className="mt-3">
+          <label className="aur-label">
+            Socio-economic set-aside
+            <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-muted/60">
+              (leave empty for full + open)
+            </span>
+          </label>
+          <div className="flex flex-wrap gap-3">
+            {SET_ASIDE_GROUPS.map((g) => (
+              <label
+                key={g.key}
+                className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted"
+              >
+                <input
+                  type="checkbox"
+                  className="accent-teal-400"
+                  checked={setAsideGroups.has(g.key)}
+                  onChange={() => toggleSetAside(g.key)}
+                />
+                {g.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-4 flex items-center justify-end">
           <button
             type="button"
@@ -167,19 +290,63 @@ export function AwardsSearchClient() {
         ) : null}
       </Panel>
 
-      {results !== null ? (
+      {results !== null && filteredResults !== null ? (
         <Panel
           title="Results"
-          eyebrow={`${results.length} shown · ${total.toLocaleString()} total · ${recompeteCount} recompete-soon`}
+          eyebrow={`${filteredResults.length} shown · ${total.toLocaleString()} total · ${recompeteCount} recompete-soon`}
         >
-          {results.length === 0 ? (
+          <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label className="aur-label">Sort</label>
+              <select
+                className="aur-input"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+              >
+                {SORT_CHOICES.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="aur-label">Filter by agency</label>
+              <select
+                className="aur-input"
+                value={resultAgencyFilter}
+                onChange={(e) => setResultAgencyFilter(e.target.value)}
+              >
+                <option value="">All agencies in results</option>
+                {agenciesInResults.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted">
+                <input
+                  type="checkbox"
+                  className="accent-amber-400"
+                  checked={recompeteOnly}
+                  onChange={(e) => setRecompeteOnly(e.target.checked)}
+                />
+                Recompete-soon only
+              </label>
+            </div>
+          </div>
+
+          {filteredResults.length === 0 ? (
             <div className="font-mono text-[11px] text-muted">
-              No awards matched. Broaden the filter set or extend the end-date
-              window.
+              {results.length === 0
+                ? "No awards matched. Broaden the filter set or extend the end-date window."
+                : "Result-side filters hide every award. Clear them above."}
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
-              {results.map((a) => (
+              {filteredResults.map((a) => (
                 <AwardRow key={a.awardId} award={a} />
               ))}
             </ul>
@@ -196,6 +363,7 @@ function AwardRow({ award }: { award: UsaspendingAward }) {
     award.startDate && award.endDate
       ? `${award.startDate} → ${award.endDate}`
       : award.startDate || award.endDate || "—";
+  const setAside = setAsideLabel(award.setAsideCode);
   return (
     <li
       className={`rounded-lg border p-3 transition-colors ${
@@ -218,6 +386,11 @@ function AwardRow({ award }: { award: UsaspendingAward }) {
             {award.awardType ? (
               <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 {award.awardType}
+              </span>
+            ) : null}
+            {setAside ? (
+              <span className="rounded bg-teal-400/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">
+                {setAside}
               </span>
             ) : null}
           </div>

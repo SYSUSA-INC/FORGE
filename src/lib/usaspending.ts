@@ -32,6 +32,13 @@ export type UsaspendingAward = {
   description: string;
   naicsCode: string;
   pscCode: string;
+  /**
+   * Set-aside type code as returned by USAspending (e.g. "8A", "HZC",
+   * "WOSB"). Empty string if the award was full-and-open or USAspending
+   * didn't expose the field. See SET_ASIDE_GROUPS for grouping codes
+   * into human-friendly buckets.
+   */
+  setAsideCode: string;
   /** Stable URL to the contract page on usaspending.gov. */
   uiUrl: string;
 };
@@ -55,7 +62,37 @@ const FIELDS = [
   "NAICS",
   "psc_hierarchy",
   "PSC",
+  "Type of Set Aside",
 ];
+
+/**
+ * Public, friendly set-aside groups. Each group maps to one or more
+ * USAspending set-aside type codes — many program flavors (competed
+ * vs. sole-source, partial vs. total) collapse into a single capture-
+ * relevant bucket. The codes come from the FAR set-aside taxonomy
+ * exposed by USAspending's `set_aside_type_codes` filter.
+ */
+export const SET_ASIDE_GROUPS = [
+  { key: "8a", label: "8(a)", codes: ["8A", "8AN"] },
+  { key: "hubzone", label: "HUBZone", codes: ["HZC", "HZS"] },
+  { key: "wosb", label: "WOSB", codes: ["WOSB", "WOSBSS"] },
+  { key: "edwosb", label: "EDWOSB", codes: ["EDWOSB", "EDWOSBSS"] },
+  { key: "sdvosb", label: "SDVOSB", codes: ["SDVOSBC", "SDVOSBS"] },
+  { key: "vosb", label: "VOSB", codes: ["VSA", "VSS"] },
+  { key: "sb", label: "Small Business", codes: ["SBA", "SBP"] },
+] as const;
+
+export type SetAsideGroupKey = (typeof SET_ASIDE_GROUPS)[number]["key"];
+
+/** Map a raw USAspending set-aside code back to its group label, or "" if unknown. */
+export function setAsideLabel(code: string): string {
+  if (!code) return "";
+  const upper = code.toUpperCase();
+  const group = SET_ASIDE_GROUPS.find((g) =>
+    (g.codes as readonly string[]).includes(upper),
+  );
+  return group ? group.label : upper;
+}
 
 /**
  * Search awards by recipient name. The name is fuzzy-matched
@@ -165,6 +202,7 @@ function normalize(raw: Record<string, unknown>): UsaspendingAward | null {
     description: (pick(raw, "Description") || "").slice(0, 4000),
     naicsCode: naics,
     pscCode: pick(raw, "PSC"),
+    setAsideCode: pick(raw, "Type of Set Aside").toUpperCase(),
     uiUrl,
   };
 }
@@ -221,6 +259,13 @@ export type AwardsSearchCriteria = {
   keyword?: string;
   /** Defaults to A/B/C/D (no IDV vehicles). */
   awardTypeCodes?: string[];
+  /**
+   * Raw USAspending set-aside type codes to filter on (e.g. ["8A", "8AN"]).
+   * Pass an empty array or omit to apply no set-aside filter. Use
+   * `SET_ASIDE_GROUPS` from this module to expand friendly group keys
+   * to the underlying codes.
+   */
+  setAsideCodes?: string[];
   /** Result-side filter on Period of Performance Current End Date (YYYY-MM-DD). */
   endDateBefore?: string | null;
   /** Result-side filter on Period of Performance Current End Date (YYYY-MM-DD). */
@@ -274,6 +319,10 @@ export async function searchAwardsByCriteria(
   if (subAgency)
     agencies.push({ type: "awarding", tier: "subtier", name: subAgency });
   if (agencies.length) filters.agencies = agencies;
+  const setAside = (criteria.setAsideCodes ?? [])
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  if (setAside.length) filters.set_aside_type_codes = setAside;
 
   const body = {
     filters,
