@@ -60,6 +60,7 @@ export async function pullSba8aFromSamAction(params: {
   let rowsUpserted = 0;
   let totalRecords = 0;
   let nextPage: number | null = null;
+  let pagesActuallyPulled = 0;
 
   try {
     for (let i = 0; i < pages; i++) {
@@ -68,17 +69,20 @@ export async function pullSba8aFromSamAction(params: {
       if (!res.ok) {
         throw new Error(res.error);
       }
+      pagesActuallyPulled += 1;
       totalRecords = res.totalRecords;
       rowsSeen += res.rows.length;
       for (const r of res.rows) {
         await upsertParticipant(r);
         rowsUpserted += 1;
       }
-      // If we got fewer than a page's worth, we've reached the end.
+      // Empty page = past the end of the dataset. Stop the loop.
       if (res.rows.length === 0) {
         nextPage = null;
         break;
       }
+      // Stop after the last numbered page in the dataset. Both `page`
+      // and `totalPages` are 1-based.
       const totalPages = Math.max(
         1,
         Math.ceil(totalRecords / Math.max(1, res.rows.length)),
@@ -102,7 +106,7 @@ export async function pullSba8aFromSamAction(params: {
     revalidatePath("/intelligence/firms");
     return {
       ok: true,
-      pagesPulled: Math.min(pages, nextPage ? nextPage - startPage : pages),
+      pagesPulled: pagesActuallyPulled,
       rowsSeen,
       rowsUpserted,
       nextPage,
