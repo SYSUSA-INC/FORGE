@@ -17,24 +17,10 @@ import {
   validateOrgProfile,
   type OrgProfileErrors,
 } from "@/lib/validators";
-import type {
-  AIEngineStatus,
-  IntegrationStatus,
-} from "@/lib/settings-status";
-import { AIEngineTab } from "./AIEngineTab";
-import { IntegrationsTab } from "./IntegrationsTab";
 import {
   applySamGovSyncAction,
   saveOrgProfileAction,
 } from "./actions";
-
-type TabKey = "organization" | "integrations" | "ai";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "organization", label: "Organization" },
-  { key: "integrations", label: "Integrations" },
-  { key: "ai", label: "AI Engine" },
-];
 
 function newId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -46,31 +32,24 @@ function newId(prefix: string): string {
 export function SettingsClient({
   initialProfile,
   canEdit,
-  integrations,
-  aiStatus,
 }: {
   initialProfile: OrgProfile;
   canEdit: boolean;
-  integrations: IntegrationStatus[];
-  aiStatus: AIEngineStatus;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<TabKey>("organization");
 
-  // Deep-link support: nav items under Operations Management point at
-  // `/settings?tab=integrations` (etc.) so each one highlights as a
-  // distinct destination. Sync the local tab state to the URL.
-  // Legacy `?tab=users` redirects to the canonical /users page since
-  // user management was consolidated there.
+  // Legacy deep-link compatibility — older nav links (and bookmarks)
+  // point at /settings?tab=integrations, ?tab=ai, ?tab=users. Each
+  // now has its own route; redirect on first paint.
   useEffect(() => {
     const t = searchParams?.get("tab");
     if (t === "users") {
       router.replace("/users");
-      return;
-    }
-    if (t === "integrations" || t === "ai" || t === "organization") {
-      setTab(t);
+    } else if (t === "integrations") {
+      router.replace("/settings/integrations");
+    } else if (t === "ai") {
+      router.replace("/settings/ai-engine");
     }
   }, [router, searchParams]);
   const [draft, setDraft] = useState<OrgProfile>(initialProfile);
@@ -153,34 +132,12 @@ export function SettingsClient({
         </div>
       ) : null}
 
-      <nav className="mb-6 flex flex-wrap gap-1 border-b border-white/10">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`relative -mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
-              tab === t.key
-                ? "border-teal-400 text-text"
-                : "border-transparent text-muted hover:text-text"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
-
-      {tab === "organization" && (
-        <OrganizationTab
-          draft={draft}
-          update={update}
-          canEdit={canEdit}
-          errors={errors}
-        />
-      )}
-      {tab === "integrations" && (
-        <IntegrationsTab integrations={integrations} />
-      )}
-      {tab === "ai" && <AIEngineTab status={aiStatus} />}
+      <OrganizationTab
+        draft={draft}
+        update={update}
+        canEdit={canEdit}
+        errors={errors}
+      />
     </>
   );
 }

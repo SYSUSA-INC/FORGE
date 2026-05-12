@@ -441,22 +441,23 @@ delivered; SLA breach escalates to PM if not acknowledged.
 
 ---
 
-### BL-14 — Settings page route split
-**Priority:** P2  ·  **Effort:** S  ·  **Depends on:** —
+### BL-14 — Settings page route split ✅ SHIPPED
 
-PR #99 deep-links Settings tabs via `?tab=integrations`. The spec
+PR #99 deep-linked Settings tabs via `?tab=integrations`. The spec
 asks them to be separate menu items; they're treated as such, but
-under the hood they're all `/settings`. Refactor to real routes so
-each has its own URL.
+under the hood they were all `/settings`. Refactored to real routes
+so each has its own URL.
 
-**Scope:**
-- `/settings/users` → reads UsersRolesTab content (or merge with
-  `/users` which already exists — pick the cleaner option)
-- `/settings/integrations` → IntegrationsTab content
-- `/settings/ai-engine` → AIEngineTab content
+**Shipped scope:**
+- `/users` absorbs UsersRolesTab content (merge path — `/users`
+  already existed as the management page)
+- `/settings/integrations` → standalone route
+- `/settings/ai-engine` → standalone route
 - `/settings` → just OrganizationTab (the "real" Settings)
-- Remove `?tab=` deep-link logic from SettingsClient
-- Update nav links
+- `?tab=` deep-link logic removed from SettingsClient; legacy
+  `?tab=users` / `?tab=integrations` / `?tab=ai` redirect to the
+  new routes for back-compat with bookmarks.
+- Sidebar nav points at the new URLs directly.
 
 **Acceptance:** each settings section has its own URL + browser
 back/forward works; deep-linking via `?tab=` no longer needed.
