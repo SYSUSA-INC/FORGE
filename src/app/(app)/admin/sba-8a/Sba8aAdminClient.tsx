@@ -111,7 +111,7 @@ export function Sba8aAdminClient({
       >
         <p className="mb-3 font-mono text-[11px] text-muted">
           Pulls one batch of pages and upserts by UEI. Click again to continue
-          from the next page. Each page is ~100 firms. The free SAM.gov API
+          from the next page. Each page is 10 firms (free-tier cap). The SAM.gov API
           tier limits ~1000 calls/day.
         </p>
         <div className="flex flex-wrap items-end gap-3">
@@ -128,10 +128,10 @@ export function Sba8aAdminClient({
             <input
               type="number"
               min={1}
-              max={20}
+              max={50}
               className="aur-input w-24"
               value={pages}
-              onChange={(e) => setPages(Math.max(1, Math.min(20, Number(e.target.value || 5))))}
+              onChange={(e) => setPages(Math.max(1, Math.min(50, Number(e.target.value || 25))))}
             />
           </Field>
           <button
