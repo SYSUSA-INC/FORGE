@@ -32,14 +32,8 @@ type NavUser = {
 
 // Six top-level entries per the platform spec.
 //
-// Operations Management consolidates the per-tenant admin surface
-// (Settings, Users & Roles, Integrations, AI Engine, Templates,
-// Notifications). Settings/Integrations/AI Engine deep-link via
-// `?tab=` until BL-14 splits them into real routes.
-//
-// Items waiting on their backing BL: Audit Log (BL-12), Platform
-// Administration sub-items (BL-15..BL-18). They re-appear here as
-// each ships.
+// Operations Management consolidates the per-tenant admin surface.
+// Each sub-page is its own URL (BL-14 route split landed).
 const NAV: NavGroup[] = [
   {
     id: "command",
@@ -55,8 +49,8 @@ const NAV: NavGroup[] = [
     children: [
       { href: "/settings", label: "Settings" },
       { href: "/users", label: "Users & Roles" },
-      { href: "/settings?tab=integrations", label: "Integrations" },
-      { href: "/settings?tab=ai", label: "AI Engine" },
+      { href: "/settings/integrations", label: "Integrations" },
+      { href: "/settings/ai-engine", label: "AI Engine" },
       { href: "/settings/templates", label: "Templates" },
       { href: "/notifications", label: "Notifications" },
       { href: "/audit-log", label: "Audit Log" },

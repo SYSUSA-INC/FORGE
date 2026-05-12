@@ -4,10 +4,6 @@ import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { requireAuth } from "@/lib/auth-helpers";
 import { rowToOrgProfile } from "@/lib/org-types";
-import {
-  getAIEngineStatus,
-  getIntegrationStatuses,
-} from "@/lib/settings-status";
 import { SettingsClient } from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
@@ -32,15 +28,5 @@ export default async function SettingsPage() {
   const profile = rowToOrgProfile(org);
   const canEdit = user.role === "admin" || user.isSuperadmin;
 
-  const integrations = getIntegrationStatuses();
-  const aiStatus = getAIEngineStatus();
-
-  return (
-    <SettingsClient
-      initialProfile={profile}
-      canEdit={canEdit}
-      integrations={integrations}
-      aiStatus={aiStatus}
-    />
-  );
+  return <SettingsClient initialProfile={profile} canEdit={canEdit} />;
 }
