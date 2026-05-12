@@ -96,6 +96,13 @@ export function AdminClient({
             >
               Source requests →
             </Link>
+            <Link
+              href="/admin/sba-8a"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Import the SBA 8(a) participant registry"
+            >
+              SBA 8(a) →
+            </Link>
           </>
         }
         meta={[
