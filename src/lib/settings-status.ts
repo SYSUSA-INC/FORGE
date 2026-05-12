@@ -129,6 +129,17 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
         "No credentials required (public API). Available out of the box.",
     },
     {
+      key: "awards-intel",
+      name: "Awards Intel (BD search)",
+      category: "data",
+      configured: envSet("AWARDS_INTEL_ENABLED"),
+      powers:
+        "BD-side awards search by NAICS / agency / keyword. Flags incumbents whose contracts end within 12 months as recompete prospects.",
+      detail: envSet("AWARDS_INTEL_ENABLED")
+        ? "AWARDS_INTEL_ENABLED=1. Available at /intelligence/awards."
+        : "Preview feature. Set AWARDS_INTEL_ENABLED=1 to enable /intelligence/awards. Uses the same public USAspending API (no extra credentials).",
+    },
+    {
       key: "anthropic",
       name: "Anthropic (Claude)",
       category: "ai",
