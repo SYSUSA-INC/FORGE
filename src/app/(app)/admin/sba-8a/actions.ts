@@ -35,12 +35,12 @@ export async function pullSba8aFromSamAction(params: {
   | { ok: false; error: string }
 > {
   await requireSuperadmin();
-  const apiKey = (process.env.SAM_GOV_API_KEY || "").trim();
+  const apiKey = (process.env.SAMGOV_API_KEY || "").trim();
   if (!apiKey) {
     return {
       ok: false,
       error:
-        "SAM_GOV_API_KEY is not set. Provision a free SAM.gov API key and add it to the environment.",
+        "SAMGOV_API_KEY is not set. Provision a free SAM.gov API key and add it to the environment.",
     };
   }
   const startPage = Math.max(1, Math.floor(params.startPage || 1));

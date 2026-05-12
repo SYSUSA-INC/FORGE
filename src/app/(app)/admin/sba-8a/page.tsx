@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function Sba8aAdminPage() {
   await requireSuperadmin();
 
-  const apiKeyPresent = !!(process.env.SAM_GOV_API_KEY || "").trim();
+  const apiKeyPresent = !!(process.env.SAMGOV_API_KEY || "").trim();
   const [stats, runs] = await Promise.all([
     safeStats(),
     safeRuns(),
@@ -49,7 +49,7 @@ export default async function Sba8aAdminPage() {
           accent="hazard"
         >
           <p className="font-mono text-[12px] text-muted">
-            Set the <code className="rounded bg-white/5 px-1.5 py-0.5">SAM_GOV_API_KEY</code>{" "}
+            Set the <code className="rounded bg-white/5 px-1.5 py-0.5">SAMGOV_API_KEY</code>{" "}
             environment variable to enable the "Pull from SAM.gov" path. Free
             keys: <a
               href="https://open.gsa.gov/api/entity-api/"
