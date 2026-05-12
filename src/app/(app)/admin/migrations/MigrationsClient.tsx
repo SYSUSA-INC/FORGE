@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  markMigrationsAppliedThroughAction,
   runMigrationsAction,
   type MigrationStatusResult,
   type RunMigrationsActionResult,
 } from "./actions";
+
+type SyncResult =
+  | { ok: true; markedFilenames: string[]; alreadyPresentFilenames: string[] }
+  | { ok: false; error: string };
 
 export function MigrationsClient({
   initialStatus,
@@ -15,11 +20,33 @@ export function MigrationsClient({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [syncing, startSync] = useTransition();
   const [lastResult, setLastResult] = useState<RunMigrationsActionResult | null>(
     null,
   );
+  const [lastSync, setLastSync] = useState<SyncResult | null>(null);
 
   const appliedSet = new Set(initialStatus.appliedFiles);
+
+  // "Sync ledger" affordance shows only when the ledger looks
+  // suspiciously empty for a long-lived DB — specifically when we
+  // see *multiple* pending migrations sitting before the newest one.
+  // A single pending migration is the normal post-deploy state; that
+  // hides the affordance so it's not a footgun in steady-state.
+  const orphanCandidates = useMemo(() => {
+    if (initialStatus.pendingFiles.length < 2) return [];
+    // All pending files EXCEPT the latest. The latest is presumed to
+    // be a genuinely-new migration the operator wants to run normally;
+    // everything before it is the orphan tail.
+    const sorted = [...initialStatus.pendingFiles].sort();
+    return sorted.slice(0, -1);
+  }, [initialStatus.pendingFiles]);
+
+  const [throughChoice, setThroughChoice] = useState<string>(
+    orphanCandidates[orphanCandidates.length - 1] ?? "",
+  );
+  const [confirmText, setConfirmText] = useState("");
+  const confirmExpected = "I VERIFIED";
 
   function apply() {
     setLastResult(null);
@@ -30,8 +57,110 @@ export function MigrationsClient({
     });
   }
 
+  function syncLedger() {
+    if (!throughChoice) return;
+    setLastSync(null);
+    startSync(async () => {
+      const result = await markMigrationsAppliedThroughAction(throughChoice);
+      setLastSync(result);
+      setConfirmText("");
+      router.refresh();
+    });
+  }
+
   return (
     <div className="mt-4 flex flex-col gap-4">
+      {orphanCandidates.length > 0 ? (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-400/[0.06] p-4">
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            <div className="font-display text-[13px] font-semibold text-amber-200">
+              Ledger sync needed?
+            </div>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-amber-300">
+              {orphanCandidates.length} orphan candidate
+              {orphanCandidates.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <p className="font-mono text-[11px] text-muted">
+            {orphanCandidates.length} migration
+            {orphanCandidates.length === 1 ? " is" : "s are"} marked pending
+            but the schema already includes their tables — typical of a DB
+            populated via <code>scripts/apply-schema.mjs</code> or drizzle-kit
+            before the runtime ledger existed. Re-running them is risky for
+            any file with non-idempotent UPDATE statements (
+            <strong>0013</strong> would clobber rich-text formatting on
+            proposal sections). Sync the ledger first, then apply just the
+            genuinely-new migration.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-300/80">
+                Mark applied through (inclusive)
+              </span>
+              <select
+                className="aur-input min-w-[280px]"
+                value={throughChoice}
+                onChange={(e) => setThroughChoice(e.target.value)}
+              >
+                {orphanCandidates.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-300/80">
+                Type <code className="rounded bg-white/5 px-1">{confirmExpected}</code> to confirm
+              </span>
+              <input
+                className="aur-input min-w-[160px]"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder={confirmExpected}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={syncLedger}
+              disabled={
+                syncing ||
+                !throughChoice ||
+                confirmText.trim().toUpperCase() !== confirmExpected
+              }
+              className="aur-btn aur-btn-primary text-[12px] disabled:opacity-50"
+            >
+              {syncing ? "Syncing…" : "Sync ledger"}
+            </button>
+          </div>
+          {lastSync ? (
+            <div
+              className={`mt-3 rounded-md border px-3 py-2 font-mono text-[11px] ${
+                lastSync.ok
+                  ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
+                  : "border-rose/40 bg-rose/10 text-rose"
+              }`}
+            >
+              {lastSync.ok ? (
+                <>
+                  Marked {lastSync.markedFilenames.length} as applied.
+                  {lastSync.alreadyPresentFilenames.length > 0 ? (
+                    <span className="ml-2 text-muted">
+                      · {lastSync.alreadyPresentFilenames.length} were already
+                      in the ledger.
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <strong>Failed:</strong> {lastSync.error}
+                </>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-3">
         <button
           type="button"
