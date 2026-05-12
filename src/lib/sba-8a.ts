@@ -2,11 +2,11 @@
  * SBA 8(a) participant registry — fetch + normalize.
  *
  * Source: SAM.gov Entity Management API
- *   GET https://api.sam.gov/entity-information/v3/entities
+ *   GET https://api.sam.gov/entity-information/v4/entities
  *       ?api_key=<SAMGOV_API_KEY>
  *       &sbaBusinessTypeCode=A6        <-- 8(a) Program Participant
  *       &samRegistered=Yes
- *       &page=<n>&size=100
+ *       &page=<n>&size=10
  *
  * The SAM Entity API exposes each registered entity's socioeconomic
  * "sbaBusinessTypeList", where each entry has:
@@ -25,13 +25,27 @@
  *
  * The API requires a free SAM.gov API key set in `SAMGOV_API_KEY`
  * (same env var used by src/lib/samgov.ts for entity registration
- * lookups — single key, two consumers). Rate limit on the free tier
- * is ~1000 requests/day, which more than covers the few hundred pages
- * of 8(a) firms (~10K participants at 100/page).
+ * lookups — single key, two consumers).
+ *
+ * Tier limits on the public/free key:
+ *   - 10 records per page (size capped at 10, larger requests 400)
+ *   - 1000 requests/day
+ *
+ * At 10 records/page, the full 8(a) registry (~10K firms) takes ~1000
+ * page calls — exactly the daily ceiling. The admin import UI batches
+ * 20-30 pages per click to stay under the Vercel serverless timeout
+ * while making meaningful progress per click. System-account keys
+ * (which require an SAM application) lift size to 100 if higher
+ * throughput becomes necessary.
  */
 
-const SAM_BASE = "https://api.sam.gov/entity-information/v3/entities";
-const PAGE_SIZE = 100;
+const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
+/**
+ * Max records per page. Public/free SAM.gov tier caps this at 10
+ * (returns HTTP 400 with errorCode SCE for anything larger). System-
+ * account tier allows 100. We stick to 10 for the free-tier default.
+ */
+const PAGE_SIZE = 10;
 /** SBA business-type code for "8(a) Program Participant". */
 const CODE_8A = "A6";
 

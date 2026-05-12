@@ -44,7 +44,11 @@ export async function pullSba8aFromSamAction(params: {
     };
   }
   const startPage = Math.max(1, Math.floor(params.startPage || 1));
-  const pages = Math.min(20, Math.max(1, Math.floor(params.pages || 5)));
+  // Server-side clamp. 50 pages × 10 records ≈ 500 firms per click,
+  // ~15-25 sec under typical SAM.gov latency — comfortably under the
+  // Vercel serverless 60s timeout while making real progress on the
+  // ~10K-firm registry.
+  const pages = Math.min(50, Math.max(1, Math.floor(params.pages || 25)));
 
   const [runRow] = await db
     .insert(sba8aImportRuns)
