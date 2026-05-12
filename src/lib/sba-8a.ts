@@ -113,6 +113,11 @@ export function normalizeFirmName(name: string): string {
  * Pull one page of 8(a) participants from SAM.gov. Returns the parsed
  * rows and the total record count (for pagination). On non-200 the
  * upstream error body is included in the returned `error`.
+ *
+ * Pagination convention: callers pass 1-based page numbers ("page 1
+ * = first page") for operator-friendliness in the admin UI. SAM.gov
+ * is internally 0-based, so we subtract one when building the URL.
+ * Caller-facing nextPage values stay 1-based.
  */
 export async function fetchSba8aPage(
   apiKey: string,
@@ -121,12 +126,20 @@ export async function fetchSba8aPage(
   if (!apiKey.trim()) {
     return { ok: false, error: "SAMGOV_API_KEY not set." };
   }
+  // SAM.gov is 0-based; admin UI is 1-based. Convert here so the rest
+  // of the system can think in plain "page 1 / 2 / 3" terms.
+  const samPage = Math.max(0, page - 1);
   const url =
     `${SAM_BASE}?api_key=${encodeURIComponent(apiKey)}` +
     `&sbaBusinessTypeCode=${CODE_8A}` +
     `&samRegistered=Yes` +
+    // registrationStatus=A filters to currently-Active SAM
+    // registrations. The Entity API silently returns empty entityData
+    // for filtered-out totals if this is missing — matches the
+    // behaviour of src/lib/samgov.ts entity searches.
+    `&registrationStatus=A` +
     `&size=${PAGE_SIZE}` +
-    `&page=${page}`;
+    `&page=${samPage}`;
   let res: Response;
   try {
     res = await fetch(url, {
