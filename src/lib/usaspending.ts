@@ -22,6 +22,12 @@ const BASE = "https://api.usaspending.gov/api/v2";
 export type UsaspendingAward = {
   awardId: string;
   recipientName: string;
+  /**
+   * Recipient SAM UEI when USAspending exposes it for this award.
+   * Empty string when missing (older awards predate UEI rollout). Used
+   * as the primary join key against `sba_8a_participant`.
+   */
+  recipientUei: string;
   /** Total obligated amount in USD. */
   amount: number;
   awardingAgency: string;
@@ -52,6 +58,7 @@ const FIELDS = [
   "Award ID",
   "generated_internal_id",
   "Recipient Name",
+  "Recipient UEI",
   "Award Amount",
   "Awarding Agency",
   "Awarding Sub Agency",
@@ -193,6 +200,9 @@ function normalize(raw: Record<string, unknown>): UsaspendingAward | null {
   return {
     awardId,
     recipientName: pick(raw, "Recipient Name"),
+    recipientUei: (
+      pick(raw, "Recipient UEI") || pick(raw, "recipient_uei")
+    ).toUpperCase(),
     amount: numericPick(raw, "Award Amount"),
     awardingAgency: pick(raw, "Awarding Agency"),
     awardingSubAgency: pick(raw, "Awarding Sub Agency"),
