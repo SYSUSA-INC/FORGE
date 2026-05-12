@@ -1,0 +1,328 @@
+"use server";
+
+import { desc, eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { db } from "@/db";
+import { sba8aImportRuns, sba8aParticipants } from "@/db/schema";
+import { requireSuperadmin } from "@/lib/auth-helpers";
+import {
+  fetchSba8aPage,
+  normalizeCsvRow,
+  type Sba8aRow,
+} from "@/lib/sba-8a";
+import { log } from "@/lib/log";
+
+/**
+ * Pull a batch of pages from SAM.gov into `sba_8a_participant`.
+ *
+ * Serverless timeouts cap how much we can do per click — instead of
+ * a long-running cron we let the operator click "Pull next batch"
+ * until they reach the end. Each call pulls up to `pages` pages
+ * sequentially, upserting rows by UEI.
+ */
+export async function pullSba8aFromSamAction(params: {
+  startPage: number;
+  pages: number;
+}): Promise<
+  | {
+      ok: true;
+      pagesPulled: number;
+      rowsSeen: number;
+      rowsUpserted: number;
+      nextPage: number | null;
+      totalRecords: number;
+    }
+  | { ok: false; error: string }
+> {
+  await requireSuperadmin();
+  const apiKey = (process.env.SAM_GOV_API_KEY || "").trim();
+  if (!apiKey) {
+    return {
+      ok: false,
+      error:
+        "SAM_GOV_API_KEY is not set. Provision a free SAM.gov API key and add it to the environment.",
+    };
+  }
+  const startPage = Math.max(1, Math.floor(params.startPage || 1));
+  const pages = Math.min(20, Math.max(1, Math.floor(params.pages || 5)));
+
+  const [runRow] = await db
+    .insert(sba8aImportRuns)
+    .values({ source: "sam.gov", status: "running" })
+    .returning({ id: sba8aImportRuns.id });
+  const runId = runRow.id;
+
+  let rowsSeen = 0;
+  let rowsUpserted = 0;
+  let totalRecords = 0;
+  let nextPage: number | null = null;
+
+  try {
+    for (let i = 0; i < pages; i++) {
+      const page = startPage + i;
+      const res = await fetchSba8aPage(apiKey, page);
+      if (!res.ok) {
+        throw new Error(res.error);
+      }
+      totalRecords = res.totalRecords;
+      rowsSeen += res.rows.length;
+      for (const r of res.rows) {
+        await upsertParticipant(r);
+        rowsUpserted += 1;
+      }
+      // If we got fewer than a page's worth, we've reached the end.
+      if (res.rows.length === 0) {
+        nextPage = null;
+        break;
+      }
+      const totalPages = Math.max(
+        1,
+        Math.ceil(totalRecords / Math.max(1, res.rows.length)),
+      );
+      if (page >= totalPages) {
+        nextPage = null;
+        break;
+      }
+      nextPage = page + 1;
+    }
+    await db
+      .update(sba8aImportRuns)
+      .set({
+        status: "ok",
+        finishedAt: new Date(),
+        rowsSeen,
+        rowsUpserted,
+      })
+      .where(eq(sba8aImportRuns.id, runId));
+    revalidatePath("/admin/sba-8a");
+    revalidatePath("/intelligence/firms");
+    return {
+      ok: true,
+      pagesPulled: Math.min(pages, nextPage ? nextPage - startPage : pages),
+      rowsSeen,
+      rowsUpserted,
+      nextPage,
+      totalRecords,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[sba-8a-import]", "SAM.gov pull failed", { error: message });
+    await db
+      .update(sba8aImportRuns)
+      .set({
+        status: "failed",
+        finishedAt: new Date(),
+        rowsSeen,
+        rowsUpserted,
+        error: message.slice(0, 1000),
+      })
+      .where(eq(sba8aImportRuns.id, runId));
+    return { ok: false, error: message };
+  }
+}
+
+export async function importSba8aCsvAction(
+  csv: string,
+): Promise<
+  | { ok: true; rowsSeen: number; rowsUpserted: number; skipped: number }
+  | { ok: false; error: string }
+> {
+  await requireSuperadmin();
+  if (!csv.trim()) return { ok: false, error: "Paste CSV content to import." };
+
+  const [runRow] = await db
+    .insert(sba8aImportRuns)
+    .values({ source: "manual_csv", status: "running" })
+    .returning({ id: sba8aImportRuns.id });
+  const runId = runRow.id;
+
+  let rowsSeen = 0;
+  let rowsUpserted = 0;
+  let skipped = 0;
+  try {
+    const parsed = parseCsv(csv);
+    rowsSeen = parsed.length;
+    for (const obj of parsed) {
+      const row = normalizeCsvRow(obj);
+      if (!row) {
+        skipped += 1;
+        continue;
+      }
+      await upsertParticipant(row);
+      rowsUpserted += 1;
+    }
+    await db
+      .update(sba8aImportRuns)
+      .set({
+        status: "ok",
+        finishedAt: new Date(),
+        rowsSeen,
+        rowsUpserted,
+      })
+      .where(eq(sba8aImportRuns.id, runId));
+    revalidatePath("/admin/sba-8a");
+    revalidatePath("/intelligence/firms");
+    return { ok: true, rowsSeen, rowsUpserted, skipped };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[sba-8a-import]", "CSV import failed", { error: message });
+    await db
+      .update(sba8aImportRuns)
+      .set({
+        status: "failed",
+        finishedAt: new Date(),
+        rowsSeen,
+        rowsUpserted,
+        error: message.slice(0, 1000),
+      })
+      .where(eq(sba8aImportRuns.id, runId));
+    return { ok: false, error: message };
+  }
+}
+
+export type ImportRunSummary = {
+  id: string;
+  startedAt: string;
+  finishedAt: string | null;
+  status: string;
+  source: string;
+  rowsSeen: number;
+  rowsUpserted: number;
+  error: string;
+};
+
+export async function listRecentImportRuns(): Promise<ImportRunSummary[]> {
+  await requireSuperadmin();
+  const rows = await db
+    .select()
+    .from(sba8aImportRuns)
+    .orderBy(desc(sba8aImportRuns.startedAt))
+    .limit(10);
+  return rows.map((r) => ({
+    id: r.id,
+    startedAt: r.startedAt.toISOString(),
+    finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
+    status: r.status,
+    source: r.source,
+    rowsSeen: r.rowsSeen,
+    rowsUpserted: r.rowsUpserted,
+    error: r.error,
+  }));
+}
+
+export async function getParticipantStats(): Promise<{
+  total: number;
+  active: number;
+  graduated: number;
+  terminated: number;
+}> {
+  await requireSuperadmin();
+  const [stats] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      active: sql<number>`sum(case when status='active' then 1 else 0 end)::int`,
+      graduated: sql<number>`sum(case when status='graduated' then 1 else 0 end)::int`,
+      terminated: sql<number>`sum(case when status='terminated' then 1 else 0 end)::int`,
+    })
+    .from(sba8aParticipants);
+  return {
+    total: stats?.total ?? 0,
+    active: stats?.active ?? 0,
+    graduated: stats?.graduated ?? 0,
+    terminated: stats?.terminated ?? 0,
+  };
+}
+
+// ── helpers ──────────────────────────────────────────────────────────
+
+async function upsertParticipant(row: Sba8aRow): Promise<void> {
+  await db
+    .insert(sba8aParticipants)
+    .values({
+      uei: row.uei,
+      firmName: row.firmName,
+      firmNameNorm: row.firmNameNorm,
+      certEntryDate: row.certEntryDate,
+      certExitDate: row.certExitDate,
+      status: row.status,
+      naicsPrimary: row.naicsPrimary,
+      city: row.city,
+      state: row.state,
+      source: row.source,
+      sourceUpdatedAt: row.sourceUpdatedAt,
+    })
+    .onConflictDoUpdate({
+      target: sba8aParticipants.uei,
+      set: {
+        firmName: row.firmName,
+        firmNameNorm: row.firmNameNorm,
+        certEntryDate: row.certEntryDate,
+        certExitDate: row.certExitDate,
+        status: row.status,
+        naicsPrimary: row.naicsPrimary,
+        city: row.city,
+        state: row.state,
+        source: row.source,
+        sourceUpdatedAt: row.sourceUpdatedAt,
+      },
+    });
+}
+
+/**
+ * Tiny RFC-4180-ish CSV parser. Splits on commas, honors double-quoted
+ * fields with embedded commas/newlines, ignores blank lines. Trims the
+ * header row only — data cells preserve internal whitespace.
+ */
+function parseCsv(text: string): Record<string, string>[] {
+  const rows: string[][] = [];
+  let cur: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cell += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      continue;
+    }
+    if (ch === ",") {
+      cur.push(cell);
+      cell = "";
+      continue;
+    }
+    if (ch === "\r") continue;
+    if (ch === "\n") {
+      cur.push(cell);
+      cell = "";
+      if (cur.some((c) => c.length > 0)) rows.push(cur);
+      cur = [];
+      continue;
+    }
+    cell += ch;
+  }
+  if (cell.length > 0 || cur.length > 0) {
+    cur.push(cell);
+    if (cur.some((c) => c.length > 0)) rows.push(cur);
+  }
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => h.trim());
+  return rows.slice(1).map((cells) => {
+    const out: Record<string, string> = {};
+    for (let i = 0; i < headers.length; i++) {
+      out[headers[i]] = cells[i] ?? "";
+    }
+    return out;
+  });
+}

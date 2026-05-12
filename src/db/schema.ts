@@ -1791,6 +1791,134 @@ export type NewSolicitationQuestionSet =
 // Tenant-scoped audit log (BL-12)
 // ────────────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────────────
+// BD INTELLIGENCE SUITE (BL-25)
+//
+// Reference data + per-tenant capture artefacts that hang off the
+// /intelligence routes. The 8(a) registry is global because it
+// describes external firms (not user data); watchlists and saved
+// searches are tenant-scoped.
+// ────────────────────────────────────────────────────────────────────
+
+export const sba8aParticipants = pgTable(
+  "sba_8a_participant",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    uei: text("uei").notNull().unique(),
+    firmName: text("firm_name").notNull(),
+    firmNameNorm: text("firm_name_norm").notNull().default(""),
+    certEntryDate: timestamp("cert_entry_date", { mode: "date" }),
+    certExitDate: timestamp("cert_exit_date", { mode: "date" }),
+    status: text("status").notNull().default("unknown"),
+    naicsPrimary: text("naics_primary").notNull().default(""),
+    city: text("city").notNull().default(""),
+    state: text("state").notNull().default(""),
+    source: text("source").notNull().default(""),
+    sourceUpdatedAt: timestamp("source_updated_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    nameNormIdx: index("sba_8a_participant_name_norm_idx").on(t.firmNameNorm),
+    exitDateIdx: index("sba_8a_participant_exit_date_idx").on(t.certExitDate),
+  }),
+);
+
+export type Sba8aParticipant = typeof sba8aParticipants.$inferSelect;
+
+export const sba8aImportRuns = pgTable(
+  "sba_8a_import_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    finishedAt: timestamp("finished_at"),
+    status: text("status").notNull().default("running"),
+    source: text("source").notNull().default(""),
+    rowsSeen: integer("rows_seen").notNull().default(0),
+    rowsUpserted: integer("rows_upserted").notNull().default(0),
+    error: text("error").notNull().default(""),
+  },
+  (t) => ({
+    startedIdx: index("sba_8a_import_run_started_idx").on(t.startedAt),
+  }),
+);
+
+export type Sba8aImportRun = typeof sba8aImportRuns.$inferSelect;
+
+export const bdWatchlistItems = pgTable(
+  "bd_watchlist_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** 'award' | 'firm' */
+    kind: text("kind").notNull(),
+    /** USAspending generated_internal_id for awards; UEI for firms. */
+    externalId: text("external_id").notNull(),
+    label: text("label").notNull().default(""),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgKindExtIdx: uniqueIndex("bd_watchlist_item_org_kind_ext_idx").on(
+      t.organizationId,
+      t.kind,
+      t.externalId,
+    ),
+    orgKindCreatedIdx: index("bd_watchlist_item_org_kind_created_idx").on(
+      t.organizationId,
+      t.kind,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type BdWatchlistItem = typeof bdWatchlistItems.$inferSelect;
+
+export const bdSavedSearches = pgTable(
+  "bd_saved_search",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    /** 'awards' | 'firms' */
+    kind: text("kind").notNull(),
+    criteria: jsonb("criteria")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    shared: boolean("shared").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastRunAt: timestamp("last_run_at"),
+  },
+  (t) => ({
+    orgOwnerIdx: index("bd_saved_search_org_owner_idx").on(
+      t.organizationId,
+      t.createdBy,
+      t.createdAt,
+    ),
+    orgSharedIdx: index("bd_saved_search_org_shared_idx").on(
+      t.organizationId,
+      t.shared,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type BdSavedSearch = typeof bdSavedSearches.$inferSelect;
+
 export const auditLogs = pgTable(
   "audit_log",
   {
