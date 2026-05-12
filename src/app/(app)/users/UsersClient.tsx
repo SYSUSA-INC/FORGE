@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { Role, MembershipStatus } from "@/db/schema";
+import type { MembersSummary } from "@/lib/settings-status";
 import {
   changeMemberRoleAction,
   inviteUserAction,
@@ -35,13 +36,44 @@ export type PendingInvite = {
 };
 
 const ROLES: { value: Role; label: string; description: string }[] = [
-  { value: "admin", label: "Admin", description: "Full access, manages users" },
-  { value: "capture", label: "Capture", description: "Qualifies opportunities" },
-  { value: "proposal", label: "Proposal", description: "Runs proposal response" },
-  { value: "author", label: "Author", description: "Writes sections" },
-  { value: "reviewer", label: "Reviewer", description: "Reviews drafts" },
-  { value: "pricing", label: "Pricing", description: "Owns cost volume" },
-  { value: "viewer", label: "Viewer", description: "Read-only access" },
+  {
+    value: "admin",
+    label: "Admin",
+    description:
+      "Full org control — invite/disable users, edit org profile, manage settings.",
+  },
+  {
+    value: "capture",
+    label: "Capture",
+    description:
+      "Owns opportunity capture, evaluation, and bid/no-bid decisions.",
+  },
+  {
+    value: "proposal",
+    label: "Proposal",
+    description:
+      "Owns proposal lifecycle, sections, color-team reviews, output.",
+  },
+  {
+    value: "author",
+    label: "Author",
+    description: "Drafts proposal sections; can edit assigned content.",
+  },
+  {
+    value: "reviewer",
+    label: "Reviewer",
+    description: "Reviews assigned proposals; leaves comments and verdicts.",
+  },
+  {
+    value: "pricing",
+    label: "Pricing",
+    description: "Owns pricing volumes (Phase 8 deferred — placeholder role today).",
+  },
+  {
+    value: "viewer",
+    label: "Viewer",
+    description: "Read-only access to opportunities, proposals, and knowledge base.",
+  },
 ];
 
 function roleLabel(r: Role): string {
@@ -50,10 +82,12 @@ function roleLabel(r: Role): string {
 
 export function UsersClient({
   currentUserId,
+  summary,
   members,
   pendingInvites,
 }: {
   currentUserId: string;
+  summary: MembersSummary;
   members: Member[];
   pendingInvites: PendingInvite[];
 }) {
@@ -64,6 +98,10 @@ export function UsersClient({
         title="Team access"
         subtitle="Invite teammates, assign roles, and manage access for your organization."
       />
+
+      <div className="mb-4">
+        <RolesOverviewPanel summary={summary} />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <InvitePanel className="xl:col-span-1" />
@@ -77,6 +115,62 @@ export function UsersClient({
         <MembersPanel members={members} currentUserId={currentUserId} />
       </div>
     </>
+  );
+}
+
+function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
+  return (
+    <Panel
+      title="Team & roles"
+      eyebrow={`${summary.total} active member${summary.total === 1 ? "" : "s"}`}
+    >
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {ROLES.map((r) => (
+          <div
+            key={r.value}
+            className="aur-card-elevated px-3 py-2"
+            title={r.description}
+          >
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
+              {r.label}
+            </div>
+            <div className="mt-1 font-display text-[20px] font-semibold text-foreground">
+              {String(summary.byRole[r.value] ?? 0).padStart(2, "0")}
+            </div>
+            <div className="mt-1 line-clamp-2 font-body text-[11px] leading-snug text-muted">
+              {r.description}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {summary.recent.length > 0 ? (
+        <div className="mt-4 border-t border-white/5 pt-4">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+            Recently joined
+          </div>
+          <ul className="space-y-1">
+            {summary.recent.map((m) => (
+              <li
+                key={m.userId}
+                className="flex items-center justify-between font-body text-[13px]"
+              >
+                <span>
+                  <span className="text-foreground">{m.name || m.email}</span>
+                  {m.name ? (
+                    <span className="ml-2 text-muted">{m.email}</span>
+                  ) : null}
+                </span>
+                <span className="font-mono text-[11px] text-muted">
+                  {roleLabel(m.role)} ·{" "}
+                  {new Date(m.joinedAt).toLocaleDateString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Panel>
   );
 }
 

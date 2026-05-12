@@ -20,21 +20,18 @@ import {
 import type {
   AIEngineStatus,
   IntegrationStatus,
-  MembersSummary,
 } from "@/lib/settings-status";
 import { AIEngineTab } from "./AIEngineTab";
 import { IntegrationsTab } from "./IntegrationsTab";
-import { UsersRolesTab } from "./UsersRolesTab";
 import {
   applySamGovSyncAction,
   saveOrgProfileAction,
 } from "./actions";
 
-type TabKey = "organization" | "users" | "integrations" | "ai";
+type TabKey = "organization" | "integrations" | "ai";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "organization", label: "Organization" },
-  { key: "users", label: "Users & Roles" },
   { key: "integrations", label: "Integrations" },
   { key: "ai", label: "AI Engine" },
 ];
@@ -49,13 +46,11 @@ function newId(prefix: string): string {
 export function SettingsClient({
   initialProfile,
   canEdit,
-  members,
   integrations,
   aiStatus,
 }: {
   initialProfile: OrgProfile;
   canEdit: boolean;
-  members: MembersSummary;
   integrations: IntegrationStatus[];
   aiStatus: AIEngineStatus;
 }) {
@@ -66,12 +61,18 @@ export function SettingsClient({
   // Deep-link support: nav items under Operations Management point at
   // `/settings?tab=integrations` (etc.) so each one highlights as a
   // distinct destination. Sync the local tab state to the URL.
+  // Legacy `?tab=users` redirects to the canonical /users page since
+  // user management was consolidated there.
   useEffect(() => {
     const t = searchParams?.get("tab");
-    if (t === "users" || t === "integrations" || t === "ai" || t === "organization") {
+    if (t === "users") {
+      router.replace("/users");
+      return;
+    }
+    if (t === "integrations" || t === "ai" || t === "organization") {
       setTab(t);
     }
-  }, [searchParams]);
+  }, [router, searchParams]);
   const [draft, setDraft] = useState<OrgProfile>(initialProfile);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -176,7 +177,6 @@ export function SettingsClient({
           errors={errors}
         />
       )}
-      {tab === "users" && <UsersRolesTab members={members} />}
       {tab === "integrations" && (
         <IntegrationsTab integrations={integrations} />
       )}
