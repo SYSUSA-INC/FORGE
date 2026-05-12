@@ -38,9 +38,15 @@ export function Sba8aAdminClient({
   const [csvResult, setCsvResult] = useState<string | null>(null);
   const [csvBusy, startCsv] = useTransition();
 
+  const [debug, setDebug] = useState<{
+    sample: string;
+    keys: string[];
+  } | null>(null);
+
   function pullFromSam() {
     setSamError(null);
     setSamResult(null);
+    setDebug(null);
     startSam(async () => {
       const res = await pullSba8aFromSamAction({ startPage, pages });
       if (!res.ok) {
@@ -53,6 +59,12 @@ export function Sba8aAdminClient({
             ? `Continue from page ${res.nextPage}.`
             : `Reached the end of the dataset (${res.totalRecords} records).`),
       );
+      if (res.debugSample) {
+        setDebug({
+          sample: res.debugSample,
+          keys: res.debugTopLevelKeys ?? [],
+        });
+      }
       if (res.nextPage) setStartPage(res.nextPage);
       // Optimistic stat bump — the next page refresh will reconcile.
       setStats((s) => ({ ...s, total: s.total + res.rowsUpserted }));
@@ -151,6 +163,21 @@ export function Sba8aAdminClient({
         {samResult ? (
           <div className="mt-3 rounded border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-200">
             {samResult}
+          </div>
+        ) : null}
+        {debug ? (
+          <div className="mt-3 rounded border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2 font-mono text-[10px] text-amber-100">
+            <div className="mb-2 font-display text-[12px] font-semibold text-amber-200">
+              Diagnostic: zero rows but SAM accepted the request
+            </div>
+            <div className="mb-1">
+              Top-level keys returned:{" "}
+              <code>{debug.keys.length ? debug.keys.join(", ") : "(none)"}</code>
+            </div>
+            <div className="mb-1">Raw response sample (first 1 KB):</div>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-black/30 p-2 text-amber-50">
+              {debug.sample}
+            </pre>
           </div>
         ) : null}
       </Panel>
