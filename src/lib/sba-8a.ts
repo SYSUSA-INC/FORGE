@@ -3,7 +3,7 @@
  *
  * Source: SAM.gov Entity Management API
  *   GET https://api.sam.gov/entity-information/v3/entities
- *       ?api_key=<SAM_GOV_API_KEY>
+ *       ?api_key=<SAMGOV_API_KEY>
  *       &sbaBusinessTypeCode=A6        <-- 8(a) Program Participant
  *       &samRegistered=Yes
  *       &page=<n>&size=100
@@ -23,10 +23,11 @@
  * any active sense, so missing them is a fine trade-off. Operators can
  * always backfill via the manual-CSV path for historical analysis.
  *
- * The API requires a free SAM.gov API key set in `SAM_GOV_API_KEY`.
- * Rate limit on the free tier is ~1000 requests/day, which more than
- * covers the few hundred pages of 8(a) firms (~10K participants at
- * 100/page).
+ * The API requires a free SAM.gov API key set in `SAMGOV_API_KEY`
+ * (same env var used by src/lib/samgov.ts for entity registration
+ * lookups — single key, two consumers). Rate limit on the free tier
+ * is ~1000 requests/day, which more than covers the few hundred pages
+ * of 8(a) firms (~10K participants at 100/page).
  */
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v3/entities";
@@ -104,7 +105,7 @@ export async function fetchSba8aPage(
   page: number,
 ): Promise<Sba8aFetchResult> {
   if (!apiKey.trim()) {
-    return { ok: false, error: "SAM_GOV_API_KEY not set." };
+    return { ok: false, error: "SAMGOV_API_KEY not set." };
   }
   const url =
     `${SAM_BASE}?api_key=${encodeURIComponent(apiKey)}` +

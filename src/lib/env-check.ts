@@ -60,8 +60,8 @@ const OPTIONAL: EnvSpec[] = [
     purpose: "Cloudflare R2 — render storage (falls back to in-memory)",
   },
   {
-    name: "SAM_GOV_API_KEY",
-    purpose: "SAM.gov — entity registration lookups",
+    name: "SAMGOV_API_KEY",
+    purpose: "SAM.gov — entity registration lookups + 8(a) registry import",
   },
   {
     name: "USASPENDING_API_KEY",
