@@ -1,0 +1,4 @@
+{
+  "src/app/(app)/opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction": "Public token-scoped review link. No auth by design — the unguessable token IS the credential. The query keys exclusively on opportunityReviewRequests.token, so cross-tenant access requires forging a token, which it can't (random uuid).",
+  "src/app/(app)/opportunities/[id]/review/actions.ts:submitOpportunityReviewAction": "Same token-scoped pattern as getReviewRequestByTokenAction. The token both authenticates and scopes the operation."
+}

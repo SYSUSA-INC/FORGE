@@ -71,24 +71,6 @@ export async function listTemplatesAction(): Promise<TemplateRow[]> {
   }));
 }
 
-export async function getDefaultTemplate(organizationId: string) {
-  const [row] = await db
-    .select({
-      id: proposalTemplates.id,
-      sectionSeed: proposalTemplates.sectionSeed,
-    })
-    .from(proposalTemplates)
-    .where(
-      and(
-        eq(proposalTemplates.organizationId, organizationId),
-        eq(proposalTemplates.isDefault, true),
-        isNull(proposalTemplates.archivedAt),
-      ),
-    )
-    .limit(1);
-  return row ?? null;
-}
-
 export async function getTemplateForEditAction(id: string) {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
