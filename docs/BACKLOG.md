@@ -570,26 +570,32 @@ tenant; filtering works; small (~5 min latency) is fine.
 ## Cross-cutting / foundation
 
 ### BL-19 — Multi-tenant isolation continuous verification
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** —
 
-PR-1 closed every cross-tenant UPDATE/DELETE leak found in the
-audit. To prevent regression, ship an automated test suite that
-verifies isolation:
+**Phase 1: static analyzer ✅ SHIPPED**
 
-**Scope:**
+`scripts/check-isolation.mjs` runs in CI on every PR. It derives the
+set of tenant-scoped tables from the migrations (anything with an
+`organization_id` column), then walks every "use server" file and
+asserts each exported async function that touches a scoped table:
+
+- calls an auth gate (`requireAuth` / `requireCurrentOrg` /
+  `requireOrgAdmin` / `requireOrgMember` / `requireSuperadmin`)
+- references `organizationId` inside the function (the query must
+  scope by org)
+
+Legitimate exceptions (public token-scoped surfaces, etc.) live in
+`.isolation-allow.json` with a one-line documented reason. The first
+run flushed out one real isolation bug (`getDefaultTemplate` took
+`organizationId` as a parameter in a "use server" file, exposing it
+as a client-callable endpoint) which was fixed in the same PR by
+moving the helper into `src/lib/`.
+
+**Phase 2 (deferred) — runtime tests:**
 - Test harness: provisions 2 tenants with seed data
-- For every table that has `organization_id`, asserts:
-  - Tenant A cannot SELECT tenant B's rows via any server action
-  - Tenant A cannot UPDATE tenant B's rows
-  - Tenant A cannot DELETE tenant B's rows
-  - Tenant A cannot reference tenant B's foreign keys (e.g. assign a
-    proposal to an opportunity in another tenant)
-- Run on every PR via CI gate
-- Snapshot of acceptable cross-tenant interactions (none today; if
-  any added later they must be explicitly allow-listed)
-
-**Acceptance:** CI fails if any new server action lacks the
-isolation assertion; existing pass.
+- For every scoped table, runtime assertions that a tenant-A user
+  invoking any server action cannot read/update/delete tenant-B rows,
+  including via foreign key references
+- Belongs in a follow-up after a test framework lands
 
 ---
 

@@ -81,6 +81,26 @@ jobs:
           node-version: "20"
       - run: node scripts/check-rsc-boundaries.mjs
 
+  isolation:
+    name: Multi-tenant isolation check
+    runs-on: ubuntu-latest
+    # BL-19: static analyzer that asserts every server action touching
+    # a tenant-scoped table (table with an `organization_id` column)
+    # also includes an auth gate (requireAuth / requireCurrentOrg /
+    # requireOrgAdmin / requireSuperadmin) AND references
+    # `organizationId` in the query. Legitimate exceptions (token-
+    # scoped public surfaces, etc.) live in .isolation-allow.json with
+    # a documented reason.
+    #
+    # Static so it can run without a DB. Pairs with future runtime
+    # tests that exercise actual cross-tenant query attempts.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/check-isolation.mjs
+
   migrations-fresh:
     name: Fresh-DB migration verification
     runs-on: ubuntu-latest

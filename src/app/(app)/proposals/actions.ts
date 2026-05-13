@@ -24,7 +24,7 @@ import {
   projectToPlain,
   validateDoc,
 } from "@/lib/tiptap-doc";
-import { getDefaultTemplate } from "@/app/(app)/settings/templates/actions";
+import { getDefaultTemplate } from "@/lib/template-defaults";
 import { log } from "@/lib/log";
 
 async function ownsProposal(id: string, organizationId: string) {
