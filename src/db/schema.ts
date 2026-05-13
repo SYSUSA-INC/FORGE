@@ -1800,11 +1800,34 @@ export type NewSolicitationQuestionSet =
 // searches are tenant-scoped.
 // ────────────────────────────────────────────────────────────────────
 
-export const sba8aParticipants = pgTable(
-  "sba_8a_participant",
+/**
+ * Socioeconomic cert codes supported by the registry. SAM.gov's
+ * `sbaBusinessTypeCode` values are mapped to these short keys for
+ * filtering/display. Add new codes here when expanding coverage.
+ */
+export const CERT_TYPES = [
+  "8a",
+  "hubzone",
+  "wosb",
+  "edwosb",
+  "sdvosb",
+  "vob",
+  "native_american",
+] as const;
+export type CertType = (typeof CERT_TYPES)[number];
+
+export const certFirms = pgTable(
+  "cert_firm",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    uei: text("uei").notNull().unique(),
+    /**
+     * SAM UEI. NOT globally unique — a single firm can hold multiple
+     * certs (8(a) + HUBZone + WOSB, for example). Uniqueness is
+     * enforced on (uei, cert_type) via `ueiCertTypeIdx`.
+     */
+    uei: text("uei").notNull(),
+    /** '8a' | 'hubzone' | 'wosb' | 'edwosb' | 'sdvosb' | 'vob' | 'native_american' */
+    certType: text("cert_type").notNull().default("8a"),
     firmName: text("firm_name").notNull(),
     firmNameNorm: text("firm_name_norm").notNull().default(""),
     certEntryDate: timestamp("cert_entry_date", { mode: "date" }),
@@ -1818,31 +1841,37 @@ export const sba8aParticipants = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
-    nameNormIdx: index("sba_8a_participant_name_norm_idx").on(t.firmNameNorm),
-    exitDateIdx: index("sba_8a_participant_exit_date_idx").on(t.certExitDate),
+    ueiCertTypeIdx: uniqueIndex("cert_firm_uei_cert_type_idx").on(
+      t.uei,
+      t.certType,
+    ),
+    nameNormIdx: index("cert_firm_name_norm_idx").on(t.firmNameNorm),
+    exitDateIdx: index("cert_firm_exit_date_idx").on(t.certExitDate),
   }),
 );
 
-export type Sba8aParticipant = typeof sba8aParticipants.$inferSelect;
+export type CertFirm = typeof certFirms.$inferSelect;
 
-export const sba8aImportRuns = pgTable(
-  "sba_8a_import_run",
+export const certImportRuns = pgTable(
+  "cert_import_run",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     startedAt: timestamp("started_at").notNull().defaultNow(),
     finishedAt: timestamp("finished_at"),
     status: text("status").notNull().default("running"),
+    /** Which cert type the pull targeted ('8a', 'hubzone', ...). */
+    certType: text("cert_type").notNull().default("8a"),
     source: text("source").notNull().default(""),
     rowsSeen: integer("rows_seen").notNull().default(0),
     rowsUpserted: integer("rows_upserted").notNull().default(0),
     error: text("error").notNull().default(""),
   },
   (t) => ({
-    startedIdx: index("sba_8a_import_run_started_idx").on(t.startedAt),
+    startedIdx: index("cert_import_run_started_idx").on(t.startedAt),
   }),
 );
 
-export type Sba8aImportRun = typeof sba8aImportRuns.$inferSelect;
+export type CertImportRun = typeof certImportRuns.$inferSelect;
 
 export const bdWatchlistItems = pgTable(
   "bd_watchlist_item",

@@ -53,6 +53,15 @@ export type Sba8aRow = {
   uei: string;
   firmName: string;
   firmNameNorm: string;
+  /**
+   * Cert type this row belongs to ('8a' | 'hubzone' | 'wosb' | etc.).
+   * Today this function only emits '8a' rows since the SAM filter is
+   * hardcoded to A6; PR B will parameterise the filter and start
+   * emitting other cert types. The field lives on the row now so
+   * downstream upsert code can target the composite (uei, cert_type)
+   * unique without further plumbing changes.
+   */
+  certType: string;
   certEntryDate: Date | null;
   certExitDate: Date | null;
   /** 'active' | 'graduated' | 'terminated' | 'unknown' */
@@ -387,6 +396,7 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
     uei,
     firmName,
     firmNameNorm: normalizeFirmName(firmName),
+    certType: "8a",
     certEntryDate,
     certExitDate,
     status,
@@ -442,6 +452,7 @@ export function normalizeCsvRow(raw: Record<string, string>): Sba8aRow | null {
     uei,
     firmName,
     firmNameNorm: normalizeFirmName(firmName),
+    certType: "8a",
     certEntryDate,
     certExitDate,
     status,

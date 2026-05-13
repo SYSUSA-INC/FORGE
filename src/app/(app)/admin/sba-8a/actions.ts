@@ -3,7 +3,7 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { sba8aImportRuns, sba8aParticipants } from "@/db/schema";
+import { certImportRuns, certFirms } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import {
   fetchSba8aPage,
@@ -58,9 +58,9 @@ export async function pullSba8aFromSamAction(params: {
   const pages = Math.min(50, Math.max(1, Math.floor(params.pages || 25)));
 
   const [runRow] = await db
-    .insert(sba8aImportRuns)
+    .insert(certImportRuns)
     .values({ source: "sam.gov", status: "running" })
-    .returning({ id: sba8aImportRuns.id });
+    .returning({ id: certImportRuns.id });
   const runId = runRow.id;
 
   let rowsSeen = 0;
@@ -109,14 +109,14 @@ export async function pullSba8aFromSamAction(params: {
       nextPage = page + 1;
     }
     await db
-      .update(sba8aImportRuns)
+      .update(certImportRuns)
       .set({
         status: "ok",
         finishedAt: new Date(),
         rowsSeen,
         rowsUpserted,
       })
-      .where(eq(sba8aImportRuns.id, runId));
+      .where(eq(certImportRuns.id, runId));
     revalidatePath("/admin/sba-8a");
     revalidatePath("/intelligence/firms");
     return {
@@ -134,7 +134,7 @@ export async function pullSba8aFromSamAction(params: {
     const message = err instanceof Error ? err.message : String(err);
     log.error("[sba-8a-import]", "SAM.gov pull failed", { error: message });
     await db
-      .update(sba8aImportRuns)
+      .update(certImportRuns)
       .set({
         status: "failed",
         finishedAt: new Date(),
@@ -142,7 +142,7 @@ export async function pullSba8aFromSamAction(params: {
         rowsUpserted,
         error: message.slice(0, 1000),
       })
-      .where(eq(sba8aImportRuns.id, runId));
+      .where(eq(certImportRuns.id, runId));
     return { ok: false, error: message };
   }
 }
@@ -157,9 +157,9 @@ export async function importSba8aCsvAction(
   if (!csv.trim()) return { ok: false, error: "Paste CSV content to import." };
 
   const [runRow] = await db
-    .insert(sba8aImportRuns)
+    .insert(certImportRuns)
     .values({ source: "manual_csv", status: "running" })
-    .returning({ id: sba8aImportRuns.id });
+    .returning({ id: certImportRuns.id });
   const runId = runRow.id;
 
   let rowsSeen = 0;
@@ -178,14 +178,14 @@ export async function importSba8aCsvAction(
       rowsUpserted += 1;
     }
     await db
-      .update(sba8aImportRuns)
+      .update(certImportRuns)
       .set({
         status: "ok",
         finishedAt: new Date(),
         rowsSeen,
         rowsUpserted,
       })
-      .where(eq(sba8aImportRuns.id, runId));
+      .where(eq(certImportRuns.id, runId));
     revalidatePath("/admin/sba-8a");
     revalidatePath("/intelligence/firms");
     return { ok: true, rowsSeen, rowsUpserted, skipped };
@@ -193,7 +193,7 @@ export async function importSba8aCsvAction(
     const message = err instanceof Error ? err.message : String(err);
     log.error("[sba-8a-import]", "CSV import failed", { error: message });
     await db
-      .update(sba8aImportRuns)
+      .update(certImportRuns)
       .set({
         status: "failed",
         finishedAt: new Date(),
@@ -201,7 +201,7 @@ export async function importSba8aCsvAction(
         rowsUpserted,
         error: message.slice(0, 1000),
       })
-      .where(eq(sba8aImportRuns.id, runId));
+      .where(eq(certImportRuns.id, runId));
     return { ok: false, error: message };
   }
 }
@@ -221,8 +221,8 @@ export async function listRecentImportRuns(): Promise<ImportRunSummary[]> {
   await requireSuperadmin();
   const rows = await db
     .select()
-    .from(sba8aImportRuns)
-    .orderBy(desc(sba8aImportRuns.startedAt))
+    .from(certImportRuns)
+    .orderBy(desc(certImportRuns.startedAt))
     .limit(10);
   return rows.map((r) => ({
     id: r.id,
@@ -250,7 +250,7 @@ export async function getParticipantStats(): Promise<{
       graduated: sql<number>`sum(case when status='graduated' then 1 else 0 end)::int`,
       terminated: sql<number>`sum(case when status='terminated' then 1 else 0 end)::int`,
     })
-    .from(sba8aParticipants);
+    .from(certFirms);
   return {
     total: stats?.total ?? 0,
     active: stats?.active ?? 0,
@@ -263,9 +263,10 @@ export async function getParticipantStats(): Promise<{
 
 async function upsertParticipant(row: Sba8aRow): Promise<void> {
   await db
-    .insert(sba8aParticipants)
+    .insert(certFirms)
     .values({
       uei: row.uei,
+      certType: row.certType,
       firmName: row.firmName,
       firmNameNorm: row.firmNameNorm,
       certEntryDate: row.certEntryDate,
@@ -277,8 +278,10 @@ async function upsertParticipant(row: Sba8aRow): Promise<void> {
       source: row.source,
       sourceUpdatedAt: row.sourceUpdatedAt,
     })
+    // Composite unique on (uei, cert_type) — a firm with multiple
+    // certs gets one row per cert, each kept fresh independently.
     .onConflictDoUpdate({
-      target: sba8aParticipants.uei,
+      target: [certFirms.uei, certFirms.certType],
       set: {
         firmName: row.firmName,
         firmNameNorm: row.firmNameNorm,

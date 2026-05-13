@@ -2,7 +2,7 @@
 
 import { inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { sba8aParticipants } from "@/db/schema";
+import { certFirms } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import {
   buildSba8aChipIndex,
@@ -89,21 +89,22 @@ export async function lookupSba8aChipsAction(
     async () => {
       const rows = await db
         .select()
-        .from(sba8aParticipants)
+        .from(certFirms)
         .where(
           ueis.length && names.length
             ? or(
-                inArray(sba8aParticipants.uei, ueis),
-                inArray(sba8aParticipants.firmNameNorm, names),
+                inArray(certFirms.uei, ueis),
+                inArray(certFirms.firmNameNorm, names),
               )
             : ueis.length
-              ? inArray(sba8aParticipants.uei, ueis)
-              : inArray(sba8aParticipants.firmNameNorm, names),
+              ? inArray(certFirms.uei, ueis)
+              : inArray(certFirms.firmNameNorm, names),
         )
         .limit(1000);
 
       const catalogue = rows.map((r) => ({
         uei: r.uei,
+        certType: r.certType,
         firmName: r.firmName,
         firmNameNorm: r.firmNameNorm,
         certEntryDate: r.certEntryDate,
