@@ -32,12 +32,21 @@ export default async function Sba8aAdminPage() {
           </Link>
         }
         meta={[
-          { label: "Participants", value: stats.total.toString() },
-          { label: "Active", value: stats.active.toString() },
+          {
+            label: "Participants",
+            value: stats.total.toString(),
+            href: "/intelligence/firms?status=all",
+          },
+          {
+            label: "Active",
+            value: stats.active.toString(),
+            href: "/intelligence/firms?status=active",
+          },
           {
             label: "Graduated",
             value: stats.graduated.toString(),
             accent: stats.graduated > 0 ? "emerald" : undefined,
+            href: "/intelligence/firms?status=graduated",
           },
         ]}
       />

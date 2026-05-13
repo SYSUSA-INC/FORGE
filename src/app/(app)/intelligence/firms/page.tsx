@@ -10,7 +10,12 @@ export const dynamic = "force-dynamic";
 export default async function FirmsIntelPage({
   searchParams,
 }: {
-  searchParams: { savedSearch?: string };
+  searchParams: {
+    savedSearch?: string;
+    status?: string;
+    naics?: string;
+    state?: string;
+  };
 }) {
   await requireAuth();
   await requireCurrentOrg();
@@ -43,11 +48,25 @@ export default async function FirmsIntelPage({
     );
   }
 
-  // Hydrate initial criteria from a saved-search deep link if present.
+  // Hydrate initial criteria from either a saved-search deep link or
+  // direct query-string filters (used by the admin drill-through tiles).
+  // Saved-search criteria win when both are present so we don't half-
+  // merge two unrelated filter sets.
   let initial: Record<string, unknown> | null = null;
   if (searchParams.savedSearch) {
     const loaded = await loadSavedSearchAction(searchParams.savedSearch);
     if (loaded?.kind === "firms") initial = loaded.criteria;
+  } else {
+    const fromQuery: Record<string, unknown> = {};
+    const status = (searchParams.status || "").trim().toLowerCase();
+    if (["active", "graduated", "terminated", "unknown", "all"].includes(status)) {
+      fromQuery.status = status;
+    }
+    if (searchParams.naics) fromQuery.naicsPrefix = searchParams.naics.trim();
+    if (searchParams.state) {
+      fromQuery.state = searchParams.state.trim().toUpperCase().slice(0, 2);
+    }
+    if (Object.keys(fromQuery).length > 0) initial = fromQuery;
   }
 
   return (

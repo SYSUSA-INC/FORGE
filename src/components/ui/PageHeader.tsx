@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import Link from "next/link";
 
 export function PageHeader({
   eyebrow,
@@ -15,6 +16,8 @@ export function PageHeader({
     label: string;
     value: string;
     accent?: "ink" | "hazard" | "blood" | "signal" | "cobalt" | "plum" | "violet" | "emerald" | "gold" | "rose" | "magenta";
+    /** When set, the tile renders as a Link drilling through to this URL. */
+    href?: string;
   }[];
 }) {
   return (
@@ -57,6 +60,7 @@ function MetaTile({
   label,
   value,
   accent,
+  href,
 }: {
   label: string;
   value: string;
@@ -72,6 +76,7 @@ function MetaTile({
     | "gold"
     | "rose"
     | "magenta";
+  href?: string;
 }) {
   const tone =
     accent === "hazard" || accent === "gold"
@@ -95,14 +100,31 @@ function MetaTile({
           ? "shadow-glow"
           : "";
 
-  return (
-    <div className={`aur-card px-4 py-3 ${glow}`}>
+  const body = (
+    <>
       <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
         {label}
       </div>
       <div className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${tone}`}>
         {value}
       </div>
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`aur-card group block px-4 py-3 transition-colors hover:border-teal-400/40 hover:bg-white/[0.04] ${glow}`}
+        title={`View ${label.toLowerCase()}`}
+      >
+        {body}
+        <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-muted/60 transition-colors group-hover:text-teal-300">
+          View →
+        </div>
+      </Link>
+    );
+  }
+
+  return <div className={`aur-card px-4 py-3 ${glow}`}>{body}</div>;
 }
