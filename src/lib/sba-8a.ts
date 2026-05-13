@@ -79,8 +79,25 @@ export type Sba8aFetchResult =
       debugRawSample: string;
       /** Detected top-level keys in the JSON envelope, for diagnostics. */
       debugTopLevelKeys: string[];
+      /**
+       * Per-entity trace of normalizeSamEntity decisions on the first
+       * 3 entities. Only populated when rows is empty — lets us see
+       * exactly which gate rejected the entity vs. what the function
+       * read from each field.
+       */
+      debugNormalizeTrace: NormalizeTrace[];
     }
   | { ok: false; error: string };
+
+export type NormalizeTrace = {
+  index: number;
+  rawKeys: string[];
+  entityRegKeys: string[];
+  coreDataKeys: string[];
+  ueiSeen: string;
+  firmNameSeen: string;
+  reason: "ok" | "no-uei" | "no-firmname" | "not-object";
+};
 
 /**
  * Normalize a firm name into a stable match key. Uppercased, with
@@ -199,13 +216,70 @@ export async function fetchSba8aPage(
     data && typeof data === "object" && !Array.isArray(data)
       ? Object.keys(data as Record<string, unknown>)
       : [];
+
+  // Trace the first 3 entities to surface what normalizeSamEntity saw
+  // when rows ends up empty. Only matters in the failure case.
+  const debugNormalizeTrace: NormalizeTrace[] =
+    rows.length === 0
+      ? (envelope.entityData ?? [])
+          .slice(0, 3)
+          .map((e, index) => traceNormalize(e, index))
+      : [];
+
   return {
     ok: true,
     rows,
     totalRecords: envelope.totalRecords ?? rows.length,
     debugRawSample: rawText.slice(0, 1024),
     debugTopLevelKeys,
+    debugNormalizeTrace,
   };
+}
+
+/**
+ * Mirrors normalizeSamEntity but emits a trace record instead of a row.
+ * Used only when the live import returns zero rows so we can see what
+ * the function actually saw on each entity, vs the raw JSON the
+ * /admin/sba-8a diagnostic surface shows.
+ */
+function traceNormalize(raw: unknown, index: number): NormalizeTrace {
+  if (!raw || typeof raw !== "object") {
+    return {
+      index,
+      rawKeys: [],
+      entityRegKeys: [],
+      coreDataKeys: [],
+      ueiSeen: "",
+      firmNameSeen: "",
+      reason: "not-object",
+    };
+  }
+  const r = raw as Record<string, unknown>;
+  const rawKeys = Object.keys(r);
+  const entityRegistration = pickObject(r, "entityRegistration") ?? r;
+  const coreData = pickObject(r, "coreData") ?? {};
+  const uei = (
+    pickString(entityRegistration, "ueiSAM") ||
+    pickString(r, "ueiSAM") ||
+    pickString(r, "uei")
+  ).trim();
+  const firmName = (
+    pickString(entityRegistration, "legalBusinessName") ||
+    pickString(r, "legalBusinessName") ||
+    pickString(r, "dbaName")
+  ).trim();
+  const trace: NormalizeTrace = {
+    index,
+    rawKeys,
+    entityRegKeys: Object.keys(entityRegistration),
+    coreDataKeys: Object.keys(coreData),
+    ueiSeen: uei,
+    firmNameSeen: firmName,
+    reason: "ok",
+  };
+  if (!uei) trace.reason = "no-uei";
+  else if (!firmName) trace.reason = "no-firmname";
+  return trace;
 }
 
 /**
