@@ -2,7 +2,7 @@
 
 import { and, asc, desc, eq, gte, ilike, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { sba8aParticipants } from "@/db/schema";
+import { certFirms } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { safeQuery } from "@/lib/schema-resilience";
 
@@ -76,25 +76,25 @@ export async function searchFirmsAction(
     async () => {
       const where: SQL<unknown>[] = [];
       if (status !== "all") {
-        where.push(eq(sba8aParticipants.status, status));
+        where.push(eq(certFirms.status, status));
       }
       if (naicsPrefix) {
-        where.push(ilike(sba8aParticipants.naicsPrimary, `${naicsPrefix}%`));
+        where.push(ilike(certFirms.naicsPrimary, `${naicsPrefix}%`));
       }
       if (stateCode) {
-        where.push(eq(sba8aParticipants.state, stateCode));
+        where.push(eq(certFirms.state, stateCode));
       }
       if (nameKeyword) {
         // Match anywhere; normalized name index covers the common case
         // implicitly via index seq-scan fall-back when ILIKE doesn't
         // hit the b-tree.
-        where.push(ilike(sba8aParticipants.firmName, `%${nameKeyword}%`));
+        where.push(ilike(certFirms.firmName, `%${nameKeyword}%`));
       }
       if (graduatedSinceMonths > 0) {
         const since = new Date();
         since.setMonth(since.getMonth() - graduatedSinceMonths);
-        where.push(gte(sba8aParticipants.certExitDate, since));
-        where.push(lt(sba8aParticipants.certExitDate, new Date()));
+        where.push(gte(certFirms.certExitDate, since));
+        where.push(lt(certFirms.certExitDate, new Date()));
       }
 
       const whereExpr = where.length ? and(...where) : undefined;
@@ -103,12 +103,12 @@ export async function searchFirmsAction(
       // window, otherwise alphabetical (stable, predictable for paging).
       const orderBy =
         graduatedSinceMonths > 0
-          ? desc(sba8aParticipants.certExitDate)
-          : asc(sba8aParticipants.firmName);
+          ? desc(certFirms.certExitDate)
+          : asc(certFirms.firmName);
 
       const rows = await db
         .select()
-        .from(sba8aParticipants)
+        .from(certFirms)
         .where(whereExpr)
         .orderBy(orderBy)
         .limit(limit)
@@ -116,7 +116,7 @@ export async function searchFirmsAction(
 
       const [{ count }] = await db
         .select({ count: sql<number>`count(*)::int` })
-        .from(sba8aParticipants)
+        .from(certFirms)
         .where(whereExpr);
 
       return {
