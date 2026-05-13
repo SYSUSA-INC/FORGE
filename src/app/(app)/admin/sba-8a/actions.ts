@@ -1,10 +1,14 @@
 "use server";
 
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { certImportRuns, certFirms } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import {
+  getCertRetentionMonths,
+  setCertRetentionMonths,
+} from "@/lib/platform-settings";
 import {
   CERT_SPECS,
   certSpecFor,
@@ -396,4 +400,205 @@ function parseCsv(text: string): Record<string, string>[] {
     }
     return out;
   });
+}
+
+// ── cron job + retention ────────────────────────────────────────────
+
+/**
+ * Pages per cert type pulled by the monthly cron. At 10 records per
+ * page × 30 pages = 300 firms per cert type × 7 cert types = ~2100
+ * records refreshed per run. Sits well under the SAM.gov free-tier
+ * 1000 calls/day quota (210 calls) and under Vercel's 60s function
+ * timeout (~45-60 sec total wall time).
+ *
+ * The cron isn't trying to be a full re-import — it catches recent
+ * additions and updates for firms that already exist. Full backfills
+ * stay an operator-initiated activity via the per-cert Pull batch UI.
+ */
+const CRON_PAGES_PER_CERT = 30;
+
+export type CronRefreshResult = {
+  ok: boolean;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  pulled: Array<{
+    certType: string;
+    rowsUpserted: number;
+    error: string | null;
+  }>;
+  cleanup: {
+    retentionMonths: number;
+    rowsDeleted: number;
+  };
+  totalRowsUpserted: number;
+};
+
+/**
+ * Refreshes the cert-firm registry from SAM.gov for every cert type
+ * with a verified business-type code, then prunes graduated firms
+ * whose cert_exit_date is older than the configured retention window.
+ *
+ * Intended caller: the /api/cron/refresh-certifications route via
+ * Vercel Cron. Also exposed as a "Trigger refresh now" admin button
+ * for on-demand runs.
+ *
+ * Caller must be super-admin OR be coming from the cron route (which
+ * checks CRON_SECRET). This function itself does NOT check auth —
+ * keep that gate in the caller so we don't bypass it from inside the
+ * server-action env.
+ */
+async function runCertRefreshInternal(): Promise<CronRefreshResult> {
+  const start = new Date();
+  const apiKey = (process.env.SAMGOV_API_KEY || "").trim();
+  const retentionMonths = await getCertRetentionMonths();
+  const pulled: CronRefreshResult["pulled"] = [];
+  let totalRowsUpserted = 0;
+
+  if (!apiKey) {
+    for (const spec of CERT_SPECS) {
+      if (!spec.verified) continue;
+      pulled.push({
+        certType: spec.certType,
+        rowsUpserted: 0,
+        error: "SAMGOV_API_KEY not set",
+      });
+    }
+  } else {
+    // Pull each verified cert type sequentially. Unverified codes get
+    // skipped — re-running with wrong codes would burn the SAM quota
+    // for zero return.
+    for (const spec of CERT_SPECS) {
+      if (!spec.verified) continue;
+      let rowsUpserted = 0;
+      let error: string | null = null;
+      const [runRow] = await db
+        .insert(certImportRuns)
+        .values({ source: "cron.sam.gov", certType: spec.certType, status: "running" })
+        .returning({ id: certImportRuns.id });
+      try {
+        for (let page = 1; page <= CRON_PAGES_PER_CERT; page++) {
+          const res = await fetchSba8aPage(apiKey, page, spec.certType);
+          if (!res.ok) {
+            error = res.error;
+            break;
+          }
+          if (res.rows.length === 0) break;
+          for (const row of res.rows) {
+            await upsertParticipant(row);
+            rowsUpserted += 1;
+          }
+        }
+        await db
+          .update(certImportRuns)
+          .set({
+            status: error ? "failed" : "ok",
+            finishedAt: new Date(),
+            rowsUpserted,
+            error: (error ?? "").slice(0, 1000),
+          })
+          .where(eq(certImportRuns.id, runRow.id));
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+        log.error("[cert-cron]", "pull failed", {
+          certType: spec.certType,
+          error,
+        });
+        await db
+          .update(certImportRuns)
+          .set({
+            status: "failed",
+            finishedAt: new Date(),
+            rowsUpserted,
+            error: error.slice(0, 1000),
+          })
+          .where(eq(certImportRuns.id, runRow.id));
+      }
+      pulled.push({ certType: spec.certType, rowsUpserted, error });
+      totalRowsUpserted += rowsUpserted;
+    }
+  }
+
+  // Auto-prune stale graduates. Hard delete is reversible by re-
+  // pulling from SAM if the firm is still in the registry — and once
+  // a firm graduated > retention months ago, BD intent is they're no
+  // longer a chip-worthy capture target anyway.
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - retentionMonths);
+  const deleted = await db
+    .delete(certFirms)
+    .where(
+      and(
+        eq(certFirms.status, "graduated"),
+        lt(certFirms.certExitDate, cutoff),
+      ),
+    )
+    .returning({ id: certFirms.id });
+
+  const finish = new Date();
+  log.info("[cert-cron]", "refresh done", {
+    durationMs: finish.getTime() - start.getTime(),
+    totalRowsUpserted,
+    rowsDeleted: deleted.length,
+    retentionMonths,
+  });
+
+  return {
+    ok: true,
+    startedAt: start.toISOString(),
+    finishedAt: finish.toISOString(),
+    durationMs: finish.getTime() - start.getTime(),
+    pulled,
+    cleanup: { retentionMonths, rowsDeleted: deleted.length },
+    totalRowsUpserted,
+  };
+}
+
+/** Public super-admin wrapper for manual "Trigger refresh now" button. */
+export async function runCertRefreshAction(): Promise<CronRefreshResult> {
+  await requireSuperadmin();
+  const result = await runCertRefreshInternal();
+  revalidatePath("/admin/sba-8a");
+  revalidatePath("/intelligence/firms");
+  return result;
+}
+
+/**
+ * Same operation but exposed for the /api/cron route. The route is
+ * responsible for verifying CRON_SECRET before calling this — that
+ * gate plus this function being package-internal (not exported as a
+ * server action) keeps the surface tight.
+ */
+export async function runCertRefreshFromCron(): Promise<CronRefreshResult> {
+  const result = await runCertRefreshInternal();
+  revalidatePath("/admin/sba-8a");
+  revalidatePath("/intelligence/firms");
+  return result;
+}
+
+// ── retention setting ──────────────────────────────────────────────
+
+export async function getCertRetentionMonthsAction(): Promise<number> {
+  await requireSuperadmin();
+  return getCertRetentionMonths();
+}
+
+export async function setCertRetentionMonthsAction(
+  months: number,
+): Promise<{ ok: true; months: number } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  const clamped = Math.min(240, Math.max(1, Math.floor(months)));
+  if (!Number.isFinite(clamped) || clamped < 1) {
+    return { ok: false, error: "Retention months must be a positive integer." };
+  }
+  try {
+    await setCertRetentionMonths(clamped, actor.id);
+    revalidatePath("/admin/sba-8a");
+    return { ok: true, months: clamped };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }

@@ -6,18 +6,25 @@ import { CERT_SPECS } from "@/lib/sba-8a";
 import {
   importSba8aCsvAction,
   pullSba8aFromSamAction,
+  runCertRefreshAction,
+  setCertRetentionMonthsAction,
+  type CronRefreshResult,
   type ImportRunSummary,
   type ParticipantStats,
 } from "./actions";
 
 export function Sba8aAdminClient({
   apiKeyPresent,
+  cronSecretPresent,
   initialRuns,
   initialStats,
+  initialRetentionMonths,
 }: {
   apiKeyPresent: boolean;
+  cronSecretPresent: boolean;
   initialRuns: ImportRunSummary[];
   initialStats: ParticipantStats;
+  initialRetentionMonths: number;
 }) {
   const [runs, setRuns] = useState<ImportRunSummary[]>(initialRuns);
   const [stats, setStats] = useState<ParticipantStats>(initialStats);
@@ -28,6 +35,16 @@ export function Sba8aAdminClient({
   const [samError, setSamError] = useState<string | null>(null);
   const [samResult, setSamResult] = useState<string | null>(null);
   const [samBusy, startSam] = useTransition();
+
+  const [retentionMonths, setRetentionMonths] = useState(initialRetentionMonths);
+  const [retentionDraft, setRetentionDraft] = useState(initialRetentionMonths);
+  const [retentionMessage, setRetentionMessage] = useState<string | null>(null);
+  const [retentionError, setRetentionError] = useState<string | null>(null);
+  const [retentionBusy, startRetention] = useTransition();
+
+  const [cronResult, setCronResult] = useState<CronRefreshResult | null>(null);
+  const [cronError, setCronError] = useState<string | null>(null);
+  const [cronBusy, startCron] = useTransition();
 
   const [csv, setCsv] = useState("");
   const [csvError, setCsvError] = useState<string | null>(null);
@@ -91,6 +108,41 @@ export function Sba8aAdminClient({
         },
         ...prev,
       ].slice(0, 10));
+    });
+  }
+
+  function saveRetention() {
+    setRetentionError(null);
+    setRetentionMessage(null);
+    startRetention(async () => {
+      const res = await setCertRetentionMonthsAction(retentionDraft);
+      if (!res.ok) {
+        setRetentionError(res.error);
+        return;
+      }
+      setRetentionMonths(res.months);
+      setRetentionDraft(res.months);
+      setRetentionMessage(`Retention set to ${res.months} months.`);
+      setTimeout(() => setRetentionMessage(null), 2500);
+    });
+  }
+
+  function triggerCron() {
+    setCronError(null);
+    setCronResult(null);
+    startCron(async () => {
+      try {
+        const res = await runCertRefreshAction();
+        setCronResult(res);
+        // Reconcile stats — server query is the source of truth, but
+        // we don't have a refresh hook here so just bump optimistically.
+        setStats((s) => ({
+          ...s,
+          total: s.total + res.totalRowsUpserted - res.cleanup.rowsDeleted,
+        }));
+      } catch (err) {
+        setCronError(err instanceof Error ? err.message : String(err));
+      }
     });
   }
 
@@ -178,6 +230,113 @@ export function Sba8aAdminClient({
             ))}
           </tbody>
         </table>
+      </Panel>
+
+      <Panel
+        title="Automation"
+        eyebrow="Monthly cron · cleanup"
+        accent={cronSecretPresent ? "emerald" : "hazard"}
+      >
+        <p className="mb-3 font-mono text-[11px] text-muted">
+          A Vercel Cron job refreshes verified cert types from SAM.gov on
+          the <strong>first of each month at 3 AM UTC</strong>. It pulls
+          the most recent ~300 firms per verified cert type (catches new
+          entrants and updates), then prunes graduated firms whose cert
+          exit date is older than the retention window below.
+        </p>
+        {!cronSecretPresent ? (
+          <div className="mb-3 rounded border border-rose/30 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose-200">
+            <strong>CRON_SECRET not set.</strong> The cron route refuses
+            unauthenticated calls. Add <code className="rounded bg-white/5 px-1">CRON_SECRET</code>{" "}
+            (any long random value) to Vercel env vars in Production
+            scope and redeploy. Until then the monthly job won't run,
+            but the manual "Trigger refresh" button below still works.
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Retention (graduated, months)">
+            <input
+              type="number"
+              min={1}
+              max={240}
+              className="aur-input w-28"
+              value={retentionDraft}
+              onChange={(e) =>
+                setRetentionDraft(
+                  Math.max(1, Math.min(240, Number(e.target.value || 36))),
+                )
+              }
+            />
+          </Field>
+          <button
+            type="button"
+            onClick={saveRetention}
+            disabled={
+              retentionBusy ||
+              retentionDraft === retentionMonths ||
+              retentionDraft < 1
+            }
+            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+          >
+            {retentionBusy ? "Saving…" : "Save retention"}
+          </button>
+          <div className="grow" />
+          <button
+            type="button"
+            onClick={triggerCron}
+            disabled={cronBusy}
+            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            title="Run the same job the monthly cron runs — refresh all verified cert types, then prune stale graduates."
+          >
+            {cronBusy ? "Refreshing…" : "Trigger refresh now"}
+          </button>
+        </div>
+
+        <p className="mt-2 font-mono text-[11px] text-muted/70">
+          Current retention: <strong className="text-text">{retentionMonths} months</strong>.
+          Graduated firms with cert exit date older than this get pruned
+          on every cron run.
+        </p>
+
+        {retentionError ? (
+          <div className="mt-3 rounded border border-rose/30 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose-200">
+            {retentionError}
+          </div>
+        ) : null}
+        {retentionMessage ? (
+          <div className="mt-3 rounded border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-200">
+            {retentionMessage}
+          </div>
+        ) : null}
+
+        {cronError ? (
+          <div className="mt-3 rounded border border-rose/30 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose-200">
+            <strong>Refresh failed:</strong> {cronError}
+          </div>
+        ) : null}
+        {cronResult ? (
+          <div className="mt-3 rounded border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-[11px] text-emerald-200">
+            <div>
+              Refreshed {cronResult.totalRowsUpserted} firms across{" "}
+              {cronResult.pulled.length} verified cert types in{" "}
+              {Math.round(cronResult.durationMs / 100) / 10}s.
+            </div>
+            <div className="mt-1">
+              Pruned {cronResult.cleanup.rowsDeleted} graduated firms older than{" "}
+              {cronResult.cleanup.retentionMonths} months.
+            </div>
+            {cronResult.pulled.some((p) => p.error) ? (
+              <div className="mt-2 text-amber-200">
+                Some cert types had errors:{" "}
+                {cronResult.pulled
+                  .filter((p) => p.error)
+                  .map((p) => `${p.certType}: ${p.error}`)
+                  .join("; ")}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Panel>
 
       <Panel
