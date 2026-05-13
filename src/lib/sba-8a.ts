@@ -210,8 +210,12 @@ export async function fetchSba8aPage(
 
 /**
  * Normalize one SAM Entity record into our Sba8aRow shape. Returns
- * null if the record has no UEI or no 8(a) entry in its socioeconomic
- * list (defensive — the API filter should already exclude those).
+ * null only when essential identity fields (UEI, firm name) are
+ * missing. We trust the upstream filter (sbaBusinessTypeCode=A6) for
+ * 8(a) membership rather than re-validating it from the response —
+ * v4 returns the businessTypes section but historically has shipped
+ * with the section omitted, so requiring its presence as a gate
+ * would silently discard every row.
  */
 export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
   if (!raw || typeof raw !== "object") return null;
@@ -220,7 +224,7 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
   const entityRegistration =
     pickObject(r, "entityRegistration") ?? r;
   const coreData = pickObject(r, "coreData") ?? {};
-  const assertions = pickObject(r, "assertions") ?? {};
+  const businessTypes = pickObject(coreData, "businessTypes") ?? {};
 
   const uei = (
     pickString(entityRegistration, "ueiSAM") ||
@@ -236,9 +240,13 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
   ).trim();
   if (!firmName) return null;
 
-  // 8(a) entry is one row of sbaBusinessTypeList.
+  // 8(a) entry lives under coreData.businessTypes.sbaBusinessTypeList
+  // in v4 (same path used by src/lib/samgov.ts entity searches). When
+  // present, mine cert dates from it; when absent, fall through and
+  // infer status from registration state.
   const sbaList = arrayOfObjects(
-    pickArray(assertions, "sbaBusinessTypeList") ??
+    pickArray(businessTypes, "sbaBusinessTypeList") ??
+      pickArray(coreData, "sbaBusinessTypeList") ??
       pickArray(r, "sbaBusinessTypeList"),
   );
   const eightA = sbaList.find(
@@ -246,35 +254,51 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
       (pickString(s, "sbaBusinessTypeCode") || "").trim().toUpperCase() ===
       CODE_8A,
   );
-  if (!eightA) return null;
 
-  const certEntryDate = parseDate(pickString(eightA, "certificationEntryDate"));
-  const certExitDate = parseDate(pickString(eightA, "certificationExitDate"));
+  const certEntryDate = eightA
+    ? parseDate(pickString(eightA, "certificationEntryDate"))
+    : null;
+  const certExitDate = eightA
+    ? parseDate(pickString(eightA, "certificationExitDate"))
+    : null;
 
   // Status derivation:
-  //   - exit date in the past  → 'graduated'
+  //   - exit date in the past   → 'graduated'
   //   - exit date in the future → 'active'
-  //   - missing both dates     → 'unknown'
+  //   - cert entry date only    → 'active' (still in the program)
+  //   - no cert dates but SAM   → 'active' (filter guaranteed 8(a))
+  //     registration active
+  //   - everything else         → 'unknown'
   const now = new Date();
   let status = "unknown";
   if (certExitDate) {
     status = certExitDate.getTime() < now.getTime() ? "graduated" : "active";
   } else if (certEntryDate) {
     status = "active";
+  } else {
+    const regStatus = pickString(entityRegistration, "registrationStatus")
+      .trim()
+      .toLowerCase();
+    if (regStatus === "active") status = "active";
   }
 
+  // NAICS: prefer coreData.naicsInformation.primaryNaics (v4
+  // canonical), fall back to older shapes for resilience.
+  const naicsInformation = pickObject(coreData, "naicsInformation") ?? {};
   const naicsList = arrayOfObjects(
-    pickArray(assertions, "goodsAndServices") ??
+    pickArray(naicsInformation, "naicsList") ??
       pickArray(coreData, "naicsList") ??
       pickArray(r, "naicsList"),
   );
-  // First NAICS marked primary, or just the first one.
-  const primary =
-    naicsList.find((n) => pickString(n, "isPrimary") === "Y") ??
-    naicsList[0];
-  const naicsPrimary = primary
-    ? pickString(primary, "naicsCode") || pickString(primary, "code")
-    : "";
+  const naicsFromList = naicsList.find(
+    (n) => pickString(n, "isPrimary") === "Y",
+  ) ?? naicsList[0];
+  const naicsPrimary =
+    pickString(naicsInformation, "primaryNaics") ||
+    (naicsFromList
+      ? pickString(naicsFromList, "naicsCode") ||
+        pickString(naicsFromList, "code")
+      : "");
 
   const physicalAddress =
     pickObject(coreData, "physicalAddress") ??
