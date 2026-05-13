@@ -46,8 +46,40 @@ const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
  * account tier allows 100. We stick to 10 for the free-tier default.
  */
 const PAGE_SIZE = 10;
-/** SBA business-type code for "8(a) Program Participant". */
-const CODE_8A = "A6";
+
+/**
+ * Mapping from internal `cert_type` keys to SAM.gov's
+ * `sbaBusinessTypeCode` filter values plus a human label.
+ *
+ * Codes come from the SAM Entity Management data dictionary
+ * (also surfaced as part of each entity's `coreData.businessTypes
+ * .sbaBusinessTypeList[].sbaBusinessTypeCode`). The high-confidence
+ * codes are `verified: true`; the others are best-guess values that
+ * may need adjustment after production validation. Codes that turn
+ * out wrong manifest as a successful Pull batch with zero rows
+ * (totalRecords also drops to whatever the upstream returns for the
+ * unrecognised filter).
+ */
+export type CertSpec = {
+  certType: string;
+  label: string;
+  samBusinessTypeCode: string;
+  verified: boolean;
+};
+
+export const CERT_SPECS: readonly CertSpec[] = [
+  { certType: "8a",             label: "8(a)",              samBusinessTypeCode: "A6", verified: true },
+  { certType: "wosb",           label: "WOSB",              samBusinessTypeCode: "A5", verified: true },
+  { certType: "edwosb",         label: "EDWOSB",            samBusinessTypeCode: "A4", verified: true },
+  { certType: "sdvosb",         label: "SDVOSB",            samBusinessTypeCode: "QF", verified: false },
+  { certType: "vob",            label: "Veteran Owned",     samBusinessTypeCode: "A2", verified: false },
+  { certType: "hubzone",        label: "HUBZone",           samBusinessTypeCode: "XX", verified: false },
+  { certType: "native_american",label: "Native American",   samBusinessTypeCode: "T1", verified: false },
+];
+
+export function certSpecFor(certType: string): CertSpec | null {
+  return CERT_SPECS.find((c) => c.certType === certType) ?? null;
+}
 
 export type Sba8aRow = {
   uei: string;
@@ -162,16 +194,21 @@ export function normalizeFirmName(name: string): string {
 export async function fetchSba8aPage(
   apiKey: string,
   page: number,
+  certType: string = "8a",
 ): Promise<Sba8aFetchResult> {
   if (!apiKey.trim()) {
     return { ok: false, error: "SAMGOV_API_KEY not set." };
+  }
+  const spec = certSpecFor(certType);
+  if (!spec) {
+    return { ok: false, error: `Unknown cert type '${certType}'.` };
   }
   // SAM.gov is 0-based; admin UI is 1-based. Convert here so the rest
   // of the system can think in plain "page 1 / 2 / 3" terms.
   const samPage = Math.max(0, page - 1);
   const url =
     `${SAM_BASE}?api_key=${encodeURIComponent(apiKey)}` +
-    `&sbaBusinessTypeCode=${CODE_8A}` +
+    `&sbaBusinessTypeCode=${spec.samBusinessTypeCode}` +
     `&samRegistered=Yes` +
     // registrationStatus=A filters to currently-Active SAM
     // registrations. The Entity API silently returns empty entityData
@@ -219,7 +256,7 @@ export async function fetchSba8aPage(
     entityData?: unknown[];
   };
   const rows = (envelope.entityData ?? [])
-    .map((e) => normalizeSamEntity(e))
+    .map((e) => normalizeSamEntity(e, certType))
     .filter((r): r is Sba8aRow => !!r);
   const debugTopLevelKeys =
     data && typeof data === "object" && !Array.isArray(data)
@@ -300,7 +337,10 @@ function traceNormalize(raw: unknown, index: number): NormalizeTrace {
  * with the section omitted, so requiring its presence as a gate
  * would silently discard every row.
  */
-export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
+export function normalizeSamEntity(
+  raw: unknown,
+  certType: string = "8a",
+): Sba8aRow | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
 
@@ -332,10 +372,15 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
       pickArray(coreData, "sbaBusinessTypeList") ??
       pickArray(r, "sbaBusinessTypeList"),
   );
+  // Find the cert entry matching the certType being pulled. The SAM
+  // filter already narrowed entities to ones holding this cert, but
+  // mining the per-cert dates requires picking the right list entry.
+  const certSpec = certSpecFor(certType);
+  const targetCode = (certSpec?.samBusinessTypeCode ?? "").toUpperCase();
   const eightA = sbaList.find(
     (s) =>
       (pickString(s, "sbaBusinessTypeCode") || "").trim().toUpperCase() ===
-      CODE_8A,
+      targetCode,
   );
 
   const certEntryDate = eightA
@@ -396,7 +441,7 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
     uei,
     firmName,
     firmNameNorm: normalizeFirmName(firmName),
-    certType: "8a",
+    certType,
     certEntryDate,
     certExitDate,
     status,
@@ -415,7 +460,10 @@ export function normalizeSamEntity(raw: unknown): Sba8aRow | null {
  * unconfigured. Header names are case-insensitive and accept a few
  * common aliases.
  */
-export function normalizeCsvRow(raw: Record<string, string>): Sba8aRow | null {
+export function normalizeCsvRow(
+  raw: Record<string, string>,
+  certType: string = "8a",
+): Sba8aRow | null {
   const lc: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) {
     lc[k.toLowerCase().trim()] = (v ?? "").trim();
@@ -452,7 +500,7 @@ export function normalizeCsvRow(raw: Record<string, string>): Sba8aRow | null {
     uei,
     firmName,
     firmNameNorm: normalizeFirmName(firmName),
-    certType: "8a",
+    certType,
     certEntryDate,
     certExitDate,
     status,

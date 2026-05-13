@@ -2,18 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { CERT_SPECS } from "@/lib/sba-8a";
 import {
   importSba8aCsvAction,
   pullSba8aFromSamAction,
   type ImportRunSummary,
+  type ParticipantStats,
 } from "./actions";
-
-type Stats = {
-  total: number;
-  active: number;
-  graduated: number;
-  terminated: number;
-};
 
 export function Sba8aAdminClient({
   apiKeyPresent,
@@ -22,11 +17,12 @@ export function Sba8aAdminClient({
 }: {
   apiKeyPresent: boolean;
   initialRuns: ImportRunSummary[];
-  initialStats: Stats;
+  initialStats: ParticipantStats;
 }) {
   const [runs, setRuns] = useState<ImportRunSummary[]>(initialRuns);
-  const [stats, setStats] = useState<Stats>(initialStats);
+  const [stats, setStats] = useState<ParticipantStats>(initialStats);
 
+  const [certType, setCertType] = useState<string>("8a");
   const [startPage, setStartPage] = useState(1);
   const [pages, setPages] = useState(5);
   const [samError, setSamError] = useState<string | null>(null);
@@ -57,13 +53,16 @@ export function Sba8aAdminClient({
     setSamResult(null);
     setDebug(null);
     startSam(async () => {
-      const res = await pullSba8aFromSamAction({ startPage, pages });
+      const res = await pullSba8aFromSamAction({ startPage, pages, certType });
       if (!res.ok) {
         setSamError(res.error);
         return;
       }
+      const certLabel =
+        CERT_SPECS.find((c) => c.certType === res.certType)?.label ??
+        res.certType;
       setSamResult(
-        `Pulled ${res.pagesPulled} page(s) · saw ${res.rowsSeen} rows · upserted ${res.rowsUpserted}. ` +
+        `[${certLabel}] Pulled ${res.pagesPulled} page(s) · saw ${res.rowsSeen} rows · upserted ${res.rowsUpserted}. ` +
           (res.nextPage
             ? `Continue from page ${res.nextPage}.`
             : `Reached the end of the dataset (${res.totalRecords} records).`),
@@ -76,14 +75,15 @@ export function Sba8aAdminClient({
         });
       }
       if (res.nextPage) setStartPage(res.nextPage);
-      // Optimistic stat bump — the next page refresh will reconcile.
-      setStats((s) => ({ ...s, total: s.total + res.rowsUpserted }));
+      // Optimistic stat bump — server-side query reconciles on refresh.
+      setStats((s) => bumpStats(s, res.certType, res.rowsUpserted));
       setRuns((prev) => [
         {
           id: crypto.randomUUID(),
           startedAt: new Date().toISOString(),
           finishedAt: new Date().toISOString(),
           status: "ok",
+          certType: res.certType,
           source: "sam.gov",
           rowsSeen: res.rowsSeen,
           rowsUpserted: res.rowsUpserted,
@@ -108,13 +108,14 @@ export function Sba8aAdminClient({
           (res.skipped ? ` · skipped ${res.skipped} (missing UEI/name)` : ""),
       );
       setCsv("");
-      setStats((s) => ({ ...s, total: s.total + res.rowsUpserted }));
+      setStats((s) => bumpStats(s, "8a", res.rowsUpserted));
       setRuns((prev) => [
         {
           id: crypto.randomUUID(),
           startedAt: new Date().toISOString(),
           finishedAt: new Date().toISOString(),
           status: "ok",
+          certType: "8a",
           source: "manual_csv",
           rowsSeen: res.rowsSeen,
           rowsUpserted: res.rowsUpserted,
@@ -128,6 +129,58 @@ export function Sba8aAdminClient({
   return (
     <div className="flex flex-col gap-4">
       <Panel
+        title="Coverage by cert type"
+        eyebrow="Imported firm counts"
+        dense
+      >
+        <table className="w-full text-left font-mono text-[11px]">
+          <thead className="bg-white/[0.02] text-muted">
+            <tr>
+              <th className="px-5 py-2">Cert</th>
+              <th className="px-5 py-2 text-right">Total</th>
+              <th className="px-5 py-2 text-right">Active</th>
+              <th className="px-5 py-2 text-right">Graduated</th>
+              <th className="px-5 py-2 text-right">Terminated</th>
+              <th className="px-5 py-2"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {stats.byCertType.map((row) => (
+              <tr key={row.certType}>
+                <td className="px-5 py-2">
+                  <span className="text-text">{row.label}</span>
+                </td>
+                <td className="px-5 py-2 text-right">{row.total}</td>
+                <td className="px-5 py-2 text-right">{row.active}</td>
+                <td
+                  className={`px-5 py-2 text-right ${
+                    row.graduated > 0 ? "text-emerald-300" : ""
+                  }`}
+                >
+                  {row.graduated}
+                </td>
+                <td className="px-5 py-2 text-right">{row.terminated}</td>
+                <td className="px-5 py-2 text-right">
+                  {row.total > 0 ? (
+                    <a
+                      href={`/intelligence/firms?certType=${encodeURIComponent(
+                        row.certType,
+                      )}`}
+                      className="text-teal hover:underline"
+                    >
+                      View →
+                    </a>
+                  ) : (
+                    <span className="text-muted/40">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
+
+      <Panel
         title="Pull from SAM.gov"
         eyebrow="Live fetch · sbaBusinessTypeCode=A6"
       >
@@ -137,6 +190,25 @@ export function Sba8aAdminClient({
           tier limits ~1000 calls/day.
         </p>
         <div className="flex flex-wrap items-end gap-3">
+          <Field label="Cert type">
+            <select
+              className="aur-input w-48"
+              value={certType}
+              onChange={(e) => {
+                setCertType(e.target.value);
+                setStartPage(1);
+                setSamResult(null);
+                setSamError(null);
+              }}
+            >
+              {CERT_SPECS.map((c) => (
+                <option key={c.certType} value={c.certType}>
+                  {c.label}
+                  {c.verified ? "" : " (unverified)"}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Start page">
             <input
               type="number"
@@ -249,6 +321,7 @@ export function Sba8aAdminClient({
             <thead className="bg-white/[0.02] text-muted">
               <tr>
                 <th className="px-5 py-2">Started</th>
+                <th className="px-5 py-2">Cert</th>
                 <th className="px-5 py-2">Source</th>
                 <th className="px-5 py-2">Status</th>
                 <th className="px-5 py-2">Seen</th>
@@ -261,6 +334,10 @@ export function Sba8aAdminClient({
                 <tr key={r.id}>
                   <td className="px-5 py-2 text-muted">
                     {formatStarted(r.startedAt)}
+                  </td>
+                  <td className="px-5 py-2">
+                    {CERT_SPECS.find((c) => c.certType === r.certType)?.label ??
+                      r.certType}
                   </td>
                   <td className="px-5 py-2">{r.source}</td>
                   <td className="px-5 py-2">
@@ -289,6 +366,33 @@ export function Sba8aAdminClient({
       </Panel>
     </div>
   );
+}
+
+/**
+ * Optimistic stat bump after a successful pull. Bumps both the cert-
+ * specific row and the aggregate totals so the page reflects the
+ * change before the next server render reconciles. Approximate —
+ * we increment `active` by the upserted count which is right for the
+ * common case (most pulled firms are active), close enough for
+ * graduates since graduations are rare in any single batch.
+ */
+function bumpStats(
+  prev: ParticipantStats,
+  certType: string,
+  upserted: number,
+): ParticipantStats {
+  if (upserted <= 0) return prev;
+  return {
+    total: prev.total + upserted,
+    active: prev.active + upserted,
+    graduated: prev.graduated,
+    terminated: prev.terminated,
+    byCertType: prev.byCertType.map((r) =>
+      r.certType === certType
+        ? { ...r, total: r.total + upserted, active: r.active + upserted }
+        : r,
+    ),
+  };
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

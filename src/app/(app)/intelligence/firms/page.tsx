@@ -13,6 +13,7 @@ export default async function FirmsIntelPage({
   searchParams: {
     savedSearch?: string;
     status?: string;
+    certType?: string;
     naics?: string;
     state?: string;
   };
@@ -65,6 +66,9 @@ export default async function FirmsIntelPage({
     if (searchParams.naics) fromQuery.naicsPrefix = searchParams.naics.trim();
     if (searchParams.state) {
       fromQuery.state = searchParams.state.trim().toUpperCase().slice(0, 2);
+    }
+    if (searchParams.certType) {
+      fromQuery.certType = searchParams.certType.trim().toLowerCase();
     }
     if (Object.keys(fromQuery).length > 0) initial = fromQuery;
   }

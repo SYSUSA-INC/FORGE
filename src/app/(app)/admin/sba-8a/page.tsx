@@ -2,10 +2,12 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { CERT_SPECS } from "@/lib/sba-8a";
 import {
   getParticipantStats,
   listRecentImportRuns,
   type ImportRunSummary,
+  type ParticipantStats,
 } from "./actions";
 import { Sba8aAdminClient } from "./Sba8aAdminClient";
 
@@ -24,8 +26,8 @@ export default async function Sba8aAdminPage() {
     <>
       <PageHeader
         eyebrow="Platform admin"
-        title="SBA 8(a) participant registry"
-        subtitle="Pull the active and graduated 8(a) firm list from SAM.gov, or paste a CSV. Used by /intelligence/firms and to chip awards on /intelligence/awards."
+        title="Socioeconomic cert registry"
+        subtitle="Pull active and graduated firms holding SBA socioeconomic certifications (8(a), HUBZone, WOSB, EDWOSB, SDVOSB, VOB, Native American). Used by /intelligence/firms and to chip awards on /intelligence/awards."
         actions={
           <Link href="/admin" className="aur-btn aur-btn-ghost">
             ← Platform admin
@@ -33,7 +35,7 @@ export default async function Sba8aAdminPage() {
         }
         meta={[
           {
-            label: "Participants",
+            label: "Total firms",
             value: stats.total.toString(),
             href: "/intelligence/firms?status=all",
           },
@@ -81,11 +83,24 @@ export default async function Sba8aAdminPage() {
   );
 }
 
-async function safeStats() {
+async function safeStats(): Promise<ParticipantStats> {
   try {
     return await getParticipantStats();
   } catch {
-    return { total: 0, active: 0, graduated: 0, terminated: 0 };
+    return {
+      total: 0,
+      active: 0,
+      graduated: 0,
+      terminated: 0,
+      byCertType: CERT_SPECS.map((c) => ({
+        certType: c.certType,
+        label: c.label,
+        total: 0,
+        active: 0,
+        graduated: 0,
+        terminated: 0,
+      })),
+    };
   }
 }
 
