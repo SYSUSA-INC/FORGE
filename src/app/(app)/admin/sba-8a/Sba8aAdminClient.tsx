@@ -41,6 +41,15 @@ export function Sba8aAdminClient({
   const [debug, setDebug] = useState<{
     sample: string;
     keys: string[];
+    trace: Array<{
+      index: number;
+      rawKeys: string[];
+      entityRegKeys: string[];
+      coreDataKeys: string[];
+      ueiSeen: string;
+      firmNameSeen: string;
+      reason: string;
+    }>;
   } | null>(null);
 
   function pullFromSam() {
@@ -63,6 +72,7 @@ export function Sba8aAdminClient({
         setDebug({
           sample: res.debugSample,
           keys: res.debugTopLevelKeys ?? [],
+          trace: res.debugNormalizeTrace ?? [],
         });
       }
       if (res.nextPage) setStartPage(res.nextPage);
@@ -178,6 +188,16 @@ export function Sba8aAdminClient({
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-black/30 p-2 text-amber-50">
               {debug.sample}
             </pre>
+            {debug.trace.length > 0 ? (
+              <div className="mt-3">
+                <div className="mb-1 font-display text-[11px] font-semibold text-amber-200">
+                  Per-entity normalize trace (first {debug.trace.length}):
+                </div>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-black/30 p-2 text-amber-50">
+                  {JSON.stringify(debug.trace, null, 2)}
+                </pre>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Panel>

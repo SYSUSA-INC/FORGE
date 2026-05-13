@@ -8,6 +8,7 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import {
   fetchSba8aPage,
   normalizeCsvRow,
+  type NormalizeTrace,
   type Sba8aRow,
 } from "@/lib/sba-8a";
 import { log } from "@/lib/log";
@@ -36,6 +37,7 @@ export async function pullSba8aFromSamAction(params: {
        *  changes without server-log access. */
       debugSample: string | null;
       debugTopLevelKeys: string[] | null;
+      debugNormalizeTrace: NormalizeTrace[] | null;
     }
   | { ok: false; error: string }
 > {
@@ -68,6 +70,7 @@ export async function pullSba8aFromSamAction(params: {
   let pagesActuallyPulled = 0;
   let lastDebugSample: string | null = null;
   let lastDebugKeys: string[] | null = null;
+  let lastDebugTrace: NormalizeTrace[] | null = null;
 
   try {
     for (let i = 0; i < pages; i++) {
@@ -89,6 +92,7 @@ export async function pullSba8aFromSamAction(params: {
       if (res.rows.length === 0) {
         lastDebugSample = res.debugRawSample;
         lastDebugKeys = res.debugTopLevelKeys;
+        lastDebugTrace = res.debugNormalizeTrace;
         nextPage = null;
         break;
       }
@@ -124,6 +128,7 @@ export async function pullSba8aFromSamAction(params: {
       totalRecords,
       debugSample: rowsUpserted === 0 ? lastDebugSample : null,
       debugTopLevelKeys: rowsUpserted === 0 ? lastDebugKeys : null,
+      debugNormalizeTrace: rowsUpserted === 0 ? lastDebugTrace : null,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
