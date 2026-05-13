@@ -9,6 +9,8 @@ import { safeQuery } from "@/lib/schema-resilience";
 export type FirmsSearchCriteria = {
   /** 'all' | 'active' | 'graduated' | 'terminated' | 'unknown'. Defaults to 'all'. */
   status?: string;
+  /** Cert type filter: '8a' | 'hubzone' | 'wosb' | ... | 'all' (default). */
+  certType?: string;
   /** Prefix match against firms' primary NAICS (e.g. "541" → all 541xxx). */
   naicsPrefix?: string;
   /** Two-letter US state code. Empty = no state filter. */
@@ -24,6 +26,7 @@ export type FirmsSearchCriteria = {
 export type FirmRow = {
   uei: string;
   firmName: string;
+  certType: string;
   status: string;
   certEntryDate: string | null;
   certExitDate: string | null;
@@ -62,6 +65,7 @@ export async function searchFirmsAction(
   if (!VALID_STATUS.has(status)) {
     return { ok: false, error: "Invalid status filter." };
   }
+  const certTypeFilter = (criteria.certType || "all").trim().toLowerCase();
   const naicsPrefix = (criteria.naicsPrefix || "").replace(/[^0-9]/g, "");
   const stateCode = (criteria.state || "").trim().toUpperCase().slice(0, 2);
   const nameKeyword = (criteria.nameKeyword || "").trim();
@@ -77,6 +81,9 @@ export async function searchFirmsAction(
       const where: SQL<unknown>[] = [];
       if (status !== "all") {
         where.push(eq(certFirms.status, status));
+      }
+      if (certTypeFilter && certTypeFilter !== "all") {
+        where.push(eq(certFirms.certType, certTypeFilter));
       }
       if (naicsPrefix) {
         where.push(ilike(certFirms.naicsPrimary, `${naicsPrefix}%`));
@@ -124,6 +131,7 @@ export async function searchFirmsAction(
         rows: rows.map((r) => ({
           uei: r.uei,
           firmName: r.firmName,
+          certType: r.certType,
           status: r.status,
           certEntryDate: r.certEntryDate
             ? r.certEntryDate.toISOString().slice(0, 10)

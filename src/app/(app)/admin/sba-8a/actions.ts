@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { certImportRuns, certFirms } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import {
+  CERT_SPECS,
+  certSpecFor,
   fetchSba8aPage,
   normalizeCsvRow,
   type NormalizeTrace,
@@ -24,9 +26,11 @@ import { log } from "@/lib/log";
 export async function pullSba8aFromSamAction(params: {
   startPage: number;
   pages: number;
+  certType?: string;
 }): Promise<
   | {
       ok: true;
+      certType: string;
       pagesPulled: number;
       rowsSeen: number;
       rowsUpserted: number;
@@ -50,6 +54,11 @@ export async function pullSba8aFromSamAction(params: {
         "SAMGOV_API_KEY is not set. Provision a free SAM.gov API key and add it to the environment.",
     };
   }
+  const certType = (params.certType || "8a").trim().toLowerCase();
+  const spec = certSpecFor(certType);
+  if (!spec) {
+    return { ok: false, error: `Unknown cert type '${certType}'.` };
+  }
   const startPage = Math.max(1, Math.floor(params.startPage || 1));
   // Server-side clamp. 50 pages × 10 records ≈ 500 firms per click,
   // ~15-25 sec under typical SAM.gov latency — comfortably under the
@@ -59,7 +68,7 @@ export async function pullSba8aFromSamAction(params: {
 
   const [runRow] = await db
     .insert(certImportRuns)
-    .values({ source: "sam.gov", status: "running" })
+    .values({ source: "sam.gov", certType, status: "running" })
     .returning({ id: certImportRuns.id });
   const runId = runRow.id;
 
@@ -75,7 +84,7 @@ export async function pullSba8aFromSamAction(params: {
   try {
     for (let i = 0; i < pages; i++) {
       const page = startPage + i;
-      const res = await fetchSba8aPage(apiKey, page);
+      const res = await fetchSba8aPage(apiKey, page, certType);
       if (!res.ok) {
         throw new Error(res.error);
       }
@@ -121,6 +130,7 @@ export async function pullSba8aFromSamAction(params: {
     revalidatePath("/intelligence/firms");
     return {
       ok: true,
+      certType,
       pagesPulled: pagesActuallyPulled,
       rowsSeen,
       rowsUpserted,
@@ -211,6 +221,7 @@ export type ImportRunSummary = {
   startedAt: string;
   finishedAt: string | null;
   status: string;
+  certType: string;
   source: string;
   rowsSeen: number;
   rowsUpserted: number;
@@ -229,6 +240,7 @@ export async function listRecentImportRuns(): Promise<ImportRunSummary[]> {
     startedAt: r.startedAt.toISOString(),
     finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
     status: r.status,
+    certType: r.certType,
     source: r.source,
     rowsSeen: r.rowsSeen,
     rowsUpserted: r.rowsUpserted,
@@ -236,27 +248,57 @@ export async function listRecentImportRuns(): Promise<ImportRunSummary[]> {
   }));
 }
 
-export async function getParticipantStats(): Promise<{
+export type ParticipantStats = {
+  /** Aggregate across all cert types. */
   total: number;
   active: number;
   graduated: number;
   terminated: number;
-}> {
+  /** Per-cert-type breakdown — one entry per CERT_SPEC. */
+  byCertType: {
+    certType: string;
+    label: string;
+    total: number;
+    active: number;
+    graduated: number;
+    terminated: number;
+  }[];
+};
+
+export async function getParticipantStats(): Promise<ParticipantStats> {
   await requireSuperadmin();
-  const [stats] = await db
+  const rows = await db
     .select({
+      certType: certFirms.certType,
       total: sql<number>`count(*)::int`,
       active: sql<number>`sum(case when status='active' then 1 else 0 end)::int`,
       graduated: sql<number>`sum(case when status='graduated' then 1 else 0 end)::int`,
       terminated: sql<number>`sum(case when status='terminated' then 1 else 0 end)::int`,
     })
-    .from(certFirms);
-  return {
-    total: stats?.total ?? 0,
-    active: stats?.active ?? 0,
-    graduated: stats?.graduated ?? 0,
-    terminated: stats?.terminated ?? 0,
-  };
+    .from(certFirms)
+    .groupBy(certFirms.certType);
+
+  const byType = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) byType.set(r.certType, r);
+
+  const byCertType = CERT_SPECS.map((spec) => {
+    const r = byType.get(spec.certType);
+    return {
+      certType: spec.certType,
+      label: spec.label,
+      total: r?.total ?? 0,
+      active: r?.active ?? 0,
+      graduated: r?.graduated ?? 0,
+      terminated: r?.terminated ?? 0,
+    };
+  });
+
+  const total = byCertType.reduce((s, r) => s + r.total, 0);
+  const active = byCertType.reduce((s, r) => s + r.active, 0);
+  const graduated = byCertType.reduce((s, r) => s + r.graduated, 0);
+  const terminated = byCertType.reduce((s, r) => s + r.terminated, 0);
+
+  return { total, active, graduated, terminated, byCertType };
 }
 
 // ── helpers ──────────────────────────────────────────────────────────

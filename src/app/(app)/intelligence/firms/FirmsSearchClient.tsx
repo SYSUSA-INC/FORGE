@@ -11,16 +11,29 @@ import {
   listWatchedExternalIdsAction,
   saveWatchlistItemAction,
 } from "../watchlist/actions";
+import { CERT_SPECS } from "@/lib/sba-8a";
 import { searchFirmsAction, type FirmRow } from "./actions";
 
 type Status = "all" | "active" | "graduated" | "terminated" | "unknown";
 
 const STATUS_CHOICES: { key: Status; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "active", label: "Active 8(a)" },
+  { key: "active", label: "Active" },
   { key: "graduated", label: "Graduated" },
   { key: "terminated", label: "Terminated" },
 ];
+
+const CERT_TYPE_CHOICES: { key: string; label: string }[] = [
+  { key: "all", label: "All certs" },
+  ...CERT_SPECS.map((c) => ({ key: c.certType, label: c.label })),
+];
+
+function certLabel(certType: string): string {
+  return (
+    CERT_SPECS.find((c) => c.certType === certType)?.label ??
+    certType.toUpperCase()
+  );
+}
 
 export function FirmsSearchClient({
   initialCriteria,
@@ -29,6 +42,9 @@ export function FirmsSearchClient({
 }) {
   const [status, setStatus] = useState<Status>(
     pickStatus(initialCriteria?.status),
+  );
+  const [certTypeFilter, setCertTypeFilter] = useState<string>(
+    pickCertType(initialCriteria?.certType),
   );
   const [naicsPrefix, setNaicsPrefix] = useState(
     pickStr(initialCriteria?.naicsPrefix),
@@ -63,6 +79,7 @@ export function FirmsSearchClient({
   function currentCriteria() {
     return {
       status,
+      certType: certTypeFilter,
       naicsPrefix,
       state: stateCode,
       graduatedSinceMonths,
@@ -124,9 +141,10 @@ export function FirmsSearchClient({
 
   function exportCsv() {
     if (!results) return;
-    downloadCsv("firms-8a.csv", results, [
+    downloadCsv("cert-firms.csv", results, [
       { header: "UEI", get: (r) => r.uei },
       { header: "Firm", get: (r) => r.firmName },
+      { header: "Cert Type", get: (r) => certLabel(r.certType) },
       { header: "Status", get: (r) => r.status },
       { header: "Cert Entry", get: (r) => r.certEntryDate ?? "" },
       { header: "Cert Exit", get: (r) => r.certExitDate ?? "" },
@@ -168,8 +186,21 @@ export function FirmsSearchClient({
 
   return (
     <>
-      <Panel title="Search" eyebrow="Filter the 8(a) registry" dense>
+      <Panel title="Search" eyebrow="Filter the cert registry" dense>
         <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Cert type">
+            <select
+              className="aur-input"
+              value={certTypeFilter}
+              onChange={(e) => setCertTypeFilter(e.target.value)}
+            >
+              {CERT_TYPE_CHOICES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Status">
             <select
               className="aur-input"
@@ -356,21 +387,24 @@ function FirmRowView({
   return (
     <li className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="truncate font-display text-[13px] text-text">
             {row.firmName}
           </span>
+          <span className="rounded bg-violet/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-violet">
+            {certLabel(row.certType)}
+          </span>
           {row.status === "graduated" && row.certExitDate ? (
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-200">
-              8(a) graduated {row.certExitDate.slice(0, 7)}
+              Graduated {row.certExitDate.slice(0, 7)}
             </span>
           ) : row.status === "active" ? (
             <span className="rounded bg-teal-500/15 px-1.5 py-0.5 font-mono text-[10px] text-teal-200">
-              8(a) active
+              Active
             </span>
           ) : row.status === "terminated" ? (
             <span className="rounded bg-rose/15 px-1.5 py-0.5 font-mono text-[10px] text-rose-200">
-              8(a) terminated
+              Terminated
             </span>
           ) : null}
         </div>
@@ -411,6 +445,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+function pickCertType(v: unknown): string {
+  if (typeof v !== "string") return "all";
+  const trimmed = v.trim().toLowerCase();
+  if (trimmed === "all") return "all";
+  return CERT_SPECS.some((c) => c.certType === trimmed) ? trimmed : "all";
 }
 
 function pickStatus(v: unknown): Status {
