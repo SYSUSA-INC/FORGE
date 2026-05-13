@@ -17,9 +17,11 @@ export default async function Sba8aAdminPage() {
   await requireSuperadmin();
 
   const apiKeyPresent = !!(process.env.SAMGOV_API_KEY || "").trim();
-  const [stats, runs] = await Promise.all([
+  const cronSecretPresent = !!(process.env.CRON_SECRET || "").trim();
+  const [stats, runs, retentionMonths] = await Promise.all([
     safeStats(),
     safeRuns(),
+    safeRetention(),
   ]);
 
   return (
@@ -76,11 +78,22 @@ export default async function Sba8aAdminPage() {
       ) : null}
       <Sba8aAdminClient
         apiKeyPresent={apiKeyPresent}
+        cronSecretPresent={cronSecretPresent}
         initialRuns={runs}
         initialStats={stats}
+        initialRetentionMonths={retentionMonths}
       />
     </>
   );
+}
+
+async function safeRetention(): Promise<number> {
+  try {
+    const { getCertRetentionMonths } = await import("@/lib/platform-settings");
+    return await getCertRetentionMonths();
+  } catch {
+    return 36;
+  }
 }
 
 async function safeStats(): Promise<ParticipantStats> {

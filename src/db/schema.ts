@@ -1873,6 +1873,23 @@ export const certImportRuns = pgTable(
 
 export type CertImportRun = typeof certImportRuns.$inferSelect;
 
+/**
+ * Singleton key/value store for platform-wide (non-tenant) settings.
+ * First user is the cert-retention threshold for the monthly refresh
+ * cron. Pattern is intentional: don't spin a fresh table for each
+ * little knob.
+ */
+export const platformSettings = pgTable("platform_setting", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: text("updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+
 export const bdWatchlistItems = pgTable(
   "bd_watchlist_item",
   {
