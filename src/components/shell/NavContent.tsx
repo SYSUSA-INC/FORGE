@@ -75,6 +75,10 @@ const NAV: NavGroup[] = [
     children: [
       { href: "/companies", label: "Company Search" },
       { href: "/intelligence", label: "FORGE Brain" },
+      { href: "/intelligence/awards", label: "Awards & recompetes" },
+      { href: "/intelligence/firms", label: "8(a) firms" },
+      { href: "/intelligence/watchlist", label: "Watchlist" },
+      { href: "/intelligence/saved-searches", label: "Saved searches" },
       { href: "/knowledge-base", label: "Knowledge" },
     ],
   },
