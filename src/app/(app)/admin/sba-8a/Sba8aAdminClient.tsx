@@ -37,7 +37,12 @@ export function Sba8aAdminClient({
   const [samBusy, startSam] = useTransition();
 
   const [retentionMonths, setRetentionMonths] = useState(initialRetentionMonths);
-  const [retentionDraft, setRetentionDraft] = useState(initialRetentionMonths);
+  // Keep the input as a raw string so users can clear and retype
+  // without the value snapping to a default mid-edit. Parsing +
+  // clamping happens at save time.
+  const [retentionDraft, setRetentionDraft] = useState(
+    String(initialRetentionMonths),
+  );
   const [retentionMessage, setRetentionMessage] = useState<string | null>(null);
   const [retentionError, setRetentionError] = useState<string | null>(null);
   const [retentionBusy, startRetention] = useTransition();
@@ -111,17 +116,31 @@ export function Sba8aAdminClient({
     });
   }
 
+  // Parse + validate the draft once per render. The Save button uses
+  // these for its disabled state; saveRetention() uses the parsed int.
+  const parsedRetentionDraft = Number.parseInt(retentionDraft, 10);
+  const retentionDraftValid =
+    Number.isFinite(parsedRetentionDraft) &&
+    parsedRetentionDraft >= 1 &&
+    parsedRetentionDraft <= 240;
+  const retentionDraftChanged =
+    retentionDraftValid && parsedRetentionDraft !== retentionMonths;
+
   function saveRetention() {
     setRetentionError(null);
     setRetentionMessage(null);
+    if (!retentionDraftValid) {
+      setRetentionError("Retention must be a whole number between 1 and 240.");
+      return;
+    }
     startRetention(async () => {
-      const res = await setCertRetentionMonthsAction(retentionDraft);
+      const res = await setCertRetentionMonthsAction(parsedRetentionDraft);
       if (!res.ok) {
         setRetentionError(res.error);
         return;
       }
       setRetentionMonths(res.months);
-      setRetentionDraft(res.months);
+      setRetentionDraft(String(res.months));
       setRetentionMessage(`Retention set to ${res.months} months.`);
       setTimeout(() => setRetentionMessage(null), 2500);
     });
@@ -260,24 +279,25 @@ export function Sba8aAdminClient({
               type="number"
               min={1}
               max={240}
+              inputMode="numeric"
               className="aur-input w-28"
               value={retentionDraft}
-              onChange={(e) =>
-                setRetentionDraft(
-                  Math.max(1, Math.min(240, Number(e.target.value || 36))),
-                )
-              }
+              onChange={(e) => setRetentionDraft(e.target.value)}
+              aria-invalid={retentionDraft !== "" && !retentionDraftValid}
             />
           </Field>
           <button
             type="button"
             onClick={saveRetention}
-            disabled={
-              retentionBusy ||
-              retentionDraft === retentionMonths ||
-              retentionDraft < 1
-            }
+            disabled={retentionBusy || !retentionDraftChanged}
             className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+            title={
+              !retentionDraftValid
+                ? "Enter a whole number between 1 and 240"
+                : !retentionDraftChanged
+                  ? "No change to save"
+                  : undefined
+            }
           >
             {retentionBusy ? "Saving…" : "Save retention"}
           </button>
