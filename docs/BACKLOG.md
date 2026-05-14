@@ -583,21 +583,61 @@ mid-month → access remains until period end; renewal extends.
 
 ---
 
-### BL-18 — Platform Audit Log (cross-tenant)
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-12
+### BL-18 — Platform Audit Log (cross-tenant) — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-12  ·  **Status:** ✅ shipped
 
-Per spec: "full platform audit logs that can be filtered by tenant,
-type, and time."
+Cross-tenant super-admin view of the BL-12 audit log.
 
-**Scope:**
-- Reuses BL-12 schema (no new table)
-- Super-admin query API + UI on `/platform/audit-log`
-- Filters: tenant, actor, action, resource type, time window
-- "Group by tenant" view for anomaly detection
-- CSV export with proper escaping
+**Shipped:**
+- ✅ `/platform/audit-log` route under super-admin gate
+  (`requireSuperadmin()`)
+- ✅ Server actions: `listPlatformAuditEventsAction`,
+  `listPlatformAuditTenantsAction`, `listPlatformAuditActorsAction`,
+  `exportPlatformAuditLogCsvAction`
+- ✅ Filters: full-text search, tenant, actor (with org tag),
+  resource type, **category (read / mutation)**, from/to dates
+- ✅ "Events by tenant" panel on the page surfaces top-20 tenants by
+  event volume; click-through filters the table to that tenant
+- ✅ Table includes tenant column with name + slug; read events
+  carry a small `read` chip so anomalies are visible at a glance
+- ✅ CSV export includes tenant + slug columns (capped 50,000 rows)
+- ✅ Nav restructure: "Platform Administration" leaf converted to a
+  parent group with **Tenants** (`/admin`) + **Audit Log**
+  (`/platform/audit-log`) children. Pending BLs (BL-15 / BL-16 /
+  BL-17) will add more children here.
 
-**Acceptance:** every BL-12 row visible to super-admin regardless of
-tenant; filtering works; small (~5 min latency) is fine.
+**Deferred (separate ticket):** The legacy `AuditLogTab` in
+`/admin` (synthesizes events from raw table activity via
+`getRecentAuditEvents`) is **not** removed by this PR. Different
+data model than the BL-12 `audit_log` table — the legacy tab shows
+derived events (`org_created`, `proposal_updated`) timestamped from
+the originating table's `createdAt`, while the new view shows
+actual recorded actions with actor IPs, user-agents, and metadata.
+Tracked as **BL-18-cleanup**.
+
+**Acceptance:** ✅ Every BL-12 row visible to super-admin regardless
+of tenant; per-tenant filter works; CSV export functional.
+
+---
+
+### BL-18-cleanup — Retire legacy AdminClient AuditLogTab
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-18
+
+The synthesized event feed in `AdminClient.tsx`'s `AuditLogTab` is
+superseded by the real BL-18 view. Once a tenant has run on the
+post-BL-12 codebase for ~30 days they'll have enough audit rows to
+make the new view fully useful, at which point the legacy tab can
+be removed.
+
+**Steps:**
+- Delete `src/app/(app)/admin/AuditLogTab.tsx`
+- Delete the AuditLogTab entry from `AdminClient.tsx` tabs config
+- Delete `src/lib/admin-audit.ts:getRecentAuditEvents` and any
+  callers
+- Replace the tab with a link to `/platform/audit-log`
+
+**Acceptance:** legacy code removed; admin page links to the BL-18
+view; no regression in the tenants page.
 
 ---
 
