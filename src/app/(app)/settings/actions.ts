@@ -14,6 +14,10 @@ import { fetchSamGovByUei } from "@/lib/samgov";
 import type { OrgProfile } from "@/lib/org-types";
 import { hasErrors, validateOrgProfile } from "@/lib/validators";
 import { log } from "@/lib/log";
+import {
+  AUDIT_RETENTION_MAX_DAYS,
+  AUDIT_RETENTION_MIN_DAYS,
+} from "./audit-retention-constants";
 
 export async function saveOrgProfileAction(profile: OrgProfile): Promise<
   { ok: true } | { ok: false; error: string }
@@ -83,15 +87,6 @@ export async function saveOrgProfileAction(profile: OrgProfile): Promise<
     };
   }
 }
-
-/**
- * BL-12c — bound retention 90–3650 days. The DB column itself is
- * unbounded but the action layer holds the contract; operators who
- * need to escape the floor can do so via direct SQL.
- */
-export const AUDIT_RETENTION_MIN_DAYS = 90;
-export const AUDIT_RETENTION_MAX_DAYS = 3650;
-export const AUDIT_RETENTION_DEFAULT_DAYS = 365;
 
 export async function setAuditRetentionDaysAction(
   days: number,

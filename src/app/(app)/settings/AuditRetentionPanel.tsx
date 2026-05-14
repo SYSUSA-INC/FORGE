@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { setAuditRetentionDaysAction } from "./actions";
 import {
   AUDIT_RETENTION_MAX_DAYS,
   AUDIT_RETENTION_MIN_DAYS,
-  setAuditRetentionDaysAction,
-} from "./actions";
+} from "./audit-retention-constants";
 
 type Props = {
   initialDays: number;
