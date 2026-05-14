@@ -399,55 +399,46 @@ row. ✅ Met.
 
 ---
 
-### BL-12c — Sensitive-read auditing + retention configuration
-**Priority:** P1  ·  **Effort:** S–M  ·  **Depends on:** BL-12b  ·  **Status:** in progress
+### BL-12c — Sensitive-read auditing + retention configuration — **shipped**
+**Priority:** P1  ·  **Effort:** S–M  ·  **Depends on:** BL-12b  ·  **Status:** ✅ Merged #137
 
-Splits out from BL-12b because it needs new infrastructure (retention
+Split out from BL-12b because it needed new infrastructure (retention
 column + cron pruner + admin UI) rather than additive logging.
 
-`recordRead()` already exists in `src/lib/audit-log.ts:71-79` as a
-thin wrapper that stamps `metadata.category = "read"`. This ticket
-wires it in and adds retention.
-
-**Surfaces to wire `recordRead`:**
-- `proposals/[id]/pdf/actions.ts` — three render actions
+**`recordRead()` wired (PR #137):**
+- ✅ `proposals/[id]/pdf/actions.ts` — three render actions
   (`renderProposalPdfAction`, `renderProposalDocxAction`,
-  `renderProposalDocxAsPdfAction`)
-- `api/proposals/[id]/pdf/[renderId]/route.ts` — the actual file
-  download (separate from render — captures "downloaded N days
-  later" cases)
-- `opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction`
-  — token-scoped share-link load (when a reviewer clicks the link)
-- `knowledge-base/usaspending/actions.ts:searchUsaspendingAction` —
-  external API lookup
+  `renderProposalDocxAsPdfAction`) → `proposal.export.render`
+- ✅ `api/proposals/[id]/pdf/[renderId]/route.ts` → `proposal.export.download`
+- ✅ `opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction`
+  → `opportunity.review.link_loaded` (token-scoped; reviewer-snapshot
+  actor)
+- ✅ `knowledge-base/usaspending/actions.ts:searchUsaspendingAction`
+  → `knowledge.usaspending.search`
 
-**Mutation gap discovered while scoping:**
-- `knowledge-base/usaspending/actions.ts:importUsaspendingAwardsAction`
-  — adds `knowledge_artifact.usaspending_import` audit row (was
-  missing from BL-12b PR-B's scope since the file wasn't on the
-  original list).
+**Mutation gap closed (PR #137):**
+- ✅ `importUsaspendingAwardsAction` → `knowledge_artifact.usaspending_import`
+  (file was missing from BL-12b's original list)
 
-**Retention configuration:**
-- Migration `0038_audit_retention.sql` adds
-  `organization.audit_retention_days integer NOT NULL DEFAULT 365`
-- Schema column in `src/db/schema.ts`
-- Server action `setAuditRetentionDaysAction(days)` — org-admin only,
-  bounded 90–3650 days, self-audits
-- UI control on `/settings` (org admin only) — a number input with
-  inline help text explaining the prune cadence
-- Cron handler `/api/cron/prune-audit-logs/route.ts` — per-org loop
-  using each tenant's window; never crosses tenant boundaries
-- `vercel.json` daily entry at 03:30 UTC (offset from the existing
-  cert refresh job)
+**Retention configuration (PR #137):**
+- ✅ Migration `0038_audit_retention.sql` —
+  `organization.audit_retention_days` integer default 365
+- ✅ `setAuditRetentionDaysAction` org-admin-only, 90–3650 day bound,
+  self-audits as `settings.audit_retention.update`
+- ✅ `AuditRetentionPanel` mounted under `/settings` (admin-only,
+  uses existing `aur-*` design tokens)
+- ✅ `pruneAuditLogsAcrossTenants` helper in `audit-log.ts` — per-
+  tenant DELETE with explicit `organization_id` filter (passes
+  static isolation check)
+- ✅ `/api/cron/prune-audit-logs/route.ts` — Bearer-CRON_SECRET
+  auth, returns `{ ok, organizations, rowsDeleted }`
+- ✅ `vercel.json` daily at 03:30 UTC
 
-**Acceptance:**
-- Reading a PDF / DOCX / share-link / USAspending search records a
-  row with `metadata.category === "read"` visible in `/audit-log`
-- Org admins can set retention 90–3650 days from `/settings`
-- Daily cron prunes per-tenant; passes `npm run check:isolation`
-- Existing rows older than a tenant's window are pruned (no grace
-  period for now — operators can lengthen retention if they need to
-  keep older rows)
+**Fixup commit:** Next.js forbids non-async exports from `"use server"`
+modules. Constants moved into sibling `audit-retention-constants.ts`.
+
+**Acceptance:** ✅ All met. The BL-12 family is now fully complete
+(BL-12 / BL-12b / BL-12c).
 
 ---
 
