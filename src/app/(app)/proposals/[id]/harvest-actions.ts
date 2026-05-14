@@ -11,6 +11,7 @@ import {
   type TipTapDoc,
   type TipTapNode,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { startKnowledgeExtractionAction } from "../../knowledge-base/import/[id]/actions";
 import { embedArtifactAction } from "../../knowledge-base/import/embed-actions";
@@ -220,6 +221,20 @@ export async function harvestProposalToCorpusAction(
   } catch (err) {
     log.warn("[harvestProposalToCorpus]", "extraction failed", { error: err });
   }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.harvest",
+    resourceType: "knowledge_artifact",
+    resourceId: artifactId,
+    metadata: {
+      proposalId,
+      reused,
+      candidateCount,
+      embeddedChunks,
+    },
+  });
 
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");

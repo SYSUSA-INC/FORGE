@@ -20,6 +20,7 @@ import {
   type CompliancePreflightItem,
   type CompliancePreflightVerdict,
 } from "@/lib/ai-prompts";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { projectToPlain } from "@/lib/tiptap-doc";
@@ -117,6 +118,19 @@ export async function createComplianceItemAction(
       .returning({ id: complianceItems.id });
     if (!row) return { ok: false, error: "Could not create item." };
 
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.compliance.create",
+      resourceType: "compliance_item",
+      resourceId: row.id,
+      metadata: {
+        proposalId,
+        category: input.category,
+        number: input.number,
+      },
+    });
+
     revalidatePath(`/proposals/${proposalId}/compliance`);
     return { ok: true, id: row.id };
   } catch (err) {
@@ -133,7 +147,7 @@ export async function updateComplianceItemAction(
   itemId: string,
   input: Partial<ComplianceItemInput>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -176,6 +190,15 @@ export async function updateComplianceItemAction(
         ),
       );
 
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.compliance.update",
+      resourceType: "compliance_item",
+      resourceId: itemId,
+      metadata: { proposalId, fields: Object.keys(input) },
+    });
+
     revalidatePath(`/proposals/${proposalId}/compliance`);
     return { ok: true };
   } catch (err) {
@@ -191,7 +214,7 @@ export async function deleteComplianceItemAction(
   proposalId: string,
   itemId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -204,6 +227,14 @@ export async function deleteComplianceItemAction(
         eq(complianceItems.proposalId, proposalId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.delete",
+    resourceType: "compliance_item",
+    resourceId: itemId,
+    metadata: { proposalId },
+  });
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
 }
@@ -255,6 +286,19 @@ export async function bulkImportComplianceItemsAction(
     })),
   );
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.bulk_import",
+    resourceType: "compliance_item",
+    resourceId: proposalId,
+    metadata: {
+      proposalId,
+      category: input.category,
+      imported: cleaned.length,
+    },
+  });
+
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true, imported: cleaned.length };
 }
@@ -300,7 +344,7 @@ const PREFLIGHT_CONFIDENCE: Set<"high" | "medium" | "low"> = new Set([
 export async function runCompliancePreflightAction(
   proposalId: string,
 ): Promise<CompliancePreflightResult> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -498,6 +542,15 @@ export async function runCompliancePreflightAction(
     }
   }
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.preflight.run",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: { assessed, unmapped, stubbed, provider },
+  });
+
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true, assessed, unmapped, stubbed, provider };
 }
@@ -511,7 +564,7 @@ export async function acceptComplianceAIAssessmentAction(
   proposalId: string,
   itemId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -549,6 +602,18 @@ export async function acceptComplianceAIAssessmentAction(
       ),
     );
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.ai_accept",
+    resourceType: "compliance_item",
+    resourceId: itemId,
+    metadata: {
+      proposalId,
+      acceptedStatus: row.assessment.suggestedStatus,
+    },
+  });
+
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
 }
@@ -560,7 +625,7 @@ export async function dismissComplianceAIAssessmentAction(
   proposalId: string,
   itemId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -578,6 +643,14 @@ export async function dismissComplianceAIAssessmentAction(
         eq(complianceItems.proposalId, proposalId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.ai_dismiss",
+    resourceType: "compliance_item",
+    resourceId: itemId,
+    metadata: { proposalId },
+  });
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
 }

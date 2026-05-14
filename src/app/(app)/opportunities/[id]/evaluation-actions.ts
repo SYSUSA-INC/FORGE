@@ -11,6 +11,7 @@ import {
   type OpportunityActivityKind,
   type OpportunityStage,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { STAGE_LABELS } from "@/lib/opportunity-types";
 
@@ -58,6 +59,20 @@ export async function addActivityAction(input: {
     })
     .returning({ id: opportunityActivities.id });
 
+  if (row) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.activity.create",
+      resourceType: "opportunity_activity",
+      resourceId: row.id,
+      metadata: {
+        opportunityId: input.opportunityId,
+        kind: input.kind,
+      },
+    });
+  }
+
   revalidatePath(`/opportunities/${input.opportunityId}`);
   return { ok: true, id: row!.id };
 }
@@ -66,7 +81,7 @@ export async function deleteActivityAction(
   opportunityId: string,
   activityId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsOpportunity(opportunityId, organizationId))) {
     return { ok: false, error: "Opportunity not found." };
@@ -79,6 +94,14 @@ export async function deleteActivityAction(
         eq(opportunityActivities.opportunityId, opportunityId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.activity.delete",
+    resourceType: "opportunity_activity",
+    resourceId: activityId,
+    metadata: { opportunityId },
+  });
   revalidatePath(`/opportunities/${opportunityId}`);
   return { ok: true };
 }
@@ -115,6 +138,19 @@ export async function setStageWithLogAction(
     title: `${fromLabel} → ${toLabel}`,
     body: reasoning.trim(),
     metadata: { from: current?.stage ?? null, to: newStage },
+  });
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: isGate ? "opportunity.gate_decision" : "opportunity.advance_stage",
+    resourceType: "opportunity",
+    resourceId: opportunityId,
+    metadata: {
+      fromStage: current?.stage ?? null,
+      toStage: newStage,
+      hasReasoning: reasoning.trim().length > 0,
+    },
   });
 
   revalidatePath(`/opportunities/${opportunityId}`);
@@ -171,6 +207,22 @@ export async function saveEvaluationAction(input: {
     body: "",
   });
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.evaluation.save",
+    resourceType: "opportunity_evaluation",
+    resourceId: input.opportunityId,
+    metadata: {
+      opportunityId: input.opportunityId,
+      strategicFit: clamp(input.strategicFit),
+      customerRelationship: clamp(input.customerRelationship),
+      competitivePosture: clamp(input.competitivePosture),
+      resourceAvailability: clamp(input.resourceAvailability),
+      financialAttractiveness: clamp(input.financialAttractiveness),
+    },
+  });
+
   revalidatePath(`/opportunities/${input.opportunityId}`);
   return { ok: true };
 }
@@ -212,6 +264,21 @@ export async function addCompetitorAction(input: {
     body: "",
   });
 
+  if (row) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "opportunity.competitor.create",
+      resourceType: "opportunity_competitor",
+      resourceId: row.id,
+      metadata: {
+        opportunityId: input.opportunityId,
+        name: input.name.trim(),
+        isIncumbent: input.isIncumbent,
+      },
+    });
+  }
+
   revalidatePath(`/opportunities/${input.opportunityId}`);
   return { ok: true, id: row!.id };
 }
@@ -228,7 +295,7 @@ export async function updateCompetitorAction(
     notes?: string;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsOpportunity(opportunityId, organizationId))) {
     return { ok: false, error: "Opportunity not found." };
@@ -250,6 +317,18 @@ export async function updateCompetitorAction(
         eq(opportunityCompetitors.opportunityId, opportunityId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.competitor.update",
+    resourceType: "opportunity_competitor",
+    resourceId: competitorId,
+    metadata: {
+      opportunityId,
+      name: input.name.trim(),
+      isIncumbent: input.isIncumbent,
+    },
+  });
   revalidatePath(`/opportunities/${opportunityId}`);
   return { ok: true };
 }
@@ -258,7 +337,7 @@ export async function removeCompetitorAction(
   competitorId: string,
   opportunityId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsOpportunity(opportunityId, organizationId))) {
     return { ok: false, error: "Opportunity not found." };
@@ -271,6 +350,14 @@ export async function removeCompetitorAction(
         eq(opportunityCompetitors.opportunityId, opportunityId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.competitor.delete",
+    resourceType: "opportunity_competitor",
+    resourceId: competitorId,
+    metadata: { opportunityId },
+  });
   revalidatePath(`/opportunities/${opportunityId}`);
   return { ok: true };
 }

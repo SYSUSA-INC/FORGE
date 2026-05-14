@@ -18,6 +18,7 @@ import {
   parseAiJson,
   winnerAnalysisSchema,
 } from "@/lib/ai-prompts";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { projectToPlain } from "@/lib/tiptap-doc";
@@ -322,6 +323,21 @@ export async function runWinnerAnalysisAction(
   } else {
     await db.insert(proposalWinnerAnalyses).values(analysisValues);
   }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.winner_analysis.run",
+    resourceType: "proposal_winner_analysis",
+    resourceId: proposalId,
+    metadata: {
+      proposalId,
+      competitorName,
+      competitorAwardsFound: competitorAwards.length,
+      stubbed,
+      model,
+    },
+  });
 
   revalidatePath(`/proposals/${proposalId}/outcome`);
 
