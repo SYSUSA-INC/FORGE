@@ -79,6 +79,45 @@ export async function recordRead(input: AuditInput): Promise<void> {
   });
 }
 
+export type AuthDenyReason =
+  | "not_member"
+  | "not_org_admin"
+  | "not_superadmin";
+
+/**
+ * BL-20 — record an authorization denial as a synthetic audit row.
+ * Called by the `require*` auth helpers when they're about to redirect
+ * a request that doesn't meet the bar.
+ *
+ * Skips fully-unauthenticated denials silently because `audit_log`
+ * requires an `organization_id` and we have no tenant context until
+ * the caller is signed in. Anonymous probing surfaces in HTTP logs
+ * instead.
+ */
+export async function recordAuthDenied(input: {
+  user: { id: string; email?: string | null };
+  organizationId: string | null;
+  reason: AuthDenyReason;
+  attemptedOrgId?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  if (!input.organizationId) return;
+  return recordAudit({
+    organizationId: input.organizationId,
+    actor: { userId: input.user.id, email: input.user.email },
+    action: "auth_denied",
+    resourceType: "auth",
+    resourceId: input.reason,
+    metadata: {
+      ...(input.metadata ?? {}),
+      reason: input.reason,
+      ...(input.attemptedOrgId
+        ? { attemptedOrgId: input.attemptedOrgId }
+        : {}),
+    },
+  });
+}
+
 export type PruneResult = {
   organizations: number;
   rowsDeleted: number;

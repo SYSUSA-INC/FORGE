@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { memberships, type Role } from "@/db/schema";
+import { recordAuthDenied } from "@/lib/audit-log";
 
 export type SessionUser = {
   id: string;
@@ -41,7 +42,15 @@ export async function requireOrgMember(orgId: string): Promise<SessionUser> {
         ),
       )
       .limit(1);
-    if (!m) redirect("/");
+    if (!m) {
+      await recordAuthDenied({
+        user,
+        organizationId: user.organizationId,
+        reason: "not_member",
+        attemptedOrgId: orgId,
+      });
+      redirect("/");
+    }
   }
   return user;
 }
@@ -53,6 +62,13 @@ export async function requireOrgAdmin(orgId: string): Promise<SessionUser> {
   if (user.isSuperadmin) return user;
   if (user.organizationId === orgId) {
     if (user.role && ORG_ADMIN_ROLES.includes(user.role)) return user;
+    await recordAuthDenied({
+      user,
+      organizationId: user.organizationId,
+      reason: "not_org_admin",
+      attemptedOrgId: orgId,
+      metadata: { role: user.role ?? null },
+    });
     redirect("/");
   }
   const [m] = await db
@@ -66,13 +82,29 @@ export async function requireOrgAdmin(orgId: string): Promise<SessionUser> {
       ),
     )
     .limit(1);
-  if (!m || !ORG_ADMIN_ROLES.includes(m.role)) redirect("/");
+  if (!m || !ORG_ADMIN_ROLES.includes(m.role)) {
+    await recordAuthDenied({
+      user,
+      organizationId: user.organizationId,
+      reason: "not_org_admin",
+      attemptedOrgId: orgId,
+      metadata: { role: m?.role ?? null },
+    });
+    redirect("/");
+  }
   return user;
 }
 
 export async function requireSuperadmin(): Promise<SessionUser> {
   const user = await requireAuth();
-  if (!user.isSuperadmin) redirect("/");
+  if (!user.isSuperadmin) {
+    await recordAuthDenied({
+      user,
+      organizationId: user.organizationId,
+      reason: "not_superadmin",
+    });
+    redirect("/");
+  }
   return user;
 }
 

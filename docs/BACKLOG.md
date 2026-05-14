@@ -673,19 +673,30 @@ moving the helper into `src/lib/`.
 
 ---
 
-### BL-20 — Authorization decision logging
-**Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-12
+### BL-20 — Authorization decision logging — **shipped**
+**Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-12  ·  **Status:** ✅ shipped
 
-Every `requireAuth`, `requireCurrentOrg`, `requireSuperadmin`, and
-feature-gate decision should land in the audit log if denied —
-gives ops a tool to detect probing or stuck users.
+Authz denials in the `require*` helpers now write an `auth_denied`
+audit row so ops can spot probing / stuck users.
 
-**Scope:**
-- Wrap auth helpers to record denials with reason code
-- "Auth denied" filter in the audit log UI
+**Shipped:**
+- ✅ `recordAuthDenied()` helper in `src/lib/audit-log.ts` — same
+  shape as `recordAudit`, takes a `reason` of
+  `not_member` | `not_org_admin` | `not_superadmin`, persists with
+  `action="auth_denied"`, `resourceType="auth"`, `resourceId=<reason>`
+- ✅ Wired into `requireOrgMember`, `requireOrgAdmin` (both deny
+  paths), `requireSuperadmin` before each redirect
+- ✅ Unauthenticated denials are skipped (no tenant context to
+  attribute the row to — those surface in HTTP logs instead)
+- ✅ "Authorization (denied)" resource preset added to both the
+  per-tenant `/audit-log` viewer and the BL-18 platform viewer so
+  ops can filter directly to denials
 
-**Acceptance:** unauthorized request to `/platform/tenants` shows up
-in BL-12 with action=`auth_denied`, reason=`not_superadmin`.
+**Acceptance:** ✅ A non-superadmin hitting `/platform/audit-log`
+(or `/admin/*`) is redirected and an `auth_denied` /
+`reason=not_superadmin` row appears in the audit log. Same for
+non-admin hitting org-admin actions, and non-member hitting another
+tenant's surface.
 
 ---
 
