@@ -65,27 +65,37 @@ level menu item updates `NavContent.tsx` in the same PR.
 
 ## Capture & pursuit (Opportunities)
 
-### BL-3 — Stage spell-out widgets on Opportunities Dashboard
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** —
+### BL-3 — Stage spell-out widgets on Opportunities Dashboard — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** —  ·  **Status:** ✅ shipped
 
-Per spec: convert the S1, S2, S3, S4, S5, S6, S7, W, L, NB chips on
-`/opportunities` into actual widgets that show the data per stage,
-with stages spelled out ("S1 → Stage 1", etc.). Keep the existing
-filter behavior, but the widgets become first-class tiles with
-counts + value totals + due-date proximity hints.
+Convert the S1…S7 / W / L / NB chips on `/opportunities` into proper
+widgets with stages spelled out, counts, **value totals**, and due-
+date proximity hints.
 
-**Scope:**
-- Server-side aggregate: count, total value (low/high), nearest due
-  date per stage
-- Client widget grid: 7 active stages + W (Won) + L (Lost) + NB
-  (No-bid) in stage order
-- Each widget: stage label, count, value range, "due within N days"
-  badge, click-to-filter
-- Replace existing chip row; tile stays selected on click
+**Shipped earlier (foundation):**
+- ✅ `StageWidget` tile component, `buildStageStats` aggregator, 10-
+  widget grid with click-to-filter, "Stage N" spell-out, past-due
+  badge, due-proximity hint
 
-**Acceptance:** dashboard renders 10 widgets; clicking one filters
+**Shipped now (closing the value-totals gap):**
+- ✅ `src/lib/money.ts` — `parseDollars`, `formatDollars`, and a new
+  `formatDollarRange(low, high)` that collapses to a single number
+  when one side is zero or both ends are equal
+- ✅ Pipeline funnel's `parseDollars`/`formatDollars` moved into
+  `src/lib/money.ts` and re-exported from `funnel-stats.ts` for
+  backwards compat — single source of truth for BL-3 + BL-4
+- ✅ `StageStat` extended with `totalValueLow` + `totalValueHigh`
+  fields; `buildStageStats` now sums these per stage using the
+  shared `parseDollars`
+- ✅ `StageWidget` renders the formatted value range as a prominent
+  line in the tile (titled "Sum of opportunity value low–high
+  across this stage")
+- ✅ `OpportunitiesClient` plumbs the totals through
+
+**Acceptance:** ✅ Dashboard renders 10 widgets; clicking one filters
 the list below; counts match `select count(*) from opportunities
-group by stage` per the org.
+group by stage`; each tile shows its value range alongside count +
+due hints.
 
 ---
 

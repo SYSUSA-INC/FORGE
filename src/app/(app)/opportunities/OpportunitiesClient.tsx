@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { OpportunityStage } from "@/db/schema";
 import { SendForReviewButton } from "./[id]/review/SendForReviewButton";
+import { formatDollarRange } from "@/lib/money";
 import { StageWidget, spellOutStageCode } from "./StageWidget";
 import { formatDueProximity, type StageStat } from "./stage-stats";
 
@@ -141,6 +142,8 @@ export function OpportunitiesClient({
             count: 0,
             soonestDue: null,
             pastDueCount: 0,
+            totalValueLow: 0,
+            totalValueHigh: 0,
           };
           const dueDate = stat.soonestDue ? new Date(stat.soonestDue) : null;
           return (
@@ -153,6 +156,10 @@ export function OpportunitiesClient({
               color={s.color}
               dueProximity={formatDueProximity(dueDate)}
               pastDueCount={stat.pastDueCount}
+              valueRange={formatDollarRange(
+                stat.totalValueLow,
+                stat.totalValueHigh,
+              )}
               active={stageFilter === s.key}
               onClick={() => setStageFilter(s.key)}
             />

@@ -18,6 +18,7 @@ export function StageWidget({
   color,
   dueProximity,
   pastDueCount,
+  valueRange,
   active,
   onClick,
 }: {
@@ -32,6 +33,9 @@ export function StageWidget({
   /** Pre-formatted "due in 3 days" / "due today" etc., or null. */
   dueProximity: string | null;
   pastDueCount: number;
+  /** Pre-formatted "$50k – $1.2M" totals across the stage, or null when
+   *  every opportunity in the stage has no value range set. */
+  valueRange: string | null;
   active: boolean;
   onClick: () => void;
 }) {
@@ -83,6 +87,15 @@ export function StageWidget({
       </div>
 
       <div className="mt-auto flex flex-col gap-1 font-mono text-[10px]">
+        {valueRange ? (
+          <span
+            className="font-display text-[12px] font-medium tabular-nums"
+            style={{ color: "var(--text)" }}
+            title="Sum of opportunity value low–high across this stage"
+          >
+            {valueRange}
+          </span>
+        ) : null}
         {pastDueCount > 0 ? (
           <span className="inline-flex items-center gap-1 text-rose">
             <span aria-hidden>●</span>
@@ -91,7 +104,7 @@ export function StageWidget({
         ) : null}
         {dueProximity ? (
           <span className="text-amber-200">{dueProximity}</span>
-        ) : count > 0 ? (
+        ) : count > 0 && !valueRange ? (
           <span className="text-subtle">no upcoming due dates</span>
         ) : null}
       </div>
