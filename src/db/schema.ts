@@ -194,6 +194,12 @@ export const organizations = pgTable("organization", {
 
   disabledAt: timestamp("disabled_at"),
 
+  // BL-12c — per-tenant audit-log retention window. Daily cron at
+  // /api/cron/prune-audit-logs deletes rows older than this. Bounded
+  // 90–3650 days at the action layer; the DB column is wider so
+  // operators can adjust the floor without a migration if needed.
+  auditRetentionDays: integer("audit_retention_days").notNull().default(365),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -14,7 +14,7 @@ import {
   users,
   type OpportunityReviewRecommendation,
 } from "@/db/schema";
-import { recordAudit } from "@/lib/audit-log";
+import { recordAudit, recordRead } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { sendOpportunityReviewRequestEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -255,6 +255,23 @@ export async function getReviewRequestByTokenAction(
   if (!row) return { ok: false, error: "Review link not found or already revoked." };
 
   const expired = row.r.expiresAt.getTime() < Date.now();
+
+  // Token-scoped read; the reviewer may be an external user without
+  // an account. Pin the actor identity to the reviewer-email snapshot
+  // on the request row so the audit trail captures who loaded the
+  // link without requiring an authenticated session.
+  await recordRead({
+    organizationId: row.r.organizationId,
+    actor: { userId: row.r.reviewerUserId, email: row.r.reviewerEmail },
+    action: "opportunity.review.link_loaded",
+    resourceType: "opportunity_review_request",
+    resourceId: row.r.id,
+    metadata: {
+      opportunityId: row.o.id,
+      expired,
+      completed: row.r.completedAt !== null,
+    },
+  });
 
   return {
     ok: true,

@@ -14,6 +14,10 @@ import { fetchSamGovByUei } from "@/lib/samgov";
 import type { OrgProfile } from "@/lib/org-types";
 import { hasErrors, validateOrgProfile } from "@/lib/validators";
 import { log } from "@/lib/log";
+import {
+  AUDIT_RETENTION_MAX_DAYS,
+  AUDIT_RETENTION_MIN_DAYS,
+} from "./audit-retention-constants";
 
 export async function saveOrgProfileAction(profile: OrgProfile): Promise<
   { ok: true } | { ok: false; error: string }
@@ -80,6 +84,51 @@ export async function saveOrgProfileAction(profile: OrgProfile): Promise<
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Failed to save changes.",
+    };
+  }
+}
+
+export async function setAuditRetentionDaysAction(
+  days: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  if (
+    !Number.isFinite(days) ||
+    !Number.isInteger(days) ||
+    days < AUDIT_RETENTION_MIN_DAYS ||
+    days > AUDIT_RETENTION_MAX_DAYS
+  ) {
+    return {
+      ok: false,
+      error: `Retention must be a whole number between ${AUDIT_RETENTION_MIN_DAYS} and ${AUDIT_RETENTION_MAX_DAYS} days.`,
+    };
+  }
+
+  try {
+    await db
+      .update(organizations)
+      .set({ auditRetentionDays: days, updatedAt: new Date() })
+      .where(eq(organizations.id, organizationId));
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "settings.audit_retention.update",
+      resourceType: "organization",
+      resourceId: organizationId,
+      metadata: { days },
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    log.error("[setAuditRetentionDaysAction]", "failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to update retention.",
     };
   }
 }

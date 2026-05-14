@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { requireAuth } from "@/lib/auth-helpers";
 import { rowToOrgProfile } from "@/lib/org-types";
+import { AuditRetentionPanel } from "./AuditRetentionPanel";
 import { SettingsClient } from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
@@ -28,5 +29,15 @@ export default async function SettingsPage() {
   const profile = rowToOrgProfile(org);
   const canEdit = user.role === "admin" || user.isSuperadmin;
 
-  return <SettingsClient initialProfile={profile} canEdit={canEdit} />;
+  return (
+    <>
+      <SettingsClient initialProfile={profile} canEdit={canEdit} />
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <AuditRetentionPanel
+          initialDays={org.auditRetentionDays}
+          canEdit={canEdit}
+        />
+      </div>
+    </>
+  );
 }

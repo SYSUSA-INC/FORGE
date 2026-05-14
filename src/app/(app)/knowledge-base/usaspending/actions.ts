@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { knowledgeEntries, organizations } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit, recordRead } from "@/lib/audit-log";
 import {
   searchAwardsByRecipientName,
   type UsaspendingAward,
@@ -24,7 +25,7 @@ export async function searchUsaspendingAction(input?: {
   recipientName?: string;
   includeIdv?: boolean;
 }): Promise<SearchResult> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   // Default the search to the org's legal name if the user didn't
@@ -52,6 +53,20 @@ export async function searchUsaspendingAction(input?: {
     includeIdv: input?.includeIdv ?? false,
   });
   if (!result.ok) return result;
+
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "knowledge.usaspending.search",
+    resourceType: "usaspending_query",
+    resourceId: query.slice(0, 128),
+    metadata: {
+      recipientName: query,
+      includeIdv: input?.includeIdv ?? false,
+      totalRecords: result.totalRecords,
+      returnedRecords: result.awards.length,
+    },
+  });
 
   // Mark already-imported entries so the UI can disable their
   // checkboxes. Match on the "usa-award-<awardId>" tag we stamp on
@@ -144,6 +159,19 @@ export async function importUsaspendingAwardsAction(
       skipped += 1;
     }
   }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "knowledge_artifact.usaspending_import",
+    resourceType: "knowledge_entry",
+    resourceId: "",
+    metadata: {
+      requested: byId.size,
+      imported,
+      skipped,
+    },
+  });
 
   revalidatePath("/knowledge-base");
   return { ok: true, imported, skipped };
