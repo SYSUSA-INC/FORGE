@@ -230,7 +230,7 @@ export async function updateTemplateAction(
 export async function setDefaultTemplateAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -255,6 +255,13 @@ export async function setDefaultTemplateAction(
           eq(proposalTemplates.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "template.set_default",
+      resourceType: "template",
+      resourceId: id,
+    });
     revalidatePath("/settings/templates");
     return { ok: true };
   } catch (err) {
@@ -269,7 +276,7 @@ export async function setDefaultTemplateAction(
 export async function archiveTemplateAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -283,6 +290,13 @@ export async function archiveTemplateAction(
           eq(proposalTemplates.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "template.archive",
+      resourceType: "template",
+      resourceId: id,
+    });
     revalidatePath("/settings/templates");
     return { ok: true };
   } catch (err) {
@@ -297,7 +311,7 @@ export async function archiveTemplateAction(
 export async function unarchiveTemplateAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -311,6 +325,13 @@ export async function unarchiveTemplateAction(
           eq(proposalTemplates.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "template.unarchive",
+      resourceType: "template",
+      resourceId: id,
+    });
     revalidatePath("/settings/templates");
     return { ok: true };
   } catch (err) {
@@ -331,7 +352,7 @@ export async function setTemplateKindAction(
   id: string,
   kind: ProposalTemplateKind,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -344,6 +365,14 @@ export async function setTemplateKindAction(
         eq(proposalTemplates.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "template.set_kind",
+    resourceType: "template",
+    resourceId: id,
+    metadata: { kind },
+  });
   revalidatePath("/settings/templates");
   revalidatePath(`/settings/templates/${id}`);
   return { ok: true };
@@ -372,7 +401,7 @@ export async function uploadTemplateDocxAction(
   templateId: string,
   formData: FormData,
 ): Promise<DocxUploadResult> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -447,6 +476,19 @@ export async function uploadTemplateDocxAction(
     })
     .where(eq(proposalTemplates.id, templateId));
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "template.upload_docx",
+    resourceType: "template",
+    resourceId: templateId,
+    metadata: {
+      fileName: file.name,
+      fileSize: file.size,
+      variableCount: scan.variables.length,
+    },
+  });
+
   revalidatePath("/settings/templates");
   revalidatePath(`/settings/templates/${templateId}`);
 
@@ -467,7 +509,7 @@ export async function uploadTemplateDocxAction(
 export async function clearTemplateDocxAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
@@ -487,6 +529,13 @@ export async function clearTemplateDocxAction(
         eq(proposalTemplates.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "template.clear_docx",
+    resourceType: "template",
+    resourceId: id,
+  });
   revalidatePath("/settings/templates");
   revalidatePath(`/settings/templates/${id}`);
   return { ok: true };

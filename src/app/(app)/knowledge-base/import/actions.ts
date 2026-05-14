@@ -8,6 +8,7 @@ import {
   type KnowledgeArtifactKind,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import {
   detectFormat,
@@ -148,6 +149,20 @@ export async function uploadKnowledgeArtifactAction(
   // Extract text inline (fast for most formats; images skip — Phase 10c
   // will run the AI vision pass async).
   await extractAndIndex(row.id, bytes, format, contentType, file.name);
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "knowledge_artifact.upload",
+    resourceType: "knowledge_artifact",
+    resourceId: row.id,
+    metadata: {
+      kind,
+      fileName: file.name,
+      fileSize: file.size,
+      format,
+    },
+  });
 
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
@@ -295,7 +310,7 @@ export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> 
 export async function deleteKnowledgeArtifactAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await db
     .delete(knowledgeArtifacts)
@@ -305,6 +320,13 @@ export async function deleteKnowledgeArtifactAction(
         eq(knowledgeArtifacts.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_artifact.delete",
+    resourceType: "knowledge_artifact",
+    resourceId: id,
+  });
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
   return { ok: true };
@@ -314,7 +336,7 @@ export async function archiveKnowledgeArtifactAction(
   id: string,
   archive: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await db
     .update(knowledgeArtifacts)
@@ -328,6 +350,13 @@ export async function archiveKnowledgeArtifactAction(
         eq(knowledgeArtifacts.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: archive ? "knowledge_artifact.archive" : "knowledge_artifact.unarchive",
+    resourceType: "knowledge_artifact",
+    resourceId: id,
+  });
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
   return { ok: true };
@@ -391,7 +420,7 @@ function guessContentType(format: ExtractFormat): string {
 export async function reextractArtifactTextAction(
   artifactId: string,
 ): Promise<{ ok: true; chars: number } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const [artifact] = await db
@@ -445,6 +474,15 @@ export async function reextractArtifactTextAction(
     .from(knowledgeArtifacts)
     .where(eq(knowledgeArtifacts.id, artifactId))
     .limit(1);
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_artifact.reextract",
+    resourceType: "knowledge_artifact",
+    resourceId: artifactId,
+    metadata: { chars: updated?.rawText?.length ?? 0, format },
+  });
 
   revalidatePath(`/knowledge-base/import/${artifactId}`);
   revalidatePath("/knowledge-base/import");

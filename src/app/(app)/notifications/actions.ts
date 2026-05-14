@@ -9,6 +9,7 @@ import {
   type NotificationKind,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 
 export type NotificationRow = {
@@ -116,6 +117,14 @@ export async function markNotificationsReadAction(
           isNull(notifications.readAt),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "notification.mark_read",
+      resourceType: "notification",
+      resourceId: ids[0] ?? "",
+      metadata: { count: ids.length, ids: ids.slice(0, 25) },
+    });
     revalidatePath("/notifications");
     revalidatePath("/", "layout");
     return { ok: true };
@@ -145,6 +154,13 @@ export async function markAllNotificationsReadAction(): Promise<
         ),
       )
       .returning({ id: notifications.id });
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "notification.mark_all_read",
+      resourceType: "notification",
+      metadata: { count: updated.length },
+    });
     revalidatePath("/notifications");
     revalidatePath("/", "layout");
     return { ok: true, count: updated.length };
