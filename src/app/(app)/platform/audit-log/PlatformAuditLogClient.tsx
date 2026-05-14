@@ -21,6 +21,7 @@ const RESOURCE_PRESETS = [
   { value: "company", label: "Companies" },
   { value: "source_request", label: "Source requests" },
   { value: "notification", label: "Notifications" },
+  { value: "auth", label: "Authorization (denied)" },
 ];
 
 const CATEGORY_PRESETS = [
