@@ -369,42 +369,85 @@ correctly with proper escaping.
 
 ---
 
-### BL-12b — Tenant Audit Log: long-tail mutation coverage
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-12
+### BL-12b — Tenant Audit Log: long-tail mutation coverage — **shipped**
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-12  ·  **Status:** ✅ Mutating action sweep complete (PR-A #135 merged, PR-B #136 merged). Sensitive-read coverage + retention split out to **BL-12c**.
 
-Sweep `recordAudit()` calls into the remaining ~20 mutating server
-actions not covered by BL-12's critical-path scope:
+**PR-A (#135):** 33 audit calls across the proposals / opportunities /
+solicitations cluster:
+- ✅ `proposals/[id]/compliance/actions.ts` (7)
+- ✅ `proposals/[id]/outcome/actions.ts` (2)
+- ✅ `proposals/[id]/outcome/winner-actions.ts` (1)
+- ✅ `proposals/[id]/reviews/actions.ts` (9)
+- ✅ `proposals/[id]/harvest-actions.ts` (1)
+- ✅ `proposals/[id]/sections/ai/auto-draft-actions.ts` (1)
+- ✅ `solicitations/[id]/team-actions.ts` (2)
+- ✅ `opportunities/[id]/review/actions.ts` (3 — includes token-scoped public submission with reviewer-snapshot actor)
+- ✅ `opportunities/[id]/evaluation-actions.ts` (7)
 
-**Files:**
-- `proposals/actions.ts` — section save / add / remove
-- `proposals/[id]/compliance/actions.ts` — compliance items
-- `proposals/[id]/outcome/actions.ts` — record outcome / debrief
-- `proposals/[id]/outcome/winner-actions.ts` — winner analysis
-- `proposals/[id]/reviews/actions.ts` — review create / comment
-- `proposals/[id]/harvest-actions.ts` — manual harvest
-- `proposals/[id]/sections/ai/auto-draft-actions.ts` — auto-draft save
-- `solicitations/[id]/team-actions.ts` — assign / unassign
-- `opportunities/[id]/review/actions.ts` — send / submit
-- `opportunities/[id]/evaluation-actions.ts` — evaluation criteria
-- `knowledge-base/actions.ts` — entry create / update / delete
-- `knowledge-base/import/actions.ts` — artifact upload
-- `knowledge-base/import/[id]/actions.ts` — extract candidates
-- `notifications/actions.ts` — mark read, dismiss
-- `settings/templates/actions.ts` — setDefault, archive, unarchive
-- `admin/actions.ts` — setUserSuperadmin, setUserDisabled,
-  forcePasswordReset, resendOrgAdminInvite, deleteOrganization
+**PR-B (#136):** 28 audit calls (delta) across knowledge-base /
+notifications / templates / admin:
+- ✅ `knowledge-base/actions.ts` (6, pre-existing)
+- ✅ `knowledge-base/import/actions.ts` (4)
+- ✅ `knowledge-base/import/[id]/actions.ts` (5)
+- ✅ `notifications/actions.ts` (2, pre-existing)
+- ✅ `settings/templates/actions.ts` (8)
+- ✅ `admin/actions.ts` (7 — `resolveAuditOrgForUser` helper for super-admin platform ops without a native tenant context)
 
-Plus `recordRead()` on sensitive reads:
-- PDF / DOCX render + download (proposals/[id]/pdf/actions.ts)
-- Share-link generation (opportunity review request, etc.)
-- USAspending lookups (knowledge-base/usaspending/actions.ts)
+**Acceptance (this ticket):** every mutating server action across
+`src/app/(app)` that touches a tenant-scoped table records an audit
+row. ✅ Met.
 
-Plus retention configuration UI: per-tenant 365-day default with an
-admin-configurable cap.
+---
 
-**Acceptance:** every mutating server action across `src/app/(app)`
-records an audit row. Sensitive reads similarly recorded. Retention
-configurable per tenant.
+### BL-12c — Sensitive-read auditing + retention configuration
+**Priority:** P1  ·  **Effort:** S–M  ·  **Depends on:** BL-12b  ·  **Status:** in progress
+
+Splits out from BL-12b because it needs new infrastructure (retention
+column + cron pruner + admin UI) rather than additive logging.
+
+`recordRead()` already exists in `src/lib/audit-log.ts:71-79` as a
+thin wrapper that stamps `metadata.category = "read"`. This ticket
+wires it in and adds retention.
+
+**Surfaces to wire `recordRead`:**
+- `proposals/[id]/pdf/actions.ts` — three render actions
+  (`renderProposalPdfAction`, `renderProposalDocxAction`,
+  `renderProposalDocxAsPdfAction`)
+- `api/proposals/[id]/pdf/[renderId]/route.ts` — the actual file
+  download (separate from render — captures "downloaded N days
+  later" cases)
+- `opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction`
+  — token-scoped share-link load (when a reviewer clicks the link)
+- `knowledge-base/usaspending/actions.ts:searchUsaspendingAction` —
+  external API lookup
+
+**Mutation gap discovered while scoping:**
+- `knowledge-base/usaspending/actions.ts:importUsaspendingAwardsAction`
+  — adds `knowledge_artifact.usaspending_import` audit row (was
+  missing from BL-12b PR-B's scope since the file wasn't on the
+  original list).
+
+**Retention configuration:**
+- Migration `0038_audit_retention.sql` adds
+  `organization.audit_retention_days integer NOT NULL DEFAULT 365`
+- Schema column in `src/db/schema.ts`
+- Server action `setAuditRetentionDaysAction(days)` — org-admin only,
+  bounded 90–3650 days, self-audits
+- UI control on `/settings` (org admin only) — a number input with
+  inline help text explaining the prune cadence
+- Cron handler `/api/cron/prune-audit-logs/route.ts` — per-org loop
+  using each tenant's window; never crosses tenant boundaries
+- `vercel.json` daily entry at 03:30 UTC (offset from the existing
+  cert refresh job)
+
+**Acceptance:**
+- Reading a PDF / DOCX / share-link / USAspending search records a
+  row with `metadata.category === "read"` visible in `/audit-log`
+- Org admins can set retention 90–3650 days from `/settings`
+- Daily cron prunes per-tenant; passes `npm run check:isolation`
+- Existing rows older than a tenant's window are pruned (no grace
+  period for now — operators can lengthen retention if they need to
+  keep older rows)
 
 ---
 

@@ -1,6 +1,7 @@
+import { and, eq, lt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { auditLogs } from "@/db/schema";
+import { auditLogs, organizations } from "@/db/schema";
 import { log } from "@/lib/log";
 
 /**
@@ -76,6 +77,54 @@ export async function recordRead(input: AuditInput): Promise<void> {
       category: "read",
     },
   });
+}
+
+export type PruneResult = {
+  organizations: number;
+  rowsDeleted: number;
+};
+
+/**
+ * BL-12c — prune audit_log rows older than each tenant's configured
+ * retention window. Called by the daily cron at
+ * /api/cron/prune-audit-logs. Per-tenant deletes keep us within the
+ * isolation contract: every WHERE has an organization_id filter.
+ *
+ * Returns a summary so the cron handler can log it for ops.
+ */
+export async function pruneAuditLogsAcrossTenants(): Promise<PruneResult> {
+  const orgs = await db
+    .select({
+      id: organizations.id,
+      auditRetentionDays: organizations.auditRetentionDays,
+    })
+    .from(organizations);
+
+  let rowsDeleted = 0;
+  for (const org of orgs) {
+    const cutoff = new Date(
+      Date.now() - org.auditRetentionDays * 24 * 60 * 60_000,
+    );
+    try {
+      const result = await db
+        .delete(auditLogs)
+        .where(
+          and(
+            eq(auditLogs.organizationId, org.id),
+            lt(auditLogs.createdAt, cutoff),
+          ),
+        )
+        .returning({ id: auditLogs.id });
+      rowsDeleted += result.length;
+    } catch (err) {
+      log.error("[pruneAuditLogs]", "delete failed for org", {
+        error: err,
+        organizationId: org.id,
+      });
+    }
+  }
+
+  return { organizations: orgs.length, rowsDeleted };
 }
 
 /**

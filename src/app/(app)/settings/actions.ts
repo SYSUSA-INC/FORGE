@@ -84,6 +84,60 @@ export async function saveOrgProfileAction(profile: OrgProfile): Promise<
   }
 }
 
+/**
+ * BL-12c — bound retention 90–3650 days. The DB column itself is
+ * unbounded but the action layer holds the contract; operators who
+ * need to escape the floor can do so via direct SQL.
+ */
+export const AUDIT_RETENTION_MIN_DAYS = 90;
+export const AUDIT_RETENTION_MAX_DAYS = 3650;
+export const AUDIT_RETENTION_DEFAULT_DAYS = 365;
+
+export async function setAuditRetentionDaysAction(
+  days: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  if (
+    !Number.isFinite(days) ||
+    !Number.isInteger(days) ||
+    days < AUDIT_RETENTION_MIN_DAYS ||
+    days > AUDIT_RETENTION_MAX_DAYS
+  ) {
+    return {
+      ok: false,
+      error: `Retention must be a whole number between ${AUDIT_RETENTION_MIN_DAYS} and ${AUDIT_RETENTION_MAX_DAYS} days.`,
+    };
+  }
+
+  try {
+    await db
+      .update(organizations)
+      .set({ auditRetentionDays: days, updatedAt: new Date() })
+      .where(eq(organizations.id, organizationId));
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "settings.audit_retention.update",
+      resourceType: "organization",
+      resourceId: organizationId,
+      metadata: { days },
+    });
+
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (err) {
+    log.error("[setAuditRetentionDaysAction]", "failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to update retention.",
+    };
+  }
+}
+
 export async function applySamGovSyncAction(uei: string): Promise<
   | { ok: true }
   | { ok: false; error: string }

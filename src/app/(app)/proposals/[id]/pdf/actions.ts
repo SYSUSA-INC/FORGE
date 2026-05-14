@@ -13,6 +13,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordRead } from "@/lib/audit-log";
 import { getPdfProvider, getPdfProviderStatus } from "@/lib/pdf";
 import {
   getStorageProvider,
@@ -182,6 +183,21 @@ export async function renderProposalPdfAction(
       error: err instanceof Error ? err.message : "Failed to record render.",
     };
   }
+
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.export.render",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      renderId,
+      contentType: rendered.contentType,
+      provider: rendered.provider,
+      byteSize: stored.byteSize,
+      format: rendered.contentType === "application/pdf" ? "pdf" : "html",
+    },
+  });
 
   revalidatePath(`/proposals/${proposalId}`);
   return {
@@ -409,6 +425,21 @@ export async function renderProposalDocxAction(
     };
   }
 
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.export.render",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      renderId,
+      format: "docx",
+      provider: "docxtemplater",
+      byteSize: stored.byteSize,
+      templateId: template.id,
+    },
+  });
+
   revalidatePath(`/proposals/${proposalId}`);
   return {
     ok: true,
@@ -592,6 +623,22 @@ export async function renderProposalDocxAsPdfAction(
       error: err instanceof Error ? err.message : "Failed to record render.",
     };
   }
+
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.export.render",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      renderId,
+      format: ext,
+      provider: converted.provider,
+      byteSize: stored.byteSize,
+      templateId: template.id,
+      stubbed: converted.stubbed,
+    },
+  });
 
   revalidatePath(`/proposals/${proposalId}`);
   return {

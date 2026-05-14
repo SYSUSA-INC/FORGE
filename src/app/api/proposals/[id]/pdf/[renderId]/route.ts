@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { proposalPdfRenders } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordRead } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string; renderId: string } },
 ) {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const [row] = await db
@@ -66,6 +67,19 @@ export async function GET(
   // Word docs need to download (not render inline) to behave well in
   // the browser. PDFs render inline.
   const disposition = ct === "docx" ? "attachment" : "inline";
+
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.export.download",
+    resourceType: "proposal",
+    resourceId: row.proposalId,
+    metadata: {
+      renderId: row.id,
+      format: ct,
+      byteSize: row.byteSize,
+    },
+  });
 
   return new NextResponse(Buffer.from(obj.bytes), {
     status: 200,
