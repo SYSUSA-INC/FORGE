@@ -96,8 +96,11 @@ const NAV: NavGroup[] = [
     id: "platform",
     label: "Platform Administration",
     icon: "✱",
-    href: "/admin",
     superadmin: true,
+    children: [
+      { href: "/admin", label: "Tenants" },
+      { href: "/platform/audit-log", label: "Audit Log" },
+    ],
   },
 ];
 
@@ -266,8 +269,7 @@ export function NavContent({
               ? hrefMatches(pathname, g.href)
               : children.some((c) => hrefMatches(pathname, c.href));
 
-            // Standalone link (Command Center, Platform Administration when
-            // it's a leaf) — direct navigation.
+            // Standalone link (e.g. Command Center) — direct navigation.
             if (g.href && children.length === 0) {
               return (
                 <Link
@@ -380,8 +382,7 @@ export function NavContent({
           const showChildren =
             !!children.length && (!isCollapsedGroup || groupActive);
 
-          // Standalone link group (Command Center, Platform Administration
-          // as leaf) — no expand affordance.
+          // Standalone link group (e.g. Command Center) — no expand affordance.
           if (g.href && children.length === 0) {
             const active = hrefMatches(pathname, g.href);
             return (

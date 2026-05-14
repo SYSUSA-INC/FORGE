@@ -399,55 +399,46 @@ row. ✅ Met.
 
 ---
 
-### BL-12c — Sensitive-read auditing + retention configuration
-**Priority:** P1  ·  **Effort:** S–M  ·  **Depends on:** BL-12b  ·  **Status:** in progress
+### BL-12c — Sensitive-read auditing + retention configuration — **shipped**
+**Priority:** P1  ·  **Effort:** S–M  ·  **Depends on:** BL-12b  ·  **Status:** ✅ Merged #137
 
-Splits out from BL-12b because it needs new infrastructure (retention
+Split out from BL-12b because it needed new infrastructure (retention
 column + cron pruner + admin UI) rather than additive logging.
 
-`recordRead()` already exists in `src/lib/audit-log.ts:71-79` as a
-thin wrapper that stamps `metadata.category = "read"`. This ticket
-wires it in and adds retention.
-
-**Surfaces to wire `recordRead`:**
-- `proposals/[id]/pdf/actions.ts` — three render actions
+**`recordRead()` wired (PR #137):**
+- ✅ `proposals/[id]/pdf/actions.ts` — three render actions
   (`renderProposalPdfAction`, `renderProposalDocxAction`,
-  `renderProposalDocxAsPdfAction`)
-- `api/proposals/[id]/pdf/[renderId]/route.ts` — the actual file
-  download (separate from render — captures "downloaded N days
-  later" cases)
-- `opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction`
-  — token-scoped share-link load (when a reviewer clicks the link)
-- `knowledge-base/usaspending/actions.ts:searchUsaspendingAction` —
-  external API lookup
+  `renderProposalDocxAsPdfAction`) → `proposal.export.render`
+- ✅ `api/proposals/[id]/pdf/[renderId]/route.ts` → `proposal.export.download`
+- ✅ `opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction`
+  → `opportunity.review.link_loaded` (token-scoped; reviewer-snapshot
+  actor)
+- ✅ `knowledge-base/usaspending/actions.ts:searchUsaspendingAction`
+  → `knowledge.usaspending.search`
 
-**Mutation gap discovered while scoping:**
-- `knowledge-base/usaspending/actions.ts:importUsaspendingAwardsAction`
-  — adds `knowledge_artifact.usaspending_import` audit row (was
-  missing from BL-12b PR-B's scope since the file wasn't on the
-  original list).
+**Mutation gap closed (PR #137):**
+- ✅ `importUsaspendingAwardsAction` → `knowledge_artifact.usaspending_import`
+  (file was missing from BL-12b's original list)
 
-**Retention configuration:**
-- Migration `0038_audit_retention.sql` adds
-  `organization.audit_retention_days integer NOT NULL DEFAULT 365`
-- Schema column in `src/db/schema.ts`
-- Server action `setAuditRetentionDaysAction(days)` — org-admin only,
-  bounded 90–3650 days, self-audits
-- UI control on `/settings` (org admin only) — a number input with
-  inline help text explaining the prune cadence
-- Cron handler `/api/cron/prune-audit-logs/route.ts` — per-org loop
-  using each tenant's window; never crosses tenant boundaries
-- `vercel.json` daily entry at 03:30 UTC (offset from the existing
-  cert refresh job)
+**Retention configuration (PR #137):**
+- ✅ Migration `0038_audit_retention.sql` —
+  `organization.audit_retention_days` integer default 365
+- ✅ `setAuditRetentionDaysAction` org-admin-only, 90–3650 day bound,
+  self-audits as `settings.audit_retention.update`
+- ✅ `AuditRetentionPanel` mounted under `/settings` (admin-only,
+  uses existing `aur-*` design tokens)
+- ✅ `pruneAuditLogsAcrossTenants` helper in `audit-log.ts` — per-
+  tenant DELETE with explicit `organization_id` filter (passes
+  static isolation check)
+- ✅ `/api/cron/prune-audit-logs/route.ts` — Bearer-CRON_SECRET
+  auth, returns `{ ok, organizations, rowsDeleted }`
+- ✅ `vercel.json` daily at 03:30 UTC
 
-**Acceptance:**
-- Reading a PDF / DOCX / share-link / USAspending search records a
-  row with `metadata.category === "read"` visible in `/audit-log`
-- Org admins can set retention 90–3650 days from `/settings`
-- Daily cron prunes per-tenant; passes `npm run check:isolation`
-- Existing rows older than a tenant's window are pruned (no grace
-  period for now — operators can lengthen retention if they need to
-  keep older rows)
+**Fixup commit:** Next.js forbids non-async exports from `"use server"`
+modules. Constants moved into sibling `audit-retention-constants.ts`.
+
+**Acceptance:** ✅ All met. The BL-12 family is now fully complete
+(BL-12 / BL-12b / BL-12c).
 
 ---
 
@@ -592,21 +583,61 @@ mid-month → access remains until period end; renewal extends.
 
 ---
 
-### BL-18 — Platform Audit Log (cross-tenant)
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-12
+### BL-18 — Platform Audit Log (cross-tenant) — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-12  ·  **Status:** ✅ shipped
 
-Per spec: "full platform audit logs that can be filtered by tenant,
-type, and time."
+Cross-tenant super-admin view of the BL-12 audit log.
 
-**Scope:**
-- Reuses BL-12 schema (no new table)
-- Super-admin query API + UI on `/platform/audit-log`
-- Filters: tenant, actor, action, resource type, time window
-- "Group by tenant" view for anomaly detection
-- CSV export with proper escaping
+**Shipped:**
+- ✅ `/platform/audit-log` route under super-admin gate
+  (`requireSuperadmin()`)
+- ✅ Server actions: `listPlatformAuditEventsAction`,
+  `listPlatformAuditTenantsAction`, `listPlatformAuditActorsAction`,
+  `exportPlatformAuditLogCsvAction`
+- ✅ Filters: full-text search, tenant, actor (with org tag),
+  resource type, **category (read / mutation)**, from/to dates
+- ✅ "Events by tenant" panel on the page surfaces top-20 tenants by
+  event volume; click-through filters the table to that tenant
+- ✅ Table includes tenant column with name + slug; read events
+  carry a small `read` chip so anomalies are visible at a glance
+- ✅ CSV export includes tenant + slug columns (capped 50,000 rows)
+- ✅ Nav restructure: "Platform Administration" leaf converted to a
+  parent group with **Tenants** (`/admin`) + **Audit Log**
+  (`/platform/audit-log`) children. Pending BLs (BL-15 / BL-16 /
+  BL-17) will add more children here.
 
-**Acceptance:** every BL-12 row visible to super-admin regardless of
-tenant; filtering works; small (~5 min latency) is fine.
+**Deferred (separate ticket):** The legacy `AuditLogTab` in
+`/admin` (synthesizes events from raw table activity via
+`getRecentAuditEvents`) is **not** removed by this PR. Different
+data model than the BL-12 `audit_log` table — the legacy tab shows
+derived events (`org_created`, `proposal_updated`) timestamped from
+the originating table's `createdAt`, while the new view shows
+actual recorded actions with actor IPs, user-agents, and metadata.
+Tracked as **BL-18-cleanup**.
+
+**Acceptance:** ✅ Every BL-12 row visible to super-admin regardless
+of tenant; per-tenant filter works; CSV export functional.
+
+---
+
+### BL-18-cleanup — Retire legacy AdminClient AuditLogTab
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-18
+
+The synthesized event feed in `AdminClient.tsx`'s `AuditLogTab` is
+superseded by the real BL-18 view. Once a tenant has run on the
+post-BL-12 codebase for ~30 days they'll have enough audit rows to
+make the new view fully useful, at which point the legacy tab can
+be removed.
+
+**Steps:**
+- Delete `src/app/(app)/admin/AuditLogTab.tsx`
+- Delete the AuditLogTab entry from `AdminClient.tsx` tabs config
+- Delete `src/lib/admin-audit.ts:getRecentAuditEvents` and any
+  callers
+- Replace the tab with a link to `/platform/audit-log`
+
+**Acceptance:** legacy code removed; admin page links to the BL-18
+view; no regression in the tenants page.
 
 ---
 
