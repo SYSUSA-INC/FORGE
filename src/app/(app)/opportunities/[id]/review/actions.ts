@@ -14,6 +14,7 @@ import {
   users,
   type OpportunityReviewRecommendation,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { sendOpportunityReviewRequestEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -144,6 +145,19 @@ export async function sendOpportunityReviewRequestAction(
     metadata: {
       reviewRequestId: row.id,
       reviewer: reviewerEmail,
+    },
+  });
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: sender.id, email: sender.email },
+    action: "opportunity.review.request",
+    resourceType: "opportunity_review_request",
+    resourceId: row.id,
+    metadata: {
+      opportunityId: opp.id,
+      reviewerEmail,
+      reviewerUserId,
     },
   });
 
@@ -324,6 +338,20 @@ export async function submitOpportunityReviewAction(
     })
     .where(eq(opportunityReviewRequests.id, row.id));
 
+  // Token-scoped submission — derive actor from the request row.
+  await recordAudit({
+    organizationId: row.organizationId,
+    actor: { userId: row.reviewerUserId, email: row.reviewerEmail },
+    action: "opportunity.review.submit",
+    resourceType: "opportunity_review_request",
+    resourceId: row.id,
+    metadata: {
+      opportunityId: row.opportunityId,
+      recommendation: input.recommendation,
+      reviewerEmail: row.reviewerEmail,
+    },
+  });
+
   // Activity entry capturing the verdict.
   await db.insert(opportunityActivities).values({
     opportunityId: row.opportunityId,
@@ -359,6 +387,18 @@ export async function submitOpportunityReviewAction(
         kind: "stage_change",
         title: "Auto-advanced to Qualification",
         body: "Reviewer recommended Bid; stage moved from Identified to Qualification.",
+        metadata: {
+          fromStage: "identified",
+          toStage: "qualification",
+          source: "review_recommendation",
+        },
+      });
+      await recordAudit({
+        organizationId: row.organizationId,
+        actor: { userId: row.reviewerUserId, email: row.reviewerEmail },
+        action: "opportunity.advance_stage",
+        resourceType: "opportunity",
+        resourceId: opp.id,
         metadata: {
           fromStage: "identified",
           toStage: "qualification",

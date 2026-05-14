@@ -15,6 +15,7 @@ import {
   type ReviewColor,
   type ReviewVerdict,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { extractMentionUserIds } from "@/lib/mentions";
 import {
@@ -144,6 +145,19 @@ export async function startReviewAction(input: {
       })),
     });
 
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.review.start",
+      resourceType: "proposal_review",
+      resourceId: review.id,
+      metadata: {
+        proposalId: input.proposalId,
+        color: input.color,
+        reviewerCount: input.reviewerUserIds.length,
+      },
+    });
+
     revalidatePath(`/proposals/${input.proposalId}/reviews`);
     revalidatePath(`/proposals/${input.proposalId}`);
     return { ok: true, reviewId: review.id };
@@ -267,6 +281,15 @@ export async function submitReviewerVerdictAction(input: {
       ),
     );
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.verdict_submit",
+    resourceType: "proposal_review_assignment",
+    resourceId: input.reviewId,
+    metadata: { reviewId: input.reviewId, verdict: input.verdict },
+  });
+
   const [review] = await db
     .select({ proposalId: proposalReviews.proposalId })
     .from(proposalReviews)
@@ -314,6 +337,18 @@ export async function closeReviewAction(input: {
       updatedAt: new Date(),
     })
     .where(eq(proposalReviews.id, input.reviewId));
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.close",
+    resourceType: "proposal_review",
+    resourceId: input.reviewId,
+    metadata: {
+      proposalId: review?.proposalId,
+      verdict: input.verdict,
+    },
+  });
 
   if (review) {
     const recipients = new Set<string>();
@@ -368,7 +403,7 @@ export async function closeReviewAction(input: {
 export async function cancelReviewAction(
   reviewId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await assertReviewOwned(reviewId, organizationId))) {
     return { ok: false, error: "Review not found." };
@@ -382,6 +417,14 @@ export async function cancelReviewAction(
     .update(proposalReviews)
     .set({ status: "cancelled", closedAt: new Date(), updatedAt: new Date() })
     .where(eq(proposalReviews.id, reviewId));
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.cancel",
+    resourceType: "proposal_review",
+    resourceId: reviewId,
+    metadata: { proposalId: review?.proposalId },
+  });
   if (review) {
     revalidatePath(`/proposals/${review.proposalId}/reviews`);
     revalidatePath(`/proposals/${review.proposalId}`);
@@ -421,6 +464,18 @@ export async function assignReviewerAction(input: {
       sectionId: input.sectionId ?? null,
     })
     .onConflictDoNothing();
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.assign",
+    resourceType: "proposal_review_assignment",
+    resourceId: input.reviewId,
+    metadata: {
+      reviewId: input.reviewId,
+      assignedUserId: input.userId,
+      sectionId: input.sectionId ?? null,
+    },
+  });
   const [review] = await db
     .select({
       proposalId: proposalReviews.proposalId,
@@ -451,7 +506,7 @@ export async function unassignReviewerAction(input: {
   reviewId: string;
   userId: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await assertReviewOwned(input.reviewId, organizationId))) {
     return { ok: false, error: "Review not found." };
@@ -464,6 +519,14 @@ export async function unassignReviewerAction(input: {
         eq(proposalReviewAssignments.userId, input.userId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.unassign",
+    resourceType: "proposal_review_assignment",
+    resourceId: input.reviewId,
+    metadata: { reviewId: input.reviewId, removedUserId: input.userId },
+  });
   const [review] = await db
     .select({ proposalId: proposalReviews.proposalId })
     .from(proposalReviews)
@@ -498,6 +561,21 @@ export async function addReviewCommentAction(input: {
       body: trimmedBody,
     })
     .returning({ id: proposalReviewComments.id });
+
+  if (row) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.review.comment",
+      resourceType: "proposal_review_comment",
+      resourceId: row.id,
+      metadata: {
+        reviewId: input.reviewId,
+        sectionId: input.sectionId ?? null,
+        length: trimmedBody.length,
+      },
+    });
+  }
 
   const [review] = await db
     .select({
@@ -573,7 +651,7 @@ export async function toggleCommentResolvedAction(input: {
   commentId: string;
   resolved: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const [row] = await db
     .select({
@@ -599,6 +677,16 @@ export async function toggleCommentResolvedAction(input: {
     .update(proposalReviewComments)
     .set({ resolved: input.resolved })
     .where(eq(proposalReviewComments.id, input.commentId));
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: input.resolved
+      ? "proposal.review.comment.resolve"
+      : "proposal.review.comment.unresolve",
+    resourceType: "proposal_review_comment",
+    resourceId: input.commentId,
+    metadata: { reviewId: row.reviewId, proposalId: row.proposalId },
+  });
   revalidatePath(`/proposals/${row.proposalId}/reviews/${row.reviewId}`);
   return { ok: true };
 }
@@ -635,6 +723,14 @@ export async function deleteReviewCommentAction(
   await db
     .delete(proposalReviewComments)
     .where(eq(proposalReviewComments.id, commentId));
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.comment.delete",
+    resourceType: "proposal_review_comment",
+    resourceId: commentId,
+    metadata: { reviewId: row.reviewId, proposalId: row.proposalId },
+  });
   revalidatePath(`/proposals/${row.proposalId}/reviews/${row.reviewId}`);
   return { ok: true };
 }

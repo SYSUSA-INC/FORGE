@@ -12,6 +12,7 @@ import {
   type ProposalOutcomeReason,
   type ProposalOutcomeType,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
 import { OUTCOME_REASONS } from "@/lib/proposal-outcome-types";
@@ -145,6 +146,18 @@ export async function saveOutcomeAction(
     } catch (err) {
       log.warn("[saveOutcomeAction]", "propagateOutcomeToCorpus failed", { error: err });
     }
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "proposal.outcome.save",
+      resourceType: "proposal_outcome",
+      resourceId: proposalId,
+      metadata: {
+        proposalId,
+        outcomeType,
+        reasonsCount: reasons.length,
+      },
+    });
     revalidatePath(`/proposals/${proposalId}`);
     revalidatePath(`/proposals/${proposalId}/outcome`);
     revalidatePath(`/proposals`);
@@ -221,6 +234,19 @@ export async function saveDebriefAction(
     } else {
       await db.insert(proposalDebriefs).values(payload);
     }
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "proposal.debrief.save",
+      resourceType: "proposal_debrief",
+      resourceId: proposalId,
+      metadata: {
+        proposalId,
+        status: statusRaw,
+        format: formatRaw,
+      },
+    });
 
     revalidatePath(`/proposals/${proposalId}/outcome`);
     return { ok: true };

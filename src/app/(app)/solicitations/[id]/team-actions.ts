@@ -12,6 +12,7 @@ import {
   users,
   type SolicitationRole,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { SOLICITATION_ROLE_LABELS } from "@/lib/solicitation-roles";
 import { log } from "@/lib/log";
@@ -179,6 +180,19 @@ export async function assignSolicitationRoleAction(input: {
     });
   }
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "solicitation.role.assign",
+    resourceType: "solicitation_assignment",
+    resourceId: input.solicitationId,
+    metadata: {
+      solicitationId: input.solicitationId,
+      assignedUserId: input.userId,
+      role: input.role,
+    },
+  });
+
   revalidatePath(`/solicitations/${input.solicitationId}`);
   revalidatePath("/solicitations");
   return { ok: true };
@@ -189,7 +203,7 @@ export async function unassignSolicitationRoleAction(input: {
   userId: string;
   role: SolicitationRole;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   await db
@@ -202,6 +216,19 @@ export async function unassignSolicitationRoleAction(input: {
         eq(solicitationAssignments.role, input.role),
       ),
     );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "solicitation.role.unassign",
+    resourceType: "solicitation_assignment",
+    resourceId: input.solicitationId,
+    metadata: {
+      solicitationId: input.solicitationId,
+      removedUserId: input.userId,
+      role: input.role,
+    },
+  });
 
   revalidatePath(`/solicitations/${input.solicitationId}`);
   return { ok: true };

@@ -8,6 +8,7 @@ import {
   proposals,
   type TipTapDoc,
 } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
@@ -209,6 +210,22 @@ export async function autoDraftSingleSectionAction(input: {
         eq(proposalSections.proposalId, input.proposalId),
       ),
     );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.section.auto_draft",
+    resourceType: "proposal_section",
+    resourceId: input.sectionId,
+    metadata: {
+      proposalId: input.proposalId,
+      wordCount,
+      provider: draft.provider,
+      model: draft.model,
+      stubbed: draft.stubbed,
+      overwrite: !!input.overwrite,
+    },
+  });
 
   revalidatePath(`/proposals/${input.proposalId}/sections`);
   revalidatePath(`/proposals/${input.proposalId}`);
