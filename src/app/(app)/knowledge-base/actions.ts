@@ -9,6 +9,7 @@ import {
   type KnowledgeOutcomeLabel,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import {
   backfillEntryEmbeddings,
   embedKnowledgeEntry,
@@ -133,6 +134,14 @@ export async function createKnowledgeEntryAction(input: {
         log.warn("[createKnowledgeEntryAction]", "embed failed", { error: err });
       });
     }
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "knowledge_entry.create",
+      resourceType: "knowledge_entry",
+      resourceId: row!.id,
+      metadata: { kind: input.kind, title: finalTitle },
+    });
     revalidatePath("/knowledge-base");
     return { ok: true, id: row!.id };
   } catch (err) {
@@ -153,7 +162,7 @@ export async function updateKnowledgeEntryAction(
     tags?: string[];
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   try {
     const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -174,6 +183,14 @@ export async function updateKnowledgeEntryAction(
           eq(knowledgeEntries.organizationId, organizationId),
         ),
       );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_entry.update",
+      resourceType: "knowledge_entry",
+      resourceId: id,
+      metadata: { fields: Object.keys(input) },
+    });
 
     // Re-embed when title or body changed so the vector matches the
     // current content. Tag-only edits don't need re-embedding.
@@ -210,7 +227,7 @@ export async function updateKnowledgeEntryAction(
 export async function archiveKnowledgeEntryAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await db
     .update(knowledgeEntries)
@@ -221,6 +238,13 @@ export async function archiveKnowledgeEntryAction(
         eq(knowledgeEntries.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_entry.archive",
+    resourceType: "knowledge_entry",
+    resourceId: id,
+  });
   revalidatePath("/knowledge-base");
   return { ok: true };
 }
@@ -228,7 +252,7 @@ export async function archiveKnowledgeEntryAction(
 export async function unarchiveKnowledgeEntryAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await db
     .update(knowledgeEntries)
@@ -239,6 +263,13 @@ export async function unarchiveKnowledgeEntryAction(
         eq(knowledgeEntries.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_entry.unarchive",
+    resourceType: "knowledge_entry",
+    resourceId: id,
+  });
   revalidatePath("/knowledge-base");
   return { ok: true };
 }
@@ -246,7 +277,7 @@ export async function unarchiveKnowledgeEntryAction(
 export async function deleteKnowledgeEntryAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await db
     .delete(knowledgeEntries)
@@ -256,6 +287,13 @@ export async function deleteKnowledgeEntryAction(
         eq(knowledgeEntries.organizationId, organizationId),
       ),
     );
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_entry.delete",
+    resourceType: "knowledge_entry",
+    resourceId: id,
+  });
   revalidatePath("/knowledge-base");
   return { ok: true };
 }
@@ -283,10 +321,17 @@ export async function backfillKnowledgeEntryEmbeddingsAction(): Promise<
   | { ok: true; embedded: number; skipped: number }
   | { ok: false; error: string }
 > {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   try {
     const result = await backfillEntryEmbeddings(organizationId);
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_entry.backfill_embeddings",
+      resourceType: "knowledge_entry",
+      metadata: { embedded: result.embedded, skipped: result.skipped },
+    });
     revalidatePath("/knowledge-base");
     return { ok: true, ...result };
   } catch (err) {

@@ -132,6 +132,19 @@ export async function setUserSuperadminAction(
     .update(users)
     .set({ isSuperadmin, updatedAt: new Date() })
     .where(eq(users.id, userId));
+  // Superadmin flag is platform-wide; fall back to the actor's org for
+  // the audit row, or the target user's primary org membership.
+  const auditOrgId = await resolveAuditOrgForUser(actor.organizationId, userId);
+  if (auditOrgId) {
+    await recordAudit({
+      organizationId: auditOrgId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "user.set_superadmin",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { isSuperadmin, superadmin: true },
+    });
+  }
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -152,6 +165,17 @@ export async function setUserDisabledAction(
       updatedAt: new Date(),
     })
     .where(eq(users.id, userId));
+  const auditOrgId = await resolveAuditOrgForUser(actor.organizationId, userId);
+  if (auditOrgId) {
+    await recordAudit({
+      organizationId: auditOrgId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "user.set_disabled",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { disabled, superadmin: true },
+    });
+  }
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -159,7 +183,7 @@ export async function setUserDisabledAction(
 export async function forcePasswordResetAction(
   userId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireSuperadmin();
+  const actor = await requireSuperadmin();
 
   const [user] = await db
     .select({ email: users.email })
@@ -175,6 +199,18 @@ export async function forcePasswordResetAction(
   } catch (err) {
     log.error("[forcePasswordResetAction]", "send failed", { error: err });
     return { ok: false, error: "Could not send reset email." };
+  }
+
+  const auditOrgId = await resolveAuditOrgForUser(actor.organizationId, userId);
+  if (auditOrgId) {
+    await recordAudit({
+      organizationId: auditOrgId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "user.force_password_reset",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { targetEmail: user.email, superadmin: true },
+    });
   }
 
   return { ok: true };
@@ -221,6 +257,15 @@ export async function resendOrgAdminInviteAction(
     .set({ invitedAt: new Date() })
     .where(eq(allowlist.id, inv.id));
 
+  await recordAudit({
+    organizationId: inv.organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.resend_invite",
+    resourceType: "allowlist",
+    resourceId: inv.id,
+    metadata: { email: inv.email, role: inv.role, superadmin: true },
+  });
+
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -247,7 +292,48 @@ export async function deleteOrganizationAction(
     };
   }
 
+  // Snapshot the name before the delete so the audit row carries it.
+  const [orgRow] = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+
   await db.delete(organizations).where(eq(organizations.id, orgId));
+
+  // Org row is gone; pin the audit to the actor's own org so the row
+  // is reachable from the superadmin's audit view. Skip when the actor
+  // has no org (rare but possible for bootstrap superadmins).
+  if (actor.organizationId) {
+    await recordAudit({
+      organizationId: actor.organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "org.delete",
+      resourceType: "organization",
+      resourceId: orgId,
+      metadata: { name: orgRow?.name ?? "", superadmin: true },
+    });
+  }
+
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * Pick an organization id to attach a superadmin user-action audit row
+ * to. Prefer the actor's current org (so they see the row in their own
+ * audit view). Fall back to the target user's primary membership. Returns
+ * null if neither yields an org — caller skips the audit row.
+ */
+async function resolveAuditOrgForUser(
+  actorOrgId: string | null,
+  targetUserId: string,
+): Promise<string | null> {
+  if (actorOrgId) return actorOrgId;
+  const [m] = await db
+    .select({ orgId: memberships.organizationId })
+    .from(memberships)
+    .where(eq(memberships.userId, targetUserId))
+    .limit(1);
+  return m?.orgId ?? null;
 }

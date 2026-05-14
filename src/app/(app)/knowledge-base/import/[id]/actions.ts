@@ -12,6 +12,7 @@ import {
   type KnowledgeKind,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
 import {
   KNOWLEDGE_EXTRACT_PROMPT_VERSION,
   aiExtractKnowledgeFromArtifact,
@@ -118,6 +119,21 @@ export async function startKnowledgeExtractionAction(
       finishedAt: new Date(),
     })
     .where(eq(knowledgeExtractionRuns.id, run.id));
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "knowledge_extraction.run",
+    resourceType: "knowledge_extraction_run",
+    resourceId: run.id,
+    metadata: {
+      artifactId: artifact.id,
+      candidateCount: aiRes.candidates.length,
+      provider: aiRes.provider,
+      model: aiRes.model,
+      stubbed: aiRes.stubbed,
+    },
+  });
 
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
@@ -321,6 +337,20 @@ export async function approveCandidateAction(
     log.warn("[approveCandidateAction]", "embed failed (non-fatal)", { error: err });
   });
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "knowledge_extraction.promote",
+    resourceType: "knowledge_extraction_candidate",
+    resourceId: c.id,
+    metadata: {
+      entryId: entry.id,
+      artifactId: c.artifactId,
+      runId: c.runId,
+      kind: c.kind,
+    },
+  });
+
   revalidatePath("/knowledge-base");
   revalidatePath(`/knowledge-base/import/${c.artifactId}`);
   return { ok: true, entryId: entry.id };
@@ -347,6 +377,14 @@ export async function rejectCandidateAction(
       ),
     );
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "knowledge_extraction.dismiss",
+    resourceType: "knowledge_extraction_candidate",
+    resourceId: candidateId,
+  });
+
   revalidatePath("/knowledge-base");
   return { ok: true };
 }
@@ -358,7 +396,7 @@ export async function rejectCandidateAction(
 export async function resetCandidateAction(
   candidateId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   await db
@@ -375,6 +413,15 @@ export async function resetCandidateAction(
         eq(knowledgeExtractionCandidates.organizationId, organizationId),
       ),
     );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_extraction.reset",
+    resourceType: "knowledge_extraction_candidate",
+    resourceId: candidateId,
+  });
+
   return { ok: true };
 }
 
@@ -385,7 +432,7 @@ export async function resetCandidateAction(
 export async function approveAllPendingForArtifactAction(
   artifactId: string,
 ): Promise<{ ok: true; approved: number } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const pending = await db
@@ -404,6 +451,15 @@ export async function approveAllPendingForArtifactAction(
     const r = await approveCandidateAction(row.id);
     if (r.ok) approved += 1;
   }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "knowledge_extraction.bulk_promote",
+    resourceType: "knowledge_artifact",
+    resourceId: artifactId,
+    metadata: { pending: pending.length, approved },
+  });
 
   return { ok: true, approved };
 }
