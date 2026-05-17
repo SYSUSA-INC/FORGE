@@ -145,6 +145,7 @@ export async function createOpportunityFromEbuyAction(
 
     revalidatePath("/opportunities");
     revalidatePath(`/opportunities/${opp.id}`);
+    revalidatePath("/");
     return { ok: true, opportunityId: opp.id };
   } catch (err) {
     log.error("[createOpportunityFromEbuyAction]", "error", { error: err });

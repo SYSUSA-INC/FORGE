@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDollarRange } from "@/lib/money";
 import { STAGES } from "@/lib/opportunity-types";
 import {
   formatDueProximity,
@@ -49,9 +50,15 @@ export function CommandCenterStageGrid({
           count: 0,
           soonestDue: null,
           pastDueCount: 0,
+          totalValueLow: 0,
+          totalValueHigh: 0,
         };
         const dueDate = stat.soonestDue ? new Date(stat.soonestDue) : null;
         const dueProximity = formatDueProximity(dueDate);
+        const valueRange = formatDollarRange(
+          stat.totalValueLow,
+          stat.totalValueHigh,
+        );
         const spellOut = spellOutStageCode(s.shortLabel);
 
         return (
@@ -91,6 +98,14 @@ export function CommandCenterStageGrid({
             </div>
 
             <div className="mt-auto flex flex-col gap-1 font-mono text-[10px]">
+              {valueRange ? (
+                <span
+                  className="font-display text-[12px] font-medium tabular-nums text-text"
+                  title="Sum of opportunity value low–high across this stage"
+                >
+                  {valueRange}
+                </span>
+              ) : null}
               {stat.pastDueCount > 0 ? (
                 <span className="inline-flex items-center gap-1 text-rose">
                   <span aria-hidden>●</span>
@@ -99,7 +114,7 @@ export function CommandCenterStageGrid({
               ) : null}
               {dueProximity ? (
                 <span className="text-amber-200">{dueProximity}</span>
-              ) : stat.count > 0 ? (
+              ) : stat.count > 0 && !valueRange ? (
                 <span className="text-subtle">no upcoming due dates</span>
               ) : null}
             </div>
