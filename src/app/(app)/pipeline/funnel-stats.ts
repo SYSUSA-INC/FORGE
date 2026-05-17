@@ -1,4 +1,5 @@
 import type { OpportunityStage } from "@/db/schema";
+import { parseDollars } from "@/lib/money";
 import { STAGES } from "@/lib/opportunity-types";
 
 /**
@@ -78,31 +79,7 @@ export function buildFunnelData(rows: RowLike[]): FunnelData {
   return { active, closed, totalCount, totalWeightedValue, winRate };
 }
 
-/**
- * Lossy parser for free-text dollar values: "10M" / "$1.5B" /
- * "500,000" / "1.2k" → number. Returns 0 for unparseable inputs.
- */
-export function parseDollars(s: string): number {
-  if (!s) return 0;
-  const trimmed = s.trim().replace(/[$,]/g, "");
-  const m = trimmed.match(/^([\d.]+)\s*([kKmMbB])?$/);
-  if (!m) {
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : 0;
-  }
-  const base = Number(m[1]);
-  if (!Number.isFinite(base)) return 0;
-  const suffix = (m[2] ?? "").toLowerCase();
-  if (suffix === "k") return base * 1_000;
-  if (suffix === "m") return base * 1_000_000;
-  if (suffix === "b") return base * 1_000_000_000;
-  return base;
-}
-
-export function formatDollars(n: number): string {
-  if (n === 0) return "—";
-  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
-  return `$${Math.round(n).toLocaleString()}`;
-}
+// parseDollars + formatDollars moved to src/lib/money.ts (shared with
+// BL-3's widget grid). Re-exported here for any caller that still
+// imports the names from this module.
+export { parseDollars, formatDollars } from "@/lib/money";

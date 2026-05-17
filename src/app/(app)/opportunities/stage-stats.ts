@@ -1,4 +1,5 @@
 import type { OpportunityStage } from "@/db/schema";
+import { parseDollars } from "@/lib/money";
 
 /**
  * Per-stage aggregates surfaced on the dashboard widget grid.
@@ -8,16 +9,25 @@ import type { OpportunityStage } from "@/db/schema";
  *                    (null if none have a due date or all are past)
  *   pastDueCount   — opportunities whose response date already elapsed
  *                    (signals stale data that needs cleanup)
+ *   totalValueLow  — sum of parsed `valueLow` strings across the stage
+ *   totalValueHigh — sum of parsed `valueHigh` strings across the stage
+ *
+ * Value totals use the same `parseDollars` lossy parser as the
+ * pipeline funnel — unparseable inputs contribute 0.
  */
 export type StageStat = {
   count: number;
   soonestDue: Date | null;
   pastDueCount: number;
+  totalValueLow: number;
+  totalValueHigh: number;
 };
 
 type RowLike = {
   stage: OpportunityStage;
   responseDueDate: Date | null;
+  valueLow: string;
+  valueHigh: string;
 };
 
 export function buildStageStats(rows: RowLike[]): Record<string, StageStat> {
@@ -27,10 +37,18 @@ export function buildStageStats(rows: RowLike[]): Record<string, StageStat> {
   for (const r of rows) {
     let stat = out[r.stage];
     if (!stat) {
-      stat = { count: 0, soonestDue: null, pastDueCount: 0 };
+      stat = {
+        count: 0,
+        soonestDue: null,
+        pastDueCount: 0,
+        totalValueLow: 0,
+        totalValueHigh: 0,
+      };
       out[r.stage] = stat;
     }
     stat.count += 1;
+    stat.totalValueLow += parseDollars(r.valueLow);
+    stat.totalValueHigh += parseDollars(r.valueHigh);
 
     if (r.responseDueDate) {
       if (r.responseDueDate.getTime() < now) {
