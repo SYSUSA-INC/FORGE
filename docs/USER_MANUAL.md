@@ -421,7 +421,11 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 
 ## 8. What FORGE records (the audit trail)
 
-FORGE doesn't have a single "audit log" page — instead, the trail is woven into each feature so the record lives next to the thing it describes. Here's the full inventory of what gets recorded today, where to find it, and what you can rely on it for.
+FORGE has two complementary trails. **Feature-level activity** lives next to the record it describes — stage changes on the opportunity's Activity timeline, review verdicts inside the review, compliance status next to the line. **`/audit-log`** is the unified org-wide stream that records every mutating action (and sensitive reads like PDF exports and share-link loads). Each entry stamps the actor, the action verb, the resource, IP, user-agent, structured metadata, and a timestamp.
+
+The two trails answer different questions. For "what happened to *this* deal?", read the timeline on the record. For "what did our team do this week?" or "did anyone outside the org load our share-link?", filter `/audit-log`.
+
+The inventory below covers the feature-level trails. `/audit-log` is described in §8.12.
 
 ### 8.1 Stage history on opportunities
 
@@ -476,12 +480,27 @@ Inviting, role-changing, disabling, or removing a member updates the membership 
 Be honest about the limits:
 
 - We don't keep prior versions of section prose, organization-profile fields, or compliance text.
-- We don't have a unified "everything that happened in the org this week" stream — the trails live on individual records.
-- We don't surface IP addresses or user-agent strings on activity entries (they're in Vercel access logs if you ever need them).
+- We don't keep a history of org-profile field edits — only the current value.
 
 Where these are needed, ask in the next planning round and we'll add them.
 
-### 8.12 How to use the trail
+### 8.12 `/audit-log` — the unified stream
+
+Open **Operations Management → Audit Log** from the sidebar. The page shows every recorded action across your tenant, newest first, with filters for:
+
+- Free-text search (action verb, resource type/id, actor email)
+- Actor (any member who appears in the log)
+- Resource type (Opportunities, Proposals, Solicitations, Knowledge, Users, Settings, Templates, Companies, Notifications, **Authorization (denied)**)
+- Date range
+- CSV export of the filtered set (compliance reviews; capped at 50,000 rows per export)
+
+Each row carries the actor, what they did, the resource id, IP address, user-agent, and a free-form metadata object that captures useful fields like the new value of an updated field or the count of imported items. Click **Detail** on a row to inspect the metadata JSON.
+
+Retention defaults to 365 days; admins can adjust this between 90 and 3,650 days under **Settings → Audit log retention**. A nightly job prunes rows older than your window.
+
+Sensitive reads (PDF / DOCX render, downloads of a render, share-link loads, USAspending lookups) are recorded too — they carry a `read` chip next to the action so you can distinguish them from mutations at a glance.
+
+### 8.13 How to use the trail
 
 Three habits make the audit trail actually work:
 
