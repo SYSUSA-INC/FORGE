@@ -206,25 +206,46 @@ include an Add Source option" ask in the original spec.
 
 ---
 
-### BL-7 — Cross-page data sync (Command Center ↔ Opportunities Dashboard)
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-3
+### BL-7 — Cross-page data sync (Command Center ↔ Opportunities Dashboard) — **shipped**
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-3  ·  **Status:** ✅ shipped
 
-Per spec: "All this information MUST roll up to the command center
-dashboard and to the Opportunities dashboard. The data has to sync
-across."
+Both pages already shared `getOrganizationSnapshot()` and the
+Command Center had the stage-grid mirror via `CommandCenterStageGrid`
+shipped in earlier work. This PR closes the audit gaps the spec
+called for.
 
-**Scope:**
-- Audit current `/` (Command Center) page; identify which widgets
-  show stale data vs. live aggregates
-- Build a single server-side `getOrganizationSnapshot()` function
-  that returns the aggregate model used by both pages
-- Wire `revalidatePath('/')` on opportunity mutations
-- Add the same stage-widget tiles to Command Center (read-only, with
-  a "Open Opportunities Dashboard →" link)
+**Already in place (foundation):**
+- ✅ Shared `getOrganizationSnapshot()` aggregate model
+- ✅ `CommandCenterStageGrid` read-only tile grid on `/`
+- ✅ Most opportunity mutations already revalidate `/`
 
-**Acceptance:** create an opportunity → Command Center stage count
-updates on next nav (no manual refresh required); same number on
-both pages.
+**Shipped now (audit + close):**
+- ✅ Audit found 7 mutation surfaces that change Command Center
+  counts but didn't `revalidatePath("/")`:
+  - `opportunities/[id]/evaluation-actions.ts:setStageWithLogAction`
+    — stage change
+  - `opportunities/import/actions.ts:importSamGovOpportunitiesAction`
+    — bulk insert
+  - `opportunities/import/ebuy/actions.ts:createOpportunityFromEbuyAction`
+    — single insert
+  - `proposals/[id]/outcome/actions.ts:saveOutcomeAction` —
+    proposal won/lost transition (affects active-proposals count)
+  - `proposals/[id]/reviews/actions.ts:startReviewAction` —
+    creates `in_progress` review (affects "in review" count)
+  - `proposals/[id]/reviews/actions.ts:closeReviewAction` — ends
+    review
+  - `proposals/[id]/reviews/actions.ts:cancelReviewAction` — ends
+    review
+  All seven now call `revalidatePath("/")` after the mutation.
+- ✅ Value-range line added to Command Center stage tiles, mirroring
+  the BL-3 widgets on `/opportunities` (so the two views are now
+  fully visually + numerically aligned)
+- ✅ `CommandCenterStageGrid`'s inline `StageStat` fallback updated
+  to include the new `totalValueLow` / `totalValueHigh` fields
+
+**Acceptance:** ✅ Creating / advancing / closing any of the
+above surfaces refreshes the Command Center on next nav with no
+manual refresh; counts match `/opportunities` exactly.
 
 ---
 

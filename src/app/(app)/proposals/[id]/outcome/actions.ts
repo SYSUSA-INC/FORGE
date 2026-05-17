@@ -162,6 +162,7 @@ export async function saveOutcomeAction(
     revalidatePath(`/proposals/${proposalId}/outcome`);
     revalidatePath(`/proposals`);
     revalidatePath(`/knowledge-base`);
+    revalidatePath("/");
     return { ok: true };
   } catch (err) {
     log.error("[saveOutcomeAction]", "error", { error: err });

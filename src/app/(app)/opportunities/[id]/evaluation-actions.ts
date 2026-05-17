@@ -155,6 +155,7 @@ export async function setStageWithLogAction(
 
   revalidatePath(`/opportunities/${opportunityId}`);
   revalidatePath("/opportunities");
+  revalidatePath("/");
   return { ok: true };
 }
 

@@ -160,6 +160,7 @@ export async function startReviewAction(input: {
 
     revalidatePath(`/proposals/${input.proposalId}/reviews`);
     revalidatePath(`/proposals/${input.proposalId}`);
+    revalidatePath("/");
     return { ok: true, reviewId: review.id };
   } catch (err) {
     log.error("[startReviewAction]", "error", { error: err });
@@ -396,6 +397,7 @@ export async function closeReviewAction(input: {
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
     revalidatePath(`/proposals/${review.proposalId}/reviews`);
     revalidatePath(`/proposals/${review.proposalId}`);
+    revalidatePath("/");
   }
   return { ok: true };
 }
@@ -428,6 +430,7 @@ export async function cancelReviewAction(
   if (review) {
     revalidatePath(`/proposals/${review.proposalId}/reviews`);
     revalidatePath(`/proposals/${review.proposalId}`);
+    revalidatePath("/");
   }
   return { ok: true };
 }

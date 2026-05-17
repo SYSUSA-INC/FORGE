@@ -198,6 +198,7 @@ export async function importSamGovOpportunitiesAction(
   await db.insert(opportunities).values(rows);
 
   revalidatePath("/opportunities");
+  revalidatePath("/");
   return {
     ok: true,
     imported: rows.length,
