@@ -251,25 +251,24 @@ manual refresh; counts match `/opportunities` exactly.
 
 ## Proposal operations
 
-### BL-8 — In-flight / New Proposals submenu finalization
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** PR #100
+### BL-8 — In-flight / New Proposals submenu finalization — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** PR #100  ·  **Status:** ✅ shipped
 
-PR #97 added the In-flight / Submitted tabs on `/proposals`. PR #100
-adds the launcher at `/proposals/new`. Per spec, the menu shows
-"In-flight Proposals" and "New Proposals" as the two Proposals
-sub-items.
+**Shipped:**
+- ✅ Nav under Opportunities: single "Proposals" child replaced with
+  two siblings — **In-flight Proposals** → `/proposals` and
+  **New Proposals** → `/proposals/new`
+- ✅ Tab on `/proposals` renamed "Submitted" → **Past proposals**
+  (also reflects in the panel header when viewing the unfiltered
+  tab). Underlying tab state key `submitted` preserved for back-
+  compat. The "Submitted" meta-tile on the page header stays — that
+  one refers specifically to the `submitted` stage count, distinct
+  from the broader "Past proposals" tab which also includes awarded
+  / lost / no_bid / archived.
 
-**Scope:**
-- Replace single "Proposals" nav item under Opportunities with a
-  parent "Proposals" header + two children:
-  - In-flight Proposals → `/proposals` (already lands on In-flight tab)
-  - New Proposals → `/proposals/new` (launcher)
-- Renames "Submitted" tab on `/proposals` to "Past proposals" (the
-  spec doesn't mention Submitted; this matches the "In-flight" /
-  "Past" mental model better)
-
-**Acceptance:** menu shows the two sub-items; clicking each lands on
-the right page with the right state.
+**Acceptance:** ✅ Menu shows the two sub-items; clicking "In-flight
+Proposals" lands on `/proposals` (default tab), clicking "New
+Proposals" lands on the launcher; tab label reads "Past proposals".
 
 ---
 

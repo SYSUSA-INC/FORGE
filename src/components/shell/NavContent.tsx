@@ -65,7 +65,8 @@ const NAV: NavGroup[] = [
       { href: "/pipeline", label: "Pipeline" },
       { href: "/opportunities/new", label: "New Opportunity" },
       { href: "/solicitations", label: "Solicitations" },
-      { href: "/proposals", label: "Proposals" },
+      { href: "/proposals", label: "In-flight Proposals" },
+      { href: "/proposals/new", label: "New Proposals" },
     ],
   },
   {
