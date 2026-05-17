@@ -25,7 +25,7 @@ type ProposalRow = {
 };
 
 // Two top-level workspaces. "In-flight" = anything actively being
-// authored or color-team reviewed. "Submitted" = past the launch
+// authored or color-team reviewed. "Past proposals" = past the launch
 // button — submitted, awarded, lost, no_bid, archived.
 const IN_FLIGHT_STAGES = new Set<ProposalStage>([
   "draft",
@@ -154,7 +154,7 @@ export function ProposalsClient({
         <TabButton
           active={tab === "submitted"}
           onClick={() => selectTab("submitted")}
-          label="Submitted"
+          label="Past proposals"
           count={submittedCount}
         />
       </div>
@@ -199,7 +199,7 @@ export function ProposalsClient({
           stageFilter === "all"
             ? tab === "in_flight"
               ? "In-flight proposals"
-              : "Submitted proposals"
+              : "Past proposals"
             : STAGES.find((s) => s.key === stageFilter)?.label
         }
         eyebrow={`${filtered.length} of ${inTab.length}`}
