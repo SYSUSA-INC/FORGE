@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import type { AuditEvent } from "@/lib/admin-audit";
-import { AuditLogTab } from "./AuditLogTab";
 import {
   createOrganizationAction,
   deleteOrganizationAction,
@@ -51,20 +49,18 @@ type Stats = {
   pendingAdminInvites: number;
 };
 
-type Tab = "overview" | "organizations" | "users" | "audit";
+type Tab = "overview" | "organizations" | "users";
 
 export function AdminClient({
   currentUserId,
   orgs,
   users,
   stats,
-  auditEvents,
 }: {
   currentUserId: string;
   orgs: OrgRow[];
   users: UserRow[];
   stats: Stats;
-  auditEvents: AuditEvent[];
 }) {
   const [tab, setTab] = useState<Tab>("organizations");
 
@@ -72,7 +68,6 @@ export function AdminClient({
     { key: "overview", label: "Overview" },
     { key: "organizations", label: "Organizations" },
     { key: "users", label: "Platform users" },
-    { key: "audit", label: "Audit log" },
   ];
 
   return (
@@ -102,6 +97,13 @@ export function AdminClient({
               title="Import the SBA 8(a) participant registry"
             >
               SBA 8(a) →
+            </Link>
+            <Link
+              href="/platform/audit-log"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Cross-tenant audit log — every recorded action across every org"
+            >
+              Audit log →
             </Link>
           </>
         }
@@ -138,7 +140,6 @@ export function AdminClient({
         <OrganizationsTab orgs={orgs} currentUserId={currentUserId} />
       )}
       {tab === "users" && <UsersTab users={users} currentUserId={currentUserId} />}
-      {tab === "audit" && <AuditLogTab events={auditEvents} />}
     </>
   );
 }

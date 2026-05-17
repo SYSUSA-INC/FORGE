@@ -1,7 +1,6 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
-import { getRecentAuditEvents } from "@/lib/admin-audit";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { AdminClient } from "./AdminClient";
 
@@ -121,8 +120,6 @@ export default async function AdminPage() {
     memberships: membershipsByUser.get(u.id) ?? [],
   }));
 
-  const auditEvents = await getRecentAuditEvents();
-
   return (
     <AdminClient
       currentUserId={actor.id}
@@ -135,7 +132,6 @@ export default async function AdminPage() {
         activeUsers: usersWithOrgs.filter((u) => !u.disabled).length,
         pendingAdminInvites: pendingAdminInvites.length,
       }}
-      auditEvents={auditEvents}
     />
   );
 }

@@ -650,24 +650,29 @@ of tenant; per-tenant filter works; CSV export functional.
 
 ---
 
-### BL-18-cleanup — Retire legacy AdminClient AuditLogTab
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-18
+### BL-18-cleanup — Retire legacy AdminClient AuditLogTab — **shipped**
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-18  ·  **Status:** ✅ shipped
 
-The synthesized event feed in `AdminClient.tsx`'s `AuditLogTab` is
-superseded by the real BL-18 view. Once a tenant has run on the
-post-BL-12 codebase for ~30 days they'll have enough audit rows to
-make the new view fully useful, at which point the legacy tab can
-be removed.
+The synthesized event feed in `AdminClient.tsx`'s `AuditLogTab` was
+superseded by the BL-18 viewer. Retiring it earlier than the
+originally-planned 30-day soak window — the BL-18 viewer reads the
+same data the new tab needed and is already wired up.
 
-**Steps:**
-- Delete `src/app/(app)/admin/AuditLogTab.tsx`
-- Delete the AuditLogTab entry from `AdminClient.tsx` tabs config
-- Delete `src/lib/admin-audit.ts:getRecentAuditEvents` and any
-  callers
-- Replace the tab with a link to `/platform/audit-log`
+**Shipped:**
+- ✅ Deleted `src/app/(app)/admin/AuditLogTab.tsx`
+- ✅ Deleted `src/lib/admin-audit.ts` (only caller was `admin/page.tsx`)
+- ✅ Removed the `audit` tab + `AuditEvent` import + `auditEvents`
+  prop from `AdminClient.tsx`; trimmed the `Tab` union accordingly
+- ✅ Removed the `getRecentAuditEvents` call from `admin/page.tsx`
+  (and the prop pass)
+- ✅ Added an **Audit log →** link to the SuperAdmin portal header
+  pointing at `/platform/audit-log`, alongside the existing
+  Migrations / Source requests / SBA 8(a) links
+- ✅ Updated the docstring on `platform/audit-log/actions.ts` to
+  mark the legacy tab as retired (past tense)
 
-**Acceptance:** legacy code removed; admin page links to the BL-18
-view; no regression in the tenants page.
+**Acceptance:** ✅ Legacy code removed; SuperAdmin portal links to
+the BL-18 view; no regression in the tenants page.
 
 ---
 
