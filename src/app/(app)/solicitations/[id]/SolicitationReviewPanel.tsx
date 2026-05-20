@@ -106,9 +106,9 @@ export function SolicitationReviewPanel({
   hasRawText: boolean;
 }) {
   const router = useRouter();
-  const [review, setReview] = useState<ReviewState>(initialReview);
-  const [matrix, setMatrix] = useState<MatrixState>(initialMatrix);
-  const [questions, setQuestions] = useState<QuestionState>(initialQuestions);
+  const [review, _setReview] = useState<ReviewState>(initialReview);
+  const [matrix, _setMatrix] = useState<MatrixState>(initialMatrix);
+  const [questions, _setQuestions] = useState<QuestionState>(initialQuestions);
   const [error, setError] = useState<string | null>(null);
   const [reviewing, startReview] = useTransition();
   const [matrixing, startMatrix] = useTransition();

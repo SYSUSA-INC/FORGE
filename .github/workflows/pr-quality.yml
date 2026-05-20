@@ -25,9 +25,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ESLint gate deferred to BL-QC-lint — the project currently has no
-  # `.eslintrc` so `next lint` prompts interactively. Configure ESLint
-  # + fix any existing violations + land the gate in a focused follow-up.
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    # BL-QC-lint: `npm run lint` (next lint) against the Next.js +
+    # TypeScript strict preset configured in .eslintrc.json. Catches
+    # unused imports, exhaustive-deps misses, and other style issues
+    # that tsc --noEmit doesn't enforce.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
 
   pr-title-format:
     name: PR title format (conventional commits)

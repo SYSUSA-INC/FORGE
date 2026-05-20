@@ -142,7 +142,7 @@ function inlineToRuns(node: TipTapNode, forced: ActiveMarks): string[] {
 
   if (node.type === "text" && typeof node.text === "string") {
     const marks = mergeMarks(forced, node.marks ?? []);
-    return splitTextOnNewlines(node.text).map((segment, i) => {
+    return splitTextOnNewlines(node.text).map((segment, _i) => {
       if (segment === "\n") return `<w:r><w:br/></w:r>`;
       return runWithText(segment, marks);
     });

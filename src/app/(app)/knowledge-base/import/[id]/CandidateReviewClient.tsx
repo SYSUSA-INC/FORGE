@@ -52,7 +52,6 @@ export function CandidateReviewClient({
   const [filter, setFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
   >("pending");
-  const [showRejected, setShowRejected] = useState(false);
 
   const pendingCandidates = candidates.filter((c) => c.decision === "pending");
   const approvedCandidates = candidates.filter(
