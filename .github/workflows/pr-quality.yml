@@ -1,0 +1,203 @@
+name: PR quality gates
+
+# Tier-2 robotic pre-merge checks (BL-QC). Each job is independent and
+# surfaces as a separate required status check on `main`, so they can be
+# toggled individually in branch protection. Failing any gate blocks the
+# merge — robotic discipline, not human discipline.
+#
+# Pair with:
+#   - .github/CODEOWNERS — routes sensitive paths to a code-owner reviewer
+#   - docs/PR_QUALITY.md — describes each gate + how to (legitimately) bypass
+#   - .github/workflows/pr.yml — existing typecheck / build / RSC / isolation /
+#     fresh-DB checks (these remain the floor; the gates here are additive)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ESLint gate deferred to BL-QC-lint — the project currently has no
+  # `.eslintrc` so `next lint` prompts interactively. Configure ESLint
+  # + fix any existing violations + land the gate in a focused follow-up.
+
+  pr-title-format:
+    name: PR title format (conventional commits)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title matches conventional-commit shape
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Allowed types per https://www.conventionalcommits.org/ plus
+          # the build / ci types we use in practice.
+          PATTERN='^(feat|fix|chore|docs|refactor|perf|test|style|build|ci)(\([^)]+\))?: .+'
+          if ! printf '%s' "$TITLE" | grep -qE "$PATTERN"; then
+            {
+              echo "::error::PR title must follow conventional-commit format: <type>(<scope>)?: <summary>"
+              echo "Got:     $TITLE"
+              echo "Allowed types: feat, fix, chore, docs, refactor, perf, test, style, build, ci"
+              echo "Example: feat(audit): BL-13 — notifications rules engine schema"
+            } >&2
+            exit 1
+          fi
+          echo "Title OK: $TITLE"
+
+  backlog-hygiene:
+    name: Backlog hygiene (BL-N references must touch BACKLOG.md)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require docs/BACKLOG.md touched when title or body references a BL-N
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          combined="$TITLE $BODY"
+          # Match BL-12, BL-12c, BL-18-cleanup, BL-QC, etc.
+          bl_refs=$(printf '%s' "$combined" | grep -oE 'BL-[A-Za-z0-9]+(-[A-Za-z0-9]+)?' | sort -u | tr '\n' ' ' || true)
+          if [ -z "$bl_refs" ]; then
+            echo "No BL references found — skipping backlog-hygiene check."
+            exit 0
+          fi
+          echo "BL references: $bl_refs"
+          git fetch origin "$BASE_REF" --depth=1
+          if git diff --name-only "origin/$BASE_REF...HEAD" | grep -qE '^docs/BACKLOG\.md$'; then
+            echo "docs/BACKLOG.md touched — backlog hygiene OK."
+            exit 0
+          fi
+          {
+            echo "::error::PR references $bl_refs but doesn't touch docs/BACKLOG.md."
+            echo "Every PR that closes / advances a tracked backlog item must update the backlog entry."
+            echo "If the BL reference in the title is incidental (not the focus of this PR), remove it."
+          } >&2
+          exit 1
+
+  schema-migration-coupling:
+    name: Schema / migration coupling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a new drizzle/*.sql when src/db schema changes
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          git fetch origin "$BASE_REF" --depth=1
+          changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          # Schema-side: any TS file under src/db/
+          schema_changed=$(printf '%s\n' "$changed" | grep -E '^src/db/.*\.ts$' || true)
+          # Migration-side: a new (or modified) numbered sql file under drizzle/
+          migration_changed=$(printf '%s\n' "$changed" | grep -E '^drizzle/[0-9]+_.*\.sql$' || true)
+          if [ -n "$schema_changed" ] && [ -z "$migration_changed" ]; then
+            if printf '%s' "$LABELS" | grep -q '"schema-no-migration"'; then
+              echo "Schema changed without migration, but label 'schema-no-migration' set — allowing."
+              echo "Schema files touched:"
+              printf '%s\n' "$schema_changed"
+              exit 0
+            fi
+            {
+              echo "::error::Schema changed but no new drizzle/[0-9]+_*.sql migration found."
+              echo "Schema files touched:"
+              printf '%s\n' "$schema_changed"
+              echo ""
+              echo "If this is type-only (no SQL impact), add the 'schema-no-migration' label and re-run this check."
+            } >&2
+            exit 1
+          fi
+          echo "Schema / migration coupling OK."
+
+  diff-size-guard:
+    name: Diff-size guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cap diff at 1500 LOC (additions + deletions, lock files excluded)
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          git fetch origin "$BASE_REF" --depth=1
+          loc=$(git diff "origin/$BASE_REF...HEAD" --numstat \
+            ':!package-lock.json' ':!pnpm-lock.yaml' ':!yarn.lock' \
+            | awk '{ a += $1; d += $2 } END { print (a + d) + 0 }')
+          loc=${loc:-0}
+          echo "Total LOC (added + deleted, excl. lock files): $loc"
+          MAX=1500
+          if [ "$loc" -gt "$MAX" ]; then
+            if printf '%s' "$LABELS" | grep -q '"oversized-ok"'; then
+              echo "PR is $loc LOC (over $MAX) but 'oversized-ok' label set — allowing."
+              exit 0
+            fi
+            {
+              echo "::error::PR is $loc LOC — exceeds soft cap of $MAX."
+              echo "Split into smaller PRs, or add the 'oversized-ok' label and justify the size in the PR description."
+            } >&2
+            exit 1
+          fi
+
+  secret-scan:
+    name: Secret scan (added lines)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Regex scan of newly-added non-doc lines
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch origin "$BASE_REF" --depth=1
+          # Only lines starting with "+" (added) but not "+++" (file headers).
+          # Skip markdown + test/spec/fixture paths so docs and fake data
+          # don't trip the scan.
+          new_lines=$(git diff "origin/$BASE_REF...HEAD" -- \
+            ':!*.md' ':!*.test.*' ':!*.spec.*' ':!*/fixtures/*' \
+            | grep -E '^\+[^+]' || true)
+          if [ -z "$new_lines" ]; then
+            echo "No newly added non-doc lines to scan."
+            exit 0
+          fi
+          patterns=(
+            'AKIA[0-9A-Z]{16}'                            # AWS access key id
+            'sk-[a-zA-Z0-9]{20,}'                          # generic API key (OpenAI / Anthropic shape)
+            'sk_(live|test)_[a-zA-Z0-9]{24,}'             # Stripe secret key
+            'ghp_[a-zA-Z0-9]{36}'                          # GitHub classic PAT
+            'github_pat_[a-zA-Z0-9_]{82}'                  # GitHub fine-grained PAT
+            'xox[baprs]-[0-9]+-[0-9]+-[a-zA-Z0-9]+'        # Slack bot/user/etc. token
+            '-----BEGIN [A-Z ]*PRIVATE KEY-----'           # PEM private key
+          )
+          found=0
+          for pat in "${patterns[@]}"; do
+            matches=$(printf '%s' "$new_lines" | grep -E "$pat" || true)
+            if [ -n "$matches" ]; then
+              {
+                echo "::error::Possible secret matching pattern: $pat"
+                printf '%s\n' "$matches" | head -5
+              } >&2
+              found=1
+            fi
+          done
+          if [ "$found" -eq 1 ]; then
+            {
+              echo ""
+              echo "If these are genuinely false positives (docs / fixtures / example values), move them under *.md or */fixtures/* — those paths are excluded from this scan."
+            } >&2
+            exit 1
+          fi
+          echo "No secret patterns detected."
