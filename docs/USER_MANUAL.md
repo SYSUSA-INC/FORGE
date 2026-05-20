@@ -492,7 +492,7 @@ Open **Operations Management → Audit Log** from the sidebar. The page shows ev
 - Actor (any member who appears in the log)
 - Resource type (Opportunities, Proposals, Solicitations, Knowledge, Users, Settings, Templates, Companies, Notifications, **Authorization (denied)**)
 - Date range
-- CSV export of the filtered set (compliance reviews; capped at 50,000 rows per export)
+- CSV export of the filtered set (for offline analysis or external audit; capped at 50,000 rows per export)
 
 Each row carries the actor, what they did, the resource id, IP address, user-agent, and a free-form metadata object that captures useful fields like the new value of an updated field or the count of imported items. Click **Detail** on a row to inspect the metadata JSON.
 
