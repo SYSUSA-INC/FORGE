@@ -708,6 +708,69 @@ moving the helper into `src/lib/`.
 
 ---
 
+### BL-QC — Robotic pre-merge quality gates — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ shipped
+
+Adds layered pre-merge gates so quality control isn't dependent on
+human discipline. Each gate is a separate required status check on
+`main`; failure blocks merge automatically.
+
+Motivated by the four-parallel-PR rebase cascade after BL-8 / BL-21 /
+BL-18-cleanup — repeated "branch out-of-date" friction surfaced that
+the existing safety stack relied on me being disciplined, not on the
+repo enforcing the discipline. This ticket closes that.
+
+**Shipped:**
+- `.github/workflows/pr-quality.yml` — five independent jobs:
+  - PR title format (conventional-commit prefix)
+  - Backlog hygiene (PRs referencing `BL-N` must touch `docs/BACKLOG.md`)
+  - Schema / migration coupling (`src/db/*.ts` changes require a new `drizzle/[0-9]+_*.sql`; `schema-no-migration` label bypasses)
+  - Diff-size guard (PRs over 1,500 LOC blocked; `oversized-ok` label bypasses)
+  - Secret scan (regex on newly-added non-doc lines)
+- `.github/CODEOWNERS` — security-critical paths (`src/db/`,
+  `drizzle/`, auth primitives, audit log, isolation enforcement,
+  `.github/`) routed to `@SYSUSA1NC`; combined with branch
+  protection's "Require review from Code Owners," these paths
+  require explicit approval on top of the robotic checks.
+- `docs/PR_QUALITY.md` — describes each gate, the bypass-label
+  semantics, how to add a new gate, and the recommended branch-
+  protection settings.
+
+**Operator follow-up (one-time, in Settings → Branches → main):**
+- Add each Tier 2 job's display name to required status checks
+  (ESLint, PR title format, Backlog hygiene, Schema / migration
+  coupling, Diff-size guard, Secret scan)
+- Add `Vercel Agent Review` to required status checks (promotes it
+  from advisory to blocking)
+- Enable "Require review from Code Owners"
+- Disable admin bypass on protection rules
+
+**Acceptance:** ✅ Every future PR clears secret scan, conventional-
+commit title check, backlog hygiene, schema-migration coupling, diff-
+size guard, Vercel Agent Review, the existing Tier 0 CI gates, AND a
+code-owner review for sensitive paths before merge is enabled. No
+admin escape hatch.
+
+---
+
+### BL-QC-lint — ESLint as a required gate
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** queued
+
+Follow-up split from BL-QC. The project has no `.eslintrc` today, so
+`next lint` prompts interactively — would block every PR if added as
+a gate. Setup needs its own PR:
+
+**Scope:**
+- Add `.eslintrc.json` with Next.js strict + TypeScript preset
+- Run `npm run lint` once, fix every existing violation (or
+  explicitly silence per rule with rationale)
+- Add an `eslint` job back to `.github/workflows/pr-quality.yml`
+- Add the new job's display name to required status checks
+
+**Acceptance:** every PR must pass `npm run lint` before merge.
+
+---
+
 ### BL-20 — Authorization decision logging — **shipped**
 **Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-12  ·  **Status:** ✅ shipped
 

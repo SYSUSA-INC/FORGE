@@ -1,0 +1,30 @@
+# CODEOWNERS — pre-merge review routing (BL-QC).
+#
+# Pairs with branch protection's "Require review from Code Owners".
+# A PR that touches any of the paths below cannot merge until the named
+# reviewer approves — robotic checks alone aren't sufficient for these
+# security-critical surfaces.
+#
+# Lines later in the file override earlier ones, so the catch-all goes
+# first and specific high-risk paths follow.
+
+# Catch-all — every PR routes a code-owner request, but in practice
+# self-approval is sufficient for ordinary changes.
+*                              @SYSUSA1NC
+
+# Schema + migrations — multi-tenant data correctness lives here. Every
+# change must be human-reviewed; schema-migration-coupling already
+# blocks at the workflow level, but this requires explicit sign-off too.
+/src/db/                       @SYSUSA1NC
+/drizzle/                      @SYSUSA1NC
+
+# Auth + audit + isolation primitives — the security backbone.
+/src/auth.ts                   @SYSUSA1NC
+/src/lib/audit-log.ts          @SYSUSA1NC
+/src/lib/auth-helpers.ts       @SYSUSA1NC
+/scripts/check-isolation.mjs   @SYSUSA1NC
+/.isolation-allow.json         @SYSUSA1NC
+
+# CI / workflows — gates-on-gates. Changing a quality check must itself
+# pass through a code-owner review.
+/.github/                      @SYSUSA1NC
