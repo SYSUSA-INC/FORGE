@@ -14,12 +14,11 @@ import { safeQuery } from "@/lib/schema-resilience";
  * tenant. Each export uses `requireSuperadmin()` as the only gate;
  * a non-superadmin call will throw before any query runs.
  *
- * The legacy `AuditLogTab` in `/admin` shows a synthesized event
- * feed derived from raw table activity. This module reads from the
- * real `audit_log` table written by `recordAudit`/`recordRead`, so
- * it has actor IPs, user agents, structured metadata, and read-vs-
- * mutation categorization. A follow-up will deprecate the legacy
- * tab in favor of this view.
+ * Reads from the real `audit_log` table written by `recordAudit` /
+ * `recordRead` — actor IPs, user agents, structured metadata, and
+ * read-vs-mutation categorization. The legacy synthesized
+ * `AuditLogTab` under `/admin` was retired in BL-18-cleanup; this
+ * is now the only super-admin audit surface.
  */
 
 const PAGE_SIZE = 100;
