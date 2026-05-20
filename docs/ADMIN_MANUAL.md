@@ -314,12 +314,20 @@ Common causes:
 
 ### 5.4 Data isolation
 
-You (as superadmin) cannot see another org's data from the regular app pages — for example, you can't open `/opportunities` and browse another org's opportunities. To look at cross-org data you'd need a separate admin UI (not yet built; coming in a later phase).
+FORGE enforces multi-tenant data isolation at three layers:
 
-For now, superadmin actions are limited to:
-- Platform-wide user + org listings
-- Org / user lifecycle (create, disable, delete)
-- Password resets
+1. **At the route.** Every page under `(app)/` calls an auth gate (`requireAuth` / `requireCurrentOrg` / `requireOrgAdmin` / `requireOrgMember` / `requireSuperadmin`). A user can't reach a page they don't have a role for, and per-org pages refuse to render rows that don't carry the caller's `organizationId`.
+2. **At the query.** Every Drizzle query against a tenant-scoped table includes an `eq(table.organizationId, organizationId)` clause. The **Multi-tenant isolation check** CI gate (BL-19 Phase 1) walks every `"use server"` file and asserts each exported async function that touches a tenant-scoped table either calls an auth gate *and* references `organizationId`, or is on the explicit allow list (`.isolation-allow.json`) with a documented reason (public token-scoped surfaces, etc.). A PR that introduces a server action that queries a scoped table without scoping is blocked from merging into `main`.
+3. **At the audit.** Authorization denials (a user trying to access another tenant's data, a non-admin invoking an admin-only action) write an `auth_denied` audit row with a reason code (`not_member`, `not_org_admin`, `not_superadmin`). Filter `/audit-log` to **Authorization (denied)** to spot probing or stuck users.
+
+Superadmin override is real but bounded: a superadmin can see every tenant's audit rows via `/platform/audit-log` and manage tenants under `/admin`, but **cannot** open another tenant's `/opportunities` or `/proposals` UI as if they were a member — every page query still scopes by `organizationId`, which for a superadmin reads from their primary membership.
+
+If you ever suspect cross-tenant leakage:
+1. Filter `/platform/audit-log` by tenant to confirm the actor's org context on each row.
+2. Run `npm run check:isolation` locally on the latest `main` — it errors out if any server action violates the contract, which is exactly the bug pattern that would let a tenant-A user read tenant-B data.
+3. Check Vercel logs for the path in question — `requireOrgMember` redirects produce a visible status code, and the `auth_denied` row in `/audit-log` will carry the offending user's IP.
+
+A planned BL-19 Phase 2 will add runtime tests: spin up two tenants, exercise every server action with cross-tenant ids, and fail loudly on any leak the static check missed. That work blocks on a test framework landing.
 
 ### 5.5 Running database migrations
 

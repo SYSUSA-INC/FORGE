@@ -752,13 +752,20 @@ guide. Tracked as continuous work, not a single PR.
   ADMIN_MANUAL §4.5 trimmed of the same stale bullets; new §4.6
   documents `/audit-log` + `/platform/audit-log` + `auth_denied` +
   retention; new §4.7 cross-references the feature-level trails.
+- ✅ Stage widgets + cross-page sync (BL-3 / BL-7) — USER_MANUAL §5.1
+  rewritten to describe the 10-widget grid (count + value range +
+  due hint + past-due badge + click-to-filter); USER_MANUAL §2
+  gains a "Command Center vs. Opportunities Dashboard" §2.1 that
+  spells out the navigate-vs-filter split and the shared snapshot.
+- ✅ Multi-tenant isolation (BL-19 Phase 1) — ADMIN_MANUAL §5.4
+  rewritten as "three layers" (route gates / query scope / audit
+  denials) with the static-check CI gate called out by name and the
+  Phase 2 runtime-test plan referenced.
 
 **Still outstanding (queued for future passes):**
-- BL-3 stage widgets w/ value totals — USER_MANUAL §5.1 list view
-- BL-7 Command Center sync — USER_MANUAL §2 app layout
-- BL-8 Proposals submenu split — USER_MANUAL §6 + §2.x nav
-- BL-19 multi-tenant isolation check — ADMIN_MANUAL §5 troubleshooting
-- BL-22 nav v2 — already partly covered in USER_MANUAL §2
+- BL-8 Proposals submenu split — USER_MANUAL §6 + §2 nav; now
+  unblocked (BL-8 merged in PR #142)
+- BL-22 nav v2 — partial coverage exists; needs a polish pass
 
 ---
 

@@ -82,11 +82,19 @@ After signing in you'll see the main **app shell**:
 
 ![App shell](docs/images/app-shell.png)
 
-- **Left sidebar** — navigation, grouped into Operations, Intelligence, Administration (admin only), and Platform (superadmin only)
+- **Left sidebar** — navigation, grouped into Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins.
 - **Top bar** — the mobile hamburger, live session clock, Settings shortcut, and your avatar
 - **Content area** — changes with the page you're on
 
 The top-right avatar is your **user menu**. Click it to see your name/email and sign out.
+
+### 2.1 Command Center vs. Opportunities Dashboard
+
+The default landing page after sign-in is the **Command Center** (`/`). It's the at-a-glance home — a 10-tile stage grid for opportunities (count + value range + due hint per stage), a "Next deadline" panel highlighting the soonest non-past-due opportunity, and a "Proposal stages" breakdown. Clicking any tile **navigates** to the Opportunities Dashboard pre-filtered to that stage.
+
+The **Opportunities Dashboard** (`/opportunities`) is the same tile grid plus an editable filter + search + the per-opportunity list. Clicking a tile here **filters in place** rather than navigating.
+
+Both pages source from the same `getOrganizationSnapshot()` aggregate, so the numbers can't disagree. Mutations on either page (creating an opportunity, advancing a stage, closing a review, etc.) refresh the Command Center on the next nav with no manual reload.
 
 ---
 
@@ -195,13 +203,22 @@ Go to **Opportunities** in the sidebar.
 
 ![Opportunities list](docs/images/opportunities-list.png)
 
-- **Stat tiles** at the top: Total / In capture / In proposal / Won
-- **Stage filter chips** — click any to filter (All, Identified, Sources Sought, Qualification, Capture, Pre-Proposal, Writing, Submitted, Won, Lost, No Bid)
+The page leads with a **10-widget grid** of stage tiles — one per active stage (S1 through S7, spelled out as "Stage 1"… "Stage 7") plus the three closed states (Won / Lost / No Bid). Each tile shows:
+
+- The count of opportunities in that stage
+- The descriptive label ("Sources Sought / RFI", "Qualification", etc.)
+- A **value range** — sum of `valueLow` to sum of `valueHigh` across the stage, formatted compactly (`$250k – $5M`). Tiles where every entry has no value range hide the line.
+- A due-date hint — "due in 3 days" / "due today" for the soonest upcoming response date, or a red **N past due** badge if responses are stale
+- An "Everything" tile at the start that clears the filter
+
+Click a tile to filter the list below to that stage. The active tile gets a colored border + filled background so you can tell at a glance what's selected.
+
+Below the grid:
 - **Search** — title, agency, owner, solicitation number
 - **+ New opportunity** — manual create
 - **Import from SAM.gov** — live SAM.gov search
 
-Click any row to open its detail page.
+Click any row to open its detail page. The same tile grid is mirrored on the **Command Center** (`/`) home page — but the Command Center tiles **navigate** to a pre-filtered dashboard view instead of filtering in place, so it's the at-a-glance read whereas Opportunities is the filter-and-drill workspace. Both views read from the same `getOrganizationSnapshot()` aggregate so the numbers can never disagree.
 
 ### 5.2 Import from SAM.gov
 
