@@ -268,12 +268,26 @@ The shape of this table is deliberate: the *decisions* (stage moves, gate calls,
 
 The trail is good but not complete. Specifically:
 
-- No per-field history on org profile or compliance items.
+- No per-field history on org profile or compliance items — only the current value.
 - No prior-version archive on section text (the current body overwrites the prior body).
-- No unified org-wide "what happened today" feed — you'd have to look per-record.
-- No IP / user-agent capture in the in-app trail (Vercel access logs cover that if you ever truly need it for an investigation).
 
 When any of these matter for your operating cadence, raise it and we'll prioritize.
+
+### 4.6 `/audit-log` (per-tenant) and `/platform/audit-log` (super-admin)
+
+The unified audit stream addresses the previous "no org-wide feed" and "no IP / user-agent capture" gaps. Two surfaces:
+
+**Operations Management → Audit Log** (`/audit-log`) — tenant-scoped. Every mutating server action and sensitive read in your org writes a row with actor, action verb, resource type + id, IP, user-agent, structured metadata, and timestamp. Filter by actor, resource type (Opportunities / Proposals / Solicitations / Knowledge / Users / Settings / Templates / Companies / Notifications / **Authorization (denied)**), date range, or free-text. CSV export available.
+
+**Platform Administration → Audit Log** (`/platform/audit-log`) — **super-admin only**. Cross-tenant view of the same rows; adds a tenant filter dropdown, a category filter (Mutations / Reads), and an "Events by tenant" panel that highlights top-20 tenants by volume — useful for spotting an unusually quiet (suspicious) or unusually loud (potential abuse) tenant. CSV export includes tenant + slug columns.
+
+**Authorization denials** (BL-20) are recorded as `auth_denied` rows with a reason code (`not_member`, `not_org_admin`, `not_superadmin`). They surface in the "Authorization (denied)" filter chip on both viewers. Useful for spotting probing or stuck users.
+
+**Retention** is configurable per tenant under **Settings → Audit log retention** (90–3,650 days, default 365). A nightly cron prunes rows older than each tenant's configured window.
+
+### 4.7 Where the trail still lives next to the record
+
+`/audit-log` is the unified feed; the feature-level trails described in §4.2 still exist and remain the right place for "what happened to *this* opportunity / review / compliance item?" questions. Use the unified feed for cross-record queries; use the per-record trails for drill-in.
 
 ---
 

@@ -731,15 +731,29 @@ tenant's surface.
 ---
 
 ### BL-21 — Help content refresh
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** —
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** —  ·  **Status:** rolling
 
 PR #98 added FAQ. User Guide (`/help/user`) and Admin Guide
-(`/help/admin`) markdown should be updated to reflect the new nav,
-new launcher flow, audit log, notifications rules, etc. as each
-feature ships. Tracked here so it doesn't fall behind.
+(`/help/admin`) markdown is updated as features ship.
 
 **Scope:** rolling — each shipping BL adds a section to user/admin
 guide. Tracked as continuous work, not a single PR.
+
+**Completed passes:**
+- ✅ Audit log family (BL-12 / BL-12c / BL-18 / BL-20) — USER_MANUAL
+  §8 rewritten: new §8.12 documents `/audit-log` (filters + CSV
+  export + retention + read-vs-mutation chip). Stale §8.11 bullets
+  removed ("no unified feed", "no IP/UA capture" — both wrong now).
+  ADMIN_MANUAL §4.5 trimmed of the same stale bullets; new §4.6
+  documents `/audit-log` + `/platform/audit-log` + `auth_denied` +
+  retention; new §4.7 cross-references the feature-level trails.
+
+**Still outstanding (queued for future passes):**
+- BL-3 stage widgets w/ value totals — USER_MANUAL §5.1 list view
+- BL-7 Command Center sync — USER_MANUAL §2 app layout
+- BL-8 Proposals submenu split — USER_MANUAL §6 + §2.x nav
+- BL-19 multi-tenant isolation check — ADMIN_MANUAL §5 troubleshooting
+- BL-22 nav v2 — already partly covered in USER_MANUAL §2
 
 ---
 
