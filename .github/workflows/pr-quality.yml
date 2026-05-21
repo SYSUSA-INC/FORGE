@@ -25,9 +25,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ESLint gate deferred to BL-QC-lint — the project currently has no
-  # `.eslintrc` so `next lint` prompts interactively. Configure ESLint
-  # + fix any existing violations + land the gate in a focused follow-up.
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    # BL-QC-lint: `npm run lint` (next lint) against the Next.js +
+    # TypeScript strict preset configured in .eslintrc.json. Catches
+    # unused imports, exhaustive-deps misses, and other style issues
+    # that tsc --noEmit doesn't enforce.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
 
   pr-title-format:
     name: PR title format (conventional commits)
@@ -133,8 +145,10 @@ jobs:
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
         run: |
           git fetch origin "$BASE_REF" --depth=1
-          loc=$(git diff "origin/$BASE_REF...HEAD" --numstat \
-            ':!package-lock.json' ':!pnpm-lock.yaml' ':!yarn.lock' \
+          loc=$(git diff "origin/$BASE_REF...HEAD" --numstat -- \
+            ':(exclude)package-lock.json' \
+            ':(exclude)pnpm-lock.yaml' \
+            ':(exclude)yarn.lock' \
             | awk '{ a += $1; d += $2 } END { print (a + d) + 0 }')
           loc=${loc:-0}
           echo "Total LOC (added + deleted, excl. lock files): $loc"
@@ -167,7 +181,10 @@ jobs:
           # Skip markdown + test/spec/fixture paths so docs and fake data
           # don't trip the scan.
           new_lines=$(git diff "origin/$BASE_REF...HEAD" -- \
-            ':!*.md' ':!*.test.*' ':!*.spec.*' ':!*/fixtures/*' \
+            ':(exclude)*.md' \
+            ':(exclude)*.test.*' \
+            ':(exclude)*.spec.*' \
+            ':(exclude)**/fixtures/**' \
             | grep -E '^\+[^+]' || true)
           if [ -z "$new_lines" ]; then
             echo "No newly added non-doc lines to scan."

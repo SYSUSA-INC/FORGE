@@ -29,16 +29,12 @@ mechanisms for legitimately bypassing one.
 
 | Gate | What it catches | Bypass |
 |---|---|---|
+| ESLint | Lint errors `tsc` doesn't catch (unused imports, exhaustive-deps, etc.) | None |
 | PR title format | Non-conventional commit titles | None |
 | Backlog hygiene | PRs that reference a `BL-N` but don't touch `docs/BACKLOG.md` | Remove the BL reference from title/body if it's incidental |
 | Schema / migration coupling | `src/db/*.ts` changes without a matching `drizzle/*.sql` | Label: `schema-no-migration` (type-only changes) |
 | Diff-size guard | PRs over 1,500 LOC (added + deleted, excl. lock files) | Label: `oversized-ok` (justify in PR description) |
 | Secret scan | Common credential shapes in newly-added lines | Move legitimate matches under `*.md` or `*/fixtures/*` |
-
-**ESLint** is deferred to **BL-QC-lint**. The project currently has no
-`.eslintrc` so `next lint` prompts interactively, which would block
-every PR. The follow-up configures ESLint with the Next.js + TypeScript
-preset, fixes any existing violations, and lands the gate.
 
 ### Tier 3 — human review (`.github/CODEOWNERS`)
 

@@ -29,7 +29,10 @@ export type MembersSummary = {
   }[];
 };
 
-const ROLE_KEYS: Role[] = [
+// Kept in sync with the role enum on the DB schema — referenced via
+// type, not value, but documented here so the source of truth lives
+// next to where membership status is computed.
+const _ROLE_KEYS: Role[] = [
   "admin",
   "capture",
   "proposal",

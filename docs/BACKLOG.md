@@ -753,21 +753,52 @@ admin escape hatch.
 
 ---
 
-### BL-QC-lint — ESLint as a required gate
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** queued
+### BL-QC-lint — ESLint as a required gate — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 
-Follow-up split from BL-QC. The project has no `.eslintrc` today, so
-`next lint` prompts interactively — would block every PR if added as
-a gate. Setup needs its own PR:
+**Shipped:**
+- `.eslintrc.json` extending `next/core-web-vitals` + `next/typescript`
+  presets, with `@typescript-eslint/no-unused-vars` strict + the
+  `^_` ignore prefix for legitimate unused args/vars
+- `eslint` + `eslint-config-next` added as devDependencies
+- Fixed 15 pre-existing violations across `src/app/(app)` and `src/lib`:
+  unused imports trimmed, unused destructured setters prefixed with
+  `_`, unused function parameters prefixed with `_`. No behavior
+  change in any file.
+- ESLint job added back to `.github/workflows/pr-quality.yml` —
+  becomes the 6th Tier-2 gate.
+
+**Operator follow-up:** add `ESLint` to required status checks in
+Settings → Branches → main.
+
+**Acceptance:** ✅ `npm run lint` exits clean on `main`; PRs must
+pass it before merge.
+
+---
+
+### BL-QC-deeper — Neon-branch-per-PR + Drizzle validate
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC, BL-QC-lint  ·  **Status:** queued
+
+Per the user's request — match the depth of checks seen on their other
+project. Three additions:
 
 **Scope:**
-- Add `.eslintrc.json` with Next.js strict + TypeScript preset
-- Run `npm run lint` once, fix every existing violation (or
-  explicitly silence per rule with rationale)
-- Add an `eslint` job back to `.github/workflows/pr-quality.yml`
-- Add the new job's display name to required status checks
+- **Neon branch per PR** — `.github/workflows/neon-branch.yml` that
+  calls Neon's API on PR `opened` to create a branch off production,
+  stores the connection string as a per-PR secret, and tears down on
+  PR `closed`. Vercel preview env picks up the branch URL; the fresh-
+  DB migration check runs against the branch (real production schema
+  + data shape, not an ephemeral empty Postgres). Requires `NEON_API_KEY`
+  in repo secrets — one-time setup by the operator.
+- **Drizzle schema validate** — new job in `pr-quality.yml` that runs
+  `drizzle-kit generate --dry-run` (or equivalent) and fails if the
+  schema and the migration files disagree. Complements the existing
+  schema/migration coupling check, which only checks file-presence.
+- **Combined typecheck-lint job (cosmetic)** — consolidates the two
+  into one job-run for faster CI; no power change.
 
-**Acceptance:** every PR must pass `npm run lint` before merge.
+**Acceptance:** every PR runs against a real Neon branch of the prod
+schema; drizzle catches schema-migration drift before merge.
 
 ---
 

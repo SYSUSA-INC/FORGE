@@ -22,7 +22,7 @@
  * and the drafter still works — pattern intel is additive context.
  */
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   complianceItems,

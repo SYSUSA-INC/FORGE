@@ -1,6 +1,6 @@
 "use server";
 
-import { inArray, or, sql } from "drizzle-orm";
+import { inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { certFirms } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";

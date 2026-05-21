@@ -222,7 +222,7 @@ export async function aiRunQuestionGenerator(input: {
 // without an Anthropic key configured.
 // ────────────────────────────────────────────────────────────────────
 
-function stubReviewVerdict(title: string): SolicitationReviewVerdict {
+function stubReviewVerdict(_title: string): SolicitationReviewVerdict {
   return {
     summary:
       "AI document review is in stub mode. Set ANTHROPIC_API_KEY on Vercel to enable a real review against your uploaded RFP. The shape below is illustrative.",
