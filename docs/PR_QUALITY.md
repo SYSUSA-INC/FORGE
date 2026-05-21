@@ -35,6 +35,7 @@ mechanisms for legitimately bypassing one.
 | Schema / migration coupling | `src/db/*.ts` changes without a matching `drizzle/*.sql` | Label: `schema-no-migration` (type-only changes) |
 | Diff-size guard | PRs over 1,500 LOC (added + deleted, excl. lock files) | Label: `oversized-ok` (justify in PR description) |
 | Secret scan | Common credential shapes in newly-added lines | Move legitimate matches under `*.md` or `*/fixtures/*` |
+| Drizzle schema validate | Snapshot / journal inconsistency in `drizzle/meta/` | None — fix the schema |
 
 ### Tier 3 — human review (`.github/CODEOWNERS`)
 

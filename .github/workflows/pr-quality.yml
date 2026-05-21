@@ -218,3 +218,28 @@ jobs:
             exit 1
           fi
           echo "No secret patterns detected."
+
+  drizzle-validate:
+    name: Drizzle schema validate
+    runs-on: ubuntu-latest
+    # BL-QC-deeper: `drizzle-kit check` validates that the recorded
+    # schema snapshots (drizzle/meta/*.json) are internally consistent
+    # — no two migrations claim the same snapshot prefix, no orphan
+    # entries, no journal/snapshot mismatch. Catches a class of
+    # corruption that `Fresh-DB migration verification` (which only
+    # runs the SQL) wouldn't surface.
+    #
+    # Doesn't replace the fresh-DB check — that's the gold-standard
+    # validation since it executes the actual SQL against a real
+    # Postgres. This is the cheap pre-flight.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npx drizzle-kit check
+        env:
+          # drizzle-kit check doesn't connect; stub satisfies config validation.
+          DATABASE_URL: "postgres://stub:stub@localhost:5432/stub"
