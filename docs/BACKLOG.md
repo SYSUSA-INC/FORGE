@@ -776,29 +776,73 @@ pass it before merge.
 
 ---
 
-### BL-QC-deeper — Neon-branch-per-PR + Drizzle validate
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC, BL-QC-lint  ·  **Status:** queued
+### BL-QC-deeper — Drizzle schema validate — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC, BL-QC-lint  ·  **Status:** ✅ shipped
 
-Per the user's request — match the depth of checks seen on their other
-project. Three additions:
+Adds `drizzle-kit check` as the 7th Tier-2 gate. Validates that the
+recorded schema snapshots (`drizzle/meta/*.json`) are internally
+consistent — no duplicate snapshot prefixes, no orphan journal
+entries, no schema/snapshot mismatch.
+
+**Shipped:**
+- New `drizzle-validate` job in `.github/workflows/pr-quality.yml`
+- Documented in `docs/PR_QUALITY.md`
+
+**Limitation:** the project applies migrations 0018+ via
+`scripts/apply-schema.mjs` rather than `drizzle-kit migrate`, so the
+journal stopped at 0017. `drizzle-kit check` only validates the
+journaled portion. The existing `Fresh-DB migration verification`
+remains the gold-standard validation because it actually runs every
+SQL file against a real Postgres.
+
+**Operator follow-up:** add `Drizzle schema validate` to required
+status checks in Settings → Branches → main.
+
+---
+
+### BL-QC-neon — Neon branch per PR
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** queued
+
+Split from the original BL-QC-deeper scope because it needs operator
+setup (`NEON_API_KEY` in repo secrets) before the workflow can
+function. Matches the depth of checks the user wants — every PR gets
+its own Neon DB branch off production, the Vercel preview env points
+at it, the fresh-DB migration check runs against it, and the branch
+tears down on PR close.
 
 **Scope:**
-- **Neon branch per PR** — `.github/workflows/neon-branch.yml` that
-  calls Neon's API on PR `opened` to create a branch off production,
-  stores the connection string as a per-PR secret, and tears down on
-  PR `closed`. Vercel preview env picks up the branch URL; the fresh-
-  DB migration check runs against the branch (real production schema
-  + data shape, not an ephemeral empty Postgres). Requires `NEON_API_KEY`
-  in repo secrets — one-time setup by the operator.
-- **Drizzle schema validate** — new job in `pr-quality.yml` that runs
-  `drizzle-kit generate --dry-run` (or equivalent) and fails if the
-  schema and the migration files disagree. Complements the existing
-  schema/migration coupling check, which only checks file-presence.
-- **Combined typecheck-lint job (cosmetic)** — consolidates the two
-  into one job-run for faster CI; no power change.
+- New workflow `.github/workflows/neon-branch.yml`:
+  - On `pull_request` `opened`/`reopened`: call Neon API to create
+    a branch named `pr-<number>` off the production branch; store
+    the connection string as a job output / set on the PR via the
+    Vercel integration
+  - On `pull_request` `closed`: call Neon API to delete the branch
+- Modify `pr.yml`'s `migrations-fresh` job to use the PR's Neon
+  branch URL when available, falling back to the ephemeral Postgres
+  service when not (so first-time deploys without `NEON_API_KEY`
+  configured still work)
+- Update Vercel project settings to inherit `DATABASE_URL` from the
+  per-PR Neon branch (one-time, documented in PR_QUALITY.md)
 
-**Acceptance:** every PR runs against a real Neon branch of the prod
-schema; drizzle catches schema-migration drift before merge.
+**Operator setup (one-time):**
+- Generate a Neon API key in the Neon console
+- Add as `NEON_API_KEY` in Settings → Secrets → Actions
+- Connect Vercel preview env to the per-PR branch via Vercel's
+  Neon integration
+
+**Acceptance:** opening a PR creates a Neon branch; closing/merging
+deletes it; Vercel preview connects to the per-PR DB; fresh-DB
+migration check runs against the branch (real production schema +
+data shape) instead of an ephemeral empty Postgres.
+
+---
+
+### BL-QC-combined-job — Consolidate typecheck + lint
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** queued
+
+Cosmetic CI cleanup — combine the separate `typecheck` (in `pr.yml`)
+and `lint` (in `pr-quality.yml`) jobs into one job-run for slightly
+faster CI. No power change; just one less `npm ci` per PR.
 
 ---
 
