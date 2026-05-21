@@ -24,6 +24,7 @@ mechanisms for legitimately bypassing one.
 |---|---|
 | Vercel Preview deploy | Build failures that the typecheck / next-build steps don't catch (env-resolution issues, edge runtime, etc.) |
 | Vercel Agent Review | Style / clarity / suggested-fix issues. Currently advisory by default — promote to required status check to make it blocking. |
+| **Neon branch lifecycle** | Per-PR DB branch off the project's `main` so the Vercel preview deploy + fresh-DB migration test against real production schema state. Auto-deletes on PR close. Requires `NEON_API_KEY` + `NEON_PROJECT_ID` configured (see operator setup below); soft-skips with a `::notice::` annotation when not configured. |
 
 ### Tier 2 — robotic quality gates (this file describes these, `.github/workflows/pr-quality.yml`)
 
@@ -68,19 +69,36 @@ Anything else — including "this is a CI flake" — gets addressed at the sourc
 
 No label exists for any other gate. If a check is genuinely wrong, fix the workflow definition itself in the same PR.
 
-## Branch-protection settings checklist
+## Operator setup checklist
 
-One-time configuration on the `main` branch, then it self-enforces:
+### Branch protection (Settings → Branches → main)
 
 - ✅ Require pull request before merging
 - ✅ Require status checks to pass before merging
   - All Tier 0 + Tier 2 job names listed
   - **Vercel Agent Review** added (promotes Vercel Agent from advisory to blocking)
+  - **Create Neon branch** + **Delete Neon branch** added (once configured)
 - ✅ Require branches to be up to date before merging (combined with the diff-size guard, this disciplines parallel PRs)
 - ✅ Require conversation resolution before merging
 - ✅ Require review from Code Owners
 - ✅ Restrict who can dismiss pull request reviews (admins only)
 - ✅ Do not allow bypassing the above settings (no admin bypass)
+
+### Neon branch lifecycle (Settings → Secrets and variables → Actions)
+
+To activate the per-PR Neon branch workflow:
+
+1. Generate a Neon API key in the [Neon console](https://console.neon.tech) under your account → API keys
+2. Add to the repo as a **secret**: `NEON_API_KEY`
+3. Find your Neon project ID (Neon console → your project → Settings → General)
+4. Add to the repo as a **variable** (not a secret — it's not sensitive): `NEON_PROJECT_ID`
+5. (Optional) If your Neon branch parent isn't `main`, add variable `NEON_BRANCH_PARENT` with the parent name
+6. (Optional) If your Neon role isn't `forge`, add variable `NEON_USERNAME` with the role name
+7. (Optional but recommended) In Vercel: connect the project to your Neon project via the official Vercel-Neon integration. Vercel will automatically use the per-PR branch's connection string in the Preview environment.
+
+Once configured, every PR creates a Neon branch named `pr-<number>` off the parent branch; the workflow posts a comment on the PR with the (password-masked) connection string. Closing/merging the PR deletes the branch.
+
+The workflow is **safe to merge before configuring**: the lifecycle jobs detect the missing secret/variable and exit cleanly with a `::notice::` annotation rather than failing.
 
 Together these mean: every merge into `main` passes the full robotic
 stack AND has a code-owner sign-off, with no admin escape hatch.

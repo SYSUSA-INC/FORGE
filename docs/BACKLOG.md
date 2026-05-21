@@ -800,40 +800,64 @@ status checks in Settings → Branches → main.
 
 ---
 
-### BL-QC-neon — Neon branch per PR
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** queued
+### BL-QC-neon — Neon branch per PR — **shipped (workflow); operator setup pending**
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ workflow shipped; awaits operator config
 
-Split from the original BL-QC-deeper scope because it needs operator
-setup (`NEON_API_KEY` in repo secrets) before the workflow can
-function. Matches the depth of checks the user wants — every PR gets
-its own Neon DB branch off production, the Vercel preview env points
-at it, the fresh-DB migration check runs against it, and the branch
-tears down on PR close.
-
-**Scope:**
+**Shipped:**
 - New workflow `.github/workflows/neon-branch.yml`:
-  - On `pull_request` `opened`/`reopened`: call Neon API to create
-    a branch named `pr-<number>` off the production branch; store
-    the connection string as a job output / set on the PR via the
-    Vercel integration
-  - On `pull_request` `closed`: call Neon API to delete the branch
-- Modify `pr.yml`'s `migrations-fresh` job to use the PR's Neon
-  branch URL when available, falling back to the ephemeral Postgres
-  service when not (so first-time deploys without `NEON_API_KEY`
-  configured still work)
-- Update Vercel project settings to inherit `DATABASE_URL` from the
-  per-PR Neon branch (one-time, documented in PR_QUALITY.md)
+  - On PR `opened` / `reopened` / `synchronize`: creates a Neon
+    branch named `pr-<number>` off the project's parent branch
+    (default `main`) using `neondatabase/create-branch-action@v6`
+  - Posts a PR comment with the password-masked connection string
+    (idempotent — updates the existing comment on subsequent syncs
+    rather than spamming new ones)
+  - On PR `closed`: deletes the branch via
+    `neondatabase/delete-branch-action@v3`
+- **Soft-skip when not configured** — both lifecycle jobs detect
+  missing `NEON_API_KEY` or `NEON_PROJECT_ID` and exit cleanly with
+  a `::notice::` annotation. The workflow is safe to merge before
+  operator setup.
+- Documented in `docs/PR_QUALITY.md` with the full setup checklist.
 
-**Operator setup (one-time):**
-- Generate a Neon API key in the Neon console
-- Add as `NEON_API_KEY` in Settings → Secrets → Actions
-- Connect Vercel preview env to the per-PR branch via Vercel's
-  Neon integration
+**Operator follow-up (one-time, Settings → Secrets and variables → Actions):**
+- Add secret `NEON_API_KEY` (from Neon console → account → API keys)
+- Add variable `NEON_PROJECT_ID` (from Neon console → project → settings)
+- Optional: `NEON_BRANCH_PARENT`, `NEON_USERNAME`
+- Optional but recommended: connect the Vercel project to the Neon
+  project via the official Vercel-Neon integration; preview deploys
+  will then auto-use the per-PR branch
+- Add `Create Neon branch` + `Delete Neon branch` to required
+  status checks in Settings → Branches → main
 
-**Acceptance:** opening a PR creates a Neon branch; closing/merging
-deletes it; Vercel preview connects to the per-PR DB; fresh-DB
-migration check runs against the branch (real production schema +
-data shape) instead of an ephemeral empty Postgres.
+**Future follow-up (BL-QC-neon-migration-rewire):** modify the
+existing `Fresh-DB migration verification` job in `pr.yml` to use
+the per-PR Neon branch when configured (falling back to the
+ephemeral Postgres service when not). That gives migrations a test
+against real production schema/data shape, not an empty Postgres.
+Split out as its own ticket because it depends on this workflow
+being live + verified working.
+
+**Acceptance:** ✅ Opening a PR creates a Neon branch (once
+configured); closing/merging deletes it; the connection string is
+posted as a PR comment. Vercel preview auto-uses the branch via the
+Neon integration. Migration-rewire deferred.
+
+---
+
+### BL-QC-neon-migration-rewire — Use Neon branch for fresh-DB check
+**Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-QC-neon  ·  **Status:** queued
+
+Follow-up to BL-QC-neon. Modify `pr.yml`'s `migrations-fresh` job
+to use the per-PR Neon branch's connection string instead of the
+ephemeral `pgvector/pgvector:pg16` service. Gives the migration
+test real production schema shape (and optionally real data shape
+via Neon's branching).
+
+**Conditions:**
+- Use the Neon branch when both `NEON_API_KEY` and `NEON_PROJECT_ID`
+  are set (`needs.create-branch.outputs.configured == 'true'`)
+- Fall back to the ephemeral Postgres service otherwise — preserves
+  the existing behavior for forks / setups without Neon access.
 
 ---
 

@@ -1,0 +1,133 @@
+name: Neon branch lifecycle
+
+# BL-QC-neon — per-PR Neon DB branch.
+#
+# On PR open/reopen/sync: create a Neon branch `pr-<number>` off the
+# project's main branch. Outputs the connection string so downstream
+# jobs (and the Vercel preview env via Neon's Vercel integration) can
+# use the per-PR DB instead of a shared one. Branch is auto-deleted on
+# PR close.
+#
+# Operator setup (one-time, in Settings → Secrets and variables → Actions):
+#   - Add secret  NEON_API_KEY         — generate in the Neon console
+#   - Add variable NEON_PROJECT_ID     — your Neon project ID
+#   - (Optional) Add variable NEON_BRANCH_PARENT (default: "main")
+#   - (Optional) Connect Vercel to Neon via the official integration so
+#     preview deployments pick up the per-PR branch automatically.
+#
+# Until both NEON_API_KEY and NEON_PROJECT_ID are configured, the
+# workflow detects the missing config and exits cleanly with a
+# `::notice::` — the check passes so it doesn't block merges, but the
+# branch lifecycle is a no-op. Configure to enable.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: neon-branch-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  create-branch:
+    name: Create Neon branch
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.detect.outputs.configured }}
+      db_url: ${{ steps.create.outputs.db_url }}
+      db_url_pooled: ${{ steps.create.outputs.db_url_pooled }}
+    steps:
+      - name: Detect Neon configuration
+        id: detect
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neon not configured — set NEON_API_KEY secret + NEON_PROJECT_ID variable to enable per-PR branches. Skipping."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Neon configured; creating branch for PR #${{ github.event.pull_request.number }}."
+          fi
+
+      - name: Create branch
+        id: create
+        if: steps.detect.outputs.configured == 'true'
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          parent: ${{ vars.NEON_BRANCH_PARENT || 'main' }}
+          branch_name: pr-${{ github.event.pull_request.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          username: ${{ vars.NEON_USERNAME || 'forge' }}
+
+      - name: Comment connection details on PR
+        if: steps.detect.outputs.configured == 'true' && steps.create.outputs.db_url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const raw = `${{ steps.create.outputs.db_url }}`;
+            // Mask the password so the comment is safe to share.
+            const masked = raw.replace(/:([^:@]+)@/, ':***@');
+            const body = [
+              `🧪 **Neon branch \`pr-${{ github.event.pull_request.number }}\` created** off \`${{ vars.NEON_BRANCH_PARENT || 'main' }}\`.`,
+              ``,
+              `Connection (password masked): \`${masked}\``,
+              ``,
+              `The branch auto-deletes when this PR closes. If Vercel's Neon integration is connected, the preview deploy points at this branch automatically.`,
+            ].join('\n');
+            const tag = '🧪 **Neon branch';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.startsWith(tag));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  delete-branch:
+    name: Delete Neon branch
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect Neon configuration
+        id: detect
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neon not configured — nothing to delete."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Delete branch
+        if: steps.detect.outputs.configured == 'true'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: pr-${{ github.event.pull_request.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
