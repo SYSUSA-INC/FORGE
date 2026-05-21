@@ -777,6 +777,188 @@ export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
 export type NotificationKind = (typeof notificationKindEnum.enumValues)[number];
 
+// ─────────────────────────────────────────────────────────────────────
+// BL-13 — Notification rules engine
+//
+// notification_rule:    the configurable rule itself
+// notification_delivery: per-rule, per-recipient delivery + SLA tracking
+//
+// Distinct from `notification` above, which is the in-app inbox row.
+// A single delivery may correspond to zero or one inbox rows depending
+// on the channel (in_app fans out to `notification`; email/slack/teams
+// go to the external system and update sent_at on the delivery row).
+// ─────────────────────────────────────────────────────────────────────
+
+export const notificationTriggerEventKindEnum = pgEnum(
+  "notification_trigger_event_kind",
+  [
+    "opportunity_due_soon",
+    "opportunity_advanced",
+    "opportunity_no_bid",
+    "opportunity_won",
+    "opportunity_lost",
+    "proposal_created",
+    "proposal_advanced",
+    "proposal_section_overdue",
+    "review_request_pending",
+    "review_completed",
+    "compliance_overdue",
+    "audit_anomaly",
+    "membership_invited",
+    "membership_disabled",
+  ],
+);
+
+export const notificationRecipientStrategyEnum = pgEnum(
+  "notification_recipient_strategy",
+  ["specific_users", "role_based", "formula"],
+);
+
+export const notificationChannelEnum = pgEnum("notification_channel", [
+  "in_app",
+  "email",
+  "slack",
+  "teams",
+]);
+
+export const notificationFrequencyEnum = pgEnum("notification_frequency", [
+  "immediate",
+  "batched_daily",
+  "batched_weekly",
+]);
+
+export const notificationRules = pgTable(
+  "notification_rule",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    triggerEventKind: notificationTriggerEventKindEnum(
+      "trigger_event_kind",
+    ).notNull(),
+    /** Additional filtering on the trigger payload. Empty object = match all. */
+    matchFilter: jsonb("match_filter")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    recipientStrategy: notificationRecipientStrategyEnum(
+      "recipient_strategy",
+    ).notNull(),
+    /**
+     * Shape depends on recipientStrategy:
+     *   specific_users: { userIds: string[] }
+     *   role_based:     { roles: Role[] }
+     *   formula:        { kind: "proposal_owner" | "opportunity_owner"
+     *                          | "capture_mgr" | "pricing_lead" | "section_author" }
+     */
+    recipientConfig: jsonb("recipient_config")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    channels: notificationChannelEnum("channels")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['in_app']::notification_channel[]`),
+    frequency: notificationFrequencyEnum("frequency")
+      .notNull()
+      .default("immediate"),
+    /** Seconds to wait for acknowledgement before flagging breach. NULL = no SLA. */
+    slaSeconds: integer("sla_seconds"),
+    /**
+     * Fallback recipient when the SLA breaches. Same shape as the primary
+     * recipient strategy, but stored as one jsonb blob:
+     *   { strategy: <enum>, config: { ... } }
+     * NULL = no escalation.
+     */
+    escalationStrategy: jsonb("escalation_strategy").$type<{
+      strategy:
+        | "specific_users"
+        | "role_based"
+        | "formula";
+      config: Record<string, unknown>;
+    } | null>(),
+    active: boolean("active").notNull().default(true),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgActiveIdx: index("notification_rule_org_active_idx").on(
+      t.organizationId,
+      t.active,
+    ),
+    orgEventIdx: index("notification_rule_org_event_idx").on(
+      t.organizationId,
+      t.triggerEventKind,
+    ),
+  }),
+);
+
+export const notificationDeliveries = pgTable(
+  "notification_delivery",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Denormalized for tenant-isolation enforcement at the query layer. */
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id")
+      .notNull()
+      .references(() => notificationRules.id, { onDelete: "cascade" }),
+    /** Denormalized so we can filter by event kind without joining the rule. */
+    triggerEventKind: notificationTriggerEventKindEnum(
+      "trigger_event_kind",
+    ).notNull(),
+    /** The payload that fired the rule (opportunityId, proposalId, etc.). */
+    triggerPayload: jsonb("trigger_payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    /**
+     * Resolved at dispatch time from the rule's recipientStrategy. NULL for
+     * batched-pending rows (will be set when the batch materializes).
+     */
+    recipientUserId: text("recipient_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    channel: notificationChannelEnum("channel").notNull(),
+    sentAt: timestamp("sent_at"),
+    ackedAt: timestamp("acked_at"),
+    slaBreachedAt: timestamp("sla_breached_at"),
+    escalatedAt: timestamp("escalated_at"),
+    error: text("error").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgRuleIdx: index("notification_delivery_org_rule_idx").on(
+      t.organizationId,
+      t.ruleId,
+      t.createdAt,
+    ),
+    recipientIdx: index("notification_delivery_recipient_idx").on(
+      t.recipientUserId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type NotificationRule = typeof notificationRules.$inferSelect;
+export type NewNotificationRule = typeof notificationRules.$inferInsert;
+export type NotificationDelivery = typeof notificationDeliveries.$inferSelect;
+export type NewNotificationDelivery = typeof notificationDeliveries.$inferInsert;
+export type NotificationTriggerEventKind =
+  (typeof notificationTriggerEventKindEnum.enumValues)[number];
+export type NotificationRecipientStrategy =
+  (typeof notificationRecipientStrategyEnum.enumValues)[number];
+export type NotificationChannel = (typeof notificationChannelEnum.enumValues)[number];
+export type NotificationFrequency =
+  (typeof notificationFrequencyEnum.enumValues)[number];
+
 export const proposalOutcomeTypeEnum = pgEnum("proposal_outcome_type", [
   "won",
   "lost",

@@ -473,35 +473,77 @@ modules. Constants moved into sibling `audit-retention-constants.ts`.
 ---
 
 ### BL-13 — Notifications rules engine
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —
+**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A shipped; Phase B–E queued
 
 Per spec: "notifications can be configured, who receives them, their
 frequency, and whether there is an SLA for escalations. These should
 all be configurable."
 
-**Scope:**
-- Schema: `notification_rule` (id, org_id, name, trigger_event_kind,
-  match_filter jsonb, recipient_strategy, channels[], frequency,
-  sla_seconds, escalation_strategy, active)
-- Schema: `notification_delivery` (id, rule_id, recipient_user_id,
-  channel, sent_at, acked_at, sla_breached_at)
-- Trigger event kinds: opportunity_due_soon, proposal_section_overdue,
-  review_request_pending, audit_anomaly, etc.
-- Recipient strategies: specific users, role-based (PM, captureMgr,
-  pricingLead), formula (the proposal owner)
-- Channels: in-app (existing notifications table), email, future
-  Slack/Teams
-- Frequency: immediate, batched daily, batched weekly
-- SLA escalations: if not acknowledged in N seconds, notify a
-  fallback recipient
-- UI on `/notifications/rules`: list + edit + test; "test send" sends
-  a sample notification to verify delivery
-- Migrate existing hardcoded notification triggers to use the new
-  engine
+**Phased delivery** (strict-serial: one phase per PR):
 
-**Acceptance:** create a rule "notify pricing-lead 48h before due
-date"; opportunity advances within 48h; rule fires; notification
-delivered; SLA breach escalates to PM if not acknowledged.
+**Phase A — Schema + types + empty admin UI (this ticket)**:
+- ✅ Migration `0039_notification_rules.sql` adds two tables +
+  four enums:
+  - `notification_rule` — id, org_id, name, description, trigger_event_kind,
+    match_filter jsonb, recipient_strategy, recipient_config jsonb,
+    channels[], frequency, sla_seconds, escalation_strategy jsonb,
+    active, created_by_user_id, created_at, updated_at
+  - `notification_delivery` — id, org_id (denormalized for tenant
+    isolation), rule_id, trigger_event_kind, trigger_payload jsonb,
+    recipient_user_id, channel, sent_at, acked_at, sla_breached_at,
+    escalated_at, error, created_at
+  - Enums: `notification_trigger_event_kind` (14 values),
+    `notification_recipient_strategy` (3),
+    `notification_channel` (4),
+    `notification_frequency` (3)
+  - Indexes: org+active, org+event for rules; org+rule+created and
+    recipient+created for deliveries; partial index for the cron's
+    "find unacked past SLA" query
+- ✅ Drizzle schema updated to match — types exported
+  (`NotificationRule`, `NotificationDelivery`, plus each enum's
+  literal-union type)
+- ✅ `src/lib/notification-rules-types.ts` — UI labels for each
+  enum + `FORMULA_KINDS` constant + `FormulaKind` type
+- ✅ `/notifications/rules` page — server-rendered list view with
+  empty-state copy explaining what a rule is + a stub `+ New rule`
+  link (the new/edit pages land in Phase B)
+- ✅ Nav: `Notification rules` added under Operations Management,
+  admin-only
+
+**Phase B — Rule CRUD + editor UI**:
+- Server actions: create, update, archive, delete, activate/deactivate
+- `/notifications/rules/new` + `/notifications/rules/[id]` form pages
+- Zod schemas for each recipient-strategy shape
+- Audit-log integration on every mutation
+
+**Phase C — Trigger dispatcher**:
+- Server-side `dispatchTriggerEvent({kind, organizationId, payload})`
+  helper that queries matching rules and creates `notification_delivery`
+  rows
+- Resolver layer for the three recipient strategies, including the
+  formula resolvers (`proposal_owner`, `opportunity_owner`, etc.)
+- Wire into representative call sites: opportunity stage changes,
+  proposal review created/closed, compliance overdue (when defined)
+- For `in_app` channel: append a row to the existing `notification`
+  table so it shows up in the inbox
+
+**Phase D — Cron + SLA escalation**:
+- Daily cron `/api/cron/notification-batches` materializes
+  `batched_daily` / `batched_weekly` deliveries
+- Cron `/api/cron/notification-sla` scans for unacked deliveries
+  past their rule's `sla_seconds`, marks `sla_breached_at`, and
+  triggers the rule's `escalation_strategy` if defined
+
+**Phase E — Test send + migrate existing triggers + retire hard-coded paths**:
+- "Test send" button on the rule editor — fires a sample event so
+  recipients see the actual delivery shape
+- Migrate the existing hardcoded notification trigger sites
+  (review-assigned, comment-mentioned, etc.) to use the new engine
+  with seeded default rules so behavior is preserved
+
+**Acceptance (full ticket):** create a rule "notify pricing-lead 48h
+before due date"; opportunity advances within 48h; rule fires;
+notification delivered; SLA breach escalates to PM if not acknowledged.
 
 ---
 

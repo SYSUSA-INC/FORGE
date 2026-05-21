@@ -53,6 +53,7 @@ const NAV: NavGroup[] = [
       { href: "/settings/ai-engine", label: "AI Engine" },
       { href: "/settings/templates", label: "Templates" },
       { href: "/notifications", label: "Notifications" },
+      { href: "/notifications/rules", label: "Notification rules", admin: true },
       { href: "/audit-log", label: "Audit Log" },
     ],
   },
