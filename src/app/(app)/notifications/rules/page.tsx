@@ -2,7 +2,11 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
 import { notificationRules, users } from "@/db/schema";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  requireAuth,
+  requireCurrentOrg,
+  requireOrgAdmin,
+} from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import {
@@ -17,6 +21,10 @@ export const dynamic = "force-dynamic";
 export default async function NotificationRulesPage() {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  // Admin-gated — nav visibility is defense in depth, not the gate.
+  // Non-admin browsing directly to /notifications/rules redirects to "/"
+  // and an auth_denied row lands in the audit log (BL-20).
+  await requireOrgAdmin(organizationId);
 
   const rows = await db
     .select({

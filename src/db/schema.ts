@@ -944,6 +944,11 @@ export const notificationDeliveries = pgTable(
       t.recipientUserId,
       t.createdAt,
     ),
+    // Cron query (BL-13 Phase D): scan for unacked deliveries past SLA.
+    // Mirrors the partial index in drizzle/0039_notification_rules.sql.
+    slaPendingIdx: index("notification_delivery_sla_pending_idx")
+      .on(t.organizationId, t.sentAt)
+      .where(sql`"acked_at" IS NULL AND "sla_breached_at" IS NULL`),
   }),
 );
 
