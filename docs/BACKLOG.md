@@ -966,6 +966,48 @@ faster CI. No power change; just one less `npm ci` per PR.
 
 ---
 
+### BL-QC-self-review-gate — Force the pre-push self-review checklist — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-guidelines  ·  **Status:** ✅ shipped
+
+Surfaced after the same merge-blocking pattern hit three PRs in a
+row (#143, #150, #153). Each time Vercel Agent caught a real issue
+that a dry-run review against `.vercel/agent.md`'s checklist would
+have caught earlier. Each time I verbally committed to running the
+dry-run on the next PR. Each time I didn't.
+
+**Shipped:**
+- `.github/PULL_REQUEST_TEMPLATE.md` (new) — every PR opens with the
+  required `## Pre-push self-review` section pre-populated. Author
+  fills in each row with either `N/A` (category doesn't apply) or
+  `addressed: <how>` (category applied + how it was handled).
+- New `self-review-section` job in `.github/workflows/pr-quality.yml`
+  — required Tier-2 gate that:
+    1. Confirms the PR body contains `## Pre-push self-review`
+    2. Confirms the section has ≥5 markdown table rows
+    3. Confirms no row leaves the `<how>` placeholder unfilled
+    4. Confirms no row has an empty Status cell
+  Failure blocks merge with a clear error pointing at the template.
+- `.vercel/agent.md` widened with three categories from real Vercel
+  Agent catches: constant-condition filter/map callbacks (#153),
+  Drizzle index parity gaps (#150), admin-only auth gate missing
+  on server components (#150). Future dry-runs check these too.
+
+**Why this is the structural fix:**
+- Previous attempts ("I'll do the dry-run next time") were verbal
+  commitments without a forcing function. The pattern repeated.
+- This gate makes the dry-run a hard prerequisite: no filled-in
+  section, no merge. Same mechanism that makes backlog hygiene
+  actually work.
+
+**Acceptance:** ✅ The next PR opened against `main` shows the
+pre-push self-review section pre-populated; pushing without filling
+it in fails the gate.
+
+**Operator follow-up:** add `Pre-push self-review section` to
+required status checks in Settings → Branches → main.
+
+---
+
 ### BL-QC-guidelines — Engineering standards + agent guidelines docs — **shipped**
 **Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 

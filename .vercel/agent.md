@@ -42,6 +42,26 @@ because no other CI gate catches them:
   must verify `Authorization: Bearer ${CRON_SECRET}` and refuse to
   run if the secret isn't set.
 
+- **Constant-condition filter/map callbacks.** An `array.filter(() => CONDITION)`
+  where `CONDITION` doesn't reference the callback parameter is
+  misleading — it either passes everything or nothing, but the
+  filter pattern suggests per-element discrimination. Replace with
+  an early-out (`if (!CONDITION) return/continue`) before the array
+  operation. Same for `.map((_, i) => ...)` patterns that ignore
+  the element. Caught on [#153](https://github.com/SYSUSA-INC/FORGE/pull/153)
+  — added here so future reviews catch it before the agent does.
+
+- **Drizzle index parity gaps.** When a `CREATE INDEX` (especially a
+  partial index with a `WHERE` clause) lands in a SQL migration, the
+  matching `index(...)` (with `.where(sql\`...\`)`) must also appear
+  in `src/db/schema.ts`. Otherwise `drizzle-kit generate` regenerating
+  from schema would drop the index. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150).
+
+- **Auth gate missing on admin-only pages.** Server components under
+  `(app)/` that should be admin-only must call
+  `requireOrgAdmin(organizationId)` after `requireCurrentOrg()`, not
+  rely on nav visibility. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150).
+
 - **Missing migrations.** If a PR changes `src/db/schema.ts` types in
   a way that affects the generated SQL, there must be a corresponding
   `drizzle/[NNNN]_*.sql` file. The schema-migration coupling gate
