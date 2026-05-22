@@ -473,7 +473,7 @@ modules. Constants moved into sibling `audit-retention-constants.ts`.
 ---
 
 ### BL-13 — Notifications rules engine
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A shipped; Phase B–E queued
+**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A + B shipped; Phase C–E queued
 
 Per spec: "notifications can be configured, who receives them, their
 frequency, and whether there is an SLA for escalations. These should
@@ -510,11 +510,33 @@ all be configurable."
 - ✅ Nav: `Notification rules` added under Operations Management,
   admin-only
 
-**Phase B — Rule CRUD + editor UI**:
-- Server actions: create, update, archive, delete, activate/deactivate
-- `/notifications/rules/new` + `/notifications/rules/[id]` form pages
-- Zod schemas for each recipient-strategy shape
-- Audit-log integration on every mutation
+**Phase B — Rule CRUD + editor UI** ✅ shipped:
+- ✅ `src/lib/notification-rules-validation.ts` — zod schemas with
+  discriminated union for `recipient` (specific_users / role_based /
+  formula), nullable escalation, SLA seconds bounded 0–30 days
+- ✅ `src/app/(app)/notifications/rules/actions.ts` — five server
+  actions: `createNotificationRuleAction`,
+  `updateNotificationRuleAction`,
+  `setNotificationRuleActiveAction` (activate / deactivate),
+  `deleteNotificationRuleAction`, `getNotificationRuleAction` (read
+  for the edit page), `listOrgUsersForRecipientPickerAction` (read
+  for the user picker). Each mutation calls `requireOrgAdmin` and
+  records audit (`notification_rule.create` / `.update` /
+  `.activate` / `.deactivate` / `.delete`).
+- ✅ `src/app/(app)/notifications/rules/RuleEditorForm.tsx` —
+  shared client component used by both `new/` and `[id]/` routes.
+  Renders identity / trigger / recipients / delivery / escalation /
+  status panels with strategy-aware sub-forms (multi-user picker,
+  role checklist, formula dropdown). SLA exposed in hours, stored
+  as seconds.
+- ✅ `src/app/(app)/notifications/rules/new/page.tsx` — admin-gated
+  server component mounting the editor in create mode
+- ✅ `src/app/(app)/notifications/rules/[id]/page.tsx` — admin-gated
+  server component loading the rule + mounting the editor in edit
+  mode with deactivate / delete affordances
+- Channels: in-app + email selectable; Slack / Teams disabled with
+  "(coming soon)" badge — Phase C/D will land them
+- Match filter: JSON textarea, server validates it parses to an object
 
 **Phase C — Trigger dispatcher**:
 - Server-side `dispatchTriggerEvent({kind, organizationId, payload})`
