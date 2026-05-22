@@ -146,26 +146,26 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
       // `notification` table so it shows up in the user's inbox.
       // Batched in-app rows materialize via the Phase D cron.
       if (!isImmediate) continue;
-      const inboxRows = recipientIds
-        .filter(() => rule.channels.includes("in_app"))
-        .map((userId) => ({
-          organizationId,
-          recipientUserId: userId,
-          actorUserId: input.actorUserId ?? null,
-          // Map the new trigger kind into the existing notification_kind
-          // enum where there's an obvious 1:1. Anything else falls back
-          // to `review_completed` so the row still renders — Phase E
-          // will widen the legacy enum.
-          kind: legacyKindFor(kind),
-          subject: input.subject,
-          body: input.body ?? "",
-          linkPath: input.linkPath ?? "",
-          proposalId: input.proposalId ?? null,
-          reviewId: input.reviewId ?? null,
-          commentId: input.commentId ?? null,
-        }));
+      if (!rule.channels.includes("in_app")) continue;
+      if (recipientIds.length === 0) continue;
 
-      if (inboxRows.length === 0) continue;
+      const inboxRows = recipientIds.map((userId) => ({
+        organizationId,
+        recipientUserId: userId,
+        actorUserId: input.actorUserId ?? null,
+        // Map the new trigger kind into the existing notification_kind
+        // enum where there's an obvious 1:1. Anything else falls back
+        // to `review_completed` so the row still renders — Phase E
+        // will widen the legacy enum.
+        kind: legacyKindFor(kind),
+        subject: input.subject,
+        body: input.body ?? "",
+        linkPath: input.linkPath ?? "",
+        proposalId: input.proposalId ?? null,
+        reviewId: input.reviewId ?? null,
+        commentId: input.commentId ?? null,
+      }));
+
       try {
         await db.insert(notifications).values(inboxRows);
       } catch (err) {
