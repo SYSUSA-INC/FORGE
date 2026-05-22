@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
 import {
   EMPTY_DOC,
@@ -193,6 +194,21 @@ export async function createProposalAction(input: {
         opportunityId: input.opportunityId,
         sectionCount: seedSections.length,
       },
+    });
+
+    // BL-13 — fire the rules engine.
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: "proposal_created",
+      payload: {
+        proposalId: row.id,
+        opportunityId: input.opportunityId,
+        title,
+      },
+      subject: `Proposal created: ${title}`,
+      linkPath: `/proposals/${row.id}`,
+      proposalId: row.id,
+      actorUserId: actor.id,
     });
 
     revalidatePath("/proposals");
