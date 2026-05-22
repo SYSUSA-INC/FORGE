@@ -912,6 +912,37 @@ faster CI. No power change; just one less `npm ci` per PR.
 
 ---
 
+### BL-QC-guidelines — Engineering standards + agent guidelines docs — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
+
+Surfaced when the stuck Vercel Agent task on PR #150 reported "No
+guidelines found" — every project-level standard we'd built up
+existed only as enforcement code (CI gates, CODEOWNERS, isolation
+script), with no human- or bot-readable document to point at. Closed
+that gap.
+
+**Shipped:**
+- `docs/ENGINEERING_STANDARDS.md` — canonical standards doc. 9
+  sections: multi-tenant isolation contract, audit logging, schema
+  + migration discipline, server action conventions, file
+  organization, PR conventions, the pre-merge gate stack, CODEOWNERS
+  routing, code review etiquette. Examples + anti-patterns for the
+  critical surfaces.
+- `AGENTS.md` (repo root) — bot-facing pointer in the conventional
+  location AI coding tools look. Quick orientation + "what to flag /
+  what NOT to flag" + authoring conventions list.
+- `.vercel/agent.md` — Vercel-Agent-specific subset. Tells the agent
+  what to focus on (categories no other gate catches) and what to
+  skip (categories already enforced by gates) so reviews stop being
+  redundant with existing checks. Should resolve future "No
+  guidelines found" reports.
+
+**Acceptance:** ✅ Next Vercel Agent Review on a FORGE PR finds the
+guidelines file. Future AI tools (Claude, Cursor, etc.) have a
+single rooted source of truth.
+
+---
+
 ### BL-20 — Authorization decision logging — **shipped**
 **Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-12  ·  **Status:** ✅ shipped
 
