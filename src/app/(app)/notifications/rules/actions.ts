@@ -25,8 +25,12 @@ import {
 // Shared types
 // ─────────────────────────────────────────────────────────────────────
 
-export type MutationResult<T extends Record<string, unknown> = Record<string, never>> =
-  | ({ ok: true } & T)
+// Two return shapes used across the actions. Kept non-generic to
+// avoid the `Record<string, never>` default-intersection trap where
+// `{ ok: true }` fails to satisfy the empty index signature.
+export type MutationResult = { ok: true } | { ok: false; error: string };
+export type CreateResult =
+  | { ok: true; id: string }
   | { ok: false; error: string };
 
 export type LoadedRule = {
@@ -158,7 +162,7 @@ export async function listOrgUsersForRecipientPickerAction(): Promise<
 
 export async function createNotificationRuleAction(
   raw: unknown,
-): Promise<MutationResult<{ id: string }>> {
+): Promise<CreateResult> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
