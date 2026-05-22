@@ -473,7 +473,7 @@ modules. Constants moved into sibling `audit-retention-constants.ts`.
 ---
 
 ### BL-13 — Notifications rules engine
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A + B shipped; Phase C–E queued
+**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A + B + C shipped; Phase D–E queued
 
 Per spec: "notifications can be configured, who receives them, their
 frequency, and whether there is an SLA for escalations. These should
@@ -538,16 +538,48 @@ all be configurable."
   "(coming soon)" badge — Phase C/D will land them
 - Match filter: JSON textarea, server validates it parses to an object
 
-**Phase C — Trigger dispatcher**:
-- Server-side `dispatchTriggerEvent({kind, organizationId, payload})`
-  helper that queries matching rules and creates `notification_delivery`
-  rows
-- Resolver layer for the three recipient strategies, including the
-  formula resolvers (`proposal_owner`, `opportunity_owner`, etc.)
-- Wire into representative call sites: opportunity stage changes,
-  proposal review created/closed, compliance overdue (when defined)
-- For `in_app` channel: append a row to the existing `notification`
-  table so it shows up in the inbox
+**Phase C — Trigger dispatcher** ✅ shipped:
+- ✅ `src/lib/notification-dispatcher.ts` — `dispatchTriggerEvent({
+  kind, organizationId, payload, subject, body?, linkPath?,
+  proposalId?, reviewId?, commentId?, actorUserId? })` entry point.
+  Reads matching active rules for the tenant + kind, applies
+  `matchFilter` as a subset-equality predicate, dispatches per
+  (recipient × channel). Best-effort: every error caught + logged,
+  user-facing flow never blocked. Frequency semantics:
+  `immediate` → `sent_at = now()`, `batched_*` → `sent_at = null`
+  (Phase D cron materializes).
+- ✅ `src/lib/notification-recipient-resolver.ts` —
+  `resolveRecipients({ organizationId, strategy, config, payload })`
+  → `userId[]`. Three branches:
+    - `specific_users`: filtered against current active members
+    - `role_based`: query memberships joined by role
+    - `formula`: dispatch on `kind` for `proposal_owner` /
+      `opportunity_owner` / `capture_mgr` / `pricing_lead` /
+      `section_author`. Each branch reads one tenant-scoped row.
+  Empty / malformed configs degrade to empty list with a warning
+  log rather than throwing.
+- ✅ Channel handling:
+    - `in_app`: creates `notification_delivery` row + appends to
+      legacy `notification` table for the inbox to render
+    - `email`: creates delivery row; sending logic lands in Phase D
+      with the email integration
+    - `slack` / `teams`: delivery row created with `error="channel
+      not yet implemented"` so the audit trail captures the gap
+- ✅ Wired into four representative call sites (Phase E migrates
+  the rest):
+    - `opportunities/actions.ts:setOpportunityStageAction` →
+      `opportunity_advanced` / `_won` / `_lost` / `_no_bid` by stage
+    - `proposals/actions.ts:createProposalAction` → `proposal_created`
+    - `proposals/[id]/reviews/actions.ts:startReviewAction` →
+      `review_request_pending`
+    - `proposals/[id]/reviews/actions.ts:closeReviewAction` →
+      `review_completed` (fires in parallel with the legacy
+      hardcoded notification dispatch; legacy retired in Phase E
+      once seeded default rules cover the surface)
+- ✅ Tenant isolation: every dispatcher / resolver query is
+  organization-scoped via `eq(table.organizationId, organizationId)`.
+  `src/lib/` location means the queries are outside the static
+  isolation check's window, but they still respect the contract.
 
 **Phase D — Cron + SLA escalation**:
 - Daily cron `/api/cron/notification-batches` materializes

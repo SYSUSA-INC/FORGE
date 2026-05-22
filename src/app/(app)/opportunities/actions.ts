@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { log } from "@/lib/log";
 
 export type OpportunityInput = {
@@ -176,6 +177,27 @@ export async function setOpportunityStageAction(
       resourceId: id,
       metadata: { stage },
     });
+
+    // BL-13 — fire the rules engine. Maps the terminal stages to the
+    // narrower closed-state events so rules can target won / lost /
+    // no-bid independently of the general "advanced" event.
+    const terminalKind =
+      stage === "won"
+        ? "opportunity_won"
+        : stage === "lost"
+          ? "opportunity_lost"
+          : stage === "no_bid"
+            ? "opportunity_no_bid"
+            : null;
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: terminalKind ?? "opportunity_advanced",
+      payload: { opportunityId: id, stage },
+      subject: `Opportunity advanced to ${stage}`,
+      linkPath: `/opportunities/${id}`,
+      actorUserId: actor.id,
+    });
+
     revalidatePath("/opportunities");
     revalidatePath(`/opportunities/${id}`);
     revalidatePath("/");

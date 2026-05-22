@@ -23,6 +23,7 @@ import {
   dispatchReviewAssignedNotification,
   dispatchReviewCompletedNotification,
 } from "@/lib/notifications";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { log } from "@/lib/log";
 
 const COLOR_LABELS: Record<ReviewColor, string> = {
@@ -156,6 +157,22 @@ export async function startReviewAction(input: {
         color: input.color,
         reviewerCount: input.reviewerUserIds.length,
       },
+    });
+
+    // BL-13 — fire the rules engine.
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: "review_request_pending",
+      payload: {
+        proposalId: input.proposalId,
+        reviewId: review.id,
+        color: input.color,
+      },
+      subject: `${input.color} review started`,
+      linkPath: `/proposals/${input.proposalId}/reviews/${review.id}`,
+      proposalId: input.proposalId,
+      reviewId: review.id,
+      actorUserId: actor.id,
     });
 
     revalidatePath(`/proposals/${input.proposalId}/reviews`);
@@ -393,6 +410,26 @@ export async function closeReviewAction(input: {
         ),
       );
     }
+
+    // BL-13 — fire the rules engine in parallel with the legacy
+    // dispatcher. The legacy hardcoded dispatch is retired in
+    // Phase E once seeded default rules cover the same surface.
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: "review_completed",
+      payload: {
+        proposalId: review.proposalId,
+        reviewId: input.reviewId,
+        verdict: input.verdict,
+        color: review.color,
+      },
+      subject: `${COLOR_LABELS[review.color]} review closed — ${VERDICT_LABELS[input.verdict]}`,
+      body: summary,
+      linkPath: `/proposals/${review.proposalId}/reviews/${input.reviewId}`,
+      proposalId: review.proposalId,
+      reviewId: input.reviewId,
+      actorUserId: actor.id,
+    });
 
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
     revalidatePath(`/proposals/${review.proposalId}/reviews`);
