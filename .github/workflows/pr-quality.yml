@@ -243,3 +243,90 @@ jobs:
         env:
           # drizzle-kit check doesn't connect; stub satisfies config validation.
           DATABASE_URL: "postgres://stub:stub@localhost:5432/stub"
+
+  self-review-section:
+    name: Pre-push self-review section
+    runs-on: ubuntu-latest
+    # BL-QC-self-review-gate — forces the PR body to include a filled-in
+    # "Pre-push self-review" section. Verbal commitments to do a dry-run
+    # against .vercel/agent.md categories were repeatedly skipped (cf.
+    # #143 / #150 / #153 — same pattern, three PRs in a row). This gate
+    # turns the commitment into a required artifact.
+    #
+    # Required behavior:
+    #   - PR body must contain the literal "## Pre-push self-review"
+    #     header
+    #   - That section must contain a markdown table with one row per
+    #     category from `.github/PULL_REQUEST_TEMPLATE.md`
+    #   - Every row's Status column must be non-empty — the placeholder
+    #     `<how>` token is treated as unfilled
+    steps:
+      - name: Verify Pre-push self-review section
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # 1. Header must exist.
+          if ! printf '%s' "$BODY" | grep -qE '^## Pre-push self-review *$'; then
+            {
+              echo "::error::PR body is missing the required '## Pre-push self-review' section."
+              echo "Add the section per .github/PULL_REQUEST_TEMPLATE.md and fill in every row."
+            } >&2
+            exit 1
+          fi
+
+          # 2. Section must contain at least 5 table rows (loose floor —
+          #    template has ~13; this catches an empty or truncated
+          #    section without being brittle to row additions).
+          section=$(printf '%s' "$BODY" | awk '
+            /^## Pre-push self-review/ { capture = 1; next }
+            /^## / && capture { capture = 0 }
+            capture { print }
+          ')
+          row_count=$(printf '%s' "$section" | grep -cE '^\|.*\|$' || true)
+          # Subtract 2 for the header + separator rows (|---|---|).
+          row_count=$(( row_count - 2 ))
+          if [ "$row_count" -lt 5 ]; then
+            {
+              echo "::error::Pre-push self-review section has too few rows ($row_count)."
+              echo "Copy the table from .github/PULL_REQUEST_TEMPLATE.md and fill in every row."
+            } >&2
+            exit 1
+          fi
+
+          # 3. No row may leave the Status column as the literal
+          #    placeholder `<how>` — that's the unfilled sentinel.
+          unfilled=$(printf '%s' "$section" | grep -E '<how>' || true)
+          if [ -n "$unfilled" ]; then
+            {
+              echo "::error::Pre-push self-review has unfilled rows (contain the '<how>' placeholder):"
+              printf '%s\n' "$unfilled"
+              echo "Replace <how> with either 'N/A' (category doesn't apply) or 'addressed: <description>' (category applied + how you handled it)."
+            } >&2
+            exit 1
+          fi
+
+          # 4. Every row must have a non-empty Status cell. A row looks
+          #    like `| <concern> | <status> |` — we split on `|` and
+          #    require the third column (index 2 after leading empty)
+          #    to be non-blank.
+          empty=$(printf '%s' "$section" | awk -F'|' '
+            /^\|.*\|$/ {
+              # Skip header (contains "Concern from") + separator (---).
+              if ($2 ~ /Concern from/) next
+              if ($2 ~ /^[ -]+$/) next
+              # Trim whitespace from the Status column.
+              gsub(/^[ \t]+|[ \t]+$/, "", $3)
+              if ($3 == "") {
+                print "  empty status for row:" $2
+              }
+            }
+          ')
+          if [ -n "$empty" ]; then
+            {
+              echo "::error::Pre-push self-review has rows with empty Status cells:"
+              printf '%s\n' "$empty"
+            } >&2
+            exit 1
+          fi
+
+          echo "Pre-push self-review section OK ($row_count rows, all filled)."
