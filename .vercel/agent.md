@@ -68,12 +68,6 @@ because no other CI gate catches them:
   enforces file presence; you should flag content mismatches (e.g., a
   schema column added but the migration is empty).
 
-- **Drizzle index parity.** When a `CREATE INDEX` lands in a SQL
-  migration, the matching `index(...)` call should also be in
-  `src/db/schema.ts` so future migrations regenerated from the schema
-  don't drop the index. (BL-13 Phase A's [#150](https://github.com/SYSUSA-INC/FORGE/pull/150) had this exact gap; good
-  catch.)
-
 ## What NOT to flag (already enforced by CI)
 
 These will surface as redundant noise — skip them:
