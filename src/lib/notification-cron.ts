@@ -57,7 +57,19 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
       .from(notificationDeliveries)
       .innerJoin(
         notificationRules,
-        eq(notificationRules.id, notificationDeliveries.ruleId),
+        // Belt-and-suspenders tenant isolation in the join: rule.id
+        // matches AND both rows belong to the same org. Defends against
+        // any future code path that might let a delivery row reference
+        // a rule from a different tenant (shouldn't happen given the
+        // dispatcher's invariants, but cross-tenant SQL leaks are the
+        // class of bug we never want to discover the hard way).
+        and(
+          eq(notificationRules.id, notificationDeliveries.ruleId),
+          eq(
+            notificationRules.organizationId,
+            notificationDeliveries.organizationId,
+          ),
+        ),
       )
       .where(
         and(
@@ -219,7 +231,15 @@ export async function processSlaBreaches(): Promise<SlaResult> {
     .from(notificationDeliveries)
     .innerJoin(
       notificationRules,
-      eq(notificationRules.id, notificationDeliveries.ruleId),
+      // Same tenant-isolation belt-and-suspenders as the batches helper:
+      // rule must match by id AND by organization_id.
+      and(
+        eq(notificationRules.id, notificationDeliveries.ruleId),
+        eq(
+          notificationRules.organizationId,
+          notificationDeliveries.organizationId,
+        ),
+      ),
     )
     .where(
       and(
