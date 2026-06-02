@@ -966,6 +966,63 @@ faster CI. No power change; just one less `npm ci` per PR.
 
 ---
 
+### BL-QC-auto-resolve — Auto-resolve outdated Vercel Agent threads — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
+
+Fifth merge-block in a row (#143, #150, #153, #154, #155) traced
+to the same pattern: Vercel Agent posts a comment, I fix in code,
+the anchored line changes, GitHub marks the thread `isOutdated:
+true` but leaves it `isResolved: false`. Branch protection's "All
+comments must be resolved" then keeps blocking merge until someone
+manually clicks Resolve.
+
+Existing fixes (self-review gate, widened `.vercel/agent.md`) reduce
+how often Vercel Agent finds something but don't eliminate it —
+that's the agent's job. The remaining friction is the manual click
+to acknowledge an outdated thread.
+
+**Shipped:**
+- `.github/workflows/auto-resolve-outdated.yml` — fires on PR
+  `synchronize` / `opened` / `reopened`. Uses the built-in
+  `GITHUB_TOKEN` to call GitHub's GraphQL `resolveReviewThread`
+  mutation. Resolves threads where ALL of:
+    - First comment's author is `vercel[bot]`
+    - `isOutdated == true`
+    - `isResolved == false`
+  Leaves untouched:
+    - Vercel Agent threads that are NOT outdated (live findings —
+      must be addressed)
+    - Human-reviewer threads (any state — preserves their authority)
+    - Threads where Vercel Agent merely replied (first author is
+      someone else)
+
+**Not a bypass:**
+- Vercel Agent still posts on every push
+- Live (non-outdated) findings still block merge
+- Human reviewer comments still block merge
+- All Tier-0 + Tier-2 + Tier-3 gates unchanged
+- "All comments must be resolved" branch protection rule stays
+  exactly as configured
+
+The workflow automates the click that GitHub has the data to make
+(the anchored code changed) but doesn't auto-make in the general
+case. For Vercel Agent specifically, an outdated thread on a fix
+commit means "this was addressed."
+
+**Operator follow-up:** none required. The workflow uses the
+default `GITHUB_TOKEN`; no secret to configure. After merge, the
+next PR with a Vercel Agent comment + fix-commit cycle should
+auto-resolve without operator action.
+
+**Acceptance:** ✅ Open a PR, get a Vercel Agent comment, push a
+fix commit that changes the anchored line → workflow runs on the
+synchronize event → thread auto-resolves → merge unblocks (assuming
+other gates are green). Tested logic via the github-script @v7
+GraphQL client; no separate test framework needed for a workflow
+this focused.
+
+---
+
 ### BL-QC-self-review-gate — Force the pre-push self-review checklist — **shipped**
 **Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-guidelines  ·  **Status:** ✅ shipped
 

@@ -1,0 +1,121 @@
+name: Auto-resolve outdated Vercel Agent threads
+
+# BL-QC-auto-resolve — eliminate the "All comments must be resolved"
+# merge block for the case that drives 100% of the friction we've
+# seen: a Vercel Agent review thread whose anchored code line was
+# changed by a subsequent commit (GitHub marks it `isOutdated: true`)
+# but the thread itself stays `isResolved: false` because GitHub
+# never auto-resolves.
+#
+# What this workflow does:
+#   - Fires on every push to a PR branch (pull_request: synchronize)
+#   - Fetches all review threads on the PR via GraphQL
+#   - Resolves threads where:
+#         author of the FIRST comment == "vercel[bot]"
+#         AND  thread.isOutdated == true
+#         AND  thread.isResolved == false
+#   - Leaves untouched:
+#       - Vercel Agent threads that are NOT outdated (the fix didn't
+#         touch the anchored line — live feedback, must address)
+#       - Human-reviewer threads (regardless of outdated state)
+#       - Threads where the first comment is not from vercel[bot]
+#         (e.g. a human opened the thread and Vercel Agent replied)
+#
+# This is NOT a bypass:
+#   - Vercel Agent still posts on every push
+#   - Live (non-outdated) findings still block merge
+#   - Human reviewers' comments still block merge
+#   - All Tier-0 + Tier-2 + Tier-3 gates remain unchanged
+#
+# It only automates the "I acknowledged this is now outdated" click
+# for Vercel Agent specifically, which GitHub already has the data
+# to mark outdated but doesn't auto-resolve in the general case.
+
+on:
+  pull_request:
+    types: [synchronize, opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: auto-resolve-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-outdated-vercel-threads:
+    name: Resolve outdated vercel[bot] threads
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve threads
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const query = `
+              query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    reviewThreads(first: 100, after: $cursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        id
+                        isResolved
+                        isOutdated
+                        comments(first: 1) {
+                          nodes { author { login } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            let cursor = null;
+            let scanned = 0;
+            let resolved = 0;
+            let skippedLive = 0;
+            let skippedNonVercel = 0;
+
+            while (true) {
+              const { repository } = await github.graphql(query, {
+                owner, repo, number: prNumber, cursor,
+              });
+              const page = repository.pullRequest.reviewThreads;
+              for (const thread of page.nodes) {
+                scanned += 1;
+                if (thread.isResolved) continue;
+                const firstAuthor = thread.comments.nodes[0]?.author?.login;
+                if (firstAuthor !== 'vercel[bot]') {
+                  skippedNonVercel += 1;
+                  continue;
+                }
+                if (!thread.isOutdated) {
+                  skippedLive += 1;
+                  continue;
+                }
+                // Outdated + unresolved + vercel[bot]-initiated → resolve.
+                await github.graphql(
+                  `mutation($id: ID!) {
+                     resolveReviewThread(input: { threadId: $id }) {
+                       thread { id isResolved }
+                     }
+                   }`,
+                  { id: thread.id },
+                );
+                resolved += 1;
+                core.info(`Resolved outdated vercel[bot] thread ${thread.id}`);
+              }
+              if (!page.pageInfo.hasNextPage) break;
+              cursor = page.pageInfo.endCursor;
+            }
+
+            core.notice(
+              `Auto-resolve summary: scanned=${scanned}, resolved=${resolved}, ` +
+              `skipped-live-vercel=${skippedLive}, skipped-non-vercel=${skippedNonVercel}.`,
+            );
