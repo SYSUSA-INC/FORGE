@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/prune-audit-logs",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/notification-batches",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/notification-sla",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
