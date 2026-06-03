@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   notifications,
@@ -165,7 +165,13 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
           inboxRowsCreated += inboxRows.length;
         }
 
-        // Mark every pending delivery for this rule as sent.
+        // Mark every pending delivery for THIS rule as sent. Filter by
+        // the explicit pendingIds collected from the SELECT above —
+        // NOT by the same `sentAt IS NULL` predicate, which would race
+        // with the Phase C dispatcher: a new delivery row inserted
+        // between SELECT and UPDATE would match `sentAt IS NULL` and be
+        // incorrectly marked sent without ever being materialized into
+        // the inbox.
         const pendingIds = pending.map((p) => p.id);
         if (pendingIds.length > 0) {
           await db
@@ -174,8 +180,7 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
             .where(
               and(
                 eq(notificationDeliveries.organizationId, organizationId),
-                eq(notificationDeliveries.ruleId, ruleId),
-                isNull(notificationDeliveries.sentAt),
+                inArray(notificationDeliveries.id, pendingIds),
               ),
             );
           deliveriesMarkedSent += pendingIds.length;
@@ -308,6 +313,39 @@ export async function processSlaBreaches(): Promise<SlaResult> {
 
       await db.insert(notificationDeliveries).values(escRows);
       escalationsCreated += escRows.length;
+
+      // BL-13 inbox-parity rule: every `in_app` delivery must also
+      // produce a row in the legacy `notification` table or it never
+      // reaches the user's inbox. Matches the Phase C dispatcher's
+      // pattern. Without this, SLA escalations land in the audit
+      // (notification_delivery) but the recipient sees nothing — the
+      // whole point of escalation is that someone needs to know NOW.
+      const escInboxRows = fallbackIds.map((userId) => ({
+        organizationId: c.organizationId,
+        recipientUserId: userId,
+        actorUserId: null,
+        // Escalations always map to "review_assigned" in the legacy
+        // notification_kind enum. The legacy enum is narrow (6 values)
+        // and "review_assigned" is the closest "you need to act on
+        // this" semantics. Phase E widens the enum so each trigger
+        // event kind has its own legacy mapping.
+        kind: "review_assigned" as const,
+        subject: `SLA breached — escalation`,
+        body: "",
+        linkPath: "/notifications",
+        proposalId: null,
+        reviewId: null,
+        commentId: null,
+      }));
+      try {
+        await db.insert(notifications).values(escInboxRows);
+      } catch (err) {
+        log.error("[processSlaBreaches]", "inbox insert failed", {
+          error: err,
+          deliveryId: c.id,
+          organizationId: c.organizationId,
+        });
+      }
 
       // Mark the original delivery as escalated.
       await db

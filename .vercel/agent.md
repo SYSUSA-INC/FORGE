@@ -62,6 +62,28 @@ because no other CI gate catches them:
   `requireOrgAdmin(organizationId)` after `requireCurrentOrg()`, not
   rely on nav visibility. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150).
 
+- **Inbox-parity for `in_app` deliveries.** Anywhere we write a
+  `notification_delivery` row with `channel === "in_app"`, we MUST
+  also insert a matching row in the legacy `notification` table.
+  The dispatcher in `src/lib/notification-dispatcher.ts` does both;
+  the SLA cron in `src/lib/notification-cron.ts` originally only
+  wrote the delivery row, so escalations never reached the inbox.
+  Caught on [#155](https://github.com/SYSUSA-INC/FORGE/pull/155).
+  Rule: if you create a `notification_delivery` with channel
+  in_app, the next thing in scope must be the matching `notification`
+  insert.
+
+- **SELECT-then-UPDATE race on the same predicate.** When a cron or
+  job pattern is "SELECT rows matching X → process → UPDATE rows
+  matching X to mark them done," the UPDATE must filter by the
+  IDs collected from the SELECT, NOT re-apply predicate X. A new
+  row inserted between SELECT and UPDATE that also matches X gets
+  marked done without being processed. Caught on [#155](https://github.com/SYSUSA-INC/FORGE/pull/155): the
+  batch materializer's UPDATE used `sentAt IS NULL` instead of
+  `inArray(id, pendingIds)`, racing with the dispatcher.
+  Rule: select rows → collect their IDs → update where
+  `inArray(id, [those ids])` (plus the tenant scope).
+
 - **Missing migrations.** If a PR changes `src/db/schema.ts` types in
   a way that affects the generated SQL, there must be a corresponding
   `drizzle/[NNNN]_*.sql` file. The schema-migration coupling gate

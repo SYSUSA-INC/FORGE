@@ -38,6 +38,8 @@ gate. Fill in **every row** before pushing.
 | Dead-store / unused destructured setters not prefixed with `_` | N/A / addressed: <how> |
 | New external API call without timeout / error handling | N/A / addressed: <how> |
 | New file without server-only guard where it touches DB | N/A / addressed: <how> |
+| Inbox-parity: any new `in_app` `notification_delivery` write also inserts a matching `notification` row | N/A / addressed: <how> |
+| SELECT-then-UPDATE pattern: UPDATE filters by collected IDs (`inArray(id, ...)`), NOT by the same predicate as the SELECT | N/A / addressed: <how> |
 
 ## Test plan
 
