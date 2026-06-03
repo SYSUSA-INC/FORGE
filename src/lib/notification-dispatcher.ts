@@ -247,6 +247,12 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
     case "membership_invited":
     case "membership_disabled":
       return "solicitation_role_assigned" as const;
+    case "comment_mentioned":
+      return "review_comment_mentioned" as const;
+    case "opportunity_reviewed":
+      return "opportunity_review_completed" as const;
+    case "solicitation_role_assigned":
+      return "solicitation_role_assigned" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
