@@ -605,12 +605,28 @@ all be configurable."
 Per-tenant isolation: every query inside both crons references
 `organizationId` from each delivery row; no cross-tenant joins.
 
-**Phase E — Test send + migrate existing triggers + retire hard-coded paths**:
-- "Test send" button on the rule editor — fires a sample event so
-  recipients see the actual delivery shape
-- Migrate the existing hardcoded notification trigger sites
-  (review-assigned, comment-mentioned, etc.) to use the new engine
-  with seeded default rules so behavior is preserved
+**Phase E-1 — Test send** ✅ shipped:
+- ✅ `testSendNotificationRuleAction(ruleId)` server action —
+  admin-only, requires the rule to be active, calls
+  `dispatchTriggerEvent` with a `testSend: true`-tagged payload so
+  downstream filters/debug can distinguish test vs real
+- ✅ "Test send" button in the rule editor (edit mode only),
+  disabled when the rule is inactive with a tooltip explaining why
+- ✅ Separate `notice` state in the editor for success messages
+  (emerald-styled banner), distinct from the error state
+- ✅ Audit: `notification_rule.test_send` logged on every fire
+- **Limitation (accepted):** test payload is empty, so rules whose
+  `match_filter` requires specific keys won't match against a test
+  send. Admins exercise filter logic by triggering real events.
+
+**Phase E-2 (queued) — Migrate legacy triggers + retire hard-coded paths**:
+- Identify all remaining hardcoded notification trigger sites
+  (e.g., `dispatchReviewCompletedNotification`, comment-mentioned)
+  and replace each with `dispatchTriggerEvent`
+- Seed default rules (per-tenant migration) so behavior is preserved
+  for orgs that haven't configured custom rules yet
+- Delete the legacy `dispatchReviewCompletedNotification` path
+- Delete the parallel dispatch added in Phase C to `closeReviewAction`
 
 **Acceptance (full ticket):** create a rule "notify pricing-lead 48h
 before due date"; opportunity advances within 48h; rule fires;

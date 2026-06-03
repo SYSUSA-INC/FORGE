@@ -22,6 +22,7 @@ import {
   createNotificationRuleAction,
   deleteNotificationRuleAction,
   setNotificationRuleActiveAction,
+  testSendNotificationRuleAction,
   updateNotificationRuleAction,
   type OrgUserOption,
 } from "./actions";
@@ -205,6 +206,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
   const [form, setForm] = useState<FormState>(() => initialFormFromLoaded(initial));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -266,6 +268,20 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
         return;
       }
       setForm((prev) => ({ ...prev, active: !prev.active }));
+    });
+  }
+
+  function onTestSend() {
+    if (!ruleId) return;
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await testSendNotificationRuleAction(ruleId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setNotice("Test send dispatched — check the configured recipients.");
     });
   }
 
@@ -584,6 +600,19 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
               <button
                 type="button"
                 className="aur-btn aur-btn-ghost text-[11px]"
+                onClick={onTestSend}
+                disabled={pending || !form.active}
+                title={
+                  form.active
+                    ? "Send a sample notification to verify recipients + channels"
+                    : "Activate the rule first to enable test send"
+                }
+              >
+                Test send
+              </button>
+              <button
+                type="button"
+                className="aur-btn aur-btn-ghost text-[11px]"
                 onClick={onToggleActive}
                 disabled={pending}
               >
@@ -605,6 +634,12 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
       {error ? (
         <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose xl:col-span-2">
           {error}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="rounded-md border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 font-mono text-[11px] text-emerald-300 xl:col-span-2">
+          ✓ {notice}
         </div>
       ) : null}
 

@@ -352,3 +352,97 @@ export async function deleteNotificationRuleAction(
     };
   }
 }
+
+/**
+ * BL-13 Phase E-1 — "Test send" for a notification rule.
+ *
+ * Fires a single sample dispatch event for the rule's trigger kind
+ * so the admin can verify recipients + channels are wired correctly
+ * without waiting for a real trigger. Uses a stubbed payload tagged
+ * with `testSend: true` in metadata so audit / dispatch trails can
+ * be filtered.
+ *
+ * Subject/body explicitly call out that this is a test message so
+ * recipients don't mistake it for a real notification.
+ */
+export async function testSendNotificationRuleAction(
+  ruleId: string,
+): Promise<MutationResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  try {
+    // Load the rule to confirm it exists + belongs to this org +
+    // recover the trigger kind to dispatch with.
+    const [rule] = await db
+      .select({
+        id: notificationRules.id,
+        name: notificationRules.name,
+        triggerEventKind: notificationRules.triggerEventKind,
+        active: notificationRules.active,
+      })
+      .from(notificationRules)
+      .where(
+        and(
+          eq(notificationRules.id, ruleId),
+          eq(notificationRules.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (!rule) return { ok: false, error: "Rule not found." };
+    if (!rule.active) {
+      return {
+        ok: false,
+        error: "Rule is inactive. Activate it before sending a test.",
+      };
+    }
+
+    // Lazy import to avoid pulling the dispatcher into every server-
+    // action import graph just for one call site.
+    const { dispatchTriggerEvent } = await import(
+      "@/lib/notification-dispatcher"
+    );
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: rule.triggerEventKind,
+      // Tag the payload so downstream filtering / debugging can tell
+      // test deliveries from real ones. The match_filter on the rule
+      // would normally fire on real payload keys; for a test we want
+      // the rule to match regardless of match_filter, so we pass an
+      // empty payload (any filter with required keys won't match —
+      // accepted limitation for test sends; admin can use real
+      // triggers to exercise filter logic).
+      payload: { testSend: true, ruleId: rule.id },
+      subject: `[Test send] ${rule.name}`,
+      body:
+        `This is a test notification dispatched from ` +
+        `${actor.email ?? actor.name ?? "an admin"}. ` +
+        `It exercises the recipient + channel configuration of the rule "${rule.name}" ` +
+        `but doesn't reflect a real ${rule.triggerEventKind} event.`,
+      linkPath: `/notifications/rules/${rule.id}`,
+      actorUserId: actor.id,
+    });
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "notification_rule.test_send",
+      resourceType: "notification_rule",
+      resourceId: rule.id,
+      metadata: {
+        name: rule.name,
+        triggerEventKind: rule.triggerEventKind,
+      },
+    });
+
+    return { ok: true };
+  } catch (err) {
+    log.error("[testSendNotificationRuleAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Test send failed.",
+    };
+  }
+}
