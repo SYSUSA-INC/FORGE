@@ -473,7 +473,7 @@ modules. Constants moved into sibling `audit-retention-constants.ts`.
 ---
 
 ### BL-13 — Notifications rules engine
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A + B + C shipped; Phase D–E queued
+**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A + B + C + D shipped; Phase E queued
 
 Per spec: "notifications can be configured, who receives them, their
 frequency, and whether there is an SLA for escalations. These should
@@ -581,12 +581,29 @@ all be configurable."
   `src/lib/` location means the queries are outside the static
   isolation check's window, but they still respect the contract.
 
-**Phase D — Cron + SLA escalation**:
-- Daily cron `/api/cron/notification-batches` materializes
-  `batched_daily` / `batched_weekly` deliveries
-- Cron `/api/cron/notification-sla` scans for unacked deliveries
-  past their rule's `sla_seconds`, marks `sla_breached_at`, and
-  triggers the rule's `escalation_strategy` if defined
+**Phase D — Cron + SLA escalation** ✅ shipped:
+- ✅ `src/lib/notification-cron.ts` — two pure helpers:
+  - `materializeNotificationBatches()` collapses pending
+    `batched_daily` / `batched_weekly` delivery rows into one inbox
+    row per (recipient × channel × cadence). Weekly only fires on
+    Sunday UTC so users get exactly one weekly digest.
+  - `processSlaBreaches()` finds delivery rows past their rule's
+    `sla_seconds` with `acked_at IS NULL` AND `sla_breached_at IS NULL`,
+    sets `sla_breached_at = now()`, and — if the rule has an
+    `escalation_strategy` — resolves fallback recipients via the
+    Phase C resolver and creates escalation delivery rows.
+- ✅ `src/app/api/cron/notification-batches/route.ts` — daily at
+  04:00 UTC (offset from prune-audit-logs at 03:30 + cert refresh
+  at 03:00 on the 1st).
+- ✅ `src/app/api/cron/notification-sla/route.ts` — every 15
+  minutes (`*/15 * * * *`). 15-min granularity matches typical
+  hour-scale SLA windows without spinning constantly.
+- ✅ Both routes use the same Bearer `${CRON_SECRET}` auth pattern
+  as the existing crons.
+- ✅ `vercel.json` updated with the two new cron entries.
+
+Per-tenant isolation: every query inside both crons references
+`organizationId` from each delivery row; no cross-tenant joins.
 
 **Phase E — Test send + migrate existing triggers + retire hard-coded paths**:
 - "Test send" button on the rule editor — fires a sample event so
