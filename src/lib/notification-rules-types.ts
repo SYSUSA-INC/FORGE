@@ -31,6 +31,9 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   audit_anomaly: "Audit anomaly detected",
   membership_invited: "Team member invited",
   membership_disabled: "Team member disabled",
+  comment_mentioned: "Review comment mention",
+  opportunity_reviewed: "Opportunity bid/no-bid review submitted",
+  solicitation_role_assigned: "Solicitation role assigned",
 };
 
 export const RECIPIENT_STRATEGY_LABELS: Record<

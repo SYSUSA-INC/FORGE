@@ -806,6 +806,9 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "audit_anomaly",
     "membership_invited",
     "membership_disabled",
+    "comment_mentioned",
+    "opportunity_reviewed",
+    "solicitation_role_assigned",
   ],
 );
 

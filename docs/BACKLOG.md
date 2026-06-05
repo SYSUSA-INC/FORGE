@@ -619,14 +619,55 @@ Per-tenant isolation: every query inside both crons references
   `match_filter` requires specific keys won't match against a test
   send. Admins exercise filter logic by triggering real events.
 
-**Phase E-2 (queued) — Migrate legacy triggers + retire hard-coded paths**:
-- Identify all remaining hardcoded notification trigger sites
-  (e.g., `dispatchReviewCompletedNotification`, comment-mentioned)
-  and replace each with `dispatchTriggerEvent`
-- Seed default rules (per-tenant migration) so behavior is preserved
-  for orgs that haven't configured custom rules yet
-- Delete the legacy `dispatchReviewCompletedNotification` path
-- Delete the parallel dispatch added in Phase C to `closeReviewAction`
+**Phase E-2a — Extend trigger-event-kind enum for remaining hardcoded sites** ✅ shipped:
+Audit (see commit message) found three hardcoded notification sites
+still bypassing the rules engine, and the enum was missing values to
+represent them:
+- `addReviewCommentAction` → `dispatchCommentMentionNotification` →
+  needs `comment_mentioned`
+- `submitOpportunityReviewAction` → direct `db.insert(notifications)` →
+  needs `opportunity_reviewed`
+- `assignSolicitationRoleAction` → direct `db.insert(notifications)` →
+  needs `solicitation_role_assigned`
+
+Phase E-2a is the mechanical prerequisite: migration `0040` adds the
+three enum values, `schema.ts` and `notification-rules-types.ts`
+expose them with UI labels so admins can build rules against them
+even before E-2b wires the dispatch.
+
+**Phase E-2b (queued) — Wire `dispatchTriggerEvent` in the remaining sites + seed default rules**:
+- Add `dispatchTriggerEvent` calls in parallel with the legacy paths
+  at the three sites above. Parallel-dispatch pattern matches Phase C's
+  shadow at `closeReviewAction`.
+- Seed-rule migration (`0041_*`): for each `(organization_id, trigger_event_kind)`
+  pair that previously had hardcoded behavior, insert a default
+  `notification_rule` row preserving prior recipient + channel +
+  frequency semantics. Idempotent — only insert if the org has no
+  existing rule for that kind (lets early adopters who already built
+  custom rules keep theirs).
+- Default-rule semantics (drafted in seed):
+  | Kind | Recipient | Channel | Frequency |
+  |---|---|---|---|
+  | `review_completed` | proposal manager + reviewers | in_app+email | immediate |
+  | `review_request_pending` | assigned reviewer | in_app+email | immediate |
+  | `comment_mentioned` | mentioned user | in_app+email | immediate |
+  | `opportunity_reviewed` | opportunity owner | in_app | immediate |
+  | `solicitation_role_assigned` | assigned user | in_app | immediate |
+
+**Phase E-2c (queued) — Retire legacy dispatchers**:
+- After E-2b has shipped + soak-tested in production (≥1 week of
+  observed delivery parity via audit log diff), delete:
+  - `dispatchReviewCompletedNotification` + parallel call in
+    `closeReviewAction`
+  - `dispatchReviewAssignedNotification` + parallel call in
+    `startReviewAction`
+  - `dispatchCommentMentionNotification` + parallel call in
+    `addReviewCommentAction`
+  - The two direct `db.insert(notifications)` paths in
+    `submitOpportunityReviewAction` + `assignSolicitationRoleAction`
+- Audit-log diff query: compare `notification_delivery` rows (Phase C
+  dispatcher) vs legacy `notification` rows for the same trigger
+  window. Mismatch = blocker for E-2c.
 
 **Acceptance (full ticket):** create a rule "notify pricing-lead 48h
 before due date"; opportunity advances within 48h; rule fires;
