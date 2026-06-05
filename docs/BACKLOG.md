@@ -665,28 +665,43 @@ back/forward works; deep-linking via `?tab=` no longer needed.
 > hides + route gates + database row-level filters.
 
 ### BL-15 — Tenant Administration
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** BL-12 (uses audit log)
+**Priority:** P0  ·  **Effort:** L (phased)  ·  **Depends on:** BL-12 (uses audit log)
 
 Per spec: "this is where the customer accounts are managed."
 
-**Scope:**
-- Provision new tenant (creates organization, primary admin user,
-  invitation email; assigns default tier)
-- Suspend tenant (sets `organizations.status`; users see suspension
-  notice on next request; new sessions blocked)
-- Restore tenant (reverses suspension)
-- Transfer ownership (change `primary_admin_user_id`)
-- Per-tenant data summary: users, opportunities, proposals, storage
-  usage, AI request counts (last 30d)
+**Phased delivery** (strict-serial: one phase per PR):
+
+**Phase A — Per-tenant detail page** ✅ shipped:
+- New `/admin/orgs/[id]` route, superadmin-only
+- Read-only operational summary: member count, opportunity count,
+  proposal count, knowledge-artifact count + total storage bytes,
+  notification-rule count, audit-log row count for the last 30 days,
+  top-5 most active operators (last 30d, by audit-row count)
+- Identity panel with org id, slug, status, created-at + contact
+  fields snapshot
+- Audited via `recordRead` (`tenant.view_summary`) every page load —
+  superadmins reading cross-tenant data is itself a sensitive action
+- "Details →" link added to each row of the existing `/admin` org
+  list to surface the new page
+- Provision / suspend / restore / delete remain on the existing
+  `/admin` list (already shipped as part of the SuperAdmin portal);
+  Phase B adds the remaining items.
+
+**Phase B (queued) — Transfer ownership + assume-identity + data export**:
+- Transfer ownership (change `primary_admin_user_id` once added; for
+  now the "primary admin" is implicit — the oldest membership with
+  `role=admin`)
 - "Assume identity" flow for support: superadmin can read-only-view a
   tenant's UI for debugging; every action logged in BL-12
 - Data export for offboarding
 - Audit isolation status check (a button that runs sample
-  cross-tenant queries to verify isolation)
+  cross-tenant queries to verify isolation, then writes a structured
+  result row)
 
-**Acceptance:** provision a new tenant via UI → tenant admin gets
-invite email → can sign in → sees only their data; suspend tenant →
-their users blocked from sign-in; assume-identity logs to audit log.
+**Acceptance (full ticket):** provision a new tenant via UI → tenant
+admin gets invite email → can sign in → sees only their data; suspend
+tenant → their users blocked from sign-in; assume-identity logs to
+audit log.
 
 ---
 
