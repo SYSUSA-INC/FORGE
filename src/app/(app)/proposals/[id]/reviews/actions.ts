@@ -680,6 +680,29 @@ export async function addReviewCommentAction(input: {
           }),
         ),
       );
+
+      // BL-13 Phase E-2b — fire the rules engine in parallel with the
+      // legacy dispatcher. The legacy hardcoded dispatch is retired in
+      // Phase E-2c once seeded default rules cover the same surface
+      // and a parity window has passed.
+      await dispatchTriggerEvent({
+        organizationId,
+        kind: "comment_mentioned",
+        payload: {
+          proposalId: review.proposalId,
+          reviewId: input.reviewId,
+          commentId: row.id,
+          color: review.color,
+          mentionedUserIds: validIds,
+        },
+        subject: `${authorName} mentioned you in a ${COLOR_LABELS[review.color]} review comment`,
+        body: trimmedBody.slice(0, 500),
+        linkPath: `/proposals/${review.proposalId}/reviews/${input.reviewId}#comment-${row.id}`,
+        proposalId: review.proposalId,
+        reviewId: input.reviewId,
+        commentId: row.id,
+        actorUserId: actor.id,
+      });
     }
 
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);

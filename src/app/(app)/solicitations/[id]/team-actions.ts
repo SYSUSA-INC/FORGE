@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { SOLICITATION_ROLE_LABELS } from "@/lib/solicitation-roles";
 import { log } from "@/lib/log";
 
@@ -167,16 +168,35 @@ export async function assignSolicitationRoleAction(input: {
 
   // Notify the assignee — but skip if they assigned themselves.
   if (input.userId !== actor.id) {
+    const subject = `Assigned as ${SOLICITATION_ROLE_LABELS[input.role]} on ${sol.title || "a solicitation"}`;
+    const body =
+      `${actor.name ?? actor.email ?? "A teammate"} added you as ${SOLICITATION_ROLE_LABELS[input.role]}.` +
+      (notes ? `\n\nNotes: ${notes}` : "");
     await db.insert(notifications).values({
       organizationId,
       recipientUserId: input.userId,
       actorUserId: actor.id,
       kind: "solicitation_role_assigned",
-      subject: `Assigned as ${SOLICITATION_ROLE_LABELS[input.role]} on ${sol.title || "a solicitation"}`,
-      body:
-        `${actor.name ?? actor.email ?? "A teammate"} added you as ${SOLICITATION_ROLE_LABELS[input.role]}.` +
-        (notes ? `\n\nNotes: ${notes}` : ""),
+      subject,
+      body,
       linkPath: `/solicitations/${sol.id}`,
+    });
+
+    // BL-13 Phase E-2b — fire the rules engine in parallel with the
+    // legacy hardcoded notification. Retired in Phase E-2c once
+    // seeded default rules cover the same surface.
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: "solicitation_role_assigned",
+      payload: {
+        solicitationId: sol.id,
+        assigneeUserId: input.userId,
+        role: input.role,
+      },
+      subject,
+      body,
+      linkPath: `/solicitations/${sol.id}`,
+      actorUserId: actor.id,
     });
   }
 
