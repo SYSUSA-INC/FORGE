@@ -384,6 +384,13 @@ function OrgRowItem({
             {new Date(org.createdAt).toLocaleDateString()}
           </div>
         </div>
+        <Link
+          href={`/admin/orgs/${org.id}`}
+          className="aur-btn aur-btn-ghost text-[11px]"
+          title="View per-tenant detail + storage + activity"
+        >
+          Details →
+        </Link>
         <button
           type="button"
           className="aur-btn aur-btn-ghost text-[11px]"
