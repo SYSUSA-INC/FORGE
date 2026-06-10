@@ -635,17 +635,31 @@ three enum values, `schema.ts` and `notification-rules-types.ts`
 expose them with UI labels so admins can build rules against them
 even before E-2b wires the dispatch.
 
-**Phase E-2b (queued) — Wire `dispatchTriggerEvent` in the remaining sites + seed default rules**:
-- Add `dispatchTriggerEvent` calls in parallel with the legacy paths
-  at the three sites above. Parallel-dispatch pattern matches Phase C's
-  shadow at `closeReviewAction`.
-- Seed-rule migration (`0041_*`): for each `(organization_id, trigger_event_kind)`
-  pair that previously had hardcoded behavior, insert a default
-  `notification_rule` row preserving prior recipient + channel +
-  frequency semantics. Idempotent — only insert if the org has no
-  existing rule for that kind (lets early adopters who already built
-  custom rules keep theirs).
-- Default-rule semantics (drafted in seed):
+**Phase E-2b-1 — Parallel `dispatchTriggerEvent` wiring** ✅ shipped:
+- `dispatchTriggerEvent` now fires alongside each of the three
+  hardcoded notification sites identified in E-2a. Parallel-dispatch
+  pattern matches Phase C's shadow at `closeReviewAction`. Legacy
+  paths remain live (no behavior change for tenants without custom
+  rules); rules-engine subscribers now ALSO receive deliveries from
+  these triggers if they've configured matching rules.
+- Sites wired:
+  - `addReviewCommentAction` → `comment_mentioned` (one dispatch per
+    `addReviewCommentAction` call regardless of mention count; payload
+    carries `mentionedUserIds` so `match_filter` rules can fan out)
+  - `submitOpportunityReviewAction` → `opportunity_reviewed`
+  - `assignSolicitationRoleAction` → `solicitation_role_assigned`
+- Subject + body re-used from the legacy notification payload to
+  keep messaging consistent across both dispatch paths.
+
+**Phase E-2b-2 (queued) — Seed default rules per existing tenant**:
+- Seed-rule migration (`0041_*`): for each existing organization,
+  insert default `notification_rule` rows covering the five
+  hardcoded trigger semantics so legacy parity holds when E-2c
+  retires the hardcoded paths.
+- Idempotent — only insert if the org has no existing rule for that
+  trigger kind (lets early adopters who already built custom rules
+  keep theirs).
+- Default-rule semantics:
   | Kind | Recipient | Channel | Frequency |
   |---|---|---|---|
   | `review_completed` | proposal manager + reviewers | in_app+email | immediate |
@@ -653,6 +667,10 @@ even before E-2b wires the dispatch.
   | `comment_mentioned` | mentioned user | in_app+email | immediate |
   | `opportunity_reviewed` | opportunity owner | in_app | immediate |
   | `solicitation_role_assigned` | assigned user | in_app | immediate |
+- Comment-mention seed needs a per-mentioned-user fan-out: either via
+  `specific_users` strategy with runtime resolution from
+  `mentionedUserIds`, or by extending the recipient resolver with a
+  `mentioned_in_payload` strategy. Decision deferred to E-2b-2 PR.
 
 **Phase E-2c (queued) — Retire legacy dispatchers**:
 - After E-2b has shipped + soak-tested in production (≥1 week of

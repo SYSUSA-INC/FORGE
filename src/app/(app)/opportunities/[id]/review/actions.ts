@@ -18,6 +18,7 @@ import { recordAudit, recordRead } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { sendOpportunityReviewRequestEmail } from "@/lib/email";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { log } from "@/lib/log";
 
 export type SendReviewRequestInput = {
@@ -432,16 +433,37 @@ export async function submitOpportunityReviewAction(
       .from(opportunities)
       .where(eq(opportunities.id, row.opportunityId))
       .limit(1);
+    const subject = `Review back — ${labelFor(input.recommendation)}: ${opp?.title ?? "an opportunity"}`;
+    const body =
+      `${row.reviewerName || row.reviewerEmail} recommended ${labelFor(input.recommendation)}.` +
+      (comment ? `\n\n"${comment.slice(0, 300)}"` : "");
     await db.insert(notifications).values({
       organizationId: row.organizationId,
       recipientUserId: row.senderUserId,
       actorUserId: row.reviewerUserId,
       kind: "opportunity_review_completed",
-      subject: `Review back — ${labelFor(input.recommendation)}: ${opp?.title ?? "an opportunity"}`,
-      body:
-        `${row.reviewerName || row.reviewerEmail} recommended ${labelFor(input.recommendation)}.` +
-        (comment ? `\n\n"${comment.slice(0, 300)}"` : ""),
+      subject,
+      body,
       linkPath: `/opportunities/${row.opportunityId}`,
+    });
+
+    // BL-13 Phase E-2b — fire the rules engine in parallel with the
+    // legacy hardcoded notification. Retired in Phase E-2c once
+    // seeded default rules cover the same surface.
+    await dispatchTriggerEvent({
+      organizationId: row.organizationId,
+      kind: "opportunity_reviewed",
+      payload: {
+        opportunityId: row.opportunityId,
+        opportunityReviewId: row.id,
+        recommendation: input.recommendation,
+        senderUserId: row.senderUserId,
+        reviewerUserId: row.reviewerUserId,
+      },
+      subject,
+      body,
+      linkPath: `/opportunities/${row.opportunityId}`,
+      actorUserId: row.reviewerUserId ?? undefined,
     });
   }
 
