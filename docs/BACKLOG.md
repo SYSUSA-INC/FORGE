@@ -665,22 +665,30 @@ even before E-2b wires the dispatch.
   `mentioned_in_payload` shows an inline explainer (no extra config).
 - Escalation also accepts the new strategy.
 
-**Phase E-2b-2b (queued) — Seed default rules per existing tenant**:
-- Seed-rule migration (`0042_*`): for each existing organization,
-  insert default `notification_rule` rows covering the five
-  hardcoded trigger semantics so legacy parity holds when E-2c
-  retires the hardcoded paths.
-- Idempotent per the decision recorded with E-2b-2a: skip a kind
-  for an org if the org already has any rule for that trigger kind
-  (lets early adopters who already built custom rules keep theirs).
-- Default-rule semantics (uses E-2b-2a strategies):
-  | Kind | Recipient | Channel | Frequency |
+**Phase E-2b-2b — Seed default rules per existing tenant** ✅ shipped:
+- Migration `0042_seed_default_notification_rules.sql` inserts default
+  `notification_rule` rows for every existing organization, covering
+  the five hardcoded trigger semantics so the rules engine matches
+  legacy behavior. `INSERT ... SELECT FROM organization WHERE NOT
+  EXISTS (...)` makes the migration idempotent per the recorded
+  decision: skip a kind for an org if it already has any rule for
+  that kind.
+- Six rules total inserted per "clean" org (two for `review_completed`).
+- All defaults are named `Default: <human label>` with a description
+  noting they were auto-seeded, so admins can recognize and tweak
+  them in the rule editor.
+- `assignSolicitationRoleAction` updated to also populate
+  `payload.mentionedUserIds: [input.userId]` so the
+  `mentioned_in_payload` seed rule resolves to the newly-assigned
+  user (no resolver change needed).
+- Default-rule semantics:
+  | Kind | Recipient strategy | Channel | Frequency |
   |---|---|---|---|
-  | `review_completed` | formula: `review_assignee` + `proposal_owner` (two seed rules per org) | in_app+email | immediate |
-  | `review_request_pending` | formula: `review_assignee` | in_app+email | immediate |
+  | `review_completed` | formula `review_assignee` + formula `proposal_owner` (two seed rules) | in_app+email | immediate |
+  | `review_request_pending` | formula `review_assignee` | in_app+email | immediate |
   | `comment_mentioned` | `mentioned_in_payload` | in_app+email | immediate |
-  | `opportunity_reviewed` | formula: `opportunity_owner` | in_app | immediate |
-  | `solicitation_role_assigned` | `mentioned_in_payload` (dispatcher tags `assigneeUserId` → bump payload to populate `mentionedUserIds`) | in_app | immediate |
+  | `opportunity_reviewed` | formula `opportunity_owner` | in_app | immediate |
+  | `solicitation_role_assigned` | `mentioned_in_payload` | in_app | immediate |
 
 **Phase E-2c (queued) — Retire legacy dispatchers**:
 - After E-2b has shipped + soak-tested in production (≥1 week of
