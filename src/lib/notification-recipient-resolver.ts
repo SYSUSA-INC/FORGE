@@ -5,6 +5,8 @@ import { db } from "@/db";
 import {
   memberships,
   opportunities,
+  proposalReviewAssignments,
+  proposalReviews,
   proposalSections,
   proposals,
   type NotificationRecipientStrategy,
@@ -87,6 +89,29 @@ export async function resolveRecipients(input: {
       const kind = config.kind;
       if (typeof kind !== "string" || !isFormulaKind(kind)) return [];
       return resolveFormula({ organizationId, kind, payload });
+    }
+
+    if (strategy === "mentioned_in_payload") {
+      // Reads `payload.mentionedUserIds` (set by dispatchers like the
+      // review-comment site). Filters to current active members so a
+      // mention of a since-removed user doesn't fire. Config is
+      // ignored — the rule just opts in to "whoever was mentioned".
+      const raw = (payload as { mentionedUserIds?: unknown }).mentionedUserIds;
+      const ids = Array.isArray(raw)
+        ? raw.filter((id): id is string => typeof id === "string")
+        : [];
+      if (ids.length === 0) return [];
+      const active = await db
+        .select({ userId: memberships.userId })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.organizationId, organizationId),
+            eq(memberships.status, "active"),
+            inArray(memberships.userId, ids),
+          ),
+        );
+      return dedupe(active.map((r) => r.userId));
     }
 
     return [];
@@ -201,6 +226,32 @@ async function resolveFormula(input: {
       )
       .limit(1);
     return row?.id ? [row.id] : [];
+  }
+
+  if (kind === "review_assignee") {
+    // Fans out to every reviewer assigned to a specific
+    // proposal_review. Used by the `review_completed` and
+    // `review_request_pending` default seed rules so the rules engine
+    // matches the legacy fan-out. Join through proposalReviews →
+    // proposals to enforce org scope — proposalReviewAssignments
+    // doesn't carry organization_id directly.
+    const reviewId = stringField(payload, "reviewId");
+    if (!reviewId) return [];
+    const rows = await db
+      .select({ id: proposalReviewAssignments.userId })
+      .from(proposalReviewAssignments)
+      .innerJoin(
+        proposalReviews,
+        eq(proposalReviews.id, proposalReviewAssignments.reviewId),
+      )
+      .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
+      .where(
+        and(
+          eq(proposalReviewAssignments.reviewId, reviewId),
+          eq(proposals.organizationId, organizationId),
+        ),
+      );
+    return dedupe(rows.map((r) => r.id));
   }
 
   // Exhaustive: every FormulaKind handled above.

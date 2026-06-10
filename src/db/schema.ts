@@ -814,7 +814,7 @@ export const notificationTriggerEventKindEnum = pgEnum(
 
 export const notificationRecipientStrategyEnum = pgEnum(
   "notification_recipient_strategy",
-  ["specific_users", "role_based", "formula"],
+  ["specific_users", "role_based", "formula", "mentioned_in_payload"],
 );
 
 export const notificationChannelEnum = pgEnum("notification_channel", [
@@ -880,7 +880,8 @@ export const notificationRules = pgTable(
       strategy:
         | "specific_users"
         | "role_based"
-        | "formula";
+        | "formula"
+        | "mentioned_in_payload";
       config: Record<string, unknown>;
     } | null>(),
     active: boolean("active").notNull().default(true),

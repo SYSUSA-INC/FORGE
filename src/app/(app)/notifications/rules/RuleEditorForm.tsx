@@ -146,21 +146,26 @@ function buildRuleInput(form: FormState): RuleInput | { error: string } {
     return { error: "Match filter is not valid JSON." };
   }
 
-  const recipient =
+  const recipient: RuleInput["recipient"] =
     form.recipientStrategy === "specific_users"
       ? {
-          strategy: "specific_users" as const,
+          strategy: "specific_users",
           config: { userIds: form.specificUserIds },
         }
       : form.recipientStrategy === "role_based"
         ? {
-            strategy: "role_based" as const,
+            strategy: "role_based",
             config: { roles: form.roleBased },
           }
-        : {
-            strategy: "formula" as const,
-            config: { kind: form.formulaKind },
-          };
+        : form.recipientStrategy === "mentioned_in_payload"
+          ? {
+              strategy: "mentioned_in_payload",
+              config: {},
+            }
+          : {
+              strategy: "formula",
+              config: { kind: form.formulaKind },
+            };
 
   const escalation = !form.escalationEnabled
     ? null
@@ -171,7 +176,9 @@ function buildRuleInput(form: FormState): RuleInput | { error: string } {
             ? { userIds: form.escalationSpecificUserIds }
             : form.escalationStrategy === "role_based"
               ? { roles: form.escalationRoleBased }
-              : { kind: form.escalationFormulaKind },
+              : form.escalationStrategy === "mentioned_in_payload"
+                ? {}
+                : { kind: form.escalationFormulaKind },
       };
 
   const slaParsed = form.slaHours.trim() ? Number(form.slaHours) : 0;
@@ -430,6 +437,16 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
               </select>
             </label>
           ) : null}
+
+          {form.recipientStrategy === "mentioned_in_payload" ? (
+            <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
+              Fires for every user the triggering event tagged as
+              mentioned (in <code>payload.mentionedUserIds</code>) who
+              is still an active member of this org. No extra
+              configuration — the dispatcher decides the recipient
+              set at runtime.
+            </div>
+          ) : null}
         </div>
       </Panel>
 
@@ -555,6 +572,14 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
                   selected={form.escalationRoleBased}
                   onToggle={(r) => toggleRole(r, false)}
                 />
+              ) : null}
+
+              {form.escalationStrategy === "mentioned_in_payload" ? (
+                <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
+                  Falls back to whoever the original event tagged as
+                  mentioned. Same runtime lookup as the primary
+                  strategy — no extra configuration.
+                </div>
               ) : null}
 
               {form.escalationStrategy === "formula" ? (
