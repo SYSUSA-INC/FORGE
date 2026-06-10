@@ -50,7 +50,7 @@ const TRIGGER_EVENT_KIND_VALUES: [
 const RECIPIENT_STRATEGY_VALUES: [
   NotificationRecipientStrategy,
   ...NotificationRecipientStrategy[],
-] = ["specific_users", "role_based", "formula"];
+] = ["specific_users", "role_based", "formula", "mentioned_in_payload"];
 
 const CHANNEL_VALUES: [NotificationChannel, ...NotificationChannel[]] = [
   "in_app",
@@ -96,10 +96,20 @@ const FormulaConfigSchema = z.object({
   }),
 });
 
+// `mentioned_in_payload` reads `payload.mentionedUserIds` at dispatch
+// time; the rule itself stores no config beyond opting in to the
+// strategy. We accept an empty object so the editor doesn't have to
+// invent fields just to satisfy a schema.
+const MentionedInPayloadConfigSchema = z.object({
+  strategy: z.literal("mentioned_in_payload"),
+  config: z.object({}).default({}),
+});
+
 export const RecipientSchema = z.discriminatedUnion("strategy", [
   SpecificUsersConfigSchema,
   RoleBasedConfigSchema,
   FormulaConfigSchema,
+  MentionedInPayloadConfigSchema,
 ]);
 
 export type RecipientInput = z.infer<typeof RecipientSchema>;

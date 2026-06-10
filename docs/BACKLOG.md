@@ -651,26 +651,36 @@ even before E-2b wires the dispatch.
 - Subject + body re-used from the legacy notification payload to
   keep messaging consistent across both dispatch paths.
 
-**Phase E-2b-2 (queued) — Seed default rules per existing tenant**:
-- Seed-rule migration (`0041_*`): for each existing organization,
+**Phase E-2b-2a — Resolver extensions** ✅ shipped:
+- New recipient strategy `mentioned_in_payload`: reads
+  `payload.mentionedUserIds` and filters to active members. Rule
+  carries no config — runtime decides the recipient set.
+- New formula kind `review_assignee`: reads `payload.reviewId` and
+  returns every user in `proposal_review_assignment` for that review.
+  Org-scoped via join through `proposal_reviews` → `proposals`.
+- Migration `0041_*` adds `mentioned_in_payload` to the
+  `notification_recipient_strategy` Postgres enum.
+- `FORMULA_KINDS` extended with `review_assignee`.
+- Rule editor surfaces the new strategy + formula kind; selecting
+  `mentioned_in_payload` shows an inline explainer (no extra config).
+- Escalation also accepts the new strategy.
+
+**Phase E-2b-2b (queued) — Seed default rules per existing tenant**:
+- Seed-rule migration (`0042_*`): for each existing organization,
   insert default `notification_rule` rows covering the five
   hardcoded trigger semantics so legacy parity holds when E-2c
   retires the hardcoded paths.
-- Idempotent — only insert if the org has no existing rule for that
-  trigger kind (lets early adopters who already built custom rules
-  keep theirs).
-- Default-rule semantics:
+- Idempotent per the decision recorded with E-2b-2a: skip a kind
+  for an org if the org already has any rule for that trigger kind
+  (lets early adopters who already built custom rules keep theirs).
+- Default-rule semantics (uses E-2b-2a strategies):
   | Kind | Recipient | Channel | Frequency |
   |---|---|---|---|
-  | `review_completed` | proposal manager + reviewers | in_app+email | immediate |
-  | `review_request_pending` | assigned reviewer | in_app+email | immediate |
-  | `comment_mentioned` | mentioned user | in_app+email | immediate |
-  | `opportunity_reviewed` | opportunity owner | in_app | immediate |
-  | `solicitation_role_assigned` | assigned user | in_app | immediate |
-- Comment-mention seed needs a per-mentioned-user fan-out: either via
-  `specific_users` strategy with runtime resolution from
-  `mentionedUserIds`, or by extending the recipient resolver with a
-  `mentioned_in_payload` strategy. Decision deferred to E-2b-2 PR.
+  | `review_completed` | formula: `review_assignee` + `proposal_owner` (two seed rules per org) | in_app+email | immediate |
+  | `review_request_pending` | formula: `review_assignee` | in_app+email | immediate |
+  | `comment_mentioned` | `mentioned_in_payload` | in_app+email | immediate |
+  | `opportunity_reviewed` | formula: `opportunity_owner` | in_app | immediate |
+  | `solicitation_role_assigned` | `mentioned_in_payload` (dispatcher tags `assigneeUserId` → bump payload to populate `mentionedUserIds`) | in_app | immediate |
 
 **Phase E-2c (queued) — Retire legacy dispatchers**:
 - After E-2b has shipped + soak-tested in production (≥1 week of

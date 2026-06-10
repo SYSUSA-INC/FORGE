@@ -43,6 +43,7 @@ export const RECIPIENT_STRATEGY_LABELS: Record<
   specific_users: "Specific users",
   role_based: "By role",
   formula: "By relationship to the record",
+  mentioned_in_payload: "Users mentioned in the event payload",
 };
 
 export const CHANNEL_LABELS: Record<NotificationChannel, string> = {
@@ -69,6 +70,7 @@ export const FORMULA_KINDS = [
   "capture_mgr",
   "pricing_lead",
   "section_author",
+  "review_assignee",
 ] as const;
 export type FormulaKind = (typeof FORMULA_KINDS)[number];
 
@@ -78,4 +80,5 @@ export const FORMULA_KIND_LABELS: Record<FormulaKind, string> = {
   capture_mgr: "Capture lead",
   pricing_lead: "Pricing lead",
   section_author: "Section author",
+  review_assignee: "Color-team review assignees",
 };
