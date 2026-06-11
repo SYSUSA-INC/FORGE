@@ -1065,20 +1065,31 @@ Neon integration. Migration-rewire deferred.
 
 ---
 
-### BL-QC-neon-migration-rewire — Use Neon branch for fresh-DB check
-**Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-QC-neon  ·  **Status:** queued
+### BL-QC-neon-migration-rewire — Use Neon branch for fresh-DB check — **shipped**
+**Priority:** P2  ·  **Effort:** S  ·  **Depends on:** BL-QC-neon  ·  **Status:** ✅ shipped
 
-Follow-up to BL-QC-neon. Modify `pr.yml`'s `migrations-fresh` job
-to use the per-PR Neon branch's connection string instead of the
-ephemeral `pgvector/pgvector:pg16` service. Gives the migration
-test real production schema shape (and optionally real data shape
-via Neon's branching).
+Follow-up to BL-QC-neon. `pr.yml`'s `migrations-fresh` job now
+prefers the per-PR Neon branch's connection string when Neon is
+configured, giving the migration test real production schema shape.
 
-**Conditions:**
-- Use the Neon branch when both `NEON_API_KEY` and `NEON_PROJECT_ID`
-  are set (`needs.create-branch.outputs.configured == 'true'`)
-- Fall back to the ephemeral Postgres service otherwise — preserves
-  the existing behavior for forks / setups without Neon access.
+**Shipped:**
+- New `Detect Neon configuration` step emits `configured=true/false`
+  based on `secrets.NEON_API_KEY` + `vars.NEON_PROJECT_ID` presence.
+- New `Resolve Neon branch` step (gated on `configured == 'true'` and
+  `github.event_name == 'pull_request'`) calls
+  `neondatabase/create-branch-action@v6` with the same
+  `branch_name: pr-<number>` the neon-branch workflow uses. The
+  action is idempotent on `branch_name` — if neon-branch.yml already
+  created the branch, this call returns the existing connection
+  details rather than failing. Parallel-safe.
+- `Run fresh-DB migration check` step's `DATABASE_URL` picks the
+  Neon `db_url` when resolved and falls back to the ephemeral
+  `pgvector/pgvector:pg16` service URL otherwise — preserves the
+  existing behavior for forks / setups without Neon access.
+- `services: postgres` block kept as the fallback target; always
+  boots (services run for the whole job) but is unused when the
+  Neon path resolves. Trade-off accepted: ~5–10s of CI time on
+  Neon-configured runs vs. splitting into two parallel jobs.
 
 ---
 

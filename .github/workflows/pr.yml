@@ -104,18 +104,27 @@ jobs:
   migrations-fresh:
     name: Fresh-DB migration verification
     runs-on: ubuntu-latest
-    # Boots an ephemeral Postgres, applies every migration from
-    # scratch, and verifies a re-run is a no-op. Catches accidental
-    # cross-migration dependencies on prior state — those pass on a
-    # developer's already-migrated DB but break a fresh production /
-    # staging deploy.
+    # Applies every migration from scratch, then re-applies to verify
+    # idempotency. Catches accidental cross-migration dependencies on
+    # prior state — those pass on a developer's already-migrated DB but
+    # break a fresh production / staging deploy.
+    #
+    # BL-QC-neon-migration-rewire: prefers the per-PR Neon branch
+    # (created by the neon-branch workflow) when Neon is configured,
+    # so the check runs against real production schema shape. Falls
+    # back to the ephemeral `pgvector/pgvector:pg16` service for forks
+    # and setups without Neon access — preserves the original behavior
+    # so the check never silently degrades.
+    #
+    # Both modes verify the same two invariants (`apply cleanly` +
+    # `idempotent re-apply`). The Neon mode additionally exercises the
+    # migration against the production schema that already exists on
+    # the branch.
     services:
       postgres:
-        # pgvector/pgvector image because migration 0022 calls
-        # `CREATE EXTENSION vector`. Vanilla `postgres:16` doesn't
-        # ship the binary, so the migration would fail with
-        # `extension "vector" is not available`. Track the same
-        # major version production runs on Neon (16).
+        # Fallback target. Always boots (services run for the whole
+        # job) but is unused when the Neon path resolves. pgvector
+        # image because migration 0022 calls `CREATE EXTENSION vector`.
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: forge
@@ -135,6 +144,42 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
-      - run: node scripts/check-migrations-fresh.mjs
+
+      - name: Detect Neon configuration
+        id: detect-neon
         env:
-          DATABASE_URL: "postgres://forge:forge@localhost:5432/forge_ci"
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neon not configured — fresh-DB check using ephemeral Postgres."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neon configured — fresh-DB check using per-PR Neon branch."
+          fi
+
+      - name: Resolve Neon branch
+        id: neon
+        # Only for pull_request events — push-to-main has no PR number
+        # and there's no per-PR branch to read.
+        if: steps.detect-neon.outputs.configured == 'true' && github.event_name == 'pull_request'
+        # create-branch-action is idempotent on `branch_name`: if the
+        # neon-branch.yml workflow already created `pr-<number>`, this
+        # call returns the existing branch's connection details rather
+        # than failing. Parallel-safe.
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          parent: ${{ vars.NEON_BRANCH_PARENT || 'main' }}
+          branch_name: pr-${{ github.event.pull_request.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          username: ${{ vars.NEON_USERNAME || 'forge' }}
+
+      - name: Run fresh-DB migration check
+        run: node scripts/check-migrations-fresh.mjs
+        env:
+          # Prefer the Neon branch URL when resolved; fall back to the
+          # ephemeral service. The `||` operator treats an empty string
+          # (skipped step) as falsy, so this works whether Neon ran or not.
+          DATABASE_URL: ${{ steps.neon.outputs.db_url || 'postgres://forge:forge@localhost:5432/forge_ci' }}
