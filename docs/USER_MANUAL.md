@@ -83,7 +83,7 @@ After signing in you'll see the main **app shell**:
 
 ![App shell](docs/images/app-shell.png)
 
-- **Left sidebar** — navigation, grouped into Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins.
+- **Left sidebar** — navigation, grouped into Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Inside the Opportunities group you'll find **Opportunities Dashboard**, **In-flight Proposals**, and **New Proposals** as siblings (see §6).
 - **Top bar** — the mobile hamburger, live session clock, Settings shortcut, and your avatar
 - **Content area** — changes with the page you're on
 
@@ -316,19 +316,25 @@ A **Proposal** is tied to an opportunity and tracks the color-team review lifecy
 
 Anyone in the org can read every proposal. Editing is gated by role *and* assignment: Proposal-role users can edit proposals where they're the manager; Authors can edit sections they're listed as author on; Reviewers can submit verdicts on reviews they're assigned to. Admins can edit any proposal, full stop.
 
-Go to **Proposals** in the sidebar.
+The proposals area lives under the **Opportunities** sidebar group as two siblings:
+
+- **In-flight Proposals** (`/proposals`) — the proposals list with all the filters and tabs described below
+- **New Proposals** (`/proposals/new`) — the launcher for creating a new proposal from an existing opportunity
+
+Use whichever entry matches the task you're about to do; both lead to the same underlying records.
 
 ### 6.1 List view
 
 ![Proposals list](docs/images/proposals-list.png)
 
+- **Tabs**: `All` / `Draft` / `In review` / **`Past proposals`** (rolls up Submitted / Awarded / Lost / No Bid / Archived — the underlying stage filter still drills further within each tab).
 - Stage filter chips (Draft / Pink / Red / Gold / White / Submitted / Awarded / Lost / No Bid / Archived)
 - Search by title, agency, PM
-- Stat tiles: Total / Draft / In review / Submitted
+- Stat tiles: Total / Draft / In review / Submitted. The **Submitted** stat tile is the count of proposals at the `submitted` stage specifically — distinct from the **Past proposals** tab, which is the broader "everything done" rollup. The tile and the tab don't disagree; they're measuring different things.
 
 ### 6.2 Create a proposal
 
-Click **+ New proposal**.
+Click **+ New proposal**, or use the **New Proposals** nav entry under Opportunities — both lead to the same launcher.
 
 ![New proposal form](docs/images/proposal-new.png)
 
