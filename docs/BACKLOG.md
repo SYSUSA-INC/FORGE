@@ -306,24 +306,62 @@ from edits.
 ## Platform intelligence (Brain & Knowledge)
 
 ### BL-10 — Knowledge ingestion improvements
-**Priority:** P2  ·  **Effort:** M  ·  **Depends on:** —
+**Priority:** P2  ·  **Effort:** M (phased)  ·  **Depends on:** —
 
 Per spec: "Knowledge — critical area where a company can dump all its
 historical data... The data provided here will be leveraged by the
 FORGE Brain..."
 
 Today's `/knowledge-base` supports artifact upload + manual entries.
-Improvements:
 
-**Scope:**
-- Bulk upload (drag-drop multiple files, queue-and-process)
-- Auto-categorization on ingest (capability / past-performance /
-  personnel / boilerplate) using the existing extraction prompt
-- Folder/category tree view
-- Entry quality scoring (how confident the Brain is in this entry)
+**Already shipped (legacy, before BL-10 was formalized):**
+- ✅ Bulk upload — `CorpusUploader` does multi-file drag-drop with a
+  queue + per-file status pills + sequential processing.
 
-**Acceptance:** drop 20 files at once → all index successfully →
-auto-categorized with reviewable suggestions → quality scores show.
+**Phase A — AI-based artifact kind classification on upload** ✅ shipped:
+- New `src/lib/knowledge-classify.ts` — `classifyArtifactKind({
+  fileName, contentType, rawText })` returns `{ kind, confidence,
+  reasoning, stubbed }`. Calls the AI gateway with a focused
+  classification prompt that maps to the 15-value
+  `knowledge_artifact_kind` enum.
+- New prompt + zod schema in `ai-prompts.ts`:
+  `buildArtifactKindClassifyPrompt`, `artifactKindClassifySchema`.
+  System prompt enumerates kind definitions, heuristics, and
+  confidence semantics. Caps the user text at 8,000 chars
+  (classification needs less context than extraction).
+- Wired into `extractAndIndex` in the upload pipeline: when the
+  user picks "Auto-detect", after text extraction succeeds, calls
+  the classifier and updates the artifact's `kind` column **only**
+  when (a) AI is non-stub, (b) confidence ≥ 0.6
+  (`CLASSIFY_CONFIDENCE_THRESHOLD`).
+- Stub-mode safe: stubbed responses are skipped, preserving the
+  existing `defaultKindFromFormat` heuristic behavior.
+- Best-effort: any failure logs and leaves the heuristic kind in
+  place. Doesn't block extraction completion.
+- Auto-detect is the default in `CorpusUploader`, so the
+  classification kicks in for nearly every uploaded file unless the
+  user deliberately picks a specific kind.
+
+**Phase B (queued) — Surface suggestions / re-classify existing**:
+- "AI suggests <kind> (confidence 87%)" inline pill on artifact rows
+  where the heuristic kind differs from the AI's suggestion at low
+  confidence. Single-click accept.
+- One-off backfill: classify existing artifacts whose `kind == "other"`
+  (the heuristic catch-all) and surface high-confidence suggestions
+  in a triage list.
+
+**Phase C (queued) — Folder / category tree view**:
+- Tree view in `/knowledge-base` grouped by kind > tags > date
+- Drag-drop to re-tag
+
+**Phase D (queued) — Entry quality scoring**:
+- 0..1 quality score per knowledge_entry surfaced in the editor.
+- Inputs: text length / structure, presence of dates and metrics,
+  past-performance match strength, etc.
+
+**Acceptance (full ticket):** drop 20 files at once → all index
+successfully → auto-categorized with reviewable suggestions → quality
+scores show.
 
 ---
 

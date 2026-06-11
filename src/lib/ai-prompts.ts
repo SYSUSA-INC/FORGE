@@ -617,6 +617,114 @@ export function buildKnowledgeExtractPrompt(input: {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// BL-10 Phase A — artifact kind classifier
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Classifies a knowledge artifact's kind from its extracted text.
+ * Replaces the file-extension-based heuristic in
+ * `defaultKindFromFormat` when the user picks "Auto-detect" on upload.
+ *
+ * Output is a single enum value (matching `knowledgeArtifactKindEnum`)
+ * plus a 0..1 confidence score and a one-sentence reasoning string.
+ * The dispatcher only applies the AI's kind when confidence ≥ 0.6 and
+ * the response was real (not stub-mode), otherwise the file-extension
+ * heuristic stays.
+ */
+export const artifactKindClassifySchema = z.object({
+  kind: z.enum([
+    "proposal",
+    "rfp",
+    "contract",
+    "cpars",
+    "debrief",
+    "capability_brief",
+    "resume",
+    "brochure",
+    "whitepaper",
+    "email",
+    "note",
+    "image",
+    "spreadsheet",
+    "deck",
+    "other",
+  ]),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+});
+
+const ARTIFACT_KIND_CLASSIFY_SYSTEM = `You classify uploaded files into FORGE's knowledge-base artifact kinds.
+
+You're shown the file name, content type, and the extracted text of one
+file. Decide which kind best describes the document and return strict
+JSON matching the schema in the user prompt.
+
+Kind definitions:
+- proposal: a complete or in-progress response to a government RFP/RFI/RFQ
+- rfp: a government solicitation document (RFP / RFI / RFQ / Sources Sought)
+- contract: an executed contract or task order
+- cpars: a Contractor Performance Assessment Report
+- debrief: an agency debrief letter or notes from a debrief meeting
+- capability_brief: a short company-capability one-pager / pitch deck
+- resume: a single person's CV / resume
+- brochure: marketing collateral describing products or services
+- whitepaper: a long-form technical or thought-leadership document
+- email: an email message or thread
+- note: free-form notes / minutes / memos / unstructured text
+- deck: a slide presentation (not a marketing brochure)
+- spreadsheet: a tabular workbook
+- image: an image of a document (when OCR text is too thin to classify further)
+- other: when nothing above fits, including form fillables / W-9s / legal misc
+
+Heuristics:
+- If the file name contains words like "RFP", "RFQ", "SOW", "PWS", "solicitation",
+  "amendment", and the text reads like government-side bid documentation, prefer "rfp".
+- If the text reads like a vendor RESPONSE to a solicitation (executive summary,
+  technical approach, past performance, price volume), prefer "proposal".
+- If the text contains CPARS rating language ("Exceptional", "Satisfactory",
+  evaluation periods), prefer "cpars".
+- Tabular content with column headers and many rows of data → "spreadsheet"
+  (unless the workbook is clearly a price volume of a proposal — then "proposal").
+- A single person's bio / experience / education / skills → "resume".
+
+Confidence:
+- 1.0 = the document explicitly states what it is (e.g., titled "Resume" or "RFP No. ...")
+- 0.7 = strong content match (e.g., a clear bid response structure even if untitled)
+- 0.4 = mixed signals — could plausibly be two kinds; pick the more likely
+- 0.0 = no usable signal; you're guessing — return "other" with this confidence
+
+Reasoning: one sentence, ≤30 words, citing the strongest signal that drove the
+choice. Used for audit / debug only — not shown to end users.`;
+
+export function buildArtifactKindClassifyPrompt(input: {
+  fileName: string;
+  contentType: string;
+  rawText: string;
+}): { system: string; messages: AIMessage[] } {
+  // Smaller cap than knowledge-extract: classification needs less context.
+  // The opening + closing of a doc usually carry enough signal.
+  const trimmed = input.rawText.slice(0, 8_000);
+
+  const userPrompt = [
+    `File:`,
+    `- name: ${input.fileName}`,
+    `- contentType: ${input.contentType || "unknown"}`,
+    ``,
+    `Extracted text (first ${trimmed.length} of ${input.rawText.length} chars):`,
+    "```",
+    trimmed,
+    "```",
+    ``,
+    `Return strict JSON: { "kind": "<one of the 15 enum values>", "confidence": <0..1 number>, "reasoning": "<one sentence>" }`,
+  ].join("\n");
+
+  return {
+    system: ARTIFACT_KIND_CLASSIFY_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Phase 14f — Proposal-vs-winner analysis
 // ────────────────────────────────────────────────────────────────────
 

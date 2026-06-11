@@ -21,6 +21,10 @@ import {
 import { extractTextFromPdf } from "@/lib/solicitation-extract";
 import { extractTextFromImageViaVision } from "@/lib/image-ocr";
 import type { AIDocumentMedia } from "@/lib/ai";
+import {
+  classifyArtifactKind,
+  CLASSIFY_CONFIDENCE_THRESHOLD,
+} from "@/lib/knowledge-classify";
 import { log } from "@/lib/log";
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB cap; corpus runs bigger than solicitations.
@@ -148,7 +152,22 @@ export async function uploadKnowledgeArtifactAction(
 
   // Extract text inline (fast for most formats; images skip — Phase 10c
   // will run the AI vision pass async).
-  await extractAndIndex(row.id, bytes, format, contentType, file.name);
+  //
+  // BL-10 Phase A: when the user picked "Auto-detect", the kind we
+  // wrote at insert time is the file-extension heuristic from
+  // defaultKindFromFormat. After extraction, classifyArtifactKind
+  // gives a content-based answer that supersedes the heuristic when
+  // confidence is high enough. We pass `wasAutoKind` so the
+  // classifier only runs in the auto path.
+  const wasAutoKind = !isValidKind(rawKind);
+  await extractAndIndex(
+    row.id,
+    bytes,
+    format,
+    contentType,
+    file.name,
+    wasAutoKind,
+  );
 
   await recordAudit({
     organizationId,
@@ -175,6 +194,7 @@ async function extractAndIndex(
   format: ExtractFormat,
   contentType: string,
   fileName: string,
+  wasAutoKind: boolean = false,
 ): Promise<void> {
   await db
     .update(knowledgeArtifacts)
@@ -253,6 +273,32 @@ async function extractAndIndex(
       updatedAt: new Date(),
     })
     .where(eq(knowledgeArtifacts.id, id));
+
+  // BL-10 Phase A — AI kind classification on auto-detect uploads.
+  // Best-effort: any failure here logs and leaves the heuristic kind in
+  // place. Skipped in stub mode, skipped on empty text, skipped when
+  // confidence is below the threshold.
+  if (wasAutoKind && rawText.trim().length > 0) {
+    try {
+      const classified = await classifyArtifactKind({
+        fileName,
+        contentType,
+        rawText,
+      });
+      if (
+        classified.ok &&
+        !classified.stubbed &&
+        classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD
+      ) {
+        await db
+          .update(knowledgeArtifacts)
+          .set({ kind: classified.kind, updatedAt: new Date() })
+          .where(eq(knowledgeArtifacts.id, id));
+      }
+    } catch (err) {
+      log.error("[knowledge-artifact classify]", "error", { error: err });
+    }
+  }
 }
 
 export type ListedArtifact = {
