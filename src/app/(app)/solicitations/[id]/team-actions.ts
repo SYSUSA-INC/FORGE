@@ -185,6 +185,11 @@ export async function assignSolicitationRoleAction(input: {
     // BL-13 Phase E-2b — fire the rules engine in parallel with the
     // legacy hardcoded notification. Retired in Phase E-2c once
     // seeded default rules cover the same surface.
+    //
+    // `mentionedUserIds` is set so the `mentioned_in_payload`
+    // recipient strategy (seeded by migration 0042) resolves to the
+    // newly-assigned user. Other strategies are free to read other
+    // payload fields (assigneeUserId, solicitationId, role).
     await dispatchTriggerEvent({
       organizationId,
       kind: "solicitation_role_assigned",
@@ -192,6 +197,7 @@ export async function assignSolicitationRoleAction(input: {
         solicitationId: sol.id,
         assigneeUserId: input.userId,
         role: input.role,
+        mentionedUserIds: [input.userId],
       },
       subject,
       body,
