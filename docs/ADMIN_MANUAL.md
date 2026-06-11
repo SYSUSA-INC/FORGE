@@ -20,7 +20,8 @@ Admins in FORGE are the people who decide who has access, what their access lets
 2. [Organization admin](#2-organization-admin)
 3. [Super administrator (platform)](#3-super-administrator-platform)
 4. [Audit & accountability](#4-audit--accountability)
-5. [Troubleshooting](#5-troubleshooting)
+5. [Notification rules](#5-notification-rules)
+6. [Troubleshooting](#6-troubleshooting)
 
 ---
 
@@ -211,6 +212,21 @@ When a new customer signs up or a new internal team needs its own workspace:
 
 You can stay out of their org's data completely; tenancy is firewalled server-side by `requireCurrentOrg` on every data-access path.
 
+### 3.4 Per-tenant detail page
+
+Click **Details →** on any row of the Organizations tab to open the tenant detail page at `/admin/orgs/<id>`. It's read-only — lifecycle controls (Disable / Enable / Delete) stay on the parent list.
+
+What it shows:
+
+- **Top metrics**: active member count, total opportunities, total proposals, audit-log rows in the last 30 days.
+- **Identity panel**: org id, slug, status (Active / Disabled with the disabled-at timestamp), created date, contact name / email / phone, website.
+- **Storage & config**: knowledge artifact count + total bytes used (formatted B / KB / MB / GB / TB), notification rule count.
+- **Most active operators (last 30d)**: top five actors by audit-row count, with a deep link into `/platform/audit-log?orgId=<id>` for the full trail.
+
+Loading this page is itself a sensitive cross-tenant read, so every visit writes a `tenant.view_summary` row into the *target* tenant's audit log. The tenant's own org-admin can see in `/audit-log` when platform support looked at their workspace.
+
+Use the detail page for operational triage — "is this tenant healthy?", "how much storage are they consuming?", "who's actively driving the work?" — without crossing into any of their record content.
+
 ---
 
 ## 4. Audit & accountability
@@ -291,20 +307,81 @@ The unified audit stream addresses the previous "no org-wide feed" and "no IP / 
 
 ---
 
-## 5. Troubleshooting
+## 5. Notification rules
 
-### 5.1 A user says they didn't get their verification / invite / reset email
+Open **Operations Management → Notification rules** (`/notifications/rules`). The page lists every active and inactive rule in your tenant. Admin-only — non-admins are redirected.
+
+A **notification rule** answers four questions: *what triggers it*, *who hears about it*, *through which channels*, and *how often*. Optionally a fifth: *what's the SLA, and who gets escalated to if it's not acknowledged in time*?
+
+### 5.1 Anatomy of a rule
+
+Click **+ New rule** (or any existing row) to open the editor.
+
+**Identity** — name and description. The description shows in the rule list; a sentence about *why* the rule exists is much more useful than the name alone.
+
+**Trigger event kind** — picks one event from a fixed list. The list expands as more product features add new triggers. Today: opportunity stage changes (advanced / won / lost / no-bid / due soon), proposal lifecycle (created / advanced / section overdue), color-team reviews (pending / completed), comment mentions, opportunity bid/no-bid reviews submitted, solicitation role assignments, compliance overdue, audit anomalies, membership invited / disabled.
+
+**Match filter** — a JSON object. Empty (`{}`) matches every event of the kind. Non-empty matches only events whose payload contains every key/value in the filter. Use this to narrow by stage, color, etc. — for example, `{"color": "red"}` on a `review_completed` rule fires only for Red Team reviews.
+
+**Recipients** — four strategies:
+
+- **Specific users**: pick the exact list of teammates.
+- **By role**: every active member with one of the chosen roles (Admin / Capture / Proposal / Author / Reviewer / Pricing / Viewer).
+- **By relationship to the record** (formula): the proposal manager, opportunity owner, capture lead, pricing lead, section author, or **color-team review assignees** (resolved from the triggering event's `reviewId`).
+- **Users mentioned in the event payload**: events like @-mentions in review comments and role assignments tag the relevant users in their payload. This strategy fans out to whoever the event tagged — no static list to maintain.
+
+**Delivery** — channels and frequency. Channels: in-app (always available), email (always available), Slack and Teams (coming soon — selectable as a placeholder but not yet delivered). Frequency: Immediate (delivery row created at trigger time), Daily digest, or Weekly digest (collapsed into a single inbox row per recipient per cadence by the materialization cron).
+
+**SLA & escalation** — optional. Set SLA hours (0 = no SLA, max 30 days). If a recipient hasn't acknowledged their delivery within the window, the SLA-breach cron marks the row breached. If an **escalation strategy** is set (same four shapes as the primary recipient), it then fires a fresh delivery to the fallback recipients.
+
+**Status** — Active or Inactive. Inactive rules don't fire. Activating mid-day takes effect on the next trigger.
+
+### 5.2 Default rules every tenant gets
+
+On migration, FORGE seeds six default rules per tenant so the rules engine matches the legacy hardcoded behavior. They're named `Default: <human label>` and noted as auto-seeded in their description. If you already had a rule for one of these trigger kinds, the seed skipped that kind — your custom rule wins.
+
+| Default rule | Recipients | Channels |
+|---|---|---|
+| Color-team review completed (reviewers) | Review assignees | In-app + Email |
+| Color-team review completed (proposal manager) | Proposal manager | In-app + Email |
+| Color-team review request pending | Review assignees | In-app + Email |
+| Review comment mention | The @-mentioned user(s) | In-app + Email |
+| Opportunity bid/no-bid review submitted | Opportunity owner | In-app |
+| Solicitation role assigned | The newly-assigned user | In-app |
+
+Edit or delete defaults the same way you'd edit a custom rule. Disabling a default doesn't break the legacy hardcoded notification (it still fires in parallel until that legacy path is retired in a future release — duplicate inbox rows are the accepted cost during the parity window).
+
+### 5.3 Test send
+
+On any active rule's edit page, click **Test send** to dispatch a sample event for that rule's trigger kind. The recipients receive an in-app (and email, if the rule's channels include email) notification prefixed with `[Test send]`, with a body identifying you as the sender and noting the event is synthetic.
+
+Test sends use an empty payload (other than `testSend: true`), so any rule with a non-empty match filter that requires specific payload keys won't match against a test. Exercise filter logic by triggering a real event. The button is disabled when the rule is Inactive; activate first.
+
+Every test send writes a `notification_rule.test_send` row to your audit log so the use can be tracked.
+
+### 5.4 Operating practices
+
+- **Read the audit trail before tuning recipients.** `/audit-log` filtered by Resource type → Notifications shows who's being delivered to and when. If recipients are complaining about volume, look there first; the answer is usually a rule that's too broad (empty match filter, or `role_based` over too many roles).
+- **Prefer formula strategies over specific_users for "people who own this work" rules.** A rule that targets the proposal manager via formula stays correct when the manager changes. A `specific_users` rule with hard-coded IDs goes stale silently.
+- **SLA + escalation should mirror your real off-hours rotation.** A 2-hour SLA with no escalation is just a louder alarm; a 2-hour SLA escalating to the on-call admin role is an SLA that actually gets work done.
+- **Disable, don't delete, while debugging.** If you suspect a rule is misbehaving, deactivate it for a day and watch the audit trail. Deletion erases the rule's history; deactivation keeps the audit context.
+
+---
+
+## 6. Troubleshooting
+
+### 6.1 A user says they didn't get their verification / invite / reset email
 
 1. Check **Resend** dashboard at https://resend.com/emails — was the email sent?
 2. Check the user's spam folder
 3. Check the domain is verified at https://resend.com/domains (sysgov.com should show green SPF/DKIM/DMARC)
 4. Check Vercel env vars: `RESEND_API_KEY` and `EMAIL_FROM` are set on Production, Preview, and Development
 
-### 5.2 A user's password doesn't work
+### 6.2 A user's password doesn't work
 
 From the SuperAdmin portal → Platform users → their row → **Reset password**. They'll get a fresh reset link.
 
-### 5.3 Someone can't sign in at all
+### 6.3 Someone can't sign in at all
 
 Common causes:
 - Their email isn't verified yet — they need to click the verification link sent to them on sign-up
@@ -312,7 +389,7 @@ Common causes:
 - Their org is disabled — check the Organizations tab for a "Disabled" pill next to their org
 - Their membership was set to `disabled` — open the org's `/users` page as an org admin and re-enable them
 
-### 5.4 Data isolation
+### 6.4 Data isolation
 
 FORGE enforces multi-tenant data isolation at three layers:
 
@@ -329,7 +406,7 @@ If you ever suspect cross-tenant leakage:
 
 A planned BL-19 Phase 2 will add runtime tests: spin up two tenants, exercise every server action with cross-tenant ids, and fail loudly on any leak the static check missed. That work blocks on a test framework landing.
 
-### 5.5 Running database migrations
+### 6.5 Running database migrations
 
 When we ship new features that add DB tables or columns, you need to apply the migration to your Neon database.
 
@@ -341,15 +418,15 @@ node scripts/apply-schema.mjs
 
 The script is idempotent — it skips anything already applied and only runs new migrations.
 
-### 5.6 Rotating Neon password
+### 6.6 Rotating Neon password
 
 Vercel → `forge` → Storage → your Neon database → Settings → **Rotate Secrets**. Vercel auto-updates `DATABASE_URL` in env vars. Copy the new value into your local `.env.local` so migration scripts keep working.
 
-### 5.7 Seeing Vercel logs
+### 6.7 Seeing Vercel logs
 
 Vercel → `forge` → **Logs** tab. Filter by path (e.g., `/api/register`) to find server-side errors. Red entries have stack traces.
 
-### 5.8 Quick reference: common admin tasks at a glance
+### 6.8 Quick reference: common admin tasks at a glance
 
 - **Onboard a new internal team:** Platform admin → Organizations → Onboard a new organization → email lead admin.
 - **Bring on a new teammate to your org:** Users → Invite a user → pick role → Send invitation.
