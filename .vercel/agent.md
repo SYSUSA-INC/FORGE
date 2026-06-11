@@ -90,6 +90,23 @@ because no other CI gate catches them:
   enforces file presence; you should flag content mismatches (e.g., a
   schema column added but the migration is empty).
 
+- **Export completeness.** Data-export endpoints (e.g.,
+  `/api/admin/orgs/[id]/export`, audit-log CSV download, tenant
+  offboarding bundles) hand-pick columns via explicit `db.select({
+  ... })` projections — that's the right pattern (avoids leaking
+  large blobs and future columns by default), but it means new
+  columns added to the source table don't automatically appear in
+  the export. Caught on #165: the original tenant-export bundle's
+  `organization` block omitted `contactTitle`,
+  `companySecurityLevel`, `employeeSecurityLevel`, `dcaaCompliant`,
+  `contractingVehicles`, and `pastPerformance` — all tenant-
+  configured fields that an offboarding customer would expect to
+  receive. When reviewing export endpoints, diff the projection
+  against the source table's column list and flag any
+  tenant-configured field that's missing without a deliberate
+  reason (the explicit reason should appear in a comment, e.g.,
+  "skip large blob `raw_text`" or "skip computed column X").
+
 ## What NOT to flag (already enforced by CI)
 
 These will surface as redundant noise — skip them:

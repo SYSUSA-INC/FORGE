@@ -40,6 +40,7 @@ gate. Fill in **every row** before pushing.
 | New file without server-only guard where it touches DB | N/A / addressed: <how> |
 | Inbox-parity: any new `in_app` `notification_delivery` write also inserts a matching `notification` row | N/A / addressed: <how> |
 | SELECT-then-UPDATE pattern: UPDATE filters by collected IDs (`inArray(id, ...)`), NOT by the same predicate as the SELECT | N/A / addressed: <how> |
+| Export completeness: data-export endpoints' projections include every tenant-configured field from the source table (skip large blobs deliberately with a comment) | N/A / addressed: <how> |
 
 ## Test plan
 
