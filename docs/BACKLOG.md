@@ -1321,10 +1321,15 @@ guide. Tracked as continuous work, not a single PR.
   "Notifications inbox" (where to find notifications, what kinds
   appear, frequency/digest semantics, test-send convention);
   sign-out renumbered to §10.
+- ✅ BL-8 Proposals submenu split — USER_MANUAL §6 intro updated
+  to describe the two nav entries (In-flight Proposals / New
+  Proposals) under Opportunities; §2 sidebar enumeration calls out
+  the Opportunities-group children; §6.1 tab list documents the
+  Submitted → "Past proposals" rename and clarifies the Submitted
+  stat tile vs. Past-proposals tab distinction; §6.2 mentions the
+  New Proposals nav entry as an alternative entry point.
 
 **Still outstanding (queued for future passes):**
-- BL-8 Proposals submenu split — USER_MANUAL §6 + §2 nav; now
-  unblocked (BL-8 merged in PR #142)
 - BL-22 nav v2 — partial coverage exists; needs a polish pass
 
 ---
