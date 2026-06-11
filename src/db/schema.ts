@@ -2213,3 +2213,114 @@ export const auditLogs = pgTable(
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-16 — subscription tiers + tenant subscriptions
+// ─────────────────────────────────────────────────────────────────────
+
+export const tenantSubscriptionStatusEnum = pgEnum(
+  "tenant_subscription_status",
+  ["trial", "active", "past_due", "canceled", "paused"],
+);
+export type TenantSubscriptionStatus =
+  (typeof tenantSubscriptionStatusEnum.enumValues)[number];
+
+/**
+ * Feature flags carried by a `subscription_tier.feature_flags` JSONB.
+ * New flags are added here AND in a follow-up migration that bumps
+ * existing rows' defaults. The runtime gate (BL-16 Phase B) reads
+ * the merged shape: tier.feature_flags ⨯ tenant.custom_overrides.
+ */
+export type TierFeatureFlags = {
+  aiAutoDraft: boolean;
+  winnerAnalysis: boolean;
+  complianceMatrix: boolean;
+  bulkExport: boolean;
+  apiAccess: boolean;
+  customTemplates: boolean;
+};
+
+/**
+ * Quotas carried by a `subscription_tier.quotas` JSONB. A value of `0`
+ * means "unlimited" (Platinum semantics) so the type avoids needing a
+ * sentinel value for unlimited.
+ */
+export type TierQuotas = {
+  aiRequestsPerMonth: number;
+  seatsIncluded: number;
+  storageGb: number;
+  proposalsPerMonth: number;
+};
+
+export const subscriptionTiers = pgTable(
+  "subscription_tier",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 32 }).notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    priceMonthlyCents: integer("price_monthly_cents").notNull().default(0),
+    priceYearlyCents: integer("price_yearly_cents").notNull().default(0),
+    featureFlags: jsonb("feature_flags")
+      .$type<TierFeatureFlags>()
+      .notNull()
+      .default(
+        sql`'{}'::jsonb` as unknown as TierFeatureFlags,
+      ),
+    quotas: jsonb("quotas")
+      .$type<TierQuotas>()
+      .notNull()
+      .default(sql`'{}'::jsonb` as unknown as TierQuotas),
+    sortOrder: integer("sort_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    sortIdx: index("subscription_tier_sort_idx").on(t.sortOrder),
+  }),
+);
+
+export type SubscriptionTier = typeof subscriptionTiers.$inferSelect;
+export type NewSubscriptionTier = typeof subscriptionTiers.$inferInsert;
+
+export const tenantSubscriptions = pgTable(
+  "tenant_subscription",
+  {
+    organizationId: uuid("organization_id")
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    tierId: uuid("tier_id")
+      .notNull()
+      .references(() => subscriptionTiers.id, { onDelete: "restrict" }),
+    status: tenantSubscriptionStatusEnum("status").notNull().default("active"),
+    currentPeriodStart: timestamp("current_period_start"),
+    currentPeriodEnd: timestamp("current_period_end"),
+    trialUntil: timestamp("trial_until"),
+    cancelAt: timestamp("cancel_at"),
+    /**
+     * Per-tenant overrides on top of the tier defaults. Shape mirrors
+     * the merged TierFeatureFlags + TierQuotas. Examples:
+     *   { "quotas": { "aiRequestsPerMonth": 5000 } }
+     *   { "featureFlags": { "winnerAnalysis": true } }
+     * The runtime gate reads tier.X then applies overrides.X on top.
+     */
+    customOverrides: jsonb("custom_overrides")
+      .$type<{
+        featureFlags?: Partial<TierFeatureFlags>;
+        quotas?: Partial<TierQuotas>;
+      }>()
+      .notNull()
+      .default({}),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    tierIdx: index("tenant_subscription_tier_idx").on(t.tierId),
+    statusIdx: index("tenant_subscription_status_idx").on(t.status),
+  }),
+);
+
+export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
+export type NewTenantSubscription = typeof tenantSubscriptions.$inferInsert;
