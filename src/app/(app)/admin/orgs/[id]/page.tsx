@@ -161,9 +161,18 @@ export default async function TenantDetailPage({
             : "Read-only operational summary. Lifecycle controls (suspend / restore / delete) remain on the SuperAdmin portal."
         }
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
-            ← All organizations
-          </Link>
+          <>
+            <a
+              href={`/api/admin/orgs/${org.id}/export`}
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Download a JSON bundle of this tenant's metadata + records (no large blobs). Audited."
+            >
+              Export data ↓
+            </a>
+            <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
+              ← All organizations
+            </Link>
+          </>
         }
         meta={[
           {

@@ -764,16 +764,44 @@ Per spec: "this is where the customer accounts are managed."
   `/admin` list (already shipped as part of the SuperAdmin portal);
   Phase B adds the remaining items.
 
-**Phase B (queued) — Transfer ownership + assume-identity + data export**:
+**Phase B-1 — Tenant data export for offboarding** ✅ shipped:
+- New superadmin-only GET route `/api/admin/orgs/[id]/export` that
+  returns a single JSON bundle of the tenant's metadata + records.
+  Per the AskUserQuestion decisions captured before implementing:
+  - **Format**: single JSON bundle (one file)
+  - **Scope**: records + metadata, no large blobs (no proposal
+    section bodies, no knowledge artifact raw_text, no audit log
+    rows — those remain accessible via their existing surfaces)
+  - **Delivery**: synchronous download. Adequate for tenant sizes
+    we have today; async-queue alternative tracked if we hit Vercel's
+    response-size or duration limits.
+- Bundle includes: organization row (full identity + contact +
+  registration IDs + socio-economic + naics/psc), memberships (with
+  user email/name/role/status/joinedAt), opportunities (id/title/
+  agency/stage/solicitation number/timestamps — no description body),
+  proposals (id/title/stage/owner IDs/timestamps — no sections),
+  knowledge artifacts (id/title/kind/file metadata — no raw_text),
+  notification rules (full definition).
+- Every export writes a `tenant.data_export` `recordRead` row into
+  the target tenant's audit log so the tenant's own org-admin can
+  see in `/audit-log` when their data was exported. Metadata field
+  carries per-table row counts for forensics.
+- Filename: `forge-tenant-<slug>-<YYYY-MM-DD>.json` with
+  `Content-Type: application/json; charset=utf-8`,
+  `Content-Disposition: attachment` so browsers handle the download.
+- UI: "Export data ↓" button added to the per-tenant detail page
+  header on `/admin/orgs/[id]`; uses plain `<a href>` so browser
+  download handling kicks in (not Next client navigation).
+
+**Phase B-2 (queued) — Transfer ownership + assume-identity + isolation check**:
 - Transfer ownership (change `primary_admin_user_id` once added; for
   now the "primary admin" is implicit — the oldest membership with
   `role=admin`)
 - "Assume identity" flow for support: superadmin can read-only-view a
   tenant's UI for debugging; every action logged in BL-12
-- Data export for offboarding
 - Audit isolation status check (a button that runs sample
   cross-tenant queries to verify isolation, then writes a structured
-  result row)
+  result row) — gated on BL-19 Phase 2 test framework
 
 **Acceptance (full ticket):** provision a new tenant via UI → tenant
 admin gets invite email → can sign in → sees only their data; suspend
