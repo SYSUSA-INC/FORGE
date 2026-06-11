@@ -25,7 +25,8 @@ This manual covers what each role can do and where to find the trail FORGE leave
 6. [Proposals](#6-proposals)
 7. [Companies](#7-companies)
 8. [What FORGE records (the audit trail)](#8-what-forge-records-the-audit-trail)
-9. [Signing out and switching orgs](#9-signing-out-and-switching-orgs)
+9. [Notifications inbox](#9-notifications-inbox)
+10. [Signing out and switching orgs](#10-signing-out-and-switching-orgs)
 
 ---
 
@@ -527,13 +528,39 @@ Three habits make the audit trail actually work:
 
 ---
 
-## 9. Signing out and switching orgs
+## 9. Notifications inbox
 
-### 9.1 Sign out
+Click the **bell icon** in the top-right of any page to open the notifications panel, or navigate to `/notifications` from the sidebar's **Operations Management** group.
+
+What lands in your inbox:
+
+- **Color-team reviews you've been assigned to** (pending) and **reviews you participated in** (completed)
+- **@-mentions** in review comments — when a teammate writes `@you` in a comment thread, FORGE notifies you with a deep link to the exact comment
+- **Opportunity bid/no-bid review responses** (when you sent the opportunity out for an external bid/no-bid recommendation, and the reviewer submits theirs)
+- **Solicitation role assignments** — when a teammate assigns you to a role on a solicitation (e.g., Pricing lead, Capture lead)
+- Anything else covered by your tenant's notification rules (see ADMIN_MANUAL §5)
+
+Each row shows who triggered it, when it happened, a short subject, and (when present) a click-through link to the record. Acknowledge a notification by opening it — the inbox tracks which rows you've read and which are still new (a numeric badge on the bell icon shows the unread count).
+
+Notifications are kept indefinitely; there's no auto-prune. If you want to clear visual clutter, mark a row as read by opening it.
+
+### 9.1 Frequency and digest
+
+Your tenant admin decides whether each kind of notification arrives **immediately**, in a **daily digest** (one row per recipient per day rolling up all matching events), or a **weekly digest** (one row per recipient per Sunday rolling up the week). Defaults are immediate for everything; admins can tune this under `/notifications/rules`. If you're getting too many or too few, that's where to ask them to adjust.
+
+### 9.2 Test sends
+
+A `[Test send]` prefix on the subject means an admin fired a test from the rule editor to verify the rule's recipient + channel wiring. The body explains who fired it and that the event is synthetic — you can safely ignore the contents.
+
+---
+
+## 10. Signing out and switching orgs
+
+### 10.1 Sign out
 
 Click your avatar at the top-right → **Sign out**.
 
-### 9.2 Switching organizations
+### 10.2 Switching organizations
 
 If you belong to multiple organizations, your active org is the first one you joined. (Multi-org switching ships in a future release.) If you need to change orgs right now, ask your admin to adjust your membership directly.
 

@@ -1285,6 +1285,14 @@ guide. Tracked as continuous work, not a single PR.
   rewritten as "three layers" (route gates / query scope / audit
   denials) with the static-check CI gate called out by name and the
   Phase 2 runtime-test plan referenced.
+- ✅ BL-13 Notification rules engine + BL-15 Phase A per-tenant
+  detail page — ADMIN_MANUAL gains §3.4 (per-tenant detail page in
+  the SuperAdmin portal) and a new §5 "Notification rules"
+  (anatomy, default seed rules, test send, operating practices);
+  troubleshooting renumbered to §6. USER_MANUAL gains §9
+  "Notifications inbox" (where to find notifications, what kinds
+  appear, frequency/digest semantics, test-send convention);
+  sign-out renumbered to §10.
 
 **Still outstanding (queued for future passes):**
 - BL-8 Proposals submenu split — USER_MANUAL §6 + §2 nav; now
