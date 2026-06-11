@@ -883,17 +883,44 @@ Bronze, Silver, Gold, Platinum, Custom."
 - Isolation check: `tenant_subscription` correctly auto-detected as
   tenant-scoped (29 tables now).
 
-**Phase B (queued) — Runtime feature gates + admin UI to view assignments**:
-- `ensureFeature(orgId, key)` helper that reads the merged
-  feature_flags (tier × custom_overrides). Throws `GatedError` on
-  deny.
-- Wire `ensureFeature` calls into the gated actions: AI auto-draft,
-  Winner Analysis, bulk export, etc.
-- `enforceQuota(orgId, key, delta)` helper for quota-bounded
-  operations. Tracks usage in a new `tenant_usage_counter` table or
-  via aggregate-on-read.
-- Read-only admin UI in SuperAdmin portal showing which tier each
-  org is on.
+**Phase B-1 — `ensureFeature` helper + first gated action + tier panel** ✅ shipped:
+- New `src/lib/subscription-gates.ts`:
+  - `class FeatureGateError extends Error` with `featureKey` + `tierName` fields
+  - `getCurrentTier(organizationId)` — joins `tenant_subscription` ×
+    `subscription_tier`, applies `custom_overrides` on top, returns
+    `{ tierId, tierName, tierSlug, status, featureFlags, quotas,
+    overrides, effectiveFlags, effectiveQuotas }` or `null` when the
+    org has no subscription row
+  - `ensureFeature(orgId, key)` — throws `FeatureGateError` when the
+    effective flag is `false`. Safe-by-default: no subscription row
+    or DB error → deny (failing-open would leak gated features). If
+    the tier is marked `active=false` (retired), every feature
+    denies — operator must reassign the org first.
+- Wired into `runWinnerAnalysisAction` (the most clearly tier-gated
+  action per the spec). Catches `FeatureGateError` and surfaces the
+  message via the existing `{ ok: false, error }` result shape — no
+  thrown errors past the boundary. Existing tenants on Platinum
+  (per Phase A backfill) keep working; new tenants on Bronze
+  (winnerAnalysis: false) get a clean upgrade-prompt message.
+- Per-tenant detail page `/admin/orgs/[id]` now shows a
+  "Subscription tier" panel: current tier name, slug, status,
+  effective AI-requests / seats quotas, whether per-tenant
+  overrides exist. Hides quota numbers when the tier means
+  unlimited (0).
+
+**Phase B-2 (queued) — Wire `ensureFeature` into remaining gated actions**:
+- AI auto-draft (proposal section generation)
+- Bulk export (CSV / ZIP downloads for audit log, knowledge base, etc.)
+- API access (token endpoint)
+- Custom templates (template editor saves)
+- complianceMatrix path (currently always-on; should gate on the flag)
+
+**Phase B-3 (queued) — Quota tracking**:
+- `enforceQuota(orgId, key, delta)` helper
+- New `tenant_usage_counter` table for monthly rolling counters
+- Period-rollover cron to reset counters at month boundaries
+
+**Phase C (queued) — Tier editor + tenant assignment + promo codes**:
 
 **Phase C (queued) — Tier editor + tenant assignment + promo codes**:
 - Tier editor (superadmin) to edit name / price / features / quotas.

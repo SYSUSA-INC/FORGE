@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
+import { getCurrentTier } from "@/lib/subscription-gates";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,13 @@ export default async function TenantDetailPage({
   const artifactBytes = Number(artifactRow[0]?.bytes ?? 0);
   const notificationRuleCount = Number(notificationRuleCountRow[0]?.n ?? 0);
   const auditLogLast30d = Number(auditLogCountRow[0]?.n ?? 0);
+
+  // BL-16 Phase B-1 — resolve current tier (joins
+  // tenant_subscription × subscription_tier and applies any
+  // custom_overrides). Returns null if the org has no subscription
+  // row, which shouldn't happen post-backfill but we surface as
+  // "No tier" to make the gap visible.
+  const currentTier = await getCurrentTier(org.id);
 
   // Top recent admins by activity — gives a quick sense of who's
   // actually operating the tenant. Limited to 5 to keep the page small.
@@ -222,6 +230,66 @@ export default async function TenantDetailPage({
             <Field label="Email" value={org.contactEmail || "—"} />
             <Field label="Phone" value={org.phone || "—"} />
           </dl>
+        </Panel>
+
+        <Panel title="Subscription tier">
+          <dl className="grid grid-cols-[140px_1fr] gap-y-2 font-mono text-[12px]">
+            <Field
+              label="Current tier"
+              value={currentTier ? currentTier.tierName : "No tier"}
+              accent={currentTier ? "emerald" : "rose"}
+            />
+            <Field
+              label="Status"
+              value={currentTier?.status ?? "—"}
+              accent={
+                currentTier?.status === "active"
+                  ? "emerald"
+                  : currentTier?.status === "past_due"
+                    ? "rose"
+                    : undefined
+              }
+            />
+            <Field
+              label="Slug"
+              value={currentTier?.tierSlug ?? "—"}
+            />
+            {currentTier ? (
+              <>
+                <Field
+                  label="AI requests/mo"
+                  value={
+                    currentTier.effectiveQuotas.aiRequestsPerMonth === 0
+                      ? "Unlimited"
+                      : String(currentTier.effectiveQuotas.aiRequestsPerMonth)
+                  }
+                />
+                <Field
+                  label="Seats"
+                  value={
+                    currentTier.effectiveQuotas.seatsIncluded === 0
+                      ? "Unlimited"
+                      : String(currentTier.effectiveQuotas.seatsIncluded)
+                  }
+                />
+                <Field
+                  label="Has overrides"
+                  value={
+                    Object.keys(currentTier.overrides.featureFlags ?? {})
+                      .length > 0 ||
+                    Object.keys(currentTier.overrides.quotas ?? {}).length > 0
+                      ? "Yes (per-tenant)"
+                      : "No"
+                  }
+                />
+              </>
+            ) : null}
+          </dl>
+          <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted/80">
+            Tier defaults set in <code>subscription_tier</code>; any
+            per-tenant changes live in <code>tenant_subscription.custom_overrides</code>.
+            Effective values shown above apply both layers.
+          </p>
         </Panel>
 
         <Panel title="Storage & config">
