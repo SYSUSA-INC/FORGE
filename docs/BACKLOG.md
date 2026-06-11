@@ -849,31 +849,62 @@ audit log.
 ---
 
 ### BL-16 — Platform Configuration (tier model)
-**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-15
+**Priority:** P1  ·  **Effort:** L (phased)  ·  **Depends on:** BL-15
 
 Per spec: "tailor offerings with promotions and various levels:
 Bronze, Silver, Gold, Platinum, Custom."
 
-**Scope:**
-- Schema: `subscription_tier` (id, name, description, price_monthly,
-  price_yearly, feature_flags jsonb, quotas jsonb, sort_order, active)
-- Schema: `tenant_subscription` (organization_id PK, tier_id,
-  status, current_period_start, current_period_end, trial_until,
-  cancel_at, custom_overrides jsonb)
-- Default tiers seeded: Bronze, Silver, Gold, Platinum, Custom
-- Feature flags per tier: e.g. `aiAutoDraft`, `winnerAnalysis`,
-  `complianceMatrix`, `bulkExport`, `apiAccess`, `customTemplates`
-- Quotas per tier: `aiRequestsPerMonth`, `seatsIncluded`,
-  `storageGb`, `proposalsPerMonth`
-- Runtime gates: `ensureFeature(orgId, "winnerAnalysis")` called
-  before each gated action; throws GatedError if denied
-- Promotional codes: `promotion_code` (code, discount_percent,
-  valid_until, max_uses)
-- UI for super-admin to define tiers, promotions, view assignments
+**Phase A — Schema + default tier seed** ✅ shipped:
+- Migration `0043_subscription_tiers.sql` adds:
+  - `subscription_tier` table — id, slug (unique), name, description,
+    price_monthly_cents (integer; cents to avoid floating-point pain),
+    price_yearly_cents, feature_flags jsonb, quotas jsonb, sort_order,
+    active, timestamps. Sort-order index.
+  - `tenant_subscription` table — organization_id PK (one tier per
+    tenant), tier_id FK, status enum, period dates, custom_overrides
+    jsonb (per-tenant feature/quota overrides), notes, timestamps.
+    Indexes on tier_id and status.
+  - `tenant_subscription_status` enum — `trial / active / past_due /
+    canceled / paused`.
+- Five default tiers seeded with placeholder pricing (sales adjusts
+  via Phase C admin UI): **Bronze** ($99/mo, limited),
+  **Silver** ($249/mo, +Winner Analysis), **Gold** ($499/mo,
+  all features unlocked), **Platinum** ($999/mo, unlimited
+  quotas), **Custom** (admin-configured per-tenant overrides).
+- Feature flags: `aiAutoDraft`, `winnerAnalysis`, `complianceMatrix`,
+  `bulkExport`, `apiAccess`, `customTemplates`.
+- Quotas: `aiRequestsPerMonth`, `seatsIncluded`, `storageGb`,
+  `proposalsPerMonth` (0 = unlimited semantics).
+- **Backfill**: every existing organization gets a Platinum
+  subscription so runtime behavior is unchanged when Phase B
+  introduces feature gates. Idempotent insert (NOT EXISTS guard).
+- TypeScript types exported: `TierFeatureFlags`, `TierQuotas`,
+  `SubscriptionTier`, `TenantSubscription`, `TenantSubscriptionStatus`.
+- Isolation check: `tenant_subscription` correctly auto-detected as
+  tenant-scoped (29 tables now).
 
-**Acceptance:** create Custom tier with `aiRequestsPerMonth=0` →
-assign to test tenant → tenant cannot run any AI feature → upgrade
-to Gold → AI features work.
+**Phase B (queued) — Runtime feature gates + admin UI to view assignments**:
+- `ensureFeature(orgId, key)` helper that reads the merged
+  feature_flags (tier × custom_overrides). Throws `GatedError` on
+  deny.
+- Wire `ensureFeature` calls into the gated actions: AI auto-draft,
+  Winner Analysis, bulk export, etc.
+- `enforceQuota(orgId, key, delta)` helper for quota-bounded
+  operations. Tracks usage in a new `tenant_usage_counter` table or
+  via aggregate-on-read.
+- Read-only admin UI in SuperAdmin portal showing which tier each
+  org is on.
+
+**Phase C (queued) — Tier editor + tenant assignment + promo codes**:
+- Tier editor (superadmin) to edit name / price / features / quotas.
+- Per-tenant tier assignment UI.
+- Promotional codes table + redemption flow.
+- Audit-log entries on every tier change.
+
+**Acceptance (full ticket):** create Custom tier with
+`aiRequestsPerMonth=0` (treated as deny under Phase B semantics;
+Phase A keeps 0 = unlimited) → assign to test tenant → tenant cannot
+run any AI feature → upgrade to Gold → AI features work.
 
 ---
 
