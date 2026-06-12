@@ -25,6 +25,10 @@ import {
   classifyArtifactKind,
   CLASSIFY_CONFIDENCE_THRESHOLD,
 } from "@/lib/knowledge-classify";
+import {
+  enforceStorageQuota,
+  QuotaExceededError,
+} from "@/lib/subscription-gates";
 import { log } from "@/lib/log";
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB cap; corpus runs bigger than solicitations.
@@ -72,6 +76,18 @@ export async function uploadKnowledgeArtifactAction(
       ok: false,
       error: `File is larger than ${MAX_BYTES / 1024 / 1024} MB. Split or compress before uploading.`,
     };
+  }
+
+  // BL-16 Phase B-3c — refuse the upload when the tenant is at or
+  // over its storage limit. Live-measured from SUM(file_size) so
+  // deleting an artifact frees space immediately.
+  try {
+    await enforceStorageQuota(organizationId, file.size);
+  } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
   }
 
   const format = detectFormat(file.type, file.name);

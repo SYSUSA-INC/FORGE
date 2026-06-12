@@ -1,8 +1,10 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, sql, sum } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  knowledgeArtifacts,
+  memberships,
   subscriptionTiers,
   tenantSubscriptions,
   tenantUsageCounters,
@@ -216,22 +218,27 @@ export type CounterQuotaKey =
   | "aiRequestsPerMonth"
   | "proposalsPerMonth";
 
+/** Any quota key — counter-backed or live-measured. */
+export type QuotaKey = keyof TierQuotas;
+
 export class QuotaExceededError extends Error {
-  readonly quotaKey: CounterQuotaKey;
+  readonly quotaKey: QuotaKey;
   readonly limit: number;
   readonly used: number;
   readonly tierName: string | null;
 
   constructor(
-    quotaKey: CounterQuotaKey,
+    quotaKey: QuotaKey,
     limit: number,
     used: number,
     tierName: string | null,
+    customMessage?: string,
   ) {
     super(
-      tierName
-        ? `Monthly quota "${quotaKey}" exceeded on the ${tierName} tier: ${used}/${limit} used. Upgrade or contact support.`
-        : `Monthly quota "${quotaKey}" exceeded: ${used}/${limit} used.`,
+      customMessage ??
+        (tierName
+          ? `Monthly quota "${quotaKey}" exceeded on the ${tierName} tier: ${used}/${limit} used. Upgrade or contact support.`
+          : `Monthly quota "${quotaKey}" exceeded: ${used}/${limit} used.`),
     );
     this.name = "QuotaExceededError";
     this.quotaKey = quotaKey;
@@ -374,4 +381,135 @@ export async function getCurrentUsage(
     )
     .limit(1);
   return row?.value ?? 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-16 Phase B-3c — live-measure quotas (seats + storage)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Unlike `aiRequestsPerMonth` / `proposalsPerMonth` which use counter
+// rows, these two quotas are measured live from their source tables.
+// No counter row is written; each call computes the current value via
+// aggregate. Accurate even without rollover-cron concerns and
+// resilient to row deletions (e.g., a removed user's membership row
+// is no longer counted toward seats).
+
+/**
+ * Counts active members of the org. Used by `enforceSeatsQuota` and
+ * available standalone for admin dashboards that want to surface
+ * "X / Y seats used".
+ */
+export async function getActiveMembershipCount(
+  organizationId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.organizationId, organizationId),
+        eq(memberships.status, "active"),
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * Sum of `knowledge_artifact.file_size` for the tenant — total bytes
+ * stored. Used by `enforceStorageQuota` + admin dashboards.
+ */
+export async function getStorageBytesUsed(
+  organizationId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ bytes: sum(knowledgeArtifacts.fileSize) })
+    .from(knowledgeArtifacts)
+    .where(eq(knowledgeArtifacts.organizationId, organizationId));
+  return Number(row?.bytes ?? 0);
+}
+
+/**
+ * Refuses a new member invite when the tenant is at or over its
+ * `seatsIncluded` limit. `seatsIncluded = 0` means unlimited
+ * (Platinum semantics). Throws `QuotaExceededError`.
+ *
+ * Counts the membership BEFORE the invite is added, so the check is
+ * "are there already N members?" not "would adding one bring us to
+ * N+1?". A tenant with seats=5 can have 5 members; the 6th invite
+ * fails.
+ */
+export async function enforceSeatsQuota(
+  organizationId: string,
+): Promise<{ used: number; limit: number }> {
+  try {
+    const tier = await getCurrentTier(organizationId);
+    if (!tier) {
+      throw new QuotaExceededError("seatsIncluded", 0, 0, null);
+    }
+    const limit = tier.effectiveQuotas.seatsIncluded;
+    if (limit === 0) return { used: 0, limit: 0 };
+
+    const used = await getActiveMembershipCount(organizationId);
+    if (used >= limit) {
+      throw new QuotaExceededError(
+        "seatsIncluded",
+        limit,
+        used,
+        tier.tierName,
+        `Seat limit reached on the ${tier.tierName} tier: ${used}/${limit} seats used. Upgrade or contact support to add more seats.`,
+      );
+    }
+    return { used, limit };
+  } catch (err) {
+    if (err instanceof QuotaExceededError) throw err;
+    log.error("[enforceSeatsQuota]", "lookup failed", {
+      error: err,
+      organizationId,
+    });
+    throw new QuotaExceededError("seatsIncluded", 0, 0, null);
+  }
+}
+
+/**
+ * Refuses an upload when the tenant is at or over its `storageGb`
+ * limit. `storageGb = 0` means unlimited. Tier values are in GB;
+ * we convert to bytes (1 GB = 1024^3) for the comparison. Throws
+ * `QuotaExceededError` when the new file would push the total over.
+ *
+ * Pass `additionalBytes` = size of the file about to be inserted.
+ */
+export async function enforceStorageQuota(
+  organizationId: string,
+  additionalBytes: number,
+): Promise<{ usedBytes: number; limitBytes: number }> {
+  try {
+    const tier = await getCurrentTier(organizationId);
+    if (!tier) {
+      throw new QuotaExceededError("storageGb", 0, 0, null);
+    }
+    const limitGb = tier.effectiveQuotas.storageGb;
+    if (limitGb === 0) return { usedBytes: 0, limitBytes: 0 };
+
+    const limitBytes = limitGb * 1024 * 1024 * 1024;
+    const usedBytes = await getStorageBytesUsed(organizationId);
+    if (usedBytes + additionalBytes > limitBytes) {
+      const usedGb = (usedBytes / (1024 * 1024 * 1024)).toFixed(1);
+      throw new QuotaExceededError(
+        "storageGb",
+        limitBytes,
+        usedBytes + additionalBytes,
+        tier.tierName,
+        `Storage limit reached on the ${tier.tierName} tier: ${usedGb} GB / ${limitGb} GB used. Upgrade or contact support to add more storage.`,
+      );
+    }
+    return { usedBytes, limitBytes };
+  } catch (err) {
+    if (err instanceof QuotaExceededError) throw err;
+    log.error("[enforceStorageQuota]", "lookup failed", {
+      error: err,
+      organizationId,
+      additionalBytes,
+    });
+    throw new QuotaExceededError("storageGb", 0, 0, null);
+  }
 }
