@@ -22,8 +22,10 @@ import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
+  enforceQuota,
   ensureFeature,
   FeatureGateError,
+  QuotaExceededError,
 } from "@/lib/subscription-gates";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { searchAwardsByRecipientName } from "@/lib/usaspending";
@@ -115,10 +117,15 @@ export async function runWinnerAnalysisAction(
   // tenants are on Platinum (all features on) per the Phase A backfill,
   // so this is preserved-behavior for current users; new tenants on
   // Bronze (winnerAnalysis: false) get a clean error message.
+  //
+  // BL-16 Phase B-3b — also bump the AI-request counter for this
+  // month. Counts every attempt (failed AI calls still bump);
+  // refunds are a future enhancement if needed.
   try {
     await ensureFeature(organizationId, "winnerAnalysis");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
   } catch (err) {
-    if (err instanceof FeatureGateError) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
       return { ok: false, error: err.message };
     }
     throw err;

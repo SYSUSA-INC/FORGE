@@ -11,8 +11,10 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { complete } from "@/lib/ai";
 import {
+  enforceQuota,
   ensureFeature,
   FeatureGateError,
+  QuotaExceededError,
 } from "@/lib/subscription-gates";
 import {
   buildSectionDraftPrompt,
@@ -50,10 +52,14 @@ export async function generateSectionDraftAction(input: {
   // BL-16 Phase B-2 — gate AI section generation on `aiAutoDraft`.
   // Existing tenants on Platinum have it enabled (per BL-16 Phase A
   // backfill); Bronze tenants get a clean upgrade-prompt error.
+  //
+  // BL-16 Phase B-3b — also bump the AI-request counter for this
+  // month so quota enforcement applies to draft generation.
   try {
     await ensureFeature(organizationId, "aiAutoDraft");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
   } catch (err) {
-    if (err instanceof FeatureGateError) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
       return { ok: false, error: err.message };
     }
     throw err;
