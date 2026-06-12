@@ -18,6 +18,10 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
+import {
+  enforceQuota,
+  QuotaExceededError,
+} from "@/lib/subscription-gates";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
 import {
   EMPTY_DOC,
@@ -104,6 +108,18 @@ export async function createProposalAction(input: {
   }
   if (!(await ownsOpportunity(input.opportunityId, organizationId))) {
     return { ok: false, error: "Opportunity not found." };
+  }
+
+  // BL-16 Phase B-3b — bump the monthly proposal counter. Throws
+  // QuotaExceededError when over limit; surfaced via the existing
+  // result shape.
+  try {
+    await enforceQuota(organizationId, "proposalsPerMonth");
+  } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
   }
 
   const [opp] = await db

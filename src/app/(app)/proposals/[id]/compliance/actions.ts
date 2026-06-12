@@ -24,8 +24,10 @@ import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
+  enforceQuota,
   ensureFeature,
   FeatureGateError,
+  QuotaExceededError,
 } from "@/lib/subscription-gates";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
@@ -357,10 +359,14 @@ export async function runCompliancePreflightAction(
   // BL-16 Phase B-2 — gate compliance preflight on `complianceMatrix`.
   // The flag covers both the compliance matrix UI (always-visible for
   // now) and this AI-powered preflight assessment.
+  //
+  // BL-16 Phase B-3b — bump the AI-request counter since preflight
+  // makes one or more AI calls.
   try {
     await ensureFeature(organizationId, "complianceMatrix");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
   } catch (err) {
-    if (err instanceof FeatureGateError) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
       return { ok: false, error: err.message };
     }
     throw err;

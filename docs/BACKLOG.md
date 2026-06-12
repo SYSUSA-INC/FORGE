@@ -957,16 +957,33 @@ built or need design work):
   tables (memberships + knowledge_artifact.file_size respectively)
   and don't need counter rows.
 
-**Phase B-3b (queued) — Wire `enforceQuota` into call sites**:
-- AI call sites (in particular the BL-23 review / capability /
-  question runners and the proposal section AI draft) → bump
-  `aiRequestsPerMonth` per call. Place the counter increment AFTER
-  the AI call succeeds — failed calls shouldn't burn quota.
-- Proposal creation (`createProposalAction`) → bump
-  `proposalsPerMonth`.
-- Live-measure paths: `seatsIncluded` checked at invite time
-  against active membership count; `storageGb` checked at upload
-  time against `SUM(file_size)` for the tenant.
+**Phase B-3b — Wire `enforceQuota` into call sites** ✅ shipped:
+- `aiRequestsPerMonth` bumped from the three Phase B-2 gated AI
+  actions (winner analysis, AI section draft, compliance preflight).
+  Counter increments on every attempt, including failed AI calls —
+  simpler call pattern at the cost of slightly inflated counts on
+  network errors. Refund semantics queued if accuracy ever matters.
+- `proposalsPerMonth` bumped from `createProposalAction`.
+- Each gated action catches `QuotaExceededError` and surfaces the
+  upgrade-prompt message via the existing `{ ok: false, error }`
+  result shape.
+- Existing Platinum tenants (every existing org per Phase A
+  backfill) see no behavior change — Platinum has all quotas = 0
+  which means unlimited; `enforceQuota` short-circuits to allow
+  without writing a counter row.
+
+**Phase B-3c (queued) — Live-measure quotas (seats + storage)**:
+- `seatsIncluded` checked at invite time against active membership
+  count.
+- `storageGb` checked at upload time against `SUM(file_size)` for
+  the tenant's knowledge artifacts.
+- Both use aggregate-on-read instead of counter rows — accurate
+  even without rollover-cron concerns.
+
+**Phase B-3d (queued) — Refund semantics**:
+- Allow `enforceQuota(orgId, key, -1)` after a failed AI call to
+  return the burnt slot. Requires extending `enforceQuota` to
+  permit negative deltas. Skipped in Phase B-3b for simplicity.
 
 **Phase C (queued) — Tier editor + tenant assignment + promo codes**:
 - Tier editor (superadmin) to edit name / price / features / quotas.
