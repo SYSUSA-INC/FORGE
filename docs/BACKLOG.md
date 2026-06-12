@@ -972,13 +972,24 @@ built or need design work):
   which means unlimited; `enforceQuota` short-circuits to allow
   without writing a counter row.
 
-**Phase B-3c (queued) — Live-measure quotas (seats + storage)**:
-- `seatsIncluded` checked at invite time against active membership
-  count.
-- `storageGb` checked at upload time against `SUM(file_size)` for
-  the tenant's knowledge artifacts.
-- Both use aggregate-on-read instead of counter rows — accurate
-  even without rollover-cron concerns.
+**Phase B-3c — Live-measure quotas (seats + storage)** ✅ shipped:
+- `QuotaExceededError` widened to accept any `QuotaKey` (counter or
+  live-measure) plus an optional `customMessage` for tailored
+  upgrade prompts.
+- New helpers in `src/lib/subscription-gates.ts`:
+  - `getActiveMembershipCount(orgId)`
+  - `getStorageBytesUsed(orgId)`
+  - `enforceSeatsQuota(orgId)` — throws when active count `>=`
+    limit. `seatsIncluded = 0` means unlimited.
+  - `enforceStorageQuota(orgId, additionalBytes)` — throws when
+    used + new file would exceed limit. Tier values are GB; helper
+    converts to bytes (1 GB = 1024³) for comparison.
+- Wired into:
+  - `inviteUserAction` (`users/actions.ts`) — seats. Live-measured,
+    so removing a user frees a seat immediately.
+  - `uploadKnowledgeArtifactAction` (`knowledge-base/import/actions.ts`)
+    — storage. Live-measured, so deleting an artifact frees space
+    immediately.
 
 **Phase B-3d (queued) — Refund semantics**:
 - Allow `enforceQuota(orgId, key, -1)` after a failed AI call to

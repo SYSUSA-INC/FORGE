@@ -18,6 +18,10 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { sendInviteEmail } from "@/lib/email";
 import { issueToken } from "@/lib/tokens";
+import {
+  enforceSeatsQuota,
+  QuotaExceededError,
+} from "@/lib/subscription-gates";
 import { validateEmail } from "@/lib/validators";
 import { log } from "@/lib/log";
 
@@ -51,6 +55,18 @@ export async function inviteUserAction(input: {
   }
   if (!isAssignableRole(input.role)) {
     return { ok: false, error: "Pick a valid role." };
+  }
+
+  // BL-16 Phase B-3c — refuse the invite when the tenant is at or
+  // over its seats limit. Live-measured from active memberships, so
+  // removing a user frees a seat immediately.
+  try {
+    await enforceSeatsQuota(organizationId);
+  } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
   }
 
   const [existingMember] = await db
