@@ -144,7 +144,17 @@ export default async function TiersPage() {
                       {tenantCountByTier.get(t.id) ?? 0}
                     </span>
                   </span>
-                  <span className="text-muted/70">sort_order {t.sortOrder}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted/70">
+                      sort_order {t.sortOrder}
+                    </span>
+                    <Link
+                      href={`/admin/tiers/${t.id}`}
+                      className="aur-btn aur-btn-ghost text-[11px]"
+                    >
+                      Edit →
+                    </Link>
+                  </div>
                 </div>
               </li>
             ))}

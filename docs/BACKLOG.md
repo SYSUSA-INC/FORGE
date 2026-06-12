@@ -1026,12 +1026,35 @@ built or need design work):
   tier panel. Only renders when `currentTier` is resolved AND there
   are >=2 active tiers (no point showing a dropdown with one option).
 
-**Phase C-3 (queued) — Tier editor**:
-- Editor (superadmin) to edit name / description / price /
-  feature flags / quotas / sort_order / active. Audit-logged.
-- "Reassign tenants first" step before retiring an active tier
-  (FK is ON DELETE RESTRICT so we can't allow deletion of tiers
-  that have active subscriptions).
+**Phase C-3 — Tier editor** ✅ shipped:
+- New route `/admin/tiers/[id]` — superadmin-only edit page.
+  PageHeader shows status (Active/Retired), tenant count, sort
+  order. notFound() if the id doesn't resolve.
+- `TierEditForm` client component with fields for:
+  - Name (text, max 64)
+  - Description (textarea, max 500)
+  - Price (monthly + yearly) — entered as USD dollars, converted
+    to cents on submit (`Math.round(usd * 100)`)
+  - Feature flags — 6 checkboxes (one per `TierFeatureFlags` key)
+  - Quotas — 4 number inputs (one per `TierQuotas` key); 0 means
+    unlimited per the standing convention
+  - Sort order (integer)
+  - Active (checkbox)
+  - Slug rendered read-only — slugs are referenced by seeds + future
+    billing integrations; create a new tier if you need a different
+    slug rather than renaming.
+- Server action `updateTierAction(tierId, input)`:
+  - zod validation on every field
+  - **Refuses retire** (active true → false) when any tenant is
+    still on this tier. Forces the explicit "reassign first"
+    workflow rather than silently breaking AI/quota resolution
+    for those tenants.
+  - Audits as `subscription_tier.update` into the actor's primary
+    org's audit log. Pure-superadmins (no org) get a structured
+    `log.info` instead of a DB row — tier edits are rare. A
+    cross-tenant `platform_audit` surface is queued separately.
+  - Revalidates `/admin/tiers` and `/admin/tiers/[id]`.
+- "Edit →" link added to each row of the `/admin/tiers` list.
 
 **Phase C-4 (queued) — Promotional codes**:
 - `promotion_code` table + redemption flow + audit log.
