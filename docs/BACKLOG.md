@@ -996,11 +996,33 @@ built or need design work):
   return the burnt slot. Requires extending `enforceQuota` to
   permit negative deltas. Skipped in Phase B-3b for simplicity.
 
-**Phase C (queued) — Tier editor + tenant assignment + promo codes**:
-- Tier editor (superadmin) to edit name / price / features / quotas.
-- Per-tenant tier assignment UI.
-- Promotional codes table + redemption flow.
-- Audit-log entries on every tier change.
+**Phase C-1 — Read-only tier list page** ✅ shipped:
+- New `/admin/tiers` route, superadmin-only. Lists every
+  `subscription_tier` row with: slug, name, description, monthly
+  + yearly price (formatted from cents), feature summary (enabled
+  flags), quota summary (with "Unlimited" for 0), active/retired
+  pill, sort_order, and the count of tenants currently on that
+  tier.
+- Single GROUPed query for per-tier tenant counts; merged into a
+  Map for O(1) lookup at render time.
+- "Tiers →" link added to the SuperAdmin portal header next to
+  Migrations / Source requests / SBA 8(a) / Audit log.
+- Read-only — Phase C-2 ships per-tenant assignment, Phase C-3
+  ships the tier editor that mutates these rows.
+
+**Phase C-2 (queued) — Per-tenant tier assignment UI**:
+- Dropdown on `/admin/orgs/[id]` to move the tenant to a different
+  tier. Server action audits the change.
+
+**Phase C-3 (queued) — Tier editor**:
+- Editor (superadmin) to edit name / description / price /
+  feature flags / quotas / sort_order / active. Audit-logged.
+- "Reassign tenants first" step before retiring an active tier
+  (FK is ON DELETE RESTRICT so we can't allow deletion of tiers
+  that have active subscriptions).
+
+**Phase C-4 (queued) — Promotional codes**:
+- `promotion_code` table + redemption flow + audit log.
 
 **Acceptance (full ticket):** create Custom tier with
 `aiRequestsPerMonth=0` (treated as deny under Phase B semantics;
