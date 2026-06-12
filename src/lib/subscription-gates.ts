@@ -1,10 +1,11 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   subscriptionTiers,
   tenantSubscriptions,
+  tenantUsageCounters,
   type TierFeatureFlags,
   type TierQuotas,
 } from "@/db/schema";
@@ -199,4 +200,178 @@ function mergeQuotas(
     storageGb: overrides.storageGb ?? base.storageGb,
     proposalsPerMonth: overrides.proposalsPerMonth ?? base.proposalsPerMonth,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-16 Phase B-3 — quota enforcement
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Quota keys that map to monthly counter values in
+ * `tenant_usage_counter`. Distinguished from `seatsIncluded` /
+ * `storageGb` which are measured live from their source tables and
+ * don't need a counter row.
+ */
+export type CounterQuotaKey =
+  | "aiRequestsPerMonth"
+  | "proposalsPerMonth";
+
+export class QuotaExceededError extends Error {
+  readonly quotaKey: CounterQuotaKey;
+  readonly limit: number;
+  readonly used: number;
+  readonly tierName: string | null;
+
+  constructor(
+    quotaKey: CounterQuotaKey,
+    limit: number,
+    used: number,
+    tierName: string | null,
+  ) {
+    super(
+      tierName
+        ? `Monthly quota "${quotaKey}" exceeded on the ${tierName} tier: ${used}/${limit} used. Upgrade or contact support.`
+        : `Monthly quota "${quotaKey}" exceeded: ${used}/${limit} used.`,
+    );
+    this.name = "QuotaExceededError";
+    this.quotaKey = quotaKey;
+    this.limit = limit;
+    this.used = used;
+    this.tierName = tierName;
+  }
+}
+
+/**
+ * Returns the first-of-month + first-of-next-month boundaries (UTC)
+ * for the current calendar period. New counter rows lazily appear
+ * on the first `enforceQuota` call of each month.
+ */
+function currentMonthPeriod(now: Date = new Date()): {
+  periodStart: Date;
+  periodEnd: Date;
+} {
+  const periodStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
+  const periodEnd = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+  );
+  return { periodStart, periodEnd };
+}
+
+/**
+ * Enforces a monthly quota and atomically increments the counter on
+ * the same call. Returns silently when the quota is `0` (unlimited
+ * semantics, Platinum) — no counter row is written in that case to
+ * avoid pointless writes.
+ *
+ * Throws `QuotaExceededError` when `currentValue + delta > limit`.
+ * The increment IS still applied when the check fails — over-quota
+ * usage is recorded so admins can see how far past the limit a
+ * tenant tried to push. If you don't want the over-quota counter
+ * to advance, branch on the check before calling.
+ *
+ * Concurrency: relies on Postgres' atomic UPSERT
+ * (`INSERT ... ON CONFLICT DO UPDATE SET value = ... + EXCLUDED.value
+ * RETURNING value`). Two concurrent calls won't lose counts. The
+ * race window for "both calls succeed when only one should fit
+ * under the limit" still exists — that's accepted; quotas are
+ * advisory ceilings, not strict transactional caps. If a tenant
+ * sneaks one extra call through, they paid for the request and we
+ * billed them; the gate's job is to refuse the NEXT one.
+ *
+ * Safe-by-default: any DB / lookup failure logs and throws
+ * QuotaExceededError to deny the action. Same posture as
+ * `ensureFeature`.
+ */
+export async function enforceQuota(
+  organizationId: string,
+  key: CounterQuotaKey,
+  delta: number = 1,
+): Promise<{ used: number; limit: number }> {
+  if (delta <= 0) {
+    return { used: 0, limit: 0 };
+  }
+
+  try {
+    const tier = await getCurrentTier(organizationId);
+    if (!tier) {
+      throw new QuotaExceededError(key, 0, 0, null);
+    }
+
+    const limit = tier.effectiveQuotas[key];
+    // Quota = 0 means unlimited (Platinum semantics). Skip the
+    // counter increment entirely — saves a write on the hot path.
+    if (limit === 0) {
+      return { used: 0, limit: 0 };
+    }
+
+    const { periodStart, periodEnd } = currentMonthPeriod();
+
+    // Atomic UPSERT. Postgres `INSERT ... ON CONFLICT DO UPDATE
+    // SET value = tenant_usage_counter.value + EXCLUDED.value
+    // RETURNING value`. Concurrent calls compose correctly.
+    const [row] = await db
+      .insert(tenantUsageCounters)
+      .values({
+        organizationId,
+        key,
+        periodStart,
+        periodEnd,
+        value: delta,
+      })
+      .onConflictDoUpdate({
+        target: [
+          tenantUsageCounters.organizationId,
+          tenantUsageCounters.key,
+          tenantUsageCounters.periodStart,
+        ],
+        set: {
+          value: sql`${tenantUsageCounters.value} + ${delta}`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ value: tenantUsageCounters.value });
+
+    const used = row?.value ?? delta;
+
+    if (used > limit) {
+      throw new QuotaExceededError(key, limit, used, tier.tierName);
+    }
+
+    return { used, limit };
+  } catch (err) {
+    if (err instanceof QuotaExceededError) throw err;
+    log.error("[enforceQuota]", "lookup/upsert failed", {
+      error: err,
+      organizationId,
+      key,
+      delta,
+    });
+    throw new QuotaExceededError(key, 0, 0, null);
+  }
+}
+
+/**
+ * Read-only counter peek. Returns `0` if no row exists yet for the
+ * current period. Used by admin dashboards that want to surface
+ * "you've used X of Y this month" without incrementing.
+ */
+export async function getCurrentUsage(
+  organizationId: string,
+  key: CounterQuotaKey,
+): Promise<number> {
+  const { periodStart } = currentMonthPeriod();
+  const [row] = await db
+    .select({ value: tenantUsageCounters.value })
+    .from(tenantUsageCounters)
+    .where(
+      and(
+        eq(tenantUsageCounters.organizationId, organizationId),
+        eq(tenantUsageCounters.key, key),
+        eq(tenantUsageCounters.periodStart, periodStart),
+      ),
+    )
+    .limit(1);
+  return row?.value ?? 0;
 }
