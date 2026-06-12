@@ -21,7 +21,8 @@ Admins in FORGE are the people who decide who has access, what their access lets
 3. [Super administrator (platform)](#3-super-administrator-platform)
 4. [Audit & accountability](#4-audit--accountability)
 5. [Notification rules](#5-notification-rules)
-6. [Troubleshooting](#6-troubleshooting)
+6. [Subscription tiers and quotas](#6-subscription-tiers-and-quotas)
+7. [Troubleshooting](#7-troubleshooting)
 
 ---
 
@@ -368,20 +369,138 @@ Every test send writes a `notification_rule.test_send` row to your audit log so 
 
 ---
 
-## 6. Troubleshooting
+## 6. Subscription tiers and quotas
 
-### 6.1 A user says they didn't get their verification / invite / reset email
+FORGE bundles platform features into tiers — Bronze / Silver / Gold / Platinum / Custom — each with its own feature toggles and monthly quotas. Tiers are platform-scoped (not per-tenant data), and every organization is assigned to exactly one tier at any given time.
+
+This section is **superadmin-only**. Org admins see the *consequences* of their tier (some features may return upgrade-prompt errors) but can't view or change tier definitions.
+
+### 6.1 Default tiers
+
+When the platform was first seeded, five tiers were created with placeholder pricing. Sales tunes these in production via the editor (§6.4); the defaults below are starting points only:
+
+| Tier | Monthly | Features (defaults) | Quotas (defaults) |
+|---|---|---|---|
+| **Bronze** | $99 | Compliance matrix only | AI reqs 100/mo · Seats 5 · Storage 10 GB · Proposals 5/mo |
+| **Silver** | $249 | + Winner analysis + Bulk export | AI reqs 500/mo · Seats 15 · Storage 50 GB · Proposals 20/mo |
+| **Gold** | $499 | All 6 features | AI reqs 2000/mo · Seats 50 · Storage 200 GB · Proposals 100/mo |
+| **Platinum** | $999 | All 6 features | All quotas **unlimited** (0 = unlimited semantics) |
+| **Custom** | $0 | All 6 features | Unlimited (negotiated per-tenant via overrides) |
+
+**Backfill behavior**: when the tier model first shipped, every existing organization was assigned the **Platinum** tier so runtime behavior didn't change. New organizations created today still default to Platinum at the application layer — superadmins move them to the correct tier as part of onboarding.
+
+### 6.2 What each feature flag gates
+
+Feature flags gate specific actions in the app. When the flag is `false` for a tenant's effective tier, the action returns a clean upgrade-prompt error instead of running:
+
+| Flag | Gated action | Where it's enforced |
+|---|---|---|
+| `aiAutoDraft` | AI section draft / improve / tighten | `generateSectionDraftAction` |
+| `winnerAnalysis` | Proposal-vs-winner analysis | `runWinnerAnalysisAction` |
+| `complianceMatrix` | AI compliance preflight | `runCompliancePreflightAction` |
+| `bulkExport` | Audit-log CSV download | `exportAuditLogCsvAction` |
+| `apiAccess` | Token-based API endpoints | (reserved; no endpoint yet) |
+| `customTemplates` | Custom proposal template editing | (reserved) |
+
+### 6.3 How quotas work
+
+Two quota mechanics depending on the key:
+
+**Counter-backed quotas** track usage in a per-tenant per-month counter row (`tenant_usage_counter`). Every relevant action atomically increments the counter; when usage exceeds the limit, the next call returns a clean error.
+
+| Quota | What increments it | Reset |
+|---|---|---|
+| `aiRequestsPerMonth` | Each AI-using action (winner analysis, AI draft, compliance preflight) | Monthly, UTC. New month → new counter row. |
+| `proposalsPerMonth` | Each `createProposalAction` call | Monthly, UTC. |
+
+**Live-measured quotas** compute usage on every check from the source table — no counter rows. Removing a user or deleting an artifact frees the quota immediately.
+
+| Quota | What it measures | Where it's enforced |
+|---|---|---|
+| `seatsIncluded` | `COUNT(*) FROM membership WHERE status='active'` | `inviteUserAction` refuses new invites when full |
+| `storageGb` | `SUM(knowledge_artifact.file_size)` for the tenant | `uploadKnowledgeArtifactAction` refuses uploads that would push over |
+
+**Quota value of 0 = unlimited** (Platinum semantics). The helpers short-circuit to allow without writing counter rows, keeping the hot path cheap.
+
+**Failed attempts still count** (for counter quotas). A network-failed AI call still bumps the counter. Net effect: a tenant on the edge of their limit may hit the cap slightly earlier than a strict success-only counter would suggest. Tradeoff documented; refund semantics are queued (Phase B-3d) if accuracy ever matters.
+
+### 6.4 Editing tier definitions
+
+Go to **Platform admin → Tiers** (`/admin/tiers`). The list shows every tier with current pricing, feature summary, quota summary, and the count of tenants currently on each tier.
+
+![Tiers list](docs/images/admin-tiers.png)
+
+Click **Edit →** on any tier to open the editor at `/admin/tiers/<id>`. You can change:
+
+- **Name** (slug stays read-only — it's referenced by seed data and future billing integrations)
+- **Description**
+- **Monthly + yearly prices** (entered as USD dollars, stored as cents)
+- **Feature flags** — 6 checkboxes
+- **Quotas** — 4 number inputs; `0` means unlimited
+- **Sort order** — lower numbers appear first in the list
+- **Active** — uncheck to retire the tier (refused server-side if any tenant is still on it)
+
+Every edit writes a `subscription_tier.update` audit row.
+
+### 6.5 Moving a tenant to a different tier
+
+On `/admin/orgs/<id>` (the per-tenant detail page), the **Subscription tier** panel shows the tenant's current tier, status, and effective quotas. The dropdown below lets you reassign:
+
+1. Pick the target tier (retired tiers are hidden — you can't assign anyone to a retired tier).
+2. Click **Change tier**.
+3. Confirm in the browser dialog.
+4. The change applies immediately. Feature access and quotas update on the next gated action call.
+
+Every change writes a `tenant.tier_change` audit row into the **target tenant's** audit log with `fromTier` and `toTier` metadata, so the tenant's own org admin sees the change in their `/audit-log`.
+
+### 6.6 Per-tenant overrides (custom_overrides)
+
+The `tenant_subscription.custom_overrides` JSONB column lets sales bump a single feature or quota for one tenant without moving them to a higher tier. Schema:
+
+```json
+{
+  "featureFlags": { "winnerAnalysis": true },
+  "quotas": { "aiRequestsPerMonth": 5000 }
+}
+```
+
+The tier's defaults form the base; overrides apply on top. The runtime gate reads the merged shape.
+
+No UI for editing `custom_overrides` yet — for now, sales updates the row directly via SQL when negotiating a Custom-tier contract. A UI is queued under the Custom-tier playbook in future BL-16 work.
+
+### 6.7 Retiring a tier (safe deletion)
+
+You cannot retire a tier (set `active=false`) while any tenant is on it. The editor refuses with a count: `Cannot retire "Silver" — 3 tenant(s) are on it. Move them to a different tier first.`
+
+To retire:
+1. Reassign every tenant off the tier (via the `/admin/orgs/<id>` dropdown).
+2. Open the tier editor and uncheck **Active**.
+3. Save.
+
+Retired tiers stay in the list (greyed with a **Retired** pill) so historical references remain readable; they just don't accept new tenant assignments.
+
+### 6.8 Operating practices
+
+- **Tier edits are platform-wide and immediate**. Flipping Bronze's `aiAutoDraft` from `false` to `true` unlocks the feature for every Bronze tenant the moment the gate's next read fires. No deploy needed. Audit the change in your shared ops doc the same day.
+- **Custom tier is the right place for sales-negotiated terms**. Don't edit Bronze/Silver/Gold/Platinum prices ad-hoc for one customer — that affects everyone. Move them to Custom and use `custom_overrides`.
+- **Watch the audit log on tier changes**. `subscription_tier.update` (from §6.4) and `tenant.tier_change` (from §6.5) are both in `/audit-log` / `/platform/audit-log`. Filter by resource type to spot patterns (e.g., a flurry of tier downgrades right before a payment is due usually means dunning).
+
+---
+
+## 7. Troubleshooting
+
+### 7.1 A user says they didn't get their verification / invite / reset email
 
 1. Check **Resend** dashboard at https://resend.com/emails — was the email sent?
 2. Check the user's spam folder
 3. Check the domain is verified at https://resend.com/domains (sysgov.com should show green SPF/DKIM/DMARC)
 4. Check Vercel env vars: `RESEND_API_KEY` and `EMAIL_FROM` are set on Production, Preview, and Development
 
-### 6.2 A user's password doesn't work
+### 7.2 A user's password doesn't work
 
 From the SuperAdmin portal → Platform users → their row → **Reset password**. They'll get a fresh reset link.
 
-### 6.3 Someone can't sign in at all
+### 7.3 Someone can't sign in at all
 
 Common causes:
 - Their email isn't verified yet — they need to click the verification link sent to them on sign-up
@@ -389,7 +508,7 @@ Common causes:
 - Their org is disabled — check the Organizations tab for a "Disabled" pill next to their org
 - Their membership was set to `disabled` — open the org's `/users` page as an org admin and re-enable them
 
-### 6.4 Data isolation
+### 7.4 Data isolation
 
 FORGE enforces multi-tenant data isolation at three layers:
 
@@ -406,7 +525,7 @@ If you ever suspect cross-tenant leakage:
 
 A planned BL-19 Phase 2 will add runtime tests: spin up two tenants, exercise every server action with cross-tenant ids, and fail loudly on any leak the static check missed. That work blocks on a test framework landing.
 
-### 6.5 Running database migrations
+### 7.5 Running database migrations
 
 When we ship new features that add DB tables or columns, you need to apply the migration to your Neon database.
 
@@ -418,15 +537,15 @@ node scripts/apply-schema.mjs
 
 The script is idempotent — it skips anything already applied and only runs new migrations.
 
-### 6.6 Rotating Neon password
+### 7.6 Rotating Neon password
 
 Vercel → `forge` → Storage → your Neon database → Settings → **Rotate Secrets**. Vercel auto-updates `DATABASE_URL` in env vars. Copy the new value into your local `.env.local` so migration scripts keep working.
 
-### 6.7 Seeing Vercel logs
+### 7.7 Seeing Vercel logs
 
 Vercel → `forge` → **Logs** tab. Filter by path (e.g., `/api/register`) to find server-side errors. Red entries have stack traces.
 
-### 6.8 Quick reference: common admin tasks at a glance
+### 7.8 Quick reference: common admin tasks at a glance
 
 - **Onboard a new internal team:** Platform admin → Organizations → Onboard a new organization → email lead admin.
 - **Bring on a new teammate to your org:** Users → Invite a user → pick role → Send invitation.
