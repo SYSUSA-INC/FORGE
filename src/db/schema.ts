@@ -2324,3 +2324,36 @@ export const tenantSubscriptions = pgTable(
 
 export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
 export type NewTenantSubscription = typeof tenantSubscriptions.$inferInsert;
+
+/**
+ * BL-16 Phase B-3a — quota counters.
+ *
+ * One row per (organization, quota key, monthly period). The helper
+ * in `src/lib/subscription-gates.ts` performs an UPSERT on increment;
+ * the composite PK (organization_id, key, period_start) ensures
+ * idempotent writes. Old rows stay around as historical data.
+ */
+export const tenantUsageCounters = pgTable(
+  "tenant_usage_counter",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    key: varchar("key", { length: 64 }).notNull(),
+    periodStart: timestamp("period_start").notNull(),
+    periodEnd: timestamp("period_end").notNull(),
+    value: integer("value").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.organizationId, t.key, t.periodStart] }),
+    periodIdx: index("tenant_usage_counter_period_idx").on(
+      t.organizationId,
+      t.key,
+      t.periodEnd,
+    ),
+  }),
+);
+
+export type TenantUsageCounter = typeof tenantUsageCounters.$inferSelect;
+export type NewTenantUsageCounter = typeof tenantUsageCounters.$inferInsert;

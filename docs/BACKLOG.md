@@ -929,12 +929,44 @@ built or need design work):
 - `customTemplates` — gating semantics need design (view-only vs.
   create-only)
 
-**Phase B-3 (queued) — Quota tracking**:
-- `enforceQuota(orgId, key, delta)` helper
-- New `tenant_usage_counter` table for monthly rolling counters
-- Period-rollover cron to reset counters at month boundaries
+**Phase B-3a — Quota counter schema + helper** ✅ shipped:
+- Migration `0044_tenant_usage_counter.sql` adds the
+  `tenant_usage_counter` table — composite PK on
+  `(organization_id, key, period_start)` + `period_end` + `value`
+  (integer counter) + `updated_at`. One row per tenant per quota
+  key per month.
+- Period semantics: calendar month, UTC. `period_start` = first of
+  the month at 00:00 UTC; `period_end` = first of next month.
+- Drizzle table + `TenantUsageCounter` / `NewTenantUsageCounter`
+  types exported. Isolation check now reports 30 tables.
+- `enforceQuota(orgId, key, delta = 1)` helper in
+  `src/lib/subscription-gates.ts`:
+  - Reads the tenant's effective quota for `key` (tier × overrides).
+  - Quota = 0 → unlimited; returns early with no DB write.
+  - Atomic UPSERT (`INSERT ... ON CONFLICT DO UPDATE SET value =
+    value + EXCLUDED.value RETURNING value`) so concurrent calls
+    compose correctly without lost updates.
+  - Throws `QuotaExceededError` when `used > limit` (after the
+    increment — over-quota usage is recorded for forensics; the
+    gate's job is to refuse the NEXT call).
+- `getCurrentUsage(orgId, key)` — read-only counter peek for admin
+  dashboards.
+- `CounterQuotaKey` type narrows the keys to those that map to a
+  counter row (`aiRequestsPerMonth`, `proposalsPerMonth`).
+  `seatsIncluded` + `storageGb` are measured live from their source
+  tables (memberships + knowledge_artifact.file_size respectively)
+  and don't need counter rows.
 
-**Phase C (queued) — Tier editor + tenant assignment + promo codes**:
+**Phase B-3b (queued) — Wire `enforceQuota` into call sites**:
+- AI call sites (in particular the BL-23 review / capability /
+  question runners and the proposal section AI draft) → bump
+  `aiRequestsPerMonth` per call. Place the counter increment AFTER
+  the AI call succeeds — failed calls shouldn't burn quota.
+- Proposal creation (`createProposalAction`) → bump
+  `proposalsPerMonth`.
+- Live-measure paths: `seatsIncluded` checked at invite time
+  against active membership count; `storageGb` checked at upload
+  time against `SUM(file_size)` for the tenant.
 
 **Phase C (queued) — Tier editor + tenant assignment + promo codes**:
 - Tier editor (superadmin) to edit name / price / features / quotas.
