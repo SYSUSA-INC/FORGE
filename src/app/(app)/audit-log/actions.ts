@@ -5,6 +5,10 @@ import { db } from "@/db";
 import { auditLogs, memberships, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { safeQuery } from "@/lib/schema-resilience";
+import {
+  ensureFeature,
+  FeatureGateError,
+} from "@/lib/subscription-gates";
 
 const PAGE_SIZE = 100;
 
@@ -206,6 +210,18 @@ export async function exportAuditLogCsvAction(
 ): Promise<{ ok: true; csv: string; rowCount: number } | { ok: false; error: string }> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-16 Phase B-2 — gate bulk CSV export on `bulkExport`. Tenants
+  // can still read individual audit-log rows in the table view; only
+  // the full-corpus CSV download is gated.
+  try {
+    await ensureFeature(organizationId, "bulkExport");
+  } catch (err) {
+    if (err instanceof FeatureGateError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
 
   // Reuse the filtered query but page through all matches (no
   // PAGE_SIZE cap on export).

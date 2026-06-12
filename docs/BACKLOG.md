@@ -908,12 +908,26 @@ Bronze, Silver, Gold, Platinum, Custom."
   overrides exist. Hides quota numbers when the tier means
   unlimited (0).
 
-**Phase B-2 (queued) — Wire `ensureFeature` into remaining gated actions**:
-- AI auto-draft (proposal section generation)
-- Bulk export (CSV / ZIP downloads for audit log, knowledge base, etc.)
-- API access (token endpoint)
-- Custom templates (template editor saves)
-- complianceMatrix path (currently always-on; should gate on the flag)
+**Phase B-2 — Wire `ensureFeature` into remaining gated actions** ✅ shipped:
+- `generateSectionDraftAction` (AI section generation in
+  `proposals/[id]/sections/ai/actions.ts`) gates on `aiAutoDraft`.
+- `runCompliancePreflightAction` (AI compliance-rating pass in
+  `proposals/[id]/compliance/actions.ts`) gates on
+  `complianceMatrix`.
+- `exportAuditLogCsvAction` (full-corpus audit-log CSV in
+  `audit-log/actions.ts`) gates on `bulkExport`. The inline table
+  view stays accessible; only the bulk download is gated.
+
+Each gate uses the same try/catch pattern: catch `FeatureGateError`
+→ return `{ ok: false, error: err.message }` via the existing
+result shape; re-throw any other error. Platinum-tier tenants (every
+existing org per Phase A backfill) see no behavior change.
+
+Still ungated (deferred — flags exist but features aren't yet
+built or need design work):
+- `apiAccess` — no token endpoint exists yet
+- `customTemplates` — gating semantics need design (view-only vs.
+  create-only)
 
 **Phase B-3 (queued) — Quota tracking**:
 - `enforceQuota(orgId, key, delta)` helper

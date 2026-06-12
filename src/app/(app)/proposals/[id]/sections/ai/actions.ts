@@ -11,6 +11,10 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { complete } from "@/lib/ai";
 import {
+  ensureFeature,
+  FeatureGateError,
+} from "@/lib/subscription-gates";
+import {
   buildSectionDraftPrompt,
   type SectionDraftMode,
   type SectionDraftSnapshot,
@@ -42,6 +46,18 @@ export async function generateSectionDraftAction(input: {
 }): Promise<SectionDraftResult> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-16 Phase B-2 — gate AI section generation on `aiAutoDraft`.
+  // Existing tenants on Platinum have it enabled (per BL-16 Phase A
+  // backfill); Bronze tenants get a clean upgrade-prompt error.
+  try {
+    await ensureFeature(organizationId, "aiAutoDraft");
+  } catch (err) {
+    if (err instanceof FeatureGateError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
 
   if (!MODES.includes(input.mode)) {
     return { ok: false, error: "Invalid mode." };

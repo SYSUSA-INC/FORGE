@@ -23,6 +23,10 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import {
+  ensureFeature,
+  FeatureGateError,
+} from "@/lib/subscription-gates";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
 
@@ -348,6 +352,18 @@ export async function runCompliancePreflightAction(
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
+  }
+
+  // BL-16 Phase B-2 — gate compliance preflight on `complianceMatrix`.
+  // The flag covers both the compliance matrix UI (always-visible for
+  // now) and this AI-powered preflight assessment.
+  try {
+    await ensureFeature(organizationId, "complianceMatrix");
+  } catch (err) {
+    if (err instanceof FeatureGateError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
   }
 
   // Rate limit per proposal — pre-flight is expensive (one AI call
