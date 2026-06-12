@@ -99,6 +99,13 @@ export function AdminClient({
               SBA 8(a) →
             </Link>
             <Link
+              href="/admin/tiers"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="View subscription tier definitions and per-tier tenant counts"
+            >
+              Tiers →
+            </Link>
+            <Link
               href="/platform/audit-log"
               className="aur-btn aur-btn-ghost text-[11px]"
               title="Cross-tenant audit log — every recorded action across every org"
