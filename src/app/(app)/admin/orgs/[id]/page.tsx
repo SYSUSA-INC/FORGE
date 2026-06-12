@@ -16,6 +16,8 @@ import {
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
 import { getCurrentTier } from "@/lib/subscription-gates";
+import { listActiveTiersAction } from "./actions";
+import { TierAssignmentForm } from "./TierAssignmentForm";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +124,12 @@ export default async function TenantDetailPage({
   // custom_overrides). Returns null if the org has no subscription
   // row, which shouldn't happen post-backfill but we surface as
   // "No tier" to make the gap visible.
+  //
+  // BL-16 Phase C-2 — also load the list of active tiers for the
+  // assignment dropdown. Both queries run in series since
+  // currentTier informs whether the dropdown should render at all.
   const currentTier = await getCurrentTier(org.id);
+  const activeTiers = currentTier ? await listActiveTiersAction() : [];
 
   // Top recent admins by activity — gives a quick sense of who's
   // actually operating the tenant. Limited to 5 to keep the page small.
@@ -290,6 +297,14 @@ export default async function TenantDetailPage({
             per-tenant changes live in <code>tenant_subscription.custom_overrides</code>.
             Effective values shown above apply both layers.
           </p>
+          {currentTier && activeTiers.length > 1 ? (
+            <TierAssignmentForm
+              organizationId={org.id}
+              currentTierId={currentTier.tierId}
+              currentTierName={currentTier.tierName}
+              tiers={activeTiers}
+            />
+          ) : null}
         </Panel>
 
         <Panel title="Storage & config">

@@ -1010,9 +1010,21 @@ built or need design work):
 - Read-only — Phase C-2 ships per-tenant assignment, Phase C-3
   ships the tier editor that mutates these rows.
 
-**Phase C-2 (queued) — Per-tenant tier assignment UI**:
-- Dropdown on `/admin/orgs/[id]` to move the tenant to a different
-  tier. Server action audits the change.
+**Phase C-2 — Per-tenant tier assignment UI** ✅ shipped:
+- New server actions in `admin/orgs/[id]/actions.ts`:
+  - `changeTenantTierAction({ organizationId, tierId })` — validates
+    target tier exists + is active + differs from current, updates
+    `tenant_subscription.tier_id`, writes a `tenant.tier_change`
+    audit row into the *target* tenant's log with `fromTier` and
+    `toTier` metadata, revalidates the org detail + the tier list.
+  - `listActiveTiersAction()` — read-only list of active tiers in
+    sort-order for the dropdown.
+- New client component `TierAssignmentForm` renders the dropdown
+  + Change tier button + browser confirm dialog + result banners
+  (success: emerald, error: rose).
+- Wired into `/admin/orgs/[id]` below the existing Subscription
+  tier panel. Only renders when `currentTier` is resolved AND there
+  are >=2 active tiers (no point showing a dropdown with one option).
 
 **Phase C-3 (queued) — Tier editor**:
 - Editor (superadmin) to edit name / description / price /
