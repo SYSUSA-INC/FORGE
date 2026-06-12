@@ -21,6 +21,10 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import {
+  ensureFeature,
+  FeatureGateError,
+} from "@/lib/subscription-gates";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { searchAwardsByRecipientName } from "@/lib/usaspending";
 import { log } from "@/lib/log";
@@ -105,6 +109,20 @@ export async function runWinnerAnalysisAction(
 ): Promise<RunWinnerAnalysisResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-16 Phase B-1 — tier feature gate. Throws FeatureGateError when
+  // the tenant's effective `winnerAnalysis` flag is false. Existing
+  // tenants are on Platinum (all features on) per the Phase A backfill,
+  // so this is preserved-behavior for current users; new tenants on
+  // Bronze (winnerAnalysis: false) get a clean error message.
+  try {
+    await ensureFeature(organizationId, "winnerAnalysis");
+  } catch (err) {
+    if (err instanceof FeatureGateError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
 
   // Rate limit: winner analysis is expensive (USAspending fetch + AI).
   // 5 runs/hour per proposal is plenty for normal iteration.
