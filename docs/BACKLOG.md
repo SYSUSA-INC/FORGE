@@ -385,11 +385,20 @@ Today's `/knowledge-base` supports artifact upload + manual entries.
 - 50-per-click cap keeps a single call from running away on huge
   corpora; admin re-clicks to drain the rest.
 
-**Phase C (queued) — Folder / category tree view**:
+**Phase C-1 — Group corpus by kind** ✅ shipped:
+- New `CorpusList` client component wraps the import-page artifact
+  list with a "Group by: Flat / By kind" toggle. Flat preserves the
+  original newest-first list; "By kind" buckets artifacts under
+  collapsible kind headers, sorted by bucket size (largest first).
+  Client-side only — re-buckets the already-loaded list, no extra
+  queries.
+- Empty-state copy moved into the component; `page.tsx` now renders
+  `<CorpusList artifacts={...} />` instead of the inline `<ul>`.
 
-**Phase C (queued) — Folder / category tree view**:
-- Tree view in `/knowledge-base` grouped by kind > tags > date
-- Drag-drop to re-tag
+**Phase C-2 (queued) — Full tree + tag grouping + drag-drop**:
+- Nest the grouping (kind > tags > date) and add drag-drop to re-tag.
+- Requires a re-tag server action + a tag-management surface; the
+  Phase C-1 grouping is the foundation.
 
 **Phase D (queued) — Entry quality scoring**:
 - 0..1 quality score per knowledge_entry surfaced in the editor.
