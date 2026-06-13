@@ -2357,3 +2357,33 @@ export const tenantUsageCounters = pgTable(
 
 export type TenantUsageCounter = typeof tenantUsageCounters.$inferSelect;
 export type NewTenantUsageCounter = typeof tenantUsageCounters.$inferInsert;
+
+/**
+ * BL-16 Phase C-4 — promotional codes.
+ *
+ * Global discount codes. Not tenant-scoped — a code applies at
+ * redemption time. Times_used is a counter incremented per
+ * redemption (real redemption flow lands with BL-17 billing).
+ */
+export const promotionCodes = pgTable(
+  "promotion_code",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    code: varchar("code", { length: 64 }).notNull().unique(),
+    description: text("description").notNull().default(""),
+    discountPercent: integer("discount_percent").notNull().default(0),
+    validFrom: timestamp("valid_from"),
+    validUntil: timestamp("valid_until"),
+    maxUses: integer("max_uses").notNull().default(0),
+    timesUsed: integer("times_used").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    createdIdx: index("promotion_code_created_idx").on(t.createdAt),
+  }),
+);
+
+export type PromotionCode = typeof promotionCodes.$inferSelect;
+export type NewPromotionCode = typeof promotionCodes.$inferInsert;
