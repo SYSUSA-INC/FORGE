@@ -215,18 +215,33 @@ You can stay out of their org's data completely; tenancy is firewalled server-si
 
 ### 3.4 Per-tenant detail page
 
-Click **Details →** on any row of the Organizations tab to open the tenant detail page at `/admin/orgs/<id>`. It's read-only — lifecycle controls (Disable / Enable / Delete) stay on the parent list.
+Click **Details →** on any row of the Organizations tab to open the tenant detail page at `/admin/orgs/<id>`. Lifecycle controls (Disable / Enable / Delete) stay on the parent list; the detail page is mostly read-only with two mutating dropdowns (tier assignment and ownership transfer).
 
 What it shows:
 
 - **Top metrics**: active member count, total opportunities, total proposals, audit-log rows in the last 30 days.
-- **Identity panel**: org id, slug, status (Active / Disabled with the disabled-at timestamp), created date, contact name / email / phone, website.
+- **Identity panel**: org id, slug, status (Active / Disabled with the disabled-at timestamp), created date, contact name / email / phone, website, and **Primary admin** (the user the platform considers the owner — used by billing correspondence and the transfer-ownership flow described in §3.5).
+- **Subscription tier panel**: current tier name + status + effective quotas + override status. Dropdown to **change tier** (see §6.5).
 - **Storage & config**: knowledge artifact count + total bytes used (formatted B / KB / MB / GB / TB), notification rule count.
 - **Most active operators (last 30d)**: top five actors by audit-row count, with a deep link into `/platform/audit-log?orgId=<id>` for the full trail.
 
 Loading this page is itself a sensitive cross-tenant read, so every visit writes a `tenant.view_summary` row into the *target* tenant's audit log. The tenant's own org-admin can see in `/audit-log` when platform support looked at their workspace.
 
 Use the detail page for operational triage — "is this tenant healthy?", "how much storage are they consuming?", "who's actively driving the work?" — without crossing into any of their record content.
+
+### 3.5 Transferring tenant ownership
+
+Every tenant has a designated **primary admin** — the person platform support emails about subscription changes, contract renewals, and outage notifications. The pointer is just informational today (no behavioral gate yet), but it's the single source of truth for "who do we talk to?".
+
+Below the Identity panel on `/admin/orgs/<id>`, the **Change primary admin** dropdown lists every active admin of that tenant. To transfer:
+
+1. Pick the new primary admin from the dropdown.
+2. Click **Transfer**.
+3. Confirm in the browser dialog.
+
+The new primary must already be an active admin of that tenant — the transfer flow doesn't promote anyone. If the right person isn't an admin yet, ask the tenant's existing admin to invite them with the Admin role first, then come back to transfer.
+
+Every transfer writes a `tenant.transfer_ownership` audit row into the **target tenant's** log with `{ fromUserId, toUserId, toEmail, toName }`. The tenant's own org admins see the change in their `/audit-log`.
 
 ---
 
@@ -479,11 +494,34 @@ To retire:
 
 Retired tiers stay in the list (greyed with a **Retired** pill) so historical references remain readable; they just don't accept new tenant assignments.
 
-### 6.8 Operating practices
+### 6.8 Promotional codes
+
+Open **Platform admin → Promo codes** (`/admin/promo-codes`). The list shows every code with status pills (**Active** / **Inactive** / **Expired** / **Maxed out** / **Usable**), description, validity window, redemption counter, and created date.
+
+Click any row to edit, or **+ New code** to create. Fields:
+
+- **Code** — the redeemable string. Letters / digits / underscore / hyphen only, 3–64 chars. **Case-sensitive** — generate in CAPS by convention to avoid the L/I/0/O ambiguity at checkout.
+- **Discount percent** — 0 to 100. `100` is a free-month code.
+- **Description** — internal note ("Spring 2026 launch promo — 25% off Bronze annual"). Customers don't see it.
+- **Valid from / Valid until** — optional date bounds. Leave blank for "effective immediately / never expires".
+- **Max uses** — `0` means unlimited; `> 0` is an absolute cap. The `times_used` counter increments at redemption.
+- **Active** — manual kill switch independent of the date window.
+
+A code becomes **Usable** only when all of:
+- `active = true`
+- current time is between `valid_from` and `valid_until` (if set)
+- `times_used < max_uses` (or `max_uses = 0`)
+
+Each create/update writes a `promo_code.create` / `promo_code.update` audit row.
+
+**Note on redemption**: Phase C-4 ships CRUD only. The actual redemption flow (applying a code to a `tenant_subscription` to discount the next period) pairs with **BL-17** (external billing integration). For now, codes exist in the DB ready for that wiring; nothing changes when a tenant types one in.
+
+### 6.9 Operating practices
 
 - **Tier edits are platform-wide and immediate**. Flipping Bronze's `aiAutoDraft` from `false` to `true` unlocks the feature for every Bronze tenant the moment the gate's next read fires. No deploy needed. Audit the change in your shared ops doc the same day.
 - **Custom tier is the right place for sales-negotiated terms**. Don't edit Bronze/Silver/Gold/Platinum prices ad-hoc for one customer — that affects everyone. Move them to Custom and use `custom_overrides`.
 - **Watch the audit log on tier changes**. `subscription_tier.update` (from §6.4) and `tenant.tier_change` (from §6.5) are both in `/audit-log` / `/platform/audit-log`. Filter by resource type to spot patterns (e.g., a flurry of tier downgrades right before a payment is due usually means dunning).
+- **Promo code hygiene**. Set a `valid_until` on every launch / event code so they auto-expire even if you forget to deactivate. Set `max_uses` for high-discount codes to cap exposure. The status pills on the list view make stale codes obvious at a glance.
 
 ---
 
