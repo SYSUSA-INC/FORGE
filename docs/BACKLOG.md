@@ -831,15 +831,43 @@ Per spec: "this is where the customer accounts are managed."
   header on `/admin/orgs/[id]`; uses plain `<a href>` so browser
   download handling kicks in (not Next client navigation).
 
-**Phase B-2 (queued) — Transfer ownership + assume-identity + isolation check**:
-- Transfer ownership (change `primary_admin_user_id` once added; for
-  now the "primary admin" is implicit — the oldest membership with
-  `role=admin`)
-- "Assume identity" flow for support: superadmin can read-only-view a
-  tenant's UI for debugging; every action logged in BL-12
+**Phase B-2 — Transfer ownership** ✅ shipped:
+- Migration `0046_organization_primary_admin.sql` adds the new
+  nullable `primary_admin_user_id` FK column to `organization`
+  (ON DELETE SET NULL — hard-deleting a user clears the pointer
+  rather than cascading). Backfill picks the oldest active admin
+  membership per org as the initial primary; orgs with no active
+  admins stay NULL.
+- Drizzle schema updated. `primaryAdminUserId` field added to the
+  organizations table definition.
+- New server action `transferOwnershipAction({ organizationId,
+  newPrimaryUserId })` in `admin/orgs/[id]/actions.ts`:
+  - Superadmin-gated. Refuses no-op (same user as current).
+  - Verifies the target user is an **active admin of THIS org**
+    (joins `membership` × `user`, checks `role='admin' AND
+    status='active'`). Won't accidentally promote a non-admin or
+    a disabled user.
+  - Audits as `tenant.transfer_ownership` with
+    `{ fromUserId, toUserId, toEmail, toName }` in metadata
+    written into the **target tenant's** audit log so their own
+    org admins see the change.
+- New helper `listOrgAdminsAction(orgId)` returns active admins
+  for the dropdown.
+- New client component `TransferOwnershipForm` — dropdown of
+  active admins with `(current)` marker, Transfer button (disabled
+  on same-selection), browser confirm dialog, result banners.
+- Per-tenant detail page (`/admin/orgs/[id]`) Identity panel now
+  shows a "Primary admin" field (resolved name/email) and renders
+  the transfer form below the field grid.
+
+**Phase B-3 (queued) — Assume identity + isolation status check**:
+- "Assume identity" flow for support: superadmin can read-only-view
+  a tenant's UI for debugging; every action logged in BL-12.
+  Security-sensitive — requires session impersonation infrastructure
+  and explicit confirm-with-reason flow.
 - Audit isolation status check (a button that runs sample
   cross-tenant queries to verify isolation, then writes a structured
-  result row) — gated on BL-19 Phase 2 test framework
+  result row) — gated on BL-19 Phase 2 test framework.
 
 **Acceptance (full ticket):** provision a new tenant via UI → tenant
 admin gets invite email → can sign in → sees only their data; suspend

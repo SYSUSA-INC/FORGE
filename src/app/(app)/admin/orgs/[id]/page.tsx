@@ -16,8 +16,9 @@ import {
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
 import { getCurrentTier } from "@/lib/subscription-gates";
-import { listActiveTiersAction } from "./actions";
+import { listActiveTiersAction, listOrgAdminsAction } from "./actions";
 import { TierAssignmentForm } from "./TierAssignmentForm";
+import { TransferOwnershipForm } from "./TransferOwnershipForm";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function TenantDetailPage({
       phone: organizations.phone,
       createdAt: organizations.createdAt,
       disabledAt: organizations.disabledAt,
+      primaryAdminUserId: organizations.primaryAdminUserId,
     })
     .from(organizations)
     .where(eq(organizations.id, params.id))
@@ -130,6 +132,13 @@ export default async function TenantDetailPage({
   // currentTier informs whether the dropdown should render at all.
   const currentTier = await getCurrentTier(org.id);
   const activeTiers = currentTier ? await listActiveTiersAction() : [];
+
+  // BL-15 Phase B-2 — load active admins for the transfer-ownership
+  // dropdown + the primary admin's identity for the Identity panel.
+  const orgAdmins = await listOrgAdminsAction(org.id);
+  const primaryAdmin = org.primaryAdminUserId
+    ? orgAdmins.find((a) => a.userId === org.primaryAdminUserId) ?? null
+    : null;
 
   // Top recent admins by activity — gives a quick sense of who's
   // actually operating the tenant. Limited to 5 to keep the page small.
@@ -236,7 +245,23 @@ export default async function TenantDetailPage({
             <Field label="Contact" value={org.contactName || "—"} />
             <Field label="Email" value={org.contactEmail || "—"} />
             <Field label="Phone" value={org.phone || "—"} />
+            <Field
+              label="Primary admin"
+              value={
+                primaryAdmin
+                  ? `${primaryAdmin.name ?? primaryAdmin.email}`
+                  : org.primaryAdminUserId
+                    ? "Set but not in active admins"
+                    : "Unset"
+              }
+              accent={primaryAdmin ? "emerald" : "rose"}
+            />
           </dl>
+          <TransferOwnershipForm
+            organizationId={org.id}
+            currentPrimaryUserId={org.primaryAdminUserId}
+            admins={orgAdmins}
+          />
         </Panel>
 
         <Panel title="Subscription tier">
