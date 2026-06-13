@@ -1585,6 +1585,16 @@ guide. Tracked as continuous work, not a single PR.
   Submitted → "Past proposals" rename and clarifies the Submitted
   stat tile vs. Past-proposals tab distinction; §6.2 mentions the
   New Proposals nav entry as an alternative entry point.
+- ✅ BL-16 Subscription tiers + quotas (Phases A through C-3) —
+  ADMIN_MANUAL gains a new §6 "Subscription tiers and quotas":
+  §6.1 default tiers (Bronze through Custom with prices + features
+  + quotas), §6.2 what each feature flag gates, §6.3 how quotas
+  work (counter-backed vs live-measured + the 0 = unlimited
+  convention + the failed-attempts-still-count tradeoff), §6.4
+  editing tier definitions, §6.5 moving a tenant to a different
+  tier, §6.6 per-tenant overrides (custom_overrides JSONB), §6.7
+  safe retirement, §6.8 operating practices. Troubleshooting
+  renumbered to §7 (subsections 6.1–6.8 → 7.1–7.8).
 
 **Still outstanding (queued for future passes):**
 - BL-22 nav v2 — partial coverage exists; needs a polish pass
