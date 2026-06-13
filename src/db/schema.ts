@@ -6,6 +6,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -1556,6 +1557,15 @@ export const knowledgeArtifacts = pgTable("knowledge_artifact", {
     .$type<Record<string, unknown>>()
     .notNull()
     .default({}),
+  // BL-10 Phase B-1 — classifier output captured at extraction time,
+  // separate from `kind` (which is the applied value). Surfaces in
+  // the artifact row UI as an "AI suggests: <X>" pill when the
+  // suggestion differs from the current kind.
+  aiSuggestedKind: knowledgeArtifactKindEnum("ai_suggested_kind"),
+  aiClassificationConfidence: real("ai_classification_confidence"),
+  aiClassificationReasoning: text("ai_classification_reasoning")
+    .notNull()
+    .default(""),
   uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),

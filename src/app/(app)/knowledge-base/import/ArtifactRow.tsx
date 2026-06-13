@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  acceptKindSuggestionAction,
   archiveKnowledgeArtifactAction,
   deleteKnowledgeArtifactAction,
   type ListedArtifact,
@@ -11,6 +12,19 @@ import {
 export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+
+  function acceptSuggestion() {
+    setAcceptError(null);
+    startTransition(async () => {
+      const res = await acceptKindSuggestionAction(artifact.id);
+      if (!res.ok) {
+        setAcceptError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   function archive() {
     startTransition(async () => {
@@ -78,6 +92,34 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
                 {t}
               </span>
             ))}
+          </div>
+        ) : null}
+        {artifact.aiSuggestedKind &&
+        artifact.aiSuggestedKind !== artifact.kind &&
+        artifact.aiClassificationConfidence !== null ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-violet/30 bg-violet/5 px-2 py-1.5">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-violet">
+              AI suggests
+            </span>
+            <span className="font-mono text-[10px] text-text">
+              {formatKind(artifact.aiSuggestedKind)} ·{" "}
+              {Math.round(artifact.aiClassificationConfidence * 100)}%
+              confidence
+            </span>
+            <button
+              type="button"
+              onClick={acceptSuggestion}
+              disabled={pending}
+              className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60"
+              title={artifact.aiClassificationReasoning || undefined}
+            >
+              Accept
+            </button>
+          </div>
+        ) : null}
+        {acceptError ? (
+          <div className="mt-1 rounded border border-rose-500/30 bg-rose-500/5 px-2 py-1 font-mono text-[10px] text-rose-300">
+            {acceptError}
           </div>
         ) : null}
         {artifact.statusError ? (

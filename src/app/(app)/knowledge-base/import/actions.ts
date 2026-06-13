@@ -292,8 +292,13 @@ async function extractAndIndex(
 
   // BL-10 Phase A — AI kind classification on auto-detect uploads.
   // Best-effort: any failure here logs and leaves the heuristic kind in
-  // place. Skipped in stub mode, skipped on empty text, skipped when
-  // confidence is below the threshold.
+  // place. Skipped in stub mode, skipped on empty text.
+  //
+  // BL-10 Phase B-1 — ALSO persist the classifier output to the new
+  // ai_suggested_kind / ai_classification_confidence /
+  // ai_classification_reasoning columns regardless of whether we
+  // applied it. UI uses these to surface low-confidence suggestions
+  // as accept-able pills.
   if (wasAutoKind && rawText.trim().length > 0) {
     try {
       const classified = await classifyArtifactKind({
@@ -301,14 +306,18 @@ async function extractAndIndex(
         contentType,
         rawText,
       });
-      if (
-        classified.ok &&
-        !classified.stubbed &&
-        classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD
-      ) {
+      if (classified.ok && !classified.stubbed) {
+        const shouldApply =
+          classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD;
         await db
           .update(knowledgeArtifacts)
-          .set({ kind: classified.kind, updatedAt: new Date() })
+          .set({
+            ...(shouldApply ? { kind: classified.kind } : {}),
+            aiSuggestedKind: classified.kind,
+            aiClassificationConfidence: classified.confidence,
+            aiClassificationReasoning: classified.reasoning,
+            updatedAt: new Date(),
+          })
           .where(eq(knowledgeArtifacts.id, id));
       }
     } catch (err) {
@@ -329,6 +338,11 @@ export type ListedArtifact = {
   charCount: number;
   uploadedAt: Date;
   archivedAt: Date | null;
+  // BL-10 Phase B-1 — AI classifier output. Nullable when classification
+  // didn't run (user picked a kind explicitly, or extraction failed).
+  aiSuggestedKind: KnowledgeArtifactKind | null;
+  aiClassificationConfidence: number | null;
+  aiClassificationReasoning: string;
 };
 
 export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> {
@@ -348,6 +362,9 @@ export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> 
       rawText: knowledgeArtifacts.rawText,
       uploadedAt: knowledgeArtifacts.createdAt,
       archivedAt: knowledgeArtifacts.archivedAt,
+      aiSuggestedKind: knowledgeArtifacts.aiSuggestedKind,
+      aiClassificationConfidence: knowledgeArtifacts.aiClassificationConfidence,
+      aiClassificationReasoning: knowledgeArtifacts.aiClassificationReasoning,
     })
     .from(knowledgeArtifacts)
     .where(eq(knowledgeArtifacts.organizationId, organizationId))
@@ -366,7 +383,72 @@ export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> 
     charCount: r.rawText?.length ?? 0,
     uploadedAt: r.uploadedAt,
     archivedAt: r.archivedAt,
+    aiSuggestedKind: r.aiSuggestedKind,
+    aiClassificationConfidence: r.aiClassificationConfidence,
+    aiClassificationReasoning: r.aiClassificationReasoning,
   }));
+}
+
+/**
+ * BL-10 Phase B-1 — accept the AI's suggested kind for this artifact.
+ *
+ * Used when the classifier produced a sub-threshold confidence (so
+ * Phase A didn't auto-apply it) but a human reviewing the row agrees
+ * with the suggestion. Updates `kind` to match `ai_suggested_kind`.
+ * Org-scoped: callers can only accept suggestions on their own
+ * artifacts.
+ */
+export async function acceptKindSuggestionAction(
+  artifactId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const [row] = await db
+    .select({
+      id: knowledgeArtifacts.id,
+      kind: knowledgeArtifacts.kind,
+      suggested: knowledgeArtifacts.aiSuggestedKind,
+    })
+    .from(knowledgeArtifacts)
+    .where(
+      and(
+        eq(knowledgeArtifacts.id, artifactId),
+        eq(knowledgeArtifacts.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
+  if (!row) return { ok: false, error: "Artifact not found." };
+  if (!row.suggested) {
+    return { ok: false, error: "No AI suggestion to accept." };
+  }
+  if (row.suggested === row.kind) {
+    return { ok: false, error: "Kind already matches the suggestion." };
+  }
+
+  try {
+    await db
+      .update(knowledgeArtifacts)
+      .set({ kind: row.suggested, updatedAt: new Date() })
+      .where(
+        and(
+          eq(knowledgeArtifacts.id, artifactId),
+          eq(knowledgeArtifacts.organizationId, organizationId),
+        ),
+      );
+    revalidatePath("/knowledge-base/import");
+    return { ok: true };
+  } catch (err) {
+    log.error("[acceptKindSuggestionAction]", "update failed", {
+      error: err,
+      artifactId,
+    });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Update failed.",
+    };
+  }
 }
 
 export async function deleteKnowledgeArtifactAction(

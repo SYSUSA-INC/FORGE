@@ -342,13 +342,34 @@ Today's `/knowledge-base` supports artifact upload + manual entries.
   classification kicks in for nearly every uploaded file unless the
   user deliberately picks a specific kind.
 
-**Phase B (queued) — Surface suggestions / re-classify existing**:
-- "AI suggests <kind> (confidence 87%)" inline pill on artifact rows
-  where the heuristic kind differs from the AI's suggestion at low
-  confidence. Single-click accept.
+**Phase B-1 — Surface suggestions on artifact rows** ✅ shipped:
+- Migration `0047_knowledge_artifact_ai_classification.sql` adds
+  three columns to `knowledge_artifact`:
+  - `ai_suggested_kind` — `knowledge_artifact_kind` enum, nullable
+  - `ai_classification_confidence` — real (0..1), nullable
+  - `ai_classification_reasoning` — text, default ""
+- Drizzle schema updated with matching fields + `real` import.
+- The Phase A classifier integration now ALSO persists its output
+  to these columns regardless of whether the suggestion was
+  applied. Confidence >= 0.6 still overwrites `kind`; lower
+  confidence leaves `kind` alone but the suggestion is recorded
+  so the UI can surface it.
+- `ListedArtifact` shape extended with the three new fields; the
+  list query selects them.
+- `ArtifactRow` shows an "AI suggests: <kind> · N% confidence"
+  pill (violet accent) when `ai_suggested_kind` differs from the
+  applied `kind`. Pill has an **Accept** button that fires the
+  new `acceptKindSuggestionAction(artifactId)` server action.
+  Tooltip on Accept shows the AI's reasoning.
+- `acceptKindSuggestionAction` is org-scoped (callers can only
+  accept on their own org's artifacts), refuses when no suggestion
+  exists or already matches kind. Revalidates the import page.
+
+**Phase B-2 (queued) — Backfill triage list**:
 - One-off backfill: classify existing artifacts whose `kind == "other"`
   (the heuristic catch-all) and surface high-confidence suggestions
-  in a triage list.
+  in a triage list. Today the existing artifacts have no
+  ai_suggested_kind populated.
 
 **Phase C (queued) — Folder / category tree view**:
 - Tree view in `/knowledge-base` grouped by kind > tags > date
