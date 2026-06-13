@@ -106,6 +106,13 @@ export function AdminClient({
               Tiers →
             </Link>
             <Link
+              href="/admin/promo-codes"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Manage promotional discount codes"
+            >
+              Promo codes →
+            </Link>
+            <Link
               href="/platform/audit-log"
               className="aur-btn aur-btn-ghost text-[11px]"
               title="Cross-tenant audit log — every recorded action across every org"

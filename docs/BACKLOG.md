@@ -1056,8 +1056,38 @@ built or need design work):
   - Revalidates `/admin/tiers` and `/admin/tiers/[id]`.
 - "Edit →" link added to each row of the `/admin/tiers` list.
 
-**Phase C-4 (queued) — Promotional codes**:
-- `promotion_code` table + redemption flow + audit log.
+**Phase C-4 — Promotional codes (CRUD)** ✅ shipped:
+- Migration `0045_promo_codes.sql` adds the `promotion_code` table:
+  id uuid PK, code varchar(64) unique (case-sensitive to avoid
+  L/I/0/O ambiguity at redemption), description, discount_percent
+  (0–100), valid_from / valid_until (nullable — null = no bound),
+  max_uses (0 = unlimited), times_used (counter, default 0),
+  active boolean, timestamps. Index on created_at DESC for the
+  admin list view.
+- Drizzle table + `PromotionCode` / `NewPromotionCode` types.
+- Server actions `createPromoCodeAction` / `updatePromoCodeAction`
+  with zod validation (code regex `[A-Za-z0-9_-]+`, length bounds,
+  discount 0–100). Surfaces unique-violation as a friendly error.
+  Audits as `promo_code.create` / `promo_code.update` into the
+  actor's primary org log (pure-superadmins → structured `log.info`).
+- UI:
+  - `/admin/promo-codes` — list view with status pills (Active /
+    Inactive / Expired / Maxed out / Usable). Each row links to
+    edit. Header has + New code + meta tiles (total codes, active
+    count, total redemptions across all codes).
+  - `/admin/promo-codes/new` — create form.
+  - `/admin/promo-codes/[id]` — edit form. notFound() on missing id.
+- `PromoCodeForm` client component handles both modes; date inputs
+  for validity window; checkbox for active; non-negative integer
+  inputs for discount + max uses with explicit "0 = unlimited"
+  hint label.
+- "Promo codes →" link added to the SuperAdmin portal header next
+  to Tiers.
+
+**What ships in a later phase**: the actual redemption flow
+(applying a code to a `tenant_subscription` to discount the next
+period's price). Redemption pairs with **BL-17** billing
+integration; the code data model is in place for when that lands.
 
 **Acceptance (full ticket):** create Custom tier with
 `aiRequestsPerMonth=0` (treated as deny under Phase B semantics;
