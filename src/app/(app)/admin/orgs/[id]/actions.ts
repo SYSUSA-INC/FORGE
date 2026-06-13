@@ -1,9 +1,15 @@
 "use server";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { subscriptionTiers, tenantSubscriptions } from "@/db/schema";
+import {
+  memberships,
+  organizations,
+  subscriptionTiers,
+  tenantSubscriptions,
+  users,
+} from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
@@ -145,4 +151,149 @@ export async function listActiveTiersAction(): Promise<
     .from(subscriptionTiers)
     .where(eq(subscriptionTiers.active, true))
     .orderBy(asc(subscriptionTiers.sortOrder));
+}
+
+/**
+ * BL-15 Phase B-2 — transfer ownership of a tenant.
+ *
+ * Sets `organization.primary_admin_user_id` to a new user. The new
+ * user must already be an active admin of the target org — this
+ * action doesn't promote anyone; it just designates the primary
+ * among existing admins. Audited.
+ */
+export async function transferOwnershipAction(input: {
+  organizationId: string;
+  newPrimaryUserId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+
+  if (!input.organizationId || !input.newPrimaryUserId) {
+    return { ok: false, error: "Pick an organization and a user." };
+  }
+
+  // Load the org to confirm it exists + capture the current primary
+  // for audit metadata.
+  const [org] = await db
+    .select({
+      id: organizations.id,
+      currentPrimaryUserId: organizations.primaryAdminUserId,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId))
+    .limit(1);
+
+  if (!org) {
+    return { ok: false, error: "Organization not found." };
+  }
+
+  if (org.currentPrimaryUserId === input.newPrimaryUserId) {
+    return {
+      ok: false,
+      error: "That user is already the primary admin.",
+    };
+  }
+
+  // Verify the new primary is an active admin of THIS org.
+  const [candidate] = await db
+    .select({
+      userId: memberships.userId,
+      userName: users.name,
+      userEmail: users.email,
+      role: memberships.role,
+      status: memberships.status,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(
+      and(
+        eq(memberships.organizationId, input.organizationId),
+        eq(memberships.userId, input.newPrimaryUserId),
+      ),
+    )
+    .limit(1);
+
+  if (!candidate) {
+    return {
+      ok: false,
+      error: "User is not a member of this organization.",
+    };
+  }
+  if (candidate.role !== "admin") {
+    return {
+      ok: false,
+      error: "User must have the Admin role to be the primary admin.",
+    };
+  }
+  if (candidate.status !== "active") {
+    return {
+      ok: false,
+      error: "User must be active (not disabled) to be the primary admin.",
+    };
+  }
+
+  try {
+    await db
+      .update(organizations)
+      .set({
+        primaryAdminUserId: input.newPrimaryUserId,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, input.organizationId));
+
+    await recordAudit({
+      organizationId: input.organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "tenant.transfer_ownership",
+      resourceType: "organization",
+      resourceId: input.organizationId,
+      metadata: {
+        fromUserId: org.currentPrimaryUserId,
+        toUserId: input.newPrimaryUserId,
+        toEmail: candidate.userEmail,
+        toName: candidate.userName,
+      },
+    });
+
+    revalidatePath(`/admin/orgs/${input.organizationId}`);
+    return { ok: true };
+  } catch (err) {
+    log.error("[transferOwnershipAction]", "update failed", {
+      error: err,
+      organizationId: input.organizationId,
+      newPrimaryUserId: input.newPrimaryUserId,
+    });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Transfer failed.",
+    };
+  }
+}
+
+/**
+ * Lists active admin memberships for the target org — populates the
+ * "Transfer ownership" dropdown. Returns user_id + name + email.
+ */
+export async function listOrgAdminsAction(
+  organizationId: string,
+): Promise<{ userId: string; name: string | null; email: string }[]> {
+  await requireSuperadmin();
+
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      email: users.email,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(
+      and(
+        eq(memberships.organizationId, organizationId),
+        eq(memberships.role, "admin"),
+        eq(memberships.status, "active"),
+      ),
+    )
+    .orderBy(asc(users.name), asc(users.email));
+
+  return rows;
 }
