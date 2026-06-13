@@ -1623,6 +1623,14 @@ guide. Tracked as continuous work, not a single PR.
   tier, §6.6 per-tenant overrides (custom_overrides JSONB), §6.7
   safe retirement, §6.8 operating practices. Troubleshooting
   renumbered to §7 (subsections 6.1–6.8 → 7.1–7.8).
+- ✅ BL-16 Phase C-4 promo codes + BL-15 Phase B-2 transfer
+  ownership — ADMIN_MANUAL §3.4 mentions the new Primary admin
+  field on the per-tenant detail page + tier dropdown; new §3.5
+  documents the transfer-ownership flow with `tenant.transfer_ownership`
+  audit. ADMIN_MANUAL §6.8 added: promo code CRUD walkthrough
+  (status pills, code constraints, redemption deferral to BL-17).
+  §6.9 operating practices gets a fourth bullet on promo-code
+  hygiene (set valid_until + max_uses on launch codes).
 
 **Still outstanding (queued for future passes):**
 - BL-22 nav v2 — partial coverage exists; needs a polish pass
