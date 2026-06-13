@@ -1668,6 +1668,15 @@ guide. Tracked as continuous work, not a single PR.
   (status pills, code constraints, redemption deferral to BL-17).
   §6.9 operating practices gets a fourth bullet on promo-code
   hygiene (set valid_until + max_uses on launch codes).
+- ✅ BL-15 Phase B-1 tenant data export — ADMIN_MANUAL gains §3.6
+  "Exporting tenant data" documenting the **Export data ↓** button
+  on the per-tenant detail page header. Spells out what's included
+  (org identity + members + opportunities + proposals + knowledge
+  artifacts + notification rules — all metadata, no large blobs),
+  what's deliberately excluded (proposal bodies, review comments,
+  knowledge raw_text, audit log rows), the JSON-file name format,
+  and the `tenant.data_export` recordRead audit. Notes the async
+  "full snapshot" pattern as future work.
 
 **Still outstanding (queued for future passes):**
 - BL-22 nav v2 — partial coverage exists; needs a polish pass

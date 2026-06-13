@@ -243,6 +243,30 @@ The new primary must already be an active admin of that tenant — the transfer 
 
 Every transfer writes a `tenant.transfer_ownership` audit row into the **target tenant's** log with `{ fromUserId, toUserId, toEmail, toName }`. The tenant's own org admins see the change in their `/audit-log`.
 
+### 3.6 Exporting tenant data
+
+For offboarding handoffs, internal investigation, or "send me a copy of what's on your platform" requests from a customer, the per-tenant detail page has an **Export data ↓** button in the header actions. It produces a single JSON file — `forge-tenant-<slug>-<YYYY-MM-DD>.json` — containing the tenant's metadata + records (no large blobs).
+
+What's included:
+
+- **`organization`** — full identity panel: name, slug, website, contact, address, registration IDs (UEI / CAGE / DUNS), security levels, DCAA compliance flag, primary + listed NAICS, PSC codes, socio-economic flags, contracting vehicles, past performance, created date, disabled-at if applicable.
+- **`members`** — every membership (active + disabled) with the user's email, name, role, status, and join date.
+- **`opportunities`** — every row with id, title, agency, stage, solicitation number, NAICS, set-aside, due date, owner, created/updated timestamps. **Description body and other large text fields are NOT included.**
+- **`proposals`** — every row with id, title, stage, owner IDs, timestamps. **Section bodies / reviews / comments are NOT included.**
+- **`knowledgeArtifacts`** — every artifact's id, title, kind, source, file name, size, content type, tags, status, created date. **`raw_text` is NOT included.**
+- **`notificationRules`** — full notification rule definitions.
+
+What's deliberately excluded (the "no large blobs" rule):
+
+- Proposal section bodies
+- Review comments and verdicts
+- Knowledge artifact extracted text
+- Audit log rows (already accessible via `/audit-log` / `/platform/audit-log` and CSV-exportable separately)
+
+Browser downloads the file directly via `Content-Disposition: attachment`. Every export writes a `tenant.data_export` `recordRead` audit row into the **target tenant's** log with per-table row counts in metadata. Tenant org admins see in their `/audit-log` when platform support exported their data.
+
+For a future "full snapshot with bodies" pattern (e.g., for legal-hold scenarios), an async queue + Blob storage + emailed download link will be added — out of scope for the current synchronous endpoint, which caps practical export size to Vercel's response limits.
+
 ---
 
 ## 4. Audit & accountability
