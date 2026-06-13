@@ -365,11 +365,27 @@ Today's `/knowledge-base` supports artifact upload + manual entries.
   accept on their own org's artifacts), refuses when no suggestion
   exists or already matches kind. Revalidates the import page.
 
-**Phase B-2 (queued) — Backfill triage list**:
-- One-off backfill: classify existing artifacts whose `kind == "other"`
-  (the heuristic catch-all) and surface high-confidence suggestions
-  in a triage list. Today the existing artifacts have no
-  ai_suggested_kind populated.
+**Phase B-2 — Classifier backfill** ✅ shipped:
+- New server actions in `knowledge-base/import/actions.ts`:
+  - `countClassifyBackfillCandidatesAction()` — counts artifacts in
+    the caller's org with `kind='other'` + no AI suggestion + raw
+    text present.
+  - `runKnowledgeClassificationBackfillAction()` — org-admin gated.
+    Selects up to 50 candidates, runs the classifier on each,
+    persists the suggestion + reasoning + confidence. High-
+    confidence results (>= 0.6) overwrite `kind` immediately;
+    lower-confidence ones surface as Phase B-1 pills for admin
+    review. Idempotent — won't re-process already-suggested rows.
+    Per-row try/catch so one failure doesn't block the rest.
+- New client component `ClassifyBackfillButton` rendered on
+  `/knowledge-base/import` when the candidate count is > 0.
+  Shows count + "Reclassify" button. Displays per-run summary
+  (processed / auto-applied / low-confidence / skipped) after
+  completion.
+- 50-per-click cap keeps a single call from running away on huge
+  corpora; admin re-clicks to drain the rest.
+
+**Phase C (queued) — Folder / category tree view**:
 
 **Phase C (queued) — Folder / category tree view**:
 - Tree view in `/knowledge-base` grouped by kind > tags > date

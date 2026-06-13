@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { ClassifyBackfillButton } from "./ClassifyBackfillButton";
 import { CorpusUploader } from "./CorpusUploader";
 import {
+  countClassifyBackfillCandidatesAction,
   listKnowledgeArtifactsAction,
   type ListedArtifact,
 } from "./actions";
@@ -13,9 +15,10 @@ import { getEmbeddingsStatusAction } from "./embed-actions";
 export const dynamic = "force-dynamic";
 
 export default async function CorpusImportPage() {
-  const [artifacts, embedStatus] = await Promise.all([
+  const [artifacts, embedStatus, classifyCandidateCount] = await Promise.all([
     listKnowledgeArtifactsAction(),
     getEmbeddingsStatusAction(),
+    countClassifyBackfillCandidatesAction(),
   ]);
   const active = artifacts.filter((a) => !a.archivedAt);
   const totalChars = active.reduce((acc, a) => acc + a.charCount, 0);
@@ -51,6 +54,12 @@ export default async function CorpusImportPage() {
           <CorpusUploader />
         </Panel>
       </div>
+
+      {classifyCandidateCount > 0 ? (
+        <div className="mt-4">
+          <ClassifyBackfillButton candidateCount={classifyCandidateCount} />
+        </div>
+      ) : null}
 
       <div className="mt-4">
         <Panel

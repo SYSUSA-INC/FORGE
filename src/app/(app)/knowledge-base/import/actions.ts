@@ -1,13 +1,17 @@
 "use server";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   knowledgeArtifacts,
   type KnowledgeArtifactKind,
 } from "@/db/schema";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  requireAuth,
+  requireCurrentOrg,
+  requireOrgAdmin,
+} from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import {
@@ -631,4 +635,136 @@ export async function reextractArtifactTextAction(
   revalidatePath(`/knowledge-base/import/${artifactId}`);
   revalidatePath("/knowledge-base/import");
   return { ok: true, chars: updated?.rawText?.length ?? 0 };
+}
+
+/**
+ * BL-10 Phase B-2 — one-off classifier backfill.
+ *
+ * For each artifact in the caller's org that has `kind='other'`
+ * (the heuristic catch-all) AND has no AI suggestion yet AND has
+ * extracted text to classify, runs the classifier and stores the
+ * result. High-confidence suggestions (>= threshold) auto-apply
+ * `kind`; lower-confidence ones surface in the import UI as
+ * accept-able pills (Phase B-1's row UI).
+ *
+ * Idempotent — skips artifacts that already have an
+ * `ai_suggested_kind`. Org admin gate; not superadmin since this
+ * is a per-tenant operation. Best-effort per artifact: one failure
+ * doesn't block the rest.
+ *
+ * Returns a summary so the caller can surface "processed N,
+ * auto-applied M" in the UI.
+ */
+export type ClassifyBackfillResult =
+  | {
+      ok: true;
+      processed: number;
+      autoApplied: number;
+      lowConfidence: number;
+      skipped: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * BL-10 Phase B-2 — count classifier-eligible artifacts.
+ *
+ * Surfaces a "N candidates" line on the import page so admins know
+ * whether the backfill button has work to do. Same predicate the
+ * backfill action uses.
+ */
+export async function countClassifyBackfillCandidatesAction(): Promise<number> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(knowledgeArtifacts)
+    .where(
+      and(
+        eq(knowledgeArtifacts.organizationId, organizationId),
+        eq(knowledgeArtifacts.kind, "other"),
+        isNull(knowledgeArtifacts.aiSuggestedKind),
+        ne(knowledgeArtifacts.rawText, ""),
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
+
+export async function runKnowledgeClassificationBackfillAction(): Promise<ClassifyBackfillResult> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const candidates = await db
+    .select({
+      id: knowledgeArtifacts.id,
+      fileName: knowledgeArtifacts.fileName,
+      contentType: knowledgeArtifacts.contentType,
+      rawText: knowledgeArtifacts.rawText,
+    })
+    .from(knowledgeArtifacts)
+    .where(
+      and(
+        eq(knowledgeArtifacts.organizationId, organizationId),
+        eq(knowledgeArtifacts.kind, "other"),
+        isNull(knowledgeArtifacts.aiSuggestedKind),
+        ne(knowledgeArtifacts.rawText, ""),
+        // Hard upper bound — keeps a single call from running away
+        // on enormous corpora. Admin can re-trigger to drain the rest.
+        sql`length(${knowledgeArtifacts.rawText}) > 0`,
+      ),
+    )
+    .limit(50);
+
+  let processed = 0;
+  let autoApplied = 0;
+  let lowConfidence = 0;
+  let skipped = 0;
+
+  for (const c of candidates) {
+    try {
+      const classified = await classifyArtifactKind({
+        fileName: c.fileName,
+        contentType: c.contentType,
+        rawText: c.rawText,
+      });
+      if (!classified.ok || classified.stubbed) {
+        skipped += 1;
+        continue;
+      }
+      const shouldApply =
+        classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD;
+      await db
+        .update(knowledgeArtifacts)
+        .set({
+          ...(shouldApply ? { kind: classified.kind } : {}),
+          aiSuggestedKind: classified.kind,
+          aiClassificationConfidence: classified.confidence,
+          aiClassificationReasoning: classified.reasoning,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(knowledgeArtifacts.id, c.id),
+            eq(knowledgeArtifacts.organizationId, organizationId),
+          ),
+        );
+      processed += 1;
+      if (shouldApply) {
+        autoApplied += 1;
+      } else {
+        lowConfidence += 1;
+      }
+    } catch (err) {
+      log.error("[runKnowledgeClassificationBackfill]", "row failed", {
+        error: err,
+        artifactId: c.id,
+        organizationId,
+      });
+      skipped += 1;
+    }
+  }
+
+  revalidatePath("/knowledge-base/import");
+  return { ok: true, processed, autoApplied, lowConfidence, skipped };
 }
