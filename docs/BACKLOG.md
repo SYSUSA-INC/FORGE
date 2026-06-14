@@ -400,10 +400,35 @@ Today's `/knowledge-base` supports artifact upload + manual entries.
 - Requires a re-tag server action + a tag-management surface; the
   Phase C-1 grouping is the foundation.
 
-**Phase D (queued) — Entry quality scoring**:
-- 0..1 quality score per knowledge_entry surfaced in the editor.
-- Inputs: text length / structure, presence of dates and metrics,
-  past-performance match strength, etc.
+**Phase D-1 — Quality score schema + scorer helper** ✅ shipped:
+- Migration `0048_knowledge_entry_quality_score.sql` adds three
+  columns to `knowledge_entry`:
+  - `quality_score` real (nullable, 0..1)
+  - `quality_score_factors` jsonb (default `{}`) — per-signal
+    contributions for the editor UI
+  - `quality_scored_at` timestamp (nullable) — lets us re-score
+    stale entries after the scorer itself changes
+- New helper `src/lib/knowledge-quality.ts` — pure heuristic
+  scorer (no AI call). Six weighted signals adding to 1.0:
+  bodyLength (0.30), bodyStructure (0.15), title (0.10), tags
+  (0.10), metadata (0.10), kindSpecific (0.25). Returns
+  `{ score, factors }` where factors carries each signal's
+  contribution for the editor breakdown.
+- Kind-specific bonuses:
+  - `past_performance`: year, award value, customer/agency
+  - `capability`: deliverables/methods, outcomes/results, bullets
+  - `personnel`: years experience, certifications, named role
+  - `boilerplate`: neutral (judged by length + structure alone)
+- Standalone — no integration with existing create/update flows yet;
+  the columns exist for Phase D-2 to populate them.
+
+**Phase D-2 (queued) — Wire scorer + surface in editor**:
+- Run `scoreKnowledgeEntry` on every entry create/update and
+  persist the score + factors + timestamp.
+- Surface the 0..1 score + factor breakdown in the entry editor
+  UI so authors see exactly which signals are weak.
+- Backfill action to score existing entries (analogous to
+  Phase B-2's classifier backfill).
 
 **Acceptance (full ticket):** drop 20 files at once → all index
 successfully → auto-categorized with reviewable suggestions → quality

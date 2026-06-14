@@ -1455,6 +1455,16 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   outcomeLabel: knowledgeOutcomeLabelEnum("outcome_label")
     .notNull()
     .default("none"),
+  // BL-10 Phase D-1 — quality score (0..1) + per-factor breakdown.
+  // NULL until the entry has been scored. Phase D-2 wires automatic
+  // scoring on create/update; today the columns exist for the helper
+  // to populate when called.
+  qualityScore: real("quality_score"),
+  qualityScoreFactors: jsonb("quality_score_factors")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  qualityScoredAt: timestamp("quality_scored_at"),
   // Phase 10f: real embedding for semantic Brain Suggest. Stored as
   // text on the JS side; the actual column type is `vector(1536)` —
   // see drizzle/0023 migration. Same provider/dim as the chunk
