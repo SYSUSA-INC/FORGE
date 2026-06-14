@@ -6,6 +6,7 @@ import type { KnowledgeKind, KnowledgeOutcomeLabel } from "@/db/schema";
 import { listKnowledgeEntriesAction } from "./actions";
 import { EmbedMissingEntriesButton } from "./EmbedMissingEntriesButton";
 import { KnowledgeBaseClient } from "./KnowledgeBaseClient";
+import { RescoreEntriesButton } from "./RescoreEntriesButton";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function KnowledgeBasePage({
         actions={
           <>
             <EmbedMissingEntriesButton />
+            <RescoreEntriesButton />
             <Link
               href="/knowledge-base/import"
               className="aur-btn aur-btn-ghost"
