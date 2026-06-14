@@ -2,13 +2,13 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { ClassifyBackfillButton } from "./ClassifyBackfillButton";
+import { CorpusList } from "./CorpusList";
 import { CorpusUploader } from "./CorpusUploader";
 import {
   countClassifyBackfillCandidatesAction,
   listKnowledgeArtifactsAction,
   type ListedArtifact,
 } from "./actions";
-import { ArtifactRow } from "./ArtifactRow";
 import { SemanticSearchClient } from "./SemanticSearchClient";
 import { getEmbeddingsStatusAction } from "./embed-actions";
 
@@ -70,17 +70,7 @@ export default async function CorpusImportPage() {
               : ""
           }`}
         >
-          {artifacts.length === 0 ? (
-            <div className="font-mono text-[11px] text-muted">
-              Empty. Upload a file to seed the corpus.
-            </div>
-          ) : (
-            <ul className="divide-y divide-white/5 rounded-lg border border-white/10">
-              {artifacts.map((a) => (
-                <ArtifactRow key={a.id} artifact={a} />
-              ))}
-            </ul>
-          )}
+          <CorpusList artifacts={artifacts} />
         </Panel>
       </div>
     </>
