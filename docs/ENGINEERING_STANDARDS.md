@@ -2,15 +2,16 @@
 
 This document is the canonical source of truth for how code lands in
 this repo. Every standard listed here is enforced by a CI gate, a
-review process, or a documented convention. Bots (Vercel Agent,
-Claude, Cursor, etc.) should read this file before reviewing or
-authoring a PR; new human contributors should read it before opening
-their first PR.
+review process, or a documented convention. Bots (Claude, Cursor,
+Copilot, etc.) should read this file before reviewing or authoring a
+PR; new human contributors should read it before opening their first
+PR.
 
 `AGENTS.md` at the repo root is the bot-facing pointer to this
-document; `.vercel/agent.md` is the Vercel-Agent-specific subset.
-Both reference back here — keep the canonical content in this file
-and let the pointers stay short.
+document; `docs/PRE_PUSH_CHECKLIST.md` is the author-discipline subset
+used by the Pre-push self-review CI gate. Both reference back here —
+keep the canonical content in this file and let the pointers stay
+short.
 
 ## Contents
 
@@ -349,7 +350,6 @@ Every PR clears four tiers before merge:
 | Gate | Catches |
 |---|---|
 | Vercel Preview deploy | Build failures that the typecheck/next-build steps don't catch |
-| Vercel Agent Review | Style / clarity / suggested-fix issues (see `.vercel/agent.md`) |
 | Neon branch lifecycle | Per-PR DB branch off prod (soft-skips when `NEON_API_KEY` not configured) |
 
 ### Tier 2 — robotic quality gates (`.github/workflows/pr-quality.yml`)
@@ -397,25 +397,6 @@ robotic gates.
 
 ## 9. Code review etiquette
 
-### Responding to Vercel Agent suggestions
-
-Three buttons; pick the right one:
-
-- **Accept** — agent's suggestion is correct; apply it. Vercel
-  auto-marks it accepted when your fix commit matches the suggested
-  change.
-- **Ignore** — only when the suggestion is **wrong**: false positive,
-  not applicable in our context, conflicts with a deliberate design
-  decision. Leave a written rationale.
-- **Resolve conversation (on GitHub)** — when you've addressed the
-  issue in code with a different approach than the suggestion. The
-  audit trail shows "resolved" rather than "accepted" or "ignored."
-
-Anti-pattern: clicking **Ignore** to clear a UI counter when the issue
-is actually fixed in code. Pollutes the audit trail; future reviewers
-see "ignored" on a real security/maintainability finding and have to
-dig to confirm the fix happened.
-
 ### Responding to human reviews
 
 - Address every comment, even when "no change needed" — reply with the
@@ -425,7 +406,10 @@ dig to confirm the fix happened.
 - After pushing, click **Resolve conversation** on threads you've
   addressed. The reviewer can re-open if they disagree.
 
-### Batched fixes
+### Author self-review before push
 
-When Vercel Agent posts multiple suggestions, address all of them in
-one commit. Each push retriggers Vercel Agent; batching saves compute.
+Before pushing any PR, do a row-by-row dry-run against
+`docs/PRE_PUSH_CHECKLIST.md`. The Pre-push self-review section of the
+PR template is a required CI artifact — every row needs a status
+(`N/A` or `addressed: <how>`). This discipline carries the load that
+the AI-review safety net used to provide.

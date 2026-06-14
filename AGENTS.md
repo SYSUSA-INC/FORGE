@@ -1,8 +1,8 @@
 # Agent guidelines — FORGE
 
-> AI coding tools (Cursor, Claude, Vercel Agent, Copilot, etc.) and
-> automated reviewers: read this file first, then read the canonical
-> standards at `docs/ENGINEERING_STANDARDS.md`.
+> AI coding tools (Cursor, Claude, Copilot, etc.) and automated
+> reviewers: read this file first, then read the canonical standards
+> at `docs/ENGINEERING_STANDARDS.md`.
 
 ## Quick orientation
 
@@ -12,9 +12,9 @@
   `organization_id`. Every server action that touches one must call
   an auth gate + scope by `organizationId`. See §1 of
   `docs/ENGINEERING_STANDARDS.md`.
-- **Pre-merge gate stack:** 7 robotic gates in
+- **Pre-merge gate stack:** 8 robotic gates in
   `.github/workflows/pr-quality.yml` + 5 in `.github/workflows/pr.yml`
-  + Vercel Agent + CODEOWNERS. See §7 of the standards doc.
+  + Vercel Preview deploy + CODEOWNERS. See §7 of the standards doc.
 - **Backlog:** `docs/BACKLOG.md` is the single source of truth for
   planned work. Every PR referencing `BL-N` must update the backlog
   entry (enforced by gate).
