@@ -1722,6 +1722,16 @@ guide. Tracked as continuous work, not a single PR.
   knowledge raw_text, audit log rows), the JSON-file name format,
   and the `tenant.data_export` recordRead audit. Notes the async
   "full snapshot" pattern as future work.
+- ✅ BL-10 Knowledge base (Phases A through D) — USER_MANUAL gains
+  a new §8 "Knowledge base" (renumbering audit-trail to §9,
+  notifications inbox to §10, signing out to §11). Covers:
+  §8.1 corpus uploads + AI auto-detect classification + backfill;
+  §8.2 group-by-kind toggle; §8.3 row-level actions
+  (Open / Archive / Delete); §8.4 curated knowledge entries by
+  kind; §8.5 quality score panel with tone-coding + factor
+  breakdown + admin Score-unscored backfill; §8.6 tips for
+  getting the most out of the corpus. Internal §8.12 cross-ref
+  updated to §9.12.
 
 **Still outstanding (queued for future passes):**
 - BL-22 nav v2 — partial coverage exists; needs a polish pass
