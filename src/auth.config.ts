@@ -23,6 +23,12 @@ export const authConfig = {
       if (pathname.startsWith("/api/forgot-password")) return true;
       if (pathname.startsWith("/api/reset-password")) return true;
       if (pathname.startsWith("/api/samgov/health")) return true;
+      // Vercel Cron handlers self-authenticate via
+      // `Authorization: Bearer ${CRON_SECRET}` and return 401 without
+      // it. Letting the middleware bounce them to /sign-in (307) breaks
+      // every scheduled job — SLA escalation, audit-log prune, batched
+      // notifications, monthly cert refresh.
+      if (pathname.startsWith("/api/cron/")) return true;
       // Token-authed public review page — opportunity review requests
       // can be answered by reviewers who don't have a FORGE account.
       if (pathname.startsWith("/review/")) return true;
