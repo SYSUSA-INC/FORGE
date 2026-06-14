@@ -6,7 +6,6 @@ import { db } from "@/db";
 import { alias } from "drizzle-orm/pg-core";
 import {
   memberships,
-  notifications,
   solicitationAssignments,
   solicitations,
   users,
@@ -172,24 +171,11 @@ export async function assignSolicitationRoleAction(input: {
     const body =
       `${actor.name ?? actor.email ?? "A teammate"} added you as ${SOLICITATION_ROLE_LABELS[input.role]}.` +
       (notes ? `\n\nNotes: ${notes}` : "");
-    await db.insert(notifications).values({
-      organizationId,
-      recipientUserId: input.userId,
-      actorUserId: actor.id,
-      kind: "solicitation_role_assigned",
-      subject,
-      body,
-      linkPath: `/solicitations/${sol.id}`,
-    });
-
-    // BL-13 Phase E-2b — fire the rules engine in parallel with the
-    // legacy hardcoded notification. Retired in Phase E-2c once
-    // seeded default rules cover the same surface.
-    //
-    // `mentionedUserIds` is set so the `mentioned_in_payload`
-    // recipient strategy (seeded by migration 0042) resolves to the
-    // newly-assigned user. Other strategies are free to read other
-    // payload fields (assigneeUserId, solicitationId, role).
+    // BL-13 — fire the rules engine. Default seeded rule
+    // (`solicitation_role_assigned`) delivers to the assignee via
+    // `mentioned_in_payload`. Other configured strategies are free
+    // to read other payload fields (assigneeUserId, solicitationId,
+    // role).
     await dispatchTriggerEvent({
       organizationId,
       kind: "solicitation_role_assigned",

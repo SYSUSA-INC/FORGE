@@ -810,22 +810,51 @@ even before E-2b wires the dispatch.
   | `opportunity_reviewed` | formula `opportunity_owner` | in_app | immediate |
   | `solicitation_role_assigned` | `mentioned_in_payload` | in_app | immediate |
 
-**Phase E-2c (queued) — Retire legacy dispatchers**:
-- After E-2b has shipped + soak-tested in production (≥1 week of
-  observed delivery parity via audit log diff), delete:
-  - `dispatchReviewCompletedNotification` + parallel call in
-    `closeReviewAction`
-  - `dispatchReviewAssignedNotification` + parallel call in
-    `startReviewAction`
-  - `dispatchCommentMentionNotification` + parallel call in
-    `addReviewCommentAction`
-  - The two direct `db.insert(notifications)` paths in
-    `submitOpportunityReviewAction` + `assignSolicitationRoleAction`
-- Audit-log diff query: compare `notification_delivery` rows (Phase C
-  dispatcher) vs legacy `notification` rows for the same trigger
-  window. Mismatch = blocker for E-2c.
+**Phase E-2c (shipped, partial) — Retire 4 of 5 legacy dispatcher paths**:
+Shipped on 2026-06-14, ≥9 days after PR #160 (initial Phase E-2b)
+landed June 5. The retirement deletes:
+- ✅ `dispatchReviewCompletedNotification` + parallel call in
+  `closeReviewAction` — `review_completed` rule (seeded by 0042)
+  with `review_assignee` + `proposal_owner` formulas covers it
+- ✅ `dispatchCommentMentionNotification` + parallel call in
+  `addReviewCommentAction` — `comment_mentioned` rule with
+  `mentioned_in_payload` strategy covers it
+- ✅ Direct `db.insert(notifications)` in `submitOpportunityReviewAction` —
+  `opportunity_reviewed` rule with `opportunity_owner` formula covers it
+- ✅ Direct `db.insert(notifications)` in `assignSolicitationRoleAction` —
+  `solicitation_role_assigned` rule with `mentioned_in_payload`
+  covers it
+- ✅ Legacy `dispatchReviewAssignedNotification` call removed from
+  `startReviewAction` — `review_request_pending` rule with
+  `review_assignee` formula covers the initial fan-out
 
-**Acceptance (full ticket):** create a rule "notify pricing-lead 48h
+**Phase E-2c kept**: `dispatchReviewAssignedNotification` + its usage
+via `fanOutAssignmentNotifications` in `assignReviewerAction`. See
+Phase E-2d below.
+
+**Phase E-2d (queued) — Migrate `assignReviewerAction` to the rules engine**:
+
+`assignReviewerAction` adds a single reviewer to an existing review,
+and the legacy `dispatchReviewAssignedNotification` notified only the
+newly-added user. The current `review_request_pending` seeded rule
+uses the `review_assignee` formula, which resolves to ALL current
+assignees — firing it on a single-reviewer add would over-notify
+every previously-assigned reviewer.
+
+To complete the legacy retirement:
+
+- Add a new `review_assignment_added` trigger event kind to
+  `notification_trigger_event_kind` enum
+- Seed a default rule per tenant using `mentioned_in_payload` strategy
+  so only the newly-assigned user is notified
+- Wire `assignReviewerAction` to call `dispatchTriggerEvent({ kind:
+  "review_assignment_added", payload: { ..., mentionedUserIds:
+  [input.userId] } })`
+- Delete `fanOutAssignmentNotifications` helper, the
+  `dispatchReviewAssignedNotification` function, and
+  `src/lib/notifications.ts` entirely
+
+**Acceptance (BL-13 full ticket):** create a rule "notify pricing-lead 48h
 before due date"; opportunity advances within 48h; rule fires;
 notification delivered; SLA breach escalates to PM if not acknowledged.
 

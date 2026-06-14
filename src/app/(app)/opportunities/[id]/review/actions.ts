@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   memberships,
-  notifications,
   opportunities,
   opportunityActivities,
   opportunityReviewRequests,
@@ -437,19 +436,9 @@ export async function submitOpportunityReviewAction(
     const body =
       `${row.reviewerName || row.reviewerEmail} recommended ${labelFor(input.recommendation)}.` +
       (comment ? `\n\n"${comment.slice(0, 300)}"` : "");
-    await db.insert(notifications).values({
-      organizationId: row.organizationId,
-      recipientUserId: row.senderUserId,
-      actorUserId: row.reviewerUserId,
-      kind: "opportunity_review_completed",
-      subject,
-      body,
-      linkPath: `/opportunities/${row.opportunityId}`,
-    });
-
-    // BL-13 Phase E-2b — fire the rules engine in parallel with the
-    // legacy hardcoded notification. Retired in Phase E-2c once
-    // seeded default rules cover the same surface.
+    // BL-13 — fire the rules engine. Default seeded rule
+    // (`opportunity_reviewed`) delivers to the opportunity owner
+    // via the `opportunity_owner` formula.
     await dispatchTriggerEvent({
       organizationId: row.organizationId,
       kind: "opportunity_reviewed",
