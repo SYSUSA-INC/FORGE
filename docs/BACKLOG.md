@@ -1590,6 +1590,67 @@ repo that runs only against Vercel Agent activity.
 
 ---
 
+### BL-QC-sentry — Sentry free-tier runtime error capture — **shipped (wiring); operator setup pending**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC-vercel-agent-retired  ·  **Status:** ✅ wiring shipped; operator must set DSN
+
+After retiring Vercel Agent's "Investigations" toggle in BL-QC-vercel-
+agent-retired, we lost the runtime-error observability layer it was
+attempting to fill. GitHub Actions catches static issues at PR time;
+nothing was catching what blew up after deploy.
+
+**What ships in this PR:**
+
+- `@sentry/nextjs` ^10.57.0 added to dependencies
+- `sentry.client.config.ts`, `sentry.server.config.ts`,
+  `sentry.edge.config.ts` at repo root — runtime SDK initialization
+  per Next.js's three runtimes (browser / Node.js / Edge)
+- `next.config.mjs` wrapped with `withSentryConfig` — bundling plugin
+  that tunnels Sentry requests through `/monitoring` (ad-blocker
+  resilience) and (optionally) uploads source maps for symbol
+  resolution in stack traces
+- `src/instrumentation.ts` updated to dynamically import the matching
+  config file based on `NEXT_RUNTIME`, plus re-export
+  `captureRequestError` so route-handler errors land in Sentry
+- `docs/SENTRY_SETUP.md` — operator setup checklist (account
+  creation, env-var setup, optional source-map upload, quota
+  monitoring guidance)
+
+**Cost-conscious settings** (Sentry free tier = 5k errors/month):
+
+- `tracesSampleRate: 0` — no performance monitoring (separate quota)
+- `replaysSessionSampleRate: 0` + `replaysOnErrorSampleRate: 0` — no
+  session replays (paid + privacy)
+- `automaticVercelMonitors: false` — paid feature; we already log
+  cron success/failure manually
+- `ignoreErrors` patterns drop Next.js framework signals
+  (NEXT_REDIRECT, NEXT_NOT_FOUND), browser-extension noise
+  (chrome-extension://), and ResizeObserver loop warnings before
+  they hit the quota
+
+**Safe-to-ship-before-configured guarantee:** every SDK init checks
+for the DSN env var and no-ops if absent. So this PR can land without
+breaking dev, preview, or production until the operator decides to
+flip the switch.
+
+**Operator follow-up (one-time, ~5 minutes):**
+
+1. Sign up at https://sentry.io/signup/ (Developer / free plan)
+2. Create a Next.js project, copy the DSN
+3. Add `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN` env vars to Vercel
+   (Production scope; same value for both)
+4. Trigger a redeploy
+5. (Optional) Add `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT`
+   for source-map upload
+
+See `docs/SENTRY_SETUP.md` for the detailed walkthrough.
+
+**Acceptance:** ✅ Build passes with no DSN set (verified by Type
+check + Next build CI gates in this PR). After operator setup, a
+deliberate `Sentry.captureMessage("test")` from the production browser
+console appears in the Sentry Issues view within 1-2 minutes.
+
+---
+
 ### BL-QC-auto-resolve — Auto-resolve outdated Vercel Agent threads — **shipped**
 **Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 
