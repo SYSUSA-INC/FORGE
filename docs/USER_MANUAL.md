@@ -24,9 +24,10 @@ This manual covers what each role can do and where to find the trail FORGE leave
 5. [Opportunities](#5-opportunities)
 6. [Proposals](#6-proposals)
 7. [Companies](#7-companies)
-8. [What FORGE records (the audit trail)](#8-what-forge-records-the-audit-trail)
-9. [Notifications inbox](#9-notifications-inbox)
-10. [Signing out and switching orgs](#10-signing-out-and-switching-orgs)
+8. [Knowledge base](#8-knowledge-base)
+9. [What FORGE records (the audit trail)](#9-what-forge-records-the-audit-trail)
+10. [Notifications inbox](#10-notifications-inbox)
+11. [Signing out and switching orgs](#11-signing-out-and-switching-orgs)
 
 ---
 
@@ -443,35 +444,113 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 
 ---
 
-## 8. What FORGE records (the audit trail)
+## 8. Knowledge base
+
+The Knowledge base is the corpus the FORGE Brain reads when it drafts sections, answers RFP questions, or proposes capabilities. Think of it as your company's institutional memory in a form the AI can actually use.
+
+Two surfaces live here:
+
+- **`/knowledge-base`** — curated **knowledge entries**: hand-authored or AI-promoted capabilities, past performance, named personnel, and boilerplate text that the Brain ranks and quotes from when drafting.
+- **`/knowledge-base/import`** — the **corpus**: raw uploaded artifacts (old proposals, RFPs, contracts, debriefs, capability briefs, resumes, brochures, whitepapers, etc.) that the Brain reads to extract knowledge candidates from.
+
+### 8.1 Drop anything in the corpus
+
+Go to **Knowledge base → Import corpus**. Drag files onto the dropzone or click to pick. Up to 50 MB per file. Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD, images. Each file becomes a **knowledge artifact** with a kind tag (proposal, rfp, contract, etc.), file metadata, and indexed plain text.
+
+**AI-assisted kind classification (auto-detect)**: leave the default "Auto-detect" kind selected. After text extraction completes, the Brain reads the document and classifies it into one of the 15 kinds. High-confidence classifications (≥ 60%) overwrite the heuristic kind directly. Lower-confidence suggestions appear as a violet **AI suggests: <kind>** pill on the row, with an **Accept** button and a tooltip showing the AI's reasoning. Click Accept to apply, or leave it alone if you disagree.
+
+**Backfill old uploads**: if you have artifacts uploaded before AI classification existed (they sit at `kind="other"`), the **AI classification backfill** panel appears with a Reclassify button. Each click processes up to 50 candidates. Run it until the panel disappears.
+
+### 8.2 Group the corpus by kind
+
+The corpus list has a **Group by: Flat / By kind** toggle:
+
+- **Flat** (default) — newest-first list, every artifact in one stream.
+- **By kind** — artifacts bucket under collapsible kind headers, largest bucket first. Useful when reviewing a single document type at a time ("show me all our debriefs") without manually filtering.
+
+The toggle is per-session and resets on reload.
+
+### 8.3 Open / archive / delete from a row
+
+Each artifact row has three actions:
+
+- **Open** — drill into the artifact's extraction queue: the Brain has already pulled candidate knowledge entries out; you review them and promote the ones worth keeping into real `/knowledge-base` entries.
+- **Archive** / **Restore** — hide from the active list without deleting. Useful for keeping a historical record without cluttering the day-to-day view.
+- **Delete** — permanent. The file is removed from storage and the row from the DB. Use Archive instead unless the artifact was uploaded by mistake.
+
+### 8.4 Knowledge entries — the curated layer
+
+`/knowledge-base` shows entries by kind:
+
+- **Capabilities** — what your company does. Used when the Brain needs to answer "do we have experience in X?".
+- **Past performance** — specific contract / project references with dates, customer, value, outcome. The strongest grounding the Brain can quote.
+- **Personnel** — named people with roles, certifications, clearances. Surfaced when the proposal needs key-personnel narratives or resume cross-references.
+- **Boilerplate** — reusable language: company overview, security posture statements, compliance affirmations. Anything you find yourself pasting into every proposal.
+
+Click any entry to open the editor.
+
+### 8.5 Entry quality score
+
+The editor shows a **Quality score** panel (violet-bordered) with a tone-coded percentage:
+
+- **Emerald ≥ 70%** — strong asset, Brain will surface it confidently.
+- **Amber 40–69%** — usable but light on signals; the Brain will quote it with less weight.
+- **Rose < 40%** — bare-minimum row; consider adding content or archiving.
+
+Below the percentage is the **per-factor breakdown**:
+
+| Factor | What it measures |
+|---|---|
+| Body length | Long enough to be reusable (curve: 200 chars = 0.3, 1000 = 0.7, 4000+ = 1.0) |
+| Body structure | Paragraph breaks, bullets, headings |
+| Title | Non-trivial title length (5–128 chars sweet spot) |
+| Tags | At least one tag attached |
+| Metadata | Structured metadata fields (e.g., year, agency, value) |
+| Kind-specific signals | Kind-aware bonus: dates + agency for past performance; deliverables / outcomes for capability; certifications / experience for personnel |
+
+The score re-computes on every save. Low scores aren't a verdict on the entry — they're a hint about what to add. An entry can be excellent at any score; the percentage just reflects how many signals the Brain can pin down.
+
+**Org admin only**: there's a **Score unscored** button in the `/knowledge-base` header that retroactively scores entries that predate the quality-scoring feature (i.e., `quality_scored_at IS NULL`). Same idempotent backfill pattern as "Embed missing". Click as many times as needed; processes 100 entries per click.
+
+### 8.6 Tips for getting the most out of the Knowledge base
+
+- **Upload everything**. The Brain ranks by relevance, not recency. Old contracts from five years ago still ground the Brain when you're pursuing a similar deal today.
+- **Don't fight the AI suggestion**. The classifier is conservative; high-confidence suggestions are usually right. If you disagree, just don't click Accept — your manually-set kind stays.
+- **Fill in metadata for past performance**. Year, agency, customer, value — each adds a measurable bump to the quality score AND gives the Brain something concrete to quote. A past-performance entry without dates is a paragraph, not a reference.
+- **Tag liberally**. Tags are how you (and the Brain) find entries again. NAICS codes, set-aside types, technology stacks, agency abbreviations — all useful tags.
+- **Archive rather than delete**. The Brain learns from outcome patterns; deleting an entry erases that signal. Archive keeps the history while removing the entry from active recommendations.
+
+---
+
+## 9. What FORGE records (the audit trail)
 
 FORGE has two complementary trails. **Feature-level activity** lives next to the record it describes — stage changes on the opportunity's Activity timeline, review verdicts inside the review, compliance status next to the line. **`/audit-log`** is the unified org-wide stream that records every mutating action (and sensitive reads like PDF exports and share-link loads). Each entry stamps the actor, the action verb, the resource, IP, user-agent, structured metadata, and a timestamp.
 
 The two trails answer different questions. For "what happened to *this* deal?", read the timeline on the record. For "what did our team do this week?" or "did anyone outside the org load our share-link?", filter `/audit-log`.
 
-The inventory below covers the feature-level trails. `/audit-log` is described in §8.12.
+The inventory below covers the feature-level trails. `/audit-log` is described in §9.12.
 
-### 8.1 Stage history on opportunities
+### 9.1 Stage history on opportunities
 
 Every stage change writes a row to the **opportunity Activity** timeline (§5.4). The row includes the actor, the prior stage, the new stage, the reasoning note, and a timestamp. You cannot delete or edit these rows. If a deal moved Identified → Capture → Submitted → Lost, you will see four entries in order with the rationale for each.
 
-### 8.2 Gate decisions
+### 9.2 Gate decisions
 
 No-bid and lost decisions are required to carry a reasoning note (§5.4 Evaluation tab). Like stage history, they live on the Activity timeline and cannot be edited or removed. This is the single most useful trail when leadership asks "why did we walk away?".
 
-### 8.3 Evaluation saves
+### 9.3 Evaluation saves
 
 Saving the qualification scorecard writes a system-attributed entry recording the new rollup score and the rationale field. Re-scoring later writes another entry — you can read the timeline to see how your assessment of the deal evolved.
 
-### 8.4 Competitor changes
+### 9.4 Competitor changes
 
 Adding or removing a competitor on an opportunity writes a row. The competitor record itself carries a created_at and updated_at, so you can tell when a competitor was first identified and when their notes were last revised.
 
-### 8.5 Manual notes, meetings, actions
+### 9.5 Manual notes, meetings, actions
 
 Anyone with edit access can post Note / Meeting / Action entries on an opportunity. They show the author, kind, body, and timestamp. The author can delete their own entries; nobody (not even an admin) can edit them after posting. If something needs correcting, post a follow-up.
 
-### 8.6 Proposal review history
+### 9.6 Proposal review history
 
 Reviews are first-class records. For each one FORGE keeps:
 
@@ -483,23 +562,23 @@ Reviews are first-class records. For each one FORGE keeps:
 
 Closed reviews are read-only. You can open a closed review months later and replay exactly how the team voted and what changed between rounds.
 
-### 8.7 Section status changes
+### 9.7 Section status changes
 
 Every proposal section carries `status`, `author`, `updatedAt`, and a free-text body. Updates to any of those bump `updatedAt` and stamp the editor; the previous body is overwritten in place (FORGE doesn't yet keep prior versions of section text — that's planned). For "who has touched this section recently?" use the updatedAt + author. For substantive content history, use review comments and verdicts.
 
-### 8.8 Compliance matrix history
+### 9.8 Compliance matrix history
 
 Each compliance item carries an owner, status, mapped section, and updatedAt. Status flips are stamped with the editor. The Rollup panel always reflects the current state; the per-row updated_at lets you see how recently each shall statement moved.
 
-### 8.9 Organization profile
+### 9.9 Organization profile
 
 Saving the **Settings** page updates `organization.updatedAt`. The previous values are not retained as a separate history (intentional — most edits are corrections, not policy changes), but every save is gated to admins, so the set of people who *could* have changed a field is bounded by who carries the Admin role.
 
-### 8.10 Membership changes
+### 9.10 Membership changes
 
 Inviting, role-changing, disabling, or removing a member updates the membership row, stamps `updated_at`, and (for invites) sends an email that becomes a record in your Resend dashboard. The audit picture is: who was a member, with what role, between when and when. Disabled rows are kept rather than deleted so the historical record stays intact.
 
-### 8.11 What's *not* recorded yet
+### 9.11 What's *not* recorded yet
 
 Be honest about the limits:
 
@@ -508,7 +587,7 @@ Be honest about the limits:
 
 Where these are needed, ask in the next planning round and we'll add them.
 
-### 8.12 `/audit-log` — the unified stream
+### 9.12 `/audit-log` — the unified stream
 
 Open **Operations Management → Audit Log** from the sidebar. The page shows every recorded action across your tenant, newest first, with filters for:
 
@@ -524,7 +603,7 @@ Retention defaults to 365 days; admins can adjust this between 90 and 3,650 days
 
 Sensitive reads (PDF / DOCX render, downloads of a render, share-link loads, USAspending lookups) are recorded too — they carry a `read` chip next to the action so you can distinguish them from mutations at a glance.
 
-### 8.13 How to use the trail
+### 9.13 How to use the trail
 
 Three habits make the audit trail actually work:
 
@@ -534,7 +613,7 @@ Three habits make the audit trail actually work:
 
 ---
 
-## 9. Notifications inbox
+## 10. Notifications inbox
 
 Click the **bell icon** in the top-right of any page to open the notifications panel, or navigate to `/notifications` from the sidebar's **Operations Management** group.
 
@@ -550,23 +629,23 @@ Each row shows who triggered it, when it happened, a short subject, and (when pr
 
 Notifications are kept indefinitely; there's no auto-prune. If you want to clear visual clutter, mark a row as read by opening it.
 
-### 9.1 Frequency and digest
+### 10.1 Frequency and digest
 
 Your tenant admin decides whether each kind of notification arrives **immediately**, in a **daily digest** (one row per recipient per day rolling up all matching events), or a **weekly digest** (one row per recipient per Sunday rolling up the week). Defaults are immediate for everything; admins can tune this under `/notifications/rules`. If you're getting too many or too few, that's where to ask them to adjust.
 
-### 9.2 Test sends
+### 10.2 Test sends
 
 A `[Test send]` prefix on the subject means an admin fired a test from the rule editor to verify the rule's recipient + channel wiring. The body explains who fired it and that the event is synthetic — you can safely ignore the contents.
 
 ---
 
-## 10. Signing out and switching orgs
+## 11. Signing out and switching orgs
 
-### 10.1 Sign out
+### 11.1 Sign out
 
 Click your avatar at the top-right → **Sign out**.
 
-### 10.2 Switching organizations
+### 11.2 Switching organizations
 
 If you belong to multiple organizations, your active org is the first one you joined. (Multi-org switching ships in a future release.) If you need to change orgs right now, ask your admin to adjust your membership directly.
 
