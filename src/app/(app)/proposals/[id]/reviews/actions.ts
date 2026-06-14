@@ -18,11 +18,7 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { extractMentionUserIds } from "@/lib/mentions";
-import {
-  dispatchCommentMentionNotification,
-  dispatchReviewAssignedNotification,
-  dispatchReviewCompletedNotification,
-} from "@/lib/notifications";
+import { dispatchReviewAssignedNotification } from "@/lib/notifications";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { log } from "@/lib/log";
 
@@ -132,19 +128,6 @@ export async function startReviewAction(input: {
       sectionId: input.sectionAssignments?.[uid] ?? null,
     }));
     await db.insert(proposalReviewAssignments).values(assignmentRows);
-
-    await fanOutAssignmentNotifications({
-      organizationId,
-      actorUserId: actor.id,
-      proposalId: input.proposalId,
-      reviewId: review.id,
-      reviewColor: input.color,
-      dueDate: input.dueDate ? new Date(input.dueDate) : null,
-      assignments: assignmentRows.map((a) => ({
-        userId: a.userId,
-        sectionId: a.sectionId,
-      })),
-    });
 
     await recordAudit({
       organizationId,
@@ -369,51 +352,9 @@ export async function closeReviewAction(input: {
   });
 
   if (review) {
-    const recipients = new Set<string>();
-    if (
-      review.proposalManagerUserId &&
-      review.proposalManagerUserId !== actor.id
-    ) {
-      recipients.add(review.proposalManagerUserId);
-    }
-    const reviewerRows = await db
-      .select({ userId: proposalReviewAssignments.userId })
-      .from(proposalReviewAssignments)
-      .where(eq(proposalReviewAssignments.reviewId, input.reviewId));
-    for (const r of reviewerRows) {
-      if (r.userId !== actor.id) recipients.add(r.userId);
-    }
-
-    if (recipients.size > 0) {
-      const [closerRow] = await db
-        .select({ name: users.name, email: users.email })
-        .from(users)
-        .where(eq(users.id, actor.id))
-        .limit(1);
-      const closerName =
-        closerRow?.name ?? closerRow?.email ?? "A teammate";
-
-      await Promise.all(
-        Array.from(recipients).map((recipientUserId) =>
-          dispatchReviewCompletedNotification({
-            organizationId,
-            actorUserId: actor.id,
-            closerName,
-            recipientUserId,
-            proposalId: review.proposalId,
-            proposalTitle: review.proposalTitle,
-            reviewId: input.reviewId,
-            reviewColor: COLOR_LABELS[review.color],
-            verdict: VERDICT_LABELS[input.verdict],
-            summary,
-          }),
-        ),
-      );
-    }
-
-    // BL-13 — fire the rules engine in parallel with the legacy
-    // dispatcher. The legacy hardcoded dispatch is retired in
-    // Phase E once seeded default rules cover the same surface.
+    // BL-13 — fire the rules engine. Default seeded rules
+    // (`review_completed`) deliver to assigned reviewers + proposal
+    // manager via the `review_assignee` and `proposal_owner` formulas.
     await dispatchTriggerEvent({
       organizationId,
       kind: "review_completed",
@@ -645,16 +586,6 @@ export async function addReviewCommentAction(input: {
         );
       const validIds = validMembers.map((m) => m.userId);
 
-      let sectionTitle: string | null = null;
-      if (input.sectionId) {
-        const [sec] = await db
-          .select({ title: proposalSections.title })
-          .from(proposalSections)
-          .where(eq(proposalSections.id, input.sectionId))
-          .limit(1);
-        sectionTitle = sec?.title ?? null;
-      }
-
       const [actorRow] = await db
         .select({ name: users.name, email: users.email })
         .from(users)
@@ -663,28 +594,9 @@ export async function addReviewCommentAction(input: {
       const authorName =
         actorRow?.name ?? actorRow?.email ?? "A teammate";
 
-      await Promise.all(
-        validIds.map((recipientUserId) =>
-          dispatchCommentMentionNotification({
-            organizationId,
-            actorUserId: actor.id,
-            authorName,
-            recipientUserId,
-            proposalId: review.proposalId,
-            proposalTitle: review.proposalTitle,
-            reviewId: input.reviewId,
-            reviewColor: COLOR_LABELS[review.color],
-            commentId: row.id,
-            commentBody: trimmedBody,
-            sectionTitle,
-          }),
-        ),
-      );
-
-      // BL-13 Phase E-2b — fire the rules engine in parallel with the
-      // legacy dispatcher. The legacy hardcoded dispatch is retired in
-      // Phase E-2c once seeded default rules cover the same surface
-      // and a parity window has passed.
+      // BL-13 — fire the rules engine. Default seeded rule
+      // (`comment_mentioned`) delivers to every @-mentioned user via
+      // the `mentioned_in_payload` recipient strategy.
       await dispatchTriggerEvent({
         organizationId,
         kind: "comment_mentioned",

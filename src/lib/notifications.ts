@@ -6,11 +6,7 @@ import {
   type NewNotification,
   type NotificationKind,
 } from "@/db/schema";
-import {
-  sendCommentMentionEmail,
-  sendReviewAssignedEmail,
-  sendReviewCompletedEmail,
-} from "@/lib/email";
+import { sendReviewAssignedEmail } from "@/lib/email";
 import { log } from "@/lib/log";
 
 type DispatchInput = {
@@ -26,11 +22,6 @@ type DispatchInput = {
   commentId?: string | null;
 };
 
-/**
- * Persist a notification row and return its id without sending email.
- * Use this when the call site wants to send email itself with
- * provider-specific args.
- */
 async function persist(input: DispatchInput): Promise<string | null> {
   try {
     const payload: NewNotification = {
@@ -89,6 +80,15 @@ async function getRecipient(userId: string): Promise<{
   return row ?? null;
 }
 
+// BL-13 Phase E-2c left this dispatcher in place because the parallel
+// `dispatchTriggerEvent({ kind: "review_request_pending" })` call exists
+// only inside `startReviewAction` (initial fan-out via the
+// `review_assignee` formula rule). `assignReviewerAction` adds a single
+// reviewer later and has no equivalent trigger-event coverage — the
+// `review_assignee` formula would over-notify by sending to all current
+// reviewers on every add. Retiring this needs a new
+// `review_assignment_added` trigger event kind + matching seed rule
+// (Phase E-2d, tracked in BACKLOG).
 export async function dispatchReviewAssignedNotification(input: {
   organizationId: string;
   actorUserId: string;
@@ -142,113 +142,5 @@ export async function dispatchReviewAssignedNotification(input: {
         error: err instanceof Error ? err.message : "send failed",
       });
     log.error("[dispatchReviewAssignedNotification]", "error", { error: err });
-  }
-}
-
-export async function dispatchCommentMentionNotification(input: {
-  organizationId: string;
-  actorUserId: string;
-  authorName: string;
-  recipientUserId: string;
-  proposalId: string;
-  proposalTitle: string;
-  reviewId: string;
-  reviewColor: string;
-  commentId: string;
-  commentBody: string;
-  sectionTitle: string | null;
-}): Promise<void> {
-  const recipient = await getRecipient(input.recipientUserId);
-  if (!recipient?.email) return;
-
-  const linkPath = `/proposals/${input.proposalId}/reviews/${input.reviewId}`;
-  const subject = `${input.authorName} mentioned you on ${input.proposalTitle}`;
-  const body = input.commentBody.slice(0, 240);
-
-  const id = await persist({
-    kind: "review_comment_mentioned",
-    organizationId: input.organizationId,
-    recipientUserId: input.recipientUserId,
-    actorUserId: input.actorUserId,
-    subject,
-    body,
-    linkPath,
-    proposalId: input.proposalId,
-    reviewId: input.reviewId,
-    commentId: input.commentId,
-  });
-
-  try {
-    await sendCommentMentionEmail({
-      to: recipient.email,
-      authorName: input.authorName,
-      proposalTitle: input.proposalTitle,
-      reviewColor: input.reviewColor,
-      commentBody: input.commentBody,
-      sectionTitle: input.sectionTitle,
-      proposalId: input.proposalId,
-      reviewId: input.reviewId,
-    });
-    if (id) await markEmailResult(id, { ok: true });
-  } catch (err) {
-    if (id)
-      await markEmailResult(id, {
-        ok: false,
-        error: err instanceof Error ? err.message : "send failed",
-      });
-    log.error("[dispatchCommentMentionNotification]", "error", { error: err });
-  }
-}
-
-export async function dispatchReviewCompletedNotification(input: {
-  organizationId: string;
-  actorUserId: string;
-  closerName: string;
-  recipientUserId: string;
-  proposalId: string;
-  proposalTitle: string;
-  reviewId: string;
-  reviewColor: string;
-  verdict: string;
-  summary: string;
-}): Promise<void> {
-  const recipient = await getRecipient(input.recipientUserId);
-  if (!recipient?.email) return;
-
-  const linkPath = `/proposals/${input.proposalId}/reviews/${input.reviewId}`;
-  const subject = `${input.reviewColor} review closed — ${input.verdict}`;
-  const body = input.summary.slice(0, 240);
-
-  const id = await persist({
-    kind: "review_completed",
-    organizationId: input.organizationId,
-    recipientUserId: input.recipientUserId,
-    actorUserId: input.actorUserId,
-    subject,
-    body,
-    linkPath,
-    proposalId: input.proposalId,
-    reviewId: input.reviewId,
-  });
-
-  try {
-    await sendReviewCompletedEmail({
-      to: recipient.email,
-      closerName: input.closerName,
-      proposalTitle: input.proposalTitle,
-      reviewColor: input.reviewColor,
-      verdict: input.verdict,
-      summary: input.summary,
-      proposalId: input.proposalId,
-      reviewId: input.reviewId,
-    });
-    if (id) await markEmailResult(id, { ok: true });
-  } catch (err) {
-    if (id)
-      await markEmailResult(id, {
-        ok: false,
-        error: err instanceof Error ? err.message : "send failed",
-      });
-    log.error("[dispatchReviewCompletedNotification]", "error", { error: err });
   }
 }
