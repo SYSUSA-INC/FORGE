@@ -1355,17 +1355,21 @@ repo enforcing the discipline. This ticket closes that.
 **Operator follow-up (one-time, in Settings → Branches → main):**
 - Add each Tier 2 job's display name to required status checks
   (ESLint, PR title format, Backlog hygiene, Schema / migration
-  coupling, Diff-size guard, Secret scan)
-- Add `Vercel Agent Review` to required status checks (promotes it
-  from advisory to blocking)
-- Enable "Require review from Code Owners"
+  coupling, Diff-size guard, Secret scan, Drizzle schema validate,
+  Pre-push self-review section)
+- ~~Add `Vercel Agent Review` to required status checks~~ —
+  superseded by BL-QC-vercel-agent-retired; Vercel Agent is no
+  longer used (see below)
+- Enable "Require review from Code Owners" — **deferred until
+  team is ≥2 humans** (GitHub blocks self-approval; would
+  permanently block merge for a solo dev)
 - Disable admin bypass on protection rules
 
 **Acceptance:** ✅ Every future PR clears secret scan, conventional-
 commit title check, backlog hygiene, schema-migration coupling, diff-
-size guard, Vercel Agent Review, the existing Tier 0 CI gates, AND a
-code-owner review for sensitive paths before merge is enabled. No
-admin escape hatch.
+size guard, drizzle schema validate, pre-push self-review section,
+and the existing Tier 0 CI gates before merge is enabled. No admin
+escape hatch.
 
 ---
 
@@ -1494,6 +1498,66 @@ configured, giving the migration test real production schema shape.
 Cosmetic CI cleanup — combine the separate `typecheck` (in `pr.yml`)
 and `lint` (in `pr-quality.yml`) jobs into one job-run for slightly
 faster CI. No power change; just one less `npm ci` per PR.
+
+---
+
+### BL-QC-vercel-agent-retired — Retire Vercel Agent, keep the checklist — **shipped**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
+
+Vercel Agent's "Code Reviews" (Beta) was costing ~$25/mo via the
+team's auto-reload credit. Over the previous ~40 PRs the agent
+contributed ~11 real catches, all of which had been engrained as
+categories in `.vercel/agent.md` — meaning the lessons survived
+without the bot continuing to post on every PR.
+
+**Cost decision:** turn off both Vercel Agent toggles (Code Reviews +
+Investigations) in **Team Settings → Agent**. Repurpose the in-repo
+footprint as an author-discipline checklist + remove machinery that
+only existed to handle agent-specific behavior.
+
+**Changes in this PR:**
+- Move `.vercel/agent.md` → `docs/PRE_PUSH_CHECKLIST.md` and reframe
+  as a self-review checklist (categories unchanged; intro/history
+  updated)
+- Remove `.github/workflows/auto-resolve-outdated.yml` (no-op once
+  Vercel Agent stops posting threads)
+- Update `.github/PULL_REQUEST_TEMPLATE.md` self-review table header
+  to reference the new file path
+- Update the BL-QC-self-review-gate comment in
+  `.github/workflows/pr-quality.yml`
+- Drop the Tier 1 "Vercel Agent Review" row from `docs/PR_QUALITY.md`
+  and the operator-setup line that suggested promoting it to a
+  required check
+- Drop §9 "Responding to Vercel Agent suggestions" from
+  `docs/ENGINEERING_STANDARDS.md`; replace with "Author self-review
+  before push"
+- Drop the Vercel Agent row from §7 Tier 1 in
+  `docs/ENGINEERING_STANDARDS.md`
+- Update `AGENTS.md` to remove the Vercel Agent reference and correct
+  the gate-count line (8 in `pr-quality.yml` + 5 in `pr.yml` +
+  Vercel Preview deploy + CODEOWNERS)
+
+**Out of scope (operator follow-up):**
+- Toggle off Code Reviews + Investigations in Vercel team settings
+  (done outside the PR)
+- Remove "Vercel Agent Review" from branch protection's required
+  status checks (was never added; nothing to remove)
+
+**What replaces it:**
+- **Static gates** (13 required, see PR_QUALITY.md) cover most of what
+  the agent caught
+- **`docs/PRE_PUSH_CHECKLIST.md`** is the human-discipline layer for
+  what gates can't catch (audit calls, isolation in the `where`,
+  export completeness, inbox parity, etc.) — same content, now
+  enforced via the Pre-push self-review CI gate
+- **Sentry free tier** (separate PR) covers the runtime-error gap
+  Vercel Agent's Investigations toggle attempted to fill
+
+**Acceptance:** ✅ The next PR after this lands does not show a
+"Vercel Agent Review" check, and the Pre-push self-review gate keeps
+passing against the renamed file. Self-review template header reads
+`Concern from docs/PRE_PUSH_CHECKLIST.md`. No machinery exists in the
+repo that runs only against Vercel Agent activity.
 
 ---
 

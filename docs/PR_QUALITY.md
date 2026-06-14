@@ -23,7 +23,6 @@ mechanisms for legitimately bypassing one.
 | Gate | What it catches |
 |---|---|
 | Vercel Preview deploy | Build failures that the typecheck / next-build steps don't catch (env-resolution issues, edge runtime, etc.) |
-| Vercel Agent Review | Style / clarity / suggested-fix issues. Currently advisory by default — promote to required status check to make it blocking. |
 | **Neon branch lifecycle** | Per-PR DB branch off the project's `main` so the Vercel preview deploy + fresh-DB migration test against real production schema state. Auto-deletes on PR close. Requires `NEON_API_KEY` + `NEON_PROJECT_ID` configured (see operator setup below); soft-skips with a `::notice::` annotation when not configured. |
 
 ### Tier 2 — robotic quality gates (this file describes these, `.github/workflows/pr-quality.yml`)
@@ -76,7 +75,6 @@ No label exists for any other gate. If a check is genuinely wrong, fix the workf
 - ✅ Require pull request before merging
 - ✅ Require status checks to pass before merging
   - All Tier 0 + Tier 2 job names listed
-  - **Vercel Agent Review** added (promotes Vercel Agent from advisory to blocking)
   - **Create Neon branch** + **Delete Neon branch** added (once configured)
 - ✅ Require branches to be up to date before merging (combined with the diff-size guard, this disciplines parallel PRs)
 - ✅ Require conversation resolution before merging

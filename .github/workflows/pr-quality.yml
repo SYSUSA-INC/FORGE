@@ -249,9 +249,9 @@ jobs:
     runs-on: ubuntu-latest
     # BL-QC-self-review-gate — forces the PR body to include a filled-in
     # "Pre-push self-review" section. Verbal commitments to do a dry-run
-    # against .vercel/agent.md categories were repeatedly skipped (cf.
-    # #143 / #150 / #153 — same pattern, three PRs in a row). This gate
-    # turns the commitment into a required artifact.
+    # against docs/PRE_PUSH_CHECKLIST.md categories were repeatedly
+    # skipped (cf. #143 / #150 / #153 — same pattern, three PRs in a
+    # row). This gate turns the commitment into a required artifact.
     #
     # Required behavior:
     #   - PR body must contain the literal "## Pre-push self-review"
