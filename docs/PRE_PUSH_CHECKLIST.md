@@ -1,13 +1,19 @@
-# Vercel Agent — review guidelines for FORGE
+# Pre-push self-review checklist — FORGE
 
-Read this file before reviewing any PR in this repo. The canonical
-standards live at `docs/ENGINEERING_STANDARDS.md`; this file is the
-Vercel-Agent-specific subset that tells you what to focus on and what
-to skip.
+Read this checklist before pushing any PR. The `Pre-push self-review`
+section of the PR template (enforced by a CI gate) is a row-by-row
+status report against this checklist.
 
-## What to flag (uncovered by automated gates)
+Canonical engineering standards live in `docs/ENGINEERING_STANDARDS.md`;
+this file is the **discipline layer** — categories that no static gate
+catches and that must be confirmed by the author before push.
 
-These are the categories where your review adds the most value
+Each category below was added in response to a real bug that landed in
+production or got caught late. They are not theoretical concerns.
+
+## What you must confirm before pushing
+
+These are the categories where author discipline carries the load
 because no other CI gate catches them:
 
 - **Missing audit log calls.** Every mutation on a tenant-scoped
@@ -22,7 +28,8 @@ because no other CI gate catches them:
   touching tenant tables call an auth gate AND reference
   `organizationId` in the function body. It can miss cases where
   `organizationId` is referenced but not actually used in the query's
-  `where` clause. Flag those.
+  `where` clause. Confirm every tenant-table query has the org filter
+  in its `where`.
 
 - **Session-derived org context.** Using `user.organizationId` from
   the session in a query is an anti-pattern — the session can lag
@@ -40,7 +47,8 @@ because no other CI gate catches them:
 
 - **Cron handlers without auth.** Anything under `src/app/api/cron/`
   must verify `Authorization: Bearer ${CRON_SECRET}` and refuse to
-  run if the secret isn't set.
+  run if the secret isn't set. See PR #189 for the middleware-blocking
+  bug that hid silent cron failures for weeks.
 
 - **Constant-condition filter/map callbacks.** An `array.filter(() => CONDITION)`
   where `CONDITION` doesn't reference the callback parameter is
@@ -48,8 +56,7 @@ because no other CI gate catches them:
   filter pattern suggests per-element discrimination. Replace with
   an early-out (`if (!CONDITION) return/continue`) before the array
   operation. Same for `.map((_, i) => ...)` patterns that ignore
-  the element. Caught on [#153](https://github.com/SYSUSA-INC/FORGE/pull/153)
-  — added here so future reviews catch it before the agent does.
+  the element. Caught on [#153](https://github.com/SYSUSA-INC/FORGE/pull/153).
 
 - **Drizzle index parity gaps.** When a `CREATE INDEX` (especially a
   partial index with a `WHERE` clause) lands in a SQL migration, the
@@ -87,8 +94,8 @@ because no other CI gate catches them:
 - **Missing migrations.** If a PR changes `src/db/schema.ts` types in
   a way that affects the generated SQL, there must be a corresponding
   `drizzle/[NNNN]_*.sql` file. The schema-migration coupling gate
-  enforces file presence; you should flag content mismatches (e.g., a
-  schema column added but the migration is empty).
+  enforces file presence; you should confirm content matches (a
+  schema column added but the migration is empty is a real footgun).
 
 - **Export completeness.** Data-export endpoints (e.g.,
   `/api/admin/orgs/[id]/export`, audit-log CSV download, tenant
@@ -101,18 +108,16 @@ because no other CI gate catches them:
   `companySecurityLevel`, `employeeSecurityLevel`, `dcaaCompliant`,
   `contractingVehicles`, and `pastPerformance` — all tenant-
   configured fields that an offboarding customer would expect to
-  receive. When reviewing export endpoints, diff the projection
-  against the source table's column list and flag any
-  tenant-configured field that's missing without a deliberate
-  reason (the explicit reason should appear in a comment, e.g.,
-  "skip large blob `raw_text`" or "skip computed column X").
+  receive. When changing export endpoints, diff the projection
+  against the source table's column list and account for every
+  tenant-configured field (omissions should appear in a comment,
+  e.g., "skip large blob `raw_text`" or "skip computed column X").
 
-## What NOT to flag (already enforced by CI)
+## What you do NOT need to confirm (already enforced by CI)
 
-These will surface as redundant noise — skip them:
+Don't put effort into these — they're already covered:
 
-- **Conventional commit format** — enforced by the "PR title format"
-  gate
+- **Conventional commit format** — enforced by the "PR title format" gate
 - **ESLint rule violations** — enforced by the ESLint gate
 - **Unused imports** — caught by ESLint's no-unused-vars rule
 - **TypeScript errors** — caught by Type check
@@ -125,21 +130,33 @@ These will surface as redundant noise — skip them:
 - **Schema changes without a migration file** — caught by Schema /
   migration coupling
 
-## Severity guidance
+## Severity guidance for the PR's self-review row statuses
 
 - **Security:** auth gate inversion, leaked secrets, missing audit on
-  mutations, cross-tenant data leaks → high priority, block merge
+  mutations, cross-tenant data leaks → these must read `addressed: <how>`
+  if the category applies; `N/A` only when the PR genuinely doesn't
+  touch the surface
 - **Maintainability:** missing index parity, missing
-  `revalidatePath`, anti-pattern usage → medium, fix before merge
-- **Style:** anything ESLint or Prettier would catch → don't post (the
-  gate handles it)
+  `revalidatePath`, anti-pattern usage → same rule; address before push
+- **Style:** anything ESLint or Prettier would catch → don't worry
+  about these in the checklist; the gates handle them
 
 ## Repository-specific shorthand
 
 - `BL-N` (e.g., `BL-12`, `BL-12c`, `BL-QC`) refers to backlog entries
   in `docs/BACKLOG.md`. Each PR references its BL ticket in the title.
-- "Tier 0 / Tier 1 / Tier 2 / Tier 3 gates" refer to the layered
-  pre-merge stack documented in §7 of `docs/ENGINEERING_STANDARDS.md`.
+- "Tier 0 / Tier 2 / Tier 3 gates" refer to the layered pre-merge
+  stack documented in §7 of `docs/ENGINEERING_STANDARDS.md`.
 - "Strict serial" = the discipline of one PR open at a time.
 - The current branch convention for AI-authored PRs is
   `claude/<bl-id>-<slug>` (e.g., `claude/bl-13-phase-a-notifications-schema`).
+
+## History
+
+This checklist was originally `.vercel/agent.md`, the configuration
+file Vercel Agent's PR review feature read for project-specific
+guidance. After the team retired Vercel Agent (see
+`BL-QC-vercel-agent-retired` in BACKLOG.md), the file moved here
+because the categories still capture real lessons and the author-
+discipline layer remains valuable — even more so without the AI
+review safety net.

@@ -23,7 +23,7 @@
 This section is required and enforced by the pre-push self-review CI
 gate. Fill in **every row** before pushing.
 
-| Concern from `.vercel/agent.md` | Status |
+| Concern from `docs/PRE_PUSH_CHECKLIST.md` | Status |
 |---|---|
 | Missing `recordAudit` on tenant mutations | N/A / addressed: <how> |
 | Missing `recordRead` on sensitive reads (PDF render, share-link load, USAspending lookup) | N/A / addressed: <how> |
