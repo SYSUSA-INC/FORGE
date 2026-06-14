@@ -44,6 +44,9 @@ export default async function KnowledgeEntryPage({
             body: row.body,
             tags: row.tags ?? [],
             archived: !!row.archivedAt,
+            qualityScore: row.qualityScore,
+            qualityScoreFactors:
+              (row.qualityScoreFactors as Record<string, number>) ?? {},
           }}
         />
       </Panel>

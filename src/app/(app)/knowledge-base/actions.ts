@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -8,12 +8,17 @@ import {
   type KnowledgeKind,
   type KnowledgeOutcomeLabel,
 } from "@/db/schema";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  requireAuth,
+  requireCurrentOrg,
+  requireOrgAdmin,
+} from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import {
   backfillEntryEmbeddings,
   embedKnowledgeEntry,
 } from "@/lib/knowledge-entry-embed";
+import { scoreKnowledgeEntry } from "@/lib/knowledge-quality";
 import { log } from "@/lib/log";
 
 const KINDS: KnowledgeKind[] = [
@@ -116,6 +121,15 @@ export async function createKnowledgeEntryAction(input: {
   try {
     const finalTitle = input.title.trim();
     const finalBody = input.body?.trim() ?? "";
+    const finalTags = dedupTags(input.tags ?? []);
+    // BL-10 Phase D-2 — score on save. Pure heuristic, no AI call.
+    const quality = scoreKnowledgeEntry({
+      kind: input.kind,
+      title: finalTitle,
+      body: finalBody,
+      tags: finalTags,
+      metadata: {},
+    });
     const [row] = await db
       .insert(knowledgeEntries)
       .values({
@@ -123,8 +137,11 @@ export async function createKnowledgeEntryAction(input: {
         kind: input.kind,
         title: finalTitle,
         body: finalBody,
-        tags: dedupTags(input.tags ?? []),
+        tags: finalTags,
         createdByUserId: user.id,
+        qualityScore: quality.score,
+        qualityScoreFactors: quality.factors,
+        qualityScoredAt: new Date(),
       })
       .returning({ id: knowledgeEntries.id });
     if (row) {
@@ -165,6 +182,28 @@ export async function updateKnowledgeEntryAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   try {
+    // Load current values so we can score against the post-update shape
+    // (input is partial). Org-scoped — won't load another tenant's row.
+    const [current] = await db
+      .select({
+        kind: knowledgeEntries.kind,
+        title: knowledgeEntries.title,
+        body: knowledgeEntries.body,
+        tags: knowledgeEntries.tags,
+        metadata: knowledgeEntries.metadata,
+      })
+      .from(knowledgeEntries)
+      .where(
+        and(
+          eq(knowledgeEntries.id, id),
+          eq(knowledgeEntries.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    if (!current) {
+      return { ok: false, error: "Entry not found." };
+    }
+
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (input.kind !== undefined) {
       if (!KINDS.includes(input.kind))
@@ -174,6 +213,22 @@ export async function updateKnowledgeEntryAction(
     if (input.title !== undefined) update.title = input.title.trim();
     if (input.body !== undefined) update.body = input.body.trim();
     if (input.tags !== undefined) update.tags = dedupTags(input.tags);
+
+    // BL-10 Phase D-2 — re-score on every save against the merged
+    // post-update shape so the score reflects the change even when
+    // tags-only edits don't trigger re-embedding.
+    const merged = {
+      kind: (update.kind as KnowledgeKind | undefined) ?? current.kind,
+      title: (update.title as string | undefined) ?? current.title,
+      body: (update.body as string | undefined) ?? current.body,
+      tags: (update.tags as string[] | undefined) ?? current.tags,
+      metadata: current.metadata,
+    };
+    const quality = scoreKnowledgeEntry(merged);
+    update.qualityScore = quality.score;
+    update.qualityScoreFactors = quality.factors;
+    update.qualityScoredAt = new Date();
+
     await db
       .update(knowledgeEntries)
       .set(update)
@@ -336,6 +391,97 @@ export async function backfillKnowledgeEntryEmbeddingsAction(): Promise<
     return { ok: true, ...result };
   } catch (err) {
     log.error("[backfillKnowledgeEntryEmbeddingsAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Backfill failed.",
+    };
+  }
+}
+
+/**
+ * BL-10 Phase D-2 — backfill quality scores for entries that haven't
+ * been scored yet (or were scored before this column existed). Org-
+ * admin gated; processes up to 100 per click so the admin can drain
+ * a large corpus across multiple clicks without long-running calls.
+ */
+export type ScoreBackfillResult =
+  | { ok: true; processed: number; remaining: number }
+  | { ok: false; error: string };
+
+export async function backfillKnowledgeEntryQualityScoresAction(): Promise<ScoreBackfillResult> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  try {
+    const candidates = await db
+      .select({
+        id: knowledgeEntries.id,
+        kind: knowledgeEntries.kind,
+        title: knowledgeEntries.title,
+        body: knowledgeEntries.body,
+        tags: knowledgeEntries.tags,
+        metadata: knowledgeEntries.metadata,
+      })
+      .from(knowledgeEntries)
+      .where(
+        and(
+          eq(knowledgeEntries.organizationId, organizationId),
+          isNull(knowledgeEntries.qualityScoredAt),
+        ),
+      )
+      .limit(100);
+
+    let processed = 0;
+    for (const c of candidates) {
+      try {
+        const quality = scoreKnowledgeEntry({
+          kind: c.kind,
+          title: c.title,
+          body: c.body,
+          tags: c.tags,
+          metadata: c.metadata,
+        });
+        await db
+          .update(knowledgeEntries)
+          .set({
+            qualityScore: quality.score,
+            qualityScoreFactors: quality.factors,
+            qualityScoredAt: new Date(),
+          })
+          .where(
+            and(
+              eq(knowledgeEntries.id, c.id),
+              eq(knowledgeEntries.organizationId, organizationId),
+            ),
+          );
+        processed += 1;
+      } catch (err) {
+        log.error(
+          "[backfillKnowledgeEntryQualityScoresAction]",
+          "row failed",
+          { error: err, entryId: c.id, organizationId },
+        );
+      }
+    }
+
+    // Cheap remaining count for the UI summary.
+    const [{ n } = { n: 0 }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(knowledgeEntries)
+      .where(
+        and(
+          eq(knowledgeEntries.organizationId, organizationId),
+          isNull(knowledgeEntries.qualityScoredAt),
+        ),
+      );
+
+    revalidatePath("/knowledge-base");
+    return { ok: true, processed, remaining: Number(n) };
+  } catch (err) {
+    log.error("[backfillKnowledgeEntryQualityScoresAction]", "error", {
+      error: err,
+    });
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Backfill failed.",

@@ -422,13 +422,24 @@ Today's `/knowledge-base` supports artifact upload + manual entries.
 - Standalone — no integration with existing create/update flows yet;
   the columns exist for Phase D-2 to populate them.
 
-**Phase D-2 (queued) — Wire scorer + surface in editor**:
-- Run `scoreKnowledgeEntry` on every entry create/update and
-  persist the score + factors + timestamp.
-- Surface the 0..1 score + factor breakdown in the entry editor
-  UI so authors see exactly which signals are weak.
-- Backfill action to score existing entries (analogous to
-  Phase B-2's classifier backfill).
+**Phase D-2 — Wire scorer + surface in editor** ✅ shipped:
+- `createKnowledgeEntryAction` scores on insert and persists
+  `qualityScore` + `qualityScoreFactors` + `qualityScoredAt`.
+- `updateKnowledgeEntryAction` loads the current row, merges the
+  partial input, re-scores against the merged shape, and includes
+  the new score columns in the existing UPDATE (no second round-
+  trip). Tag-only edits now re-score too.
+- New `backfillKnowledgeEntryQualityScoresAction` — org-admin
+  gated, processes up to 100 unscored entries per click, returns
+  `{ processed, remaining }` for the UI summary. Per-row try/catch
+  isolates failures.
+- Entry editor (`EditEntryClient`) shows a violet-bordered Quality
+  score panel: tone-coded percentage (emerald ≥ 70%, amber 40–69%,
+  rose < 40%) + per-factor breakdown table + hint text. Falls back
+  to a muted "will compute on next save" line when the score is
+  still NULL.
+- New `RescoreEntriesButton` next to the existing "Embed missing"
+  button in the knowledge-base header. Same idempotent pattern.
 
 **Acceptance (full ticket):** drop 20 files at once → all index
 successfully → auto-categorized with reviewable suggestions → quality
