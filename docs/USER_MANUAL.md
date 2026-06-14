@@ -84,13 +84,34 @@ After signing in you'll see the main **app shell**:
 
 ![App shell](docs/images/app-shell.png)
 
-- **Left sidebar** — navigation, grouped into Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Inside the Opportunities group you'll find **Opportunities Dashboard**, **In-flight Proposals**, and **New Proposals** as siblings (see §6).
+- **Left sidebar** — collapsible navigation with a wide mode (full labels + group headers) and an icon-rail mode (icons only, hover to see labels). Click the chevron at the top to toggle. Groups: Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Sub-items render with tree-connector lines so the hierarchy stays visually obvious. See §2.2 for the full nav structure.
 - **Top bar** — the mobile hamburger, live session clock, Settings shortcut, and your avatar
 - **Content area** — changes with the page you're on
+- **User identity card** — pinned at the bottom of the sidebar. Shows your name, email, and active org. Click your avatar in the top bar (or the identity card directly) to open the user menu.
 
 The top-right avatar is your **user menu**. Click it to see your name/email and sign out.
 
-### 2.1 Command Center vs. Opportunities Dashboard
+### 2.1 Sidebar navigation
+
+The sidebar groups every workspace into seven top-level sections. Each group is collapsible — click the group header (or its chevron) to fold its children. Group visibility depends on your role: Operations Management only shows for org admins; Platform Administration only shows for superadmins.
+
+| Group | Children | Who sees it |
+|---|---|---|
+| **Command Center** | (none — direct link to `/`) | Everyone |
+| **Operations Management** | Audit Log, Notification rules, Users | Org admins |
+| **Opportunities** | Opportunities Dashboard, In-flight Proposals, New Proposals, Pipeline, Companies | Everyone |
+| **Platform Intelligence** | Knowledge base, Watchlist, Firms, Awards, Solicitations | Everyone |
+| **Brain** | (direct link) | Everyone |
+| **Help** | User Guide, Admin Guide, FAQ | Everyone (admin guide only for admins) |
+| **Platform Administration** | SuperAdmin portal, Audit log (cross-tenant), Tiers, Promo codes | Superadmins |
+
+**Collapse to icons.** The chevron at the top of the sidebar toggles between **wide mode** (full labels) and **icon-rail mode** (icons only). Icon mode is what you want when you need a wider content area — the labels still appear on hover. Your preference persists across reloads.
+
+**Tree-connector lines** render under sub-items so the hierarchy stays obvious at a glance, even in icon-rail mode.
+
+**User identity card** at the bottom of the sidebar shows your name, email, and active org. It replaces the older FORGE Brain promo card — direct way to confirm "am I in the right tenant?" before you click anything destructive.
+
+### 2.2 Command Center vs. Opportunities Dashboard
 
 The default landing page after sign-in is the **Command Center** (`/`). It's the at-a-glance home — a 10-tile stage grid for opportunities (count + value range + due hint per stage), a "Next deadline" panel highlighting the soonest non-past-due opportunity, and a "Proposal stages" breakdown. Clicking any tile **navigates** to the Opportunities Dashboard pre-filtered to that stage.
 

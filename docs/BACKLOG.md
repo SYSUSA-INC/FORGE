@@ -1732,9 +1732,17 @@ guide. Tracked as continuous work, not a single PR.
   breakdown + admin Score-unscored backfill; §8.6 tips for
   getting the most out of the corpus. Internal §8.12 cross-ref
   updated to §9.12.
+- ✅ BL-22 Nav v2 polish — USER_MANUAL §2 layout bullet rewritten
+  to call out the collapsible icon-rail (wide ↔ icons), tree-
+  connector lines under sub-items, and the user identity card at
+  the bottom of the sidebar (replaced the older FORGE Brain
+  promo). New §2.1 "Sidebar navigation" enumerates every group +
+  its children (with role visibility) and explains the
+  collapse-to-icons toggle. Existing CC-vs-Dashboard subsection
+  renumbered to §2.2.
 
 **Still outstanding (queued for future passes):**
-- BL-22 nav v2 — partial coverage exists; needs a polish pass
+- (none — BL-21 outstanding queue is drained as of this pass)
 
 ---
 
