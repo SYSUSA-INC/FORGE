@@ -1590,64 +1590,86 @@ repo that runs only against Vercel Agent activity.
 
 ---
 
-### BL-QC-sentry — Sentry free-tier runtime error capture — **shipped (wiring); operator setup pending**
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC-vercel-agent-retired  ·  **Status:** ✅ wiring shipped; operator must set DSN
+### BL-QC-sentry — Sentry free-tier runtime error capture — **shipped (will be retired in follow-up PR)**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC-vercel-agent-retired  ·  **Status:** ⚠ wiring landed; user redirected to in-app error log — retire in follow-up
 
-After retiring Vercel Agent's "Investigations" toggle in BL-QC-vercel-
-agent-retired, we lost the runtime-error observability layer it was
-attempting to fill. GitHub Actions catches static issues at PR time;
-nothing was catching what blew up after deploy.
+Wiring shipped in PR #193 but the user redirected to skip Sentry and
+remove any reference before the merge happened. The merge went
+through anyway. A follow-up PR (BL-QC-sentry-retire) will rip
+Sentry back out and ship the in-app error log table per the user-
+stated preference. See docs/SENTRY_SETUP.md (also to be removed).
 
-**What ships in this PR:**
+---
 
-- `@sentry/nextjs` ^10.57.0 added to dependencies
-- `sentry.client.config.ts`, `sentry.server.config.ts`,
-  `sentry.edge.config.ts` at repo root — runtime SDK initialization
-  per Next.js's three runtimes (browser / Node.js / Edge)
-- `next.config.mjs` wrapped with `withSentryConfig` — bundling plugin
-  that tunnels Sentry requests through `/monitoring` (ad-blocker
-  resilience) and (optionally) uploads source maps for symbol
-  resolution in stack traces
-- `src/instrumentation.ts` updated to dynamically import the matching
-  config file based on `NEXT_RUNTIME`, plus re-export
-  `captureRequestError` so route-handler errors land in Sentry
-- `docs/SENTRY_SETUP.md` — operator setup checklist (account
-  creation, env-var setup, optional source-map upload, quota
-  monitoring guidance)
+### BL-QC-auto-migrate — Auto-apply migrations on deploy with rollback gates — **shipped**
+**Priority:** P0  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 
-**Cost-conscious settings** (Sentry free tier = 5k errors/month):
+Surfaced after the 2026-06-14 production crash: /settings and
+/notifications/rules returned 500 because the production DB was
+missing migrations 0036–0048. Cause: migrations are committed in PRs
+but auto-applied on production has never been wired — the operator
+had to remember to run /admin/migrations after each merge. Days of
+schema drift accumulated, then both surfaces broke as soon as a user
+clicked them.
 
-- `tracesSampleRate: 0` — no performance monitoring (separate quota)
-- `replaysSessionSampleRate: 0` + `replaysOnErrorSampleRate: 0` — no
-  session replays (paid + privacy)
-- `automaticVercelMonitors: false` — paid feature; we already log
-  cron success/failure manually
-- `ignoreErrors` patterns drop Next.js framework signals
-  (NEXT_REDIRECT, NEXT_NOT_FOUND), browser-extension noise
-  (chrome-extension://), and ResizeObserver loop warnings before
-  they hit the quota
+**Structural fix: auto-apply on every server cold start** with safety
+guards so a bad migration does not auto-take-down production.
 
-**Safe-to-ship-before-configured guarantee:** every SDK init checks
-for the DSN env var and no-ops if absent. So this PR can land without
-breaking dev, preview, or production until the operator decides to
-flip the switch.
+**Shipped:**
 
-**Operator follow-up (one-time, ~5 minutes):**
+- tryAutoApplyMigrations() in src/lib/migration-runner.ts:
+  - Skips when DISABLE_AUTO_MIGRATE=1 (escape hatch)
+  - Skips when no pending migrations (returns in <100ms — common case)
+  - Refuses when any pending migration contains destructive ops
+    (DROP TABLE/COLUMN/TYPE/SCHEMA/DATABASE, TRUNCATE,
+    ALTER COLUMN ... TYPE) — these require manual application
+  - Single-flight via pg_try_advisory_lock(7240613514)
+  - Takes a Neon branch snapshot before applying (if NEON_API_KEY +
+    NEON_PROJECT_ID configured)
+  - Never throws
+- detectDestructiveOps(content) + scanPendingForDestructive() —
+  static regex scan; surfaces blockers to the admin UI
+- src/lib/neon-snapshot.ts — tryCreateBranchSnapshot() Neon REST
+  API call with 10s timeout. No-op when NEON_API_KEY not set
+- src/instrumentation.ts — fire-and-forget call to
+  tryAutoApplyMigrations() followed by the existing schema verify
+- /admin/migrations UI — new Auto-apply panel showing
+  enabled/disabled, snapshot configuration, destructive blockers
+- docs/MIGRATION_PROTOCOL.md — authoring rules, auto-apply mechanics,
+  rollback procedures (mid-batch failure / downstream broken /
+  logically-bad migration), Neon snapshot + PITR mechanics
 
-1. Sign up at https://sentry.io/signup/ (Developer / free plan)
-2. Create a Next.js project, copy the DSN
-3. Add `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN` env vars to Vercel
-   (Production scope; same value for both)
-4. Trigger a redeploy
-5. (Optional) Add `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT`
-   for source-map upload
+**Rollback gates (per user request):**
 
-See `docs/SENTRY_SETUP.md` for the detailed walkthrough.
+1. **Destructive-op block** — DROP TABLE / DROP COLUMN / TRUNCATE /
+   ALTER COLUMN TYPE / DROP TYPE / DROP DATABASE / DROP SCHEMA refused
+   by auto-apply
+2. **Per-migration transactions** — existing pattern; partial apply
+   impossible
+3. **Pre-apply Neon snapshot** — branch-as-snapshot before each batch;
+   restore via Neon dashboard
+4. **Compensating-migration doc convention** — no down-migrations;
+   write a new forward migration to undo a bad one
 
-**Acceptance:** ✅ Build passes with no DSN set (verified by Type
-check + Next build CI gates in this PR). After operator setup, a
-deliberate `Sentry.captureMessage("test")` from the production browser
-console appears in the Sentry Issues view within 1-2 minutes.
+**Forward-only philosophy:** no -- @down blocks. Industry consensus
+is that down-migrations are hard to write correctly and encourage the
+wrong mental model. Compensating migrations + snapshot-based rollback
+is the modern norm.
+
+**Operator follow-up (one-time, ~5 min):**
+
+- Add NEON_API_KEY + NEON_PROJECT_ID to Vercel env (Production) if
+  not already set for the per-PR Neon branch workflow. Both needed for
+  snapshot-on-apply
+- Decide on snapshot retention — manual prune for now; a future
+  /api/cron/prune-snapshots cron can automate
+
+**Acceptance:** ✅ Next deploy runs tryAutoApplyMigrations() on cold
+start. With no pending migrations, returns silently in <100ms. With
+pending non-destructive migrations, applies them + logs
+[auto-migrate] applied N pending migration(s). With pending
+destructive migrations, logs a warn and refuses, preserving the
+manual /admin/migrations flow.
 
 ---
 
