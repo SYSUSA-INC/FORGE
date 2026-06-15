@@ -43,6 +43,15 @@ export type ErrorCaptureInput = {
   requestMethod?: string | null;
   httpStatus?: number | null;
   userAgent?: string | null;
+  /**
+   * Optional React error digest. Included in the fingerprint so the
+   * same digest (anchored to a stable identity across deploys) gets
+   * its own row in `/admin/errors`. Critical for Next.js production
+   * Server Component errors where `error.message` is the same generic
+   * string for every site — without the digest in the fingerprint,
+   * all server-side errors collapse into one row.
+   */
+  digest?: string | null;
 };
 
 const MAX_MESSAGE_LEN = 1000;
@@ -68,7 +77,12 @@ export async function captureProductionError(
     // (intentional — different sites likely need different triage).
     const message = input.tag ? `${input.tag} ${rawMessage}` : rawMessage;
 
-    const fingerprint = computeFingerprint(message, stack);
+    const fingerprint = computeFingerprint(
+      message,
+      stack,
+      input.requestPath ?? "",
+      input.digest ?? "",
+    );
 
     const environment =
       process.env.VERCEL_ENV || process.env.NODE_ENV || "development";
@@ -177,7 +191,12 @@ function shouldIgnore(message: string, stack: string): boolean {
   return false;
 }
 
-function computeFingerprint(message: string, stack: string): string {
+function computeFingerprint(
+  message: string,
+  stack: string,
+  requestPath: string,
+  digest: string,
+): string {
   // Strip absolute paths, hex line/column markers, and trailing
   // anonymous-function counters so the fingerprint is stable across
   // deploys (different file hashes in Vercel builds change the path
@@ -195,6 +214,22 @@ function computeFingerprint(message: string, stack: string): string {
     .filter(Boolean)
     .slice(0, STACK_FRAMES_FOR_FINGERPRINT);
 
-  const raw = `${message}\n${frames.join("\n")}`;
+  // Include request_path + digest in the fingerprint input so:
+  //   - Two different routes failing the same way (e.g., every page
+  //     hitting a missing schema column) become DISTINCT rows in the
+  //     viewer. Without this, Next.js's generic
+  //     "An error occurred in the Server Components render" message
+  //     (always identical in production) collapsed every server-side
+  //     error in the whole app into one row.
+  //   - The same React digest (when available) anchors the
+  //     fingerprint to a stable identity across deploys.
+  const raw = [
+    message,
+    frames.join("\n"),
+    requestPath ? `path:${requestPath}` : "",
+    digest ? `digest:${digest}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   return createHash("sha256").update(raw).digest("hex");
 }

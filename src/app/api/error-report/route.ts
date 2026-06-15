@@ -41,6 +41,11 @@ export async function POST(req: NextRequest) {
     const path = typeof body.path === "string" ? body.path : "";
     const userAgent =
       typeof body.userAgent === "string" ? body.userAgent : "";
+    // React's error digest — same value across deploys for the same
+    // underlying server-side error. Included in the captured row's
+    // fingerprint so distinct server-side bugs don't collapse into one
+    // row just because Next.js production hides the message.
+    const digest = typeof body.digest === "string" ? body.digest : "";
 
     // Look up user context if the request carries a session.
     // Never required — pre-auth errors still get captured.
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest) {
       requestPath: path,
       requestMethod: "GET", // best guess — client error was during page render
       userAgent,
+      digest,
     });
   } catch {
     // Swallow. Returning 204 unconditionally — see header comment.
