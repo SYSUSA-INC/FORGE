@@ -18,7 +18,6 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { extractMentionUserIds } from "@/lib/mentions";
-import { dispatchReviewAssignedNotification } from "@/lib/notifications";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { log } from "@/lib/log";
 
@@ -171,64 +170,6 @@ export async function startReviewAction(input: {
   }
 }
 
-async function fanOutAssignmentNotifications(input: {
-  organizationId: string;
-  actorUserId: string;
-  proposalId: string;
-  reviewId: string;
-  reviewColor: ReviewColor;
-  dueDate: Date | null;
-  assignments: { userId: string; sectionId: string | null }[];
-}): Promise<void> {
-  const [actorRow] = await db
-    .select({ name: users.name, email: users.email })
-    .from(users)
-    .where(eq(users.id, input.actorUserId))
-    .limit(1);
-  const starterName =
-    actorRow?.name ?? actorRow?.email ?? "A teammate";
-
-  const [proposalRow] = await db
-    .select({ title: proposals.title })
-    .from(proposals)
-    .where(eq(proposals.id, input.proposalId))
-    .limit(1);
-  const proposalTitle = proposalRow?.title ?? "your proposal";
-
-  const sectionIds = input.assignments
-    .map((a) => a.sectionId)
-    .filter((id): id is string => Boolean(id));
-  const sectionMap = new Map<string, string>();
-  if (sectionIds.length) {
-    const sectionRows = await db
-      .select({
-        id: proposalSections.id,
-        title: proposalSections.title,
-      })
-      .from(proposalSections)
-      .where(inArray(proposalSections.id, sectionIds));
-    for (const s of sectionRows) sectionMap.set(s.id, s.title);
-  }
-
-  await Promise.all(
-    input.assignments
-      .filter((a) => a.userId !== input.actorUserId)
-      .map((a) =>
-        dispatchReviewAssignedNotification({
-          organizationId: input.organizationId,
-          actorUserId: input.actorUserId,
-          recipientUserId: a.userId,
-          proposalId: input.proposalId,
-          proposalTitle,
-          reviewId: input.reviewId,
-          reviewColor: COLOR_LABELS[input.reviewColor],
-          starterName,
-          dueDate: input.dueDate,
-          sectionTitle: a.sectionId ? sectionMap.get(a.sectionId) ?? null : null,
-        }),
-      ),
-  );
-}
 
 export async function startReviewAndGoAction(input: {
   proposalId: string;
@@ -467,16 +408,28 @@ export async function assignReviewerAction(input: {
     .where(eq(proposalReviews.id, input.reviewId))
     .limit(1);
   if (review) {
-    await fanOutAssignmentNotifications({
+    // BL-13 Phase E-2d — fire the rules engine. Default seeded rule
+    // (`review_assignment_added`) uses `mentioned_in_payload` so only
+    // the newly-assigned user is notified — distinct from the initial
+    // fan-out at review start, which uses `review_request_pending`
+    // with the `review_assignee` formula (notifies all current
+    // assignees).
+    await dispatchTriggerEvent({
       organizationId,
-      actorUserId: actor.id,
+      kind: "review_assignment_added",
+      payload: {
+        proposalId: review.proposalId,
+        reviewId: input.reviewId,
+        color: review.color,
+        addedUserId: input.userId,
+        sectionId: input.sectionId ?? null,
+        mentionedUserIds: [input.userId],
+      },
+      subject: `${review.color} review — you've been added`,
+      linkPath: `/proposals/${review.proposalId}/reviews/${input.reviewId}`,
       proposalId: review.proposalId,
       reviewId: input.reviewId,
-      reviewColor: review.color,
-      dueDate: review.dueDate,
-      assignments: [
-        { userId: input.userId, sectionId: input.sectionId ?? null },
-      ],
+      actorUserId: actor.id,
     });
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
   }

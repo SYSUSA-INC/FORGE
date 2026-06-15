@@ -832,27 +832,39 @@ landed June 5. The retirement deletes:
 via `fanOutAssignmentNotifications` in `assignReviewerAction`. See
 Phase E-2d below.
 
-**Phase E-2d (queued) — Migrate `assignReviewerAction` to the rules engine**:
+**Phase E-2d (shipped) — Migrate `assignReviewerAction` to the rules engine**:
 
-`assignReviewerAction` adds a single reviewer to an existing review,
-and the legacy `dispatchReviewAssignedNotification` notified only the
-newly-added user. The current `review_request_pending` seeded rule
-uses the `review_assignee` formula, which resolves to ALL current
-assignees — firing it on a single-reviewer add would over-notify
-every previously-assigned reviewer.
+Completes the legacy notification dispatcher retirement started in
+Phase E-2c. `assignReviewerAction` adds a single reviewer to an
+existing review — distinct from the initial review-start fan-out.
+The existing `review_request_pending` rule uses formula
+`review_assignee` which would over-notify every previously-assigned
+reviewer on a single-reviewer add. So Phase E-2d added a separate
+trigger event kind:
 
-To complete the legacy retirement:
-
-- Add a new `review_assignment_added` trigger event kind to
+- ✅ Migration 0050 adds `review_assignment_added` to the
   `notification_trigger_event_kind` enum
-- Seed a default rule per tenant using `mentioned_in_payload` strategy
-  so only the newly-assigned user is notified
-- Wire `assignReviewerAction` to call `dispatchTriggerEvent({ kind:
-  "review_assignment_added", payload: { ..., mentionedUserIds:
-  [input.userId] } })`
-- Delete `fanOutAssignmentNotifications` helper, the
-  `dispatchReviewAssignedNotification` function, and
-  `src/lib/notifications.ts` entirely
+- ✅ Migration 0051 seeds a default rule per tenant using the
+  `mentioned_in_payload` recipient strategy so only the
+  newly-assigned user is notified
+- ✅ `assignReviewerAction` now fires `dispatchTriggerEvent({
+  kind: "review_assignment_added", payload: { ...,
+  mentionedUserIds: [input.userId] } })`
+- ✅ `fanOutAssignmentNotifications` helper deleted
+- ✅ `dispatchReviewAssignedNotification` deleted
+- ✅ `src/lib/notifications.ts` deleted entirely
+- ✅ `legacyKindFor` switch in `notification-dispatcher.ts` extended
+  with `review_assignment_added → review_assigned` mapping
+  (inbox kind stays the same; the late-add vs initial-fan-out
+  distinction lives in the trigger event kind + rule, not in the
+  inbox row)
+
+**Acceptance:** ✅ Every notification path in the codebase that
+fires a notification now goes through `dispatchTriggerEvent`. Zero
+direct `db.insert(notifications)` outside the dispatcher itself
+(verified by `grep -r "db.insert(notifications)"` returning only
+`notification-dispatcher.ts`, `notification-cron.ts`, and the
+dispatcher's own inbox-parity writes).
 
 **Acceptance (BL-13 full ticket):** create a rule "notify pricing-lead 48h
 before due date"; opportunity advances within 48h; rule fires;
