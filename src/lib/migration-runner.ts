@@ -247,6 +247,196 @@ export async function getMigrationStatus(): Promise<{
   return { expectedFiles, appliedFiles, pendingFiles };
 }
 
+/**
+ * BL-QC-auto-migrate — detect destructive SQL operations.
+ *
+ * Auto-apply REFUSES to run a pending migration whose content matches
+ * any of these patterns. The operator must apply such migrations
+ * manually via `/admin/migrations` with an explicit confirmation.
+ *
+ * Rationale: data loss is permanent. Auto-applying a migration that
+ * drops a column or table can take down production in seconds with
+ * no easy undo. Catching it pre-apply forces a human review.
+ *
+ * Patterns we flag (data destruction, not perf/semantics):
+ *   - DROP TABLE / COLUMN / TYPE / DATABASE / SCHEMA
+ *   - TRUNCATE
+ *   - ALTER COLUMN ... (SET DATA) TYPE (re-type can lose precision / fail)
+ *
+ * Patterns we do NOT flag:
+ *   - DROP INDEX  (perf hit, recoverable by re-creating)
+ *   - DROP CONSTRAINT  (semantics change, no data loss)
+ *   - ADD/CREATE anything
+ *   - INSERT / UPDATE / DELETE  (row-level — trusted to be reviewed)
+ */
+const DESTRUCTIVE_PATTERNS: { name: string; regex: RegExp }[] = [
+  { name: "DROP TABLE", regex: /\bDROP\s+TABLE\b/i },
+  { name: "DROP COLUMN", regex: /\bDROP\s+COLUMN\b/i },
+  { name: "DROP TYPE", regex: /\bDROP\s+TYPE\b/i },
+  { name: "DROP DATABASE", regex: /\bDROP\s+DATABASE\b/i },
+  { name: "DROP SCHEMA", regex: /\bDROP\s+SCHEMA\b/i },
+  { name: "TRUNCATE", regex: /\bTRUNCATE\b/i },
+  {
+    name: "ALTER COLUMN TYPE",
+    regex: /\bALTER\s+COLUMN\s+\S+\s+(?:SET\s+DATA\s+)?TYPE\b/i,
+  },
+];
+
+export type DestructiveFinding = {
+  filename: string;
+  matches: string[]; // human-readable list of destructive op names
+};
+
+/**
+ * Scan a migration file's content for destructive ops. Strips
+ * comments before scanning so a "DROP TABLE foo" inside a `--` line
+ * doesn't trigger a false positive.
+ */
+export function detectDestructiveOps(content: string): string[] {
+  // Strip both `--` line comments and `/* */` block comments.
+  const stripped = content
+    .replace(/--[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const matches: string[] = [];
+  for (const p of DESTRUCTIVE_PATTERNS) {
+    if (p.regex.test(stripped)) matches.push(p.name);
+  }
+  return matches;
+}
+
+/**
+ * Read pending migration files and return any that contain
+ * destructive operations. Used by auto-apply to refuse, and by the
+ * admin UI to surface a warning panel.
+ */
+export async function scanPendingForDestructive(): Promise<DestructiveFinding[]> {
+  const status = await getMigrationStatus();
+  const findings: DestructiveFinding[] = [];
+  const dir = join(process.cwd(), "drizzle");
+  for (const file of status.pendingFiles) {
+    try {
+      const content = readFileSync(join(dir, file), "utf-8");
+      const matches = detectDestructiveOps(content);
+      if (matches.length > 0) findings.push({ filename: file, matches });
+    } catch {
+      // If we can't read the file, leave it alone — runMigrations()
+      // will surface the read error.
+    }
+  }
+  return findings;
+}
+
+/**
+ * Postgres advisory-lock key for single-flight migration apply.
+ * Picked arbitrarily; just needs to be unique within the database.
+ * If two server processes both try to auto-apply at cold start, only
+ * one acquires the lock — the other returns immediately.
+ */
+const ADVISORY_LOCK_KEY = 7240613514;
+
+export type AutoApplyResult =
+  | {
+      kind: "ok";
+      appliedFilenames: string[];
+      skippedFilenames: string[];
+      snapshotId: string | null;
+    }
+  | { kind: "no-pending" }
+  | {
+      kind: "blocked-destructive";
+      blockers: DestructiveFinding[];
+    }
+  | { kind: "lock-held" }
+  | { kind: "disabled" }
+  | { kind: "failed"; error: string; snapshotId: string | null };
+
+/**
+ * Cold-start hook for auto-applying pending migrations.
+ *
+ * Flow:
+ *   1. Bail if DISABLE_AUTO_MIGRATE env var is set
+ *   2. Bail if no pending migrations
+ *   3. Bail if any pending migration contains destructive ops
+ *   4. Acquire Postgres advisory lock (single-flight)
+ *   5. Take Neon branch snapshot (if NEON_API_KEY is configured)
+ *   6. Run runMigrations()
+ *   7. Release lock
+ *
+ * Never throws. All failure modes return a structured AutoApplyResult
+ * so the caller (instrumentation.ts) can log appropriately without
+ * blocking server boot.
+ */
+export async function tryAutoApplyMigrations(): Promise<AutoApplyResult> {
+  if (process.env.DISABLE_AUTO_MIGRATE === "1") {
+    return { kind: "disabled" };
+  }
+
+  let status;
+  try {
+    status = await getMigrationStatus();
+  } catch (err) {
+    return {
+      kind: "failed",
+      error: `Could not read migration status: ${err instanceof Error ? err.message : "unknown"}`,
+      snapshotId: null,
+    };
+  }
+
+  if (status.pendingFiles.length === 0) {
+    return { kind: "no-pending" };
+  }
+
+  const blockers = await scanPendingForDestructive();
+  if (blockers.length > 0) {
+    return { kind: "blocked-destructive", blockers };
+  }
+
+  // Try to acquire the advisory lock. pg_try_advisory_lock returns
+  // immediately — true if we got it, false if another process holds
+  // it. Non-blocking: a second cold-start instance just sees
+  // "lock-held" and exits, letting the first one finish.
+  const lockResult = await db.execute(
+    sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS got`,
+  );
+  const got = (lockResult.rows[0] as { got?: boolean } | undefined)?.got;
+  if (!got) {
+    return { kind: "lock-held" };
+  }
+
+  let snapshotId: string | null = null;
+  try {
+    // Try to snapshot before applying. If Neon API isn't configured
+    // or the call fails, we LOG and continue — snapshotting is
+    // best-effort, not a blocker. The user can also take a manual
+    // snapshot via the Neon dashboard.
+    const { tryCreateBranchSnapshot } = await import("./neon-snapshot");
+    snapshotId = await tryCreateBranchSnapshot(
+      `auto-migrate-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`,
+    );
+
+    const result = await runMigrations();
+    if (!result.ok) {
+      return { kind: "failed", error: result.error, snapshotId };
+    }
+    return {
+      kind: "ok",
+      appliedFilenames: result.appliedFilenames,
+      skippedFilenames: result.skippedFilenames,
+      snapshotId,
+    };
+  } catch (err) {
+    return {
+      kind: "failed",
+      error: err instanceof Error ? err.message : "unknown apply failure",
+      snapshotId,
+    };
+  } finally {
+    await db
+      .execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`)
+      .catch(() => undefined);
+  }
+}
+
 export type MarkAppliedResult =
   | { ok: true; markedFilenames: string[]; alreadyPresentFilenames: string[] }
   | { ok: false; error: string };
