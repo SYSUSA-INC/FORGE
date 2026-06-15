@@ -1,0 +1,27 @@
+-- BL-13 Phase E-2d — extend `notification_trigger_event_kind` with
+-- `review_assignment_added`.
+--
+-- Why: the existing `review_request_pending` rule uses the
+-- `review_assignee` formula, which resolves to ALL current assignees
+-- on a review. That's correct for the initial fan-out from
+-- startReviewAction (notify everyone who's just been added), but
+-- wrong for assignReviewerAction (adding a single reviewer to an
+-- existing review would over-notify every previously-assigned
+-- reviewer).
+--
+-- This migration adds a separate trigger event kind so
+-- assignReviewerAction can fire its own event with a
+-- `mentioned_in_payload` recipient strategy that resolves only to
+-- the newly-assigned user.
+--
+-- After this migration:
+--   - The seed migration in 0051 will create one default rule per
+--     tenant for review_assignment_added
+--   - assignReviewerAction will fire dispatchTriggerEvent with the
+--     new kind, completing the legacy dispatcher retirement
+--
+-- `ALTER TYPE ... ADD VALUE` can't run inside a transaction that
+-- also references the new value, so it's its own statement.
+-- `IF NOT EXISTS` makes the migration safe to re-run.
+
+ALTER TYPE "notification_trigger_event_kind" ADD VALUE IF NOT EXISTS 'review_assignment_added';

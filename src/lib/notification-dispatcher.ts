@@ -253,6 +253,12 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
       return "opportunity_review_completed" as const;
     case "solicitation_role_assigned":
       return "solicitation_role_assigned" as const;
+    case "review_assignment_added":
+      // Late-add reviewer notification — same inbox kind as the
+      // initial review-start fan-out (`review_assigned`). The
+      // distinction between initial fan-out and late-add lives in
+      // the trigger event kind + rule, not in the inbox row.
+      return "review_assigned" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;

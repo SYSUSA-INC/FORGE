@@ -27,6 +27,7 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   proposal_section_overdue: "Proposal section overdue",
   review_request_pending: "Color-team review pending",
   review_completed: "Color-team review completed",
+  review_assignment_added: "Color-team reviewer added late",
   compliance_overdue: "Compliance item overdue",
   audit_anomaly: "Audit anomaly detected",
   membership_invited: "Team member invited",
