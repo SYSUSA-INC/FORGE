@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { OpportunityForm } from "../OpportunityForm";
 import { listOpportunityOwners } from "../actions";
 import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
+import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,10 @@ export default async function OpportunityOverviewPage({
       </Panel>
       <div className="flex flex-col gap-4">
         <OpportunityBriefPanel opportunityId={opp.id} />
+        <OpportunityDocsAndAIPanel
+          opportunityId={opp.id}
+          organizationId={organizationId}
+        />
       </div>
     </div>
   );
