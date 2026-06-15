@@ -113,6 +113,13 @@ export function AdminClient({
               Promo codes →
             </Link>
             <Link
+              href="/admin/errors"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="In-app production error log — uncaught exceptions deduped by fingerprint"
+            >
+              Errors →
+            </Link>
+            <Link
               href="/platform/audit-log"
               className="aur-btn aur-btn-ghost text-[11px]"
               title="Cross-tenant audit log — every recorded action across every org"

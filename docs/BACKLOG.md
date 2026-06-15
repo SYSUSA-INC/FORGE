@@ -1643,6 +1643,87 @@ No code, no config, no docs reference Sentry as an active dependency.
 
 ---
 
+### BL-QC-errors — In-app production error log — **shipped**
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC-sentry-retire  ·  **Status:** ✅ shipped
+
+Replaces what an external observability backend (e.g., Sentry —
+retired in BL-QC-sentry-retire) would give us. Same mental model as
+the existing `audit_log` table — uncaught exceptions land in a
+platform-wide `production_error` table, deduped by a SHA-256
+fingerprint of the stack trace's top 5 frames so 1000 firings of the
+same bug collapse into 1 row with `occurrenceCount = 1000`.
+
+Surfaced 2026-06-14 when `/settings` and `/notifications/rules`
+silently 500'd from schema drift. The crashes were invisible until a
+user clicked them. With this in place, future similar crashes appear
+at `/admin/errors` immediately on the first occurrence, before
+anyone has to click anything to discover them.
+
+**What ships:**
+
+- `drizzle/0049_production_error_log.sql` — `production_error` table
+  with fingerprint-based dedup, partial index on unresolved rows,
+  cascade-set-null for org / user / actor references
+- `src/db/schema.ts` — `productionErrors` Drizzle binding
+- `src/lib/error-log.ts` — `captureProductionError(input)` with
+  SHA-256 fingerprint over top 5 stack frames (line/column markers
+  stripped for cross-deploy stability), UPSERT-based dedup via
+  `onConflictDoUpdate`, noise-filter (NEXT_REDIRECT, AbortError,
+  ResizeObserver loops, browser-extension paths)
+- `src/app/global-error.tsx` — root error boundary. POSTs to
+  `/api/error-report` fire-and-forget. Minimal styled fallback
+  page with the Next.js `digest` reference
+- `src/app/api/error-report/route.ts` — public endpoint (allow-listed
+  in `auth.config.ts`) that captures client-side errors. Returns
+  204 unconditionally so the report endpoint never errors during an
+  already-broken page render
+- `src/app/(app)/admin/errors/page.tsx` — superadmin viewer with
+  filter by status (unresolved/acknowledged/resolved/all) + env
+  (production/preview/development). Top-line counts: total issues,
+  unresolved, unacknowledged, total occurrences
+- `src/app/(app)/admin/errors/ErrorRowActions.tsx` — per-issue
+  acknowledge / resolve / re-open / add-notes
+- `src/app/(app)/admin/errors/actions.ts` — server actions for the
+  four triage operations. Allow-listed in `.isolation-allow.json`
+  with rationale (platform-wide ops data, not tenant-scoped)
+- `src/app/(app)/admin/AdminClient.tsx` — "Errors →" nav link in
+  the SuperAdmin portal action bar
+
+**What this is NOT:**
+
+- Server-side auto-capture from server actions / route handlers /
+  RSC. Next 14 doesn't have an `onRequestError` hook (Next 15
+  feature). Explicit `captureProductionError(...)` calls in catch
+  blocks are the migration path; can sweep the existing 99
+  `log.error` sites in a follow-up if needed
+- Performance monitoring / profiling — out of scope. Cron timing
+  observability lives in the cron handlers' structured log lines
+- Cross-tenant tenant visibility — production_error is platform-wide,
+  not tenant-scoped. Tenant admins don't see it. Superadmin only.
+
+**Cost-conscious posture:**
+
+- Zero external SaaS dependency. Lives in the existing Neon DB.
+- Dedup means runaway error storms can't balloon table size (1
+  fingerprint = 1 row, even at 1M occurrences)
+- Partial index on `resolved_at IS NULL` keeps the default
+  "show me what needs attention" query fast even after the
+  resolved-history grows large
+- Pre-write `shouldIgnore` filter drops the same kinds of noise
+  Sentry's `ignoreErrors` config would have dropped (Next framework
+  signals, browser-extension exceptions, ResizeObserver loops,
+  AbortError)
+
+**Acceptance:** ✅ A deliberate uncaught error in a client component
+shows up at `/admin/errors` within a few seconds of the page render.
+Re-triggering produces `occurrenceCount = 2` on the same row, not a
+new row. Acknowledge / Resolve transitions the row's status filter
+group. Notes save and persist across page loads. A new occurrence on
+a previously-resolved fingerprint un-resolves the row (so a "fixed"
+bug coming back is visible).
+
+---
+
 ### BL-QC-auto-migrate — Auto-apply migrations on deploy with rollback gates — **shipped**
 **Priority:** P0  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 

@@ -2415,3 +2415,86 @@ export const promotionCodes = pgTable(
 
 export type PromotionCode = typeof promotionCodes.$inferSelect;
 export type NewPromotionCode = typeof promotionCodes.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-QC-errors — in-app production error log
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Replaces what an external observability backend (e.g., Sentry) would
+ * give us. Same idea — uncaught exceptions land here, grouped by a
+ * fingerprint hashed from the stack trace's top frames so 1000 firings
+ * of the same bug become 1 row with `occurrenceCount = 1000`.
+ *
+ * Organization context is captured when available but the column is
+ * nullable — pre-auth errors (sign-in page crash, etc.) still get
+ * logged with `organizationId = NULL`. The admin viewer at
+ * `/admin/errors` is superadmin-scoped so it can see across tenants.
+ */
+export const productionErrors = pgTable(
+  "production_error",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Null when the error happened before tenant context was resolved. */
+    organizationId: uuid("organization_id").references(
+      () => organizations.id,
+      { onDelete: "set null" },
+    ),
+    /** Null for client-side and pre-auth errors. */
+    userId: text("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * SHA-256 of normalized stack trace (top 5 frames, line/column
+     * numbers stripped). Drives dedup — same fingerprint → bump
+     * occurrenceCount + update lastSeenAt instead of inserting a new
+     * row.
+     */
+    fingerprint: text("fingerprint").notNull(),
+    message: text("message").notNull(),
+    stack: text("stack").notNull().default(""),
+    /** "server" | "client" | "edge" — which runtime captured this. */
+    runtime: text("runtime").notNull().default("server"),
+    /** "production" | "preview" | "development" — VERCEL_ENV. */
+    environment: text("environment").notNull().default(""),
+    /** Path on the request that triggered the error (server-side only). */
+    requestPath: text("request_path").notNull().default(""),
+    requestMethod: text("request_method").notNull().default(""),
+    httpStatus: integer("http_status"),
+    userAgent: text("user_agent").notNull().default(""),
+    /** Vercel deploy SHA when the error fired (helps correlate to git). */
+    releaseSha: text("release_sha").notNull().default(""),
+    firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+    occurrenceCount: integer("occurrence_count").notNull().default(1),
+    /** Set when an operator marks the issue as triaged. */
+    acknowledgedAt: timestamp("acknowledged_at"),
+    acknowledgedByUserId: text("acknowledged_by_user_id").references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
+    /** Set when the underlying bug has been fixed + verified. */
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    fingerprintIdx: uniqueIndex("production_error_fingerprint_idx").on(
+      t.fingerprint,
+    ),
+    lastSeenIdx: index("production_error_last_seen_idx").on(t.lastSeenAt),
+    orgLastSeenIdx: index("production_error_org_last_seen_idx").on(
+      t.organizationId,
+      t.lastSeenAt,
+    ),
+    unresolvedIdx: index("production_error_unresolved_idx")
+      .on(t.lastSeenAt)
+      .where(sql`${t.resolvedAt} IS NULL`),
+  }),
+);
+
+export type ProductionError = typeof productionErrors.$inferSelect;
+export type NewProductionError = typeof productionErrors.$inferInsert;
