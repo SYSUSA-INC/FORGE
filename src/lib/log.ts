@@ -62,6 +62,13 @@ function serializeError(err: unknown): LogPayload["error"] | undefined {
   return undefined;
 }
 
+// Recursion guard for the auto-capture-on-log.error pipeline. When
+// captureProductionError fails (DB unreachable, table missing, etc.)
+// it itself calls log.error("[captureProductionError]", ...). Without
+// this guard, that nested call would trigger another capture attempt,
+// which would fail again, recurse forever.
+let _captureInProgress = false;
+
 function emit(
   level: LogPayload["level"],
   tag: string,
@@ -74,6 +81,7 @@ function emit(
     message,
   };
 
+  let errorForCapture: Error | undefined;
   if (ctx) {
     // Pull `error` out of ctx and elevate it to a structured field —
     // Vercel's log viewer wants stack as its own key, not buried
@@ -81,10 +89,40 @@ function emit(
     const { error, ...rest } = ctx as { error?: unknown } & LogContext;
     if (error !== undefined) {
       payload.error = serializeError(error);
+      if (error instanceof Error) errorForCapture = error;
     }
     if (Object.keys(rest).length > 0) {
       payload.ctx = rest;
     }
+  }
+
+  // BL-QC-errors-autocapture — when log.error fires with a real Error
+  // in ctx, also persist to the production_error table so /admin/errors
+  // surfaces it. Node-only (Edge runtime can't reach pg) + non-blocking
+  // (DB write is fire-and-forget; never delays the user's response).
+  if (
+    level === "error" &&
+    errorForCapture !== undefined &&
+    !_captureInProgress &&
+    process.env.NEXT_RUNTIME === "nodejs"
+  ) {
+    _captureInProgress = true;
+    void (async () => {
+      try {
+        const { captureProductionError } = await import("./error-log");
+        await captureProductionError({
+          error: errorForCapture,
+          tag,
+          runtime: "server",
+        });
+      } catch {
+        // Swallow — the telemetry pipeline failing should never
+        // affect the user's request. The Vercel log line above
+        // already captured the structured error.
+      } finally {
+        _captureInProgress = false;
+      }
+    })();
   }
 
   // In production, emit a single JSON line — Vercel's dashboard parses
