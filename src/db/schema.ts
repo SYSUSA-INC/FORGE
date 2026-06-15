@@ -811,6 +811,7 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "proposal_section_overdue",
     "review_request_pending",
     "review_completed",
+    "review_assignment_added",
     "compliance_overdue",
     "audit_anomaly",
     "membership_invited",
