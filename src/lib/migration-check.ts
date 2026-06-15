@@ -19,7 +19,7 @@ import { log } from "@/lib/log";
  * adding a new drizzle/0NNN migration file. The build will fail
  * loudly if forgotten.
  */
-const EXPECTED_LATEST_MIGRATION = "0034_audit_log.sql";
+const EXPECTED_LATEST_MIGRATION = "0052_repair_false_applied_ledger.sql";
 
 let didCheck = false;
 

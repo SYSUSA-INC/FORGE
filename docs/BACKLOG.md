@@ -1834,6 +1834,74 @@ bump `occurrenceCount` rather than duplicating rows.
 
 ---
 
+### BL-QC-schema-repair — Repair false-applied ledger entries — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-auto-migrate  ·  **Status:** ✅ shipped
+
+Surfaced 2026-06-15 when `/admin/orgs/[id]` started returning 500 with
+Postgres error `42P01 — relation "audit_log" does not exist`. The
+`_forge_migration` ledger claimed migrations 0028, 0031, 0032, 0033,
+0034 were applied, but the 7 tables they create were missing. Later
+migrations (0035+) HAD applied — proving the database wasn't simply
+behind, but in a partial state where the ledger lied.
+
+**Root cause:** at some point an operator clicked the "Sync ledger"
+affordance on `/admin/migrations` (the "orphan candidates" panel from
+`MigrationsClient.tsx:73-162`). That affordance writes ledger entries
+without running the SQL — designed for the case where a database was
+migrated via `scripts/apply-schema.mjs` BEFORE the runtime ledger
+existed. It was applied past the actual high-water mark, marking
+0028-0034 as applied when their tables didn't yet exist.
+
+**Immediate operator fix (2026-06-15 22:19 UTC):** operator ran the
+idempotent recovery SQL via the Neon SQL Editor. The 7 missing tables
+now exist on production. Audit log persistence works again,
+`/admin/orgs/[id]` renders, recordAudit succeeds.
+
+**This PR — SDLC closure:**
+
+- New migration `drizzle/0052_repair_false_applied_ledger.sql` that
+  idempotently re-creates the 7 missing tables. Mirrors the content
+  of 0028, 0031, 0032, 0033, 0034 but every CREATE uses
+  `IF NOT EXISTS`, every CREATE TYPE wraps in DO/EXCEPTION, every
+  ADD CONSTRAINT wraps in DO/EXCEPTION. Safe to run anywhere:
+    - On production where the hotfix SQL already ran → migration
+      no-ops (every guard succeeds-as-skipped)
+    - On a fresh deploy / restored backup → migration creates the
+      tables, restoring the schema invariant
+- Bumps `EXPECTED_LATEST_MIGRATION` in `src/lib/migration-check.ts`
+  to `0052_repair_false_applied_ledger.sql` (was `0034_audit_log.sql`
+  — long out of date)
+- Documents the incident + root cause in the migration's header
+  comment block for future readers
+
+**Why this isn't a "band-aid":**
+
+- The fix is in version control, reviewable as a PR, run through CI
+  gates (TypeScript, lint, RSC, isolation, schema/migration coupling,
+  fresh-DB migration verification)
+- The auto-migrate pipeline (BL-QC-auto-migrate) will apply 0052 on
+  the next cold start
+- Fresh-DB CI runs every migration including 0052 from scratch, so
+  the migration is exercised end-to-end before merge
+- Reproducible — anyone bringing up a new environment gets the same
+  schema state by running migrations through the ledger
+
+**Acceptance:** ✅ The 7 tables exist on production. /admin and
+/admin/orgs/[id] load. After this PR merges + auto-migrate cold-starts,
+the ledger has 0052 applied. Fresh-DB CI passes (proves migration
+0052 is idempotent + composes with 0000-0051).
+
+**Hardening follow-up (queued, separate PR):**
+
+- BL-QC-ledger-drift-detector — detect "ledger says applied but
+  target table missing" on boot. Auto-recover where safe, refuse to
+  start otherwise.
+- Replace `/admin/migrations`'s "Sync ledger" UI with a per-file
+  affordance that verifies the target table exists before marking
+  applied. Or remove the UI entirely — it's a footgun.
+
+---
+
 ### BL-QC-auto-migrate — Auto-apply migrations on deploy with rollback gates — **shipped**
 **Priority:** P0  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 
