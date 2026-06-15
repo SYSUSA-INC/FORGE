@@ -10,8 +10,6 @@
  *      - Takes a Neon branch snapshot if NEON_API_KEY is configured
  *      - Set DISABLE_AUTO_MIGRATE=1 to freeze the schema in place
  *   3. Verify the DB schema matches what the code expects (warn-only)
- *   4. Initialize Sentry on Node.js + Edge runtimes (no-ops when DSN
- *      isn't set)
  *
  * **Webpack pruning requirement:** every dynamic import of a Node-only
  * module (migration-runner, migration-check, pg-via-db) MUST be
@@ -22,7 +20,6 @@
  *
  * Docs: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  *       docs/MIGRATION_PROTOCOL.md
- *       docs/SENTRY_SETUP.md
  */
 
 export async function register() {
@@ -112,19 +109,5 @@ export async function register() {
         }
       })();
     }
-
-    // Sentry server-side initialization. The config file no-ops when
-    // SENTRY_DSN / NEXT_PUBLIC_SENTRY_DSN isn't set, so this import is
-    // safe in environments without Sentry configured.
-    await import("../sentry.server.config");
-  }
-
-  if (process.env.NEXT_RUNTIME === "edge") {
-    await import("../sentry.edge.config");
   }
 }
-
-// Re-export Sentry's request-error hook so Next.js wires it
-// automatically — captures errors thrown from server actions, route
-// handlers, and RSC that would otherwise be invisible.
-export { captureRequestError as onRequestError } from "@sentry/nextjs";

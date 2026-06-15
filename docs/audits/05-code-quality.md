@@ -3,7 +3,7 @@
 ## Executive summary
 
 FORGE exhibits **moderate brittleness** in error handling, type safety, and observability. Key gaps:
-- **99 `console.error/warn` calls** log internally only; zero observability backend (Sentry/Datadog). Production bugs are invisible.
+- **99 `console.error/warn` calls** log internally only; zero structured-error backend. Production bugs are invisible until users report them. Addressed in BL-QC-errors (in-app `production_error` table + admin viewer).
 - **Widespread unvalidated JSON parsing** from AI outputs using informal `extractJson` + `JSON.parse` chains without schemas.
 - **Dual action return shapes**: Most use `{ ok: boolean; data | error }`, but AI actions return `Result | Error` union types (incompatible with client patterns).
 - **Unsafe db.execute() result casts** using `as unknown as TypeX` chains in embedding/semantic search queries.
@@ -19,7 +19,7 @@ No critical data-loss bugs found, but refactor-safety is low.
 
 | Severity | Area | File:line | Issue | Recommended fix |
 |---|---|---|---|---|
-| P1 | observability | src/lib/ai.ts + 99 sites | 99x console.error/warn calls, zero telemetry. Production bugs invisible. | Integrate Sentry error tracking; wrap console.error calls with `captureException()`. |
+| P1 | observability | src/lib/ai.ts + 99 sites | 99x console.error/warn calls, zero telemetry. Production bugs invisible. | Ship in-app error log (`production_error` table + `/admin/errors` viewer) so uncaught exceptions deduped by stack-trace fingerprint. Tracked as BL-QC-errors. |
 | P1 | type safety | src/app/(app)/knowledge-base/import/embed-actions.ts:205–206 | `result as unknown as { rows? } as unknown as rows` — three-layer cast to work around Drizzle unknown typing. Parsing failure = no error. | Type-safe wrapper around `db.execute(sql`...`)` results; validate shape at runtime with zod or manual checks. |
 | P1 | type safety | src/app/(app)/proposals/[id]/compliance/actions.ts:390 | `JSON.parse(extractJson(raw))` on AI output without schema validation. Parse failure logs warning, skips item (`continue`), user gets partial results silently. | Use zod to validate `CompliancePreflightVerdict[]` shape before parsing. Fail the action if verdicts malformed. |
 | P1 | consistency | src/app/(app)/opportunities/[id]/ai/actions.ts:20–31 | Opportunity brief returns `OpportunityBriefResult | OpportunityBriefError` union; compliance action returns `{ ok: boolean; ... }`. Client code must handle both patterns. | Normalize all actions to `Promise<{ ok: true; ...} \| { ok: false; error }>` or use a consistent union. Document the pattern. |
@@ -116,7 +116,7 @@ No critical data-loss bugs found, but refactor-safety is low.
 
 ## Top 10 fix order
 
-1. **Integrate error tracking** (Sentry free tier).  Wrap `console.error` calls. Visibility into production bugs.
+1. **Ship in-app error log** (`production_error` table + admin viewer; BL-QC-errors). Visibility into production bugs without external SaaS dependency.
 2. **Normalize action return types**. All `Promise<{ ok: boolean; error?: string; data? }>`. No unions.
 3. **Validate AI JSON with zod**. Parse schemas for compliance verdicts, opportunity brief, etc.
 4. **Type-safe db.execute wrapper**. Single function that validates Drizzle sql`...` results. Reuse across embed, search, etc.

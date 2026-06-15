@@ -111,7 +111,7 @@ The quick view:
 5. **PR-5: Rate limiting + abuse protection** (P1 × 3) — register, review, AI endpoints
 6. **PR-6: Markdown sanitization + auth gap on /api/samgov/entity** (P2 × 2)
 7. **PR-7: Action return-shape normalization + zod validation on AI JSON** (P1 × 2 from Pass 5)
-8. **PR-8: Telemetry/observability (Sentry integration)** (P1 from Pass 5)
+8. **PR-8: In-app error log — BL-QC-errors** (P1 from Pass 5) — `production_error` table + `/admin/errors` viewer; replaces the Sentry integration that was originally drafted but retired (BL-QC-sentry-retire)
 9. **PR-9: JSONB default consistency + minor data-integrity P2s** (P2 × 3)
 10. **PR-10: Stub-mode UX unification + env-var validation on boot** (P2/P3 cleanup)
 

@@ -12,8 +12,8 @@
  * Why a facade rather than direct console.* calls:
  *
  * - One place to add structured metadata (timestamp, severity, tag)
- * - One place to wire up a future SDK (Sentry, Better Stack, etc.) —
- *   if/when we want one, we change one file, not 116 call sites
+ * - One place to wire up future telemetry — if/when we want one, we
+ *   change one file, not 116 call sites
  * - Easier to silence noisy log lines in tests via a `silenceLog()`
  *   helper later (not today)
  *
@@ -76,8 +76,8 @@ function emit(
 
   if (ctx) {
     // Pull `error` out of ctx and elevate it to a structured field —
-    // Vercel's log viewer + future Sentry both want stack as its own
-    // key, not buried inside ctx.
+    // Vercel's log viewer wants stack as its own key, not buried
+    // inside ctx.
     const { error, ...rest } = ctx as { error?: unknown } & LogContext;
     if (error !== undefined) {
       payload.error = serializeError(error);
