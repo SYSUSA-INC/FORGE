@@ -101,6 +101,12 @@ const NAV: NavGroup[] = [
     superadmin: true,
     children: [
       { href: "/admin", label: "Tenants" },
+      { href: "/admin/tiers", label: "Subscription tiers" },
+      { href: "/admin/promo-codes", label: "Promo codes" },
+      { href: "/admin/errors", label: "Production errors" },
+      { href: "/admin/migrations", label: "Database migrations" },
+      { href: "/admin/sba-8a", label: "SBA 8(a) registry" },
+      { href: "/admin/source-requests", label: "Source requests" },
       { href: "/platform/audit-log", label: "Audit Log" },
     ],
   },
