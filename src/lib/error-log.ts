@@ -29,6 +29,12 @@ import { log } from "@/lib/log";
 
 export type ErrorCaptureInput = {
   error: unknown;
+  /**
+   * Optional tag — typically the call-site identifier from
+   * `log.error("[tag]", ...)`. Prepended to the stored message so
+   * `/admin/errors` shows where the error came from.
+   */
+  tag?: string | null;
   /** "server" | "client" | "edge" — caller fills in based on context. */
   runtime?: "server" | "client" | "edge";
   organizationId?: string | null;
@@ -50,10 +56,17 @@ export async function captureProductionError(
   input: ErrorCaptureInput,
 ): Promise<void> {
   try {
-    const { message, stack } = normalize(input.error);
-    if (!message) return; // nothing to report
+    const { message: rawMessage, stack } = normalize(input.error);
+    if (!rawMessage) return; // nothing to report
 
-    if (shouldIgnore(message, stack)) return;
+    if (shouldIgnore(rawMessage, stack)) return;
+
+    // Prepend the tag (if any) so the stored message identifies the
+    // call site. Tag becomes part of the fingerprint input via
+    // computeFingerprint(message, stack) — same tag + same error
+    // dedupe; same error from different tags get distinct rows
+    // (intentional — different sites likely need different triage).
+    const message = input.tag ? `${input.tag} ${rawMessage}` : rawMessage;
 
     const fingerprint = computeFingerprint(message, stack);
 

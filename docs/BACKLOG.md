@@ -1765,6 +1765,47 @@ bug coming back is visible).
 
 ---
 
+### BL-QC-errors-autocapture — Wire `log.error` into `production_error` — **shipped**
+**Priority:** P1  ·  **Effort:** XS  ·  **Depends on:** BL-QC-errors  ·  **Status:** ✅ shipped
+
+BL-QC-errors landed the `production_error` table + admin viewer, but
+the 99 existing `log.error(...)` catch sites in the codebase still
+only wrote to Vercel logs — they didn't populate the new in-app
+viewer. This PR closes that gap with a minimal-touch wiring rather
+than a 99-site sweep.
+
+**What ships:**
+
+- `src/lib/error-log.ts` — `ErrorCaptureInput` gains an optional
+  `tag` field. When set, the stored message is prefixed `[tag] ...`
+  so the admin viewer surfaces the call-site identifier
+- `src/lib/log.ts` — when `log.error(tag, msg, { error })` is called
+  with an `Error` instance in `ctx.error`, a fire-and-forget
+  `captureProductionError({ error, tag, runtime: "server" })` runs
+  alongside the structured log line. Node-only (skips on Edge
+  runtime where pg isn't available) + recursion-guarded (the
+  meta-error path inside captureProductionError can't loop)
+
+**Behavioral change:** every existing `log.error("[X]", "msg",
+{ error: err })` call automatically populates `/admin/errors` from
+now on. Same fingerprint-dedup + noise-filter applies. No DB write
+on `log.error` calls without an Error (operational signals stay
+just-Vercel-logs).
+
+**Why not a 99-site sweep:** mechanical, low-value per touch. The
+wiring approach gives the same effect with one file change. Sites
+that need richer context (e.g., requestPath, userId) can be
+upgraded later to call `captureProductionError` directly with the
+extra fields.
+
+**Acceptance:** ✅ Triggering an exception inside any server action
+that has the `log.error("[tag]", "msg", { error: err })` pattern
+produces a row at `/admin/errors` within seconds, with message
+prefixed `[tag] ...`. Subsequent occurrences of the same error
+bump `occurrenceCount` rather than duplicating rows.
+
+---
+
 ### BL-QC-auto-migrate — Auto-apply migrations on deploy with rollback gates — **shipped**
 **Priority:** P0  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 
