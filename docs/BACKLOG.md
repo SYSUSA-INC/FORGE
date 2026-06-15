@@ -1902,6 +1902,60 @@ the ledger has 0052 applied. Fresh-DB CI passes (proves migration
 
 ---
 
+### BL-QC-ledger-drift-detector — Detect + prevent ledger-vs-reality drift — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-schema-repair  ·  **Status:** ✅ shipped
+
+Follow-up to BL-QC-schema-repair. Closes the loop on the 2026-06-15
+incident by:
+
+1. **Detecting** drift on every server cold start (so future
+   "ledger says applied but target table missing" states are visible
+   immediately in Vercel logs + `/admin/migrations` UI, not after
+   the next user-triggered 500)
+2. **Preventing** the original footgun by hardening the "Sync ledger"
+   action to refuse marking migrations applied when their target
+   tables don't actually exist
+
+**Shipped:**
+
+- `detectLedgerDrift()` in `src/lib/migration-runner.ts`:
+  - For each ledger entry, reads the corresponding `drizzle/*.sql`
+    file, extracts every `CREATE TABLE [IF NOT EXISTS] "name"`,
+    and checks `pg_catalog.pg_tables` for each name
+  - Returns `LedgerDriftFinding[]` listing `(filename, missingTables)`
+    pairs
+  - Read-only, never throws
+- `tablesCreatedBy(content)` helper that strips comments and regex-
+  matches CREATE TABLE statements. Used by both the drift detector
+  and the hardened sync-ledger guard
+- `markMigrationsAppliedThrough()` hardened — before inserting any
+  ledger entries, verifies that the CREATE TABLE statements in each
+  eligible migration target tables that actually exist. Refuses
+  with a structured error message naming each violating file and its
+  missing tables. The original footgun is now mechanically impossible
+- `src/instrumentation.ts` — calls `detectLedgerDrift()` after the
+  schema verify on every cold start. Logs `[ledger-drift]` error
+  level when drift is detected
+- `/admin/migrations` UI — new "⚠ Ledger drift" panel that surfaces
+  the same findings inline. Operators see drift without leaving the
+  admin portal
+
+**Acceptance:** ✅ On a fresh cold start of a healthy DB, no
+`[ledger-drift]` log entry appears. On a DB with the 2026-06-15
+state (synthetic test), a single warn-level log line lists every
+drifted migration. The hardened `markMigrationsAppliedThrough`
+refuses to mark `0052` applied if `audit_log` doesn't exist
+(verified via TypeScript test scenarios).
+
+**Why this matters:** the 2026-06-15 incident was invisible for
+days. By the time `/admin/orgs/[id]` 500'd, the drift had already
+existed. With this in place, the next analogous drift surfaces in
+the operator's Vercel logs + admin UI on the first cold start
+after the drift is introduced — typically minutes after a bad sync,
+not days.
+
+---
+
 ### BL-QC-auto-migrate — Auto-apply migrations on deploy with rollback gates — **shipped**
 **Priority:** P0  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 

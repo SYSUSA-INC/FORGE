@@ -107,6 +107,29 @@ export async function register() {
             error: err,
           });
         }
+
+        // BL-QC-ledger-drift-detector — scan for "ledger says applied
+        // but target table missing" drift. Read-only; logs a loud
+        // warn so operators see drift in Vercel logs immediately
+        // instead of waiting for the next 500. Triggered by the
+        // 2026-06-15 incident (BL-QC-schema-repair).
+        try {
+          const { detectLedgerDrift } = await import(
+            "./lib/migration-runner"
+          );
+          const drift = await detectLedgerDrift();
+          if (drift.length > 0) {
+            log.error(
+              "[ledger-drift]",
+              `detected ${drift.length} migration(s) with missing target tables — schema is in a partial state; apply the affected migrations or write a repair migration like 0052`,
+              { drift },
+            );
+          }
+        } catch (err) {
+          log.warn("[ledger-drift]", "detector failed to run", {
+            error: err,
+          });
+        }
       })();
     }
   }

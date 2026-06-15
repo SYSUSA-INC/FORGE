@@ -3,6 +3,7 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import {
+  detectLedgerDrift,
   getMigrationStatus,
   scanPendingForDestructive,
 } from "@/lib/migration-runner";
@@ -15,7 +16,10 @@ export default async function MigrationsPage() {
 
   const status = await getMigrationStatus();
   const inSync = status.pendingFiles.length === 0;
-  const destructiveBlockers = inSync ? [] : await scanPendingForDestructive();
+  const [destructiveBlockers, ledgerDrift] = await Promise.all([
+    inSync ? Promise.resolve([]) : scanPendingForDestructive(),
+    detectLedgerDrift(),
+  ]);
   const autoApplyEnabled = process.env.DISABLE_AUTO_MIGRATE !== "1";
   const neonSnapshotsEnabled = !!(
     process.env.NEON_API_KEY && process.env.NEON_PROJECT_ID
@@ -115,6 +119,31 @@ export default async function MigrationsPage() {
               Review each destructive migration carefully (have you taken a
               Neon snapshot? Is the schema change recoverable?). Apply them
               manually via the button below.
+            </p>
+          </div>
+        ) : null}
+
+        {ledgerDrift.length > 0 ? (
+          <div className="mt-3 rounded-md border border-rose/40 bg-rose/[0.06] p-3">
+            <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-widest text-rose">
+              ⚠ Ledger drift — applied migrations whose tables are missing
+            </div>
+            <ul className="flex flex-col gap-1 font-mono text-[11px] text-muted">
+              {ledgerDrift.map((d) => (
+                <li key={d.filename}>
+                  <span className="text-text">{d.filename}</span>{" "}
+                  <span className="text-rose/80">
+                    missing: {d.missingTables.join(", ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 font-body text-[12px] leading-relaxed text-muted">
+              The ledger thinks these migrations applied but their target
+              tables don&apos;t exist. This was the 2026-06-15 incident
+              (see BL-QC-schema-repair). Write a repair migration that
+              recreates the missing tables idempotently (mirror migration
+              0052 as the template), or contact the platform team.
             </p>
           </div>
         ) : null}
