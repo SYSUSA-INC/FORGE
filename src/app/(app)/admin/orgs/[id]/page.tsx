@@ -186,6 +186,13 @@ export default async function TenantDetailPage({
         }
         actions={
           <>
+            <Link
+              href={`/admin/orgs/${org.id}/activity`}
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Recent activity + health indicators for this tenant"
+            >
+              Activity →
+            </Link>
             <a
               href={`/api/admin/orgs/${org.id}/export`}
               className="aur-btn aur-btn-ghost text-[11px]"

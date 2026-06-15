@@ -983,14 +983,43 @@ Per spec: "this is where the customer accounts are managed."
   shows a "Primary admin" field (resolved name/email) and renders
   the transfer form below the field grid.
 
-**Phase B-3 (queued) — Assume identity + isolation status check**:
-- "Assume identity" flow for support: superadmin can read-only-view
-  a tenant's UI for debugging; every action logged in BL-12.
-  Security-sensitive — requires session impersonation infrastructure
-  and explicit confirm-with-reason flow.
-- Audit isolation status check (a button that runs sample
-  cross-tenant queries to verify isolation, then writes a structured
-  result row) — gated on BL-19 Phase 2 test framework.
+**Phase B-3a (shipped) — Tenant activity view**:
+Highest-value subset of Phase B-3 shipped without the session-
+impersonation surface area. Operator triage tool that surfaces what's
+been happening in a tenant + where to look first if something's off.
+
+- New route `/admin/orgs/[id]/activity` — superadmin-only
+- Recent activity panel: latest 50 audit-log rows for the tenant
+  with action / actor / resource / timestamp / relative time
+- Health panel: unresolved error count (links to `/admin/errors`),
+  last activity timestamp, notification delivery health (7d OK vs
+  errored counts), disabled-state banner if applicable
+- "Activity →" link added to `/admin/orgs/[id]` actions row
+- `recordRead("tenant.view_activity")` on every page load for the
+  audit trail
+
+Full assume-identity (session impersonation + confirm-with-reason +
+read-only enforcement) is **Phase B-3b** — punted because the
+infrastructure cost (~600-800 LOC including security review, session
+plumbing, write-block enforcement) outweighs the immediate triage
+need. Phase B-3a satisfies the operator's "what's going on in this
+tenant" question without the security-sensitive surface.
+
+**Phase B-3b (queued) — Full assume-identity flow**:
+- Session-level impersonation cookie + middleware override of
+  `requireCurrentOrg()`
+- Confirm-with-reason modal before assuming identity (reason
+  required, written to audit)
+- Visible banner on every authenticated page while impersonating
+  ("🛡 Viewing as <tenant name> — Exit")
+- All mutating server actions refuse with a clear message during
+  impersonation; reads work normally
+- `superadmin.assume_start` / `superadmin.assume_end` audit rows
+
+**Phase B-3c (queued) — Audit isolation status check**:
+Gated on BL-19 Phase 2 test framework. A button that runs sample
+cross-tenant queries to verify isolation, then writes a structured
+result row.
 
 **Acceptance (full ticket):** provision a new tenant via UI → tenant
 admin gets invite email → can sign in → sees only their data; suspend
