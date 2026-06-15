@@ -983,20 +983,48 @@ Per spec: "this is where the customer accounts are managed."
   shows a "Primary admin" field (resolved name/email) and renders
   the transfer form below the field grid.
 
-**Phase B-3a (shipped) — Tenant activity view**:
+**Phase B-3a (shipped) — Tenant activity view + per-tenant user management**:
 Highest-value subset of Phase B-3 shipped without the session-
-impersonation surface area. Operator triage tool that surfaces what's
-been happening in a tenant + where to look first if something's off.
+impersonation surface area. Two operator-triage tools that together
+cover the "tenant is stuck" cases the spec called out (admin left
+without promoting a replacement, locked-out user, pending-invite
+stuck, member needs promotion).
 
-- New route `/admin/orgs/[id]/activity` — superadmin-only
+**Tenant activity (shipped first):**
+- New route `/admin/orgs/[id]/activity` — superadmin-only, read-only
 - Recent activity panel: latest 50 audit-log rows for the tenant
   with action / actor / resource / timestamp / relative time
 - Health panel: unresolved error count (links to `/admin/errors`),
   last activity timestamp, notification delivery health (7d OK vs
   errored counts), disabled-state banner if applicable
-- "Activity →" link added to `/admin/orgs/[id]` actions row
-- `recordRead("tenant.view_activity")` on every page load for the
-  audit trail
+
+**Per-tenant user management (shipped follow-up):**
+- New route `/admin/orgs/[id]/users` — superadmin-only
+- Members panel — every member with role / status / verified state /
+  joined date / primary-admin flag / global-disabled flag
+- Per-member actions:
+  - **Change role** (admin / capture / proposal / author / reviewer
+    / pricing / viewer) via dropdown
+  - **Disable / Re-enable membership** — toggles
+    `membership.status` for this tenant only; doesn't touch the
+    user's global account
+  - **Remove** — deletes the membership row (user keeps account)
+- Pending invites panel — per-invite **Resend** + **Revoke**
+- Safety: refuses to demote / disable / remove the only active
+  admin (prevents tenant from being stranded)
+- "⚠ No active admins" banner when activeAdminCount === 0
+- Pointer panel linking to global SuperAdmin portal for cross-tenant
+  ops (disable user globally, force password reset, toggle
+  superadmin)
+- Audit posture: every action writes to the TARGET tenant's audit
+  log with `viaSuperadmin: true` in metadata so the tenant's admins
+  can later see what platform support did
+- "Users →" + "Activity →" links added to `/admin/orgs/[id]` actions row
+
+Combined: an operator can land on `/admin/orgs/[id]` from the
+SuperAdmin portal, click through to **Activity** to see what's
+happening, click through to **Users** to fix membership/role
+issues, all without leaving the admin surface.
 
 Full assume-identity (session impersonation + confirm-with-reason +
 read-only enforcement) is **Phase B-3b** — punted because the
