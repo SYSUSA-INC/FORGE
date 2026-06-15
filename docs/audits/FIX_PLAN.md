@@ -165,19 +165,22 @@ CREATE INDEX IF NOT EXISTS knowledge_artifact_organization_id_idx ON knowledge_a
 
 ---
 
-## PR-8 — Observability via Sentry
+## PR-8 — Observability via in-app error log (BL-QC-errors)
 
-**Scope:** integrate Sentry (free tier handles us at our scale). Wrap all `console.error` calls.
+**Scope:** ship the `production_error` table + admin viewer at `/admin/errors`. Same mental model as the existing `audit_log` — uncaught exceptions deduped by stack-trace fingerprint so 1000 firings collapse into 1 row.
+
+**Why not Sentry:** evaluated and retired (BL-QC-sentry-retire). Cost (auto-reload $25/mo on Vercel-bundled Sentry) wasn't worth it for the team's stage. In-app gives the same audit-log-style experience, zero external dependency, native user + tenant context, infinite retention.
 
 **Files:**
-- `package.json` — add `@sentry/nextjs`
-- `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts` — bootstrap files
-- `next.config.mjs` — Sentry build wrapper
-- `src/lib/log.ts` — single helper that wraps `Sentry.captureException` + `console.error`
-- Sweep all `console.error` and `console.warn` calls; replace with `log.error(...)` so we get both stderr (dev) and Sentry (prod)
-- Vercel env vars: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`
+- `drizzle/00NN_production_error_log.sql` — new table with fingerprint-based dedup
+- `src/db/schema.ts` — Drizzle binding for the new table
+- `src/lib/error-log.ts` — `captureProductionError({ error, runtime, organizationId, userId, requestPath, ... })` with SHA-256 fingerprint + UPSERT to dedupe + `ignoreErrors` filter for noise
+- `src/app/global-error.tsx` — root error boundary; POSTs to `/api/error-report`
+- `src/app/api/error-report/route.ts` — public endpoint (allow-listed in `auth.config.ts`) that captures client-side errors
+- `src/app/(app)/admin/errors/page.tsx` + actions + row-actions client — superadmin viewer with filter by status (unresolved/acknowledged/resolved/all) + env, acknowledge/resolve/notes
+- `src/auth.config.ts` — allow-list `/api/error-report` for pre-auth errors
 
-**Effort:** 1 day.
+**Effort:** half day. Half already drafted on `claude/in-app-error-log` branch.
 
 ---
 

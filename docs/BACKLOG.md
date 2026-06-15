@@ -1590,14 +1590,56 @@ repo that runs only against Vercel Agent activity.
 
 ---
 
-### BL-QC-sentry — Sentry free-tier runtime error capture — **shipped (will be retired in follow-up PR)**
-**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC-vercel-agent-retired  ·  **Status:** ⚠ wiring landed; user redirected to in-app error log — retire in follow-up
+### BL-QC-sentry — Sentry free-tier runtime error capture — **retired**
+**Priority:** P1  ·  **Effort:** S  ·  **Depends on:** BL-QC-vercel-agent-retired  ·  **Status:** ⛔ retired (PR #193 merged then reverted)
 
-Wiring shipped in PR #193 but the user redirected to skip Sentry and
-remove any reference before the merge happened. The merge went
-through anyway. A follow-up PR (BL-QC-sentry-retire) will rip
-Sentry back out and ship the in-app error log table per the user-
-stated preference. See docs/SENTRY_SETUP.md (also to be removed).
+Wiring shipped in PR #193 but the user redirected to "skip Sentry and
+remove any reference" before the merge happened. The merge went
+through anyway by accident. Retired in BL-QC-sentry-retire (this PR).
+
+**Why retired:** the user's framing "Sentry is more like an audit log
+than anything else" matched our existing infrastructure exactly —
+we already have a tenant-scoped `audit_log` table, an `/admin/audit-log`
+viewer, and email infrastructure. Building the same pattern as
+`production_error` gives Sentry-equivalent functionality with zero
+external SaaS dependency, no quota cap, no monthly cost (Sentry's
+free tier is generous but Vercel-bundled Sentry was auto-reloading
+$25/mo via "Investigations" credit even before active use).
+
+**Replaced by:** `BL-QC-errors` — in-app `production_error` table +
+`/admin/errors` viewer (follow-up PR after this one lands).
+
+---
+
+### BL-QC-sentry-retire — Rip Sentry from the codebase — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-sentry  ·  **Status:** ✅ shipped
+
+Restores the cost-conscious posture established when Vercel Agent was
+retired (BL-QC-vercel-agent-retired). Sentry crept back in via PR #193
+which was merged after I marked it closed but before the close took
+effect. This PR cleanly removes every Sentry surface so future searches
+of the codebase don't surface "is Sentry coming back?" ambiguity.
+
+**Removed:**
+
+- `@sentry/nextjs` ^10.57.0 dependency (npm uninstall)
+- `sentry.client.config.ts`, `sentry.server.config.ts`,
+  `sentry.edge.config.ts` at repo root
+- `withSentryConfig` wrap around `next.config.mjs`
+- Sentry imports + `captureRequestError` re-export from
+  `src/instrumentation.ts`
+- `docs/SENTRY_SETUP.md`
+- Sentry mentions in `src/lib/log.ts` comments
+- Sentry mentions in audit docs (`05-code-quality.md`,
+  `FIX_PLAN.md`, `SUMMARY.md`); recommendations re-pointed at
+  the in-app error log (BL-QC-errors)
+
+**Not removed:** the `production_error` table from the upcoming
+BL-QC-errors PR. That's the replacement, lands as a separate PR.
+
+**Acceptance:** ✅ `grep -ri sentry .` from the repo root returns only
+historical mentions in BACKLOG.md (i.e., this entry + BL-QC-sentry).
+No code, no config, no docs reference Sentry as an active dependency.
 
 ---
 
