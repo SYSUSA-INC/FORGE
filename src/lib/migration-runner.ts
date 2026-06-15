@@ -442,6 +442,97 @@ export type MarkAppliedResult =
   | { ok: false; error: string };
 
 /**
+ * BL-QC-ledger-drift-detector — surface "ledger says applied but
+ * target table missing" drift.
+ *
+ * Scans every ledger entry, parses the migration file for
+ * `CREATE TABLE [IF NOT EXISTS] "?<name>"?` statements, and checks
+ * `information_schema.tables` for each name. Returns the list of
+ * (migration, missing_table) pairs.
+ *
+ * Read-only. Called from `instrumentation.ts` on boot — logs a
+ * loud warn when drift is detected so the operator sees it in
+ * Vercel logs instead of waiting for the next 500.
+ *
+ * Why this exists: the 2026-06-15 incident (BL-QC-schema-repair)
+ * surfaced after `/admin/orgs/[id]` started returning 500. We had
+ * NO boot-time signal for the drift even though it was present
+ * for days. Detector would have flagged it on the next cold start.
+ */
+export type LedgerDriftFinding = {
+  filename: string;
+  missingTables: string[];
+};
+
+const CREATE_TABLE_RE = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+)"?/gi;
+
+function tablesCreatedBy(content: string): string[] {
+  // Strip comments first so commented-out CREATE TABLE in headers
+  // doesn't yield false positives.
+  const stripped = content
+    .replace(/--[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const matches = new Set<string>();
+  for (const m of stripped.matchAll(CREATE_TABLE_RE)) {
+    const name = m[1];
+    if (name && !name.startsWith("_forge_migration")) {
+      matches.add(name);
+    }
+  }
+  return [...matches];
+}
+
+export async function detectLedgerDrift(): Promise<LedgerDriftFinding[]> {
+  let appliedLedger: { filename: string }[] = [];
+  try {
+    const result = await db.execute(
+      sql`SELECT filename FROM "_forge_migration"`,
+    );
+    appliedLedger = result.rows as { filename: string }[];
+  } catch {
+    // Ledger doesn't exist yet — nothing to verify.
+    return [];
+  }
+  if (appliedLedger.length === 0) return [];
+
+  // Pull every table name once.
+  let existingTables = new Set<string>();
+  try {
+    const tableResult = await db.execute(
+      sql`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public'`,
+    );
+    existingTables = new Set(
+      (tableResult.rows as { tablename: string }[]).map((r) => r.tablename),
+    );
+  } catch (err) {
+    log.warn("[ledger-drift]", "could not read pg_tables", { error: err });
+    return [];
+  }
+
+  const dir = join(process.cwd(), "drizzle");
+  const findings: LedgerDriftFinding[] = [];
+
+  for (const row of appliedLedger) {
+    let content: string;
+    try {
+      content = readFileSync(join(dir, row.filename), "utf-8");
+    } catch {
+      // Ledger references a file that no longer exists in the
+      // bundle — separate problem, skip from drift report.
+      continue;
+    }
+    const expectedTables = tablesCreatedBy(content);
+    if (expectedTables.length === 0) continue;
+    const missing = expectedTables.filter((t) => !existingTables.has(t));
+    if (missing.length > 0) {
+      findings.push({ filename: row.filename, missingTables: missing });
+    }
+  }
+
+  return findings;
+}
+
+/**
  * Mark migration files as already-applied in the ledger **without
  * running their SQL**. Use case: a long-lived DB whose schema is
  * already in sync with the deployed code, but whose `_forge_migration`
@@ -508,6 +599,61 @@ export async function markMigrationsAppliedThrough(
   );
 
   const eligible = files.filter((f) => f <= throughFilename);
+
+  // BL-QC-ledger-drift-detector — refuse to mark a file applied if
+  // the CREATE TABLE statements inside it reference tables that
+  // don't exist in the database. This is the safety guard that
+  // would have prevented the 2026-06-15 incident: if the operator
+  // had clicked "Sync ledger" past a too-recent file, the underlying
+  // tables wouldn't have existed → this guard refuses.
+  let existingTables = new Set<string>();
+  try {
+    const tableResult = await db.execute(
+      sql`SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public'`,
+    );
+    existingTables = new Set(
+      (tableResult.rows as { tablename: string }[]).map((r) => r.tablename),
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Could not read pg_tables to verify sync safety: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const safetyViolations: { file: string; missingTables: string[] }[] = [];
+  for (const file of eligible) {
+    if (applied.has(file)) continue;
+    let content: string;
+    try {
+      content = readFileSync(join(dir, file), "utf-8");
+    } catch {
+      // Read error gets handled per-file below; skip safety check here.
+      continue;
+    }
+    const expectedTables = tablesCreatedBy(content);
+    const missing = expectedTables.filter((t) => !existingTables.has(t));
+    if (missing.length > 0) {
+      safetyViolations.push({ file, missingTables: missing });
+    }
+  }
+
+  if (safetyViolations.length > 0) {
+    const summary = safetyViolations
+      .map((v) => `${v.file} (missing: ${v.missingTables.join(", ")})`)
+      .join("; ");
+    return {
+      ok: false,
+      error:
+        `Refusing to sync ledger — ${safetyViolations.length} migration(s) ` +
+        `create tables that don't exist in the database. Marking them as ` +
+        `applied without running the SQL would leave the schema in a broken ` +
+        `state (this is exactly the 2026-06-15 incident — see BL-QC-schema-repair). ` +
+        `Apply the missing migrations first via runMigrations(), then retry sync. ` +
+        `Violations: ${summary}`,
+    };
+  }
+
   const markedFilenames: string[] = [];
   const alreadyPresentFilenames: string[] = [];
 
