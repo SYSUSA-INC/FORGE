@@ -5,9 +5,7 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import {
   getMigrationStatus,
-  markMigrationsAppliedThrough,
   runMigrations,
-  type MarkAppliedResult,
 } from "@/lib/migration-runner";
 
 export type MigrationStatusResult = {
@@ -69,49 +67,13 @@ export async function runMigrationsAction(): Promise<RunMigrationsActionResult> 
   return result;
 }
 
-/**
- * Sync the migration ledger up through a chosen filename without
- * actually running the SQL. Use case: a long-lived DB whose schema
- * matches the deployed code but whose `_forge_migration` ledger is
- * stale (e.g. earlier migrations applied via scripts/apply-schema.mjs
- * or drizzle-kit before this runner existed).
- *
- * After syncing, `runMigrationsAction()` will skip the synced files
- * and only run migrations newer than `throughFilename`.
- *
- * **Risk-bearing.** Super-admin only and audit-logged because
- * mis-syncing a file that hasn't actually been applied means the
- * corresponding tables/columns won't exist and queries will fail at
- * runtime.
- */
-export async function markMigrationsAppliedThroughAction(
-  throughFilename: string,
-): Promise<MarkAppliedResult> {
-  const actor = await requireSuperadmin();
-
-  const result = await markMigrationsAppliedThrough(throughFilename);
-
-  if (actor.organizationId) {
-    await recordAudit({
-      organizationId: actor.organizationId,
-      actor: { userId: actor.id, email: actor.email },
-      action: result.ok
-        ? "platform.migrations.ledger_sync"
-        : "platform.migrations.ledger_sync_failed",
-      resourceType: "platform",
-      resourceId: "migrations",
-      metadata: {
-        through: throughFilename,
-        ...(result.ok
-          ? {
-              marked: result.markedFilenames,
-              alreadyPresent: result.alreadyPresentFilenames,
-            }
-          : { error: result.error }),
-      },
-    });
-  }
-
-  revalidatePath("/admin/migrations");
-  return result;
-}
+// `markMigrationsAppliedThroughAction` was removed in BL-QC-sync-ledger-
+// retire. It was the entry point for the "Sync ledger" UI affordance
+// that caused the 2026-06-15 schema drift incident (false-applied
+// ledger entries past the actual high-water mark). The underlying
+// `markMigrationsAppliedThrough` helper in migration-runner.ts is
+// kept as a low-level utility (now hardened to refuse syncing past
+// missing tables — see BL-QC-ledger-drift-detector / PR #203) for
+// genuine emergencies, but no UI entry exists. Operators in such an
+// emergency must construct the call deliberately, which is the
+// intended friction.
