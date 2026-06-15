@@ -1956,6 +1956,44 @@ not days.
 
 ---
 
+### BL-QC-sync-ledger-retire — Remove "Sync ledger" UI affordance — **shipped**
+**Priority:** P2  ·  **Effort:** XS  ·  **Depends on:** BL-QC-ledger-drift-detector  ·  **Status:** ✅ shipped
+
+Final cleanup of the 2026-06-15 incident root cause. PR #203's
+hardening (`markMigrationsAppliedThrough` refuses to mark applied
+when target tables are missing) made the function safe, but the UI
+affordance was still confusing and easy to misuse. This PR removes
+the UI entry point entirely.
+
+**Removed:**
+
+- "Ledger sync needed?" amber panel in `MigrationsClient.tsx`
+  (orphan-candidates detection, "Mark applied through" dropdown,
+  "I VERIFIED" confirm input, "Sync ledger" button)
+- All related client state: `syncing`, `lastSync`, `orphanCandidates`,
+  `throughChoice`, `confirmText`, `confirmExpected`, `syncLedger()`
+- `markMigrationsAppliedThroughAction` server action in
+  `admin/migrations/actions.ts`
+
+**Kept (intentionally):**
+
+- `markMigrationsAppliedThrough()` low-level utility in
+  `src/lib/migration-runner.ts` — hardened in PR #203 to refuse
+  syncing past missing tables. Kept available for genuine
+  emergencies (e.g., migrating a long-lived DB from a different
+  ledger format) but no UI entry exists. Operators in such an
+  emergency must deliberately construct the call, which is the
+  intended friction.
+
+Net diff: -167 LOC across 2 files.
+
+**Acceptance:** ✅ `/admin/migrations` renders cleanly with only the
+"Apply pending migrations" button + ledger list. No "Sync ledger"
+panel, regardless of how many migrations are pending. The 2026-06-15
+incident class is now mechanically impossible from the UI.
+
+---
+
 ### BL-QC-auto-migrate — Auto-apply migrations on deploy with rollback gates — **shipped**
 **Priority:** P0  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped
 
