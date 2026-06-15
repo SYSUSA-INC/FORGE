@@ -465,21 +465,100 @@ export type LedgerDriftFinding = {
 };
 
 const CREATE_TABLE_RE = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+)"?/gi;
+const RENAME_TABLE_RE =
+  /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?(\w+)"?\s+RENAME\s+TO\s+"?(\w+)"?/gi;
+const DROP_TABLE_RE = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?(\w+)"?/gi;
 
-function tablesCreatedBy(content: string): string[] {
-  // Strip comments first so commented-out CREATE TABLE in headers
-  // doesn't yield false positives.
-  const stripped = content
-    .replace(/--[^\n]*/g, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
-  const matches = new Set<string>();
-  for (const m of stripped.matchAll(CREATE_TABLE_RE)) {
-    const name = m[1];
-    if (name && !name.startsWith("_forge_migration")) {
-      matches.add(name);
+function stripSqlComments(content: string): string {
+  return content.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+type TableLineage = {
+  createdBy: string;
+  currentName: string;
+  dropped: boolean;
+};
+
+/**
+ * Replay every migration in `files` (in name order) and produce a map
+ * from creator-filename → final names of the tables that file created,
+ * after applying any subsequent RENAME TO / DROP TABLE statements.
+ *
+ * Why: a naive "did pg_tables contain CREATE TABLE's name?" check
+ * false-positives whenever a later migration renames the table. 0036
+ * renames sba_8a_participant → cert_firm; 0035's CREATE TABLE statements
+ * look like drift unless we project the rename forward.
+ */
+function buildSchemaProjection(
+  files: string[],
+  dir: string,
+): Map<string, string[]> {
+  const byCreator = new Map<string, TableLineage[]>();
+  // Multiple migrations may CREATE the same name idempotently (e.g.
+  // 0052 re-creates 0028's tables with IF NOT EXISTS). Track all
+  // lineages claiming a current name so RENAME / DROP updates each one.
+  const byCurrent = new Map<string, TableLineage[]>();
+
+  function attach(name: string, lineage: TableLineage) {
+    const list = byCurrent.get(name);
+    if (list) list.push(lineage);
+    else byCurrent.set(name, [lineage]);
+  }
+
+  for (const file of files) {
+    let content: string;
+    try {
+      content = readFileSync(join(dir, file), "utf-8");
+    } catch {
+      continue;
+    }
+    const sqlBody = stripSqlComments(content);
+
+    for (const m of sqlBody.matchAll(CREATE_TABLE_RE)) {
+      const name = m[1];
+      if (!name || name === "_forge_migration") continue;
+      const lineage: TableLineage = {
+        createdBy: file,
+        currentName: name,
+        dropped: false,
+      };
+      const fileList = byCreator.get(file) ?? [];
+      fileList.push(lineage);
+      byCreator.set(file, fileList);
+      attach(name, lineage);
+    }
+
+    for (const m of sqlBody.matchAll(RENAME_TABLE_RE)) {
+      const oldName = m[1];
+      const newName = m[2];
+      if (!oldName || !newName) continue;
+      const lineages = byCurrent.get(oldName);
+      if (!lineages) continue;
+      byCurrent.delete(oldName);
+      for (const lineage of lineages) {
+        lineage.currentName = newName;
+        attach(newName, lineage);
+      }
+    }
+
+    for (const m of sqlBody.matchAll(DROP_TABLE_RE)) {
+      const name = m[1];
+      if (!name) continue;
+      const lineages = byCurrent.get(name);
+      if (!lineages) continue;
+      byCurrent.delete(name);
+      for (const lineage of lineages) lineage.dropped = true;
     }
   }
-  return [...matches];
+
+  const projection = new Map<string, string[]>();
+  for (const [file, lineages] of byCreator) {
+    const live = lineages
+      .filter((l) => !l.dropped)
+      .map((l) => l.currentName);
+    if (live.length > 0) projection.set(file, live);
+  }
+  return projection;
 }
 
 export async function detectLedgerDrift(): Promise<LedgerDriftFinding[]> {
@@ -510,25 +589,23 @@ export async function detectLedgerDrift(): Promise<LedgerDriftFinding[]> {
   }
 
   const dir = join(process.cwd(), "drizzle");
-  const findings: LedgerDriftFinding[] = [];
+  let allFiles: string[] = [];
+  try {
+    allFiles = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  } catch {
+    return [];
+  }
+  const projection = buildSchemaProjection(allFiles, dir);
 
+  const findings: LedgerDriftFinding[] = [];
   for (const row of appliedLedger) {
-    let content: string;
-    try {
-      content = readFileSync(join(dir, row.filename), "utf-8");
-    } catch {
-      // Ledger references a file that no longer exists in the
-      // bundle — separate problem, skip from drift report.
-      continue;
-    }
-    const expectedTables = tablesCreatedBy(content);
-    if (expectedTables.length === 0) continue;
-    const missing = expectedTables.filter((t) => !existingTables.has(t));
+    const expected = projection.get(row.filename);
+    if (!expected || expected.length === 0) continue;
+    const missing = expected.filter((t) => !existingTables.has(t));
     if (missing.length > 0) {
       findings.push({ filename: row.filename, missingTables: missing });
     }
   }
-
   return findings;
 }
 
@@ -621,18 +698,16 @@ export async function markMigrationsAppliedThrough(
     };
   }
 
+  // Project forward only through the requested upper bound so a
+  // RENAME in a file we're NOT marking can't paper over a real
+  // missing-table problem in a file we ARE marking.
+  const projection = buildSchemaProjection(eligible, dir);
+
   const safetyViolations: { file: string; missingTables: string[] }[] = [];
   for (const file of eligible) {
     if (applied.has(file)) continue;
-    let content: string;
-    try {
-      content = readFileSync(join(dir, file), "utf-8");
-    } catch {
-      // Read error gets handled per-file below; skip safety check here.
-      continue;
-    }
-    const expectedTables = tablesCreatedBy(content);
-    const missing = expectedTables.filter((t) => !existingTables.has(t));
+    const expected = projection.get(file) ?? [];
+    const missing = expected.filter((t) => !existingTables.has(t));
     if (missing.length > 0) {
       safetyViolations.push({ file, missingTables: missing });
     }
