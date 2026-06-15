@@ -23,6 +23,10 @@ export const authConfig = {
       if (pathname.startsWith("/api/forgot-password")) return true;
       if (pathname.startsWith("/api/reset-password")) return true;
       if (pathname.startsWith("/api/samgov/health")) return true;
+      // Client-side error boundary posts to /api/error-report when
+      // the global error catches anything. Errors fired before auth
+      // resolves (sign-in page crashes etc.) must still get logged.
+      if (pathname.startsWith("/api/error-report")) return true;
       // Vercel Cron handlers self-authenticate via
       // `Authorization: Bearer ${CRON_SECRET}` and return 401 without
       // it. Letting the middleware bounce them to /sign-in (307) breaks

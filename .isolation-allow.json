@@ -1,4 +1,8 @@
 {
   "src/app/(app)/opportunities/[id]/review/actions.ts:getReviewRequestByTokenAction": "Public token-scoped review link. No auth by design — the unguessable token IS the credential. The query keys exclusively on opportunityReviewRequests.token, so cross-tenant access requires forging a token, which it can't (random uuid).",
-  "src/app/(app)/opportunities/[id]/review/actions.ts:submitOpportunityReviewAction": "Same token-scoped pattern as getReviewRequestByTokenAction. The token both authenticates and scopes the operation."
+  "src/app/(app)/opportunities/[id]/review/actions.ts:submitOpportunityReviewAction": "Same token-scoped pattern as getReviewRequestByTokenAction. The token both authenticates and scopes the operation.",
+  "src/app/(app)/admin/errors/actions.ts:acknowledgeErrorAction": "Platform-wide superadmin operation on production_error (ops data, not tenant data). Gated by requireSuperadmin(); the row's id is the lookup key. Cross-tenant view is the intended behavior of the /admin/errors triage surface.",
+  "src/app/(app)/admin/errors/actions.ts:resolveErrorAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction.",
+  "src/app/(app)/admin/errors/actions.ts:unresolveErrorAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction.",
+  "src/app/(app)/admin/errors/actions.ts:updateErrorNotesAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction."
 }
