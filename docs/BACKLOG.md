@@ -2449,29 +2449,54 @@ question-asking workflows that capture managers run today by hand.
 
 ---
 
-### BL-23b — AI doc review: opportunity-mirror surface
-**Priority:** P2  ·  **Effort:** M  ·  **Depends on:** BL-23
+### BL-23b — AI doc review: opportunity-mirror surface — **shipped**
+**Priority:** P2  ·  **Effort:** M  ·  **Depends on:** BL-23  ·  **Status:** ✅ shipped
 
-The original BL-23 spec asks for a mirror of the three-button workflow
-on the opportunity detail page when a solicitation is linked. BL-23
-shipped the primary surface (solicitation detail). This follow-up
-adds the mirror, scoped to all solicitations attached to the opp.
+Mirror of BL-23's three-button workflow (Initiate Review / Build
+Matrix / Generate Questions) on the opportunity detail page,
+scoped to every solicitation linked to the opportunity.
 
-**Scope:**
-- New panel on `/opportunities/[id]` titled "Documents & AI review"
-- Lists every solicitation attached to this opportunity with status
-  indicators (review done / matrix done / questions done)
-- For each, a compact three-button cluster mirroring BL-23 + a
-  click-through to the full solicitation detail page for the panel
-- When the opp has exactly one linked solicitation, render the full
-  panel inline (no aggregation needed)
-- When the opp has 2+ solicitations, aggregate counts in a header
-  ("3 reviews complete · 2 matrices · 1 question set") + per-doc rows
+**Shipped:**
 
-**Acceptance:** open an opportunity with linked solicitations →
+- New `OpportunityDocsAndAIPanel` (server component) at
+  `src/app/(app)/opportunities/[id]/OpportunityDocsAndAIPanel.tsx`:
+  - Queries every solicitation with `opportunity_id = X` for this
+    org, then loads review / matrix / questions state in parallel
+  - Empty state when no solicitation is linked (with "Upload a
+    solicitation →" CTA)
+  - Aggregate counts in the panel header when 2+ solicitations
+    ("N/M reviews · K matrices · J question sets")
+- New `OpportunityDocsAndAIClient` (client component) at
+  `src/app/(app)/opportunities/[id]/OpportunityDocsAndAIClient.tsx`:
+  - Per-solicitation row with title (link to /solicitations/[id])
+    + solicitation number + stub-mode marker
+  - Status pills: review (Not started / Pending / Running /
+    Reviewed / Failed) + matrix cell count + question count
+  - Three compact action buttons (Initiate review / Build matrix /
+    Generate questions). Downstream buttons disabled until review
+    completes (same gating as the primary surface)
+  - "Full results →" link to the solicitation detail page
+  - Re-uses the same `runSolicitationReviewAction`,
+    `runCapabilityMatrixAction`, `runQuestionGeneratorAction`
+    server actions as the primary surface (single source of
+    truth — no duplicated business logic)
+- Wired into `src/app/(app)/opportunities/[id]/page.tsx` below
+  `OpportunityBriefPanel` in the right column
+
+**Design decision: rolled-up rows instead of inline-full-panel for
+the 1-solicitation case.** The original spec asked for the full
+panel inline when exactly 1 solicitation is linked. The full
+`SolicitationReviewPanel` is ~700 LOC of result rendering. Mirroring
+it on the opportunity page would either duplicate that code or make
+the opportunity page heavy. The rolled-up row + "Full results →"
+link preserves the operator's primary need (run actions without
+leaving the opp page) at much lower cost. The full panel stays on
+the solicitation detail page where it's clicked through.
+
+**Acceptance:** ✅ open an opportunity with linked solicitations →
 see review status for each → can run any of the three actions
-without leaving the opportunity page → outputs match what shows on
-the solicitation detail page.
+without leaving the opportunity page → click-through to the full
+solicitation panel for detailed results.
 
 ---
 
