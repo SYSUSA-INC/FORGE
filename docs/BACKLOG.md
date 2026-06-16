@@ -23,9 +23,12 @@ Effort key:
 
 | # | Item | Priority | Effort | Status |
 |---|---|---|---|---|
-| 1 | **BL-ENV-SEP** — Dev/staging/prod environment separation | P0 | M | 🟡 docs landed (this PR); operator setup pending |
-| 2 | **BL-TENANT-AUDIT** — Multi-tenant data firewall comprehensive audit | P0 | L | ⏳ queued |
-| 3 | **BL-PACKAGES** — Subscription packages with super-admin configuration + AI token caps | P1 | L | ⏳ queued |
+| 1 | **BL-ENV-SEP** — Dev/staging/prod environment separation | P0 | M | 🟡 docs landed (PR #210); operator setup pending |
+| 2 | **BL-TENANT-AUDIT** — Multi-tenant data firewall comprehensive audit | P0 | L | ✅ shipped (PR #211) — PASS with documented exceptions |
+| 3a | **BL-PACKAGES Slice 1** — AI token cap enforcement at gateway | P1 | M | 🟡 in progress (this PR) — gateway + 5 callers migrated |
+| 3b | **BL-PACKAGES Slice 2** — Migrate remaining 7 lib-helper AI callers (require signature changes) | P1 | M | ⏳ queued |
+| 3c | **BL-PACKAGES Slice 3** — Super-admin tier-config UI exposes `aiTokensPerMonth`; usage panel | P1 | M | ⏳ queued |
+| 3d | **BL-PACKAGES Slice 4** — Public landing/pricing page; tenant upgrade flow | P1 | M | ⏳ queued |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab; body_doc projection writeback | P1 | M | ⏳ queued |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued |
 

@@ -17,7 +17,7 @@ import {
 import {
   STAGE_LABELS as PROP_STAGE_LABELS,
 } from "@/lib/proposal-types";
-import { complete, getAIProviderStatus } from "@/lib/ai";
+import { completeForTenant, getAIProviderStatus } from "@/lib/ai";
 import {
   buildPipelineBriefPrompt,
   type PipelineSnapshot,
@@ -178,7 +178,8 @@ export async function generatePipelineBriefAction(
 
   try {
     const prompt = buildPipelineBriefPrompt(snapshot);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 600,

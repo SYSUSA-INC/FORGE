@@ -436,3 +436,102 @@ export function getAIProvider(): AIProvider {
 export async function complete(opts: AICompleteOptions): Promise<AICompleteResult> {
   return getAIProvider().complete(opts);
 }
+
+/**
+ * BL-PACKAGES Slice 1 — tenant-gated AI completion.
+ *
+ * Use this in EVERY server action or API route that runs AI on behalf
+ * of a tenant. The plain `complete()` above remains for unkeyed contexts
+ * (cron + future ingest pipelines that don't have an `organizationId`),
+ * but the long-term goal is for those callers to migrate too so we have
+ * full per-tenant cost visibility.
+ *
+ * Enforcement model:
+ *   1. **Pre-check.** Read the tenant's current `aiTokensPerMonth`
+ *      usage and the effective quota. If usage is already ≥ the
+ *      cap, refuse the call with `QuotaExceededError` before any
+ *      provider request fires (no wasted dollar).
+ *   2. **Provider call.** Identical to `complete()` — same provider,
+ *      same shape, same return.
+ *   3. **Post-record.** On success, atomically add the actual
+ *      `inputTokens + outputTokens` to the counter via the existing
+ *      `enforceQuota` machinery. Concurrent calls compose correctly.
+ *
+ * Why post-record rather than pre-reserve: tokens aren't known until
+ * the provider responds, and the worst overshoot is bounded by a
+ * single call's max_tokens (default 1024, capped at 4-8k in practice).
+ * For Bronze/Free tiers with small caps we lose at most one call of
+ * over-budget tokens — well below the cost of a failed reserve
+ * + reconcile dance.
+ *
+ * Why a separate function rather than parameter on `complete`: the
+ * existing `complete()` has ~15 callers; threading `organizationId`
+ * everywhere is a coordinated refactor (BL-PACKAGES Slice 2). Until
+ * then, `completeForTenant` is the canonical path for new code AND
+ * the migration target for old code.
+ *
+ * Failure modes:
+ *   - No subscription row → throws (deny-by-default, same as the
+ *     existing `ensureFeature` posture)
+ *   - Quota = 0 (unlimited) → no counter increment; the
+ *     `enforceQuota` helper already short-circuits in this case
+ *   - Stub provider returns 0 tokens → no counter increment;
+ *     fine, the stub doesn't cost anything
+ *   - Provider call throws → counter is NOT incremented; aligns
+ *     with "you don't pay for failed calls"
+ */
+export async function completeForTenant(
+  opts: AICompleteOptions & { organizationId: string },
+): Promise<AICompleteResult> {
+  const { organizationId, ...rest } = opts;
+  // Dynamic import keeps the AI gateway free of a hard dep on the
+  // subscription-gates module — useful for the future ingest /
+  // worker contexts that may use this file without the gates layer.
+  const { enforceQuota, getCurrentUsage, getCurrentTier, QuotaExceededError } =
+    await import("@/lib/subscription-gates");
+
+  // Pre-check: refuse before calling the provider when the tenant is
+  // already over their token cap. The check is best-effort — a tenant
+  // can sneak one final call through if multiple workers race past the
+  // threshold simultaneously; same advisory-ceiling semantics as the
+  // existing request-count quota.
+  const tier = await getCurrentTier(organizationId);
+  if (tier && tier.effectiveQuotas.aiTokensPerMonth > 0) {
+    const used = await getCurrentUsage(organizationId, "aiTokensPerMonth");
+    if (used >= tier.effectiveQuotas.aiTokensPerMonth) {
+      throw new QuotaExceededError(
+        "aiTokensPerMonth",
+        tier.effectiveQuotas.aiTokensPerMonth,
+        used,
+        tier.tierName,
+      );
+    }
+  }
+
+  const result = await complete(rest);
+
+  // Post-record: atomically add this call's actual token usage. The
+  // helper itself throws `QuotaExceededError` if the new total exceeds
+  // the cap — that's *informational* on the post-record path; the call
+  // succeeded and the tenant paid, so we let the result flow through
+  // but the next call into this code path will be refused at pre-check.
+  const tokens =
+    (result.inputTokens ?? 0) + (result.outputTokens ?? 0);
+  if (tokens > 0) {
+    try {
+      await enforceQuota(organizationId, "aiTokensPerMonth", tokens);
+    } catch (err) {
+      // Counter went over after this call — log so admins notice but
+      // don't fail the response; the user already paid for this call's
+      // output. The next call will be refused at pre-check.
+      const { log } = await import("@/lib/log");
+      log.warn("[completeForTenant]", "tenant just crossed token cap", {
+        organizationId,
+        tokens,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return result;
+}

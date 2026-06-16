@@ -2285,7 +2285,18 @@ export type TierFeatureFlags = {
  * sentinel value for unlimited.
  */
 export type TierQuotas = {
+  /**
+   * BL-16 Phase B-3a — per-month AI request count. A poor cost proxy
+   * on its own (one call can be cheap or expensive); keep but pair with
+   * `aiTokensPerMonth` below for actual margin protection. 0 = unlimited.
+   */
   aiRequestsPerMonth: number;
+  /**
+   * BL-PACKAGES Slice 1 — per-month AI token cap (input + output
+   * tokens combined). Enforced at the AI gateway in
+   * `completeForTenant`. 0 = unlimited (Platinum / Enterprise semantics).
+   */
+  aiTokensPerMonth: number;
   seatsIncluded: number;
   storageGb: number;
   proposalsPerMonth: number;

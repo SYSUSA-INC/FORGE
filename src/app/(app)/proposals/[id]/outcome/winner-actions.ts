@@ -12,7 +12,7 @@ import {
   proposals,
   type TipTapDoc,
 } from "@/db/schema";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import {
   buildWinnerAnalysisPrompt,
   parseAiJson,
@@ -283,7 +283,8 @@ export async function runWinnerAnalysisAction(
   let model = "stub";
   let stubbed = true;
   try {
-    const res = await complete({
+    const res = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,

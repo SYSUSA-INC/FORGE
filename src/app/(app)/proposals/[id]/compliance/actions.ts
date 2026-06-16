@@ -12,7 +12,7 @@ import {
   type ComplianceStatus,
   type TipTapDoc,
 } from "@/db/schema";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import {
   buildCompliancePreflightPrompt,
   compliancePreflightResponseSchema,
@@ -494,7 +494,8 @@ export async function runCompliancePreflightAction(
 
     let raw = "";
     try {
-      const res = await complete({
+      const res = await completeForTenant({
+        organizationId,
         system: prompt.system,
         messages: prompt.messages,
         maxTokens: 2000,

@@ -198,6 +198,7 @@ function mergeQuotas(
   return {
     aiRequestsPerMonth:
       overrides.aiRequestsPerMonth ?? base.aiRequestsPerMonth,
+    aiTokensPerMonth: overrides.aiTokensPerMonth ?? base.aiTokensPerMonth,
     seatsIncluded: overrides.seatsIncluded ?? base.seatsIncluded,
     storageGb: overrides.storageGb ?? base.storageGb,
     proposalsPerMonth: overrides.proposalsPerMonth ?? base.proposalsPerMonth,
@@ -216,6 +217,7 @@ function mergeQuotas(
  */
 export type CounterQuotaKey =
   | "aiRequestsPerMonth"
+  | "aiTokensPerMonth"
   | "proposalsPerMonth";
 
 /** Any quota key — counter-backed or live-measured. */
