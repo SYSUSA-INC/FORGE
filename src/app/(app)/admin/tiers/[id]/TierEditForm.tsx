@@ -27,6 +27,7 @@ const FLAG_LABELS: Record<keyof TierFeatureFlags, string> = {
 
 const QUOTA_LABELS: Record<keyof TierQuotas, string> = {
   aiRequestsPerMonth: "AI requests/month",
+  aiTokensPerMonth: "AI tokens/month",
   seatsIncluded: "Seats included",
   storageGb: "Storage (GB)",
   proposalsPerMonth: "Proposals/month",

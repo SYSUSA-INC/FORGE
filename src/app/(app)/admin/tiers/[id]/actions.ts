@@ -39,6 +39,7 @@ const TierFeatureFlagsSchema = z.object({
 
 const TierQuotasSchema = z.object({
   aiRequestsPerMonth: z.number().int().min(0),
+  aiTokensPerMonth: z.number().int().min(0),
   seatsIncluded: z.number().int().min(0),
   storageGb: z.number().int().min(0),
   proposalsPerMonth: z.number().int().min(0),

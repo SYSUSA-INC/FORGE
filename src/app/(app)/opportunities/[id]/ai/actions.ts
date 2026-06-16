@@ -10,7 +10,7 @@ import {
   organizations,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import {
   buildOpportunityBriefPrompt,
   type OpportunitySnapshot,
@@ -183,7 +183,8 @@ export async function generateOpportunityBriefAction(
 
   try {
     const prompt = buildOpportunityBriefPrompt(snapshot);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 600,

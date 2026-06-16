@@ -9,7 +9,7 @@ import {
   proposals,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import {
   enforceQuota,
   ensureFeature,
@@ -163,7 +163,8 @@ export async function generateSectionDraftAction(input: {
 
   try {
     const prompt = buildSectionDraftPrompt(input.mode, snapshot);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: input.mode === "tighten" ? 1200 : 2200,
