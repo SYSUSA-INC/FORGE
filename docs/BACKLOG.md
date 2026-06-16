@@ -19,6 +19,56 @@ Effort key:
 
 ---
 
+## Active priorities (2026-06-16)
+
+| # | Item | Priority | Effort | Status |
+|---|---|---|---|---|
+| 1 | **BL-ENV-SEP** — Dev/staging/prod environment separation | P0 | M | 🟡 docs landed (this PR); operator setup pending |
+| 2 | **BL-TENANT-AUDIT** — Multi-tenant data firewall comprehensive audit | P0 | L | ⏳ queued |
+| 3 | **BL-PACKAGES** — Subscription packages with super-admin configuration + AI token caps | P1 | L | ⏳ queued |
+| 4 | **BL-9 Slice 2b** — SectionsClient wires collab; body_doc projection writeback | P1 | M | ⏳ queued |
+| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued |
+
+### BL-ENV-SEP — Dev/staging/prod environment separation
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 docs landed
+
+Before the first paying customer onboards, production must be isolated from staging/dev so a developer error cannot touch real customer data. Operator runbook in `docs/ENVIRONMENTS.md`; production-deploy gate in `docs/PRODUCTION_DEPLOY_GATE.md`. Code-side guards (env validation, non-prod banners, blocked-in-staging operations) land in a follow-on PR.
+
+### BL-TENANT-AUDIT — Multi-tenant data firewall audit
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Comprehensive audit of every server action, API route, server-component DB query, and admin path for `organizationId` scoping. We have `npm run check:isolation` covering server actions today, but the audit covers cases the static checker can't see:
+- API route handlers (not server actions)
+- Server components fetching data without going through a tenant-gated helper
+- Admin / superadmin paths that intentionally cross tenants (must be allow-listed with a documented reason)
+- DB-level guarantees: every `organization_id` column has a NOT NULL constraint + an index covering tenant-scoped queries
+
+Deliverable: `docs/audits/06-multi-tenant-firewall-2026-06.md` with findings + a remediation PR for each hole.
+
+### BL-PACKAGES — Subscription packages + AI token caps
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work; the new build:
+- Super-admin UI to create/edit packages with feature flags + quotas
+- Add-on system (AI, advanced reporting, etc.)
+- **Per-package AI token cap** (Anthropic input + output tokens) with enforcement at the AI gateway, so a runaway tenant cannot burn through profits
+- Landing page surfacing available packages
+- Tenant-facing upgrade flow
+- Promo codes already in schema; surface in checkout
+- Stripe / Paddle integration TBD (BL-17)
+
+Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
+
+### BL-ITAR-TAG — ITAR-restricted tenant tagging
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Add `organization.itar_restricted` boolean. When true:
+- All members must be US persons (admin-attested at member-add time)
+- Audit log surfaces ITAR-flagged events distinctly
+- Future: GovCloud-only enforcement when we lift the gov tier
+
+Defer until first ITAR-bearing proposal lands.
+
 ## Already shipped (reference only)
 
 | Item | Status |
