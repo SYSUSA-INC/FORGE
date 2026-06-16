@@ -273,7 +273,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slice 1 in progress
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slice 2a in progress (Slice 1 shipped)
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -291,10 +291,18 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
 **Sliced delivery:**
 
 - **Slice 1** — Service skeleton + `yjs_doc` migration + architecture
-  doc. No client wiring yet. 🟡 *in progress (this PR)*
-- **Slice 2** — Wire `RichSectionEditor` to Hocuspocus behind
-  `NEXT_PUBLIC_COLLAB_ENABLED` flag; `/api/collab/token` endpoint;
-  body_doc projection writeback; presence cursors. Deploy to Fly.io.
+  doc. No client wiring yet. ✅ *shipped (PR #207)*
+- **Slice 2a** — Collab token endpoint (`/api/collab/token`),
+  `mintCollabToken` helper, `RichSectionEditor` plumbed for optional
+  Yjs binding behind `NEXT_PUBLIC_COLLAB_ENABLED` flag; tiptap
+  upgrade to 3.26.1. No caller wires it yet — default behavior
+  unchanged. 🟡 *in progress (this PR)*
+- **Slice 2b** — `SectionsClient` passes `collab` prop; body_doc
+  projection writeback (Y.Doc → ProseMirror JSON on debounce so PDF
+  render / exports stay current). Pending.
+- **Slice 2c** — Deploy `services/collab/` to Fly.io; flip
+  `NEXT_PUBLIC_COLLAB_ENABLED=1` for a pilot tenant; smoke test.
+  Pending.
 - **Slice 3** — Track changes (Tiptap Pro extension license vs.
   Y.Map-based implementation — decision in this slice).
 - **Slice 4** — Comment threads anchored via `Y.RelativePosition`;
