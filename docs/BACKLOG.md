@@ -273,33 +273,39 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slice 1 in progress
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
 templates. Section editing happens inside FORGE so the Brain learns
 from edits.
 
-**Scope (phased — break into BL-9a … BL-9f):**
+**Architecture decision (2026-06-15):** Self-hosted **Hocuspocus + Yjs**
+on commercial Fly.io for Slices 1-5; AWS GovCloud lift + FedRAMP 20x
+Moderate submission in Slice 6 when first CUI customer signs. MIT
+license, no vendor lock-in, first-party TipTap binding. See
+`docs/architecture/collab-editor.md` for the full design + the vendor
+comparison that led here (Liveblocks / Convex / y-sweet / Supabase /
+PartyKit / Ably all disqualified for FedRAMP path or maturity).
 
-- **BL-9a** Foundation: Yjs CRDT integration with the existing
-  TipTap editor; per-section Yjs doc; `y-websocket` provider with
-  authentication; presence cursors + names
-- **BL-9b** Track changes: tracked-changes mark layer (insertions,
-  deletions, format changes); accept/reject UI per change; per-user
-  attribution
-- **BL-9c** Comment threads: anchored to a text range; reply chain;
-  resolve/unresolve; per-comment notification
-- **BL-9d** Suggestion mode: switch from "edit" to "suggest" — all
-  changes become tracked-changes by default, owner approves before
-  they apply to the canonical doc
-- **BL-9e** Diff visualization: side-by-side or inline diff between
-  two snapshots; restore prior snapshot
-- **BL-9f** Brain feedback: every accepted/rejected change feeds the
-  pattern-intel pipeline so future drafts learn from real edits
+**Sliced delivery:**
 
-**Acceptance per phase:** measured against the existing TipTap editor
-+ team workflow; specifics defined per sub-BL when each starts.
+- **Slice 1** — Service skeleton + `yjs_doc` migration + architecture
+  doc. No client wiring yet. 🟡 *in progress (this PR)*
+- **Slice 2** — Wire `RichSectionEditor` to Hocuspocus behind
+  `NEXT_PUBLIC_COLLAB_ENABLED` flag; `/api/collab/token` endpoint;
+  body_doc projection writeback; presence cursors. Deploy to Fly.io.
+- **Slice 3** — Track changes (Tiptap Pro extension license vs.
+  Y.Map-based implementation — decision in this slice).
+- **Slice 4** — Comment threads anchored via `Y.RelativePosition`;
+  `extension-redis` for horizontal scale if needed.
+- **Slice 5** — Suggestion mode + version snapshots + diff viewer.
+- **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
+- **Slice 7** — Brain feedback loop: every accepted/rejected change
+  feeds the pattern-intel pipeline.
+
+**Acceptance per slice:** measured against the existing TipTap editor
++ team workflow; specifics defined per slice when each starts.
 
 ---
 

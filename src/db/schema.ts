@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -15,6 +16,15 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+// Drizzle ships no first-class bytea — BL-9's yjs_doc.state column
+// holds Y.encodeStateAsUpdate() binary blobs that are written by the
+// Hocuspocus service. Reads from the Next app surface as Uint8Array.
+const bytea = customType<{ data: Uint8Array; default: false }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const roleEnum = pgEnum("role", [
   "admin",
@@ -2499,3 +2509,44 @@ export const productionErrors = pgTable(
 
 export type ProductionError = typeof productionErrors.$inferSelect;
 export type NewProductionError = typeof productionErrors.$inferInsert;
+
+/**
+ * BL-9 Slice 1 — Yjs document persistence for the collaborative
+ * editor. One row per (organization_id, doc_name); rewritten by the
+ * Hocuspocus service (services/collab/) on every debounced commit.
+ *
+ * See drizzle/0053_yjs_doc.sql and docs/architecture/collab-editor.md.
+ *
+ * The Next app does not read or write this table in Slice 1 — the
+ * Drizzle const exists so the multi-tenant isolation check sees the
+ * canonical TS identifier for `yjs_doc`, and so any future server-side
+ * access path (e.g. a snapshot/export endpoint) goes through Drizzle
+ * with the existing `organizationId` discipline.
+ */
+export const yjsDocs = pgTable(
+  "yjs_doc",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    docName: text("doc_name").notNull(),
+    state: bytea("state").notNull(),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgNameUq: uniqueIndex("yjs_doc_org_name_uq").on(
+      t.organizationId,
+      t.docName,
+    ),
+    orgUpdatedIdx: index("yjs_doc_org_updated_idx").on(
+      t.organizationId,
+      t.updatedAt,
+    ),
+  }),
+);
+
+export type YjsDoc = typeof yjsDocs.$inferSelect;
+export type NewYjsDoc = typeof yjsDocs.$inferInsert;
