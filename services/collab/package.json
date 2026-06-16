@@ -1,0 +1,30 @@
+{
+  "name": "@forge/collab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BL-9 — Hocuspocus collaboration service for FORGE. Self-hosted Yjs over WebSocket, NextAuth JWT auth, Postgres persistence via yjs_doc.",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hocuspocus/extension-database": "^4.2.0",
+    "@hocuspocus/server": "^4.2.0",
+    "jose": "^5.9.0",
+    "pg": "^8.20.0",
+    "yjs": "^13.6.20"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
