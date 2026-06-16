@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { organizations } from "@/db/schema";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { rowToOrgProfile } from "@/lib/org-types";
 import { AuditRetentionPanel } from "./AuditRetentionPanel";
 import { SettingsClient } from "./SettingsClient";
@@ -10,16 +10,12 @@ import { SettingsClient } from "./SettingsClient";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const user = await requireAuth();
-
-  if (!user.organizationId) {
-    redirect("/");
-  }
+  const { user, organizationId } = await requireCurrentOrg();
 
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.id, user.organizationId))
+    .where(eq(organizations.id, organizationId))
     .limit(1);
 
   if (!org) {
