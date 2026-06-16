@@ -10,27 +10,124 @@ import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableCell } from "@tiptap/extension-table-cell";
-import { useCallback, useEffect, useMemo } from "react";
+import { Collaboration } from "@tiptap/extension-collaboration";
+import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import type { AnyExtension } from "@tiptap/core";
+import * as Y from "yjs";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { TipTapDoc } from "@/db/schema";
+
+/**
+ * BL-9 Slice 2 — when a `collab` config is supplied AND
+ * `NEXT_PUBLIC_COLLAB_ENABLED === "1"`, the editor binds to a Yjs
+ * document hosted by the Hocuspocus service. Otherwise it falls back
+ * to the original single-user path (byte-identical with pre-Slice-2
+ * behavior).
+ *
+ * Subsequent slices add presence cursors with stable colors, track
+ * changes, and comments. Slice 2 only ships the plumbing — no
+ * caller wires `collab` yet, so this remains dead-but-tested code
+ * until the SectionsClient hand-off lands.
+ */
+export type CollabConfig = {
+  /** "section/<proposalSectionId>" — see docs/architecture/collab-editor.md */
+  docName: string;
+  /** Full URL to the Hocuspocus service — e.g. wss://collab.forge.app */
+  serverUrl: string;
+  /** Display name shown above the remote user's cursor. */
+  userName: string;
+  /** Stable per-user hex color for the cursor. */
+  userColor: string;
+  /**
+   * Function the editor calls to fetch a fresh JWT. Called at mount
+   * and again before token expiry. Returns the bare JWT string;
+   * `/api/collab/token` is the canonical implementation.
+   */
+  fetchToken: () => Promise<string>;
+};
 
 type Props = {
   doc: TipTapDoc;
   onChange: (doc: TipTapDoc, plain: string, words: number) => void;
   placeholder?: string;
   disabled?: boolean;
+  /**
+   * When provided and the COLLAB_ENABLED feature flag is on, the
+   * editor connects to Hocuspocus for real-time collaboration. When
+   * omitted, the editor renders exactly as it did pre-Slice-2.
+   */
+  collab?: CollabConfig;
 };
+
+function collabEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_COLLAB_ENABLED === "1";
+}
 
 export function RichSectionEditor({
   doc,
   onChange,
   placeholder,
   disabled,
+  collab,
 }: Props) {
-  const extensions = useMemo(
-    () => [
+  const useCollab = !!collab && collabEnabled();
+
+  // Yjs doc + Hocuspocus provider live for the lifetime of the editor
+  // instance. Stored in refs so React renders don't tear them down.
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const providerRef = useRef<HocuspocusProvider | null>(null);
+  if (useCollab && !ydocRef.current) {
+    ydocRef.current = new Y.Doc();
+  }
+
+  useEffect(() => {
+    if (!useCollab || !collab) return;
+    let cancelled = false;
+    const ydoc = ydocRef.current!;
+
+    // Bootstrap the provider with a real token. Hocuspocus accepts
+    // either a string token or a function — we use the function form
+    // so token refresh on reconnect just calls back into the app.
+    void collab
+      .fetchToken()
+      .then((token) => {
+        if (cancelled) return;
+        providerRef.current = new HocuspocusProvider({
+          url: collab.serverUrl,
+          name: collab.docName,
+          document: ydoc,
+          token,
+        });
+      })
+      .catch(() => {
+        // Surfacing the error here would race the editor render. The
+        // provider's own onClose / onAuthenticationFailed will fire if
+        // the token mint succeeds but verification fails server-side;
+        // a pure mint failure leaves the editor in single-user mode
+        // until next mount.
+      });
+
+    return () => {
+      cancelled = true;
+      providerRef.current?.destroy();
+      providerRef.current = null;
+    };
+    // Intentionally omit `collab` from deps — its identity changes on
+    // every parent render, but the doc-name / server-url / fetchToken
+    // are stable for the section's lifetime. Re-mount the editor if
+    // any of those need to change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useCollab]);
+
+  const extensions = useMemo(() => {
+    const base: AnyExtension[] = [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         codeBlock: { HTMLAttributes: { class: "tiptap-codeblock" } },
+        // Yjs ships its own undo manager; the starter-kit's undoRedo
+        // extension fights it. Turn ours off when collab is on.
+        ...(useCollab ? { undoRedo: false as const } : {}),
       }),
       Underline,
       Link.configure({
@@ -47,13 +144,37 @@ export function RichSectionEditor({
       TableRow,
       TableHeader,
       TableCell,
-    ],
-    [placeholder],
-  );
+    ];
+    if (useCollab && collab && ydocRef.current) {
+      base.push(Collaboration.configure({ document: ydocRef.current }));
+      // CollaborationCaret (formerly CollaborationCursor in TipTap 2.x)
+      // needs the provider's awareness handle. We pass a getter so the
+      // extension picks it up once the provider is ready instead of
+      // failing fast on first render.
+      base.push(
+        CollaborationCaret.configure({
+          // The awareness API surface CollaborationCaret reads from.
+          // `providerRef.current` becomes non-null after the
+          // fetchToken promise resolves; the caret extension polls
+          // until then, so a brief gap is harmless.
+          provider: {
+            get awareness() {
+              return providerRef.current?.awareness ?? null;
+            },
+          },
+          user: { name: collab.userName, color: collab.userColor },
+        }),
+      );
+    }
+    return base;
+  }, [placeholder, useCollab, collab]);
 
   const editor = useEditor({
     extensions,
-    content: doc,
+    // In collab mode the Y.Doc is the source of truth; passing
+    // `content` would double-initialize the doc and produce phantom
+    // edits. The Hocuspocus provider hydrates from the server.
+    content: useCollab ? undefined : doc,
     editable: !disabled,
     immediatelyRender: false,
     editorProps: {
