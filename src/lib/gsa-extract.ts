@@ -16,7 +16,7 @@ import {
   parseAiJson,
   type GsaExtractionResult,
 } from "@/lib/ai-prompts";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type GsaExtractOk = {
@@ -38,6 +38,7 @@ const VALID_NOTICE_TYPES = new Set([
 ]);
 
 export async function aiExtractGsa(
+  organizationId: string,
   rawText: string,
 ): Promise<GsaExtractOk | GsaExtractErr> {
   if (!rawText.trim()) {
@@ -53,7 +54,8 @@ export async function aiExtractGsa(
 
   try {
     const prompt = buildGsaExtractPrompt(rawText);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 1800,

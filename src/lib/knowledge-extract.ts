@@ -15,7 +15,7 @@ import {
   type KnowledgeExtractionCandidateOutput,
   type KnowledgeKindEnumLike,
 } from "@/lib/ai-prompts";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type KnowledgeExtractOk = {
@@ -38,6 +38,7 @@ const ALLOWED_KINDS: KnowledgeKindEnumLike[] = [
 ];
 
 export async function aiExtractKnowledgeFromArtifact(input: {
+  organizationId: string;
   artifactKind: string;
   artifactTitle: string;
   artifactTags: string[];
@@ -53,7 +54,8 @@ export async function aiExtractKnowledgeFromArtifact(input: {
 
   try {
     const prompt = buildKnowledgeExtractPrompt(input);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId: input.organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3500,

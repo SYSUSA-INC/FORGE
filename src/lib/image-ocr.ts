@@ -11,7 +11,7 @@
  * Anthropic-only at the moment; falls back to a clear error in
  * stub or non-Anthropic mode.
  */
-import { complete, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
+import { completeForTenant, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type ImageOcrResult =
@@ -35,6 +35,7 @@ Rules:
 - Maximum 8000 characters output. Truncate gracefully if the image has more text than that.`;
 
 export async function extractTextFromImageViaVision(input: {
+  organizationId: string;
   bytes: Uint8Array;
   mediaType: AIDocumentMedia;
   fileName: string;
@@ -60,7 +61,8 @@ export async function extractTextFromImageViaVision(input: {
   }
 
   try {
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId: input.organizationId,
       system: SYSTEM,
       messages: [
         {

@@ -186,6 +186,7 @@ export async function uploadKnowledgeArtifactAction(
     format,
     contentType,
     file.name,
+    organizationId,
     wasAutoKind,
   );
 
@@ -214,6 +215,7 @@ async function extractAndIndex(
   format: ExtractFormat,
   contentType: string,
   fileName: string,
+  organizationId: string,
   wasAutoKind: boolean = false,
 ): Promise<void> {
   await db
@@ -249,6 +251,7 @@ async function extractAndIndex(
         // Falls back gracefully when AI provider isn't configured —
         // the artifact still lands but with an explanatory note.
         const ocr = await extractTextFromImageViaVision({
+          organizationId,
           bytes,
           mediaType: (contentType || "image/png") as AIDocumentMedia,
           fileName,
@@ -306,6 +309,7 @@ async function extractAndIndex(
   if (wasAutoKind && rawText.trim().length > 0) {
     try {
       const classified = await classifyArtifactKind({
+        organizationId,
         fileName,
         contentType,
         rawText,
@@ -614,6 +618,7 @@ export async function reextractArtifactTextAction(
     format,
     artifact.contentType,
     artifact.fileName,
+    organizationId,
   );
 
   // Reload to return the new char count.
@@ -724,6 +729,7 @@ export async function runKnowledgeClassificationBackfillAction(): Promise<Classi
   for (const c of candidates) {
     try {
       const classified = await classifyArtifactKind({
+        organizationId,
         fileName: c.fileName,
         contentType: c.contentType,
         rawText: c.rawText,

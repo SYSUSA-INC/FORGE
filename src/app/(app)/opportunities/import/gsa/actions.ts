@@ -36,7 +36,7 @@ export async function parseGsaTextAction(
   rawText: string,
 ): Promise<GsaParseResult> {
   await requireAuth();
-  await requireCurrentOrg();
+  const { organizationId } = await requireCurrentOrg();
 
   if (!rawText || rawText.trim().length === 0) {
     return { ok: false, error: "Paste the GSA email body before extracting." };
@@ -49,7 +49,7 @@ export async function parseGsaTextAction(
     };
   }
 
-  return aiExtractGsa(rawText);
+  return aiExtractGsa(organizationId, rawText);
 }
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB per file

@@ -4,7 +4,7 @@
  * mode handling and zod validation, mirroring the pattern from
  * `solicitation-extract.ts` and `ebuy-extract.ts`.
  */
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import { parseAiJson } from "@/lib/ai-prompts";
 import {
   buildCapabilityMatrixPrompt,
@@ -33,6 +33,7 @@ type Err = { ok: false; error: string };
 // ────────────────────────────────────────────────────────────────────
 
 export async function aiRunSolicitationReview(input: {
+  organizationId: string;
   title: string;
   fileName: string;
   rawText: string;
@@ -47,7 +48,8 @@ export async function aiRunSolicitationReview(input: {
 
   try {
     const prompt = buildSolicitationReviewPrompt(input);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId: input.organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 4000,
@@ -94,6 +96,7 @@ export async function aiRunSolicitationReview(input: {
 // ────────────────────────────────────────────────────────────────────
 
 export async function aiRunCapabilityMatrix(input: {
+  organizationId: string;
   solicitationTitle: string;
   agency: string;
   setAside: string;
@@ -116,7 +119,8 @@ export async function aiRunCapabilityMatrix(input: {
 
   try {
     const prompt = buildCapabilityMatrixPrompt(input);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId: input.organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 4000,
@@ -163,6 +167,7 @@ export async function aiRunCapabilityMatrix(input: {
 // ────────────────────────────────────────────────────────────────────
 
 export async function aiRunQuestionGenerator(input: {
+  organizationId: string;
   solicitationTitle: string;
   agency: string;
   reviewSummary: string;
@@ -174,7 +179,8 @@ export async function aiRunQuestionGenerator(input: {
 }): Promise<Ok<QuestionSetVerdict> | Err> {
   try {
     const prompt = buildQuestionGeneratorPrompt(input);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId: input.organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3000,

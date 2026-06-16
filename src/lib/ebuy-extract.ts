@@ -13,7 +13,7 @@ import {
   parseAiJson,
   type EbuyExtractionResult,
 } from "@/lib/ai-prompts";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type EbuyExtractOk = {
@@ -26,6 +26,7 @@ export type EbuyExtractOk = {
 export type EbuyExtractErr = { ok: false; error: string };
 
 export async function aiExtractEbuy(
+  organizationId: string,
   rawText: string,
 ): Promise<EbuyExtractOk | EbuyExtractErr> {
   if (!rawText.trim()) {
@@ -41,7 +42,8 @@ export async function aiExtractEbuy(
 
   try {
     const prompt = buildEbuyExtractPrompt(rawText);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 1800,

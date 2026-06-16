@@ -113,7 +113,7 @@ export async function uploadSolicitationAction(
   // Kick off parsing in the same request so the user gets a populated
   // record on the redirect. Failures are recorded on the row and shown
   // on the detail page; the upload itself still succeeds.
-  void parseSolicitationFromBytes(row.id, bytes).catch((err) =>
+  void parseSolicitationFromBytes(row.id, organizationId, bytes).catch((err) =>
     log.error("[uploadSolicitationAction]", "inline parse failed", { error: err }),
   );
 
@@ -140,6 +140,7 @@ const TEXT_LAYER_MIN_CHARS = 200;
 
 async function parseSolicitationFromBytes(
   solicitationId: string,
+  organizationId: string,
   bytes: Uint8Array,
 ): Promise<void> {
   await db
@@ -173,6 +174,7 @@ async function parseSolicitationFromBytes(
   if (format === "image") {
     const mediaType = (contentType || "image/png") as AIDocumentMedia;
     const visionRes = await aiExtractSolicitationFromImage(
+      organizationId,
       bytes,
       fileName,
       mediaType,
@@ -219,7 +221,7 @@ async function parseSolicitationFromBytes(
     format === "pdf" &&
     rawText.trim().length < TEXT_LAYER_MIN_CHARS
   ) {
-    const visionRes = await aiExtractSolicitationFromPdf(bytes, fileName);
+    const visionRes = await aiExtractSolicitationFromPdf(organizationId, bytes, fileName);
     if (!visionRes.ok) {
       await db
         .update(solicitations)
@@ -276,7 +278,7 @@ async function parseSolicitationFromBytes(
     return;
   }
 
-  const aiRes = await aiExtractSolicitation(rawText);
+  const aiRes = await aiExtractSolicitation(organizationId, rawText);
   if (!aiRes.ok) {
     await db
       .update(solicitations)
@@ -392,7 +394,7 @@ export async function reparseSolicitationAction(
         "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)",
     };
 
-  void parseSolicitationFromBytes(id, obj.bytes).catch((err) =>
+  void parseSolicitationFromBytes(id, organizationId, obj.bytes).catch((err) =>
     log.error("[reparseSolicitationAction]", "parse failed", { error: err }),
   );
   return { ok: true };

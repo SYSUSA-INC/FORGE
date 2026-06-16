@@ -76,6 +76,7 @@ export async function startKnowledgeExtractionAction(
   if (!run) return { ok: false, error: "Could not create extraction run." };
 
   const aiRes = await aiExtractKnowledgeFromArtifact({
+    organizationId,
     artifactKind: artifact.kind,
     artifactTitle: artifact.title || artifact.fileName,
     artifactTags: artifact.tags ?? [],

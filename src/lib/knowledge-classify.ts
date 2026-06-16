@@ -20,7 +20,7 @@ import {
   buildArtifactKindClassifyPrompt,
   parseAiJson,
 } from "@/lib/ai-prompts";
-import { complete } from "@/lib/ai";
+import { completeForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 import type { KnowledgeArtifactKind } from "@/db/schema";
 
@@ -41,6 +41,7 @@ export type ClassifyArtifactKindResult =
 export const CLASSIFY_CONFIDENCE_THRESHOLD = 0.6;
 
 export async function classifyArtifactKind(input: {
+  organizationId: string;
   fileName: string;
   contentType: string;
   rawText: string;
@@ -55,7 +56,8 @@ export async function classifyArtifactKind(input: {
 
   try {
     const prompt = buildArtifactKindClassifyPrompt(input);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId: input.organizationId,
       system: prompt.system,
       messages: prompt.messages,
       // Classification is short — 200 tokens covers JSON {kind, confidence, reasoning}.
