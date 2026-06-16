@@ -36,6 +36,9 @@ export const authConfig = {
       // Token-authed public review page — opportunity review requests
       // can be answered by reviewers who don't have a FORGE account.
       if (pathname.startsWith("/review/")) return true;
+      // Public pricing page — anyone can see what we sell before
+      // creating an account.
+      if (pathname === "/pricing") return true;
 
       return !!auth?.user;
     },
