@@ -102,6 +102,7 @@ const NAV: NavGroup[] = [
     children: [
       { href: "/admin", label: "Tenants" },
       { href: "/admin/tiers", label: "Subscription tiers" },
+      { href: "/admin/usage", label: "AI usage & costs" },
       { href: "/admin/promo-codes", label: "Promo codes" },
       { href: "/admin/errors", label: "Production errors" },
       { href: "/admin/migrations", label: "Database migrations" },
