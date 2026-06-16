@@ -15,7 +15,7 @@ import {
   solicitationExtractionSchema,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
-import { complete, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
+import { completeForTenant, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
 import {
   detectFormat,
   extractTextFromDocx,
@@ -72,12 +72,14 @@ export async function extractTextFromAny(
 }
 
 export async function aiExtractSolicitation(
+  organizationId: string,
   rawText: string,
 ): Promise<{ ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean } | { ok: false; error: string }> {
   if (!rawText.trim()) return { ok: false, error: "No text extracted from the file." };
   try {
     const prompt = buildSolicitationExtractPrompt(rawText);
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -143,6 +145,7 @@ export async function aiExtractSolicitation(
  * can surface "OCR needs Anthropic; configure ANTHROPIC_API_KEY".
  */
 export async function aiExtractSolicitationFromPdf(
+  organizationId: string,
   bytes: Uint8Array,
   fileName: string,
 ): Promise<
@@ -171,7 +174,8 @@ export async function aiExtractSolicitationFromPdf(
 
   try {
     const prompt = buildSolicitationVisionPrompt();
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -214,6 +218,7 @@ export async function aiExtractSolicitationFromPdf(
  * of printed RFQs.
  */
 export async function aiExtractSolicitationFromImage(
+  organizationId: string,
   bytes: Uint8Array,
   fileName: string,
   mediaType: AIDocumentMedia,
@@ -242,7 +247,8 @@ export async function aiExtractSolicitationFromImage(
 
   try {
     const prompt = buildSolicitationVisionPrompt();
-    const ai = await complete({
+    const ai = await completeForTenant({
+      organizationId,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,

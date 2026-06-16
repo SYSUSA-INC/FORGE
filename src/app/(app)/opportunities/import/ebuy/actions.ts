@@ -23,7 +23,7 @@ export async function parseEbuyTextAction(
   rawText: string,
 ): Promise<EbuyParseResult> {
   await requireAuth();
-  await requireCurrentOrg();
+  const { organizationId } = await requireCurrentOrg();
 
   if (!rawText || rawText.trim().length === 0) {
     return { ok: false, error: "Paste the eBuy RFQ body before extracting." };
@@ -36,7 +36,7 @@ export async function parseEbuyTextAction(
     };
   }
 
-  return aiExtractEbuy(rawText);
+  return aiExtractEbuy(organizationId, rawText);
 }
 
 export type EbuyCreateInput = {

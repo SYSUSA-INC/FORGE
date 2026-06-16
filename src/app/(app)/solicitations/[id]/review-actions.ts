@@ -240,6 +240,7 @@ export async function runSolicitationReviewAction(
 
   // Fire the AI call.
   const result = await aiRunSolicitationReview({
+    organizationId,
     title: doc.title,
     fileName: doc.fileName,
     rawText: doc.rawText,
@@ -455,6 +456,7 @@ export async function runCapabilityMatrixAction(
     .orderBy(asc(knowledgeEntries.title));
 
   const result = await aiRunCapabilityMatrix({
+    organizationId,
     solicitationTitle: doc.title,
     agency: doc.agency,
     setAside: doc.setAside,
@@ -624,6 +626,7 @@ export async function runQuestionGeneratorAction(
   }
 
   const result = await aiRunQuestionGenerator({
+    organizationId,
     solicitationTitle: doc.title,
     agency: doc.agency,
     reviewSummary: reviewResult.summary,
