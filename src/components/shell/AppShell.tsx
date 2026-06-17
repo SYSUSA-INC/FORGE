@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
+import { NonProdBanner } from "@/components/shell/NonProdBanner";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { auth } from "@/auth";
@@ -24,8 +25,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     : null;
 
   return (
-    <div className="flex min-h-screen text-text">
-      <SideNav
+    <>
+      <NonProdBanner />
+      <div className="flex min-h-screen text-text">
+        <SideNav
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
         user={navUser}
@@ -87,7 +90,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </footer>
         </main>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

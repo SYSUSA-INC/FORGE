@@ -130,6 +130,45 @@ export async function register() {
             error: err,
           });
         }
+        // BL-ENV-SEP — environment marker check.
+        // Compares the runtime's VERCEL_ENV (or FORGE_ENV_OVERRIDE) to
+        // the marker stored in `_forge_env`. Mismatch means this
+        // deploy is pointed at the wrong DB (e.g. staging Vercel
+        // project accidentally using prod DATABASE_URL) — CRASH
+        // immediately. Better than silently corrupting prod data.
+        try {
+          const { verifyEnvMarker } = await import("./lib/env-marker");
+          const result = await verifyEnvMarker();
+          switch (result.kind) {
+            case "ok":
+              log.info("[env-marker]", "marker verified", {
+                env: result.expected,
+              });
+              break;
+            case "first-boot":
+              log.info("[env-marker]", "first-boot marker recorded", {
+                env: result.recorded,
+              });
+              break;
+            case "skipped":
+              log.info("[env-marker]", "skipped", { reason: result.reason });
+              break;
+            case "mismatch":
+              // HARD CRASH: this is exactly the scenario we built
+              // this for. Refuse to serve a single request when
+              // the env label doesn't match what the DB expects.
+              log.error(
+                "[env-marker]",
+                "FATAL: env marker mismatch — refusing to start",
+                { expected: result.expected, current: result.current },
+              );
+              // SIGTERM the process so the platform restarts us (and
+              // ideally the operator notices the crash loop).
+              process.exit(1);
+          }
+        } catch (err) {
+          log.warn("[env-marker]", "verifier failed to run", { error: err });
+        }
       })();
     }
   }
