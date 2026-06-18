@@ -30,10 +30,14 @@ Effort key:
 | 3b | **BL-PACKAGES Slice 2** — Migrate 7 lib-helper AI callers | P1 | M | ✅ shipped (PR #213) — 100% tenant AI paths token-capped |
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
-| 4 | **BL-9 Slice 2b** — SectionsClient wires collab; pickColorForUser | P1 | M | 🟡 in progress (this PR) — code ready; activates on flag flip after 2c deploys Hocuspocus |
-| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy + env vars) |
-| 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ⏳ queued — perf optimization; current client onChange handles persistence redundantly across users |
-| 7 | **BL-17** — Stripe vs Paddle research + integration | P1 | L | 🟡 Slice 1 (provider research) in flight (background agent) |
+| 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
+| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
+| 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ⏳ queued — perf optimization |
+| 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | 🟢 ready (this PR) — recommendation: **Stripe** |
+| 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ⏳ queued |
+| 9 | **BL-17 Slice 3** — Checkout flow (sign-up → Stripe Checkout → tier provisioning) | P1 | M | ⏳ queued |
+| 10 | **BL-17 Slice 4** — Customer portal + dunning emails | P1 | M | ⏳ queued |
+| 11 | **BL-17 Slice 5** — Upgrade/downgrade + enterprise wire-invoice flow | P1 | S | ⏳ queued |
 
 ### BL-ENV-SEP — Dev/staging/prod environment separation
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 docs landed
