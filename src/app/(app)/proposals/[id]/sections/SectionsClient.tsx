@@ -13,7 +13,11 @@ import {
   SECTION_STATUS_LABELS,
 } from "@/lib/proposal-types";
 import { fromPlainText } from "@/lib/tiptap-doc";
-import { RichSectionEditor } from "@/components/editor/RichSectionEditor";
+import { pickColorForUser } from "@/lib/collab-user";
+import {
+  RichSectionEditor,
+  type CollabConfig,
+} from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import {
@@ -39,6 +43,11 @@ type Section = {
 
 type TeamMember = { id: string; name: string | null; email: string };
 
+type CurrentUser = {
+  id: string;
+  displayName: string;
+};
+
 const STATUSES: ProposalSectionStatus[] = [
   "not_started",
   "in_progress",
@@ -56,14 +65,56 @@ const KIND_OPTIONS: ProposalSectionKind[] = [
   "executive_summary",
 ];
 
+/**
+ * BL-9 Slice 2b — build the per-section CollabConfig for the editor.
+ *
+ * Returns undefined when collab isn't enabled in this environment, so
+ * `RichSectionEditor` falls back to its existing single-user path —
+ * byte-identical behavior with pre-collab deploys.
+ *
+ * `serverUrl` defaults to `NEXT_PUBLIC_COLLAB_URL` (e.g.
+ * `wss://collab.forge.app`). Without it, even if the feature flag is
+ * on, we can't connect — bail to single-user instead of crashing.
+ */
+function buildCollabConfig(
+  sectionId: string,
+  user: CurrentUser,
+): CollabConfig | undefined {
+  const enabled = process.env.NEXT_PUBLIC_COLLAB_ENABLED === "1";
+  const serverUrl = process.env.NEXT_PUBLIC_COLLAB_URL || "";
+  if (!enabled || !serverUrl) return undefined;
+  return {
+    docName: `section/${sectionId}`,
+    serverUrl,
+    userName: user.displayName,
+    userColor: pickColorForUser(user.id),
+    fetchToken: fetchCollabToken,
+  };
+}
+
+async function fetchCollabToken(): Promise<string> {
+  const res = await fetch("/api/collab/token", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+  if (!res.ok) {
+    throw new Error(`collab token request failed: ${res.status}`);
+  }
+  const body = (await res.json()) as { token?: string };
+  if (!body.token) throw new Error("collab token response missing `token`");
+  return body.token;
+}
+
 export function SectionsClient({
   proposalId,
   sections,
   team,
+  currentUser,
 }: {
   proposalId: string;
   sections: Section[];
   team: TeamMember[];
+  currentUser: CurrentUser;
 }) {
   const [expanded, setExpanded] = useState<string | null>(
     sections[0]?.id ?? null,
@@ -80,6 +131,7 @@ export function SectionsClient({
             proposalId={proposalId}
             section={s}
             team={team}
+            currentUser={currentUser}
             open={expanded === s.id}
             onToggle={() => setExpanded(expanded === s.id ? null : s.id)}
           />
@@ -163,15 +215,21 @@ function SectionRow({
   proposalId,
   section,
   team,
+  currentUser,
   open,
   onToggle,
 }: {
   proposalId: string;
   section: Section;
   team: TeamMember[];
+  currentUser: CurrentUser;
   open: boolean;
   onToggle: () => void;
 }) {
+  // BL-9 Slice 2b — collab config (undefined when feature flag is off).
+  // Memoized via inline call: the inputs (section.id, currentUser) are
+  // stable for this row's lifetime, so referential identity stays put.
+  const collab = buildCollabConfig(section.id, currentUser);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -366,6 +424,7 @@ function SectionRow({
                 setWordCount(count);
               }}
               placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
+              collab={collab}
             />
             <input type="hidden" value={plainContent} readOnly />
           </div>

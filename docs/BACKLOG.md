@@ -30,8 +30,10 @@ Effort key:
 | 3b | **BL-PACKAGES Slice 2** — Migrate 7 lib-helper AI callers | P1 | M | ✅ shipped (PR #213) — 100% tenant AI paths token-capped |
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
-| 4 | **BL-9 Slice 2b** — SectionsClient wires collab; body_doc projection writeback | P1 | M | ⏳ queued |
-| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued |
+| 4 | **BL-9 Slice 2b** — SectionsClient wires collab; pickColorForUser | P1 | M | 🟡 in progress (this PR) — code ready; activates on flag flip after 2c deploys Hocuspocus |
+| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy + env vars) |
+| 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ⏳ queued — perf optimization; current client onChange handles persistence redundantly across users |
+| 7 | **BL-17** — Stripe vs Paddle research + integration | P1 | L | 🟡 Slice 1 (provider research) in flight (background agent) |
 
 ### BL-ENV-SEP — Dev/staging/prod environment separation
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 docs landed
