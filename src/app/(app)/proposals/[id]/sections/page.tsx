@@ -15,7 +15,7 @@ export default async function ProposalSectionsPage({
 }: {
   params: { id: string };
 }) {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const [p] = await db
@@ -75,6 +75,10 @@ export default async function ProposalSectionsPage({
           authorEmail: s.authorEmail,
         }))}
         team={team}
+        currentUser={{
+          id: user.id,
+          displayName: user.name || user.email || user.id,
+        }}
       />
     </Panel>
   );
