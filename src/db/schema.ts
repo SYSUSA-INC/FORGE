@@ -2349,6 +2349,14 @@ export const tenantSubscriptions = pgTable(
     trialUntil: timestamp("trial_until"),
     cancelAt: timestamp("cancel_at"),
     /**
+     * BL-17 Slice 2 — Stripe binding. Null until a tenant goes through
+     * Stripe Checkout; populated by the `checkout.session.completed`
+     * webhook. Look-up indexes are created in the migration; queries
+     * filter `WHERE stripe_customer_id IS NOT NULL` to use them.
+     */
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    /**
      * Per-tenant overrides on top of the tier defaults. Shape mirrors
      * the merged TierFeatureFlags + TierQuotas. Examples:
      *   { "quotas": { "aiRequestsPerMonth": 5000 } }
@@ -2369,11 +2377,69 @@ export const tenantSubscriptions = pgTable(
   (t) => ({
     tierIdx: index("tenant_subscription_tier_idx").on(t.tierId),
     statusIdx: index("tenant_subscription_status_idx").on(t.status),
+    // Partial indexes — only Stripe-bound rows. Webhook handlers hit
+    // these to resolve tenant from a customer/subscription id payload.
+    stripeCustomerIdx: index("tenant_subscription_stripe_customer_idx").on(
+      t.stripeCustomerId,
+    ),
+    stripeSubscriptionIdx: index(
+      "tenant_subscription_stripe_subscription_idx",
+    ).on(t.stripeSubscriptionId),
   }),
 );
 
 export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
 export type NewTenantSubscription = typeof tenantSubscriptions.$inferInsert;
+
+/**
+ * BL-17 Slice 2 — Stripe webhook event ledger.
+ *
+ * One row per Stripe event we receive. Three jobs:
+ *   1. Idempotency — UNIQUE on `stripe_event_id` makes retried
+ *      deliveries cheap to detect (INSERT ... ON CONFLICT DO NOTHING).
+ *   2. Audit trail — preserve the raw payload so billing disputes
+ *      6 months later don't require Stripe-dashboard archeology.
+ *   3. Reconciliation — failed handlers leave `handler_status='failed'`
+ *      + payload intact for replay (Slice 4 admin UI).
+ *
+ * Platform-wide (no organization_id directly — `organization_id` is
+ * NULLABLE because the tenant isn't known until the handler resolves
+ * the stripe_customer_id). Read access is superadmin-only via the
+ * platform-admin UI; never exposed to tenant users. Same posture as
+ * `production_error_log` — documented in
+ * `docs/audits/06-multi-tenant-firewall-2026-06.md`.
+ */
+export const paymentEvents = pgTable(
+  "payment_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stripeEventId: text("stripe_event_id").notNull().unique(),
+    eventType: text("event_type").notNull(),
+    stripeCustomerId: text("stripe_customer_id"),
+    organizationId: uuid("organization_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    payload: jsonb("payload").notNull().default({}),
+    handlerStatus: text("handler_status").notNull().default("unhandled"),
+    handlerError: text("handler_error").notNull().default(""),
+    receivedAt: timestamp("received_at").notNull().defaultNow(),
+    processedAt: timestamp("processed_at"),
+  },
+  (t) => ({
+    receivedIdx: index("payment_event_received_idx").on(t.receivedAt),
+    orgReceivedIdx: index("payment_event_org_received_idx").on(
+      t.organizationId,
+      t.receivedAt,
+    ),
+    handlerStatusIdx: index("payment_event_handler_status_idx").on(
+      t.handlerStatus,
+      t.receivedAt,
+    ),
+  }),
+);
+
+export type PaymentEvent = typeof paymentEvents.$inferSelect;
+export type NewPaymentEvent = typeof paymentEvents.$inferInsert;
 
 /**
  * BL-16 Phase B-3a — quota counters.

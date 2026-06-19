@@ -33,8 +33,8 @@ Effort key:
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ⏳ queued — perf optimization |
-| 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | 🟢 ready (this PR) — recommendation: **Stripe** |
-| 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ⏳ queued |
+| 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
+| 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | 🟡 in progress (this PR) — schema, payment_event ledger, webhook route w/ signature verification + idempotent dedup |
 | 9 | **BL-17 Slice 3** — Checkout flow (sign-up → Stripe Checkout → tier provisioning) | P1 | M | ⏳ queued |
 | 10 | **BL-17 Slice 4** — Customer portal + dunning emails | P1 | M | ⏳ queued |
 | 11 | **BL-17 Slice 5** — Upgrade/downgrade + enterprise wire-invoice flow | P1 | S | ⏳ queued |
