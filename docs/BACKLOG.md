@@ -37,7 +37,7 @@ Effort key:
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
 | 10 | **BL-17 Slice 4** — Customer portal + dunning email + tier-flip on webhook | P1 | M | ✅ shipped (PR #221) |
-| 11 | **BL-17 Slice 5** — Enterprise wire-invoice flow | P1 | M | 🟡 in progress (this PR) |
+| 11 | **BL-17 Slice 5** — Enterprise wire-invoice flow | P1 | M | ✅ shipped (PR #222) — paused pending launch readiness |
 
 ### BL-ENV-SEP — Dev/staging/prod environment separation
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 docs landed
