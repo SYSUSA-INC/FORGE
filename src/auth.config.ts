@@ -39,6 +39,11 @@ export const authConfig = {
       // Public pricing page — anyone can see what we sell before
       // creating an account.
       if (pathname === "/pricing") return true;
+      // Stripe webhook — authenticated by the stripe-signature header,
+      // verified inside the route handler against STRIPE_WEBHOOK_SECRET.
+      // The middleware can't run that check, so let the request through
+      // unconditionally and the route enforces signing.
+      if (pathname === "/api/webhooks/stripe") return true;
 
       return !!auth?.user;
     },
