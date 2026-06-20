@@ -137,6 +137,8 @@ export async function listActiveTiersAction(): Promise<
     slug: string;
     name: string;
     priceMonthlyCents: number;
+    stripePriceIdMonthly: string | null;
+    stripePriceIdYearly: string | null;
   }[]
 > {
   await requireSuperadmin();
@@ -147,6 +149,8 @@ export async function listActiveTiersAction(): Promise<
       slug: subscriptionTiers.slug,
       name: subscriptionTiers.name,
       priceMonthlyCents: subscriptionTiers.priceMonthlyCents,
+      stripePriceIdMonthly: subscriptionTiers.stripePriceIdMonthly,
+      stripePriceIdYearly: subscriptionTiers.stripePriceIdYearly,
     })
     .from(subscriptionTiers)
     .where(eq(subscriptionTiers.active, true))

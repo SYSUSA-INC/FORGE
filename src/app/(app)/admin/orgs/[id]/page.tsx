@@ -19,6 +19,7 @@ import { getCurrentTier } from "@/lib/subscription-gates";
 import { listActiveTiersAction, listOrgAdminsAction } from "./actions";
 import { TierAssignmentForm } from "./TierAssignmentForm";
 import { TransferOwnershipForm } from "./TransferOwnershipForm";
+import { EnterpriseInvoiceForm } from "./EnterpriseInvoiceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -344,6 +345,21 @@ export default async function TenantDetailPage({
               tiers={activeTiers}
             />
           ) : null}
+          {/* BL-17 Slice 5 — enterprise wire-invoice flow. Superadmin-only
+              path for sales-led deals where the customer pays by wire
+              against a hosted invoice, not by card via self-serve
+              Checkout. */}
+          <EnterpriseInvoiceForm
+            organizationId={org.id}
+            organizationName={org.name}
+            defaultBillingEmail={primaryAdmin?.email ?? ""}
+            tiers={activeTiers.map((t) => ({
+              slug: t.slug,
+              name: t.name,
+              hasMonthlyPrice: !!t.stripePriceIdMonthly,
+              hasYearlyPrice: !!t.stripePriceIdYearly,
+            }))}
+          />
         </Panel>
 
         <Panel title="Storage & config">
