@@ -10,6 +10,8 @@ type Initial = {
   description: string;
   priceMonthlyCents: number;
   priceYearlyCents: number;
+  stripePriceIdMonthly: string;
+  stripePriceIdYearly: string;
   featureFlags: TierFeatureFlags;
   quotas: TierQuotas;
   sortOrder: number;
@@ -53,6 +55,12 @@ export function TierEditForm({
   );
   const [priceYearly, setPriceYearly] = useState(
     (initial.priceYearlyCents / 100).toString(),
+  );
+  const [stripePriceMonthly, setStripePriceMonthly] = useState(
+    initial.stripePriceIdMonthly,
+  );
+  const [stripePriceYearly, setStripePriceYearly] = useState(
+    initial.stripePriceIdYearly,
   );
   const [flags, setFlags] = useState<TierFeatureFlags>(initial.featureFlags);
   const [quotas, setQuotas] = useState<TierQuotas>(initial.quotas);
@@ -106,6 +114,8 @@ export function TierEditForm({
         description: description.trim(),
         priceMonthlyCents: Math.round(monthly * 100),
         priceYearlyCents: Math.round(yearly * 100),
+        stripePriceIdMonthly: stripePriceMonthly.trim(),
+        stripePriceIdYearly: stripePriceYearly.trim(),
         featureFlags: flags,
         quotas,
         sortOrder: Math.round(sort),
@@ -189,6 +199,39 @@ export function TierEditForm({
           />
         </label>
       </div>
+
+      <fieldset className="rounded-md border border-white/10 p-3">
+        <legend className="px-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          Stripe binding
+        </legend>
+        <p className="mb-3 font-mono text-[10px] text-muted">
+          Paste the Stripe Price ids for this tier (from Stripe Dashboard →
+          Products → your product → Prices). Leave blank to disable
+          self-serve checkout for this tier (Enterprise / sales-assisted only).
+        </p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="aur-label">Stripe Price (monthly)</span>
+            <input
+              className="aur-input font-mono text-[12px]"
+              type="text"
+              placeholder="price_1Q..."
+              value={stripePriceMonthly}
+              onChange={(e) => setStripePriceMonthly(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="aur-label">Stripe Price (yearly)</span>
+            <input
+              className="aur-input font-mono text-[12px]"
+              type="text"
+              placeholder="price_1Q..."
+              value={stripePriceYearly}
+              onChange={(e) => setStripePriceYearly(e.target.value)}
+            />
+          </label>
+        </div>
+      </fieldset>
 
       <fieldset className="rounded-md border border-white/10 p-3">
         <legend className="px-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
