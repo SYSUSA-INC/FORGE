@@ -36,8 +36,8 @@ Effort key:
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
-| 10 | **BL-17 Slice 4** — Customer portal + dunning email + tier-flip on webhook | P1 | M | 🟡 in progress (this PR) |
-| 11 | **BL-17 Slice 5** — Upgrade/downgrade + enterprise wire-invoice flow | P1 | S | ⏳ queued |
+| 10 | **BL-17 Slice 4** — Customer portal + dunning email + tier-flip on webhook | P1 | M | ✅ shipped (PR #221) |
+| 11 | **BL-17 Slice 5** — Enterprise wire-invoice flow | P1 | M | 🟡 in progress (this PR) |
 
 ### BL-ENV-SEP — Dev/staging/prod environment separation
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 docs landed
