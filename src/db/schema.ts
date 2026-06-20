@@ -2311,6 +2311,14 @@ export const subscriptionTiers = pgTable(
     description: text("description").notNull().default(""),
     priceMonthlyCents: integer("price_monthly_cents").notNull().default(0),
     priceYearlyCents: integer("price_yearly_cents").notNull().default(0),
+    /**
+     * BL-17 Slice 3 — Stripe Price ids for self-serve checkout.
+     * Super-admin pastes these from the Stripe Dashboard after creating
+     * the Product + Prices. Null = "not buyable via self-serve"
+     * (Enterprise tier with sales-assisted invoicing only).
+     */
+    stripePriceIdMonthly: text("stripe_price_id_monthly"),
+    stripePriceIdYearly: text("stripe_price_id_yearly"),
     featureFlags: jsonb("feature_flags")
       .$type<TierFeatureFlags>()
       .notNull()

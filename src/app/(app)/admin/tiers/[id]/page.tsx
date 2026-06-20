@@ -80,6 +80,8 @@ export default async function TierEditPage({
             description: tier.description,
             priceMonthlyCents: tier.priceMonthlyCents,
             priceYearlyCents: tier.priceYearlyCents,
+            stripePriceIdMonthly: tier.stripePriceIdMonthly ?? "",
+            stripePriceIdYearly: tier.stripePriceIdYearly ?? "",
             featureFlags: tier.featureFlags as TierFeatureFlags,
             quotas: tier.quotas as TierQuotas,
             sortOrder: tier.sortOrder,

@@ -48,6 +48,7 @@ const NAV: NavGroup[] = [
     admin: true,
     children: [
       { href: "/settings", label: "Settings" },
+      { href: "/settings/billing", label: "Billing", admin: true },
       { href: "/users", label: "Users & Roles" },
       { href: "/settings/integrations", label: "Integrations" },
       { href: "/settings/ai-engine", label: "AI Engine" },

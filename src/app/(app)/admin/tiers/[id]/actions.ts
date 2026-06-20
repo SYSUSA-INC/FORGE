@@ -56,6 +56,10 @@ const UpdateTierInputSchema = z.object({
     .number()
     .int("Price must be a whole number of cents.")
     .min(0),
+  // BL-17 Slice 3 — Stripe Price ids pasted from the Stripe Dashboard.
+  // Empty string is normalized to null in the DB write below.
+  stripePriceIdMonthly: z.string().trim().max(128).default(""),
+  stripePriceIdYearly: z.string().trim().max(128).default(""),
   featureFlags: TierFeatureFlagsSchema,
   quotas: TierQuotasSchema,
   sortOrder: z.number().int(),
@@ -122,6 +126,8 @@ export async function updateTierAction(
         description: input.description,
         priceMonthlyCents: input.priceMonthlyCents,
         priceYearlyCents: input.priceYearlyCents,
+        stripePriceIdMonthly: input.stripePriceIdMonthly || null,
+        stripePriceIdYearly: input.stripePriceIdYearly || null,
         featureFlags: input.featureFlags,
         quotas: input.quotas,
         sortOrder: input.sortOrder,
