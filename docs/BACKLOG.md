@@ -32,7 +32,7 @@ Effort key:
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
-| 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ⏳ queued — perf optimization |
+| 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -333,7 +333,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slice 2a in progress (Slice 1 shipped)
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d shipped; 2c operator-pending; Slice 3 next
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -355,14 +355,17 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
 - **Slice 2a** — Collab token endpoint (`/api/collab/token`),
   `mintCollabToken` helper, `RichSectionEditor` plumbed for optional
   Yjs binding behind `NEXT_PUBLIC_COLLAB_ENABLED` flag; tiptap
-  upgrade to 3.26.1. No caller wires it yet — default behavior
-  unchanged. 🟡 *in progress (this PR)*
-- **Slice 2b** — `SectionsClient` passes `collab` prop; body_doc
-  projection writeback (Y.Doc → ProseMirror JSON on debounce so PDF
-  render / exports stay current). Pending.
+  upgrade to 3.26.1. ✅ *shipped (PR #208)*
+- **Slice 2b** — `SectionsClient` passes `collab` prop; collab config
+  builder; presence cursor colors. ✅ *shipped (PR #217)*
 - **Slice 2c** — Deploy `services/collab/` to Fly.io; flip
   `NEXT_PUBLIC_COLLAB_ENABLED=1` for a pilot tenant; smoke test.
-  Pending.
+  ⏳ *operator deploy — engineering complete*
+- **Slice 2d** — Server-side `body_doc` projection writeback: Hocuspocus
+  `onStoreDocument` converts Y.XmlFragment → ProseMirror JSON + plain
+  text + word count → `proposal_section`. Also updated server.ts to
+  correct Hocuspocus v4 API (`new Server(...)`, `lastContext`, typed
+  hook payloads). ✅ *shipped (PR #224)*
 - **Slice 3** — Track changes (Tiptap Pro extension license vs.
   Y.Map-based implementation — decision in this slice).
 - **Slice 4** — Comment threads anchored via `Y.RelativePosition`;
