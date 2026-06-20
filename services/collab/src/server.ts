@@ -1,34 +1,37 @@
-import { createServer } from "node:http";
-import { Database } from "@hocuspocus/extension-database";
 import { Server } from "@hocuspocus/server";
+import type {
+  onAuthenticatePayload,
+  onDisconnectPayload,
+  onLoadDocumentPayload,
+  onRequestPayload,
+  onStoreDocumentPayload,
+  storePayload,
+  fetchPayload,
+} from "@hocuspocus/server";
+import { Database } from "@hocuspocus/extension-database";
 import { Pool } from "pg";
+import * as Y from "yjs";
 import { parseDocName, verifyCollabToken, type CollabClaims } from "./auth.js";
 
 /**
  * BL-9 Slice 1 — Hocuspocus collaboration service entrypoint.
  *
  * Boots an HTTP server that:
- *   - GET  /health             → 200 "ok" for the container healthcheck.
- *   - GET  /collab?token&doc=  → upgrades to WebSocket; Hocuspocus
- *                                handles the protocol from there.
+ *   - GET  /health → 200 "ok" for the container healthcheck.
+ *   - WS  Hocuspocus WebSocket protocol for all other connections.
  *
  * Auth:
  *   `onAuthenticate` verifies the NextAuth JWT (HS256, AUTH_SECRET)
  *   and confirms the requested doc_name's row in `yjs_doc` (if it
- *   exists) belongs to the JWT's organizationId. If the row does not
- *   exist yet, the connection is permitted — the first save creates
- *   it under the JWT's org.
+ *   exists) belongs to the JWT's organizationId.
  *
  * Persistence:
- *   `@hocuspocus/extension-database` is wired with custom fetch/store
- *   functions that read and upsert `yjs_doc.state`. We do not use
- *   the default RocksDB extension — Postgres is the canonical store.
+ *   `@hocuspocus/extension-database` reads/upserts `yjs_doc.state`.
  *
- * Not yet in Slice 1:
- *   - Redis fan-out for horizontal scaling (Slice 4).
- *   - Production_error_log shipping (handled by Fly's log shipper +
- *     Slice 2 ingest endpoint).
- *   - Track changes / comments / suggestion mode.
+ * BL-9 Slice 2d — after each debounced store, the Yjs XML fragment is
+ *   projected back to ProseMirror JSON and written to
+ *   `proposal_section.body_doc` so PDF exports and AI drafts always
+ *   read current content from the DB, even without the editor open.
  */
 
 const PORT = Number(process.env.PORT || 1234);
@@ -46,20 +49,134 @@ if (!DATABASE_URL) {
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  // Conservative pool — Hocuspocus serializes per-doc writes, so we
-  // don't need a fat pool. Right-size in Slice 4 with load data.
+  // Conservative pool — Hocuspocus serializes per-doc writes.
   max: 10,
   idleTimeoutMillis: 30_000,
 });
 
 type ConnectionContext = CollabClaims & { docKey: string };
 
-const hocuspocus = Server.configure({
-  // Hocuspocus's default WebSocket path is `/collab` when mounted on
-  // an HTTP server (see attachHttp below).
+// ---------------------------------------------------------------------------
+// BL-9 Slice 2d — Yjs → ProseMirror JSON projection helpers
+// ---------------------------------------------------------------------------
+// TipTap's Collaboration extension stores the document in a Y.XmlFragment
+// named "default". These helpers project it back to ProseMirror JSON so
+// proposal_section.body_doc stays current after each debounced store.
+// No prosemirror-model dependency needed — the conversion is a structural
+// walk of the Y.Xml tree (mirrors y-prosemirror's yDocToProsemirrorJSON).
+
+type PmNode = {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: PmNode[];
+  text?: string;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+};
+
+type Delta = { insert: string; attributes?: Record<string, unknown> };
+
+function xmlFragmentToJson(fragment: Y.XmlFragment): PmNode[] {
+  const nodes: PmNode[] = [];
+  fragment.forEach((item) => {
+    if (item instanceof Y.XmlElement) {
+      const attrs = item.getAttributes() as Record<string, unknown>;
+      const content = xmlFragmentToJson(item);
+      const node: PmNode = { type: item.nodeName };
+      if (Object.keys(attrs).length > 0) node.attrs = attrs;
+      if (content.length > 0) node.content = content;
+      nodes.push(node);
+    } else if (item instanceof Y.XmlText) {
+      const delta = item.toDelta() as Delta[];
+      for (const d of delta) {
+        if (!d.insert) continue;
+        const marks: { type: string; attrs?: Record<string, unknown> }[] = [];
+        if (d.attributes) {
+          for (const [markType, value] of Object.entries(d.attributes)) {
+            marks.push(
+              value === true
+                ? { type: markType }
+                : { type: markType, attrs: { [markType]: value } },
+            );
+          }
+        }
+        const textNode: PmNode = { type: "text", text: d.insert };
+        if (marks.length > 0) textNode.marks = marks;
+        nodes.push(textNode);
+      }
+    }
+  });
+  return nodes;
+}
+
+function ydocToBodyDoc(ydoc: Y.Doc): PmNode {
+  const fragment = ydoc.getXmlFragment("default");
+  return { type: "doc", content: xmlFragmentToJson(fragment) };
+}
+
+// Recursively extract plain text from a ProseMirror node tree.
+function extractPlainText(node: PmNode): string {
+  if (node.type === "text") return node.text ?? "";
+  const parts: string[] = [];
+  for (const child of node.content ?? []) {
+    const t = extractPlainText(child);
+    if (t) parts.push(t);
+  }
+  return parts.join("\n");
+}
+
+// Project Yjs state into proposal_section.body_doc after each debounced
+// store. Non-fatal: Yjs binary state is already persisted; next store retries.
+async function writebackSection(
+  organizationId: string,
+  sectionId: string,
+  ydoc: Y.Doc,
+): Promise<void> {
+  const bodyDoc = ydocToBodyDoc(ydoc);
+  // Skip if the Y.Doc is still empty (freshly initialised, no content yet).
+  if (!bodyDoc.content || bodyDoc.content.length === 0) return;
+
+  const content = extractPlainText(bodyDoc);
+  const wordCount = content
+    .split(/\s+/)
+    .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+
+  // Scope update through `proposals` join to prevent cross-tenant writes
+  // even if the JWT were somehow misconfigured.
+  await pool.query(
+    `UPDATE proposal_section ps
+        SET body_doc   = $1::jsonb,
+            content    = $2,
+            word_count = $3,
+            updated_at = now()
+       FROM proposals p
+      WHERE ps.id             = $4
+        AND ps.proposal_id    = p.id
+        AND p.organization_id = $5`,
+    [JSON.stringify(bodyDoc), content, wordCount, sectionId, organizationId],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hocuspocus server
+// ---------------------------------------------------------------------------
+
+const server = new Server<ConnectionContext>({
   name: "forge-collab",
 
-  async onAuthenticate(data): Promise<ConnectionContext> {
+  // Health-check endpoint — used by the Fly.io container health probe.
+  async onRequest({ request, response }: onRequestPayload) {
+    if (request.url === "/health" || request.url === "/") {
+      response.writeHead(200, { "Content-Type": "text/plain" });
+      response.end("ok");
+    } else {
+      response.writeHead(404, { "Content-Type": "text/plain" });
+      response.end("not found");
+    }
+  },
+
+  async onAuthenticate(
+    data: onAuthenticatePayload<ConnectionContext>,
+  ): Promise<ConnectionContext> {
     const token = (data.token || "").trim();
     const claims = await verifyCollabToken(token, AUTH_SECRET);
     const docKey = data.documentName;
@@ -69,9 +186,7 @@ const hocuspocus = Server.configure({
       throw new Error(`invalid doc name: ${docKey}`);
     }
 
-    // If a yjs_doc row already exists, its organization_id must match
-    // the JWT's org. Otherwise the user is trying to open someone
-    // else's document.
+    // If a yjs_doc row already exists, its organization_id must match.
     const { rows } = await pool.query<{ organization_id: string }>(
       `SELECT organization_id FROM yjs_doc WHERE doc_name = $1 LIMIT 1`,
       [docKey],
@@ -84,27 +199,21 @@ const hocuspocus = Server.configure({
     return { ...claims, docKey };
   },
 
-  // Hocuspocus calls extensions in the order they are configured.
   extensions: [
     new Database({
-      // Load: return null when no row exists; Hocuspocus then creates
-      // a fresh Y.Doc and the first store call inserts the row.
-      fetch: async ({ documentName, context }) => {
-        const ctx = context as ConnectionContext;
+      fetch: async ({ documentName, context }: fetchPayload<ConnectionContext>) => {
         const { rows } = await pool.query<{ state: Buffer }>(
           `SELECT state FROM yjs_doc
             WHERE organization_id = $1 AND doc_name = $2
             LIMIT 1`,
-          [ctx.organizationId, documentName],
+          [context.organizationId, documentName],
         );
         const state = rows[0]?.state;
         if (!state) return null;
         return new Uint8Array(state);
       },
 
-      // Store: upsert the new state + bump version + updated_at.
-      store: async ({ documentName, state, context }) => {
-        const ctx = context as ConnectionContext;
+      store: async ({ documentName, state, lastContext }: storePayload<ConnectionContext>) => {
         await pool.query(
           `INSERT INTO yjs_doc (organization_id, doc_name, state, version, created_at, updated_at)
            VALUES ($1, $2, $3, 1, now(), now())
@@ -112,71 +221,78 @@ const hocuspocus = Server.configure({
            DO UPDATE SET state = EXCLUDED.state,
                          version = yjs_doc.version + 1,
                          updated_at = now()`,
-          [ctx.organizationId, documentName, Buffer.from(state)],
+          [lastContext.organizationId, documentName, Buffer.from(state)],
         );
       },
     }),
   ],
 
-  // Structured logging — Fly's log shipper picks these up; Slice 2
-  // adds an ingest endpoint that funnels server-side errors into the
-  // main production_error_log table.
-  async onLoadDocument({ documentName, context }) {
-    const ctx = context as ConnectionContext;
+  async onLoadDocument({ documentName, context }: onLoadDocumentPayload<ConnectionContext>) {
     console.log(
       JSON.stringify({
         level: "info",
         evt: "collab.load",
-        org: ctx.organizationId,
-        user: ctx.userId,
+        org: context.organizationId,
+        user: context.userId,
         doc: documentName,
       }),
     );
     return undefined;
   },
-  async onStoreDocument({ documentName, context }) {
-    const ctx = context as ConnectionContext;
+
+  // BL-9 Slice 2d: after Hocuspocus debounces and persists the Yjs binary,
+  // project the Y.Doc to ProseMirror JSON and write it back to the source
+  // proposal_section row so PDF exports / AI drafts read current content.
+  async onStoreDocument({
+    documentName,
+    document,
+    lastContext,
+  }: onStoreDocumentPayload<ConnectionContext>) {
     console.log(
       JSON.stringify({
         level: "info",
         evt: "collab.store",
-        org: ctx.organizationId,
-        user: ctx.userId,
+        org: lastContext.organizationId,
+        user: lastContext.userId,
         doc: documentName,
       }),
     );
+
+    const parsed = parseDocName(documentName);
+    if (parsed?.namespace === "section") {
+      writebackSection(lastContext.organizationId, parsed.entityId, document).catch(
+        (err) => {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              evt: "collab.writeback_failed",
+              doc: documentName,
+              org: lastContext.organizationId,
+              error: String(err),
+            }),
+          );
+        },
+      );
+    }
   },
-  async onDisconnect({ documentName, context }) {
-    const ctx = context as ConnectionContext | undefined;
+
+  async onDisconnect({
+    documentName,
+    context,
+  }: onDisconnectPayload<ConnectionContext>) {
     console.log(
       JSON.stringify({
         level: "info",
         evt: "collab.disconnect",
-        org: ctx?.organizationId ?? "",
-        user: ctx?.userId ?? "",
+        org: context.organizationId,
+        user: context.userId,
         doc: documentName,
       }),
     );
   },
 });
 
-const http = createServer((req, res) => {
-  if (req.url === "/health" || req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("ok");
-    return;
-  }
-  res.writeHead(404, { "Content-Type": "text/plain" });
-  res.end("not found");
-});
-
-// Hocuspocus attaches its WebSocket upgrade handler to the same HTTP
-// server. Clients connect to `ws(s)://host:PORT/<doc-name>?token=...`.
-http.on("upgrade", (request, socket, head) => {
-  hocuspocus.handleConnection(socket as never, request, head);
-});
-
-http.listen(PORT, () => {
+server.listen(PORT).then(() => {
   console.log(
     JSON.stringify({
       level: "info",
@@ -190,7 +306,7 @@ function shutdown(signal: string) {
   console.log(
     JSON.stringify({ level: "info", evt: "collab.shutdown", signal }),
   );
-  http.close();
+  server.destroy().catch(() => undefined);
   pool.end().catch(() => undefined);
   setTimeout(() => process.exit(0), 1_000).unref();
 }
