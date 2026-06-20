@@ -192,6 +192,91 @@ export async function createCheckoutSessionAction(input: {
 }
 
 /**
+ * BL-17 Slice 4 — open the Stripe Customer Portal for the current tenant.
+ *
+ * Stripe-hosted self-service: update payment method, change plan,
+ * download invoices, cancel subscription. Returns a one-time URL the
+ * caller redirects to.
+ *
+ * Requires an existing Stripe Customer (i.e. the tenant has gone
+ * through Checkout at least once). For tenants that haven't yet,
+ * surface an error directing them to the upgrade flow instead.
+ *
+ * Gated by `requireOrgAdmin` — same posture as
+ * `createCheckoutSessionAction`. Non-admins see the page but can't
+ * open the portal.
+ */
+export async function createPortalSessionAction(): Promise<CheckoutSessionResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const [subRow] = await db
+    .select({ stripeCustomerId: tenantSubscriptions.stripeCustomerId })
+    .from(tenantSubscriptions)
+    .where(eq(tenantSubscriptions.organizationId, organizationId))
+    .limit(1);
+  if (!subRow?.stripeCustomerId) {
+    return {
+      ok: false,
+      error:
+        "No Stripe billing account is linked yet. Pick a plan above to set one up.",
+    };
+  }
+
+  let stripe;
+  try {
+    stripe = getStripeClient();
+  } catch (err) {
+    log.error("[createPortalSessionAction]", "stripe client unavailable", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      ok: false,
+      error:
+        "Billing portal isn't configured for this environment. Contact support.",
+    };
+  }
+
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://app.forge.app"
+  ).replace(/\/$/, "");
+
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: subRow.stripeCustomerId,
+      return_url: `${appUrl}/settings/billing`,
+    });
+    if (!session.url) {
+      return {
+        ok: false,
+        error: "Stripe didn't return a portal URL — try again.",
+      };
+    }
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "subscription.portal_opened",
+      resourceType: "tenant_subscription",
+      resourceId: organizationId,
+      metadata: { sessionId: session.id },
+    });
+    return { ok: true, url: session.url };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[createPortalSessionAction]", "stripe portal create failed", {
+      organizationId,
+      error: message,
+    });
+    return {
+      ok: false,
+      error: `Could not open billing portal: ${message.slice(0, 200)}`,
+    };
+  }
+}
+
+/**
  * Server-side check for "this tenant has any active paid subscription."
  * Used by the billing page header to decide between an "Upgrade" and
  * a "Start a paid plan" framing.

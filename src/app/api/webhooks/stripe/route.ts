@@ -11,6 +11,8 @@ import {
   getWebhookSecret,
   HANDLED_EVENT_TYPES,
 } from "@/lib/stripe";
+import { resolveTierFromStripePriceId } from "@/lib/stripe-tier-resolve";
+import { sendPaymentFailedEmail } from "@/lib/stripe-dunning-email";
 import { log } from "@/lib/log";
 import { recordAudit } from "@/lib/audit-log";
 
@@ -222,11 +224,57 @@ async function dispatchHandler(
       );
       break;
     case "invoice.paid":
+      // Slice 2 already records this in the event ledger. The
+      // subscription.updated event fires alongside paid invoices and
+      // handles tier/period bookkeeping, so no work needed here.
+      break;
     case "invoice.payment_failed":
-      // Slice 2 records these in the event ledger. Slice 4 wires the
-      // dunning email sequence on payment_failed.
+      // BL-17 Slice 4 — single notification email. Stripe Smart
+      // Retries owns the retry timing; subsequent payment_failed
+      // events for the same invoice are deduped by the email helper.
+      await handleInvoicePaymentFailed(
+        event.data.object as Stripe.Invoice,
+        organizationId,
+      );
       break;
   }
+}
+
+async function handleInvoicePaymentFailed(
+  invoice: Stripe.Invoice,
+  organizationId: string | null,
+): Promise<void> {
+  if (!organizationId) {
+    log.warn(
+      "[stripe-webhook]",
+      "invoice.payment_failed for unknown customer — skipping email",
+      { invoiceId: invoice.id, customer: invoice.customer },
+    );
+    return;
+  }
+  await sendPaymentFailedEmail({
+    organizationId,
+    invoiceId: invoice.id,
+    amountDueCents: invoice.amount_due ?? 0,
+    currency: invoice.currency ?? "usd",
+    hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+    attemptCount: invoice.attempt_count ?? 1,
+    nextPaymentAttemptAt: invoice.next_payment_attempt
+      ? new Date(invoice.next_payment_attempt * 1000)
+      : null,
+  });
+  await recordAudit({
+    organizationId,
+    actor: { userId: null, email: "stripe-webhook" },
+    action: "subscription.payment_failed",
+    resourceType: "tenant_subscription",
+    resourceId: organizationId,
+    metadata: {
+      invoiceId: invoice.id,
+      amountDueCents: invoice.amount_due,
+      attemptCount: invoice.attempt_count,
+    },
+  });
 }
 
 async function handleCheckoutCompleted(
@@ -254,11 +302,33 @@ async function handleCheckoutCompleted(
     throw new Error("checkout.session.completed without a customer id");
   }
 
+  // BL-17 Slice 4 — resolve tier_id from the Stripe Price the customer
+  // checked out with. Stripe Checkout sessions don't carry line items
+  // on the event payload by default; expand or list separately.
+  let resolvedTierId: string | null = null;
+  try {
+    const stripe = getStripeClient();
+    const items = await stripe.checkout.sessions.listLineItems(session.id, {
+      limit: 1,
+    });
+    const priceId = items.data[0]?.price?.id ?? null;
+    if (priceId) {
+      const tier = await resolveTierFromStripePriceId(priceId);
+      if (tier) resolvedTierId = tier.tierId;
+    }
+  } catch (err) {
+    log.warn("[stripe-webhook]", "could not resolve tier from line items", {
+      sessionId: session.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await db
     .update(tenantSubscriptions)
     .set({
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId ?? null,
+      ...(resolvedTierId ? { tierId: resolvedTierId } : {}),
       status: "active",
       updatedAt: new Date(),
     })
@@ -274,6 +344,7 @@ async function handleCheckoutCompleted(
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       sessionId: session.id,
+      tierId: resolvedTierId,
     },
   });
 }
@@ -287,10 +358,23 @@ async function handleSubscriptionUpdated(
       `customer.subscription.updated for unknown customer ${sub.customer as string}`,
     );
   }
+
+  // BL-17 Slice 4 — when the customer changes plan via the Stripe
+  // Customer Portal, this event fires with the new Price id on the
+  // first subscription item. Re-resolve the FORGE tier so our
+  // tenant_subscription row reflects the change.
+  const priceId = sub.items.data[0]?.price?.id ?? null;
+  let resolvedTierId: string | null = null;
+  if (priceId) {
+    const tier = await resolveTierFromStripePriceId(priceId);
+    if (tier) resolvedTierId = tier.tierId;
+  }
+
   await db
     .update(tenantSubscriptions)
     .set({
       stripeSubscriptionId: sub.id,
+      ...(resolvedTierId ? { tierId: resolvedTierId } : {}),
       status: mapStripeStatus(sub.status),
       currentPeriodStart: sub.current_period_start
         ? new Date(sub.current_period_start * 1000)
@@ -312,6 +396,8 @@ async function handleSubscriptionUpdated(
     metadata: {
       stripeSubscriptionId: sub.id,
       stripeStatus: sub.status,
+      tierId: resolvedTierId,
+      stripePriceId: priceId,
     },
   });
 }

@@ -11,6 +11,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { BillingActionsClient } from "./BillingActionsClient";
+import { ManagePortalButton } from "./ManagePortalButton";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,8 @@ export default async function BillingPage({
             <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[10px] text-muted">
               Only org admins can change the plan. Ask your admin to upgrade.
             </div>
+          ) : current?.hasStripeCustomer ? (
+            <ManagePortalButton />
           ) : null}
         </Panel>
 
