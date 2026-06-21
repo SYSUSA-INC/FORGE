@@ -307,3 +307,14 @@ mark {
   50% { opacity: 0.4; }
 }
 .tc-pulse { animation: tc-pulse 1.5s ease-in-out infinite; }
+
+/* BL-9 Slice 4 — comment-thread inline highlight */
+.comment-anchor {
+  background-color: rgba(251, 191, 36, 0.16);
+  border-bottom: 1.5px dashed rgba(251, 191, 36, 0.55);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.comment-anchor:hover {
+  background-color: rgba(251, 191, 36, 0.28);
+}

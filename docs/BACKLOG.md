@@ -34,6 +34,7 @@ Effort key:
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
 | 12 | **BL-9 Slice 3** — Y.Map-based track changes (TcInsert/TcDelete marks + sidebar + recording toggle) | P1 | M | ✅ shipped (PR #226) |
+| 13 | **BL-9 Slice 4** — Comment threads (commentAnchor mark + Y.Map threads + sidebar + reply/resolve flow) | P1 | M | ✅ shipped (PR #227) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -334,7 +335,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3 shipped; 2c operator-pending; Slice 4 next
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4 shipped; 2c operator-pending; Slice 5 next
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -381,8 +382,20 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
   block-level changes not marked; IME composition may bypass handler.
   Audit log for accept/reject events deferred to Slice 7.
   ✅ *shipped (PR #226)*
-- **Slice 4** — Comment threads anchored via `Y.RelativePosition`;
-  `extension-redis` for horizontal scale if needed.
+- **Slice 4** — Comment threads. Introduces a `commentAnchor` TipTap
+  mark with `data-thread-id` attr that visually highlights the
+  commented text and syncs inline with the Yjs document; thread data
+  (creator, quoted snippet, resolve flag, messages array) lives on
+  `ydoc.getMap("comments")` keyed by threadId. New `Comments`
+  extension exposes `addCommentThread`, `replyToThread`,
+  `toggleThreadResolved`, `focusThread` commands. `CommentsSidebar`
+  panel lists threads with their quoted snippet + messages + reply
+  composer; auto-updates via `observeDeep`. Orphaned threads (anchor
+  deleted) are flagged so reviewers can still find them. Comments
+  only activate when collab is enabled (Y.Doc-backed). Future work:
+  `Y.RelativePosition` orphan-resistance, single-user persistence,
+  `@user` mentions, in-app notifications, optional `extension-redis`
+  for horizontal Hocuspocus scale. ✅ *shipped (PR #227)*
 - **Slice 5** — Suggestion mode + version snapshots + diff viewer.
 - **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
 - **Slice 7** — Brain feedback loop: every accepted/rejected change

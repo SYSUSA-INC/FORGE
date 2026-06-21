@@ -15,7 +15,7 @@ import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import type { AnyExtension } from "@tiptap/core";
 import * as Y from "yjs";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { TipTapDoc } from "@/db/schema";
 import {
   TcInsert,
@@ -23,6 +23,8 @@ import {
   TrackChanges,
 } from "./extensions/TrackChanges";
 import { TrackChangesSidebar } from "./TrackChangesSidebar";
+import { CommentAnchor, Comments } from "./extensions/Comments";
+import { CommentsSidebar } from "./CommentsSidebar";
 
 /**
  * BL-9 Slice 2 — when a `collab` config is supplied AND
@@ -65,6 +67,18 @@ export type TrackChangesConfig = {
   };
 };
 
+/**
+ * BL-9 Slice 4 — author identity for comment threads.
+ * When provided AND collab is enabled, the editor activates the Comments
+ * extension. Threads live on the shared Y.Doc so all peers see them.
+ */
+export type CommentsConfig = {
+  author: {
+    id: string;
+    name: string;
+  };
+};
+
 type Props = {
   doc: TipTapDoc;
   onChange: (doc: TipTapDoc, plain: string, words: number) => void;
@@ -81,6 +95,11 @@ type Props = {
    * becomes available and the toolbar gains a "Track" toggle button.
    */
   trackChanges?: TrackChangesConfig;
+  /**
+   * When provided AND `collab` is also provided + enabled, activates
+   * the Comments extension. Threads live on the shared Y.Doc.
+   */
+  comments?: CommentsConfig;
 };
 
 function collabEnabled(): boolean {
@@ -94,11 +113,20 @@ export function RichSectionEditor({
   disabled,
   collab,
   trackChanges,
+  comments,
 }: Props) {
   const useCollab = !!collab && collabEnabled();
   // Local toggle for track-changes sidebar visibility (independent of
   // tracking mode which lives in the extension storage / Y.Map).
   const [tcSidebarOpen, setTcSidebarOpen] = useState(false);
+  // BL-9 Slice 4 — local toggle for comments sidebar. Comments only
+  // activate when collab + comments config are both supplied.
+  const useComments = !!comments && useCollab;
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  // Reply / new-thread inline composer state — opened by the toolbar
+  // "comment" button when there's a selection.
+  const [draftComment, setDraftComment] = useState<string>("");
+  const [composerOpen, setComposerOpen] = useState(false);
 
   // Yjs doc + Hocuspocus provider live for the lifetime of the editor
   // instance. Stored in refs so React renders don't tear them down.
@@ -209,8 +237,19 @@ export function RichSectionEditor({
         }),
       );
     }
+    // BL-9 Slice 4 — comment threads. Requires collab to be on so the
+    // Y.Doc actually persists; otherwise threads vanish on reload.
+    if (useComments && comments && ydocRef.current) {
+      base.push(CommentAnchor);
+      base.push(
+        Comments.configure({
+          ydoc: ydocRef.current,
+          author: { id: comments.author.id, name: comments.author.name },
+        }),
+      );
+    }
     return base;
-  }, [placeholder, useCollab, collab, trackChanges]);
+  }, [placeholder, useCollab, collab, trackChanges, useComments, comments]);
 
   const editor = useEditor({
     extensions,
@@ -413,8 +452,84 @@ export function RichSectionEditor({
             />
           </>
         ) : null}
+        {/* BL-9 Slice 4 — Comments toggle (only when extension is loaded) */}
+        {useComments ? (
+          <>
+            <ToolbarDivider />
+            <CommentsToggleBtn
+              editor={editor}
+              sidebarOpen={commentsOpen}
+              onToggleSidebar={() => setCommentsOpen((v) => !v)}
+              onStartCompose={() => {
+                if (editor.state.selection.empty) return;
+                setComposerOpen(true);
+                setCommentsOpen(true);
+              }}
+            />
+          </>
+        ) : null}
       </div>
+      {/* Inline composer for new comment threads on the current selection */}
+      {useComments && composerOpen ? (
+        <div className="flex items-end gap-1.5 rounded-md border border-yellow-400/30 bg-yellow-400/[0.04] p-2">
+          <textarea
+            autoFocus
+            value={draftComment}
+            onChange={(e) => setDraftComment(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setComposerOpen(false);
+                setDraftComment("");
+              }
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                if (draftComment.trim() && editor) {
+                  editor.commands.addCommentThread(draftComment);
+                  setDraftComment("");
+                  setComposerOpen(false);
+                }
+              }
+            }}
+            rows={2}
+            placeholder="Start a comment thread on the selected text (⌘+Enter to post, Esc to cancel)"
+            className="aur-input flex-1 resize-none text-[11px]"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setComposerOpen(false);
+              setDraftComment("");
+            }}
+            className="aur-btn-ghost text-[10px]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!draftComment.trim()}
+            onClick={() => {
+              if (!editor) return;
+              editor.commands.addCommentThread(draftComment);
+              setDraftComment("");
+              setComposerOpen(false);
+            }}
+            className="aur-btn-primary text-[10px] disabled:opacity-40"
+          >
+            Comment
+          </button>
+        </div>
+      ) : null}
       <EditorContent editor={editor} />
+      {/* Comments review sidebar — shown when the user opens it */}
+      {useComments && comments ? (
+        <CommentsSidebar
+          editor={editor}
+          ydoc={ydocRef.current}
+          visible={commentsOpen}
+          currentUserId={comments.author.id}
+        />
+      ) : null}
       {/* Track changes review sidebar — shown when the user opens it */}
       {trackChanges ? (
         <TrackChangesSidebar editor={editor} visible={tcSidebarOpen} />
@@ -473,6 +588,74 @@ function TrackToggleBtn({
         type="button"
         onClick={onToggleSidebar}
         title="Open / close track-changes review panel"
+        className={`inline-flex h-7 items-center justify-center rounded px-1 font-mono text-[10px] transition-colors ${
+          sidebarOpen
+            ? "bg-white/10 text-text"
+            : "text-muted hover:bg-white/[0.06] hover:text-text"
+        }`}
+      >
+        ▾
+      </button>
+    </div>
+  );
+}
+
+/**
+ * BL-9 Slice 4 — comments toolbar button.
+ *
+ * The "comment" action requires a non-empty selection: when the user
+ * clicks with an empty selection, the button just opens the sidebar
+ * instead of starting a new thread. The ▾ chevron toggles sidebar
+ * visibility independently.
+ */
+function CommentsToggleBtn({
+  editor,
+  sidebarOpen,
+  onToggleSidebar,
+  onStartCompose,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  onStartCompose: () => void;
+}) {
+  // Hooks must run unconditionally; the null-editor case is handled inline below.
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    if (!editor) return;
+    editor.on("selectionUpdate", forceUpdate);
+    return () => {
+      editor.off("selectionUpdate", forceUpdate);
+    };
+  }, [editor]);
+
+  if (!editor) return null;
+  const hasSelection = !editor.state.selection.empty;
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={onStartCompose}
+        disabled={!hasSelection}
+        title={
+          hasSelection
+            ? "Start a comment thread on the selection"
+            : "Select text first to start a comment thread"
+        }
+        className={`inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors ${
+          hasSelection
+            ? "text-muted hover:bg-white/[0.06] hover:text-text"
+            : "text-subtle opacity-50 cursor-not-allowed"
+        }`}
+      >
+        <span aria-hidden>💬</span>
+        comment
+      </button>
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        title="Open / close comments panel"
         className={`inline-flex h-7 items-center justify-center rounded px-1 font-mono text-[10px] transition-colors ${
           sidebarOpen
             ? "bg-white/10 text-text"
