@@ -21,6 +21,7 @@ import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import {
   enforceQuota,
   QuotaExceededError,
+  refundQuota,
 } from "@/lib/subscription-gates";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
 import {
@@ -173,6 +174,11 @@ export async function createProposalAction(input: {
     templateId = null;
   }
 
+  // BL-16 Phase B-3d — track whether the proposal row was actually
+  // inserted; if a downstream step (sections insert / audit / dispatch)
+  // fails, the proposal still exists in the DB so we keep the slot.
+  // Only refund when the proposal itself was never created.
+  let proposalCreated = false;
   try {
     const [row] = await db
       .insert(proposals)
@@ -187,7 +193,11 @@ export async function createProposalAction(input: {
         createdByUserId: actor.id,
       })
       .returning({ id: proposals.id });
-    if (!row) return { ok: false, error: "Could not create proposal." };
+    if (!row) {
+      await refundQuota(organizationId, "proposalsPerMonth");
+      return { ok: false, error: "Could not create proposal." };
+    }
+    proposalCreated = true;
 
     await db.insert(proposalSections).values(
       seedSections.map((s) => ({
@@ -231,6 +241,12 @@ export async function createProposalAction(input: {
     revalidatePath("/");
     return { ok: true, id: row.id };
   } catch (err) {
+    // BL-16 Phase B-3d — refund only if the proposal row itself never
+    // landed. If a downstream insert/audit failed, the proposal exists
+    // and the slot was legitimately consumed.
+    if (!proposalCreated) {
+      await refundQuota(organizationId, "proposalsPerMonth");
+    }
     log.error("[createProposalAction]", "error", { error: err });
     return {
       ok: false,

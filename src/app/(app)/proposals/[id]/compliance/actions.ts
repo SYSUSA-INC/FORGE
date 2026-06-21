@@ -28,6 +28,7 @@ import {
   ensureFeature,
   FeatureGateError,
   QuotaExceededError,
+  refundQuota,
 } from "@/lib/subscription-gates";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
@@ -381,6 +382,8 @@ export async function runCompliancePreflightAction(
     windowSeconds: 3600,
   });
   if (!limit.ok) {
+    // BL-16 Phase B-3d — rate-limited before any AI work; refund the slot.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
     return {
       ok: false,
       error: `Pre-flight limit (10/hour) reached for this proposal. Retry in ${Math.ceil(limit.retryAfter / 60)} min.`,
@@ -432,6 +435,9 @@ export async function runCompliancePreflightAction(
   const unmapped = allCountRows.filter((r) => !r.mapped).length;
 
   if (rows.length === 0) {
+    // BL-16 Phase B-3d — no mapped items, so no AI call will run.
+    // Refund the upfront slot charge.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
     return {
       ok: true,
       assessed: 0,
@@ -563,6 +569,15 @@ export async function runCompliancePreflightAction(
       // result is empty — that's fine, we just skip the count.
       if (result.length > 0) assessed += 1;
     }
+  }
+
+  // BL-16 Phase B-3d — refund the request slot when the entire preflight
+  // produced no assessments (every section's AI call failed or every
+  // verdict was rejected). The user got zero value; don't burn the slot.
+  // If even one section was assessed, the preflight did real work — keep
+  // the charge.
+  if (assessed === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
   }
 
   await recordAudit({

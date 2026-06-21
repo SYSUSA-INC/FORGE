@@ -26,6 +26,7 @@ import {
   ensureFeature,
   FeatureGateError,
   QuotaExceededError,
+  refundQuota,
 } from "@/lib/subscription-gates";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { searchAwardsByRecipientName } from "@/lib/usaspending";
@@ -139,6 +140,8 @@ export async function runWinnerAnalysisAction(
     windowSeconds: 3600,
   });
   if (!limit.ok) {
+    // BL-16 Phase B-3d — rate-limited before any AI work; refund the slot.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
     return {
       ok: false,
       error: `Winner analysis limit (5/hour) reached for this proposal. Retry in ${Math.ceil(limit.retryAfter / 60)} min.`,
@@ -295,6 +298,9 @@ export async function runWinnerAnalysisAction(
     model = `${res.provider}:${res.model}`;
     stubbed = res.stubbed;
   } catch (err) {
+    // BL-16 Phase B-3d — refund the request slot when the AI call fails;
+    // the user got no analysis, shouldn't burn a slot.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[winner-analysis]", "AI call failed", { error: err });
     return {
       ok: false,
