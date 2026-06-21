@@ -385,6 +385,60 @@ export async function getCurrentUsage(
   return row?.value ?? 0;
 }
 
+/**
+ * BL-16 Phase B-3d — refund a previously-charged counter slot.
+ *
+ * Use when `enforceQuota` charged a slot but the underlying work
+ * didn't actually happen — most commonly an AI provider error that
+ * surfaces AFTER the upfront charge but before the model returned any
+ * usable output. Atomic decrement with a `GREATEST(0, …)` clamp so a
+ * stray refund never produces a negative counter.
+ *
+ * No-op (silent return) when:
+ *   - `count <= 0`
+ *   - Tier resolves with quota = 0 (unlimited — no counter row was ever written)
+ *   - No counter row exists yet for the current period (UPDATE matches zero rows)
+ *
+ * Best-effort: any DB / lookup failure logs and returns. Callers are
+ * already surfacing the original failure to the user; a refund miss
+ * is accounting-level noise, not a user-blocking error.
+ */
+export async function refundQuota(
+  organizationId: string,
+  key: CounterQuotaKey,
+  count: number = 1,
+): Promise<void> {
+  if (count <= 0) return;
+
+  try {
+    const tier = await getCurrentTier(organizationId);
+    if (!tier) return;
+    if (tier.effectiveQuotas[key] === 0) return;
+
+    const { periodStart } = currentMonthPeriod();
+    await db
+      .update(tenantUsageCounters)
+      .set({
+        value: sql`GREATEST(0, ${tenantUsageCounters.value} - ${count})`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(tenantUsageCounters.organizationId, organizationId),
+          eq(tenantUsageCounters.key, key),
+          eq(tenantUsageCounters.periodStart, periodStart),
+        ),
+      );
+  } catch (err) {
+    log.warn("[refundQuota]", "refund failed", {
+      error: err,
+      organizationId,
+      key,
+      count,
+    });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // BL-16 Phase B-3c — live-measure quotas (seats + storage)
 // ─────────────────────────────────────────────────────────────────────
