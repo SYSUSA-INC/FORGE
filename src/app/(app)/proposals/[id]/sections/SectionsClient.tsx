@@ -17,6 +17,7 @@ import { pickColorForUser } from "@/lib/collab-user";
 import {
   RichSectionEditor,
   type CollabConfig,
+  type CommentsConfig,
   type TrackChangesConfig,
 } from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
@@ -104,6 +105,21 @@ function buildTrackChangesConfig(user: CurrentUser): TrackChangesConfig {
       id: user.id,
       name: user.displayName,
       color: pickColorForUser(user.id),
+    },
+  };
+}
+
+/**
+ * BL-9 Slice 4 — comments author config for the current user.
+ * Comments only activate when collab is enabled (the Y.Doc backs them);
+ * `RichSectionEditor` enforces that gate, so we can safely always pass
+ * the config.
+ */
+function buildCommentsConfig(user: CurrentUser): CommentsConfig {
+  return {
+    author: {
+      id: user.id,
+      name: user.displayName,
     },
   };
 }
@@ -248,6 +264,8 @@ function SectionRow({
   const collab = buildCollabConfig(section.id, currentUser);
   // BL-9 Slice 3 — track changes config (always provided).
   const trackChanges = buildTrackChangesConfig(currentUser);
+  // BL-9 Slice 4 — comments config (activates only when collab is on).
+  const comments = buildCommentsConfig(currentUser);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -444,6 +462,7 @@ function SectionRow({
               placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
               collab={collab}
               trackChanges={trackChanges}
+              comments={comments}
             />
             <input type="hidden" value={plainContent} readOnly />
           </div>
