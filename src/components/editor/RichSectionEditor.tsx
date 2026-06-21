@@ -15,8 +15,14 @@ import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import type { AnyExtension } from "@tiptap/core";
 import * as Y from "yjs";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TipTapDoc } from "@/db/schema";
+import {
+  TcInsert,
+  TcDelete,
+  TrackChanges,
+} from "./extensions/TrackChanges";
+import { TrackChangesSidebar } from "./TrackChangesSidebar";
 
 /**
  * BL-9 Slice 2 — when a `collab` config is supplied AND
@@ -47,6 +53,18 @@ export type CollabConfig = {
   fetchToken: () => Promise<string>;
 };
 
+/**
+ * BL-9 Slice 3 — author identity for track changes.
+ * When provided, the editor activates the TrackChanges extension.
+ */
+export type TrackChangesConfig = {
+  author: {
+    id: string;
+    name: string;
+    color: string;
+  };
+};
+
 type Props = {
   doc: TipTapDoc;
   onChange: (doc: TipTapDoc, plain: string, words: number) => void;
@@ -58,6 +76,11 @@ type Props = {
    * omitted, the editor renders exactly as it did pre-Slice-2.
    */
   collab?: CollabConfig;
+  /**
+   * When provided, activates the TrackChanges extension. The sidebar
+   * becomes available and the toolbar gains a "Track" toggle button.
+   */
+  trackChanges?: TrackChangesConfig;
 };
 
 function collabEnabled(): boolean {
@@ -70,8 +93,12 @@ export function RichSectionEditor({
   placeholder,
   disabled,
   collab,
+  trackChanges,
 }: Props) {
   const useCollab = !!collab && collabEnabled();
+  // Local toggle for track-changes sidebar visibility (independent of
+  // tracking mode which lives in the extension storage / Y.Map).
+  const [tcSidebarOpen, setTcSidebarOpen] = useState(false);
 
   // Yjs doc + Hocuspocus provider live for the lifetime of the editor
   // instance. Stored in refs so React renders don't tear them down.
@@ -166,8 +193,24 @@ export function RichSectionEditor({
         }),
       );
     }
+    // BL-9 Slice 3 — track changes marks + extension.
+    // Enabled whenever the caller supplies a `trackChanges` config.
+    if (trackChanges) {
+      base.push(TcInsert);
+      base.push(TcDelete);
+      base.push(
+        TrackChanges.configure({
+          authorId: trackChanges.author.id,
+          authorName: trackChanges.author.name,
+          authorColor: trackChanges.author.color,
+          // Share the collab Y.Doc so the tracking-mode toggle syncs
+          // to all peers. Undefined in single-user mode (local state only).
+          ydoc: useCollab && ydocRef.current ? ydocRef.current : undefined,
+        }),
+      );
+    }
     return base;
-  }, [placeholder, useCollab, collab]);
+  }, [placeholder, useCollab, collab, trackChanges]);
 
   const editor = useEditor({
     extensions,
@@ -359,8 +402,80 @@ export function RichSectionEditor({
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
         />
+        {/* BL-9 Slice 3 — Track changes toggle (only when extension is loaded) */}
+        {trackChanges ? (
+          <>
+            <ToolbarDivider />
+            <TrackToggleBtn
+              editor={editor}
+              sidebarOpen={tcSidebarOpen}
+              onToggleSidebar={() => setTcSidebarOpen((v) => !v)}
+            />
+          </>
+        ) : null}
       </div>
       <EditorContent editor={editor} />
+      {/* Track changes review sidebar — shown when the user opens it */}
+      {trackChanges ? (
+        <TrackChangesSidebar editor={editor} visible={tcSidebarOpen} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Toolbar button that combines the tracking-mode indicator with the
+ * sidebar toggle. Shows an amber dot when recording is active.
+ */
+function TrackToggleBtn({
+  editor,
+  sidebarOpen,
+  onToggleSidebar,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}) {
+  if (!editor) return null;
+  const tcStorage = (editor.storage as unknown as Record<string, unknown>)
+    .TrackChanges as { trackingEnabled: boolean } | undefined;
+  const trackingEnabled: boolean = tcStorage?.trackingEnabled ?? false;
+
+  function toggleTracking() {
+    editor!.commands.setTrackingMode(!trackingEnabled);
+  }
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {/* Recording-mode pill */}
+      <button
+        type="button"
+        onClick={toggleTracking}
+        title={trackingEnabled ? "Stop recording changes" : "Record changes"}
+        className={`inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors ${
+          trackingEnabled
+            ? "bg-amber/15 text-amber"
+            : "text-muted hover:bg-white/[0.06] hover:text-text"
+        }`}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${trackingEnabled ? "bg-amber tc-pulse" : "bg-white/20"}`}
+        />
+        track
+      </button>
+      {/* Sidebar-open toggle */}
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        title="Open / close track-changes review panel"
+        className={`inline-flex h-7 items-center justify-center rounded px-1 font-mono text-[10px] transition-colors ${
+          sidebarOpen
+            ? "bg-white/10 text-text"
+            : "text-muted hover:bg-white/[0.06] hover:text-text"
+        }`}
+      >
+        ▾
+      </button>
     </div>
   );
 }

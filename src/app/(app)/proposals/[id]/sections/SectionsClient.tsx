@@ -17,6 +17,7 @@ import { pickColorForUser } from "@/lib/collab-user";
 import {
   RichSectionEditor,
   type CollabConfig,
+  type TrackChangesConfig,
 } from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
@@ -89,6 +90,21 @@ function buildCollabConfig(
     userName: user.displayName,
     userColor: pickColorForUser(user.id),
     fetchToken: fetchCollabToken,
+  };
+}
+
+/**
+ * BL-9 Slice 3 — track changes author config for the current user.
+ * Always provided so the editor has track-changes capability in both
+ * collab and single-user modes.
+ */
+function buildTrackChangesConfig(user: CurrentUser): TrackChangesConfig {
+  return {
+    author: {
+      id: user.id,
+      name: user.displayName,
+      color: pickColorForUser(user.id),
+    },
   };
 }
 
@@ -230,6 +246,8 @@ function SectionRow({
   // Memoized via inline call: the inputs (section.id, currentUser) are
   // stable for this row's lifetime, so referential identity stays put.
   const collab = buildCollabConfig(section.id, currentUser);
+  // BL-9 Slice 3 — track changes config (always provided).
+  const trackChanges = buildTrackChangesConfig(currentUser);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -425,6 +443,7 @@ function SectionRow({
               }}
               placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
               collab={collab}
+              trackChanges={trackChanges}
             />
             <input type="hidden" value={plainContent} readOnly />
           </div>
