@@ -20,6 +20,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Stub Next.js server-side guards so server modules can be imported
+      // in a Node/vitest context without throwing.
+      "server-only": path.resolve(__dirname, "tests/mocks/server-only.ts"),
+      "next/headers": path.resolve(__dirname, "tests/mocks/next-headers.ts"),
+      "next/cache": path.resolve(__dirname, "tests/mocks/next-cache.ts"),
     },
   },
   test: {
