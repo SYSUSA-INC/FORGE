@@ -7,19 +7,23 @@ import { CorpusUploader } from "./CorpusUploader";
 import {
   countClassifyBackfillCandidatesAction,
   listKnowledgeArtifactsAction,
+  listTagUsageAction,
   type ListedArtifact,
 } from "./actions";
 import { SemanticSearchClient } from "./SemanticSearchClient";
+import { TagManager } from "./TagManager";
 import { getEmbeddingsStatusAction } from "./embed-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function CorpusImportPage() {
-  const [artifacts, embedStatus, classifyCandidateCount] = await Promise.all([
-    listKnowledgeArtifactsAction(),
-    getEmbeddingsStatusAction(),
-    countClassifyBackfillCandidatesAction(),
-  ]);
+  const [artifacts, embedStatus, classifyCandidateCount, tagUsage] =
+    await Promise.all([
+      listKnowledgeArtifactsAction(),
+      getEmbeddingsStatusAction(),
+      countClassifyBackfillCandidatesAction(),
+      listTagUsageAction(),
+    ]);
   const active = artifacts.filter((a) => !a.archivedAt);
   const totalChars = active.reduce((acc, a) => acc + a.charCount, 0);
 
@@ -73,6 +77,17 @@ export default async function CorpusImportPage() {
           <CorpusList artifacts={artifacts} />
         </Panel>
       </div>
+
+      {tagUsage.length > 0 ? (
+        <div className="mt-4">
+          <Panel
+            title="Tags"
+            eyebrow={`${tagUsage.length} in use · rename, merge, or delete`}
+          >
+            <TagManager tags={tagUsage} />
+          </Panel>
+        </div>
+      ) : null}
     </>
   );
 }

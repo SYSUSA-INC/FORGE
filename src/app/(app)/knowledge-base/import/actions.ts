@@ -774,3 +774,275 @@ export async function runKnowledgeClassificationBackfillAction(): Promise<Classi
   revalidatePath("/knowledge-base/import");
   return { ok: true, processed, autoApplied, lowConfidence, skipped };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// BL-10 Phase C-2 — manual reclassification + tag management
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Set an artifact's `kind` directly. Used by the corpus drag-drop UI
+ * when a user drops an artifact card onto a different kind bucket.
+ * Org-scoped — callers can only re-kind their own artifacts.
+ */
+export async function setArtifactKindAction(
+  artifactId: string,
+  kind: KnowledgeArtifactKind,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  if (!isValidKind(kind)) {
+    return { ok: false, error: "Invalid kind." };
+  }
+
+  try {
+    const result = await db
+      .update(knowledgeArtifacts)
+      .set({ kind, updatedAt: new Date() })
+      .where(
+        and(
+          eq(knowledgeArtifacts.id, artifactId),
+          eq(knowledgeArtifacts.organizationId, organizationId),
+        ),
+      )
+      .returning({ id: knowledgeArtifacts.id });
+
+    if (result.length === 0) {
+      return { ok: false, error: "Artifact not found." };
+    }
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_artifact.set_kind",
+      resourceType: "knowledge_artifact",
+      resourceId: artifactId,
+      metadata: { kind },
+    });
+    revalidatePath("/knowledge-base/import");
+    return { ok: true };
+  } catch (err) {
+    log.error("[setArtifactKindAction]", "update failed", {
+      error: err,
+      artifactId,
+    });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Update failed.",
+    };
+  }
+}
+
+/**
+ * Replace an artifact's `tags` array. Trims, lowercases, dedupes, and
+ * caps each tag at 64 chars; caps total tag count at 24 so a runaway
+ * caller can't pollute the row.
+ */
+export async function setArtifactTagsAction(
+  artifactId: string,
+  tags: string[],
+): Promise<{ ok: true; tags: string[] } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const cleaned = normalizeTags(tags);
+
+  try {
+    const result = await db
+      .update(knowledgeArtifacts)
+      .set({ tags: cleaned, updatedAt: new Date() })
+      .where(
+        and(
+          eq(knowledgeArtifacts.id, artifactId),
+          eq(knowledgeArtifacts.organizationId, organizationId),
+        ),
+      )
+      .returning({ id: knowledgeArtifacts.id });
+
+    if (result.length === 0) {
+      return { ok: false, error: "Artifact not found." };
+    }
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_artifact.set_tags",
+      resourceType: "knowledge_artifact",
+      resourceId: artifactId,
+      metadata: { tagCount: cleaned.length },
+    });
+    revalidatePath("/knowledge-base/import");
+    return { ok: true, tags: cleaned };
+  } catch (err) {
+    log.error("[setArtifactTagsAction]", "update failed", {
+      error: err,
+      artifactId,
+    });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Update failed.",
+    };
+  }
+}
+
+/**
+ * Rename a tag across every artifact in the caller's org. Removes the
+ * old tag and adds the new one in a single UPDATE per row using array
+ * functions so concurrent writes don't corrupt the array.
+ */
+export async function renameTagAction(
+  fromTag: string,
+  toTag: string,
+): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const oldClean = normalizeTag(fromTag);
+  const newClean = normalizeTag(toTag);
+  if (!oldClean) return { ok: false, error: "Old tag is empty." };
+  if (!newClean) return { ok: false, error: "New tag is empty." };
+  if (oldClean === newClean) {
+    return { ok: false, error: "Old and new tag are the same." };
+  }
+
+  try {
+    // array_remove + array_append produces a deterministic result and is
+    // race-safe because we filter by `oldClean = ANY(tags)`. If a concurrent
+    // write removes oldClean first, this UPDATE just no-ops on that row.
+    const result = await db
+      .update(knowledgeArtifacts)
+      .set({
+        tags: sql`(
+          SELECT array_agg(DISTINCT t)
+          FROM unnest(array_append(array_remove(${knowledgeArtifacts.tags}, ${oldClean}), ${newClean})) AS t
+          WHERE t IS NOT NULL AND t <> ''
+        )`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(knowledgeArtifacts.organizationId, organizationId),
+          sql`${oldClean} = ANY(${knowledgeArtifacts.tags})`,
+        ),
+      )
+      .returning({ id: knowledgeArtifacts.id });
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_artifact.rename_tag",
+      resourceType: "knowledge_artifact_tag",
+      resourceId: oldClean,
+      metadata: { from: oldClean, to: newClean, affectedRows: result.length },
+    });
+    revalidatePath("/knowledge-base/import");
+    return { ok: true, updated: result.length };
+  } catch (err) {
+    log.error("[renameTagAction]", "rename failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Rename failed.",
+    };
+  }
+}
+
+/**
+ * Remove a tag from every artifact in the caller's org. Used by the
+ * tag-management surface; idempotent.
+ */
+export async function deleteTagAction(
+  tag: string,
+): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const clean = normalizeTag(tag);
+  if (!clean) return { ok: false, error: "Tag is empty." };
+
+  try {
+    const result = await db
+      .update(knowledgeArtifacts)
+      .set({
+        tags: sql`array_remove(${knowledgeArtifacts.tags}, ${clean})`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(knowledgeArtifacts.organizationId, organizationId),
+          sql`${clean} = ANY(${knowledgeArtifacts.tags})`,
+        ),
+      )
+      .returning({ id: knowledgeArtifacts.id });
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_artifact.delete_tag",
+      resourceType: "knowledge_artifact_tag",
+      resourceId: clean,
+      metadata: { tag: clean, affectedRows: result.length },
+    });
+    revalidatePath("/knowledge-base/import");
+    return { ok: true, updated: result.length };
+  } catch (err) {
+    log.error("[deleteTagAction]", "delete failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Delete failed.",
+    };
+  }
+}
+
+/**
+ * List every distinct tag used across the caller's org's artifacts,
+ * with usage counts. Powers the tag-management surface.
+ */
+export async function listTagUsageAction(): Promise<
+  Array<{ tag: string; count: number }>
+> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const rows = await db
+    .select({
+      tag: sql<string>`t`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(knowledgeArtifacts)
+    .innerJoin(
+      sql`unnest(${knowledgeArtifacts.tags}) AS t`,
+      sql`true`,
+    )
+    .where(eq(knowledgeArtifacts.organizationId, organizationId))
+    .groupBy(sql`t`)
+    .orderBy(sql`count(*) desc, t asc`);
+
+  return rows.map((r) => ({ tag: r.tag, count: Number(r.count) }));
+}
+
+const MAX_TAG_LENGTH = 64;
+const MAX_TAGS_PER_ARTIFACT = 24;
+
+/** Normalize a single tag: trim, collapse whitespace, lowercase, length-cap. */
+function normalizeTag(raw: string): string {
+  return (raw ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .slice(0, MAX_TAG_LENGTH);
+}
+
+/** Normalize + dedupe + cap an incoming tag array. */
+function normalizeTags(raw: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of raw ?? []) {
+    const n = normalizeTag(t);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+    if (out.length >= MAX_TAGS_PER_ARTIFACT) break;
+  }
+  return out;
+}
