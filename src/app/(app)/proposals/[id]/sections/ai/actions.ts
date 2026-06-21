@@ -15,6 +15,7 @@ import {
   ensureFeature,
   FeatureGateError,
   QuotaExceededError,
+  refundQuota,
 } from "@/lib/subscription-gates";
 import {
   buildSectionDraftPrompt,
@@ -174,6 +175,8 @@ export async function generateSectionDraftAction(input: {
 
     const text = (ai.text ?? "").trim();
     if (!text) {
+      // BL-16 Phase B-3d — AI returned nothing usable, refund the request slot.
+      await refundQuota(organizationId, "aiRequestsPerMonth");
       return { ok: false, error: "AI returned an empty response." };
     }
 
@@ -190,6 +193,10 @@ export async function generateSectionDraftAction(input: {
       generatedAt: new Date().toISOString(),
     };
   } catch (err) {
+    // BL-16 Phase B-3d — AI call failed (network / provider error). Refund
+    // the request slot so the user isn't billed for an attempt that never
+    // produced output. Token cap is post-record so it never charged.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[generateSectionDraftAction]", "error", { error: err });
     return {
       ok: false,

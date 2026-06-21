@@ -1289,10 +1289,23 @@ built or need design work):
     — storage. Live-measured, so deleting an artifact frees space
     immediately.
 
-**Phase B-3d (queued) — Refund semantics**:
-- Allow `enforceQuota(orgId, key, -1)` after a failed AI call to
-  return the burnt slot. Requires extending `enforceQuota` to
-  permit negative deltas. Skipped in Phase B-3b for simplicity.
+**Phase B-3d — Refund semantics** ✅ shipped (PR #225):
+- New `refundQuota(orgId, key, count = 1)` helper in
+  `subscription-gates.ts`. Atomic decrement with `GREATEST(0, ...)`
+  clamp so a stray refund never produces a negative counter. No-op
+  when count ≤ 0, tier quota = 0 (unlimited — no row), or no row
+  exists for the current period. Best-effort: failures log + return,
+  never throw.
+- Wired into the four upfront-charge call sites where the original
+  Phase B-3b implementation noted "counts every attempt":
+  - `generateSectionDraftAction` — AI call failure OR empty response
+  - `runWinnerAnalysisAction` — AI call failure OR rate-limited
+  - `runCompliancePreflightAction` — no mapped items OR zero
+    assessments produced OR rate-limited
+  - `createProposalAction` (`proposalsPerMonth`) — INSERT returned
+    no row OR threw before the proposal row landed. `proposalCreated`
+    flag prevents refund when downstream sections/audit/dispatch
+    fails after the proposal already exists.
 
 **Phase C-1 — Read-only tier list page** ✅ shipped:
 - New `/admin/tiers` route, superadmin-only. Lists every
