@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { memberships, type Role } from "@/db/schema";
 import { recordAuthDenied } from "@/lib/audit-log";
+import { getActiveImpersonationSession } from "@/lib/impersonation";
 
 export type SessionUser = {
   id: string;
@@ -108,11 +109,40 @@ export async function requireSuperadmin(): Promise<SessionUser> {
   return user;
 }
 
-export async function requireCurrentOrg(): Promise<{
+export type CurrentOrgContext = {
   user: SessionUser;
   organizationId: string;
-}> {
+  /** BL-15 Phase B-3b — true when a super-admin is impersonating this org. */
+  isImpersonating: boolean;
+  /** Active impersonation session id (when isImpersonating === true). */
+  impersonationSessionId?: string;
+};
+
+export async function requireCurrentOrg(): Promise<CurrentOrgContext> {
   const user = await requireAuth();
+
+  // BL-15 Phase B-3b — super-admin impersonation override. When the
+  // calling super-admin has an active session row + cookie, the
+  // effective organizationId becomes the target tenant's. Every
+  // downstream query and revalidation reads/writes as that tenant.
+  // Mutations are blocked at the middleware layer; this helper does
+  // NOT throw on impersonation so read-only browsing works.
+  if (user.isSuperadmin) {
+    const session = await getActiveImpersonationSession(user.id);
+    if (session) {
+      return {
+        user,
+        organizationId: session.targetOrganizationId,
+        isImpersonating: true,
+        impersonationSessionId: session.id,
+      };
+    }
+  }
+
   if (!user.organizationId) redirect("/onboarding");
-  return { user, organizationId: user.organizationId };
+  return {
+    user,
+    organizationId: user.organizationId,
+    isImpersonating: false,
+  };
 }
