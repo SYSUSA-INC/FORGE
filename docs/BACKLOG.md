@@ -35,6 +35,7 @@ Effort key:
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
 | 12 | **BL-9 Slice 3** — Y.Map-based track changes (TcInsert/TcDelete marks + sidebar + recording toggle) | P1 | M | ✅ shipped (PR #226) |
 | 13 | **BL-9 Slice 4** — Comment threads (commentAnchor mark + Y.Map threads + sidebar + reply/resolve flow) | P1 | M | ✅ shipped (PR #227) |
+| 14 | **BL-10 Phase C-2** — Corpus tree (kind > tag) + drag-drop reclassification + tag manager | P2 | M | ✅ shipped (PR #228) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -498,10 +499,36 @@ Today's `/knowledge-base` supports artifact upload + manual entries.
 - Empty-state copy moved into the component; `page.tsx` now renders
   `<CorpusList artifacts={...} />` instead of the inline `<ul>`.
 
-**Phase C-2 (queued) — Full tree + tag grouping + drag-drop**:
-- Nest the grouping (kind > tags > date) and add drag-drop to re-tag.
-- Requires a re-tag server action + a tag-management surface; the
-  Phase C-1 grouping is the foundation.
+**Phase C-2 — Corpus tree + tag grouping + drag-drop** ✅ shipped:
+- Third group mode "By kind & tag" nests artifact buckets: kind →
+  tag sub-buckets → cards. Untagged artifacts surface in a
+  collapsible "(untagged)" sub-bucket so they don't get lost.
+- HTML5 native drag-and-drop (no new dependency): drop an artifact
+  card onto a kind header to re-classify (calls
+  `setArtifactKindAction`); drop onto a tag sub-bucket to add that
+  tag (calls `setArtifactTagsAction`). Each drop target highlights
+  on hover (teal for kind, amber for tag) so the user sees where
+  the action will land.
+- "Empty kinds" pill row inside the group view exposes every kind
+  with zero current artifacts as a drop target, so a re-classify
+  doesn't require switching modes.
+- New server actions on `knowledge-base/import/actions.ts`:
+  - `setArtifactKindAction(id, kind)` — org-scoped UPDATE + audit
+    `knowledge_artifact.set_kind`.
+  - `setArtifactTagsAction(id, tags)` — normalizes (NFKC trim
+    lowercase 64-char cap), dedupes, caps at 24 tags per row.
+  - `listTagUsageAction()` — unique tags across the org's artifacts
+    with counts, sorted by count desc.
+  - `renameTagAction(from, to)` — race-safe `array_remove +
+    array_append` in a single UPDATE; audit + per-row count.
+  - `deleteTagAction(tag)` — race-safe `array_remove` across the
+    org; audit + per-row count.
+- New `TagManager` panel below the corpus tree lists every tag in
+  use with its artifact count + inline rename + delete confirm.
+- Date grouping (the third level mentioned in the original C-2
+  scope) deferred — kind > tags covers the immediate need; a
+  future micro-phase can add date sub-buckets.
+- ✅ *shipped (PR #228)*
 
 **Phase D-1 — Quality score schema + scorer helper** ✅ shipped:
 - Migration `0048_knowledge_entry_quality_score.sql` adds three
