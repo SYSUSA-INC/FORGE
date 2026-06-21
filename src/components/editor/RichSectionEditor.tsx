@@ -452,14 +452,19 @@ function TrackToggleBtn({
         type="button"
         onClick={toggleTracking}
         title={trackingEnabled ? "Stop recording changes" : "Record changes"}
-        className={`inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors ${
+        className="inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors hover:bg-white/[0.06]"
+        style={
           trackingEnabled
-            ? "bg-amber/15 text-amber"
-            : "text-muted hover:bg-white/[0.06] hover:text-text"
-        }`}
+            ? {
+                background: "rgba(251, 191, 36, 0.15)",
+                color: "#FBBF24",
+              }
+            : undefined
+        }
       >
         <span
-          className={`h-1.5 w-1.5 rounded-full ${trackingEnabled ? "bg-amber tc-pulse" : "bg-white/20"}`}
+          className={`h-1.5 w-1.5 rounded-full ${trackingEnabled ? "tc-pulse" : "bg-white/20"}`}
+          style={trackingEnabled ? { background: "#FBBF24" } : undefined}
         />
         track
       </button>
