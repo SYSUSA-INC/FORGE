@@ -37,6 +37,7 @@ Effort key:
 | 13 | **BL-9 Slice 4** — Comment threads (commentAnchor mark + Y.Map threads + sidebar + reply/resolve flow) | P1 | M | ✅ shipped (PR #227) |
 | 14 | **BL-10 Phase C-2** — Corpus tree (kind > tag) + drag-drop reclassification + tag manager | P2 | M | ✅ shipped (PR #228) |
 | 15 | **BL-15 Phase B-3b** — Super-admin assume-identity flow (session table + cookie + write-block middleware + banner) | P1 | M | ✅ shipped (PR #229) |
+| 16 | **BL-19 Phase 2** — Runtime cross-tenant isolation tests (Vitest harness + 2-tenant fixture + 10 isolation assertions + CI job) | P0 | M | ✅ shipped (PR #230) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -1597,12 +1598,41 @@ run flushed out one real isolation bug (`getDefaultTemplate` took
 as a client-callable endpoint) which was fixed in the same PR by
 moving the helper into `src/lib/`.
 
-**Phase 2 (deferred) — runtime tests:**
-- Test harness: provisions 2 tenants with seed data
-- For every scoped table, runtime assertions that a tenant-A user
-  invoking any server action cannot read/update/delete tenant-B rows,
-  including via foreign key references
-- Belongs in a follow-up after a test framework lands
+**Phase 2 — runtime tests** ✅ shipped:
+- **Vitest 2.x** added as a dev dep; `npm test` runs the suite once,
+  `npm run test:watch` for interactive dev. `check:all` now chains
+  through tests after the static checks.
+- `vitest.config.ts` aliases `@/` to `src/` and uses a single fork
+  so tests share a Postgres pool. `testTimeout: 20s` accommodates
+  the fixture build (4 INSERTs per tenant pair).
+- `tests/setup.ts` is a global guard: refuses to run without
+  `DATABASE_URL`, with `NODE_ENV=production`, or against any DB whose
+  URL contains the word `prod` (override flag `FORGE_TEST_ALLOW_ANY_DB=1`
+  for the rare legitimate case). Hard-stops a mistaken pointer at
+  production before any INSERT.
+- `tests/helpers/fixtures.ts` exposes `createTwoTenants(label)` which
+  builds two isolated tenants (org + user + membership + one
+  opportunity + one proposal + one knowledge artifact each), with
+  uniquified slugs/emails so parallel runs don't collide. Returns a
+  `cleanup()` that CASCADE-deletes both orgs.
+- `tests/isolation/cross-tenant-scoping.test.ts` covers three
+  representative tables and proves the SQL scoping pattern at
+  runtime:
+  - `opportunities` — top-level org scope
+  - `proposals` — org scope + FK to opportunities
+  - `knowledge_artifact` — org scope + soft-delete archival
+  For each: SELECT-with-other-org-id returns nothing, scoped DELETE
+  with the wrong org id leaves the row intact, scoped UPDATE with the
+  wrong org id is a no-op. Plus a regression-guard test that shows
+  the unscoped pattern WOULD leak — proves the suite is sensitive
+  enough to catch a missing org predicate.
+- New CI job `runtime-isolation-tests` in `.github/workflows/pr.yml`:
+  spins up the ephemeral `pgvector/pgvector:pg16` service, applies
+  every migration with `scripts/apply-schema.mjs`, then runs
+  `npm test`. Runs in parallel with the existing
+  `migrations-fresh` job; uses its own DB so the two jobs don't
+  share fixture lifetimes.
+- ✅ *shipped (PR #230)*
 
 ---
 

@@ -17,7 +17,9 @@
     "check:rsc": "node scripts/check-rsc-boundaries.mjs",
     "check:isolation": "node scripts/check-isolation.mjs",
     "check:migrations": "node scripts/check-migrations-fresh.mjs",
-    "check:all": "npm run typecheck && npm run check:rsc && npm run check:isolation && npm run build"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:all": "npm run typecheck && npm run check:rsc && npm run check:isolation && npm run test && npm run build"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
@@ -75,6 +77,7 @@
     "eslint-config-next": "^14.2.15",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^2.1.9"
   }
 }
