@@ -183,3 +183,48 @@ jobs:
           # ephemeral service. The `||` operator treats an empty string
           # (skipped step) as falsy, so this works whether Neon ran or not.
           DATABASE_URL: ${{ steps.neon.outputs.db_url || 'postgres://forge:forge@localhost:5432/forge_ci' }}
+
+  runtime-isolation-tests:
+    name: Runtime isolation tests
+    runs-on: ubuntu-latest
+    # BL-19 Phase 2 — runtime cross-tenant isolation tests. Provisions
+    # two real tenants in Postgres and verifies every scoped query
+    # pattern (SELECT / DELETE / UPDATE with org-id WHERE clause)
+    # rejects cross-tenant access. Pairs with the static check
+    # `scripts/check-isolation.mjs` (Phase 1).
+    #
+    # Always runs against the ephemeral pgvector service — never against
+    # a Neon branch, because the tests INSERT and DELETE fixture rows
+    # and we don't want to share that lifecycle with the migration
+    # verification job's branch (or worse, with a developer's dev DB).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: forge
+          POSTGRES_PASSWORD: forge
+          POSTGRES_DB: forge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+
+      - name: Apply migrations
+        run: node scripts/apply-schema.mjs
+        env:
+          DATABASE_URL: postgres://forge:forge@localhost:5432/forge_ci
+
+      - name: Run isolation tests
+        run: npm test
+        env:
+          DATABASE_URL: postgres://forge:forge@localhost:5432/forge_ci

@@ -110,8 +110,11 @@ jobs:
         run: |
           git fetch origin "$BASE_REF" --depth=1
           changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
-          # Schema-side: any TS file under src/db/
-          schema_changed=$(printf '%s\n' "$changed" | grep -E '^src/db/.*\.ts$' || true)
+          # Schema-side: only the real schema files, not helpers like
+          # src/db/index.ts (pool init) or src/db/queries/* (read-only
+          # convenience). Matches src/db/schema.ts and any future
+          # src/db/schema/<part>.ts split.
+          schema_changed=$(printf '%s\n' "$changed" | grep -E '^src/db/schema(\.ts$|/)' || true)
           # Migration-side: a new (or modified) numbered sql file under drizzle/
           migration_changed=$(printf '%s\n' "$changed" | grep -E '^drizzle/[0-9]+_.*\.sql$' || true)
           if [ -n "$schema_changed" ] && [ -z "$migration_changed" ]; then
