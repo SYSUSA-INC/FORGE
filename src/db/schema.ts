@@ -2646,7 +2646,7 @@ export const superadminImpersonationSessions = pgTable(
   "superadmin_impersonation_session",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    superadminUserId: uuid("superadmin_user_id")
+    superadminUserId: text("superadmin_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     targetOrganizationId: uuid("target_organization_id")

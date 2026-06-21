@@ -25,7 +25,7 @@
 
 CREATE TABLE IF NOT EXISTS "superadmin_impersonation_session" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "superadmin_user_id" uuid NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "superadmin_user_id" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "target_organization_id" uuid NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "reason" text NOT NULL,
   "started_at" timestamp with time zone NOT NULL DEFAULT now(),
