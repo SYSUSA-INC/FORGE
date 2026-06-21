@@ -33,6 +33,7 @@ Effort key:
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
+| 12 | **BL-9 Slice 3** — Y.Map-based track changes (TcInsert/TcDelete marks + sidebar + recording toggle) | P1 | M | ✅ shipped (PR #226) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -333,7 +334,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d shipped; 2c operator-pending; Slice 3 next
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3 shipped; 2c operator-pending; Slice 4 next
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -366,8 +367,20 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
   text + word count → `proposal_section`. Also updated server.ts to
   correct Hocuspocus v4 API (`new Server(...)`, `lastContext`, typed
   hook payloads). ✅ *shipped (PR #224)*
-- **Slice 3** — Track changes (Tiptap Pro extension license vs.
-  Y.Map-based implementation — decision in this slice).
+- **Slice 3** — Y.Map-based track changes (decision: roll our own, no
+  TipTap Pro license required). Two TipTap marks (`TcInsert` /
+  `TcDelete`) carry change metadata inline with the Yjs document
+  (synced automatically to all peers). A `Y.Map("tc-meta")` on the
+  shared Y.Doc stores the tracking-mode toggle so all collaborators
+  see when tracking is on. Accept/reject commands in `TrackChanges`
+  extension manipulate marks + doc in a single ProseMirror
+  transaction; a `TrackChangesSidebar` panel shows pending changes
+  per author with individual and bulk accept/reject. Works in both
+  collab mode (Y.Map sync) and single-user mode (local state).
+  Known Slice-3 limitations (future slices): paste/cut not tracked;
+  block-level changes not marked; IME composition may bypass handler.
+  Audit log for accept/reject events deferred to Slice 7.
+  ✅ *shipped (PR #226)*
 - **Slice 4** — Comment threads anchored via `Y.RelativePosition`;
   `extension-redis` for horizontal scale if needed.
 - **Slice 5** — Suggestion mode + version snapshots + diff viewer.

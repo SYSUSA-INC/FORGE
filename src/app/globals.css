@@ -282,3 +282,28 @@ mark {
   color: rgba(91, 138, 160, 0.7); pointer-events: none;
   height: 0; font-style: italic;
 }
+
+/* BL-9 Slice 3 — track-changes inline marks */
+.tc-insert {
+  background-color: rgba(74, 222, 128, 0.12);
+  border-bottom: 1.5px solid rgba(74, 222, 128, 0.55);
+  border-radius: 2px;
+  text-decoration: underline;
+  text-decoration-color: rgba(74, 222, 128, 0.55);
+  text-decoration-skip-ink: none;
+}
+.tc-delete {
+  text-decoration: line-through;
+  text-decoration-color: rgba(248, 113, 113, 0.75);
+  color: #F87171;
+  background-color: rgba(248, 113, 113, 0.08);
+  border-radius: 2px;
+  opacity: 0.80;
+  cursor: default;
+}
+/* Amber dot pulse for the "track" toolbar recording indicator */
+@keyframes tc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.tc-pulse { animation: tc-pulse 1.5s ease-in-out infinite; }
