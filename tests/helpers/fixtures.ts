@@ -139,6 +139,80 @@ async function seedTenant(slugTag: string): Promise<TenantFixture> {
 }
 
 /**
+ * Build a subscription tier + assign it to an organization, for tests
+ * that exercise `enforceQuota` / `ensureFeature` / `refundQuota`.
+ * Returns helpers to clean both rows up after the test.
+ */
+export async function createTierAndSubscribe(opts: {
+  organizationId: string;
+  slug: string;
+  name: string;
+  featureFlags?: Partial<import("@/db/schema").TierFeatureFlags>;
+  quotas?: Partial<import("@/db/schema").TierQuotas>;
+  active?: boolean;
+  overrides?: {
+    featureFlags?: Partial<import("@/db/schema").TierFeatureFlags>;
+    quotas?: Partial<import("@/db/schema").TierQuotas>;
+  };
+}): Promise<{ tierId: string; cleanup: () => Promise<void> }> {
+  const { subscriptionTiers, tenantSubscriptions } = await import(
+    "@/db/schema"
+  );
+  const defaultFlags: import("@/db/schema").TierFeatureFlags = {
+    aiAutoDraft: false,
+    winnerAnalysis: false,
+    complianceMatrix: false,
+    bulkExport: false,
+    apiAccess: false,
+    customTemplates: false,
+  };
+  const defaultQuotas: import("@/db/schema").TierQuotas = {
+    aiRequestsPerMonth: 0,
+    aiTokensPerMonth: 0,
+    proposalsPerMonth: 0,
+    seatsIncluded: 0,
+    storageGb: 0,
+  };
+  const [tier] = await db
+    .insert(subscriptionTiers)
+    .values({
+      slug: opts.slug,
+      name: opts.name,
+      featureFlags: { ...defaultFlags, ...(opts.featureFlags ?? {}) },
+      quotas: { ...defaultQuotas, ...(opts.quotas ?? {}) },
+      active: opts.active ?? true,
+    })
+    .returning({ id: subscriptionTiers.id });
+  if (!tier) throw new Error("createTierAndSubscribe: tier insert failed");
+
+  await db
+    .insert(tenantSubscriptions)
+    .values({
+      organizationId: opts.organizationId,
+      tierId: tier.id,
+      status: "active",
+      customOverrides: opts.overrides ?? {},
+    })
+    .onConflictDoUpdate({
+      target: tenantSubscriptions.organizationId,
+      set: {
+        tierId: tier.id,
+        customOverrides: opts.overrides ?? {},
+      },
+    });
+
+  return {
+    tierId: tier.id,
+    async cleanup() {
+      await db
+        .delete(tenantSubscriptions)
+        .where(eq(tenantSubscriptions.organizationId, opts.organizationId));
+      await db.delete(subscriptionTiers).where(eq(subscriptionTiers.id, tier.id));
+    },
+  };
+}
+
+/**
  * Convenience — verify a specific row still exists in its org. Used to
  * assert that a cross-tenant DELETE/UPDATE attempt was a no-op.
  */
