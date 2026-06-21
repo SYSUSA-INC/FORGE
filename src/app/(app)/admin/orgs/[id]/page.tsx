@@ -20,6 +20,7 @@ import { listActiveTiersAction, listOrgAdminsAction } from "./actions";
 import { TierAssignmentForm } from "./TierAssignmentForm";
 import { TransferOwnershipForm } from "./TransferOwnershipForm";
 import { EnterpriseInvoiceForm } from "./EnterpriseInvoiceForm";
+import { StartImpersonationForm } from "./StartImpersonationForm";
 
 export const dynamic = "force-dynamic";
 
@@ -208,6 +209,11 @@ export default async function TenantDetailPage({
             >
               Export data ↓
             </a>
+            <StartImpersonationForm
+              organizationId={org.id}
+              organizationName={org.name}
+              disabled={!!org.disabledAt}
+            />
             <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
               ← All organizations
             </Link>

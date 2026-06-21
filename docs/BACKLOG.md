@@ -36,6 +36,7 @@ Effort key:
 | 12 | **BL-9 Slice 3** — Y.Map-based track changes (TcInsert/TcDelete marks + sidebar + recording toggle) | P1 | M | ✅ shipped (PR #226) |
 | 13 | **BL-9 Slice 4** — Comment threads (commentAnchor mark + Y.Map threads + sidebar + reply/resolve flow) | P1 | M | ✅ shipped (PR #227) |
 | 14 | **BL-10 Phase C-2** — Corpus tree (kind > tag) + drag-drop reclassification + tag manager | P2 | M | ✅ shipped (PR #228) |
+| 15 | **BL-15 Phase B-3b** — Super-admin assume-identity flow (session table + cookie + write-block middleware + banner) | P1 | M | ✅ shipped (PR #229) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -1163,16 +1164,56 @@ plumbing, write-block enforcement) outweighs the immediate triage
 need. Phase B-3a satisfies the operator's "what's going on in this
 tenant" question without the security-sensitive surface.
 
-**Phase B-3b (queued) — Full assume-identity flow**:
-- Session-level impersonation cookie + middleware override of
-  `requireCurrentOrg()`
-- Confirm-with-reason modal before assuming identity (reason
-  required, written to audit)
-- Visible banner on every authenticated page while impersonating
-  ("🛡 Viewing as <tenant name> — Exit")
-- All mutating server actions refuse with a clear message during
-  impersonation; reads work normally
-- `superadmin.assume_start` / `superadmin.assume_end` audit rows
+**Phase B-3b — Full assume-identity flow** ✅ shipped:
+- Migration `0058_superadmin_impersonation.sql` adds
+  `superadmin_impersonation_session` table (id, super-admin user,
+  target org, reason, started/expires/ended timestamps) with a
+  partial index on active-by-user for O(1) "is this super-admin
+  impersonating?" lookups.
+- Drizzle schema entry `superadminImpersonationSessions` mirrors
+  the migration.
+- `src/lib/impersonation.ts` — `getActiveImpersonationSession(uid)`
+  reads the cookie's session id and validates against the DB row
+  (must match calling user, unexpired, not ended). Cookie alone
+  proves nothing — server-side DB lookup is the source of truth.
+  Helpers `setImpersonationCookie` / `clearImpersonationCookie`
+  set/clear `forge_impersonation_session` (httpOnly, samesite=lax,
+  secure in production, 1-hour maxAge).
+- `requireCurrentOrg()` now returns `CurrentOrgContext` with
+  `isImpersonating` + optional `impersonationSessionId` fields.
+  Super-admins with an active session see the target org as their
+  effective tenant on every page read.
+- New server actions in
+  `src/app/(app)/admin/orgs/[id]/impersonation-actions.ts`:
+  - `startImpersonationAction({ organizationId, reason })` —
+    super-admin gated, rejects disabled orgs, requires reason ≥ 8
+    chars, refuses when caller already has an active session.
+    Audits `superadmin.assume_start` into the target org's log.
+  - `endImpersonationAction()` — closes every active session for the
+    calling super-admin (idempotent), clears the cookie, audits
+    `superadmin.assume_end` with `durationMs` metadata into the
+    target org's log.
+- `src/middleware.ts` — write-block: when the impersonation cookie
+  is present, any non-GET/HEAD/OPTIONS request OR any request with a
+  `Next-Action` header (server-action POST) returns 403 with a
+  clear error message. The only carve-out is
+  `/api/admin/impersonation/end` so the operator can always end the
+  session. Cookie-presence check (not DB) keeps the middleware edge-
+  safe; DB authoritative validation runs inside the server actions.
+- UI:
+  - `StartImpersonationForm` button on `/admin/orgs/[id]` opens an
+    inline reason-required form (8-char minimum); on success
+    pushes to `/` so the operator starts browsing as the tenant.
+  - `ImpersonationBanner` is a sticky red bar in the AppShell that
+    shows the target tenant name, reason, time remaining, and the
+    `EndImpersonationButton`. The button POSTs to
+    `/api/admin/impersonation/end` (the carve-out route) and
+    redirects to `/admin`.
+- Audit visibility: tenant admins see `superadmin.assume_start` and
+  `superadmin.assume_end` in their own `/audit-log` with
+  `viaSuperadmin: true` metadata so platform-support access is
+  never invisible to the tenant.
+- ✅ *shipped (PR #229)*
 
 **Phase B-3c (queued) — Audit isolation status check**:
 Gated on BL-19 Phase 2 test framework. A button that runs sample

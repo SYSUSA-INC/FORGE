@@ -2635,3 +2635,42 @@ export const yjsDocs = pgTable(
 
 export type YjsDoc = typeof yjsDocs.$inferSelect;
 export type NewYjsDoc = typeof yjsDocs.$inferInsert;
+
+// ────────────────────────────────────────────────────────────────────────────
+// BL-15 Phase B-3b — super-admin assume-identity sessions.
+// ────────────────────────────────────────────────────────────────────────────
+// Row-per-session so the super-admin's impersonation is revocable from
+// anywhere and the audit trail is permanent. Cookie carries only the id.
+// ────────────────────────────────────────────────────────────────────────────
+export const superadminImpersonationSessions = pgTable(
+  "superadmin_impersonation_session",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    superadminUserId: uuid("superadmin_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetOrganizationId: uuid("target_organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    activeByUserIdx: index("idx_superadmin_imp_active_by_user")
+      .on(t.superadminUserId)
+      .where(sql`${t.endedAt} IS NULL`),
+    targetIdx: index("idx_superadmin_imp_target").on(t.targetOrganizationId),
+  }),
+);
+
+export type SuperadminImpersonationSession =
+  typeof superadminImpersonationSessions.$inferSelect;
+export type NewSuperadminImpersonationSession =
+  typeof superadminImpersonationSessions.$inferInsert;
