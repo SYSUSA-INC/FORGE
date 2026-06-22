@@ -38,6 +38,7 @@ Effort key:
 | 14 | **BL-10 Phase C-2** — Corpus tree (kind > tag) + drag-drop reclassification + tag manager | P2 | M | ✅ shipped (PR #228) |
 | 15 | **BL-15 Phase B-3b** — Super-admin assume-identity flow (session table + cookie + write-block middleware + banner) | P1 | M | ✅ shipped (PR #229) |
 | 16 | **BL-19 Phase 2** — Runtime cross-tenant isolation tests (Vitest harness + 2-tenant fixture + 10 isolation assertions + CI job) | P0 | M | ✅ shipped (PR #230) |
+| 17 | **BL-16 tests** — Runtime tests for subscription gates (ensureFeature / enforceQuota / refundQuota across 17 assertions) | P0 | S | ✅ shipped (PR #231) |
 | 20 | **BL-17 tests** — Runtime tests for Stripe webhook (signature, idempotency, dispatch, dunning email, error path) | P0 | S | ✅ shipped (PR #234) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
