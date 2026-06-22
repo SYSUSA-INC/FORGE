@@ -45,7 +45,8 @@ Effort key:
 | 21 | **BL-PACKAGES tests** — Runtime tests for `completeForTenant` token cap (pre-check, post-record, provider failure, unlimited tier, multi-tenant) | P0 | S | ✅ shipped (PR #235) |
 | 22 | **BL-9 Slice 5a** — Suggestion mode + view mode (3-mode picker in toolbar, owner-gated accept/reject, non-owner forced to suggest) | P1 | M | ✅ shipped (PR #236) |
 | 23 | **BL-9 Slice 5b** — Version snapshots (per-section snapshot table, manual + auto-stage-transition triggers, restore + delete, sidebar UI) | P1 | M | ✅ shipped (PR #237) |
-| 24 | **BL-9 Slice 5c** — Snapshot diff viewer (per-row Diff button → modal showing word-level diff vs. current via jsdiff) | P1 | M | 🟡 in-flight |
+| 24 | **BL-9 Slice 5c** — Snapshot diff viewer (per-row Diff button → modal showing word-level diff vs. current via jsdiff) | P1 | M | ✅ shipped (PR #238) |
+| 25 | **BL-15 Phase B-3c** — Runtime isolation status check (per-tenant probe runner + result table + admin UI) | P0 | S | 🟡 in-flight |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -1262,10 +1263,26 @@ tenant" question without the security-sensitive surface.
   never invisible to the tenant.
 - ✅ *shipped (PR #229)*
 
-**Phase B-3c (queued) — Audit isolation status check**:
-Gated on BL-19 Phase 2 test framework. A button that runs sample
-cross-tenant queries to verify isolation, then writes a structured
-result row.
+**Phase B-3c — Audit isolation status check** 🟡 in-flight:
+- New table `isolation_check_result` (tenant-scoped via
+  `organization_id`) carries per-run summary + a per-table jsonb
+  details array.
+- `runIsolationCheckAction` (superadmin-only) picks any other
+  tenant as a phantom attacker, samples up to 10 row ids from
+  three representative tables (opportunities, proposals,
+  knowledge_artifacts), then runs a SELECT scoped to the target
+  tenant looking for those ids — must return zero rows for an
+  isolated tenant. Any non-zero return is a real cross-tenant
+  leak and counts as a failed check. The runner writes one
+  result row and audits `superadmin.isolation_check_passed` or
+  `superadmin.isolation_check_failed`.
+- `listIsolationCheckResultsAction` (superadmin-only) returns
+  the last N results for the operator UI.
+- `IsolationCheckPanel` renders on `/admin/orgs/[id]` with a
+  "Run isolation check" button and the recent-results list with
+  per-probe pass / fail / skipped detail. Single-tenant databases
+  return SKIPPED with a clear reason — the check is well-defined
+  but can't actually run without a second tenant.
 
 **Acceptance (full ticket):** provision a new tenant via UI → tenant
 admin gets invite email → can sign in → sees only their data; suspend
