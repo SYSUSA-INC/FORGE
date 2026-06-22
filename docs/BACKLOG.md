@@ -43,6 +43,7 @@ Effort key:
 | 19 | **BL-15 Phase B-3b tests** — Runtime tests for assume-identity (start/end actions + getActiveImpersonationSession + cookie + audit) | P0 | S | ✅ shipped (PR #233) |
 | 20 | **BL-17 tests** — Runtime tests for Stripe webhook (signature, idempotency, dispatch, dunning email, error path) | P0 | S | ✅ shipped (PR #234) |
 | 21 | **BL-PACKAGES tests** — Runtime tests for `completeForTenant` token cap (pre-check, post-record, provider failure, unlimited tier, multi-tenant) | P0 | S | ✅ shipped (PR #235) |
+| 22 | **BL-9 Slice 5a** — Suggestion mode + view mode (3-mode picker in toolbar, owner-gated accept/reject, non-owner forced to suggest) | P1 | M | 🟡 in-flight |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -343,7 +344,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4 shipped; 2c operator-pending; Slice 5 next
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4 shipped; 2c operator-pending; Slice 5a in-flight (PR pending), 5b/5c next
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -405,6 +406,24 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
   `@user` mentions, in-app notifications, optional `extension-redis`
   for horizontal Hocuspocus scale. ✅ *shipped (PR #227)*
 - **Slice 5** — Suggestion mode + version snapshots + diff viewer.
+  - **Slice 5a — Suggestion mode** (in-flight): the `TrackChanges`
+    extension grows a third state alongside `trackingEnabled`:
+    `editorMode: "edit" | "suggest" | "view"`. `view` makes the
+    editor read-only via `editor.setEditable(false)`; `suggest` is
+    exactly tracking-on; `edit` is the pre-5a baseline. Mode syncs
+    via the same `tc-meta` Y.Map (alongside the legacy boolean so
+    older clients still observe a toggle).
+    The extension takes a per-client `isOwner` option. Owners see a
+    3-segment picker (Edit / Suggest / View) and the accept/reject
+    controls in the sidebar. Non-owners are forced into suggest
+    (or view) mode regardless of the doc-wide setting, and see the
+    sidebar as a read-only list.
+    For the sections editor in `SectionsClient`, owner = the
+    section's assigned `authorUserId` (ownerless sections fall
+    back to owner-mode for the current user to avoid locking out
+    single-author drafts).
+  - Slice 5b — Version snapshots (pending).
+  - Slice 5c — Diff viewer (pending).
 - **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
 - **Slice 7** — Brain feedback loop: every accepted/rejected change
   feeds the pattern-intel pipeline.

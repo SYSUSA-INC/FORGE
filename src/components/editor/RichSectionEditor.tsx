@@ -58,6 +58,11 @@ export type CollabConfig = {
 /**
  * BL-9 Slice 3 — author identity for track changes.
  * When provided, the editor activates the TrackChanges extension.
+ *
+ * BL-9 Slice 5a — `isOwner` gates the accept/reject controls and the
+ * mode picker. Non-owners are forced to operate in suggestion mode;
+ * their edits land as tracked changes for the owner to resolve.
+ * Defaults to `true` so pre-5a callers behave unchanged.
  */
 export type TrackChangesConfig = {
   author: {
@@ -65,6 +70,7 @@ export type TrackChangesConfig = {
     name: string;
     color: string;
   };
+  isOwner?: boolean;
 };
 
 /**
@@ -234,6 +240,10 @@ export function RichSectionEditor({
           // Share the collab Y.Doc so the tracking-mode toggle syncs
           // to all peers. Undefined in single-user mode (local state only).
           ydoc: useCollab && ydocRef.current ? ydocRef.current : undefined,
+          // Slice 5a — default to owner so single-user (no collab) keeps
+          // the pre-5a UX where every keystroke is freely editable and
+          // any tracked change is accept/rejectable.
+          isOwner: trackChanges.isOwner ?? true,
         }),
       );
     }
@@ -449,6 +459,7 @@ export function RichSectionEditor({
               editor={editor}
               sidebarOpen={tcSidebarOpen}
               onToggleSidebar={() => setTcSidebarOpen((v) => !v)}
+              isOwner={trackChanges.isOwner ?? true}
             />
           </>
         ) : null}
@@ -532,57 +543,109 @@ export function RichSectionEditor({
       ) : null}
       {/* Track changes review sidebar — shown when the user opens it */}
       {trackChanges ? (
-        <TrackChangesSidebar editor={editor} visible={tcSidebarOpen} />
+        <TrackChangesSidebar
+          editor={editor}
+          visible={tcSidebarOpen}
+          isOwner={trackChanges.isOwner ?? true}
+        />
       ) : null}
     </div>
   );
 }
 
 /**
- * Toolbar button that combines the tracking-mode indicator with the
- * sidebar toggle. Shows an amber dot when recording is active.
+ * Toolbar control combining the editor-mode picker (Slice 5a) with
+ * the track-changes sidebar toggle. Owners see a 3-segment picker
+ * (Edit / Suggest / View); non-owners see a read-only pill stating
+ * the current mode (which for them is always Suggest, unless the
+ * owner has set the doc to View).
+ *
+ * Re-renders on every transaction so a remote mode change is
+ * reflected immediately.
  */
 function TrackToggleBtn({
   editor,
   sidebarOpen,
   onToggleSidebar,
+  isOwner,
 }: {
   editor: ReturnType<typeof useEditor>;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  isOwner: boolean;
 }) {
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    if (!editor) return;
+    editor.on("transaction", forceUpdate);
+    return () => {
+      editor.off("transaction", forceUpdate);
+    };
+  }, [editor]);
+
   if (!editor) return null;
   const tcStorage = (editor.storage as unknown as Record<string, unknown>)
-    .TrackChanges as { trackingEnabled: boolean } | undefined;
-  const trackingEnabled: boolean = tcStorage?.trackingEnabled ?? false;
-
-  function toggleTracking() {
-    editor!.commands.setTrackingMode(!trackingEnabled);
-  }
+    .TrackChanges as
+    | { trackingEnabled: boolean; editorMode: "edit" | "suggest" | "view" }
+    | undefined;
+  const mode = tcStorage?.editorMode ?? "edit";
 
   return (
     <div className="flex items-center gap-0.5">
-      {/* Recording-mode pill */}
-      <button
-        type="button"
-        onClick={toggleTracking}
-        title={trackingEnabled ? "Stop recording changes" : "Record changes"}
-        className="inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors hover:bg-white/[0.06]"
-        style={
-          trackingEnabled
-            ? {
-                background: "rgba(251, 191, 36, 0.15)",
-                color: "#FBBF24",
-              }
-            : undefined
-        }
-      >
+      {isOwner ? (
+        <div
+          role="group"
+          aria-label="Editor mode"
+          className="inline-flex h-7 items-center overflow-hidden rounded border border-white/10"
+        >
+          <ModePill
+            label="Edit"
+            active={mode === "edit"}
+            activeStyle={{
+              background: "rgba(74, 222, 128, 0.15)",
+              color: "#4ADE80",
+            }}
+            onClick={() => editor.commands.setEditorMode("edit")}
+            title="Edit mode — your changes apply directly"
+          />
+          <ModePill
+            label="Suggest"
+            active={mode === "suggest"}
+            activeStyle={{
+              background: "rgba(251, 191, 36, 0.15)",
+              color: "#FBBF24",
+            }}
+            onClick={() => editor.commands.setEditorMode("suggest")}
+            title="Suggest mode — changes are recorded for the owner to accept"
+          />
+          <ModePill
+            label="View"
+            active={mode === "view"}
+            activeStyle={{
+              background: "rgba(148, 163, 184, 0.15)",
+              color: "#94A3B8",
+            }}
+            onClick={() => editor.commands.setEditorMode("view")}
+            title="View mode — read-only for everyone"
+          />
+        </div>
+      ) : (
         <span
-          className={`h-1.5 w-1.5 rounded-full ${trackingEnabled ? "tc-pulse" : "bg-white/20"}`}
-          style={trackingEnabled ? { background: "#FBBF24" } : undefined}
-        />
-        track
-      </button>
+          className="inline-flex h-7 items-center gap-1 rounded border border-white/10 px-2 font-mono text-[10px]"
+          style={
+            mode === "view"
+              ? { color: "#94A3B8" }
+              : { background: "rgba(251, 191, 36, 0.10)", color: "#FBBF24" }
+          }
+          title={
+            mode === "view"
+              ? "The owner has set this section to read-only"
+              : "Your edits will be saved as suggestions for the owner to accept"
+          }
+        >
+          {mode === "view" ? "view" : "suggest"}
+        </span>
+      )}
       {/* Sidebar-open toggle */}
       <button
         type="button"
@@ -597,6 +660,33 @@ function TrackToggleBtn({
         ▾
       </button>
     </div>
+  );
+}
+
+function ModePill({
+  label,
+  active,
+  activeStyle,
+  onClick,
+  title,
+}: {
+  label: string;
+  active: boolean;
+  activeStyle: React.CSSProperties;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className="inline-flex h-7 items-center justify-center px-2 font-mono text-[10px] transition-colors hover:bg-white/[0.06]"
+      style={active ? activeStyle : undefined}
+    >
+      {label}
+    </button>
   );
 }
 

@@ -9,6 +9,14 @@
  *   - Accept/reject commands manipulate marks + doc directly; no server
  *     round-trip is needed. Audit logging lands in Slice 7.
  *
+ * BL-9 Slice 5a — suggestion mode + view mode:
+ *   - The Y.Map now also stores `editorMode: "edit" | "suggest" | "view"`.
+ *     `suggest` is exactly tracking-on; `view` makes the editor read-only.
+ *   - The old `trackingEnabled` boolean is kept in sync so existing
+ *     callers and the legacy `setTrackingMode` command keep working.
+ *   - A per-client `isOwner` option gates the accept/reject commands —
+ *     non-owners can suggest edits but only owners can resolve them.
+ *
  * Limitations in this slice (logged for future work):
  *   - Pasted text is not tracked (would require handlePaste override).
  *   - Cut is not tracked (requires handleDOMEvents: { cut }).
@@ -31,6 +39,17 @@ export type TrackAuthor = {
   name: string;
   color: string;
 };
+
+/**
+ * BL-9 Slice 5a — three-mode editor:
+ *   - `edit`    direct edits; tracking off
+ *   - `suggest` every edit is recorded as a tracked change
+ *   - `view`    read-only; no input is accepted at all
+ *
+ * The mode is synced via Y.Map so all collaborators see the same
+ * document-wide mode; per-client `isOwner` decides who may flip it.
+ */
+export type EditorMode = "edit" | "suggest" | "view";
 
 export type ChangeType = "insert" | "delete";
 
@@ -325,10 +344,18 @@ type TrackChangesOptions = {
   authorColor: string;
   /** When provided, tracking-mode toggle syncs via ydoc.getMap("tc-meta"). */
   ydoc?: Y.Doc;
+  /**
+   * BL-9 Slice 5a — when false, accept/reject commands are refused and
+   * the client is forced to operate in `suggest` mode regardless of the
+   * doc-wide mode. Defaults to true to preserve pre-5a behaviour.
+   */
+  isOwner?: boolean;
 };
 
 type TrackChangesStorage = {
   trackingEnabled: boolean;
+  /** BL-9 Slice 5a — current document-wide editor mode. */
+  editorMode: EditorMode;
 };
 
 declare module "@tiptap/core" {
@@ -336,13 +363,18 @@ declare module "@tiptap/core" {
     TrackChanges: {
       /** Turn tracking mode on or off. Syncs to all collab peers when ydoc is set. */
       setTrackingMode: (enabled: boolean) => ReturnType;
-      /** Accept a specific change by its changeId. */
+      /**
+       * BL-9 Slice 5a — set the document-wide editor mode. Owners only;
+       * non-owner clients refuse this command and stay in suggest mode.
+       */
+      setEditorMode: (mode: EditorMode) => ReturnType;
+      /** Accept a specific change by its changeId. Owners only. */
       acceptChange: (id: string) => ReturnType;
-      /** Reject a specific change by its changeId. */
+      /** Reject a specific change by its changeId. Owners only. */
       rejectChange: (id: string) => ReturnType;
-      /** Accept every pending change in one transaction. */
+      /** Accept every pending change in one transaction. Owners only. */
       acceptAllChanges: () => ReturnType;
-      /** Reject every pending change in one transaction. */
+      /** Reject every pending change in one transaction. Owners only. */
       rejectAllChanges: () => ReturnType;
     };
   }
@@ -360,32 +392,67 @@ export const TrackChanges = Extension.create<
       authorName: "",
       authorColor: "#888",
       ydoc: undefined,
+      isOwner: true,
     };
   },
 
   addStorage() {
-    return { trackingEnabled: false };
+    return { trackingEnabled: false, editorMode: "edit" as EditorMode };
   },
 
   onCreate() {
     const ydoc = this.options.ydoc;
-    if (!ydoc) return;
-
-    const meta = ydoc.getMap<boolean>("tc-meta");
-    const current = meta.get("trackingEnabled");
-    if (typeof current === "boolean") {
-      this.storage.trackingEnabled = current;
+    // Non-owner clients always render in suggest mode regardless of the
+    // doc-wide setting; force the local view + tracking flag.
+    if (!this.options.isOwner) {
+      this.storage.editorMode = "suggest";
+      this.storage.trackingEnabled = true;
+    }
+    if (!ydoc) {
+      this.editor.setEditable(this.storage.editorMode !== "view");
+      return;
     }
 
-    // Keep local storage in sync when a remote peer toggles tracking.
+    const meta = ydoc.getMap<unknown>("tc-meta");
+
+    // Hydrate from the Y.Map. The legacy `trackingEnabled` boolean
+    // remains the source of truth when no explicit `editorMode` has
+    // been written yet (single migration path: turn it on → suggest).
+    const rawMode = meta.get("editorMode");
+    if (rawMode === "edit" || rawMode === "suggest" || rawMode === "view") {
+      this.storage.editorMode = rawMode;
+    } else {
+      const legacy = meta.get("trackingEnabled");
+      this.storage.editorMode =
+        typeof legacy === "boolean" && legacy ? "suggest" : "edit";
+    }
+    if (!this.options.isOwner) {
+      this.storage.editorMode = this.storage.editorMode === "view" ? "view" : "suggest";
+    }
+    this.storage.trackingEnabled = this.storage.editorMode === "suggest";
+    this.editor.setEditable(this.storage.editorMode !== "view");
+
+    // Keep local storage in sync when a remote peer flips the mode.
     meta.observe(() => {
-      const v = meta.get("trackingEnabled");
-      if (typeof v === "boolean" && this.storage.trackingEnabled !== v) {
-        this.storage.trackingEnabled = v;
-        this.editor.view.dispatch(
-          this.editor.state.tr.setMeta("tc-sync", v),
-        );
-      }
+      const next = meta.get("editorMode");
+      const docMode: EditorMode =
+        next === "edit" || next === "suggest" || next === "view"
+          ? next
+          : meta.get("trackingEnabled") === true
+            ? "suggest"
+            : "edit";
+      const effective: EditorMode = this.options.isOwner
+        ? docMode
+        : docMode === "view"
+          ? "view"
+          : "suggest";
+      if (this.storage.editorMode === effective) return;
+      this.storage.editorMode = effective;
+      this.storage.trackingEnabled = effective === "suggest";
+      this.editor.setEditable(effective !== "view");
+      this.editor.view.dispatch(
+        this.editor.state.tr.setMeta("tc-sync", effective),
+      );
     });
   },
 
@@ -394,17 +461,47 @@ export const TrackChanges = Extension.create<
       setTrackingMode:
         (enabled) =>
         ({ editor }) => {
+          // Non-owners cannot flip the doc-wide mode; they stay in suggest.
+          if (!this.options.isOwner) return false;
+          const mode: EditorMode = enabled ? "suggest" : "edit";
           this.storage.trackingEnabled = enabled;
+          this.storage.editorMode = mode;
           const ydoc = this.options.ydoc;
-          if (ydoc) ydoc.getMap<boolean>("tc-meta").set("trackingEnabled", enabled);
-          // Force a transaction so plugins re-read the tracking state.
+          if (ydoc) {
+            const meta = ydoc.getMap<unknown>("tc-meta");
+            ydoc.transact(() => {
+              meta.set("trackingEnabled", enabled);
+              meta.set("editorMode", mode);
+            });
+          }
+          editor.setEditable(true);
           editor.view.dispatch(editor.state.tr.setMeta("tc-toggle", enabled));
+          return true;
+        },
+
+      setEditorMode:
+        (mode) =>
+        ({ editor }) => {
+          if (!this.options.isOwner) return false;
+          this.storage.editorMode = mode;
+          this.storage.trackingEnabled = mode === "suggest";
+          const ydoc = this.options.ydoc;
+          if (ydoc) {
+            const meta = ydoc.getMap<unknown>("tc-meta");
+            ydoc.transact(() => {
+              meta.set("editorMode", mode);
+              meta.set("trackingEnabled", mode === "suggest");
+            });
+          }
+          editor.setEditable(mode !== "view");
+          editor.view.dispatch(editor.state.tr.setMeta("tc-mode", mode));
           return true;
         },
 
       acceptChange:
         (id) =>
         ({ state, dispatch }) => {
+          if (!this.options.isOwner) return false;
           const changes = collectChanges(state);
           const change = changes.get(id);
           if (!change || !dispatch) return false;
@@ -434,6 +531,7 @@ export const TrackChanges = Extension.create<
       rejectChange:
         (id) =>
         ({ state, dispatch }) => {
+          if (!this.options.isOwner) return false;
           const changes = collectChanges(state);
           const change = changes.get(id);
           if (!change || !dispatch) return false;
@@ -463,6 +561,7 @@ export const TrackChanges = Extension.create<
       acceptAllChanges:
         () =>
         ({ state, dispatch }) => {
+          if (!this.options.isOwner) return false;
           const changes = collectChanges(state);
           if (changes.size === 0 || !dispatch) return false;
 
@@ -498,6 +597,7 @@ export const TrackChanges = Extension.create<
       rejectAllChanges:
         () =>
         ({ state, dispatch }) => {
+          if (!this.options.isOwner) return false;
           const changes = collectChanges(state);
           if (changes.size === 0 || !dispatch) return false;
 
