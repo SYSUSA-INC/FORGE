@@ -40,6 +40,7 @@ Effort key:
 | 16 | **BL-19 Phase 2** — Runtime cross-tenant isolation tests (Vitest harness + 2-tenant fixture + 10 isolation assertions + CI job) | P0 | M | ✅ shipped (PR #230) |
 | 17 | **BL-16 tests** — Runtime tests for subscription gates (ensureFeature / enforceQuota / refundQuota across 17 assertions) | P0 | S | ✅ shipped (PR #231) |
 | 18 | **BL-12 / BL-20 tests** — Runtime tests for audit-log helpers + auth-denied audit + per-tenant retention pruning | P0 | S | ✅ shipped (PR #232) |
+| 19 | **BL-15 Phase B-3b tests** — Runtime tests for assume-identity (start/end actions + getActiveImpersonationSession + cookie + audit) | P0 | S | ✅ shipped (PR #233) |
 | 20 | **BL-17 tests** — Runtime tests for Stripe webhook (signature, idempotency, dispatch, dunning email, error path) | P0 | S | ✅ shipped (PR #234) |
 | 21 | **BL-PACKAGES tests** — Runtime tests for `completeForTenant` token cap (pre-check, post-record, provider failure, unlimited tier, multi-tenant) | P0 | S | ✅ shipped (PR #235) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
