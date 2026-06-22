@@ -25,6 +25,7 @@ import {
 import { TrackChangesSidebar } from "./TrackChangesSidebar";
 import { CommentAnchor, Comments } from "./extensions/Comments";
 import { CommentsSidebar } from "./CommentsSidebar";
+import { SnapshotsSidebar } from "./SnapshotsSidebar";
 
 /**
  * BL-9 Slice 2 — when a `collab` config is supplied AND
@@ -85,6 +86,20 @@ export type CommentsConfig = {
   };
 };
 
+/**
+ * BL-9 Slice 5b — per-section version snapshots. When provided, the
+ * editor renders a Snapshots toolbar button + sidebar. `onRestored`
+ * fires after a successful restore so the caller can reload the doc
+ * from the parent (the editor itself doesn't know the new doc shape
+ * until the parent re-renders).
+ */
+export type SnapshotsConfig = {
+  proposalId: string;
+  sectionId: string;
+  isOwner?: boolean;
+  onRestored?: () => void;
+};
+
 type Props = {
   doc: TipTapDoc;
   onChange: (doc: TipTapDoc, plain: string, words: number) => void;
@@ -101,6 +116,8 @@ type Props = {
    * becomes available and the toolbar gains a "Track" toggle button.
    */
   trackChanges?: TrackChangesConfig;
+  /** Slice 5b — version snapshots toolbar button + sidebar. */
+  snapshots?: SnapshotsConfig;
   /**
    * When provided AND `collab` is also provided + enabled, activates
    * the Comments extension. Threads live on the shared Y.Doc.
@@ -120,6 +137,7 @@ export function RichSectionEditor({
   collab,
   trackChanges,
   comments,
+  snapshots,
 }: Props) {
   const useCollab = !!collab && collabEnabled();
   // Local toggle for track-changes sidebar visibility (independent of
@@ -133,6 +151,9 @@ export function RichSectionEditor({
   // "comment" button when there's a selection.
   const [draftComment, setDraftComment] = useState<string>("");
   const [composerOpen, setComposerOpen] = useState(false);
+  // BL-9 Slice 5b — snapshots sidebar visibility + reload key.
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false);
+  const [snapshotsReloadKey, setSnapshotsReloadKey] = useState(0);
 
   // Yjs doc + Hocuspocus provider live for the lifetime of the editor
   // instance. Stored in refs so React renders don't tear them down.
@@ -479,6 +500,24 @@ export function RichSectionEditor({
             />
           </>
         ) : null}
+        {/* BL-9 Slice 5b — Snapshots toggle (only when extension is configured) */}
+        {snapshots ? (
+          <>
+            <ToolbarDivider />
+            <button
+              type="button"
+              onClick={() => setSnapshotsOpen((v) => !v)}
+              title="Open / close snapshots panel"
+              className={`inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors ${
+                snapshotsOpen
+                  ? "bg-white/10 text-text"
+                  : "text-muted hover:bg-white/[0.06] hover:text-text"
+              }`}
+            >
+              snap ▾
+            </button>
+          </>
+        ) : null}
       </div>
       {/* Inline composer for new comment threads on the current selection */}
       {useComments && composerOpen ? (
@@ -547,6 +586,20 @@ export function RichSectionEditor({
           editor={editor}
           visible={tcSidebarOpen}
           isOwner={trackChanges.isOwner ?? true}
+        />
+      ) : null}
+      {/* BL-9 Slice 5b — Snapshots sidebar */}
+      {snapshots ? (
+        <SnapshotsSidebar
+          proposalId={snapshots.proposalId}
+          sectionId={snapshots.sectionId}
+          visible={snapshotsOpen}
+          isOwner={snapshots.isOwner ?? true}
+          reloadKey={snapshotsReloadKey}
+          onRestored={() => {
+            setSnapshotsReloadKey((k) => k + 1);
+            snapshots.onRestored?.();
+          }}
         />
       ) : null}
     </div>

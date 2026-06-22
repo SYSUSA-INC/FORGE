@@ -43,7 +43,8 @@ Effort key:
 | 19 | **BL-15 Phase B-3b tests** — Runtime tests for assume-identity (start/end actions + getActiveImpersonationSession + cookie + audit) | P0 | S | ✅ shipped (PR #233) |
 | 20 | **BL-17 tests** — Runtime tests for Stripe webhook (signature, idempotency, dispatch, dunning email, error path) | P0 | S | ✅ shipped (PR #234) |
 | 21 | **BL-PACKAGES tests** — Runtime tests for `completeForTenant` token cap (pre-check, post-record, provider failure, unlimited tier, multi-tenant) | P0 | S | ✅ shipped (PR #235) |
-| 22 | **BL-9 Slice 5a** — Suggestion mode + view mode (3-mode picker in toolbar, owner-gated accept/reject, non-owner forced to suggest) | P1 | M | 🟡 in-flight |
+| 22 | **BL-9 Slice 5a** — Suggestion mode + view mode (3-mode picker in toolbar, owner-gated accept/reject, non-owner forced to suggest) | P1 | M | ✅ shipped (PR #236) |
+| 23 | **BL-9 Slice 5b** — Version snapshots (per-section snapshot table, manual + auto-stage-transition triggers, restore + delete, sidebar UI) | P1 | M | 🟡 in-flight |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -344,7 +345,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4 shipped; 2c operator-pending; Slice 5a in-flight (PR pending), 5b/5c next
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a shipped; 2c operator-pending; Slice 5b in-flight, 5c next
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -422,7 +423,19 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     section's assigned `authorUserId` (ownerless sections fall
     back to owner-mode for the current user to avoid locking out
     single-author drafts).
-  - Slice 5b — Version snapshots (pending).
+  - **Slice 5b — Version snapshots** (in-flight): new
+    `proposal_section_snapshot` table (org-scoped) holding a
+    point-in-time copy of `body_doc`, the word count, the author's
+    name (denormalized so deleted users still attribute correctly),
+    and the snapshot `kind` — `manual` for the toolbar button or
+    `auto` for stage-transition checkpoints captured automatically
+    by `saveSectionAction` when the section's status crosses a
+    milestone. Restoring a snapshot first auto-snapshots the
+    CURRENT body_doc with a "before restore" label so every
+    restore is reversible. The sidebar lists snapshots newest-first
+    with restore + delete buttons (owner-only); non-owners see the
+    list read-only. Each create / restore / delete writes an audit
+    row.
   - Slice 5c — Diff viewer (pending).
 - **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
 - **Slice 7** — Brain feedback loop: every accepted/rejected change

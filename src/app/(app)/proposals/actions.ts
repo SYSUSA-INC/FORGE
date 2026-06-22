@@ -7,6 +7,7 @@ import {
   memberships,
   opportunities,
   proposalSections,
+  proposalSectionSnapshots,
   proposalTemplates,
   proposals,
   users,
@@ -14,6 +15,7 @@ import {
   type ProposalSectionStatus,
   type ProposalStage,
   type TemplateSectionSeed,
+  type TipTapDoc,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
@@ -408,13 +410,42 @@ export async function saveSectionAction(input: {
   pageLimit?: number | null;
   authorUserId?: string | null;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(input.proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
 
   try {
+    // BL-9 Slice 5b — when status crosses a meaningful milestone we
+    // snapshot the body_doc as it stood BEFORE the transition so each
+    // stage has a recoverable checkpoint. Read the prior state up-front
+    // to avoid a race with the UPDATE below.
+    let snapshotBody: TipTapDoc | null = null;
+    let snapshotStage: ProposalSectionStatus | null = null;
+    let snapshotWordCount = 0;
+    if (input.status !== undefined) {
+      const [prior] = await db
+        .select({
+          status: proposalSections.status,
+          bodyDoc: proposalSections.bodyDoc,
+          wordCount: proposalSections.wordCount,
+        })
+        .from(proposalSections)
+        .where(
+          and(
+            eq(proposalSections.id, input.sectionId),
+            eq(proposalSections.proposalId, input.proposalId),
+          ),
+        )
+        .limit(1);
+      if (prior && prior.status !== input.status) {
+        snapshotBody = prior.bodyDoc;
+        snapshotStage = prior.status;
+        snapshotWordCount = prior.wordCount;
+      }
+    }
+
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (input.title !== undefined) update.title = input.title.trim();
     if (input.bodyDoc !== undefined) {
@@ -441,6 +472,26 @@ export async function saveSectionAction(input: {
           eq(proposalSections.proposalId, input.proposalId),
         ),
       );
+
+    if (snapshotBody && snapshotStage && input.status) {
+      // Best-effort: a failure here MUST NOT block the save itself.
+      try {
+        await db.insert(proposalSectionSnapshots).values({
+          organizationId,
+          proposalSectionId: input.sectionId,
+          proposalId: input.proposalId,
+          kind: "auto",
+          label: `stage ${snapshotStage} → ${input.status}`,
+          bodyDoc: snapshotBody,
+          wordCount: snapshotWordCount,
+          createdByUserId: actor.id,
+          createdByNameSnapshot: actor.name ?? actor.email ?? "",
+        });
+      } catch (err) {
+        log.warn("[saveSectionAction]", "auto-snapshot failed", { error: err });
+      }
+    }
+
     revalidatePath(`/proposals/${input.proposalId}/sections`);
     revalidatePath(`/proposals/${input.proposalId}`);
     return { ok: true };

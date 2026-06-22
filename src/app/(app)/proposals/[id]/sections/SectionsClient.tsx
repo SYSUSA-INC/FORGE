@@ -18,6 +18,7 @@ import {
   RichSectionEditor,
   type CollabConfig,
   type CommentsConfig,
+  type SnapshotsConfig,
   type TrackChangesConfig,
 } from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
@@ -132,6 +133,28 @@ function buildCommentsConfig(user: CurrentUser): CommentsConfig {
       id: user.id,
       name: user.displayName,
     },
+  };
+}
+
+/**
+ * BL-9 Slice 5b — snapshots config for the editor.
+ * The owner mirror of `buildTrackChangesConfig` — anyone can take a
+ * snapshot, but only the section author (or an ownerless section)
+ * can restore or delete one. `onRestored` is filled in by the row
+ * itself so it can pull the freshly-restored doc back from the DB.
+ */
+function buildSnapshotsConfig(opts: {
+  proposalId: string;
+  sectionId: string;
+  currentUser: CurrentUser;
+  authorUserId: string | null;
+  onRestored: () => void;
+}): SnapshotsConfig {
+  return {
+    proposalId: opts.proposalId,
+    sectionId: opts.sectionId,
+    isOwner: opts.authorUserId === null || opts.authorUserId === opts.currentUser.id,
+    onRestored: opts.onRestored,
   };
 }
 
@@ -279,6 +302,16 @@ function SectionRow({
   // BL-9 Slice 4 — comments config (activates only when collab is on).
   const comments = buildCommentsConfig(currentUser);
   const router = useRouter();
+  // BL-9 Slice 5b — snapshots config. The restore path mutates the
+  // section's body_doc server-side, so a successful restore triggers
+  // a router.refresh() to re-fetch fresh server data into the editor.
+  const snapshots = buildSnapshotsConfig({
+    proposalId,
+    sectionId: section.id,
+    currentUser,
+    authorUserId: section.authorUserId,
+    onRestored: () => router.refresh(),
+  });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -475,6 +508,7 @@ function SectionRow({
               collab={collab}
               trackChanges={trackChanges}
               comments={comments}
+              snapshots={snapshots}
             />
             <input type="hidden" value={plainContent} readOnly />
           </div>
