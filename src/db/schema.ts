@@ -2730,3 +2730,53 @@ export type SuperadminImpersonationSession =
   typeof superadminImpersonationSessions.$inferSelect;
 export type NewSuperadminImpersonationSession =
   typeof superadminImpersonationSessions.$inferInsert;
+
+/**
+ * BL-15 Phase B-3c — runtime isolation check results.
+ *
+ * Each row records the outcome of a superadmin-triggered probe that
+ * verifies a tenant's data is still isolated from the rest of the
+ * database. `details` is a per-table JSON array; `total / passed /
+ * failed / skipped` summarise the run. A failed row is a real
+ * security finding — the operator should investigate immediately.
+ */
+export type IsolationCheckProbeDetail = {
+  table: string;
+  status: "pass" | "fail" | "skipped";
+  attackerOrganizationId?: string;
+  attackerRowIdsSampled?: number;
+  rowsLeaked?: number;
+  reason?: string;
+};
+
+export const isolationCheckResults = pgTable(
+  "isolation_check_result",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    triggeredByUserId: text("triggered_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    triggeredAt: timestamp("triggered_at").notNull().defaultNow(),
+    totalChecks: integer("total_checks").notNull().default(0),
+    passedChecks: integer("passed_checks").notNull().default(0),
+    failedChecks: integer("failed_checks").notNull().default(0),
+    skippedChecks: integer("skipped_checks").notNull().default(0),
+    details: jsonb("details")
+      .$type<IsolationCheckProbeDetail[]>()
+      .notNull()
+      .default([]),
+    notes: text("notes").notNull().default(""),
+  },
+  (t) => ({
+    orgIdIdx: index("isolation_check_result_org_id_idx").on(
+      t.organizationId,
+      t.triggeredAt,
+    ),
+  }),
+);
+
+export type IsolationCheckResult = typeof isolationCheckResults.$inferSelect;
+export type NewIsolationCheckResult = typeof isolationCheckResults.$inferInsert;

@@ -21,6 +21,7 @@ import { TierAssignmentForm } from "./TierAssignmentForm";
 import { TransferOwnershipForm } from "./TransferOwnershipForm";
 import { EnterpriseInvoiceForm } from "./EnterpriseInvoiceForm";
 import { StartImpersonationForm } from "./StartImpersonationForm";
+import { IsolationCheckPanel } from "./IsolationCheckPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -419,6 +420,11 @@ export default async function TenantDetailPage({
               View full audit log for this tenant →
             </Link>
           </div>
+        </Panel>
+
+        {/* BL-15 Phase B-3c — runtime cross-tenant isolation probe */}
+        <Panel title="Isolation status">
+          <IsolationCheckPanel organizationId={org.id} />
         </Panel>
       </div>
     </>
