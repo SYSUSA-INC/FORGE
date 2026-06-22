@@ -2,7 +2,11 @@
 
 import { useReducer, useEffect } from "react";
 import type { Editor } from "@tiptap/core";
-import { getPendingChanges, type PendingChange } from "./extensions/TrackChanges";
+import {
+  getPendingChanges,
+  type EditorMode,
+  type PendingChange,
+} from "./extensions/TrackChanges";
 
 /**
  * BL-9 Slice 3 — sidebar panel for reviewing pending tracked changes.
@@ -13,15 +17,21 @@ import { getPendingChanges, type PendingChange } from "./extensions/TrackChanges
  * pending.
  *
  * Re-renders on every editor transaction so the list stays current.
+ *
+ * BL-9 Slice 5a — `isOwner` controls whether Accept / Reject controls
+ * are shown. Non-owners see the change list (so they can see what
+ * they've contributed) but cannot resolve changes.
  */
 
 type Props = {
   editor: Editor | null;
   /** Show/hide the panel regardless of pending-change count. */
   visible: boolean;
+  /** Slice 5a — non-owners see a read-only list (no accept/reject). */
+  isOwner?: boolean;
 };
 
-export function TrackChangesSidebar({ editor, visible }: Props) {
+export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) {
   // Subscribe to editor transactions so the list stays live.
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
   useEffect(() => {
@@ -36,8 +46,10 @@ export function TrackChangesSidebar({ editor, visible }: Props) {
 
   const changes = getPendingChanges(editor.state);
   const tcStorage = (editor.storage as unknown as Record<string, unknown>)
-    .TrackChanges as { trackingEnabled: boolean } | undefined;
-  const trackingEnabled: boolean = tcStorage?.trackingEnabled ?? false;
+    .TrackChanges as
+    | { trackingEnabled: boolean; editorMode: EditorMode }
+    | undefined;
+  const mode: EditorMode = tcStorage?.editorMode ?? "edit";
 
   function accept(id: string) {
     editor?.commands.acceptChange(id);
@@ -63,27 +75,15 @@ export function TrackChangesSidebar({ editor, visible }: Props) {
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
             Track changes
           </span>
-          <span
-            className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
-            style={
-              trackingEnabled
-                ? {
-                    background: "rgba(251, 191, 36, 0.12)",
-                    border: "1px solid rgba(251, 191, 36, 0.35)",
-                    color: "#FBBF24",
-                  }
-                : {
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.10)",
-                    color: "#6B7280",
-                  }
-            }
-          >
-            {trackingEnabled ? "recording" : "paused"}
-          </span>
+          <ModeBadge mode={mode} />
+          {!isOwner && (
+            <span className="font-mono text-[9px] uppercase tracking-wider text-subtle">
+              · read-only
+            </span>
+          )}
         </div>
 
-        {changes.length > 1 && (
+        {isOwner && changes.length > 1 && (
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -106,14 +106,24 @@ export function TrackChangesSidebar({ editor, visible }: Props) {
       {/* Change list */}
       {changes.length === 0 ? (
         <p className="font-mono text-[11px] text-muted">
-          {trackingEnabled
+          {mode === "suggest"
             ? "No pending changes — start editing to record suggestions."
-            : "Turn on recording to track changes made by contributors."}
+            : mode === "view"
+              ? "Document is in view mode — no edits accepted."
+              : isOwner
+                ? "Switch to Suggest mode to record changes from contributors."
+                : "No pending changes."}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {changes.map((c) => (
-            <ChangeRow key={c.id} change={c} onAccept={accept} onReject={reject} />
+            <ChangeRow
+              key={c.id}
+              change={c}
+              canResolve={isOwner}
+              onAccept={accept}
+              onReject={reject}
+            />
           ))}
         </ul>
       )}
@@ -121,12 +131,42 @@ export function TrackChangesSidebar({ editor, visible }: Props) {
   );
 }
 
+function ModeBadge({ mode }: { mode: EditorMode }) {
+  const STYLE: Record<EditorMode, React.CSSProperties> = {
+    edit: {
+      background: "rgba(74, 222, 128, 0.12)",
+      border: "1px solid rgba(74, 222, 128, 0.35)",
+      color: "#4ADE80",
+    },
+    suggest: {
+      background: "rgba(251, 191, 36, 0.12)",
+      border: "1px solid rgba(251, 191, 36, 0.35)",
+      color: "#FBBF24",
+    },
+    view: {
+      background: "rgba(148, 163, 184, 0.12)",
+      border: "1px solid rgba(148, 163, 184, 0.35)",
+      color: "#94A3B8",
+    },
+  };
+  return (
+    <span
+      className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+      style={STYLE[mode]}
+    >
+      {mode}
+    </span>
+  );
+}
+
 function ChangeRow({
   change,
+  canResolve,
   onAccept,
   onReject,
 }: {
   change: PendingChange;
+  canResolve: boolean;
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
 }) {
@@ -166,24 +206,26 @@ function ChangeRow({
           </span>
           <span className="font-mono text-[9px] text-subtle">{timeAgo}</span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onAccept(change.id)}
-            title="Accept this change"
-            className="rounded border border-emerald/30 bg-emerald/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald hover:bg-emerald/20 transition-colors"
-          >
-            ✓
-          </button>
-          <button
-            type="button"
-            onClick={() => onReject(change.id)}
-            title="Reject this change"
-            className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
+        {canResolve && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onAccept(change.id)}
+              title="Accept this change"
+              className="rounded border border-emerald/30 bg-emerald/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald hover:bg-emerald/20 transition-colors"
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              onClick={() => onReject(change.id)}
+              title="Reject this change"
+              className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
       {preview && (
         <p

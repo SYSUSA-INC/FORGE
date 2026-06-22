@@ -98,14 +98,25 @@ function buildCollabConfig(
  * BL-9 Slice 3 — track changes author config for the current user.
  * Always provided so the editor has track-changes capability in both
  * collab and single-user modes.
+ *
+ * BL-9 Slice 5a — `isOwner` controls whether this user can flip the
+ * editor mode, accept/reject changes, or only suggest. Section author
+ * counts as the owner of their section; everyone else suggests.
+ * When no author has been assigned the section is treated as ownerless,
+ * so the current user gets the full picker (most common for new
+ * single-author sections that haven't been re-assigned yet).
  */
-function buildTrackChangesConfig(user: CurrentUser): TrackChangesConfig {
+function buildTrackChangesConfig(
+  user: CurrentUser,
+  authorUserId: string | null,
+): TrackChangesConfig {
   return {
     author: {
       id: user.id,
       name: user.displayName,
       color: pickColorForUser(user.id),
     },
+    isOwner: authorUserId === null || authorUserId === user.id,
   };
 }
 
@@ -263,7 +274,8 @@ function SectionRow({
   // stable for this row's lifetime, so referential identity stays put.
   const collab = buildCollabConfig(section.id, currentUser);
   // BL-9 Slice 3 — track changes config (always provided).
-  const trackChanges = buildTrackChangesConfig(currentUser);
+  // Slice 5a — section author is the owner; non-authors can only suggest.
+  const trackChanges = buildTrackChangesConfig(currentUser, section.authorUserId);
   // BL-9 Slice 4 — comments config (activates only when collab is on).
   const comments = buildCommentsConfig(currentUser);
   const router = useRouter();
