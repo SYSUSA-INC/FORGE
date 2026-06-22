@@ -42,6 +42,7 @@ Effort key:
 | 18 | **BL-12 / BL-20 tests** — Runtime tests for audit-log helpers + auth-denied audit + per-tenant retention pruning | P0 | S | ✅ shipped (PR #232) |
 | 19 | **BL-15 Phase B-3b tests** — Runtime tests for assume-identity (start/end actions + getActiveImpersonationSession + cookie + audit) | P0 | S | ✅ shipped (PR #233) |
 | 20 | **BL-17 tests** — Runtime tests for Stripe webhook (signature, idempotency, dispatch, dunning email, error path) | P0 | S | ✅ shipped (PR #234) |
+| 21 | **BL-PACKAGES tests** — Runtime tests for `completeForTenant` token cap (pre-check, post-record, provider failure, unlimited tier, multi-tenant) | P0 | S | ✅ shipped (PR #235) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
