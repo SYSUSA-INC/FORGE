@@ -41,6 +41,7 @@
     "@tiptap/starter-kit": "^3.26.1",
     "@tiptap/y-tiptap": "^3.0.5",
     "bcryptjs": "^3.0.3",
+    "diff": "^7.0.0",
     "docxtemplater": "^3.68.6",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
@@ -65,6 +66,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/diff": "^7.0.2",
     "@types/node": "^20.14.11",
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.20.0",

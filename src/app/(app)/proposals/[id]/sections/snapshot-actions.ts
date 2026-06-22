@@ -177,6 +177,69 @@ export async function listSectionSnapshotsAction(input: {
   return { ok: true, snapshots };
 }
 
+/**
+ * BL-9 Slice 5c — fetch a single snapshot's full body for the diff
+ * viewer. The list action above drops body_doc to keep payloads
+ * small; this action returns it for exactly one snapshot at a time.
+ */
+export async function getSectionSnapshotBodyAction(input: {
+  proposalId: string;
+  sectionId: string;
+  snapshotId: string;
+}): Promise<
+  | {
+      ok: true;
+      bodyDoc: TipTapDoc;
+      meta: SectionSnapshotSummary;
+    }
+  | { ok: false; error: string }
+> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const section = await loadOwnedSection({
+    proposalId: input.proposalId,
+    sectionId: input.sectionId,
+    organizationId,
+  });
+  if (!section) return { ok: false, error: "Section not found." };
+
+  const [row] = await db
+    .select({
+      id: proposalSectionSnapshots.id,
+      kind: proposalSectionSnapshots.kind,
+      label: proposalSectionSnapshots.label,
+      bodyDoc: proposalSectionSnapshots.bodyDoc,
+      wordCount: proposalSectionSnapshots.wordCount,
+      createdAt: proposalSectionSnapshots.createdAt,
+      createdByUserId: proposalSectionSnapshots.createdByUserId,
+      createdByNameSnapshot: proposalSectionSnapshots.createdByNameSnapshot,
+    })
+    .from(proposalSectionSnapshots)
+    .where(
+      and(
+        eq(proposalSectionSnapshots.id, input.snapshotId),
+        eq(proposalSectionSnapshots.proposalSectionId, section.id),
+        eq(proposalSectionSnapshots.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!row) return { ok: false, error: "Snapshot not found." };
+
+  return {
+    ok: true,
+    bodyDoc: row.bodyDoc,
+    meta: {
+      id: row.id,
+      kind: (row.kind === "auto" ? "auto" : "manual") as ProposalSectionSnapshotKind,
+      label: row.label,
+      wordCount: row.wordCount,
+      createdAt: row.createdAt.toISOString(),
+      createdByUserId: row.createdByUserId,
+      createdByName: row.createdByNameSnapshot,
+    },
+  };
+}
+
 export async function restoreSectionSnapshotAction(input: {
   proposalId: string;
   sectionId: string;

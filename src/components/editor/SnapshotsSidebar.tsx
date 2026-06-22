@@ -9,12 +9,17 @@
  * user. Owners can restore (which itself snapshots first, so the
  * restore is reversible) or delete; non-owners see a read-only list.
  *
+ * BL-9 Slice 5c — each snapshot row now exposes a "Diff" button
+ * that opens an inline modal comparing the snapshot's projected
+ * plain text against the section's current body.
+ *
  * The component is intentionally form-driven rather than chatty —
  * the server actions write audit rows, so each restore / delete /
  * create is already accountable.
  */
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import type { TipTapDoc } from "@/db/schema";
 import {
   createSectionSnapshotAction,
   deleteSectionSnapshotAction,
@@ -22,12 +27,15 @@ import {
   restoreSectionSnapshotAction,
   type SectionSnapshotSummary,
 } from "@/app/(app)/proposals/[id]/sections/snapshot-actions";
+import { SnapshotDiffViewer } from "./SnapshotDiffViewer";
 
 type Props = {
   proposalId: string;
   sectionId: string;
   visible: boolean;
   isOwner?: boolean;
+  /** Live section body fed into the diff viewer as the "to" side. */
+  currentBodyDoc: TipTapDoc;
   /** Bumped by the parent after a save to force a fresh fetch. */
   reloadKey?: number;
   /** Fired after a successful restore so the parent can re-render the editor. */
@@ -41,11 +49,13 @@ export function SnapshotsSidebar({
   isOwner = true,
   reloadKey = 0,
   onRestored,
+  currentBodyDoc,
 }: Props) {
   const [snapshots, setSnapshots] = useState<SectionSnapshotSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [label, setLabel] = useState("");
+  const [diffOpen, setDiffOpen] = useState<SectionSnapshotSummary | null>(null);
   const [pending, startTransition] = useTransition();
 
   const load = useCallback(async () => {
@@ -177,9 +187,20 @@ export function SnapshotsSidebar({
               canResolve={isOwner}
               onRestore={() => restore(s.id)}
               onDelete={() => remove(s.id)}
+              onDiff={() => setDiffOpen(s)}
             />
           ))}
         </ul>
+      )}
+      {diffOpen && (
+        <SnapshotDiffViewer
+          proposalId={proposalId}
+          sectionId={sectionId}
+          snapshotId={diffOpen.id}
+          snapshotMeta={diffOpen}
+          currentBodyDoc={currentBodyDoc}
+          onClose={() => setDiffOpen(null)}
+        />
       )}
     </div>
   );
@@ -190,11 +211,13 @@ function SnapshotRow({
   canResolve,
   onRestore,
   onDelete,
+  onDiff,
 }: {
   snapshot: SectionSnapshotSummary;
   canResolve: boolean;
   onRestore: () => void;
   onDelete: () => void;
+  onDiff: () => void;
 }) {
   const isAuto = snapshot.kind === "auto";
   const created = formatTimeAgo(new Date(snapshot.createdAt).getTime());
@@ -226,26 +249,36 @@ function SnapshotRow({
             {snapshot.label || (isAuto ? "checkpoint" : "manual snapshot")}
           </span>
         </div>
-        {canResolve && (
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={onRestore}
-              title="Restore this snapshot (current text saved first)"
-              className="rounded border border-teal/30 bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-teal hover:bg-teal/20 transition-colors"
-            >
-              Restore
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              title="Delete this snapshot"
-              className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onDiff}
+            title="Compare this snapshot to the current text"
+            className="rounded border border-violet/30 bg-violet/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-violet hover:bg-violet/20 transition-colors"
+          >
+            Diff
+          </button>
+          {canResolve && (
+            <>
+              <button
+                type="button"
+                onClick={onRestore}
+                title="Restore this snapshot (current text saved first)"
+                className="rounded border border-teal/30 bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-teal hover:bg-teal/20 transition-colors"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                title="Delete this snapshot"
+                className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
+              >
+                ✕
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-1.5 font-mono text-[9px] text-subtle">
         <span>{author}</span>
