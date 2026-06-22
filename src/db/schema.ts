@@ -511,6 +511,57 @@ export const proposalSections = pgTable("proposal_section", {
   proposalIdIdx: index("proposal_section_proposal_id_idx").on(t.proposalId),
 }));
 
+/**
+ * BL-9 Slice 5b — version snapshots of proposal sections.
+ *
+ * Each snapshot captures the projected ProseMirror JSON (body_doc) at
+ * a point in time. `kind` is `'manual'` for user-triggered snapshots
+ * (toolbar button) or `'auto'` for stage-transition checkpoints. The
+ * author's name is denormalized into `created_by_name_snapshot` so a
+ * later display can show the author even after the user is removed.
+ *
+ * `organization_id` is denormalized from the proposal so the static
+ * isolation checker auto-registers this table and per-tenant queries
+ * stay one-hop.
+ */
+export const proposalSectionSnapshots = pgTable(
+  "proposal_section_snapshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalSectionId: uuid("proposal_section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().default("manual"),
+    label: text("label").notNull().default(""),
+    bodyDoc: jsonb("body_doc")
+      .$type<TipTapDoc>()
+      .notNull()
+      .default({ type: "doc", content: [] }),
+    wordCount: integer("word_count").notNull().default(0),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdByNameSnapshot: text("created_by_name_snapshot").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    sectionIdIdx: index("proposal_section_snapshot_section_id_idx").on(
+      t.proposalSectionId,
+      t.createdAt,
+    ),
+    orgIdIdx: index("proposal_section_snapshot_org_id_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
 export type TipTapDoc = {
   type: "doc";
   content: TipTapNode[];
@@ -532,6 +583,11 @@ export type ProposalSectionKind =
   (typeof proposalSectionKindEnum.enumValues)[number];
 export type ProposalSectionStatus =
   (typeof proposalSectionStatusEnum.enumValues)[number];
+export type ProposalSectionSnapshot =
+  typeof proposalSectionSnapshots.$inferSelect;
+export type NewProposalSectionSnapshot =
+  typeof proposalSectionSnapshots.$inferInsert;
+export type ProposalSectionSnapshotKind = "manual" | "auto";
 
 export const companyRelationshipEnum = pgEnum("company_relationship", [
   "customer",
