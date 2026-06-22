@@ -596,6 +596,7 @@ export function RichSectionEditor({
           visible={snapshotsOpen}
           isOwner={snapshots.isOwner ?? true}
           reloadKey={snapshotsReloadKey}
+          currentBodyDoc={doc}
           onRestored={() => {
             setSnapshotsReloadKey((k) => k + 1);
             snapshots.onRestored?.();
