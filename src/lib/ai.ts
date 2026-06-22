@@ -437,6 +437,16 @@ export async function complete(opts: AICompleteOptions): Promise<AICompleteResul
   return getAIProvider().complete(opts);
 }
 
+// Test seam: in production this is exactly `complete`. Tests that want
+// to control the provider's return shape without setting up real API
+// keys can swap this via __setCompleteImplForTest. Internal callers
+// (completeForTenant) call through this indirection so the swap takes
+// effect — vi.mock cannot reach in-module references to `complete`.
+let _completeImpl: typeof complete = complete;
+export function __setCompleteImplForTest(fn: typeof complete | null): void {
+  _completeImpl = fn ?? complete;
+}
+
 /**
  * BL-PACKAGES Slice 1 — tenant-gated AI completion.
  *
@@ -508,7 +518,7 @@ export async function completeForTenant(
     }
   }
 
-  const result = await complete(rest);
+  const result = await _completeImpl(rest);
 
   // Post-record: atomically add this call's actual token usage. The
   // helper itself throws `QuotaExceededError` if the new total exceeds

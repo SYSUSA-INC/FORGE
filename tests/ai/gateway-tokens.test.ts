@@ -25,7 +25,6 @@ import {
   describe,
   expect,
   it,
-  vi,
 } from "vitest";
 import { db } from "@/db";
 import {
@@ -108,6 +107,16 @@ async function createTierAndSubscribe(opts: {
 }
 
 // ── AI provider mock ───────────────────────────────────────────────────
+//
+// vi.mock("@/lib/ai") can't intercept the in-module call to `complete`
+// from `completeForTenant` (ESM closure binding, not export lookup).
+// Production exposes a test seam `__setCompleteImplForTest` that swaps
+// the function `completeForTenant` calls internally.
+
+import {
+  completeForTenant,
+  __setCompleteImplForTest,
+} from "@/lib/ai";
 
 // Configured per test: what tokens to return + whether to throw.
 let nextProviderResult: {
@@ -118,16 +127,16 @@ let nextProviderResult: {
 let providerCallCount = 0;
 let providerShouldThrow: Error | null = null;
 
-vi.mock("@/lib/ai", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/ai")>(
-    "@/lib/ai",
-  );
-  // Replace just the inner `complete` so completeForTenant's pre-check
-  // and post-record run real-DB. The post-record path uses
-  // result.inputTokens + result.outputTokens, which we control.
-  return {
-    ...actual,
-    complete: async () => {
+describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
+  let fx: TwoTenantFixture;
+  let cleanupTier: () => Promise<void> = async () => {};
+
+  beforeEach(async () => {
+    fx = await createTwoTenants("ai-gateway");
+    providerCallCount = 0;
+    providerShouldThrow = null;
+    nextProviderResult = { text: "ok", inputTokens: 10, outputTokens: 20 };
+    __setCompleteImplForTest(async () => {
       providerCallCount += 1;
       if (providerShouldThrow) throw providerShouldThrow;
       return {
@@ -138,25 +147,11 @@ vi.mock("@/lib/ai", async () => {
         outputTokens: nextProviderResult.outputTokens,
         stubbed: false,
       };
-    },
-  };
-});
-
-// Import under test after mock declaration.
-import { completeForTenant } from "@/lib/ai";
-
-describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
-  let fx: TwoTenantFixture;
-  let cleanupTier: () => Promise<void> = async () => {};
-
-  beforeEach(async () => {
-    fx = await createTwoTenants("ai-gateway");
-    providerCallCount = 0;
-    providerShouldThrow = null;
-    nextProviderResult = { text: "ok", inputTokens: 10, outputTokens: 20 };
+    });
   });
 
   afterEach(async () => {
+    __setCompleteImplForTest(null);
     await cleanupTier();
     await fx.cleanup();
   });
