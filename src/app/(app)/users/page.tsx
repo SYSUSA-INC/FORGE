@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { allowlist, memberships, users } from "@/db/schema";
+import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { getMembersSummary } from "@/lib/settings-status";
 import { UsersClient } from "./UsersClient";
@@ -12,7 +12,7 @@ export default async function UsersPage() {
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
-  const [memberRows, inviteRows, summary] = await Promise.all([
+  const [memberRows, inviteRows, summary, orgRow] = await Promise.all([
     db
       .select({
         userId: users.id,
@@ -49,6 +49,11 @@ export default async function UsersPage() {
       )
       .orderBy(desc(allowlist.invitedAt)),
     getMembersSummary(organizationId),
+    db
+      .select({ itarRestricted: organizations.itarRestricted })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1),
   ]);
 
   const pending = inviteRows.filter((i) => !i.consumedAt);
@@ -75,6 +80,7 @@ export default async function UsersPage() {
         title: i.title,
         invitedAt: i.invitedAt.toISOString(),
       }))}
+      itarRestricted={orgRow[0]?.itarRestricted ?? false}
     />
   );
 }

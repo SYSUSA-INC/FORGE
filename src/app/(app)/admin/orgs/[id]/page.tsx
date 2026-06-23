@@ -22,6 +22,7 @@ import { TransferOwnershipForm } from "./TransferOwnershipForm";
 import { EnterpriseInvoiceForm } from "./EnterpriseInvoiceForm";
 import { StartImpersonationForm } from "./StartImpersonationForm";
 import { IsolationCheckPanel } from "./IsolationCheckPanel";
+import { ItarRestrictedToggle } from "./ItarRestrictedToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,7 @@ export default async function TenantDetailPage({
       createdAt: organizations.createdAt,
       disabledAt: organizations.disabledAt,
       primaryAdminUserId: organizations.primaryAdminUserId,
+      itarRestricted: organizations.itarRestricted,
     })
     .from(organizations)
     .where(eq(organizations.id, params.id))
@@ -425,6 +427,14 @@ export default async function TenantDetailPage({
         {/* BL-15 Phase B-3c — runtime cross-tenant isolation probe */}
         <Panel title="Isolation status">
           <IsolationCheckPanel organizationId={org.id} />
+        </Panel>
+
+        {/* BL-ITAR-TAG — ITAR-restricted flag (gates new invites) */}
+        <Panel title="Compliance">
+          <ItarRestrictedToggle
+            organizationId={org.id}
+            initialValue={org.itarRestricted}
+          />
         </Panel>
       </div>
     </>

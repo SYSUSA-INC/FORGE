@@ -85,11 +85,13 @@ export function UsersClient({
   summary,
   members,
   pendingInvites,
+  itarRestricted,
 }: {
   currentUserId: string;
   summary: MembersSummary;
   members: Member[];
   pendingInvites: PendingInvite[];
+  itarRestricted: boolean;
 }) {
   return (
     <>
@@ -104,7 +106,10 @@ export function UsersClient({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <InvitePanel className="xl:col-span-1" />
+        <InvitePanel
+          className="xl:col-span-1"
+          itarRestricted={itarRestricted}
+        />
         <PendingPanel
           className="xl:col-span-2"
           invites={pendingInvites}
@@ -174,11 +179,21 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
   );
 }
 
-function InvitePanel({ className }: { className?: string }) {
+function InvitePanel({
+  className,
+  itarRestricted,
+}: {
+  className?: string;
+  itarRestricted: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("viewer");
   const [title, setTitle] = useState("");
+  // BL-ITAR-TAG — when the tenant is ITAR-restricted the admin must
+  // attest the invitee is a US person. We send the value either way
+  // for forensic completeness; the server enforces the requirement.
+  const [attestUsPerson, setAttestUsPerson] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -188,7 +203,12 @@ function InvitePanel({ className }: { className?: string }) {
     setError(null);
     setSuccess(null);
     startTransition(async () => {
-      const res = await inviteUserAction({ email, role, title });
+      const res = await inviteUserAction({
+        email,
+        role,
+        title,
+        attestUsPerson,
+      });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -197,6 +217,7 @@ function InvitePanel({ className }: { className?: string }) {
       setEmail("");
       setTitle("");
       setRole("viewer");
+      setAttestUsPerson(false);
       router.refresh();
     });
   }
@@ -243,6 +264,23 @@ function InvitePanel({ className }: { className?: string }) {
             placeholder="Capture Manager"
           />
         </div>
+        {/* BL-ITAR-TAG — admin attestation required for ITAR-restricted orgs */}
+        {itarRestricted && (
+          <label className="flex items-start gap-2 rounded-md border border-rose/30 bg-rose/[0.04] px-3 py-2 font-mono text-[11px] text-text">
+            <input
+              type="checkbox"
+              checked={attestUsPerson}
+              onChange={(e) => setAttestUsPerson(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong className="text-rose">ITAR-restricted workspace.</strong>{" "}
+              I confirm this invitee is a US person (citizen, permanent resident,
+              or protected individual under 8 U.S.C. § 1324b(a)(3)) and that
+              this attestation is recorded with my user id + timestamp.
+            </span>
+          </label>
+        )}
         {error ? (
           <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
             {error}

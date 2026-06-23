@@ -48,7 +48,8 @@ Effort key:
 | 24 | **BL-9 Slice 5c** — Snapshot diff viewer (per-row Diff button → modal showing word-level diff vs. current via jsdiff) | P1 | M | ✅ shipped (PR #238) |
 | 25 | **BL-15 Phase B-3c** — Runtime isolation status check (per-tenant probe runner + result table + admin UI) | P0 | S | ✅ shipped (PR #239) |
 | 26 | **BL-9 Slice 5b/5c tests** — Runtime tests for snapshot create/list/restore/delete + getBody + auto-snapshot on stage transition | P0 | S | ✅ shipped (PR #240) |
-| 27 | **BL-15 B-3c tests** — Runtime tests for the isolation status check runner + list action | P0 | S | 🟡 in-flight |
+| 27 | **BL-15 B-3c tests** — Runtime tests for the isolation status check runner + list action | P0 | S | ✅ shipped (PR #241) |
+| 28 | **BL-ITAR-TAG** — ITAR-restricted org flag (gates new invites on admin US-person attestation; superadmin toggle) | P2 | S | 🟡 in-flight |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -86,14 +87,31 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 
 ### BL-ITAR-TAG — ITAR-restricted tenant tagging
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
 
-Add `organization.itar_restricted` boolean. When true:
-- All members must be US persons (admin-attested at member-add time)
-- Audit log surfaces ITAR-flagged events distinctly
-- Future: GovCloud-only enforcement when we lift the gov tier
+Adds `organization.itar_restricted` (boolean). When true:
+- New invites require an admin-attested "this user is a US person"
+  checkbox; without it `inviteUserAction` refuses + audits
+  `user.invite_denied` with reason `itar_us_person_attestation_required`.
+- The attestation timestamp + admin user id are recorded on the
+  allowlist row and copied onto the membership row on consume so
+  per-member compliance queries don't need to join through the
+  (eventually expired) allowlist row.
+- Existing memberships are grandfathered — the gate fires only on
+  new invites going forward. Disabling the flag does NOT
+  retroactively un-attest existing members.
+- Audit metadata for every invite now carries
+  `itarRestricted: true|false` + `usPersonAttested: true|false` so
+  audit-log filters surface ITAR events distinctly.
+- Super-admin UI: `ItarRestrictedToggle` on `/admin/orgs/[id]`
+  flips the flag with a confirmation dialog. Audits
+  `tenant.itar_restricted_{on,off}` with `viaSuperadmin: true`.
+- Tenant-facing UI: the user-invite form on `/users` shows a
+  rose-bordered attestation checkbox + statutory language when the
+  org is ITAR-restricted. Disabled by default; the submit button
+  still requires the attestation server-side regardless of UI state.
 
-Defer until first ITAR-bearing proposal lands.
+Future: GovCloud-only enforcement when we lift the gov tier.
 
 ## Already shipped (reference only)
 
