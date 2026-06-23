@@ -43,6 +43,13 @@ export async function inviteUserAction(input: {
   email: string;
   role: string;
   title?: string | null;
+  /**
+   * BL-ITAR-TAG — admin attestation that this invitee is a US person.
+   * Required (must be `true`) when the inviting tenant is
+   * `itar_restricted`. Ignored otherwise (still recorded on the
+   * invite + membership rows for forensic completeness).
+   */
+  attestUsPerson?: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -56,6 +63,34 @@ export async function inviteUserAction(input: {
   if (!isAssignableRole(input.role)) {
     return { ok: false, error: "Pick a valid role." };
   }
+
+  // BL-ITAR-TAG — when the tenant is ITAR-restricted, the inviting
+  // admin MUST attest that the invitee is a US person. Without the
+  // attestation we refuse + audit the denial.
+  const [orgRow] = await db
+    .select({ itarRestricted: organizations.itarRestricted })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (orgRow?.itarRestricted && !input.attestUsPerson) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "user.invite_denied",
+      resourceType: "user",
+      metadata: {
+        invitedEmail: email,
+        reason: "itar_us_person_attestation_required",
+      },
+    });
+    return {
+      ok: false,
+      error:
+        "This workspace is ITAR-restricted. Confirm the invitee is a US person before inviting.",
+    };
+  }
+  const attestUsPerson = !!input.attestUsPerson;
+  const attestUsPersonAt = attestUsPerson ? new Date() : null;
 
   // BL-16 Phase B-3c — refuse the invite when the tenant is at or
   // over its seats limit. Live-measured from active memberships, so
@@ -107,6 +142,8 @@ export async function inviteUserAction(input: {
         invitedAt: new Date(),
         consumedAt: null,
         revoked: false,
+        usPersonAttested: attestUsPerson,
+        usPersonAttestedAt: attestUsPersonAt,
       })
       .where(eq(allowlist.id, existingPending.id));
     inviteId = existingPending.id;
@@ -119,6 +156,8 @@ export async function inviteUserAction(input: {
         role: input.role,
         title: input.title?.trim() || null,
         invitedByUserId: user.id,
+        usPersonAttested: attestUsPerson,
+        usPersonAttestedAt: attestUsPersonAt,
       })
       .returning({ id: allowlist.id });
     if (!row) return { ok: false, error: "Could not create invitation." };
@@ -153,7 +192,12 @@ export async function inviteUserAction(input: {
     action: "user.invite",
     resourceType: "user",
     resourceId: inviteId,
-    metadata: { invitedEmail: email, role: input.role },
+    metadata: {
+      invitedEmail: email,
+      role: input.role,
+      itarRestricted: !!orgRow?.itarRestricted,
+      usPersonAttested: attestUsPerson,
+    },
   });
 
   revalidatePath("/users");

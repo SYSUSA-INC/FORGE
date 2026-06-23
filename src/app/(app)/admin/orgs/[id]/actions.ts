@@ -301,3 +301,57 @@ export async function listOrgAdminsAction(
 
   return rows;
 }
+
+/**
+ * BL-ITAR-TAG — flip the ITAR-restricted flag for a tenant.
+ *
+ * Superadmin-only. Toggles `organization.itar_restricted`. Existing
+ * memberships are grandfathered; the gate only fires on new invites.
+ * Disabling the flag does NOT retroactively un-attest existing members
+ * (their attestation timestamps remain on the membership row).
+ */
+export async function setItarRestrictedAction(input: {
+  organizationId: string;
+  itarRestricted: boolean;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+
+  const [prior] = await db
+    .select({ itarRestricted: organizations.itarRestricted })
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId))
+    .limit(1);
+  if (!prior) return { ok: false, error: "Organization not found." };
+  if (prior.itarRestricted === input.itarRestricted) {
+    return { ok: false, error: "No change to apply." };
+  }
+
+  try {
+    await db
+      .update(organizations)
+      .set({ itarRestricted: input.itarRestricted, updatedAt: new Date() })
+      .where(eq(organizations.id, input.organizationId));
+    await recordAudit({
+      organizationId: input.organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: input.itarRestricted
+        ? "tenant.itar_restricted_on"
+        : "tenant.itar_restricted_off",
+      resourceType: "organization",
+      resourceId: input.organizationId,
+      metadata: {
+        viaSuperadmin: true,
+        priorValue: prior.itarRestricted,
+        newValue: input.itarRestricted,
+      },
+    });
+    revalidatePath(`/admin/orgs/${input.organizationId}`);
+    return { ok: true };
+  } catch (err) {
+    log.error("[setItarRestrictedAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not update ITAR flag.",
+    };
+  }
+}

@@ -148,6 +148,11 @@ async function acceptInvite(opts: {
         role: inv.role,
         status: "active",
         title: inv.title,
+        // BL-ITAR-TAG — carry the admin's attestation forward onto the
+        // membership row so per-member compliance queries don't need
+        // to join through the (eventually expired) allowlist row.
+        usPersonAttested: inv.usPersonAttested,
+        usPersonAttestedAt: inv.usPersonAttestedAt,
       });
     } catch (err) {
       log.error("[acceptInvite]", "membership insert failed", { error: err });

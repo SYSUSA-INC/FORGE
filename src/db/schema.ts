@@ -219,6 +219,13 @@ export const organizations = pgTable("organization", {
   // operators can adjust the floor without a migration if needed.
   auditRetentionDays: integer("audit_retention_days").notNull().default(365),
 
+  // BL-ITAR-TAG — when true, every new member invitation requires
+  // an admin-attested "this user is a US person" checkbox. Existing
+  // memberships are grandfathered (the gate fires only on new
+  // invites). Future: GovCloud-only enforcement when the gov tier
+  // lifts.
+  itarRestricted: boolean("itar_restricted").notNull().default(false),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -235,6 +242,12 @@ export const memberships = pgTable(
     role: roleEnum("role").notNull().default("viewer"),
     status: membershipStatusEnum("status").notNull().default("active"),
     title: text("title"),
+    // BL-ITAR-TAG — captured at consume time from the source allowlist
+    // row. Pre-ITAR memberships have these set to false / null
+    // (grandfathered). New memberships joining an ITAR-restricted org
+    // always have `usPersonAttested = true`.
+    usPersonAttested: boolean("us_person_attested").notNull().default(false),
+    usPersonAttestedAt: timestamp("us_person_attested_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -257,6 +270,12 @@ export const allowlist = pgTable("allowlist", {
   invitedAt: timestamp("invited_at").notNull().defaultNow(),
   consumedAt: timestamp("consumed_at"),
   revoked: boolean("revoked").notNull().default(false),
+  // BL-ITAR-TAG — admin attestation that the invitee is a US person.
+  // Required only when the inviting org is `itar_restricted = true`.
+  // Copied onto the membership row on consume so per-member queries
+  // don't need to join through this (eventually expired) row.
+  usPersonAttested: boolean("us_person_attested").notNull().default(false),
+  usPersonAttestedAt: timestamp("us_person_attested_at"),
 });
 
 export type User = typeof users.$inferSelect;
