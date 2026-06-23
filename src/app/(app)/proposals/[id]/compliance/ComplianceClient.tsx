@@ -15,7 +15,9 @@ import {
   dismissComplianceAIAssessmentAction,
   runCompliancePreflightAction,
   updateComplianceItemAction,
+  type EvidenceRow as EvidenceRowType,
 } from "./actions";
+import { EvidenceDock } from "./EvidenceDock";
 
 type CategoryDef = {
   key: ComplianceCategory;
@@ -53,6 +55,7 @@ type ItemRow = {
   sectionOrdering: number | null;
   aiAssessment: AIAssessment;
   aiAssessedAt: string | null;
+  evidence: EvidenceRowType[];
 };
 
 export function ComplianceClient({
@@ -741,6 +744,12 @@ function ItemRowCard({
             {error}
           </div>
         ) : null}
+
+        <EvidenceDock
+          proposalId={proposalId}
+          itemId={item.id}
+          evidence={item.evidence}
+        />
       </li>
     );
   }
