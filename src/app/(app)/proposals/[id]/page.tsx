@@ -6,6 +6,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
+import { ProposalScanPanel } from "./ProposalScanPanel";
 import { StageAdvancePanel } from "./StageAdvancePanel";
 import { ExportPanel } from "./pdf/ExportPanel";
 import {
@@ -90,6 +91,8 @@ export default async function ProposalOverviewPage({
           exportCapability={exportCapability}
           docxToPdfProvider={docxToPdfStatus.active.name}
         />
+
+        <ProposalScanPanel proposalId={p.id} />
 
         <Panel title="Sections" eyebrow={`${approved}/${sections.length} approved · ${totalWords} words`}>
           <ul className="flex flex-col gap-1.5">

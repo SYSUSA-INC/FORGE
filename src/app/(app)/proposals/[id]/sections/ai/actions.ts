@@ -7,6 +7,7 @@ import {
   organizations,
   proposalSections,
   proposals,
+  solicitations,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { completeForTenant } from "@/lib/ai";
@@ -108,6 +109,44 @@ export async function generateSectionDraftAction(input: {
       description: (p.description ?? "").slice(0, 400),
     }));
 
+  // Load solicitation requirements (best-effort). Gives the AI concrete
+  // Section L/M language to write against instead of generic prose.
+  let solicitationContext: SectionDraftSnapshot["solicitation"] | undefined;
+  try {
+    const [solRow] = await db
+      .select({
+        sectionLSummary: solicitations.sectionLSummary,
+        sectionMSummary: solicitations.sectionMSummary,
+        extractedRequirements: solicitations.extractedRequirements,
+      })
+      .from(solicitations)
+      .where(
+        and(
+          eq(solicitations.opportunityId, row.proposal.opportunityId),
+          eq(solicitations.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    if (
+      solRow &&
+      (solRow.sectionLSummary ||
+        solRow.sectionMSummary ||
+        (solRow.extractedRequirements ?? []).length > 0)
+    ) {
+      solicitationContext = {
+        sectionLSummary: solRow.sectionLSummary,
+        sectionMSummary: solRow.sectionMSummary,
+        requirements: (solRow.extractedRequirements ?? []).slice(0, 25),
+      };
+    }
+  } catch (err) {
+    log.warn(
+      "[generateSectionDraftAction]",
+      "solicitation requirements load failed",
+      { error: err },
+    );
+  }
+
   // Phase 14d — pattern intel. Best-effort; failures degrade to no
   // intel rather than blocking the draft.
   let patternIntel: SectionDraftSnapshot["patternIntel"];
@@ -135,7 +174,7 @@ export async function generateSectionDraftAction(input: {
       naicsCode: row.naicsCode ?? "",
       setAside: row.setAside ?? "",
       incumbent: row.incumbent ?? "",
-      opportunityDescription: (row.opportunityDescription ?? "").slice(0, 1500),
+      opportunityDescription: (row.opportunityDescription ?? "").slice(0, 2000),
     },
     section: {
       title: row.section.title,
@@ -146,6 +185,7 @@ export async function generateSectionDraftAction(input: {
     },
     pastPerformance,
     patternIntel,
+    solicitation: solicitationContext,
   };
 
   // Improve / tighten require existing content to be useful.

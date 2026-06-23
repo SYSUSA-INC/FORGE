@@ -111,6 +111,15 @@ export function OutcomeClient({
             proposalId={proposalId}
             outcomeType={outcome.outcomeType}
             awardedToCompetitor={outcome.awardedToCompetitor ?? ""}
+            debrief={
+              debrief
+                ? {
+                    strengths: debrief.strengths,
+                    weaknesses: debrief.weaknesses,
+                    improvements: debrief.improvements,
+                  }
+                : null
+            }
           />
         ) : null}
       </div>
