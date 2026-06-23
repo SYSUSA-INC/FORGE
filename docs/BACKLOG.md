@@ -46,7 +46,8 @@ Effort key:
 | 22 | **BL-9 Slice 5a** — Suggestion mode + view mode (3-mode picker in toolbar, owner-gated accept/reject, non-owner forced to suggest) | P1 | M | ✅ shipped (PR #236) |
 | 23 | **BL-9 Slice 5b** — Version snapshots (per-section snapshot table, manual + auto-stage-transition triggers, restore + delete, sidebar UI) | P1 | M | ✅ shipped (PR #237) |
 | 24 | **BL-9 Slice 5c** — Snapshot diff viewer (per-row Diff button → modal showing word-level diff vs. current via jsdiff) | P1 | M | ✅ shipped (PR #238) |
-| 25 | **BL-15 Phase B-3c** — Runtime isolation status check (per-tenant probe runner + result table + admin UI) | P0 | S | 🟡 in-flight |
+| 25 | **BL-15 Phase B-3c** — Runtime isolation status check (per-tenant probe runner + result table + admin UI) | P0 | S | ✅ shipped (PR #239) |
+| 26 | **BL-9 Slice 5b/5c tests** — Runtime tests for snapshot create/list/restore/delete + getBody + auto-snapshot on stage transition | P0 | S | 🟡 in-flight |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
