@@ -113,6 +113,18 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
+### BL-FB-CM-EVIDENCE — Per-row evidence linking for compliance items
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+
+Each compliance requirement gets an expandable Evidence dock with a
+picker over three pools: organization past-performance entries,
+knowledge-base entries, and live proposal-section paragraphs. Attach
+buttons cache `label + snippet` on the link row so the matrix exports
+cleanly even after the source is later edited or removed. Schema is
+new table `compliance_item_evidence` (migration 0062) — org-scoped,
+double-indexed by both `organization_id` and `compliance_item_id`.
+Server actions audit every attach + detach.
+
 ## Already shipped (reference only)
 
 | Item | Status |
