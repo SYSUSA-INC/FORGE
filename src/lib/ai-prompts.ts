@@ -1030,6 +1030,122 @@ export const compliancePreflightResponseSchema = z.object({
   verdicts: z.array(compliancePreflightVerdictSchema),
 });
 
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-CM-AUTOMAP — Auto-map requirements to proposal sections
+// ────────────────────────────────────────────────────────────────────
+
+export type ComplianceAutoMapItem = {
+  itemId: string;
+  number: string;
+  category: string;
+  requirementText: string;
+};
+
+export type ComplianceAutoMapSection = {
+  sectionId: string;
+  title: string;
+  kind: string;
+};
+
+export type ComplianceAutoMapInput = {
+  items: ComplianceAutoMapItem[];
+  sections: ComplianceAutoMapSection[];
+};
+
+export type ComplianceAutoMapVerdict = {
+  itemId: string;
+  /** Section id to assign, or "" to leave unmapped. */
+  sectionId: string;
+  /** AI confidence in the mapping. */
+  confidence: "high" | "medium" | "low";
+  /** 1 short sentence explaining the choice. */
+  rationale: string;
+};
+
+const COMPLIANCE_AUTOMAP_SYSTEM = `You are a federal proposal compliance analyst inside FORGE. Your job: assign each Section L/M requirement to the most appropriate proposal section so the team can build a compliance crosswalk fast.
+
+You receive:
+  - A list of compliance items (Section L instructions or Section M evaluation criteria) — each with an id, number, category, and the requirement text.
+  - A list of proposal sections — each with an id, title, and kind (e.g. executive_summary, technical, management, past_performance, pricing, compliance).
+
+Your job: for each item, pick the single best section to address it.
+
+Output ONLY a single JSON object:
+{
+  "mappings": [
+    {
+      "itemId": "<echo the supplied id>",
+      "sectionId": "<id of the best-fit section, or empty string '' if no section is a good fit>",
+      "confidence": "high" | "medium" | "low",
+      "rationale": "<one short sentence explaining the choice>"
+    }
+  ]
+}
+
+Heuristics:
+- Section L instructions about technical approach → kind=technical or "Technical Approach"-titled section.
+- Section L instructions about management approach, staffing, transition, risk → kind=management.
+- Section L instructions about past performance → kind=past_performance.
+- Pricing / cost / CLIN instructions → kind=pricing.
+- Cover letter, executive summary, theme statements → kind=executive_summary.
+- Cross-cutting requirements (page limits, font, format, table-of-contents, certifications) → kind=compliance OR no mapping if no compliance volume exists.
+- Section M evaluation factors: map to the section whose CONTENT will be evaluated against that factor (e.g. Factor 1: Technical → technical section; Factor 2: Past Performance → past_performance section).
+
+Confidence rules:
+- high: the requirement's topic clearly matches the section's kind / title.
+- medium: plausible match but the section could overlap with another (e.g. risk could go in technical or management).
+- low: weak signal; the requirement is generic or there's no clear best section.
+
+Hard rules:
+- Echo each itemId exactly. Return one mapping per supplied item, in the same order.
+- If no section is a reasonable fit (e.g. the proposal has no compliance volume), set sectionId to "" with rationale explaining why.
+- rationale ≤ 200 characters. Plain prose, no markdown.
+- Do NOT invent section ids. sectionId must be either an id from the input list or "".`;
+
+export function buildComplianceAutoMapPrompt(
+  input: ComplianceAutoMapInput,
+): { system: string; messages: AIMessage[] } {
+  const itemLines = input.items
+    .map(
+      (it, i) =>
+        `${i + 1}. id=${it.itemId} | number=${it.number || "(none)"} | category=${it.category} | text="${it.requirementText.replace(/"/g, '\\"').slice(0, 400)}"`,
+    )
+    .join("\n");
+
+  const sectionLines = input.sections
+    .map(
+      (s, i) =>
+        `${i + 1}. id=${s.sectionId} | kind=${s.kind} | title="${s.title.replace(/"/g, '\\"')}"`,
+    )
+    .join("\n");
+
+  const userPrompt = [
+    `Compliance items to map (${input.items.length}):`,
+    itemLines || "(none)",
+    ``,
+    `Proposal sections available (${input.sections.length}):`,
+    sectionLines || "(none)",
+    ``,
+    `Return strict JSON per the schema in the system prompt. One mapping per item, in the same order.`,
+  ].join("\n");
+
+  return {
+    system: COMPLIANCE_AUTOMAP_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+export const complianceAutoMapVerdictSchema = z.object({
+  itemId: z.string(),
+  sectionId: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+  rationale: z.string(),
+});
+
+export const complianceAutoMapResponseSchema = z.object({
+  mappings: z.array(complianceAutoMapVerdictSchema),
+});
+
 /**
  * Zod-parse a JSON-ish string from the AI. Strips any leading/trailing
  * prose by clipping to the first `{` and last `}` before parsing —
