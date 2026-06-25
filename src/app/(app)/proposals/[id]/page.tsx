@@ -10,6 +10,7 @@ import { ProposalScanPanel } from "./ProposalScanPanel";
 import { StageAdvancePanel } from "./StageAdvancePanel";
 import { ExportPanel } from "./pdf/ExportPanel";
 import {
+  getComplianceGateStatusAction,
   getDocxToPdfStatusAction,
   getProposalExportCapabilityAction,
   getProviderStatusAction,
@@ -54,13 +55,19 @@ export default async function ProposalOverviewPage({
   const totalWords = sections.reduce((a, s) => a + s.wordCount, 0);
   const approved = sections.filter((s) => s.status === "approved").length;
 
-  const [recentRenders, providerStatus, exportCapability, docxToPdfStatus] =
-    await Promise.all([
-      listRecentRendersAction(params.id, 5),
-      getProviderStatusAction(),
-      getProposalExportCapabilityAction(params.id),
-      getDocxToPdfStatusAction(),
-    ]);
+  const [
+    recentRenders,
+    providerStatus,
+    exportCapability,
+    docxToPdfStatus,
+    complianceGate,
+  ] = await Promise.all([
+    listRecentRendersAction(params.id, 5),
+    getProviderStatusAction(),
+    getProposalExportCapabilityAction(params.id),
+    getDocxToPdfStatusAction(),
+    getComplianceGateStatusAction(params.id),
+  ]);
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -89,6 +96,7 @@ export default async function ProposalOverviewPage({
           pdfStatus={providerStatus.pdf.active}
           storageStatus={providerStatus.storage.active}
           exportCapability={exportCapability}
+          complianceGate={complianceGate}
           docxToPdfProvider={docxToPdfStatus.active.name}
         />
 

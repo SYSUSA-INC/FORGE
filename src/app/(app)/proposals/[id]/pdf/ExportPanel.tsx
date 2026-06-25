@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
+  renderComplianceCrosswalkAction,
   renderProposalDocxAction,
   renderProposalDocxAsPdfAction,
   renderProposalPdfAction,
@@ -15,6 +16,17 @@ import {
   type RecentRenderRow,
 } from "./actions";
 import type { PdfProviderStatus, StorageProviderStatus } from "./status-types";
+
+type ComplianceGate = {
+  blocked: boolean;
+  hasMatrix: boolean;
+  totalItems: number;
+  completeCount: number;
+  partialCount: number;
+  notAddressedCount: number;
+  notApplicableCount: number;
+  summary: string;
+};
 
 type SuccessResult = Extract<PdfRenderResult, { ok: true }>;
 type DocxSuccess = Extract<DocxRenderActionResult, { ok: true }>;
@@ -30,6 +42,7 @@ type Props = {
     hasHtmlTemplate: boolean;
     templateName: string;
   };
+  complianceGate: ComplianceGate;
   docxToPdfProvider?: "cloudconvert" | "stub";
 };
 
@@ -39,6 +52,7 @@ export function ExportPanel({
   pdfStatus,
   storageStatus,
   exportCapability,
+  complianceGate,
   docxToPdfProvider,
 }: Props) {
   const router = useRouter();
@@ -47,12 +61,15 @@ export function ExportPanel({
   const [recent, setRecent] = useState<SuccessResult | null>(null);
   const [recentDocx, setRecentDocx] = useState<DocxSuccess | null>(null);
   const [recentDocxPdf, setRecentDocxPdf] = useState<DocxPdfSuccess | null>(null);
+  const [recentCrosswalk, setRecentCrosswalk] = useState<SuccessResult | null>(null);
+  const [forceExport, setForceExport] = useState(false);
 
   function clearAll() {
     setError(null);
     setRecent(null);
     setRecentDocx(null);
     setRecentDocxPdf(null);
+    setRecentCrosswalk(null);
   }
 
   function generate() {
@@ -62,7 +79,9 @@ export function ExportPanel({
       // button hits the docx-to-pdf path so the user gets the same
       // header/footer/cover/TOC fidelity in their PDF.
       if (exportCapability.hasDocxTemplate) {
-        const res = await renderProposalDocxAsPdfAction(proposalId);
+        const res = await renderProposalDocxAsPdfAction(proposalId, {
+          forceExport,
+        });
         if (!res.ok) {
           setError(res.error);
           return;
@@ -71,7 +90,7 @@ export function ExportPanel({
         router.refresh();
         return;
       }
-      const res = await renderProposalPdfAction(proposalId);
+      const res = await renderProposalPdfAction(proposalId, { forceExport });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -84,7 +103,7 @@ export function ExportPanel({
   function generateDocx() {
     clearAll();
     startTransition(async () => {
-      const res = await renderProposalDocxAction(proposalId);
+      const res = await renderProposalDocxAction(proposalId, { forceExport });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -93,6 +112,24 @@ export function ExportPanel({
       router.refresh();
     });
   }
+
+  function generateCrosswalk() {
+    clearAll();
+    startTransition(async () => {
+      const res = await renderComplianceCrosswalkAction(proposalId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setRecentCrosswalk(res);
+      router.refresh();
+    });
+  }
+
+  // Disable the proposal export buttons when the gate blocks AND the
+  // user hasn't checked Force export.
+  const exportDisabled =
+    pending || (complianceGate.blocked && !forceExport);
 
   const stubMode = pdfStatus.name === "stub" || storageStatus.name === "memory";
 
@@ -132,13 +169,54 @@ export function ExportPanel({
           </div>
         ) : null}
 
+        {/* BL-FB-CM-GATE — compliance status before the user clicks generate */}
+        {complianceGate.hasMatrix ? (
+          <div
+            className={`rounded-md border px-3 py-2 font-mono text-[11px] ${
+              complianceGate.blocked
+                ? "border-rose/40 bg-rose/10 text-rose"
+                : "border-emerald/40 bg-emerald/10 text-emerald"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <div className="font-semibold uppercase tracking-wider">
+                  {complianceGate.blocked
+                    ? "Compliance gate blocking export"
+                    : "Compliance gate clear"}
+                </div>
+                <div className="mt-0.5 text-[10px] opacity-90">
+                  {complianceGate.summary}
+                </div>
+              </div>
+              <Link
+                href={`/proposals/${proposalId}/compliance`}
+                className="shrink-0 underline hover:no-underline"
+              >
+                Open matrix →
+              </Link>
+            </div>
+            {complianceGate.blocked ? (
+              <label className="mt-2 flex cursor-pointer items-center gap-2 text-[10px]">
+                <input
+                  type="checkbox"
+                  checked={forceExport}
+                  onChange={(e) => setForceExport(e.target.checked)}
+                  className="accent-rose"
+                />
+                Force export anyway (acknowledges the matrix has gaps)
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           {exportCapability.hasDocxTemplate ? (
             <button
               type="button"
               onClick={generateDocx}
-              disabled={pending}
-              className="aur-btn aur-btn-primary"
+              disabled={exportDisabled}
+              className="aur-btn aur-btn-primary disabled:opacity-50"
               title={`Render via Word template "${exportCapability.templateName}"`}
             >
               {pending ? "Generating…" : "Download as Word"}
@@ -147,8 +225,8 @@ export function ExportPanel({
           <button
             type="button"
             onClick={generate}
-            disabled={pending}
-            className={`aur-btn ${exportCapability.hasDocxTemplate ? "aur-btn-ghost" : "aur-btn-primary"}`}
+            disabled={exportDisabled}
+            className={`aur-btn ${exportCapability.hasDocxTemplate ? "aur-btn-ghost" : "aur-btn-primary"} disabled:opacity-50`}
           >
             {pending && !exportCapability.hasDocxTemplate
               ? "Generating…"
@@ -156,6 +234,17 @@ export function ExportPanel({
                 ? "Download as PDF"
                 : "Generate"}
           </button>
+          {complianceGate.hasMatrix ? (
+            <button
+              type="button"
+              onClick={generateCrosswalk}
+              disabled={pending}
+              className="aur-btn aur-btn-ghost disabled:opacity-50"
+              title="Generate the Section L/M crosswalk PDF — ship this with your proposal submission"
+            >
+              {pending ? "Generating…" : "Crosswalk PDF"}
+            </button>
+          ) : null}
         </div>
 
         {!exportCapability.hasDocxTemplate &&
@@ -197,6 +286,25 @@ export function ExportPanel({
               className="mt-1 inline-block text-emerald underline hover:no-underline"
             >
               Download .docx →
+            </a>
+          </div>
+        ) : null}
+
+        {recentCrosswalk ? (
+          <div className="rounded-md border border-violet-400/40 bg-violet-400/10 px-3 py-2 font-mono text-[11px] text-violet-200">
+            <div>
+              Crosswalk{" "}
+              {recentCrosswalk.contentType === "application/pdf" ? "PDF" : "HTML"}{" "}
+              ready — {Math.max(1, Math.round(recentCrosswalk.byteSize / 1024))}{" "}
+              KB.
+            </div>
+            <a
+              href={recentCrosswalk.downloadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block text-violet-200 underline hover:no-underline"
+            >
+              Download crosswalk →
             </a>
           </div>
         ) : null}
