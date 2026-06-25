@@ -113,6 +113,19 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
+### BL-FB-CM-AUTOMAP — Auto-map compliance items to proposal sections
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+
+AI assigns each Section L/M requirement to the most appropriate
+proposal section automatically. Replaces the manual 30-minute task
+on a typical 50-row matrix. Renders confidence chips (high/med/low)
+per row with a one-sentence rationale; user reviews, can override the
+section choice per row, then applies in bulk via "Apply N
+high-confidence" or "Apply all selected". Items already mapped to the
+AI's choice are counted as "unchanged" and skipped from the suggestion
+list. Rate-limited 5/hour per proposal; feature-gated on
+`complianceMatrix` tier flag.
+
 ## Already shipped (reference only)
 
 | Item | Status |

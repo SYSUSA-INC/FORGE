@@ -16,6 +16,7 @@ import {
   runCompliancePreflightAction,
   updateComplianceItemAction,
 } from "./actions";
+import { AutoMapPanel } from "./AutoMapPanel";
 
 type CategoryDef = {
   key: ComplianceCategory;
@@ -103,6 +104,11 @@ export function ComplianceClient({
 
   return (
     <div className="flex flex-col gap-4">
+      <AutoMapPanel
+        proposalId={proposalId}
+        unmappedCount={items.filter((i) => !i.proposalSectionId).length}
+        sections={sections}
+      />
       <PreflightBar
         proposalId={proposalId}
         items={items}
