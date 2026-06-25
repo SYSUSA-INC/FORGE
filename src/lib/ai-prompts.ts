@@ -339,6 +339,12 @@ export type SectionDraftSnapshot = {
     sectionMSummary: string;
     requirements: { kind: string; text: string; ref: string }[];
   };
+  /**
+   * BL-FB-GEN-THEMES — proposal-level win themes the drafter is
+   * expected to weave through every section. 1-3 entries, each with
+   * a short title and a one-sentence statement.
+   */
+  winThemes?: { title: string; statement: string }[];
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -395,15 +401,37 @@ export function buildSectionDraftPrompt(
         .join("\n")
     : "";
 
-  // Pass the snapshot as JSON but omit the solicitation field (already
-  // formatted above) to avoid double-printing large text.
-  const { solicitation: _omit, ...snapshotForJson } = snapshot;
-  void _omit;
+  // BL-FB-GEN-THEMES — emit a dedicated win-themes block so the model
+  // treats themes as first-class direction, not just another snapshot
+  // field. Themes appear BEFORE the solicitation block because they're
+  // the higher-altitude framing the model should hold while writing.
+  const themesBlock =
+    snapshot.winThemes && snapshot.winThemes.length > 0
+      ? [
+          `Proposal win themes — every section MUST reinforce these themes naturally; do NOT force every theme into every paragraph, but weave them into the section's substance where relevant. Avoid quoting the title verbatim — show the theme through specifics.`,
+          ...snapshot.winThemes.map(
+            (t, i) =>
+              `Theme ${i + 1} (${t.title}): ${t.statement}`,
+          ),
+        ].join("\n")
+      : "";
+
+  // Pass the snapshot as JSON but omit the solicitation + winThemes
+  // fields (formatted above) so we don't double-print large text.
+  const {
+    solicitation: _omitSol,
+    winThemes: _omitThemes,
+    ...snapshotForJson
+  } = snapshot;
+  void _omitSol;
+  void _omitThemes;
 
   const userPrompt = [
     `Mode: ${mode}.`,
     MODE_INSTRUCTIONS[mode],
     ``,
+    themesBlock,
+    themesBlock ? `` : "",
     solicitationBlock,
     solicitationBlock ? `` : "",
     `Section + proposal snapshot (JSON):`,

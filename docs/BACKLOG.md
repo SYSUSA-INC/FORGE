@@ -113,8 +113,24 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
-### BL-FB-SOL-AMEND-DIFF — Solicitation amendment diff viewer
+### BL-FB-GEN-THEMES — Win themes as first-class draft inputs
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+
+Schema (migration 0064): per-proposal `win_themes` jsonb on the
+`proposal` row, capped at 3 entries by app code (each row = title +
+one-sentence statement). New WinThemesPanel on the proposal overview
+page lets the team set, edit, and save themes. New
+`updateWinThemesAction` cleans, validates (refuses half-filled rows),
+audits `proposal.win_themes.update`. Themes are then threaded into:
+(1) the `buildSectionDraftPrompt` snapshot so every draft / improve /
+tighten run weaves them in; (2) the chat-actions context block so
+the in-section AI chat reinforces them; (3) the proposal scan prompt
+so the health check flags sections that drift off-theme. Biggest
+single quality lever on AI-generated content — closes out the
+"generic content" feedback at its root.
+
+### BL-FB-SOL-AMEND-DIFF — Solicitation amendment diff viewer
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #248)
 
 Adds parent → child amendment relationship to `solicitation` (new
 `parent_solicitation_id` self-FK + `amendment_number` free-text +

@@ -186,6 +186,13 @@ export async function generateSectionDraftAction(input: {
     pastPerformance,
     patternIntel,
     solicitation: solicitationContext,
+    // BL-FB-GEN-THEMES — pass per-proposal win themes through so the
+    // drafter weaves them into every section. Cap at 3 (the same cap
+    // applied at write time) as a defence-in-depth.
+    winThemes: (row.proposal.winThemes ?? []).slice(0, 3).map((t) => ({
+      title: t.title ?? "",
+      statement: t.statement ?? "",
+    })),
   };
 
   // Improve / tighten require existing content to be useful.

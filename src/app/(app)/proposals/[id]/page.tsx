@@ -8,6 +8,7 @@ import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-typ
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { ProposalScanPanel } from "./ProposalScanPanel";
 import { StageAdvancePanel } from "./StageAdvancePanel";
+import { WinThemesPanel } from "./WinThemesPanel";
 import { ExportPanel } from "./pdf/ExportPanel";
 import {
   getComplianceGateStatusAction,
@@ -71,7 +72,7 @@ export default async function ProposalOverviewPage({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <div className="xl:col-span-2">
+      <div className="flex flex-col gap-4 xl:col-span-2">
         <Panel title="Proposal details">
           <ProposalOverviewForm
             proposalId={p.id}
@@ -85,6 +86,10 @@ export default async function ProposalOverviewPage({
             team={team}
           />
         </Panel>
+        <WinThemesPanel
+          proposalId={p.id}
+          initial={(p.winThemes ?? []) as { title: string; statement: string }[]}
+        />
       </div>
 
       <div className="flex flex-col gap-4">
