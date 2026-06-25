@@ -1423,6 +1423,15 @@ export const solicitations = pgTable("solicitation", {
   postedDate: timestamp("posted_date", { mode: "date" }),
   source: text("source").notNull().default("uploaded"),
 
+  // BL-FB-SOL-AMEND-DIFF — amendment relationship. Child amendments
+  // point at the original solicitation; cascade-delete keeps the tree
+  // clean. `amendmentNumber` is free text ("0001", "A-1", "Mod 3").
+  parentSolicitationId: uuid("parent_solicitation_id").references(
+    (): AnyPgColumn => solicitations.id,
+    { onDelete: "cascade" },
+  ),
+  amendmentNumber: text("amendment_number").notNull().default(""),
+
   // File metadata
   fileName: text("file_name").notNull().default(""),
   fileSize: integer("file_size").notNull().default(0),
@@ -1460,7 +1469,11 @@ export const solicitations = pgTable("solicitation", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-FB-SOL-AMEND-DIFF — speeds up "list amendments for this parent"
+  // and "list ancestors of this amendment" lookups.
+  parentIdx: index("solicitation_parent_idx").on(t.parentSolicitationId),
+}));
 
 export type Solicitation = typeof solicitations.$inferSelect;
 export type NewSolicitation = typeof solicitations.$inferInsert;
