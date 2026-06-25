@@ -196,6 +196,7 @@ async function parseSolicitationFromBytes(
       .set({
         parseStatus: "parsed",
         parseError: "",
+        rawText: buildRawTextFromExtraction(d),
         title: d.title || stripExt(fileName),
         agency: d.agency,
         office: d.office,
@@ -240,7 +241,7 @@ async function parseSolicitationFromBytes(
       .set({
         parseStatus: "parsed",
         parseError: "",
-        rawText: rawText.slice(0, 500_000),
+        rawText: buildRawTextFromExtraction(d),
         title: d.title || stripExt(fileName),
         agency: d.agency,
         office: d.office,
@@ -415,6 +416,47 @@ export async function deleteSolicitationAction(
     );
   revalidatePath("/solicitations");
   return { ok: true };
+}
+
+/**
+ * Reconstructs a usable rawText string from AI-extracted structured fields.
+ * Used for vision-OCR paths (image uploads, scanned PDFs) where no text
+ * layer exists — the review action requires non-empty rawText to run.
+ */
+function buildRawTextFromExtraction(d: {
+  title: string;
+  agency: string;
+  office: string;
+  solicitationNumber: string;
+  type: string;
+  naicsCode: string;
+  setAside: string;
+  responseDueDate: string | null;
+  sectionLSummary: string;
+  sectionMSummary: string;
+  requirements: { kind: string; text: string; ref: string }[];
+}): string {
+  const header = [
+    d.title && `TITLE: ${d.title}`,
+    d.agency && `AGENCY: ${d.agency}`,
+    d.office && `OFFICE: ${d.office}`,
+    d.solicitationNumber && `SOLICITATION NUMBER: ${d.solicitationNumber}`,
+    d.type && `TYPE: ${d.type.toUpperCase()}`,
+    d.naicsCode && `NAICS: ${d.naicsCode}`,
+    d.setAside && `SET-ASIDE: ${d.setAside}`,
+    d.responseDueDate && `DUE DATE: ${d.responseDueDate}`,
+  ].filter(Boolean).join('\n');
+
+  const sections = [
+    d.sectionLSummary && `SECTION L (Instructions to Offerors):\n${d.sectionLSummary}`,
+    d.sectionMSummary && `SECTION M (Evaluation Criteria):\n${d.sectionMSummary}`,
+    d.requirements.length > 0 &&
+      `REQUIREMENTS:\n${d.requirements.map((r, i) =>
+        `${i + 1}. [${r.ref || '?'}] ${r.kind.toUpperCase()}: ${r.text}`
+      ).join('\n')}`,
+  ].filter(Boolean).join('\n\n');
+
+  return [header, sections].filter(Boolean).join('\n\n');
 }
 
 /**

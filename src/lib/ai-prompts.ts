@@ -329,6 +329,16 @@ export type SectionDraftSnapshot = {
   }[];
   /** Phase 14d — optional. Drafter falls back to non-pattern-guided when omitted. */
   patternIntel?: SectionDraftPatternIntel;
+  /**
+   * Solicitation requirements extracted during intake — gives the AI a
+   * concrete spec to write against so the draft addresses actual Section
+   * L/M language rather than generic proposal best-practices.
+   */
+  solicitation?: {
+    sectionLSummary: string;
+    sectionMSummary: string;
+    requirements: { kind: string; text: string; ref: string }[];
+  };
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -360,13 +370,45 @@ export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
   snapshot: SectionDraftSnapshot,
 ): { system: string; messages: AIMessage[] } {
+  // Build a solicitation block when requirements are available so the
+  // draft addresses real Section L/M language rather than generic prose.
+  const solicitationBlock = snapshot.solicitation
+    ? [
+        `Solicitation requirements (write to these — use [ref] inline for traceability):`,
+        snapshot.solicitation.sectionLSummary
+          ? `Section L summary: ${snapshot.solicitation.sectionLSummary.slice(0, 800)}`
+          : "",
+        snapshot.solicitation.sectionMSummary
+          ? `Section M summary: ${snapshot.solicitation.sectionMSummary.slice(0, 800)}`
+          : "",
+        snapshot.solicitation.requirements.length > 0
+          ? snapshot.solicitation.requirements
+              .slice(0, 25)
+              .map(
+                (r, i) =>
+                  `${i + 1}. [${r.ref || "?"}] ${r.kind.toUpperCase()}: ${r.text.slice(0, 300)}`,
+              )
+              .join("\n")
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
+  // Pass the snapshot as JSON but omit the solicitation field (already
+  // formatted above) to avoid double-printing large text.
+  const { solicitation: _omit, ...snapshotForJson } = snapshot;
+  void _omit;
+
   const userPrompt = [
     `Mode: ${mode}.`,
     MODE_INSTRUCTIONS[mode],
     ``,
+    solicitationBlock,
+    solicitationBlock ? `` : "",
     `Section + proposal snapshot (JSON):`,
     "```json",
-    JSON.stringify(snapshot, null, 2),
+    JSON.stringify(snapshotForJson, null, 2),
     "```",
     ``,
     mode === "draft"
@@ -374,7 +416,9 @@ export function buildSectionDraftPrompt(
       : mode === "improve"
         ? `Return the improved body. Output ONLY the body text — no diff, no commentary about what you changed.`
         : `Return the tightened body. Output ONLY the body text — no commentary about what you cut.`,
-  ].join("\n");
+  ]
+    .filter((l) => l !== undefined && l !== null)
+    .join("\n");
 
   return {
     system: SECTION_DRAFT_SYSTEM,

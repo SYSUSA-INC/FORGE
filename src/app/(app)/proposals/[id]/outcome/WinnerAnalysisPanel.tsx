@@ -9,21 +9,34 @@ import {
   type WinnerAnalysisRow,
 } from "./winner-actions";
 
+type DebriefSummary = {
+  strengths: string;
+  weaknesses: string;
+  improvements: string;
+};
+
 /**
  * Phase 14f — Proposal-vs-winner analysis panel.
  *
  * Renders only on lost proposals where awardedToCompetitor is set.
- * Pulls the existing analysis on mount, lets the user trigger a
- * fresh run, and renders the four AI-produced sections + provenance.
+ *
+ * Layout:
+ *  1. Agency feedback (from the official debrief — direct inputs, not AI).
+ *  2. Competitor intelligence — AI-generated profile + recommendations.
+ *
+ * Gaps and Strengths come from the agency's own debrief record.
+ * AI generates the competitor profile and forward-looking recommendations.
  */
 export function WinnerAnalysisPanel({
   proposalId,
   outcomeType,
   awardedToCompetitor,
+  debrief,
 }: {
   proposalId: string;
   outcomeType: string | null;
   awardedToCompetitor: string;
+  debrief: DebriefSummary | null;
 }) {
   const router = useRouter();
   const [analysis, setAnalysis] = useState<WinnerAnalysisRow | null>(null);
@@ -35,6 +48,8 @@ export function WinnerAnalysisPanel({
 
   const eligible = outcomeType === "lost";
   const hasCompetitor = awardedToCompetitor.trim().length > 0;
+  const hasDebrief =
+    debrief && (debrief.weaknesses.trim() || debrief.strengths.trim());
 
   useEffect(() => {
     if (!eligible) {
@@ -74,11 +89,11 @@ export function WinnerAnalysisPanel({
 
   return (
     <Panel
-      title="Winner analysis (Phase 14f)"
+      title="Winner analysis"
       eyebrow={
         analysis
-          ? `Generated ${new Date(analysis.updatedAt).toLocaleString()}${analysis.stubbed ? " · stub" : ""}`
-          : "Side-by-side: us vs the winner"
+          ? `AI profile generated ${new Date(analysis.updatedAt).toLocaleString()}${analysis.stubbed ? " · stub" : ""}`
+          : "Agency feedback + competitive intelligence"
       }
       actions={
         <button
@@ -91,14 +106,14 @@ export function WinnerAnalysisPanel({
               ? "Set 'Awarded to' on the outcome (the winning competitor's name) before running."
               : analysis
                 ? "Re-run with the latest debrief and competitor awards."
-                : "Pull the competitor's USAspending profile and ask the AI for a candid loss read."
+                : "Pull the competitor's USAspending profile and generate competitive recommendations."
           }
         >
           {pending
             ? "Analyzing…"
             : analysis
-              ? "Re-run analysis"
-              : "Run winner analysis"}
+              ? "Re-run AI analysis"
+              : "Run AI competitor analysis"}
         </button>
       }
     >
@@ -109,96 +124,154 @@ export function WinnerAnalysisPanel({
         </div>
       ) : null}
 
-      <p className="font-body text-[13px] leading-relaxed text-muted">
-        Pulls the competitor&apos;s recent USAspending awards to characterize
-        their profile, then asks the AI to compare against our submission +
-        debrief. Used to plan the next bid against the same competitor.
-      </p>
+      {/* ── Agency Feedback (from debrief — source of truth for gaps/strengths) ── */}
+      <div className="mt-4">
+        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          Agency feedback (from debrief)
+        </div>
+        {hasDebrief ? (
+          <div className="space-y-3">
+            {debrief!.weaknesses.trim() ? (
+              <AgencySection
+                label="Weaknesses cited by agency"
+                tone="text-rose"
+                body={debrief!.weaknesses}
+              />
+            ) : null}
+            {debrief!.strengths.trim() ? (
+              <AgencySection
+                label="Strengths cited by agency"
+                tone="text-emerald-300"
+                body={debrief!.strengths}
+              />
+            ) : null}
+            {debrief!.improvements.trim() ? (
+              <AgencySection
+                label="Suggested improvements"
+                tone="text-amber-300"
+                body={debrief!.improvements}
+              />
+            ) : null}
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
+            No debrief recorded yet. Record the agency&apos;s official feedback
+            in the <strong>Debrief</strong> panel above — gaps and strengths
+            should come from the agency, not the AI.
+          </div>
+        )}
+      </div>
 
-      {error ? (
-        <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
-          {error}
+      {/* ── AI Competitive Analysis ── */}
+      <div className="mt-5 border-t border-white/5 pt-4">
+        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          Competitive intelligence (AI)
         </div>
-      ) : null}
-      {notice ? (
-        <div className="mt-3 rounded-md border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 font-mono text-[11px] text-emerald">
-          {notice}
-        </div>
-      ) : null}
+        <p className="font-body text-[12px] leading-relaxed text-muted">
+          Pulls the competitor&apos;s recent USAspending awards to characterize
+          their profile, then suggests forward-looking recommendations for the
+          next bid.
+        </p>
 
-      {!loaded ? (
-        <div className="mt-3 font-mono text-[11px] text-subtle">Loading…</div>
-      ) : !analysis ? (
-        <div className="mt-3 rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
-          {hasCompetitor
-            ? `No analysis yet. Click "Run winner analysis" to compare against ${awardedToCompetitor}.`
-            : "Once an outcome with the winning competitor is recorded, run the analysis here."}
-        </div>
-      ) : (
-        <div className="mt-4 space-y-4">
-          <Section
-            label="Winner profile"
-            tone="text-foreground"
-            body={analysis.winnerProfileSummary}
-          />
-          <Section
-            label="Gaps we had"
-            tone="text-rose"
-            body={analysis.gapsWeHad}
-          />
-          <Section
-            label="Our strengths the debrief missed"
-            tone="text-emerald-300"
-            body={analysis.ourStrengthsUnrecognized}
-          />
-          <Section
-            label="Recommendations for next bid"
-            tone="text-teal-300"
-            body={analysis.recommendations}
-          />
+        {error ? (
+          <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+            {error}
+          </div>
+        ) : null}
+        {notice ? (
+          <div className="mt-3 rounded-md border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 font-mono text-[11px] text-emerald">
+            {notice}
+          </div>
+        ) : null}
 
-          {analysis.sourceUsaspending.length > 0 ? (
-            <div className="border-t border-white/5 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowSources((v) => !v)}
-                className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle hover:text-foreground"
-              >
-                {showSources ? "Hide" : "Show"} {analysis.sourceUsaspending.length}{" "}
-                USAspending source{analysis.sourceUsaspending.length === 1 ? "" : "s"}
-              </button>
-              {showSources ? (
-                <ul className="mt-2 space-y-1">
-                  {analysis.sourceUsaspending.map((a) => (
-                    <li
-                      key={a.piid}
-                      className="font-mono text-[11px] leading-relaxed text-muted"
-                    >
-                      <span className="text-foreground">{a.piid}</span>
-                      {" · "}
-                      {a.agency}
-                      {a.value ? ` · ${a.value}` : ""}
-                      {a.periodStart && a.periodEnd
-                        ? ` · ${a.periodStart} → ${a.periodEnd}`
-                        : ""}
-                      {a.description ? (
-                        <div className="mt-0.5 text-subtle">
-                          {a.description.slice(0, 240)}
-                        </div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      )}
+        {!loaded ? (
+          <div className="mt-3 font-mono text-[11px] text-subtle">Loading…</div>
+        ) : !analysis ? (
+          <div className="mt-3 rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
+            {hasCompetitor
+              ? `No AI analysis yet. Click "Run AI competitor analysis" above.`
+              : "Once an outcome with the winning competitor is recorded, run the analysis here."}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            <AiSection
+              label="Competitor profile"
+              tone="text-foreground"
+              body={analysis.winnerProfileSummary}
+            />
+            <AiSection
+              label="Recommendations for next bid"
+              tone="text-teal-300"
+              body={analysis.recommendations}
+            />
+
+            {analysis.sourceUsaspending.length > 0 ? (
+              <div className="border-t border-white/5 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSources((v) => !v)}
+                  className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle hover:text-foreground"
+                >
+                  {showSources ? "Hide" : "Show"}{" "}
+                  {analysis.sourceUsaspending.length} USAspending source
+                  {analysis.sourceUsaspending.length === 1 ? "" : "s"}
+                </button>
+                {showSources ? (
+                  <ul className="mt-2 space-y-1">
+                    {analysis.sourceUsaspending.map((a) => (
+                      <li
+                        key={a.piid}
+                        className="font-mono text-[11px] leading-relaxed text-muted"
+                      >
+                        <span className="text-foreground">{a.piid}</span>
+                        {" · "}
+                        {a.agency}
+                        {a.value ? ` · ${a.value}` : ""}
+                        {a.periodStart && a.periodEnd
+                          ? ` · ${a.periodStart} → ${a.periodEnd}`
+                          : ""}
+                        {a.description ? (
+                          <div className="mt-0.5 text-subtle">
+                            {a.description.slice(0, 240)}
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
     </Panel>
   );
 }
 
-function Section({
+function AgencySection({
+  label,
+  tone,
+  body,
+}: {
+  label: string;
+  tone: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+      <div
+        className={`mb-1 font-mono text-[10px] uppercase tracking-[0.18em] ${tone}`}
+      >
+        {label}
+      </div>
+      <div className="whitespace-pre-wrap font-body text-[13px] leading-relaxed text-foreground">
+        {body}
+      </div>
+    </div>
+  );
+}
+
+function AiSection({
   label,
   tone,
   body,
