@@ -1,7 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
+  complianceItemEvidence,
   complianceItems,
   proposalSections,
   proposals,
@@ -83,6 +84,24 @@ export default async function ProposalCompliancePage({
     .where(eq(proposalSections.proposalId, params.id))
     .orderBy(asc(proposalSections.ordering));
 
+  // BL-FB-CM-EVIDENCE — load evidence for every item in this proposal.
+  // Single SELECT scoped to the proposal's item ids; the page already
+  // verified tenant ownership above.
+  const itemIds = items.map((i) => i.id);
+  const evidenceRows = itemIds.length > 0
+    ? await db
+        .select()
+        .from(complianceItemEvidence)
+        .where(inArray(complianceItemEvidence.complianceItemId, itemIds))
+        .orderBy(asc(complianceItemEvidence.createdAt))
+    : [];
+  const evidenceByItem = new Map<string, typeof evidenceRows>();
+  for (const e of evidenceRows) {
+    const arr = evidenceByItem.get(e.complianceItemId) ?? [];
+    arr.push(e);
+    evidenceByItem.set(e.complianceItemId, arr);
+  }
+
   const team = await listProposalTeamCandidates();
 
   const stats = computeCompletion(items.map((i) => ({ status: i.status })));
@@ -163,6 +182,14 @@ export default async function ProposalCompliancePage({
           aiAssessedAt: i.aiAssessedAt
             ? i.aiAssessedAt.toISOString()
             : null,
+          evidence: (evidenceByItem.get(i.id) ?? []).map((e) => ({
+            id: e.id,
+            kind: e.kind,
+            refId: e.refId,
+            label: e.label,
+            snippet: e.snippet,
+            createdAt: e.createdAt.toISOString(),
+          })),
         }))}
       />
     </div>

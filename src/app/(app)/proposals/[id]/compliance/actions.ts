@@ -4,11 +4,15 @@ import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
+  complianceItemEvidence,
   complianceItems,
+  knowledgeEntries,
+  organizations,
   proposalSections,
   proposals,
   type ComplianceAIAssessment,
   type ComplianceCategory,
+  type ComplianceEvidenceKind,
   type ComplianceStatus,
   type TipTapDoc,
 } from "@/db/schema";
@@ -990,6 +994,284 @@ export async function applyComplianceAutoMapAction(
 
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true, applied };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-CM-EVIDENCE — per-row evidence linking
+// ────────────────────────────────────────────────────────────────────
+
+export type EvidenceRow = {
+  id: string;
+  kind: ComplianceEvidenceKind;
+  refId: string;
+  label: string;
+  snippet: string;
+  createdAt: string;
+};
+
+export type AvailableEvidence = {
+  pastPerformance: {
+    refId: string;
+    customer: string;
+    contract: string;
+    description: string;
+  }[];
+  knowledgeEntries: {
+    id: string;
+    kind: string;
+    title: string;
+    body: string;
+  }[];
+  sections: {
+    id: string;
+    title: string;
+    ordering: number;
+    contentSnippets: string[];
+  }[];
+};
+
+/**
+ * Owns the proposal AND the compliance item belongs to that proposal.
+ * Used to gate writes against cross-proposal item ids.
+ */
+async function ownsComplianceItem(
+  itemId: string,
+  organizationId: string,
+): Promise<{ ok: true; proposalId: string } | { ok: false }> {
+  const [row] = await db
+    .select({
+      itemId: complianceItems.id,
+      proposalId: complianceItems.proposalId,
+    })
+    .from(complianceItems)
+    .innerJoin(proposals, eq(proposals.id, complianceItems.proposalId))
+    .where(
+      and(
+        eq(complianceItems.id, itemId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!row) return { ok: false };
+  return { ok: true, proposalId: row.proposalId };
+}
+
+export async function listAvailableEvidenceAction(
+  proposalId: string,
+): Promise<
+  { ok: true; data: AvailableEvidence } | { ok: false; error: string }
+> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  const [orgRow] = await db
+    .select({ pastPerformance: organizations.pastPerformance })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+
+  // Past performance lives as an array of jsonb objects on the org;
+  // each entry has a stable `id` we'll use as refId.
+  const pastPerformance = (orgRow?.pastPerformance ?? [])
+    .filter((p) => p && (p.customer || p.contract || p.description))
+    .map((p) => ({
+      refId: p.id,
+      customer: p.customer ?? "",
+      contract: p.contract ?? "",
+      description: (p.description ?? "").slice(0, 400),
+    }));
+
+  const knowledge = await db
+    .select({
+      id: knowledgeEntries.id,
+      kind: knowledgeEntries.kind,
+      title: knowledgeEntries.title,
+      body: knowledgeEntries.body,
+    })
+    .from(knowledgeEntries)
+    .where(eq(knowledgeEntries.organizationId, organizationId))
+    .orderBy(asc(knowledgeEntries.title))
+    .limit(200);
+
+  const sectionRows = await db
+    .select({
+      id: proposalSections.id,
+      title: proposalSections.title,
+      ordering: proposalSections.ordering,
+      bodyDoc: proposalSections.bodyDoc,
+      content: proposalSections.content,
+    })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId))
+    .orderBy(asc(proposalSections.ordering));
+
+  // Break each section's plain text into paragraph-sized snippets so
+  // the picker can show pickable paragraphs (rather than full sections).
+  const sections = sectionRows.map((s) => {
+    const plain =
+      projectToPlain(s.bodyDoc as TipTapDoc | null) || s.content || "";
+    const paragraphs = plain
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 40)
+      .slice(0, 25);
+    return {
+      id: s.id,
+      title: s.title,
+      ordering: s.ordering,
+      contentSnippets: paragraphs.map((p) => p.slice(0, 500)),
+    };
+  });
+
+  return {
+    ok: true,
+    data: {
+      pastPerformance,
+      knowledgeEntries: knowledge.map((k) => ({
+        id: k.id,
+        kind: k.kind,
+        title: k.title,
+        body: k.body.slice(0, 1000),
+      })),
+      sections,
+    },
+  };
+}
+
+export async function attachComplianceEvidenceAction(input: {
+  proposalId: string;
+  itemId: string;
+  kind: ComplianceEvidenceKind;
+  refId: string;
+  label: string;
+  snippet: string;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(input.proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  const owns = await ownsComplianceItem(input.itemId, organizationId);
+  if (!owns.ok || owns.proposalId !== input.proposalId) {
+    return { ok: false, error: "Compliance item does not belong to this proposal." };
+  }
+
+  // Validate the refId against the kind so we don't store dangling
+  // pointers. For section_paragraph, confirm the section belongs to
+  // this proposal. For knowledge_entry, confirm the entry belongs to
+  // this org. For past_performance, the refId is the array entry's
+  // stable id — no DB check possible, accept as-is.
+  if (input.kind === "section_paragraph") {
+    if (!(await sectionBelongsToProposal(input.refId, input.proposalId))) {
+      return {
+        ok: false,
+        error: "Section does not belong to this proposal.",
+      };
+    }
+  } else if (input.kind === "knowledge_entry") {
+    const [k] = await db
+      .select({ id: knowledgeEntries.id })
+      .from(knowledgeEntries)
+      .where(
+        and(
+          eq(knowledgeEntries.id, input.refId),
+          eq(knowledgeEntries.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    if (!k) {
+      return {
+        ok: false,
+        error: "Knowledge entry not found in this organization.",
+      };
+    }
+  }
+
+  try {
+    const [row] = await db
+      .insert(complianceItemEvidence)
+      .values({
+        organizationId,
+        complianceItemId: input.itemId,
+        kind: input.kind,
+        refId: input.refId,
+        label: input.label.slice(0, 256),
+        snippet: input.snippet.slice(0, 2000),
+        createdByUserId: actor.id,
+      })
+      .returning({ id: complianceItemEvidence.id });
+    if (!row) return { ok: false, error: "Could not attach evidence." };
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.compliance.evidence.attach",
+      resourceType: "compliance_item_evidence",
+      resourceId: row.id,
+      metadata: {
+        proposalId: input.proposalId,
+        itemId: input.itemId,
+        kind: input.kind,
+      },
+    });
+    revalidatePath(`/proposals/${input.proposalId}/compliance`);
+    return { ok: true, id: row.id };
+  } catch (err) {
+    log.error("[attachComplianceEvidenceAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Attach failed.",
+    };
+  }
+}
+
+export async function detachComplianceEvidenceAction(
+  evidenceId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  // Cross-tenant-safe delete: scope by both id AND organizationId so a
+  // hand-typed UUID can't reach into another org's evidence rows.
+  const result = await db
+    .delete(complianceItemEvidence)
+    .where(
+      and(
+        eq(complianceItemEvidence.id, evidenceId),
+        eq(complianceItemEvidence.organizationId, organizationId),
+      ),
+    )
+    .returning({
+      id: complianceItemEvidence.id,
+      itemId: complianceItemEvidence.complianceItemId,
+    });
+
+  if (result.length === 0) {
+    return { ok: false, error: "Evidence not found." };
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.evidence.detach",
+    resourceType: "compliance_item_evidence",
+    resourceId: evidenceId,
+    metadata: { itemId: result[0].itemId },
+  });
+
+  // Best-effort lookup of the proposal id to revalidate the page.
+  const [prow] = await db
+    .select({ proposalId: complianceItems.proposalId })
+    .from(complianceItems)
+    .where(eq(complianceItems.id, result[0].itemId))
+    .limit(1);
+  if (prow) revalidatePath(`/proposals/${prow.proposalId}/compliance`);
+
+  return { ok: true };
 }
 
 export async function listProposalSectionsLite(proposalId: string) {

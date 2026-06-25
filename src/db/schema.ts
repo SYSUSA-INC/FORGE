@@ -826,6 +826,51 @@ export type ComplianceCategory =
 export type ComplianceStatus =
   (typeof complianceStatusEnum.enumValues)[number];
 
+/**
+ * BL-FB-CM-EVIDENCE — evidence linked to a compliance item.
+ *
+ * Each row is one piece of evidence supporting one requirement.
+ * Label + snippet are cached at attach time so the matrix exports
+ * cleanly even if the referenced entry is later edited or removed.
+ */
+export const complianceEvidenceKindEnum = pgEnum("compliance_evidence_kind", [
+  "past_performance",
+  "knowledge_entry",
+  "section_paragraph",
+]);
+
+export const complianceItemEvidence = pgTable(
+  "compliance_item_evidence",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    complianceItemId: uuid("compliance_item_id")
+      .notNull()
+      .references(() => complianceItems.id, { onDelete: "cascade" }),
+    kind: complianceEvidenceKindEnum("kind").notNull(),
+    refId: text("ref_id").notNull().default(""),
+    label: text("label").notNull().default(""),
+    snippet: text("snippet").notNull().default(""),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    itemIdx: index("compliance_item_evidence_item_idx").on(t.complianceItemId),
+    orgIdx: index("compliance_item_evidence_org_idx").on(t.organizationId),
+  }),
+);
+
+export type ComplianceItemEvidence =
+  typeof complianceItemEvidence.$inferSelect;
+export type NewComplianceItemEvidence =
+  typeof complianceItemEvidence.$inferInsert;
+export type ComplianceEvidenceKind =
+  (typeof complianceEvidenceKindEnum.enumValues)[number];
+
 export const notificationKindEnum = pgEnum("notification_kind", [
   "review_assigned",
   "review_section_assigned",
