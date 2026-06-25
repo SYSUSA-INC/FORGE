@@ -113,8 +113,25 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
+### BL-FB-SOL-AMEND-DIFF — Solicitation amendment diff viewer
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+
+Adds parent → child amendment relationship to `solicitation` (new
+`parent_solicitation_id` self-FK + `amendment_number` free-text +
+index — migration 0063). The detail page surfaces an Amendments
+panel with an "Add amendment" upload affordance; uploaded amendments
+parse independently via the existing solicitation pipeline. A
+diff route at `/solicitations/[id]/diff` renders a side-by-side
+comparison: top-level field changes (title, agency, due date,
+NAICS, set-aside, Section L/M summaries) + requirement diff
+(added / removed / modified / unchanged) computed by Jaccard
+similarity over normalized word sets at threshold 0.55. Modified
+requirements show before + after blocks with the similarity score.
+Reduces "missed amendment" compliance failures — historically the
+single biggest cause of disqualification on federal bids.
+
 ### BL-FB-CM-GATE — Pre-submission compliance gate + crosswalk PDF
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #247)
 
 Adds two pieces:
 1. **Gate:** every proposal-export action (PDF, DOCX, DOCX-to-PDF)
