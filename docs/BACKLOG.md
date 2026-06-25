@@ -2822,7 +2822,339 @@ solicitation panel for detailed results.
 
 ---
 
+## User feedback enhancements (post-pilot, 2026-06-23)
 
+Captured from initial pilot feedback and a strategic enhancement
+review across six product surfaces (solicitation intake, compliance
+matrix, winner analysis, AI scan, content generation, chat). Items
+are grouped by surface and given a stable **BL-FB-*** ID. Priorities
+reflect impact on **win rate** and **time saved per pursuit** — the
+two outcomes federal contractors actually measure. Final prioritization
+pending operator review.
+
+### Area 1 — Solicitation intake ("RFP Command Center")
+
+### BL-FB-SOL-BUNDLE — Multi-document solicitation bundles
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+RFP + amendments + attachments (PWS, SOW, CDRLs, J-attachments) parsed
+as one cohesive solicitation, not separate uploads. Single solicitation
+detail page surfaces all child documents, dedupes overlapping
+requirements, merges Section L/M extractions, and tracks which child
+each requirement came from. Schema: new `solicitation_document` table
+with FK to `solicitation` (parent) — extractions roll up to the parent.
+
+### BL-FB-SOL-AMEND-DIFF — Amendment diff viewer
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+When Amendment 0002 drops, render a side-by-side diff vs Amendment 0001
+showing what changed in due dates, page limits, and requirements.
+Missed amendments are the most common cause of compliance failures.
+Re-parses requirements per amendment, flags changed rows in red, adds
+new rows in green, strikes deleted rows. Notification to proposal team
+on amendment ingestion.
+
+### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Poll SAM.gov for Q&A responses on linked notice IDs. When the
+contracting officer answers a question that contradicts or refines a
+requirement, surface it on the solicitation review and update the
+matrix. Persists Q&A history with timestamps; auto-flags the row in
+the matrix as "amended by Q&A".
+
+### BL-FB-SOL-CALENDAR — Key-date calendar with reminders
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Auto-extract every key milestone from the solicitation (Q&A cutoff,
+site visit, final RFP, proposal due, oral presentation, expected award,
+debrief window, protest window). Render as a per-opportunity Gantt
+strip with email/in-app reminders at T-7 / T-3 / T-1 days. Integrates
+with the notification rules engine (BL-13).
+
+### BL-FB-SOL-CUSTOMER-PATTERN — Past-customer intelligence
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+When a new solicitation arrives, surface "you've seen this agency
+N times before — here's what they buy, who wins, average award size,
+evaluator priorities, and your historical PWin against this customer".
+Cross-joins solicitations + opportunities + outcomes + USAspending.
+
+---
+
+### Area 2 — Compliance matrix ("Section L/M crosswalk that auto-builds")
+
+### BL-FB-CM-AUTOMAP — Auto-mapping of requirements to sections
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+When a proposal template is applied to an opportunity, AI assigns each
+Section L/M requirement to the most appropriate proposal section
+automatically. Current flow makes the human map every requirement
+by hand — a 30-minute task on a 50-row matrix. Idempotent re-runnable
+mapping with confidence scores per assignment and a single-click
+"accept all high-confidence" action.
+
+### BL-FB-CM-EVIDENCE — Evidence linking per requirement
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Per-row evidence dock: drag-drop a past-performance citation,
+knowledge entry, or specific paragraph from a proposal section onto
+a requirement to mark it covered. The matrix exports as the Section L
+crosswalk in the back of the proposal volume with auto-built page
+references. Replaces hand-built compliance crosswalks.
+
+### BL-FB-CM-GATE — Pre-submission compliance gate
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Block proposal export/submit when any requirement is `not_addressed`.
+Configurable per-tier (Enterprise can hard-block, Bronze can soft-warn).
+Compliance crosswalk PDF auto-attaches to the export bundle.
+
+### BL-FB-CM-OWNERS — Per-row owner assignment
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Assign a team member to each requirement with status (assigned /
+in-progress / complete / blocked) and reminder cadence. Owner dashboard
+shows "my rows across all proposals" with overdue flags.
+
+### BL-FB-CM-HEATMAP — Compliance heat-map view
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Alternate matrix view: colored grid (rows = requirements, columns =
+sections, cells = status). One screen for the capture manager to see
+coverage holes. Drill-down opens the row in the full matrix.
+
+---
+
+### Area 3 — Winner analysis & debrief ("Loss intelligence engine")
+
+### BL-FB-WIN-DEBRIEF-REQ — Auto-generate debrief request letter
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+One-click generation of the formal debrief request with the right FAR
+citation (FAR 15.506 / 8.405-2 / 16.505) based on procurement type,
+the questions a procurement attorney would ask, and the deadline math
+(3 business days post-notification). Outputs a ready-to-send letter or
+email. Recorded on the debrief row.
+
+### BL-FB-WIN-PROTEST — Protest viability check
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Given the debrief weaknesses + the awardee's USAspending profile +
+the solicitation's evaluation criteria, surface "is there a credible
+protest?" with the GAO precedents that match. Calibrated, not bait —
+surfaces the protest **only** when grounds exist. Output: a risk-tier
+summary (none / weak / colorable / strong) and the controlling cases.
+
+### BL-FB-WIN-CROSS-LOSS — Cross-loss pattern detection
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Aggregate-level loss intelligence: "you've lost 3 of the last 5 to
+Booz on defense IT — the pattern is price (18% high on average)" or
+"every NAICS 541330 loss cites past performance gaps." Detects
+patterns across all your debriefs + outcomes; surfaces in the loss
+intelligence dashboard. Operationalizes what no single capture manager
+can see across pursuits.
+
+### BL-FB-WIN-RECOMPETE — Re-compete radar
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+When a solicitation reappears (NAICS + agency + scope similarity above
+threshold), flag the past loss and the lessons learned automatically.
+Surfaces in SAM.gov import results and the dashboard "needs attention"
+strip. Includes the original outcome, debrief, and winner analysis.
+
+---
+
+### Area 4 — AI health check ("Continuous quality layer")
+
+The on-demand scan shipped in PR #243 is v1. The v2 is **continuous**.
+
+### BL-FB-SCAN-CONTINUOUS — Background health scan on every save
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Move the health scan from on-demand to background-on-save. Section
+list shows live red/amber/green dots driven by the latest scan.
+Debounced so a typo doesn't burn AI quota; aggregates section edits
+into a single proposal-level scan every N minutes. Foundation for
+all downstream scan enhancements (themes, contradiction, tone).
+
+### BL-FB-SCAN-THEMES — Win-theme consistency check
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Set 3 win themes upfront on the proposal (e.g. "FedRAMP High depth,"
+"lowest-risk transition," "DEI in workforce"). The scan checks every
+section reinforces them; flags sections that drift off-theme.
+Surfaces theme coverage as a per-section badge.
+
+### BL-FB-SCAN-CONTRADICTION — Cross-volume contradiction detection
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Detect inconsistencies between volumes — e.g., Technical Volume claims
+24/7 operations, Management Volume staffs only business hours.
+Cross-volume claim extraction + reconciliation. High-value for
+multi-volume responses where different writers own different volumes.
+
+### BL-FB-SCAN-TONE — Reading-level + tone enforcement
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Flag marketing-speak ("world-class," "best-in-class," "robust",
+"leverage"), passive voice over a threshold, and reading-level above
+college sophomore (the federal evaluator standard). Per-section
+score; click-to-fix surfaces an Improve-mode draft pre-loaded with
+the offending phrases.
+
+### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Section header shows live page count vs cap as the user types
+(4.2 / 3 pages — over by 1.2 pages). Color-coded ring. No interruption
+to typing; just constant visibility. Companion to the existing
+`tighten` AI mode.
+
+---
+
+### Area 5 — Content generation ("Voice-aware drafting")
+
+### BL-FB-GEN-THEMES — Win themes as first-class draft inputs
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Promote win themes from a prompt afterthought to a structured input.
+Per-proposal theme editor with 1-3 themes; the section draft prompt
+weaves them in explicitly. Pairs with BL-FB-SCAN-THEMES so themes
+both drive drafts AND are checked post-hoc. Single biggest quality
+lever on generated content.
+
+### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Mine the solicitation's own Section L/M language and the agency's
+strategic plan / mission statement; paraphrase those phrases back
+into the draft when topically relevant. Evaluators respond to
+hearing their own words. Per-section toggle.
+
+### BL-FB-GEN-BLOCKS — Reusable content block library
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Versioned, taggable boilerplate registry: "our cyber capability v3,"
+"key personnel intro," "transition risk methodology." Drop into any
+section by tag; each block stays version-controlled with a changelog.
+Replaces the org-wide "boilerplate.docx" everyone copies from.
+
+### BL-FB-GEN-VOICE — Per-author voice training
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+The AI learns each writer's voice from accepted past drafts (system
+prompt fragments captured per author). Generated content for "Sarah's
+sections" matches Sarah's voice; for Mike, matches Mike's. Eliminates
+the "this reads like AI" tell.
+
+### BL-FB-GEN-CITE — Citation-required draft mode
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Every concrete claim in the generated draft must link to a knowledge
+entry, past performance row, or named contract. Un-cited claims are
+flagged with `[NEEDS CITATION]` brackets the human must resolve.
+Prevents AI-fabricated past performance.
+
+### BL-FB-GEN-GRAPHICS — Graphics suggestions
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Section-aware suggestions: "this Technical Approach section would
+benefit from a notional architecture diagram" with a starter SVG or
+Mermaid block. Embedded inline. Foundation for richer mid-doc visuals.
+
+---
+
+### Area 6 — Chat ("Multi-modal section co-pilot")
+
+### BL-FB-CHAT-UPLOAD — Mid-chat document upload
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Drop a sample SOW, capability brief, or prior proposal into the chat;
+the AI uses it as a reference for the current message ("model my
+Technical Approach on this structure"). Document is scoped to the
+conversation, not persisted to the KB unless explicitly saved.
+
+### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Cursor-style two-pane layout: chat left, live section draft right.
+AI-suggested edits stream into the draft in real time; user accepts
+or rejects per-paragraph instead of all-or-nothing. Replaces the
+current "Apply to section" full-replace flow when the user wants
+surgical edits.
+
+### BL-FB-CHAT-SLASH — Slash commands in chat
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
+`/check-compliance`, `/voc` (rewrite in voice-of-customer). Each maps
+to a structured server action. Faster than typing the full instruction.
+
+### BL-FB-CHAT-VOICE — Voice input
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Push-to-talk dictation for drive-time / hands-free use. Web Speech API
+on supported browsers; Anthropic audio transcription on the others.
+Particularly valuable for capture managers driving between customer
+meetings.
+
+### BL-FB-CHAT-PERSIST — Persisted history per section
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Save chat history to a per-section thread; reopen the section and pick
+up where you left off. Schema: `section_chat_message` table.
+Foundation for BL-FB-CHAT-MULTI (multi-user). Pairs with the existing
+proposal comment threads but lives separately so AI-assist
+conversations don't clutter human comment streams.
+
+### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Capture manager + writer + AI in the same thread; `@mention` a team
+member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces
+Slack-side-conversations about specific sections with in-platform
+threads tied to the work.
+
+---
+
+### Cross-cutting intelligence multipliers
+
+### BL-FB-X-BRAIN-MINE — Auto-mine past wins into the Brain
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Every won proposal you've uploaded gets mined back into the KB as
+structured knowledge entries (capability statements, past performance
+citations, key personnel bios, win themes that worked). The section
+drafter then retrieves from your actual wins, not generic prose. Most
+direct path to "less generic content" (the issue #6 we already
+addressed) becoming "deeply specific, on-brand content."
+
+### BL-FB-X-PWIN-MODEL — Calibrated PWin model
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Train a model on your historical outcomes (NAICS × agency × set-aside
+× incumbent × company size × proposal stage × time-in-stage) to
+produce a calibrated PWin number, not the current guess. Replaces
+the manual slider on the opportunity record. Brier-score tracked over
+time so the model is honestly graded.
+
+### BL-FB-X-CRM — Customer relationship CRM
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Per-agency contact list with last-touch / next-touch fields,
+procurement history (joined to USAspending), and a relationship-warmth
+score. Pre-RFP intelligence — who do we know at this customer, when
+was the last conversation. Lightweight CRM scoped to capture.
+
+### BL-FB-X-COLOR-TEAM — Color-team review workflow
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+
+Built-in pink / red / gold / green review templates with reviewer
+assignments per section, comment consolidation, and reviewer
+checklists. Automates the manual "schedule a red team for Friday"
+process most contractors run in email + Word.
 
 ---
 
