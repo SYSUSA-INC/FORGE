@@ -17,6 +17,7 @@ import {
   updateComplianceItemAction,
   type EvidenceRow as EvidenceRowType,
 } from "./actions";
+import { AutoMapPanel } from "./AutoMapPanel";
 import { EvidenceDock } from "./EvidenceDock";
 
 type CategoryDef = {
@@ -106,6 +107,11 @@ export function ComplianceClient({
 
   return (
     <div className="flex flex-col gap-4">
+      <AutoMapPanel
+        proposalId={proposalId}
+        unmappedCount={items.filter((i) => !i.proposalSectionId).length}
+        sections={sections}
+      />
       <PreflightBar
         proposalId={proposalId}
         items={items}

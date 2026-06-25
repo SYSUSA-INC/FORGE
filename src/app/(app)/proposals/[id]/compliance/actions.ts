@@ -18,9 +18,12 @@ import {
 } from "@/db/schema";
 import { completeForTenant } from "@/lib/ai";
 import {
+  buildComplianceAutoMapPrompt,
   buildCompliancePreflightPrompt,
+  complianceAutoMapResponseSchema,
   compliancePreflightResponseSchema,
   parseAiJson,
+  type ComplianceAutoMapVerdict,
   type CompliancePreflightItem,
   type CompliancePreflightVerdict,
 } from "@/lib/ai-prompts";
@@ -695,6 +698,302 @@ export async function dismissComplianceAIAssessmentAction(
   });
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-CM-AUTOMAP — Auto-map compliance items to proposal sections
+// ────────────────────────────────────────────────────────────────────
+
+export type AutoMapSuggestion = {
+  itemId: string;
+  itemNumber: string;
+  itemText: string;
+  currentSectionId: string | null;
+  suggestedSectionId: string;
+  suggestedSectionTitle: string;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+};
+
+export type RunComplianceAutoMapResult =
+  | {
+      ok: true;
+      suggestions: AutoMapSuggestion[];
+      unchanged: number;
+      stubbed: boolean;
+      model: string;
+    }
+  | { ok: false; error: string };
+
+const AUTOMAP_CONFIDENCE: Set<"high" | "medium" | "low"> = new Set([
+  "high",
+  "medium",
+  "low",
+]);
+
+/**
+ * BL-FB-CM-AUTOMAP — Phase 1.
+ *
+ * Asks the AI to map every compliance item to the best-fit proposal
+ * section. Returns a suggestion list (does NOT write to DB on its own —
+ * the user reviews and applies). Each suggestion carries a confidence
+ * level so the UI can render an "Accept all high-confidence" affordance.
+ *
+ * Rate-limited 5/hour per proposal. AI quota counted per attempt;
+ * refunded on early failure (no AI call) or empty result.
+ */
+export async function runComplianceAutoMapAction(
+  proposalId: string,
+): Promise<RunComplianceAutoMapResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  try {
+    await ensureFeature(organizationId, "complianceMatrix");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
+  } catch (err) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
+
+  const limit = await enforceRateLimit({
+    key: `automap:proposal:${proposalId}`,
+    limit: 5,
+    windowSeconds: 3600,
+  });
+  if (!limit.ok) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error: `Auto-map limit (5/hour) reached for this proposal. Retry in ${Math.ceil(limit.retryAfter / 60)} min.`,
+    };
+  }
+
+  const items = await db
+    .select({
+      id: complianceItems.id,
+      number: complianceItems.number,
+      category: complianceItems.category,
+      requirementText: complianceItems.requirementText,
+      proposalSectionId: complianceItems.proposalSectionId,
+    })
+    .from(complianceItems)
+    .where(eq(complianceItems.proposalId, proposalId))
+    .orderBy(asc(complianceItems.ordering));
+
+  const sections = await db
+    .select({
+      id: proposalSections.id,
+      title: proposalSections.title,
+      kind: proposalSections.kind,
+    })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId))
+    .orderBy(asc(proposalSections.ordering));
+
+  if (items.length === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error: "No compliance items to map. Import or add items first.",
+    };
+  }
+  if (sections.length === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error: "Proposal has no sections to map to. Add sections first.",
+    };
+  }
+
+  // Cap items per call to keep prompts in bounds. 80 items per request
+  // is well within Anthropic limits and covers nearly every proposal.
+  const ITEMS_PER_BATCH = 80;
+  const sectionLookup = new Map(sections.map((s) => [s.id, s.title]));
+
+  let stubbed = false;
+  let model = "stub";
+  const aggregated: ComplianceAutoMapVerdict[] = [];
+
+  for (let i = 0; i < items.length; i += ITEMS_PER_BATCH) {
+    const batch = items.slice(i, i + ITEMS_PER_BATCH);
+    const prompt = buildComplianceAutoMapPrompt({
+      items: batch.map((it) => ({
+        itemId: it.id,
+        number: it.number,
+        category: it.category,
+        requirementText: it.requirementText,
+      })),
+      sections: sections.map((s) => ({
+        sectionId: s.id,
+        title: s.title,
+        kind: s.kind,
+      })),
+    });
+
+    let raw = "";
+    try {
+      const res = await completeForTenant({
+        organizationId,
+        system: prompt.system,
+        messages: prompt.messages,
+        maxTokens: 3000,
+        temperature: 0,
+        cacheSystem: true,
+      });
+      raw = res.text;
+      stubbed = stubbed || res.stubbed;
+      model = `${res.provider}:${res.model}`;
+    } catch (err) {
+      log.warn("[runComplianceAutoMapAction]", "AI call failed", { error: err });
+      continue;
+    }
+
+    const parseResult = parseAiJson(raw, complianceAutoMapResponseSchema);
+    if (!parseResult.ok) {
+      log.warn("[runComplianceAutoMapAction]", "JSON parse failed", {
+        parseError: parseResult.error,
+        rawSnippet: raw.slice(0, 240),
+      });
+      continue;
+    }
+    aggregated.push(...parseResult.data.mappings);
+  }
+
+  if (aggregated.length === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error:
+        "AI returned no usable mappings. Re-run, or check the AI provider configuration.",
+    };
+  }
+
+  // Build suggestions, filtering invalid section ids + low-quality entries.
+  const validSectionIds = new Set(sections.map((s) => s.id));
+  const itemIndex = new Map(items.map((it) => [it.id, it]));
+  const suggestions: AutoMapSuggestion[] = [];
+  let unchanged = 0;
+
+  for (const v of aggregated) {
+    if (!AUTOMAP_CONFIDENCE.has(v.confidence)) continue;
+    const item = itemIndex.get(v.itemId);
+    if (!item) continue;
+
+    // Empty sectionId means AI declined to map — skip and let the
+    // user map manually.
+    if (!v.sectionId) continue;
+    if (!validSectionIds.has(v.sectionId)) continue;
+
+    // If the AI's suggestion matches the current mapping, count as
+    // unchanged so the UI can summarize "AI confirmed N mappings,
+    // suggests M changes".
+    if (item.proposalSectionId === v.sectionId) {
+      unchanged += 1;
+      continue;
+    }
+
+    suggestions.push({
+      itemId: v.itemId,
+      itemNumber: item.number,
+      itemText: item.requirementText.slice(0, 240),
+      currentSectionId: item.proposalSectionId ?? null,
+      suggestedSectionId: v.sectionId,
+      suggestedSectionTitle: sectionLookup.get(v.sectionId) ?? "(unknown)",
+      confidence: v.confidence,
+      rationale: v.rationale.slice(0, 240),
+    });
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.automap.run",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      proposalId,
+      totalItems: items.length,
+      suggestionCount: suggestions.length,
+      unchanged,
+      stubbed,
+      model,
+    },
+  });
+
+  return { ok: true, suggestions, unchanged, stubbed, model };
+}
+
+/**
+ * Apply a set of auto-map suggestions. Used by the "Accept all high-
+ * confidence" button or per-row apply. Caller passes the itemId →
+ * sectionId pairs they want to commit.
+ */
+export async function applyComplianceAutoMapAction(
+  proposalId: string,
+  mappings: { itemId: string; sectionId: string }[],
+): Promise<
+  { ok: true; applied: number } | { ok: false; error: string }
+> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+  if (mappings.length === 0) {
+    return { ok: true, applied: 0 };
+  }
+
+  // Validate every section id belongs to this proposal — refuse the
+  // whole batch on any cross-proposal section reference.
+  const sectionIds = Array.from(new Set(mappings.map((m) => m.sectionId)));
+  const sectionRows = await db
+    .select({ id: proposalSections.id })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId));
+  const validIds = new Set(sectionRows.map((r) => r.id));
+  for (const sid of sectionIds) {
+    if (!validIds.has(sid)) {
+      return {
+        ok: false,
+        error: "One or more sections do not belong to this proposal.",
+      };
+    }
+  }
+
+  // Apply sequentially per Neon-pgbouncer rule.
+  let applied = 0;
+  const now = new Date();
+  for (const m of mappings) {
+    const r = await db
+      .update(complianceItems)
+      .set({ proposalSectionId: m.sectionId, updatedAt: now })
+      .where(
+        and(
+          eq(complianceItems.id, m.itemId),
+          eq(complianceItems.proposalId, proposalId),
+        ),
+      )
+      .returning({ id: complianceItems.id });
+    if (r.length > 0) applied += 1;
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.automap.apply",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: { proposalId, requested: mappings.length, applied },
+  });
+
+  revalidatePath(`/proposals/${proposalId}/compliance`);
+  return { ok: true, applied };
 }
 
 // ────────────────────────────────────────────────────────────────────
