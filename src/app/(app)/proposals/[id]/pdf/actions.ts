@@ -4,6 +4,8 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
+  complianceItemEvidence,
+  complianceItems,
   opportunities,
   organizations,
   proposalPdfRenders,
@@ -14,11 +16,16 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
+import {
+  complianceGateBlockMessage,
+  getComplianceGateStatus,
+} from "@/lib/compliance-gate";
 import { getPdfProvider, getPdfProviderStatus } from "@/lib/pdf";
 import {
   getStorageProvider,
   getStorageProviderStatus,
 } from "@/lib/storage";
+import { renderCrosswalkHtml } from "@/lib/compliance-crosswalk-render";
 import { renderProposalHtml } from "@/lib/pdf-template-render";
 import { renderProposalToDocx } from "@/lib/docx-render";
 import {
@@ -42,9 +49,20 @@ export type PdfRenderResult =
 
 export async function renderProposalPdfAction(
   proposalId: string,
+  options?: { forceExport?: boolean },
 ): Promise<PdfRenderResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-FB-CM-GATE — refuse the export when the compliance matrix
+  // has unaddressed / partial requirements unless the caller passes
+  // forceExport: true. Gate is inactive when no matrix is recorded.
+  if (!options?.forceExport) {
+    const gate = await getComplianceGateStatus(proposalId, organizationId);
+    if (gate.blocked) {
+      return { ok: false, error: complianceGateBlockMessage(gate) };
+    }
+  }
 
   // 1. Load proposal + its opportunity + template + sections + org.
   const [propRow] = await db
@@ -294,9 +312,18 @@ export type DocxRenderActionResult =
  */
 export async function renderProposalDocxAction(
   proposalId: string,
+  options?: { forceExport?: boolean },
 ): Promise<DocxRenderActionResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-FB-CM-GATE — same gate as the PDF path.
+  if (!options?.forceExport) {
+    const gate = await getComplianceGateStatus(proposalId, organizationId);
+    if (gate.blocked) {
+      return { ok: false, error: complianceGateBlockMessage(gate) };
+    }
+  }
 
   // Pull proposal + opportunity inline; we need the opportunity for
   // agency / NAICS / set-aside variables.
@@ -476,9 +503,18 @@ export type DocxAsPdfResult =
  */
 export async function renderProposalDocxAsPdfAction(
   proposalId: string,
+  options?: { forceExport?: boolean },
 ): Promise<DocxAsPdfResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-FB-CM-GATE — same gate as the PDF path.
+  if (!options?.forceExport) {
+    const gate = await getComplianceGateStatus(proposalId, organizationId);
+    if (gate.blocked) {
+      return { ok: false, error: complianceGateBlockMessage(gate) };
+    }
+  }
 
   // Reuse the same loaders as the docx render. Inline duplication
   // would be cleaner if extracted, but keeping symmetry with the
@@ -664,6 +700,211 @@ export async function getDocxToPdfStatusAction() {
  * proposal's template supports the .docx render path so we can show
  * the right buttons.
  */
+// BL-FB-CM-GATE — surface the gate state so the ExportPanel can show
+// the user why a render might refuse and offer the override toggle.
+export async function getComplianceGateStatusAction(
+  proposalId: string,
+): Promise<
+  Awaited<ReturnType<typeof getComplianceGateStatus>>
+> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return getComplianceGateStatus(proposalId, organizationId);
+}
+
+// BL-FB-CM-GATE — render the compliance crosswalk as a standalone PDF.
+// Designed to ship with the proposal submission package as evidence of
+// Section L/M traceability. The crosswalk is NEVER gated — operators
+// often need to print it precisely to discuss the unaddressed rows.
+export async function renderComplianceCrosswalkAction(
+  proposalId: string,
+): Promise<PdfRenderResult> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  // Verify ownership + load proposal + opportunity context.
+  const [propRow] = await db
+    .select({
+      id: proposals.id,
+      title: proposals.title,
+      agency: opportunities.agency,
+      solicitationNumber: opportunities.solicitationNumber,
+    })
+    .from(proposals)
+    .innerJoin(opportunities, eq(opportunities.id, proposals.opportunityId))
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!propRow) return { ok: false, error: "Proposal not found." };
+
+  const [orgRow] = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!orgRow) return { ok: false, error: "Organization not found." };
+
+  // Pull every compliance item + its mapped section title + attached
+  // evidence in a single pass per table (no N+1).
+  const itemRows = await db
+    .select({
+      id: complianceItems.id,
+      category: complianceItems.category,
+      number: complianceItems.number,
+      requirementText: complianceItems.requirementText,
+      rfpPageReference: complianceItems.rfpPageReference,
+      proposalSectionId: complianceItems.proposalSectionId,
+      proposalPageReference: complianceItems.proposalPageReference,
+      status: complianceItems.status,
+      ordering: complianceItems.ordering,
+      sectionTitle: proposalSections.title,
+      sectionOrdering: proposalSections.ordering,
+    })
+    .from(complianceItems)
+    .leftJoin(
+      proposalSections,
+      eq(proposalSections.id, complianceItems.proposalSectionId),
+    )
+    .where(eq(complianceItems.proposalId, proposalId))
+    .orderBy(asc(complianceItems.ordering));
+
+  const evidenceByItem = new Map<
+    string,
+    { kind: string; label: string }[]
+  >();
+  if (itemRows.length > 0) {
+    const evidenceRows = await db
+      .select({
+        complianceItemId: complianceItemEvidence.complianceItemId,
+        kind: complianceItemEvidence.kind,
+        label: complianceItemEvidence.label,
+      })
+      .from(complianceItemEvidence)
+      .where(
+        eq(
+          complianceItemEvidence.organizationId,
+          organizationId,
+        ),
+      );
+    for (const e of evidenceRows) {
+      const arr = evidenceByItem.get(e.complianceItemId) ?? [];
+      arr.push({ kind: e.kind, label: e.label });
+      evidenceByItem.set(e.complianceItemId, arr);
+    }
+  }
+
+  const html = renderCrosswalkHtml({
+    organization: { name: orgRow.name },
+    proposal: {
+      title: propRow.title,
+      agency: propRow.agency ?? "",
+      solicitationNumber: propRow.solicitationNumber ?? "",
+    },
+    items: itemRows.map((r) => ({
+      id: r.id,
+      category: r.category,
+      number: r.number,
+      requirementText: r.requirementText,
+      rfpPageReference: r.rfpPageReference,
+      sectionTitle: r.sectionTitle ?? null,
+      sectionOrdering: r.sectionOrdering ?? null,
+      proposalPageReference: r.proposalPageReference,
+      status: r.status,
+      evidence: evidenceByItem.get(r.id) ?? [],
+    })),
+    generatedAt: new Date(),
+  });
+
+  // Render via the PDF provider (stub → returns HTML; live → real PDF).
+  let rendered;
+  try {
+    const provider = getPdfProvider();
+    rendered = await provider.render(html);
+  } catch (err) {
+    log.error("[renderComplianceCrosswalkAction]", "provider.render failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "PDF render failed.",
+    };
+  }
+
+  const renderId = crypto.randomUUID();
+  const storageKey = `org/${organizationId}/proposal/${proposalId}/crosswalk/${renderId}.${
+    rendered.contentType === "application/pdf" ? "pdf" : "html"
+  }`;
+  let stored;
+  try {
+    const storage = getStorageProvider();
+    stored = await storage.put({
+      key: storageKey,
+      bytes: rendered.bytes,
+      contentType: rendered.contentType,
+    });
+  } catch (err) {
+    log.error("[renderComplianceCrosswalkAction]", "storage.put failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Storage write failed.",
+    };
+  }
+
+  const downloadUrl = `/api/proposals/${proposalId}/pdf/${renderId}`;
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60_000);
+
+  try {
+    await db.insert(proposalPdfRenders).values({
+      id: renderId,
+      proposalId,
+      organizationId,
+      templateId: null,
+      renderedByUserId: user.id,
+      storagePath: stored.storagePath,
+      contentType: rendered.contentType === "application/pdf" ? "pdf" : "html",
+      byteSize: stored.byteSize,
+      pageCount: rendered.pageCount,
+      provider: rendered.provider,
+      downloadUrl,
+      expiresAt,
+    });
+  } catch (err) {
+    log.error("[renderComplianceCrosswalkAction]", "insert failed", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Failed to record render.",
+    };
+  }
+
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.compliance.crosswalk.render",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      renderId,
+      itemCount: itemRows.length,
+      provider: rendered.provider,
+      byteSize: stored.byteSize,
+    },
+  });
+
+  revalidatePath(`/proposals/${proposalId}`);
+  return {
+    ok: true,
+    id: renderId,
+    contentType: rendered.contentType,
+    provider: rendered.provider,
+    stubbed: rendered.stubbed,
+    byteSize: stored.byteSize,
+    downloadUrl,
+    renderedAt: new Date().toISOString(),
+  };
+}
+
 export async function getProposalExportCapabilityAction(
   proposalId: string,
 ): Promise<{

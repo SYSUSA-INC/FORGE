@@ -113,6 +113,26 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
+### BL-FB-CM-GATE — Pre-submission compliance gate + crosswalk PDF
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+
+Adds two pieces:
+1. **Gate:** every proposal-export action (PDF, DOCX, DOCX-to-PDF)
+   refuses by default when the compliance matrix has any
+   `not_addressed` or `partial` rows. Caller can override with
+   `forceExport: true`. Gate is inactive when no matrix exists, so
+   tenants who haven't built one aren't broken. Gate status is also
+   surfaced inline on the ExportPanel with a "Force export anyway"
+   checkbox the user must explicitly check.
+2. **Crosswalk PDF:** new `renderComplianceCrosswalkAction` renders
+   the Section L/M traceability table as a standalone landscape PDF
+   (one row per requirement → section mapping → status → attached
+   evidence from BL-FB-CM-EVIDENCE). Designed to ship with the
+   submission package as the back-of-volume crosswalk.
+
+Future (BL-FB-CM-GATE-CONFIG): per-tier gate hardness — Enterprise
+hard-block (no override), Bronze soft-warn (override always on).
+
 ### BL-FB-CM-AUTOMAP — Auto-map compliance items to proposal sections
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #245)
 
