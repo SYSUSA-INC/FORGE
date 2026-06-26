@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
-import { runProposalScanAction, type ProposalScanResult } from "./scan-actions";
+import {
+  runProposalScanAction,
+  type ProposalScanResult,
+  type StoredProposalScan,
+} from "./scan-actions";
 
 type ScanData = Extract<ProposalScanResult, { ok: true }>;
 
@@ -36,8 +41,31 @@ const SEVERITY_COLOR: Record<string, string> = {
   low: "#94a3b8",
 };
 
-export function ProposalScanPanel({ proposalId }: { proposalId: string }) {
-  const [scan, setScan] = useState<ScanData | null>(null);
+export function ProposalScanPanel({
+  proposalId,
+  initial,
+  backgroundScanRunning,
+}: {
+  proposalId: string;
+  initial: StoredProposalScan | null;
+  backgroundScanRunning: boolean;
+}) {
+  const router = useRouter();
+  // Hydrate from the persisted scan so the panel renders content
+  // immediately on page load instead of waiting for the user to click.
+  const [scan, setScan] = useState<ScanData | null>(
+    initial
+      ? {
+          ok: true,
+          overallScore: initial.overallScore,
+          summary: initial.summary,
+          sectionIssues: initial.sectionIssues,
+          topRecommendations: initial.topRecommendations,
+          stubbed: initial.stubbed,
+          generatedAt: initial.generatedAt,
+        }
+      : null,
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -50,17 +78,19 @@ export function ProposalScanPanel({ proposalId }: { proposalId: string }) {
         return;
       }
       setScan(res);
+      router.refresh();
     });
   }
 
   const scoreStyle = scan ? SCORE_STYLES[scan.overallScore] : null;
+  const isStale = initial?.dirtySince != null;
 
   return (
     <Panel
       title="AI Health Check"
       eyebrow={
         scan
-          ? `Scanned ${new Date(scan.generatedAt).toLocaleString()}${scan.stubbed ? " · stub" : ""}`
+          ? `Scanned ${new Date(scan.generatedAt).toLocaleString()}${scan.stubbed ? " · stub" : ""}${isStale ? " · stale" : ""}`
           : "Scan in-flight proposal for gaps"
       }
       actions={
@@ -74,6 +104,18 @@ export function ProposalScanPanel({ proposalId }: { proposalId: string }) {
         </button>
       }
     >
+      {backgroundScanRunning ? (
+        <div className="mb-2 rounded-md border border-violet-400/40 bg-violet-400/10 px-3 py-2 font-mono text-[11px] text-violet-200">
+          Background scan running — reload in ~10 seconds for an updated
+          report. Edits since your last scan are tracked automatically.
+        </div>
+      ) : isStale ? (
+        <div className="mb-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 font-mono text-[11px] text-amber-200">
+          Sections have changed since this scan. Click <strong>Re-scan</strong>{" "}
+          to refresh — auto-refresh kicks in on next page load.
+        </div>
+      ) : null}
+
       {!scan && !error ? (
         <p className="font-body text-[12px] leading-relaxed text-muted">
           Checks every section for empty content, thin drafts, and compliance

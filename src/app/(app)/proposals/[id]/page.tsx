@@ -9,6 +9,10 @@ import { BrainMinePanel } from "./BrainMinePanel";
 import { getBrainMineStatusAction } from "./brain-actions";
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { ProposalScanPanel } from "./ProposalScanPanel";
+import {
+  getStoredProposalScanAction,
+  triggerProposalScanIfStaleAction,
+} from "./scan-actions";
 import { StageAdvancePanel } from "./StageAdvancePanel";
 import { WinThemesPanel } from "./WinThemesPanel";
 import { ExportPanel } from "./pdf/ExportPanel";
@@ -65,6 +69,8 @@ export default async function ProposalOverviewPage({
     docxToPdfStatus,
     complianceGate,
     brainMineStatus,
+    storedScan,
+    scanTrigger,
   ] = await Promise.all([
     listRecentRendersAction(params.id, 5),
     getProviderStatusAction(),
@@ -72,6 +78,12 @@ export default async function ProposalOverviewPage({
     getDocxToPdfStatusAction(),
     getComplianceGateStatusAction(params.id),
     getBrainMineStatusAction(params.id),
+    getStoredProposalScanAction(params.id),
+    // BL-FB-SCAN-CONTINUOUS — on every page load, ask the trigger to
+    // re-scan if the proposal is dirty + outside the debounce window.
+    // Fire-and-forget at the server-action layer; we just surface
+    // whether a scan was launched so the panel can show a notice.
+    triggerProposalScanIfStaleAction(params.id),
   ]);
 
   return (
@@ -110,7 +122,11 @@ export default async function ProposalOverviewPage({
           docxToPdfProvider={docxToPdfStatus.active.name}
         />
 
-        <ProposalScanPanel proposalId={p.id} />
+        <ProposalScanPanel
+          proposalId={p.id}
+          initial={storedScan}
+          backgroundScanRunning={scanTrigger.triggered}
+        />
 
         <Panel title="Sections" eyebrow={`${approved}/${sections.length} approved · ${totalWords} words`}>
           <ul className="flex flex-col gap-1.5">

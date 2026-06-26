@@ -42,6 +42,11 @@ type Section = {
   authorUserId: string | null;
   authorName: string | null;
   authorEmail: string | null;
+  // BL-FB-SCAN-CONTINUOUS — per-section severity from the latest health
+  // scan, or null when no scan has run / no issue was raised for this
+  // section. Drives the red/amber/green dot in the section list.
+  scanSeverity: "high" | "medium" | "low" | null;
+  scanIssue: string | null;
 };
 
 type TeamMember = { id: string; name: string | null; email: string };
@@ -378,6 +383,8 @@ function SectionRow({
             <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
               {section.ordering}
             </span>
+            {/* BL-FB-SCAN-CONTINUOUS — health dot per section */}
+            <ScanDot severity={section.scanSeverity} issue={section.scanIssue} />
             <span className="truncate font-display text-[14px] font-semibold text-text">
               {section.title}
             </span>
@@ -545,5 +552,44 @@ function SectionRow({
         </div>
       ) : null}
     </li>
+  );
+}
+
+function ScanDot({
+  severity,
+  issue,
+}: {
+  severity: "high" | "medium" | "low" | null;
+  issue: string | null;
+}) {
+  // Emerald = no issue raised in the last scan (or no scan yet, which
+  // we render the same neutral colour to avoid alarming the operator
+  // about a freshly-started proposal).
+  const color =
+    severity === "high"
+      ? "#f87171"
+      : severity === "medium"
+        ? "#fbbf24"
+        : severity === "low"
+          ? "#94a3b8"
+          : "#34d399";
+  const label =
+    severity === "high"
+      ? "Critical issue"
+      : severity === "medium"
+        ? "Needs attention"
+        : severity === "low"
+          ? "Minor issue"
+          : "Healthy";
+  return (
+    <span
+      title={issue ? `${label}: ${issue}` : label}
+      aria-label={label}
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
+      style={{
+        background: color,
+        boxShadow: `0 0 0 1px ${color}55`,
+      }}
+    />
   );
 }

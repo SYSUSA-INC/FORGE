@@ -560,6 +560,25 @@ export async function saveSectionAction(input: {
       }
     }
 
+    // BL-FB-SCAN-CONTINUOUS — flag the proposal as dirty so the next
+    // overview-page load can fire a debounced re-scan. Only when the
+    // save actually touched content (title alone doesn't move the
+    // scan needle). Best-effort — failure here MUST NOT block the
+    // save itself.
+    if (
+      input.bodyDoc !== undefined ||
+      input.content !== undefined ||
+      input.status !== undefined ||
+      input.pageLimit !== undefined
+    ) {
+      try {
+        const { markScanDirty } = await import("@/lib/proposal-scan-dirty");
+        await markScanDirty(input.proposalId, organizationId);
+      } catch (err) {
+        log.warn("[saveSectionAction]", "markScanDirty failed", { error: err });
+      }
+    }
+
     revalidatePath(`/proposals/${input.proposalId}/sections`);
     revalidatePath(`/proposals/${input.proposalId}`);
     return { ok: true };

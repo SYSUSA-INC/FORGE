@@ -113,8 +113,38 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
-### BL-FB-X-BRAIN-MINE — Won proposals always mine into the Brain
+### BL-FB-SCAN-CONTINUOUS — Continuous health scan + section dots
 **Priority:** P1  ·  **Effort:** L  ·  **Status:** 🟡 in-flight
+
+Promotes the on-demand AI Health Check from PR #243 into a
+continuous always-on quality layer:
+- Schema (migration 0065): new `proposal_scan_result` table
+  (UPSERT per proposal) persists overall score, summary,
+  per-section issues, and recommendations; new
+  `proposal.scan_dirty_since` column marks "content changed since
+  last scan".
+- `runProposalScanAction` extended to UPSERT into the table and
+  clear `scan_dirty_since` on success.
+- `saveSectionAction` calls a new `markScanDirty` helper after any
+  content-touching save so the dirty flag captures the OLDEST
+  unscanned edit (best-effort, never blocks the save).
+- New `triggerProposalScanIfStaleAction` — debounced auto-trigger
+  fired on proposal-overview + sections-list page loads. Only
+  launches a fresh scan if the proposal is dirty AND the dirty
+  flag is older than 60s. Fire-and-forget so page renders aren't
+  blocked.
+- ProposalScanPanel hydrates from the persisted scan and surfaces
+  a "background scan running" banner when triggered, or a "stale"
+  banner if dirty content sits behind the debounce window.
+- Section list now shows a red/amber/green health dot per row,
+  driven by the latest scan's section-level severities. Healthy
+  sections (no issue raised) render emerald.
+
+Result: scan results are always visible, always cheap to render,
+and stay fresh without burning AI quota on every keystroke.
+
+### BL-FB-X-BRAIN-MINE — Won proposals always mine into the Brain
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #250)
 
 The harvest pipeline (Phase 10f) + outcome propagation (Phase 14a)
 already index submitted proposals and tag entries with the outcome

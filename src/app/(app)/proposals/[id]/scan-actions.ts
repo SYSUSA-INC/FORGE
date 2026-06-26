@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   opportunities,
+  proposalScanResults,
   proposalSections,
   proposals,
   solicitations,
@@ -248,18 +249,70 @@ export async function runProposalScanAction(
       sectionIssues: ProposalScanIssue[];
       topRecommendations: string[];
     };
-    return {
-      ok: true,
-      overallScore: ["strong", "needs_work", "critical"].includes(
+    const result = {
+      overallScore: (["strong", "needs_work", "critical"] as const).includes(
         parsed.overallScore,
       )
         ? parsed.overallScore
-        : "needs_work",
+        : ("needs_work" as const),
       summary: (parsed.summary ?? "").slice(0, 1200),
       sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
       topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
       stubbed,
-      generatedAt: new Date().toISOString(),
+      generatedAt: new Date(),
+    };
+
+    // BL-FB-SCAN-CONTINUOUS — persist the scan and clear the dirty flag.
+    // Sequential UPSERT pattern per Neon-pgbouncer rule (no transactions).
+    try {
+      const [existing] = await db
+        .select({ id: proposalScanResults.id })
+        .from(proposalScanResults)
+        .where(eq(proposalScanResults.proposalId, proposalId))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(proposalScanResults)
+          .set({
+            overallScore: result.overallScore,
+            summary: result.summary,
+            sectionIssues: result.sectionIssues,
+            topRecommendations: result.topRecommendations,
+            stubbed: result.stubbed,
+            generatedAt: result.generatedAt,
+          })
+          .where(eq(proposalScanResults.id, existing.id));
+      } else {
+        await db.insert(proposalScanResults).values({
+          organizationId,
+          proposalId,
+          overallScore: result.overallScore,
+          summary: result.summary,
+          sectionIssues: result.sectionIssues,
+          topRecommendations: result.topRecommendations,
+          stubbed: result.stubbed,
+          generatedAt: result.generatedAt,
+        });
+      }
+
+      // Clear the dirty flag — this scan covers all content as of now.
+      await db
+        .update(proposals)
+        .set({ scanDirtySince: null })
+        .where(eq(proposals.id, proposalId));
+    } catch (err) {
+      log.warn("[runProposalScanAction]", "persist failed", { error: err });
+    }
+
+    return {
+      ok: true,
+      overallScore: result.overallScore,
+      summary: result.summary,
+      sectionIssues: result.sectionIssues,
+      topRecommendations: result.topRecommendations,
+      stubbed: result.stubbed,
+      generatedAt: result.generatedAt.toISOString(),
     };
   } catch {
     await refundQuota(organizationId, "aiRequestsPerMonth");
@@ -271,4 +324,118 @@ export async function runProposalScanAction(
       error: "AI returned an unexpected format. Re-run the scan.",
     };
   }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-SCAN-CONTINUOUS — persisted scan + continuous-refresh helpers
+// ────────────────────────────────────────────────────────────────────
+
+export type StoredProposalScan = {
+  overallScore: "strong" | "needs_work" | "critical";
+  summary: string;
+  sectionIssues: ProposalScanIssue[];
+  topRecommendations: string[];
+  stubbed: boolean;
+  generatedAt: string;
+  dirtySince: string | null;
+};
+
+/**
+ * Read the latest persisted scan for a proposal (+ dirty flag). Used by
+ * pages that want to render scan-driven UI without forcing a fresh AI
+ * call. Returns `null` when no scan has ever been recorded.
+ */
+export async function getStoredProposalScanAction(
+  proposalId: string,
+): Promise<StoredProposalScan | null> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const [own] = await db
+    .select({
+      id: proposals.id,
+      scanDirtySince: proposals.scanDirtySince,
+    })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!own) return null;
+
+  const [row] = await db
+    .select()
+    .from(proposalScanResults)
+    .where(
+      and(
+        eq(proposalScanResults.proposalId, proposalId),
+        eq(proposalScanResults.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+
+  return {
+    overallScore: row.overallScore as "strong" | "needs_work" | "critical",
+    summary: row.summary,
+    sectionIssues: row.sectionIssues,
+    topRecommendations: row.topRecommendations,
+    stubbed: row.stubbed,
+    generatedAt: row.generatedAt.toISOString(),
+    dirtySince: own.scanDirtySince ? own.scanDirtySince.toISOString() : null,
+  };
+}
+
+/**
+ * Debounced auto-trigger. Page-load callers invoke this; if the proposal
+ * is dirty AND the most recent edit is at least DEBOUNCE_SECONDS old AND
+ * we're not currently within the rate-limit window, fire a fresh scan
+ * in the background.
+ *
+ * Returns whether a scan was actually triggered so the UI can show a
+ * "scan running" indicator.
+ */
+const SCAN_DEBOUNCE_SECONDS = 60;
+
+export async function triggerProposalScanIfStaleAction(
+  proposalId: string,
+): Promise<{ triggered: boolean }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const [own] = await db
+    .select({
+      id: proposals.id,
+      scanDirtySince: proposals.scanDirtySince,
+    })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.id, proposalId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!own || !own.scanDirtySince) return { triggered: false };
+
+  const dirtyAgeSeconds =
+    (Date.now() - own.scanDirtySince.getTime()) / 1000;
+  if (dirtyAgeSeconds < SCAN_DEBOUNCE_SECONDS) {
+    return { triggered: false };
+  }
+
+  // Fire-and-forget — the user will see results on the next page load.
+  // `runProposalScanAction` handles its own rate-limit + quota refund
+  // path, so we don't need defensive logic here beyond catching to
+  // keep the unhandled rejection clean.
+  void runProposalScanAction(proposalId).catch((err) => {
+    log.warn("[triggerProposalScanIfStaleAction]", "background scan failed", {
+      error: err,
+    });
+  });
+
+  return { triggered: true };
 }
