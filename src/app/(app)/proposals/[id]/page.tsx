@@ -5,6 +5,8 @@ import { proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
+import { BrainMinePanel } from "./BrainMinePanel";
+import { getBrainMineStatusAction } from "./brain-actions";
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { ProposalScanPanel } from "./ProposalScanPanel";
 import { StageAdvancePanel } from "./StageAdvancePanel";
@@ -62,12 +64,14 @@ export default async function ProposalOverviewPage({
     exportCapability,
     docxToPdfStatus,
     complianceGate,
+    brainMineStatus,
   ] = await Promise.all([
     listRecentRendersAction(params.id, 5),
     getProviderStatusAction(),
     getProposalExportCapabilityAction(params.id),
     getDocxToPdfStatusAction(),
     getComplianceGateStatusAction(params.id),
+    getBrainMineStatusAction(params.id),
   ]);
 
   return (
@@ -90,6 +94,7 @@ export default async function ProposalOverviewPage({
           proposalId={p.id}
           initial={(p.winThemes ?? []) as { title: string; statement: string }[]}
         />
+        <BrainMinePanel proposalId={p.id} initial={brainMineStatus} />
       </div>
 
       <div className="flex flex-col gap-4">

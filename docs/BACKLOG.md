@@ -113,8 +113,33 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
+### BL-FB-X-BRAIN-MINE — Won proposals always mine into the Brain
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** 🟡 in-flight
+
+The harvest pipeline (Phase 10f) + outcome propagation (Phase 14a)
+already index submitted proposals and tag entries with the outcome
+label. Gap: proposals marked "won" that never went through the
+`stage=submitted` transition (e.g. uploaded after the fact, or that
+jumped straight to "awarded") never got mined. This PR:
+- Triggers `harvestProposalToCorpusAction` from `saveOutcomeAction`
+  when outcome=won AND no harvested artifact exists for the proposal
+  (detected via the `artifactsTagged === 0` signal already returned
+  by `propagateOutcomeToCorpus`).
+- New `BrainMinePanel` on the proposal overview surfaces mining
+  status: mined yes/no, outcome label, candidate count, promoted
+  count, last-harvested timestamp, link to the artifact + review
+  queue, manual "Mine into Brain" / "Re-mine" trigger.
+- New `getBrainMineStatusAction` reads the artifact + extraction
+  candidate counts for the panel; tenant-scoped via inline ownership
+  check.
+
+Result: every won proposal lands in the Brain with `outcomeLabel=won`,
+giving the existing Phase 14a outcome-aware retrieval the data it
+needs to actually bias drafts toward proven-winning content rather
+than generic prose.
+
 ### BL-FB-GEN-THEMES — Win themes as first-class draft inputs
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #249)
 
 Schema (migration 0064): per-proposal `win_themes` jsonb on the
 `proposal` row, capped at 3 entries by app code (each row = title +
