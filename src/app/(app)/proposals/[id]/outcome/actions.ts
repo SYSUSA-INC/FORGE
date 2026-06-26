@@ -142,7 +142,25 @@ export async function saveOutcomeAction(
     // if the corpus update errors, since the outcome row is the
     // source of truth.
     try {
-      await propagateOutcomeToCorpus(proposalId, outcomeType);
+      const propagated = await propagateOutcomeToCorpus(
+        proposalId,
+        outcomeType,
+      );
+
+      // BL-FB-X-BRAIN-MINE — wins must end up in the Brain. The
+      // standard pipeline harvests on stage=submitted transition;
+      // proposals that go straight to "won" (e.g. uploaded after the
+      // fact, or that skipped submitted in the stage progression)
+      // never get mined unless we kick off a harvest here. Fire-and-
+      // forget so the outcome save isn't blocked by AI extraction.
+      if (outcomeType === "won" && propagated.artifactsTagged === 0) {
+        const { harvestProposalToCorpusAction } = await import(
+          "../harvest-actions"
+        );
+        void harvestProposalToCorpusAction(proposalId).catch((err) => {
+          log.warn("[saveOutcomeAction]", "win-harvest failed", { error: err });
+        });
+      }
     } catch (err) {
       log.warn("[saveOutcomeAction]", "propagateOutcomeToCorpus failed", { error: err });
     }
