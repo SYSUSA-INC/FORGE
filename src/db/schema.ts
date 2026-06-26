@@ -496,6 +496,13 @@ export const proposals = pgTable("proposal", {
     onDelete: "set null",
   }),
   notes: text("notes").notNull().default(""),
+  // BL-FB-GEN-THEMES — 1-3 win themes the AI threads into every
+  // section draft. Capped at 3 by app code; each theme is a short
+  // title + a one-sentence statement.
+  winThemes: jsonb("win_themes")
+    .$type<{ title: string; statement: string }[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -504,6 +511,8 @@ export const proposals = pgTable("proposal", {
 }, (t) => ({
   organizationIdIdx: index("proposal_organization_id_idx").on(t.organizationId),
 }));
+
+export type ProposalWinTheme = { title: string; statement: string };
 
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),

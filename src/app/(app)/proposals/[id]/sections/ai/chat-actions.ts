@@ -135,6 +135,19 @@ export async function chatWithSectionAction(input: {
     // best effort
   }
 
+  // BL-FB-GEN-THEMES — surface the proposal's win themes so the chat
+  // assistant can reinforce them when suggesting language.
+  const winThemes = (row.proposal.winThemes ?? []).slice(0, 3);
+  const themesBlock =
+    winThemes.length > 0
+      ? `\nWin themes (weave these into every suggestion):\n${winThemes
+          .map(
+            (t, i) =>
+              `  ${i + 1}. ${t.title}: ${t.statement}`,
+          )
+          .join("\n")}`
+      : "";
+
   const contextBlock = [
     `Organization: ${orgRow?.name ?? "unknown"}`,
     `Proposal: ${row.proposal.title}`,
@@ -145,6 +158,7 @@ export async function chatWithSectionAction(input: {
     row.incumbent && `Incumbent: ${row.incumbent}`,
     row.opportunityDescription &&
       `Opportunity description: ${row.opportunityDescription.slice(0, 800)}`,
+    themesBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
     row.section.content?.trim() &&

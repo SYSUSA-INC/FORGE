@@ -187,12 +187,24 @@ export async function runProposalScanAction(
           .join("\n")
       : "";
 
+  // BL-FB-GEN-THEMES — feed win themes into the scan so it can flag
+  // sections that drift off-theme (e.g. a Technical Approach that
+  // never mentions the proposal's headline differentiator).
+  const winThemes = (propRow.proposal.winThemes ?? []).slice(0, 3);
+  const themesBlock =
+    winThemes.length > 0
+      ? `\nWin themes (the proposal team committed to these — flag any section that doesn't reinforce them):\n${winThemes
+          .map((t, i) => `  ${i + 1}. ${t.title}: ${t.statement}`)
+          .join("\n")}`
+      : "";
+
   const userPrompt = [
     `Proposal: ${propRow.proposal.title}`,
     `Agency: ${propRow.agency || "(unknown)"}`,
     `Solicitation: ${propRow.solicitationNumber || "(none)"}`,
     `NAICS: ${propRow.naicsCode || "(unknown)"}`,
     `Set-aside: ${propRow.setAside || "(unrestricted)"}`,
+    themesBlock,
     requirementsBlock,
     ``,
     `Sections (${sections.length} total):`,
