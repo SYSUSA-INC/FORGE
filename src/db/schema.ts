@@ -503,6 +503,11 @@ export const proposals = pgTable("proposal", {
     .$type<{ title: string; statement: string }[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
+  // BL-FB-SCAN-CONTINUOUS — marker for "content changed since the
+  // last health scan". NULL = fresh; set to the timestamp of the
+  // first dirtying edit so callers can decide whether a re-scan is
+  // worth firing (debounce window).
+  scanDirtySince: timestamp("scan_dirty_since"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -513,6 +518,59 @@ export const proposals = pgTable("proposal", {
 }));
 
 export type ProposalWinTheme = { title: string; statement: string };
+
+/**
+ * BL-FB-SCAN-CONTINUOUS — persisted health-scan result, one row per
+ * proposal (UPSERT on each scan run).
+ *
+ * Mirrors the on-demand shape from `runProposalScanAction`:
+ *   - overallScore: strong / needs_work / critical
+ *   - summary: 2-3 sentence health summary
+ *   - sectionIssues: array of { sectionId, sectionTitle, issue, severity }
+ *   - topRecommendations: array of strings
+ *   - stubbed: provider was in stub mode
+ *
+ * Indexed by both `proposal_id` (UNIQUE, drives the UPSERT) and
+ * `organization_id` (tenant-scope query path).
+ */
+export type ProposalScanSectionIssue = {
+  sectionId: string;
+  sectionTitle: string;
+  issue: string;
+  severity: "high" | "medium" | "low";
+};
+
+export const proposalScanResults = pgTable(
+  "proposal_scan_result",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .unique()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    overallScore: text("overall_score").notNull().default("needs_work"),
+    summary: text("summary").notNull().default(""),
+    sectionIssues: jsonb("section_issues")
+      .$type<ProposalScanSectionIssue[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    topRecommendations: jsonb("top_recommendations")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    stubbed: boolean("stubbed").notNull().default(false),
+    generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("proposal_scan_result_org_idx").on(t.organizationId),
+  }),
+);
+
+export type ProposalScanResult = typeof proposalScanResults.$inferSelect;
+export type NewProposalScanResult = typeof proposalScanResults.$inferInsert;
 
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
