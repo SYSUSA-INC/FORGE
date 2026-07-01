@@ -14,6 +14,9 @@ import {
   CATEGORIES,
   CATEGORY_COLORS,
   CATEGORY_LABELS,
+  OWNER_STATUS_COLORS,
+  OWNER_STATUS_LABELS,
+  OWNER_STATUSES,
   STATUS_COLORS,
   STATUS_LABELS,
   STATUSES,
@@ -58,6 +61,7 @@ export default async function ProposalCompliancePage({
       notes: complianceItems.notes,
       ordering: complianceItems.ordering,
       ownerUserId: complianceItems.ownerUserId,
+      ownerStatus: complianceItems.ownerStatus,
       ownerName: users.name,
       ownerEmail: users.email,
       sectionTitle: proposalSections.title,
@@ -151,6 +155,9 @@ export default async function ProposalCompliancePage({
         proposalId={params.id}
         categories={CATEGORIES}
         statuses={STATUSES}
+        ownerStatuses={OWNER_STATUSES}
+        ownerStatusLabels={OWNER_STATUS_LABELS}
+        ownerStatusColors={OWNER_STATUS_COLORS}
         categoryLabels={CATEGORY_LABELS}
         categoryColors={CATEGORY_COLORS}
         statusLabels={STATUS_LABELS}
@@ -174,6 +181,7 @@ export default async function ProposalCompliancePage({
           status: i.status,
           notes: i.notes,
           ownerUserId: i.ownerUserId,
+          ownerStatus: i.ownerStatus,
           ownerName: i.ownerName,
           ownerEmail: i.ownerEmail,
           sectionTitle: i.sectionTitle ?? null,

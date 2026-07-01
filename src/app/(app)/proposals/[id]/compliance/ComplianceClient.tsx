@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import type {
   ComplianceCategory,
+  ComplianceOwnerStatus,
   ComplianceStatus,
 } from "@/db/schema";
 import {
@@ -27,6 +28,7 @@ type CategoryDef = {
   description: string;
 };
 type StatusDef = { key: ComplianceStatus; label: string; color: string };
+type OwnerStatusDef = { key: ComplianceOwnerStatus; label: string; color: string };
 type SectionLite = { id: string; title: string; ordering: number };
 type TeamMember = { id: string; name: string | null; email: string };
 
@@ -50,6 +52,7 @@ type ItemRow = {
   status: ComplianceStatus;
   notes: string;
   ownerUserId: string | null;
+  ownerStatus: ComplianceOwnerStatus;
   ownerName: string | null;
   ownerEmail: string | null;
   sectionTitle: string | null;
@@ -63,6 +66,9 @@ export function ComplianceClient({
   proposalId,
   categories,
   statuses,
+  ownerStatuses,
+  ownerStatusLabels,
+  ownerStatusColors,
   categoryLabels,
   categoryColors,
   statusLabels,
@@ -75,6 +81,9 @@ export function ComplianceClient({
   proposalId: string;
   categories: CategoryDef[];
   statuses: StatusDef[];
+  ownerStatuses: OwnerStatusDef[];
+  ownerStatusLabels: Record<ComplianceOwnerStatus, string>;
+  ownerStatusColors: Record<ComplianceOwnerStatus, string>;
   categoryLabels: Record<ComplianceCategory, string>;
   categoryColors: Record<ComplianceCategory, string>;
   statusLabels: Record<ComplianceStatus, string>;
@@ -89,6 +98,7 @@ export function ComplianceClient({
     "all",
   );
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "heatmap">("list");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -178,33 +188,69 @@ export function ComplianceClient({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <div className="flex gap-1 rounded-md border border-white/10 bg-white/[0.02] p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            className={`rounded px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              viewMode === "list"
+                ? "bg-white/10 text-text"
+                : "text-muted hover:text-text"
+            }`}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("heatmap")}
+            className={`rounded px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              viewMode === "heatmap"
+                ? "bg-white/10 text-text"
+                : "text-muted hover:text-text"
+            }`}
+          >
+            Heatmap
+          </button>
+        </div>
       </div>
 
-      <Panel title="Compliance items" eyebrow={`${filtered.length} of ${items.length}`}>
-        {filtered.length === 0 ? (
-          <div className="font-mono text-[11px] text-muted">
-            No items match the current filters.
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {filtered.map((i) => (
-              <ItemRowCard
-                key={i.id}
-                proposalId={proposalId}
-                item={i}
-                categories={categories}
-                statuses={statuses}
-                categoryLabels={categoryLabels}
-                categoryColors={categoryColors}
-                statusLabels={statusLabels}
-                statusColors={statusColors}
-                sections={sections}
-                team={team}
-              />
-            ))}
-          </ul>
-        )}
-      </Panel>
+      {viewMode === "heatmap" ? (
+        <ComplianceHeatmap
+          items={filtered}
+          sections={sections}
+          statusColors={statusColors}
+          statusLabels={statusLabels}
+        />
+      ) : (
+        <Panel title="Compliance items" eyebrow={`${filtered.length} of ${items.length}`}>
+          {filtered.length === 0 ? (
+            <div className="font-mono text-[11px] text-muted">
+              No items match the current filters.
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {filtered.map((i) => (
+                <ItemRowCard
+                  key={i.id}
+                  proposalId={proposalId}
+                  item={i}
+                  categories={categories}
+                  statuses={statuses}
+                  ownerStatuses={ownerStatuses}
+                  ownerStatusLabels={ownerStatusLabels}
+                  ownerStatusColors={ownerStatusColors}
+                  categoryLabels={categoryLabels}
+                  categoryColors={categoryColors}
+                  statusLabels={statusLabels}
+                  statusColors={statusColors}
+                  sections={sections}
+                  team={team}
+                />
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
     </div>
   );
 }
@@ -551,6 +597,9 @@ function ItemRowCard({
   item,
   categories,
   statuses,
+  ownerStatuses,
+  ownerStatusLabels,
+  ownerStatusColors,
   categoryLabels,
   categoryColors,
   statusLabels,
@@ -562,6 +611,9 @@ function ItemRowCard({
   item: ItemRow;
   categories: CategoryDef[];
   statuses: StatusDef[];
+  ownerStatuses: OwnerStatusDef[];
+  ownerStatusLabels: Record<ComplianceOwnerStatus, string>;
+  ownerStatusColors: Record<ComplianceOwnerStatus, string>;
   categoryLabels: Record<ComplianceCategory, string>;
   categoryColors: Record<ComplianceCategory, string>;
   statusLabels: Record<ComplianceStatus, string>;
@@ -588,6 +640,7 @@ function ItemRowCard({
   const [status, setStatus] = useState(item.status);
   const [notes, setNotes] = useState(item.notes);
   const [ownerUserId, setOwnerUserId] = useState(item.ownerUserId ?? "");
+  const [ownerStatus, setOwnerStatus] = useState<ComplianceOwnerStatus>(item.ownerStatus);
 
   function save() {
     setError(null);
@@ -603,6 +656,7 @@ function ItemRowCard({
         status,
         notes,
         ownerUserId: ownerUserId || null,
+        ownerStatus,
       });
       if (!res.ok) return setError(res.error);
       setEditing(false);
@@ -628,6 +682,16 @@ function ItemRowCard({
       });
       if (!res.ok) return setError(res.error);
       router.refresh();
+    });
+  }
+
+  function quickOwnerStatus(next: ComplianceOwnerStatus) {
+    setOwnerStatus(next);
+    startTransition(async () => {
+      const res = await updateComplianceItemAction(proposalId, item.id, {
+        ownerStatus: next,
+      });
+      if (!res.ok) setOwnerStatus(item.ownerStatus);
     });
   }
 
@@ -673,7 +737,19 @@ function ItemRowCard({
                 <span>Our {item.proposalPageReference}</span>
               ) : null}
               {item.ownerName || item.ownerEmail ? (
-                <span>Owner: {item.ownerName ?? item.ownerEmail}</span>
+                <span className="flex items-center gap-1">
+                  <span>Owner: {item.ownerName ?? item.ownerEmail}</span>
+                  <span
+                    className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider"
+                    style={{
+                      color: ownerStatusColors[ownerStatus],
+                      backgroundColor: `${ownerStatusColors[ownerStatus]}1A`,
+                      border: `1px solid ${ownerStatusColors[ownerStatus]}40`,
+                    }}
+                  >
+                    {ownerStatusLabels[ownerStatus]}
+                  </span>
+                </span>
               ) : null}
             </div>
             {item.notes ? (
@@ -725,6 +801,31 @@ function ItemRowCard({
                 </button>
               ))}
             </div>
+            {item.ownerUserId ? (
+              <div className="flex flex-wrap justify-end gap-1">
+                {ownerStatuses.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest text-muted transition-colors hover:border-white/30 hover:text-text"
+                    disabled={pending || s.key === ownerStatus}
+                    onClick={() => quickOwnerStatus(s.key)}
+                    style={
+                      s.key === ownerStatus
+                        ? {
+                            color: s.color,
+                            borderColor: `${s.color}60`,
+                            backgroundColor: `${s.color}1A`,
+                          }
+                        : undefined
+                    }
+                    title={`Owner status: ${s.label}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -861,6 +962,21 @@ function ItemRowCard({
             ))}
           </select>
         </div>
+        <div>
+          <label className="aur-label">Owner status</label>
+          <select
+            className="aur-input"
+            value={ownerStatus}
+            onChange={(e) => setOwnerStatus(e.target.value as ComplianceOwnerStatus)}
+            disabled={!ownerUserId}
+          >
+            {ownerStatuses.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="md:col-span-2">
           <label className="aur-label">Notes</label>
           <textarea
@@ -893,6 +1009,139 @@ function ItemRowCard({
         </button>
       </div>
     </li>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BL-FB-CM-HEATMAP — color-grid matrix view
+// ─────────────────────────────────────────────────────────────────
+
+function ComplianceHeatmap({
+  items,
+  sections,
+  statusColors,
+  statusLabels,
+}: {
+  items: ItemRow[];
+  sections: SectionLite[];
+  statusColors: Record<ComplianceStatus, string>;
+  statusLabels: Record<ComplianceStatus, string>;
+}) {
+  // Build column list: mapped sections in order, then unassigned column.
+  const mappedSectionIds = new Set(
+    items.map((i) => i.proposalSectionId).filter(Boolean),
+  );
+  const cols = sections.filter((s) => mappedSectionIds.has(s.id));
+  const hasUnmapped = items.some((i) => !i.proposalSectionId);
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-6 text-center font-mono text-[11px] text-muted">
+        No items match the current filters.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-white/10 bg-white/[0.02]">
+      <table className="w-full border-collapse text-[11px]">
+        <thead>
+          <tr>
+            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-[#0d1117] px-3 py-2 text-left font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              Requirement
+            </th>
+            {cols.map((s) => (
+              <th
+                key={s.id}
+                className="min-w-[80px] px-2 py-2 font-mono text-[10px] text-muted"
+                title={s.title}
+              >
+                <div className="max-w-[80px] truncate text-center uppercase tracking-wider">
+                  §{s.ordering}
+                </div>
+                <div className="max-w-[80px] truncate text-center text-[9px] text-subtle">
+                  {s.title}
+                </div>
+              </th>
+            ))}
+            {hasUnmapped ? (
+              <th className="min-w-[80px] px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-subtle">
+                Unassigned
+              </th>
+            ) : null}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} className="border-t border-white/[0.04] hover:bg-white/[0.02]">
+              <td className="sticky left-0 z-10 bg-[#0d1117] px-3 py-2 font-body text-[12px] text-text">
+                <div className="flex items-center gap-1.5">
+                  {item.number ? (
+                    <span className="shrink-0 font-mono text-[10px] text-muted">
+                      {item.number}
+                    </span>
+                  ) : null}
+                  <span className="line-clamp-2 max-w-[200px] leading-snug">
+                    {item.requirementText}
+                  </span>
+                </div>
+              </td>
+              {cols.map((s) => {
+                const isThis = item.proposalSectionId === s.id;
+                if (!isThis) {
+                  return (
+                    <td
+                      key={s.id}
+                      className="px-2 py-2 text-center"
+                    >
+                      <div className="mx-auto h-5 w-5 rounded bg-white/[0.03]" />
+                    </td>
+                  );
+                }
+                const color = statusColors[item.status];
+                return (
+                  <td key={s.id} className="px-2 py-2 text-center">
+                    <div
+                      className="mx-auto h-5 w-5 rounded"
+                      style={{ backgroundColor: `${color}CC` }}
+                      title={`${statusLabels[item.status]}${item.notes ? ` — ${item.notes.slice(0, 80)}` : ""}`}
+                    />
+                  </td>
+                );
+              })}
+              {hasUnmapped ? (
+                <td className="px-2 py-2 text-center">
+                  {!item.proposalSectionId ? (
+                    <div
+                      className="mx-auto h-5 w-5 rounded"
+                      style={{
+                        backgroundColor: `${statusColors[item.status]}CC`,
+                      }}
+                      title={statusLabels[item.status]}
+                    />
+                  ) : (
+                    <div className="mx-auto h-5 w-5 rounded bg-white/[0.03]" />
+                  )}
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="flex flex-wrap items-center gap-4 border-t border-white/[0.06] px-3 py-2">
+        {(["not_addressed", "partial", "complete", "not_applicable"] as ComplianceStatus[]).map(
+          (s) => (
+            <div key={s} className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
+              <div
+                className="h-3 w-3 rounded"
+                style={{ backgroundColor: `${statusColors[s]}CC` }}
+              />
+              {statusLabels[s]}
+            </div>
+          ),
+        )}
+      </div>
+    </div>
   );
 }
 
