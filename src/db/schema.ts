@@ -838,6 +838,14 @@ export const complianceStatusEnum = pgEnum("compliance_status", [
   "not_applicable",
 ]);
 
+export const complianceOwnerStatusEnum = pgEnum("compliance_owner_status", [
+  "unassigned",
+  "assigned",
+  "in_progress",
+  "complete",
+  "blocked",
+]);
+
 /**
  * Phase 14c — compliance pre-flight AI assessment.
  *
@@ -874,6 +882,9 @@ export const complianceItems = pgTable("compliance_item", {
   ownerUserId: text("owner_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
+  ownerStatus: complianceOwnerStatusEnum("owner_status")
+    .notNull()
+    .default("unassigned"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -892,6 +903,8 @@ export type ComplianceCategory =
   (typeof complianceCategoryEnum.enumValues)[number];
 export type ComplianceStatus =
   (typeof complianceStatusEnum.enumValues)[number];
+export type ComplianceOwnerStatus =
+  (typeof complianceOwnerStatusEnum.enumValues)[number];
 
 /**
  * BL-FB-CM-EVIDENCE — evidence linked to a compliance item.

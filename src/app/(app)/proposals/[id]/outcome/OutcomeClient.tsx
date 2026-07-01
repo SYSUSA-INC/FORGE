@@ -18,7 +18,11 @@ import {
   OUTCOME_TYPE_COLORS,
   OUTCOME_TYPE_LABELS,
 } from "@/lib/proposal-outcome-types";
-import { saveDebriefAction, saveOutcomeAction } from "./actions";
+import {
+  generateDebriefRequestLetterAction,
+  saveDebriefAction,
+  saveOutcomeAction,
+} from "./actions";
 import { WinnerAnalysisPanel } from "./WinnerAnalysisPanel";
 
 type OutcomeForm = {
@@ -106,6 +110,7 @@ export function OutcomeClient({
           hasOutcome={Boolean(outcome)}
           debrief={debrief}
         />
+        <DebriefRequestPanel proposalId={proposalId} />
         {outcome?.outcomeType === "lost" ? (
           <WinnerAnalysisPanel
             proposalId={proposalId}
@@ -752,5 +757,109 @@ function Row({ label, value }: { label: string; value: string }) {
       </span>
       <span className="text-right text-text">{value}</span>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// BL-FB-WIN-DEBRIEF-REQ — debrief request letter panel
+// ─────────────────────────────────────────────────────────────────
+
+function DebriefRequestPanel({ proposalId }: { proposalId: string }) {
+  const [pending, startTransition] = useTransition();
+  const [letter, setLetter] = useState<string | null>(null);
+  const [farCite, setFarCite] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  function generate() {
+    setError(null);
+    startTransition(async () => {
+      const res = await generateDebriefRequestLetterAction(proposalId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setLetter(res.letter);
+      setFarCite(res.farCite);
+    });
+  }
+
+  function copy() {
+    if (!letter) return;
+    navigator.clipboard.writeText(letter).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <Panel
+      title="Debrief request letter"
+      eyebrow="FAR-compliant template — customize before sending"
+      actions={
+        letter ? (
+          <button
+            type="button"
+            onClick={copy}
+            className="aur-btn aur-btn-ghost text-[11px]"
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        ) : undefined
+      }
+    >
+      <p className="font-body text-[12px] leading-relaxed text-muted">
+        Generates a post-award debriefing request letter with the correct FAR
+        citation based on procurement type (FAR 15.506 for negotiated, FAR
+        8.405-2 for FSS schedules, FAR 16.505 for IDIQ task orders).
+      </p>
+
+      {!letter ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={generate}
+            disabled={pending}
+            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+          >
+            {pending ? "Generating…" : "Generate letter"}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <div className="mb-2 flex items-center gap-2 font-mono text-[10px] text-muted">
+            <span className="rounded border border-teal-400/40 bg-teal-400/10 px-1.5 py-0.5 text-teal-300">
+              {farCite}
+            </span>
+            <span>Verify FAR cite against actual solicitation before sending</span>
+          </div>
+          <pre className="max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.02] p-4 font-mono text-[11px] leading-relaxed text-foreground">
+            {letter}
+          </pre>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={copy}
+              className="aur-btn aur-btn-primary text-[12px]"
+            >
+              {copied ? "Copied!" : "Copy to clipboard"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLetter(null)}
+              className="aur-btn aur-btn-ghost text-[12px]"
+            >
+              Regenerate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error ? (
+        <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+          {error}
+        </div>
+      ) : null}
+    </Panel>
   );
 }
