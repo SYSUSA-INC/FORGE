@@ -346,7 +346,7 @@ function pickFarCite(
 }
 
 function addBusinessDays(from: Date, days: number): Date {
-  let d = new Date(from);
+  const d = new Date(from);
   let added = 0;
   while (added < days) {
     d.setDate(d.getDate() + 1);
