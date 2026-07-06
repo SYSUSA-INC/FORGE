@@ -271,7 +271,7 @@ export function buildGsaExtractPrompt(rawText: string): {
   };
 }
 
-export type SectionDraftMode = "draft" | "improve" | "tighten";
+export type SectionDraftMode = "draft" | "improve" | "tighten" | "draft_alt";
 
 /**
  * Phase 14d — pattern intel attached to the snapshot.
@@ -370,6 +370,8 @@ const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
     "The author has a draft and wants you to strengthen it. Keep the structure but tighten the prose, add specificity, surface win themes, and fix weak phrasing. Do NOT change facts. Preserve TBD placeholders in [BRACKETS] when present.",
   tighten:
     "The author needs the draft reduced to fit. Cut filler aggressively, merge paragraphs, remove redundant sentences. Preserve every concrete fact, citation, and number. Aim for the section's page cap if one is given (assume 350 words/page).",
+  draft_alt:
+    "BL-11 A/B variant: produce an alternative first draft that leads with the organization's single strongest differentiator or win theme. Challenge conventional section structure if it better serves the reader — front-load the most compelling claim, then support it. Aim for the same word/page targets as the standard draft mode but choose a distinctly different structural approach.",
 };
 
 export function buildSectionDraftPrompt(

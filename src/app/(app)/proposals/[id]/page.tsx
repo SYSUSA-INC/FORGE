@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
 import { BrainMinePanel } from "./BrainMinePanel";
 import { getBrainMineStatusAction } from "./brain-actions";
+import { DraftInsightsPanel } from "./DraftInsightsPanel";
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { ProposalScanPanel } from "./ProposalScanPanel";
 import {
@@ -107,6 +108,7 @@ export default async function ProposalOverviewPage({
           initial={(p.winThemes ?? []) as { title: string; statement: string }[]}
         />
         <BrainMinePanel proposalId={p.id} initial={brainMineStatus} />
+        <DraftInsightsPanel proposalId={p.id} />
       </div>
 
       <div className="flex flex-col gap-4">

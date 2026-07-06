@@ -579,6 +579,21 @@ export async function saveSectionAction(input: {
       }
     }
 
+    // BL-11 — resolve any pending draft signal so we can measure how
+    // much of the AI draft the user retained. Only when body content
+    // actually changed. Best-effort — never blocks the save.
+    if (input.bodyDoc !== undefined || input.content !== undefined) {
+      const savedText = input.bodyDoc !== undefined
+        ? projectToPlain(validateDoc(input.bodyDoc) ?? EMPTY_DOC)
+        : (input.content ?? "");
+      try {
+        const { resolveDraftSignal } = await import("@/lib/draft-signal");
+        await resolveDraftSignal({ sectionId: input.sectionId, organizationId, savedText });
+      } catch (err) {
+        log.warn("[saveSectionAction]", "resolveDraftSignal failed", { error: err });
+      }
+    }
+
     revalidatePath(`/proposals/${input.proposalId}/sections`);
     revalidatePath(`/proposals/${input.proposalId}`);
     return { ok: true };

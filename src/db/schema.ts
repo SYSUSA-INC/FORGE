@@ -572,6 +572,49 @@ export const proposalScanResults = pgTable(
 export type ProposalScanResult = typeof proposalScanResults.$inferSelect;
 export type NewProposalScanResult = typeof proposalScanResults.$inferInsert;
 
+// BL-11 — Brain self-improvement loop. One row per AI draft generated;
+// `accepted_fraction` is computed when the user saves the section and
+// measures how much of the AI text survived editing (0 = replaced, 1 = kept).
+// A/B comparisons share an `ab_pair_id`; `selected` marks the chosen variant.
+export const sectionDraftSignals = pgTable(
+  "section_draft_signal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    mode: text("mode").notNull().default("draft"),
+    sectionKind: text("section_kind").notNull().default(""),
+    draftText: text("draft_text").notNull(),
+    draftWordCount: integer("draft_word_count").notNull().default(0),
+    acceptedWordCount: integer("accepted_word_count"),
+    acceptedFraction: real("accepted_fraction"),
+    stubbed: boolean("stubbed").notNull().default(false),
+    abPairId: uuid("ab_pair_id"),
+    abVariant: text("ab_variant"),
+    selected: boolean("selected"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => ({
+    orgCreatedIdx: index("sds_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    sectionIdx: index("sds_section_idx").on(t.sectionId),
+  }),
+);
+
+export type SectionDraftSignal = typeof sectionDraftSignals.$inferSelect;
+export type NewSectionDraftSignal = typeof sectionDraftSignals.$inferInsert;
+
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
   proposalId: uuid("proposal_id")
