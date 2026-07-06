@@ -247,7 +247,7 @@ double-indexed by both `organization_id` and `compliance_item_id`.
 Server actions audit every attach + detach.
 
 ### BL-FB-CM-OWNERS — Per-row owner status on compliance items
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
 
 Each compliance item can already have an `ownerUserId`. This item
 adds a separate `ownerStatus` axis (unassigned → assigned → in_progress
@@ -264,7 +264,7 @@ on `compliance_item` (migration 0066, DEFAULT 'unassigned').
 - Owner name + status pill shown in the read view.
 
 ### BL-FB-WIN-DEBRIEF-REQ — Debrief request letter generator
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
 
 One-click generation of a FAR-compliant post-award debriefing
 request letter from the Outcome tab. Picks the correct FAR citation
@@ -280,7 +280,7 @@ from today). Copy-to-clipboard button. Disclaimer to verify cite
 and seek legal review before sending.
 
 ### BL-FB-CM-HEATMAP — Compliance matrix heatmap view
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
 
 Color-grid alternate view of the compliance matrix toggled by a
 "List / Heatmap" switch in the filter bar. Grid layout:
