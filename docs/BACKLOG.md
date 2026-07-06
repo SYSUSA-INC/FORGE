@@ -246,6 +246,55 @@ new table `compliance_item_evidence` (migration 0062) — org-scoped,
 double-indexed by both `organization_id` and `compliance_item_id`.
 Server actions audit every attach + detach.
 
+### BL-FB-CM-OWNERS — Per-row owner status on compliance items
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+
+Each compliance item can already have an `ownerUserId`. This item
+adds a separate `ownerStatus` axis (unassigned → assigned → in_progress
+→ complete | blocked) so the team can track the owner's progress
+independently of whether the proposal section actually addresses the
+requirement (that's the item `status`).
+
+Schema: new enum `compliance_owner_status` + `owner_status` column
+on `compliance_item` (migration 0066, DEFAULT 'unassigned').
+- Creating an item with an ownerUserId auto-sets ownerStatus to `assigned`.
+- Clearing the ownerUserId resets ownerStatus to `unassigned`.
+- Quick-click buttons appear on each row (owner must be set).
+- Dropdown in the edit form.
+- Owner name + status pill shown in the read view.
+
+### BL-FB-WIN-DEBRIEF-REQ — Debrief request letter generator
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+
+One-click generation of a FAR-compliant post-award debriefing
+request letter from the Outcome tab. Picks the correct FAR citation
+automatically based on procurement type:
+- **FAR 15.506** — Full-and-open negotiated acquisitions (default)
+- **FAR 8.405-2(d)** — GSA Schedule / Federal Supply Schedule task orders
+- **FAR 16.505(b)(6)** — IDIQ / delivery-order task orders (non-FSS)
+
+Pure template (no AI quota). Letter includes: to/from fields,
+subject with solicitation number, required statutory questions for
+the detected procurement vehicle, and deadline math (5 business days
+from today). Copy-to-clipboard button. Disclaimer to verify cite
+and seek legal review before sending.
+
+### BL-FB-CM-HEATMAP — Compliance matrix heatmap view
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+
+Color-grid alternate view of the compliance matrix toggled by a
+"List / Heatmap" switch in the filter bar. Grid layout:
+- Rows = compliance requirements (filtered by current cat/status/search)
+- Columns = proposal sections that at least one item is mapped to
+  (ordered by section ordering) + an "Unassigned" column for unmapped
+- Cells = colored square keyed to item status (green=complete,
+  amber=partial, rose=not_addressed, gray=N/A)
+- Hovering a cell shows a tooltip with status + notes excerpt
+- Legend below the grid
+
+Lets managers spot coverage gaps at a glance without scrolling
+through the row list.
+
 ## Already shipped (reference only)
 
 | Item | Status |

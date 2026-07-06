@@ -13,6 +13,7 @@ import {
   type ComplianceAIAssessment,
   type ComplianceCategory,
   type ComplianceEvidenceKind,
+  type ComplianceOwnerStatus,
   type ComplianceStatus,
   type TipTapDoc,
 } from "@/db/schema";
@@ -83,6 +84,7 @@ export type ComplianceItemInput = {
   status: ComplianceStatus;
   notes: string;
   ownerUserId: string | null;
+  ownerStatus?: ComplianceOwnerStatus;
 };
 
 export async function createComplianceItemAction(
@@ -127,6 +129,7 @@ export async function createComplianceItemAction(
         notes: input.notes.trim(),
         ordering: (maxOrder?.max ?? 0) + 1,
         ownerUserId: input.ownerUserId,
+        ownerStatus: input.ownerUserId ? (input.ownerStatus ?? "assigned") : "unassigned",
         createdByUserId: actor.id,
       })
       .returning({ id: complianceItems.id });
@@ -191,8 +194,14 @@ export async function updateComplianceItemAction(
       update.proposalPageReference = input.proposalPageReference.trim();
     if (input.status !== undefined) update.status = input.status;
     if (input.notes !== undefined) update.notes = input.notes.trim();
-    if (input.ownerUserId !== undefined)
+    if (input.ownerUserId !== undefined) {
       update.ownerUserId = input.ownerUserId;
+      // When clearing the owner, reset owner status to unassigned.
+      if (!input.ownerUserId && input.ownerStatus === undefined) {
+        update.ownerStatus = "unassigned";
+      }
+    }
+    if (input.ownerStatus !== undefined) update.ownerStatus = input.ownerStatus;
 
     await db
       .update(complianceItems)
