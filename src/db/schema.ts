@@ -1529,6 +1529,12 @@ export const solicitationTypeEnum = pgEnum("solicitation_type", [
   "other",
 ]);
 
+// BL-FB-SOL-BUNDLE — companion document types within a solicitation bundle.
+export const solicitationDocumentTypeEnum = pgEnum(
+  "solicitation_document_type",
+  ["rfp", "pws", "sow", "cdrl", "j_attachment", "amendment", "other"],
+);
+
 export const solicitations = pgTable("solicitation", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -1571,14 +1577,10 @@ export const solicitations = pgTable("solicitation", {
   // AI-extracted summaries
   sectionLSummary: text("section_l_summary").notNull().default(""),
   sectionMSummary: text("section_m_summary").notNull().default(""),
+  // BL-FB-SOL-BUNDLE: extended with optional sourceDocId when a companion
+  // document's requirements are merged in via the bundle mechanism.
   extractedRequirements: jsonb("extracted_requirements")
-    .$type<
-      {
-        kind: "shall" | "should" | "may";
-        text: string;
-        ref: string;
-      }[]
-    >()
+    .$type<SolicitationRequirement[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
 
@@ -1604,6 +1606,76 @@ export type SolicitationParseStatus =
   (typeof solicitationParseStatusEnum.enumValues)[number];
 export type SolicitationType =
   (typeof solicitationTypeEnum.enumValues)[number];
+
+// Shared requirement shape for both solicitations.extractedRequirements
+// and solicitationDocuments.extractedRequirements. The optional sourceDocId
+// is set on bundle-document requirements after they roll up to the parent.
+export type SolicitationRequirement = {
+  kind: "shall" | "should" | "may";
+  text: string;
+  ref: string;
+  sourceDocId?: string;
+};
+
+/**
+ * BL-FB-SOL-BUNDLE — companion documents within a solicitation bundle.
+ *
+ * The primary RFP lives as the solicitation row itself. Additional
+ * attachments (PWS, SOW, CDRLs, J-attachments) are stored here and
+ * parsed independently. After each document parses, the parent
+ * solicitation's extractedRequirements is recomputed as the deduped
+ * union of the primary document's requirements plus all companion-
+ * document requirements.
+ */
+export const solicitationDocuments = pgTable(
+  "solicitation_document",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    documentType: solicitationDocumentTypeEnum("document_type")
+      .notNull()
+      .default("other"),
+    fileName: text("file_name").notNull().default(""),
+    fileSize: integer("file_size").notNull().default(0),
+    contentType: text("content_type").notNull().default(""),
+    storagePath: text("storage_path").notNull().default(""),
+    parseStatus: solicitationParseStatusEnum("parse_status")
+      .notNull()
+      .default("uploaded"),
+    parseError: text("parse_error").notNull().default(""),
+    rawText: text("raw_text").notNull().default(""),
+    sectionLSummary: text("section_l_summary").notNull().default(""),
+    sectionMSummary: text("section_m_summary").notNull().default(""),
+    extractedRequirements: jsonb("extracted_requirements")
+      .$type<SolicitationRequirement[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    sortOrder: integer("sort_order").notNull().default(0),
+    uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    solicitationIdx: index("sol_doc_solicitation_idx").on(t.solicitationId),
+    orgCreatedIdx: index("sol_doc_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type SolicitationDocument = typeof solicitationDocuments.$inferSelect;
+export type NewSolicitationDocument =
+  typeof solicitationDocuments.$inferInsert;
+export type SolicitationDocumentType =
+  (typeof solicitationDocumentTypeEnum.enumValues)[number];
 
 /**
  * Per-solicitation team roles. Distinct from the org-level membership
