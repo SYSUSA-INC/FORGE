@@ -20,6 +20,8 @@ import { SolicitationActions } from "./SolicitationActions";
 import { SolicitationReviewPanel } from "./SolicitationReviewPanel";
 import { TeamPanel } from "./TeamPanel";
 import { listSolicitationAssignmentsAction } from "./team-actions";
+import { listSolicitationDocumentsAction } from "./document-actions";
+import { SolicitationDocumentsPanel } from "./SolicitationDocumentsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +100,9 @@ export default async function SolicitationDetail({
       .limit(1);
     parentSolicitation = parent ?? null;
   }
+
+  // BL-FB-SOL-BUNDLE — load companion documents for the bundle panel.
+  const companionDocs = await listSolicitationDocumentsAction(s.id);
 
   // BL-23: review + matrix + question state for the review panel.
   // Wrapped in safeQuery so a missing 0033 migration on a deployed
@@ -278,6 +283,14 @@ export default async function SolicitationDetail({
         />
       </div>
 
+      {/* BL-FB-SOL-BUNDLE — companion document bundle */}
+      <div className="mb-4">
+        <SolicitationDocumentsPanel
+          solicitationId={s.id}
+          initial={companionDocs}
+        />
+      </div>
+
       <div className="mb-4">
         <SolicitationReviewPanel
           solicitationId={s.id}
@@ -328,7 +341,7 @@ export default async function SolicitationDetail({
 
           <Panel
             title="Requirements"
-            eyebrow={`${s.extractedRequirements.length} extracted`}
+            eyebrow={`${s.extractedRequirements.length} extracted${companionDocs.length > 0 ? " (merged)" : ""}`}
           >
             {s.extractedRequirements.length === 0 ? (
               <p className="font-body text-[13px] text-muted">
@@ -342,6 +355,9 @@ export default async function SolicitationDetail({
               <ul className="flex flex-col gap-1.5">
                 {s.extractedRequirements.map((r, i) => {
                   const color = KIND_COLOR[r.kind] ?? "#9BC9D9";
+                  const sourceDoc = r.sourceDocId
+                    ? companionDocs.find((d) => d.id === r.sourceDocId)
+                    : null;
                   return (
                     <li
                       key={i}
@@ -361,11 +377,26 @@ export default async function SolicitationDetail({
                         <p className="font-body text-[13px] leading-relaxed text-text">
                           {r.text}
                         </p>
-                        {r.ref ? (
-                          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-subtle">
-                            {r.ref}
-                          </div>
-                        ) : null}
+                        <div className="mt-0.5 flex items-center gap-2">
+                          {r.ref ? (
+                            <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
+                              {r.ref}
+                            </span>
+                          ) : null}
+                          {sourceDoc ? (
+                            <span
+                              className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest"
+                              style={{
+                                color: "#9BC9D9",
+                                backgroundColor: "#9BC9D91A",
+                                border: "1px solid #9BC9D930",
+                              }}
+                              title={sourceDoc.fileName}
+                            >
+                              {sourceDoc.documentType.toUpperCase().replace("_", "-")}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </li>
                   );

@@ -49,7 +49,7 @@ Effort key:
 | 25 | **BL-15 Phase B-3c** — Runtime isolation status check (per-tenant probe runner + result table + admin UI) | P0 | S | ✅ shipped (PR #239) |
 | 26 | **BL-9 Slice 5b/5c tests** — Runtime tests for snapshot create/list/restore/delete + getBody + auto-snapshot on stage transition | P0 | S | ✅ shipped (PR #240) |
 | 27 | **BL-15 B-3c tests** — Runtime tests for the isolation status check runner + list action | P0 | S | ✅ shipped (PR #241) |
-| 28 | **BL-ITAR-TAG** — ITAR-restricted org flag (gates new invites on admin US-person attestation; superadmin toggle) | P2 | S | 🟡 in-flight |
+| 28 | **BL-ITAR-TAG** — ITAR-restricted org flag (gates new invites on admin US-person attestation; superadmin toggle) | P2 | S | ✅ shipped (PR #242) |
 | 7 | **BL-17 Slice 1** — Payment provider research + ADR | P1 | S | ✅ shipped (PR #218) — decision: **Stripe** |
 | 8 | **BL-17 Slice 2** — Stripe schema + webhook plumbing | P1 | M | ✅ shipped (PR #219) |
 | 9 | **BL-17 Slice 3** — Checkout flow (`/settings/billing` → Stripe Checkout → tier provisioning) | P1 | M | ✅ shipped (PR #220) |
@@ -87,7 +87,7 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 
 ### BL-ITAR-TAG — ITAR-restricted tenant tagging
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #242)
 
 Adds `organization.itar_restricted` (boolean). When true:
 - New invites require an admin-attested "this user is a US person"
@@ -235,7 +235,7 @@ list. Rate-limited 5/hour per proposal; feature-gated on
 `complianceMatrix` tier flag.
 
 ### BL-FB-CM-EVIDENCE — Per-row evidence linking for compliance items
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #246)
 
 Each compliance requirement gets an expandable Evidence dock with a
 picker over three pools: organization past-performance entries,
@@ -3012,7 +3012,7 @@ pending operator review.
 ### Area 1 — Solicitation intake ("RFP Command Center")
 
 ### BL-FB-SOL-BUNDLE — Multi-document solicitation bundles
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #254)
 
 RFP + amendments + attachments (PWS, SOW, CDRLs, J-attachments) parsed
 as one cohesive solicitation, not separate uploads. Single solicitation
