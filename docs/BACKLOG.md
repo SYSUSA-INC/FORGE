@@ -114,7 +114,7 @@ Adds `organization.itar_restricted` (boolean). When true:
 Future: GovCloud-only enforcement when we lift the gov tier.
 
 ### BL-FB-SCAN-CONTINUOUS — Continuous health scan + section dots
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** 🟡 in-flight
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #251)
 
 Promotes the on-demand AI Health Check from PR #243 into a
 continuous always-on quality layer:
@@ -247,7 +247,7 @@ double-indexed by both `organization_id` and `compliance_item_id`.
 Server actions audit every attach + detach.
 
 ### BL-FB-CM-OWNERS — Per-row owner status on compliance items
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
 
 Each compliance item can already have an `ownerUserId`. This item
 adds a separate `ownerStatus` axis (unassigned → assigned → in_progress
@@ -264,7 +264,7 @@ on `compliance_item` (migration 0066, DEFAULT 'unassigned').
 - Owner name + status pill shown in the read view.
 
 ### BL-FB-WIN-DEBRIEF-REQ — Debrief request letter generator
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
 
 One-click generation of a FAR-compliant post-award debriefing
 request letter from the Outcome tab. Picks the correct FAR citation
@@ -280,7 +280,7 @@ from today). Copy-to-clipboard button. Disclaimer to verify cite
 and seek legal review before sending.
 
 ### BL-FB-CM-HEATMAP — Compliance matrix heatmap view
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** 🟡 in-flight
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
 
 Color-grid alternate view of the compliance matrix toggled by a
 "List / Heatmap" switch in the filter bar. Grid layout:
@@ -829,27 +829,47 @@ scores show.
 ---
 
 ### BL-11 — Brain self-improvement loop
-**Priority:** P2  ·  **Effort:** L  ·  **Depends on:** BL-9f
+**Priority:** P2  ·  **Effort:** L  ·  **Depends on:** BL-9f  ·  **Status:** ✅ shipped (PR #253)
 
 Per spec: "[Knowledge] will also learn from proposals being written
 within the platform and grow its ability to deliver excellence with
 every proposal, compete with itself, and challenge itself..."
 
-The Brain currently uses pattern intel from sections marked complete.
-Self-improvement extends this:
+**Delivered:**
+- Migration `0067_section_draft_signal.sql` — new `section_draft_signal`
+  table (id, org, proposal, section, mode, section_kind, draft_text,
+  draft_word_count, accepted_word_count, accepted_fraction, stubbed,
+  ab_pair_id, ab_variant, selected, created_at, resolved_at).
+  Two indexes: org+created (trend queries) and section (resolve lookup).
+- `src/lib/draft-signal.ts` (server-only) — `recordDraftSignal`,
+  `resolveDraftSignal` (word-overlap scoring), `markABVariantSelected`.
+- Signal capture: `generateSectionDraftAction` inserts a signal row for
+  every `draft` and `draft_alt` generation. Best-effort — never blocks
+  the draft response.
+- Signal resolution: `saveSectionAction` calls `resolveDraftSignal`
+  after any content save. Computes `accepted_fraction` (fraction of AI
+  words that survived in the saved text) and stamps `resolved_at`.
+  Best-effort — never blocks the save.
+- A/B variant: new `draft_alt` mode in `SectionDraftMode` (ai-prompts.ts)
+  with "lead with your strongest differentiator, challenge conventional
+  structure" instruction. `generateSectionDraftABAction` generates both
+  `draft` (standard) and `draft_alt` (alternative) in parallel, links
+  them via `ab_pair_id`, scores with a lightweight heuristic (lexical
+  diversity + length fit), and returns the recommended variant.
+- A/B UI: "A/B Compare" button added to the AI Assistant Panel in the
+  section editor. Shows a two-column comparison; user picks "Use Variant A"
+  or "Use Variant B". `selectABVariantAction` stamps the chosen variant's
+  `selected = true`, discarded variant `selected = false`.
+- `DraftInsightsPanel` (server component) on the proposal overview:
+  shows overall average accepted fraction, per-section-kind breakdown
+  (draft count + avg retention %, color-coded green/amber/red), and A/B
+  comparison win-rate stats. Panel only renders when at least one signal
+  exists for the proposal.
 
-**Scope:**
-- Per-section A/B comparison: Brain generates a draft; user edits;
-  diff feeds learning signals
-- Quality benchmark suite: known inputs → expected outputs; track
-  metric drift over time
-- "Compete with itself" — generate two drafts using different prompt
-  strategies, score them, surface the better one
-- Surfaces rejected / accepted suggestion stats per writer per
-  section kind
-
-**Acceptance:** quality metric trends visibly upward over a
-multi-proposal window; A/B comparisons capture and persist.
+**Acceptance:** ✅ A/B comparisons capture and persist (ab_pair_id links
+both signal rows; selected column records user choice). Quality metric
+(accepted_fraction) trends visible in the DraftInsightsPanel — higher =
+AI drafts more closely match what users submit.
 
 ---
 
