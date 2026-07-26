@@ -7,6 +7,11 @@ import {
   generateSectionDraftAction,
   type SectionDraftResult,
 } from "./actions";
+import {
+  generateSectionDraftABAction,
+  selectABVariantAction,
+  type ABDraftResult,
+} from "./ab-actions";
 import { chatWithSectionAction, type ChatMessage } from "./chat-actions";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
 
@@ -50,6 +55,12 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
     hasContent ? "improve" : "draft",
   );
 
+  // A/B compare state (BL-11)
+  type ABSuccess = Extract<ABDraftResult, { ok: true }>;
+  const [abPending, startAbTransition] = useTransition();
+  const [abResult, setAbResult] = useState<ABSuccess | null>(null);
+  const [abError, setAbError] = useState<string | null>(null);
+
   // Chat tab state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -82,6 +93,37 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
     onAccept(result.bodyDoc, result.text, words);
     setOpen(false);
     setResult(null);
+  }
+
+  function generateAB() {
+    setAbError(null);
+    setAbResult(null);
+    setResult(null);
+    setError(null);
+    startAbTransition(async () => {
+      const res = await generateSectionDraftABAction({ sectionId });
+      if (!res.ok) {
+        setAbError(res.error);
+        return;
+      }
+      setAbResult(res);
+    });
+  }
+
+  function acceptAB(variant: "a" | "b") {
+    if (!abResult) return;
+    const chosen = variant === "a" ? abResult.variantA : abResult.variantB;
+    const words = chosen.text
+      .split(/\s+/g)
+      .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+    // Fire-and-forget selection record
+    void selectABVariantAction({
+      abPairId: abResult.abPairId,
+      selectedVariant: variant,
+    });
+    onAccept(chosen.bodyDoc, chosen.text, words);
+    setOpen(false);
+    setAbResult(null);
   }
 
   function sendChat() {
@@ -176,7 +218,62 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
 
       {/* ── Generate tab ── */}
       {activeTab === "generate" ? (
-        !result ? (
+        abResult ? (
+          /* ── A/B comparison view ── */
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-teal">
+                A/B Compare
+              </span>
+              <span className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] text-teal">
+                {abResult.recommended === "b" ? "Alt. recommended" : "Standard recommended"}
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(["a", "b"] as const).map((v) => {
+                const variant = v === "a" ? abResult.variantA : abResult.variantB;
+                const isRecommended = abResult.recommended === v;
+                return (
+                  <div
+                    key={v}
+                    className={`flex flex-col gap-2 rounded-md border p-3 ${
+                      isRecommended
+                        ? "border-teal/40 bg-teal/[0.04]"
+                        : "border-white/10 bg-white/[0.02]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+                        Variant {v.toUpperCase()} · {variant.wordCount}w
+                        {v === "b" ? " (alt.)" : " (standard)"}
+                      </span>
+                      {isRecommended ? (
+                        <span className="font-mono text-[9px] text-teal">★ rec.</span>
+                      ) : null}
+                    </div>
+                    <div className="max-h-[220px] overflow-y-auto whitespace-pre-wrap rounded border border-white/10 bg-canvas px-2 py-1.5 font-body text-[12px] leading-relaxed text-text">
+                      {variant.text}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => acceptAB(v)}
+                      className="aur-btn aur-btn-primary text-[11px]"
+                    >
+                      Use Variant {v.toUpperCase()}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setAbResult(null); setAbError(null); }}
+              className="self-start font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
+            >
+              Discard comparison
+            </button>
+          </div>
+        ) : !result ? (
           <>
             <div className="grid gap-2 md:grid-cols-3">
               {MODES.map((m) => {
@@ -205,14 +302,33 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                 );
               })}
             </div>
-            {pending ? (
+            {/* A/B Compare button — BL-11 */}
+            <button
+              type="button"
+              disabled={pending || abPending}
+              onClick={generateAB}
+              className="mt-1 flex w-full items-center justify-between rounded-md border border-teal/20 bg-teal/[0.03] px-3 py-2 text-left transition-colors hover:border-teal/40 disabled:opacity-50"
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="font-display text-[13px] font-semibold text-teal">
+                  A/B Compare
+                </span>
+                <span className="font-body text-[11px] text-muted">
+                  Generate two drafts (standard + alternative lead) and pick the stronger one.
+                </span>
+              </div>
+              {abPending ? (
+                <span className="font-mono text-[10px] text-teal">generating…</span>
+              ) : null}
+            </button>
+            {(pending || abPending) ? (
               <div className="mt-2 font-mono text-[10px] text-muted">
                 Generating…
               </div>
             ) : null}
-            {error ? (
+            {(error || abError) ? (
               <div className="mt-2 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
-                {error}
+                {error ?? abError}
               </div>
             ) : null}
           </>

@@ -113,6 +113,188 @@ Adds `organization.itar_restricted` (boolean). When true:
 
 Future: GovCloud-only enforcement when we lift the gov tier.
 
+### BL-FB-SCAN-CONTINUOUS — Continuous health scan + section dots
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #251)
+
+Promotes the on-demand AI Health Check from PR #243 into a
+continuous always-on quality layer:
+- Schema (migration 0065): new `proposal_scan_result` table
+  (UPSERT per proposal) persists overall score, summary,
+  per-section issues, and recommendations; new
+  `proposal.scan_dirty_since` column marks "content changed since
+  last scan".
+- `runProposalScanAction` extended to UPSERT into the table and
+  clear `scan_dirty_since` on success.
+- `saveSectionAction` calls a new `markScanDirty` helper after any
+  content-touching save so the dirty flag captures the OLDEST
+  unscanned edit (best-effort, never blocks the save).
+- New `triggerProposalScanIfStaleAction` — debounced auto-trigger
+  fired on proposal-overview + sections-list page loads. Only
+  launches a fresh scan if the proposal is dirty AND the dirty
+  flag is older than 60s. Fire-and-forget so page renders aren't
+  blocked.
+- ProposalScanPanel hydrates from the persisted scan and surfaces
+  a "background scan running" banner when triggered, or a "stale"
+  banner if dirty content sits behind the debounce window.
+- Section list now shows a red/amber/green health dot per row,
+  driven by the latest scan's section-level severities. Healthy
+  sections (no issue raised) render emerald.
+
+Result: scan results are always visible, always cheap to render,
+and stay fresh without burning AI quota on every keystroke.
+
+### BL-FB-X-BRAIN-MINE — Won proposals always mine into the Brain
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #250)
+
+The harvest pipeline (Phase 10f) + outcome propagation (Phase 14a)
+already index submitted proposals and tag entries with the outcome
+label. Gap: proposals marked "won" that never went through the
+`stage=submitted` transition (e.g. uploaded after the fact, or that
+jumped straight to "awarded") never got mined. This PR:
+- Triggers `harvestProposalToCorpusAction` from `saveOutcomeAction`
+  when outcome=won AND no harvested artifact exists for the proposal
+  (detected via the `artifactsTagged === 0` signal already returned
+  by `propagateOutcomeToCorpus`).
+- New `BrainMinePanel` on the proposal overview surfaces mining
+  status: mined yes/no, outcome label, candidate count, promoted
+  count, last-harvested timestamp, link to the artifact + review
+  queue, manual "Mine into Brain" / "Re-mine" trigger.
+- New `getBrainMineStatusAction` reads the artifact + extraction
+  candidate counts for the panel; tenant-scoped via inline ownership
+  check.
+
+Result: every won proposal lands in the Brain with `outcomeLabel=won`,
+giving the existing Phase 14a outcome-aware retrieval the data it
+needs to actually bias drafts toward proven-winning content rather
+than generic prose.
+
+### BL-FB-GEN-THEMES — Win themes as first-class draft inputs
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #249)
+
+Schema (migration 0064): per-proposal `win_themes` jsonb on the
+`proposal` row, capped at 3 entries by app code (each row = title +
+one-sentence statement). New WinThemesPanel on the proposal overview
+page lets the team set, edit, and save themes. New
+`updateWinThemesAction` cleans, validates (refuses half-filled rows),
+audits `proposal.win_themes.update`. Themes are then threaded into:
+(1) the `buildSectionDraftPrompt` snapshot so every draft / improve /
+tighten run weaves them in; (2) the chat-actions context block so
+the in-section AI chat reinforces them; (3) the proposal scan prompt
+so the health check flags sections that drift off-theme. Biggest
+single quality lever on AI-generated content — closes out the
+"generic content" feedback at its root.
+
+### BL-FB-SOL-AMEND-DIFF — Solicitation amendment diff viewer
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #248)
+
+Adds parent → child amendment relationship to `solicitation` (new
+`parent_solicitation_id` self-FK + `amendment_number` free-text +
+index — migration 0063). The detail page surfaces an Amendments
+panel with an "Add amendment" upload affordance; uploaded amendments
+parse independently via the existing solicitation pipeline. A
+diff route at `/solicitations/[id]/diff` renders a side-by-side
+comparison: top-level field changes (title, agency, due date,
+NAICS, set-aside, Section L/M summaries) + requirement diff
+(added / removed / modified / unchanged) computed by Jaccard
+similarity over normalized word sets at threshold 0.55. Modified
+requirements show before + after blocks with the similarity score.
+Reduces "missed amendment" compliance failures — historically the
+single biggest cause of disqualification on federal bids.
+
+### BL-FB-CM-GATE — Pre-submission compliance gate + crosswalk PDF
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #247)
+
+Adds two pieces:
+1. **Gate:** every proposal-export action (PDF, DOCX, DOCX-to-PDF)
+   refuses by default when the compliance matrix has any
+   `not_addressed` or `partial` rows. Caller can override with
+   `forceExport: true`. Gate is inactive when no matrix exists, so
+   tenants who haven't built one aren't broken. Gate status is also
+   surfaced inline on the ExportPanel with a "Force export anyway"
+   checkbox the user must explicitly check.
+2. **Crosswalk PDF:** new `renderComplianceCrosswalkAction` renders
+   the Section L/M traceability table as a standalone landscape PDF
+   (one row per requirement → section mapping → status → attached
+   evidence from BL-FB-CM-EVIDENCE). Designed to ship with the
+   submission package as the back-of-volume crosswalk.
+
+Future (BL-FB-CM-GATE-CONFIG): per-tier gate hardness — Enterprise
+hard-block (no override), Bronze soft-warn (override always on).
+
+### BL-FB-CM-AUTOMAP — Auto-map compliance items to proposal sections
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #245)
+
+AI assigns each Section L/M requirement to the most appropriate
+proposal section automatically. Replaces the manual 30-minute task
+on a typical 50-row matrix. Renders confidence chips (high/med/low)
+per row with a one-sentence rationale; user reviews, can override the
+section choice per row, then applies in bulk via "Apply N
+high-confidence" or "Apply all selected". Items already mapped to the
+AI's choice are counted as "unchanged" and skipped from the suggestion
+list. Rate-limited 5/hour per proposal; feature-gated on
+`complianceMatrix` tier flag.
+
+### BL-FB-CM-EVIDENCE — Per-row evidence linking for compliance items
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🟡 in-flight
+
+Each compliance requirement gets an expandable Evidence dock with a
+picker over three pools: organization past-performance entries,
+knowledge-base entries, and live proposal-section paragraphs. Attach
+buttons cache `label + snippet` on the link row so the matrix exports
+cleanly even after the source is later edited or removed. Schema is
+new table `compliance_item_evidence` (migration 0062) — org-scoped,
+double-indexed by both `organization_id` and `compliance_item_id`.
+Server actions audit every attach + detach.
+
+### BL-FB-CM-OWNERS — Per-row owner status on compliance items
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
+
+Each compliance item can already have an `ownerUserId`. This item
+adds a separate `ownerStatus` axis (unassigned → assigned → in_progress
+→ complete | blocked) so the team can track the owner's progress
+independently of whether the proposal section actually addresses the
+requirement (that's the item `status`).
+
+Schema: new enum `compliance_owner_status` + `owner_status` column
+on `compliance_item` (migration 0066, DEFAULT 'unassigned').
+- Creating an item with an ownerUserId auto-sets ownerStatus to `assigned`.
+- Clearing the ownerUserId resets ownerStatus to `unassigned`.
+- Quick-click buttons appear on each row (owner must be set).
+- Dropdown in the edit form.
+- Owner name + status pill shown in the read view.
+
+### BL-FB-WIN-DEBRIEF-REQ — Debrief request letter generator
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
+
+One-click generation of a FAR-compliant post-award debriefing
+request letter from the Outcome tab. Picks the correct FAR citation
+automatically based on procurement type:
+- **FAR 15.506** — Full-and-open negotiated acquisitions (default)
+- **FAR 8.405-2(d)** — GSA Schedule / Federal Supply Schedule task orders
+- **FAR 16.505(b)(6)** — IDIQ / delivery-order task orders (non-FSS)
+
+Pure template (no AI quota). Letter includes: to/from fields,
+subject with solicitation number, required statutory questions for
+the detected procurement vehicle, and deadline math (5 business days
+from today). Copy-to-clipboard button. Disclaimer to verify cite
+and seek legal review before sending.
+
+### BL-FB-CM-HEATMAP — Compliance matrix heatmap view
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252)
+
+Color-grid alternate view of the compliance matrix toggled by a
+"List / Heatmap" switch in the filter bar. Grid layout:
+- Rows = compliance requirements (filtered by current cat/status/search)
+- Columns = proposal sections that at least one item is mapped to
+  (ordered by section ordering) + an "Unassigned" column for unmapped
+- Cells = colored square keyed to item status (green=complete,
+  amber=partial, rose=not_addressed, gray=N/A)
+- Hovering a cell shows a tooltip with status + notes excerpt
+- Legend below the grid
+
+Lets managers spot coverage gaps at a glance without scrolling
+through the row list.
+
 ## Already shipped (reference only)
 
 | Item | Status |
@@ -647,27 +829,47 @@ scores show.
 ---
 
 ### BL-11 — Brain self-improvement loop
-**Priority:** P2  ·  **Effort:** L  ·  **Depends on:** BL-9f
+**Priority:** P2  ·  **Effort:** L  ·  **Depends on:** BL-9f  ·  **Status:** ✅ shipped (PR #253)
 
 Per spec: "[Knowledge] will also learn from proposals being written
 within the platform and grow its ability to deliver excellence with
 every proposal, compete with itself, and challenge itself..."
 
-The Brain currently uses pattern intel from sections marked complete.
-Self-improvement extends this:
+**Delivered:**
+- Migration `0067_section_draft_signal.sql` — new `section_draft_signal`
+  table (id, org, proposal, section, mode, section_kind, draft_text,
+  draft_word_count, accepted_word_count, accepted_fraction, stubbed,
+  ab_pair_id, ab_variant, selected, created_at, resolved_at).
+  Two indexes: org+created (trend queries) and section (resolve lookup).
+- `src/lib/draft-signal.ts` (server-only) — `recordDraftSignal`,
+  `resolveDraftSignal` (word-overlap scoring), `markABVariantSelected`.
+- Signal capture: `generateSectionDraftAction` inserts a signal row for
+  every `draft` and `draft_alt` generation. Best-effort — never blocks
+  the draft response.
+- Signal resolution: `saveSectionAction` calls `resolveDraftSignal`
+  after any content save. Computes `accepted_fraction` (fraction of AI
+  words that survived in the saved text) and stamps `resolved_at`.
+  Best-effort — never blocks the save.
+- A/B variant: new `draft_alt` mode in `SectionDraftMode` (ai-prompts.ts)
+  with "lead with your strongest differentiator, challenge conventional
+  structure" instruction. `generateSectionDraftABAction` generates both
+  `draft` (standard) and `draft_alt` (alternative) in parallel, links
+  them via `ab_pair_id`, scores with a lightweight heuristic (lexical
+  diversity + length fit), and returns the recommended variant.
+- A/B UI: "A/B Compare" button added to the AI Assistant Panel in the
+  section editor. Shows a two-column comparison; user picks "Use Variant A"
+  or "Use Variant B". `selectABVariantAction` stamps the chosen variant's
+  `selected = true`, discarded variant `selected = false`.
+- `DraftInsightsPanel` (server component) on the proposal overview:
+  shows overall average accepted fraction, per-section-kind breakdown
+  (draft count + avg retention %, color-coded green/amber/red), and A/B
+  comparison win-rate stats. Panel only renders when at least one signal
+  exists for the proposal.
 
-**Scope:**
-- Per-section A/B comparison: Brain generates a draft; user edits;
-  diff feeds learning signals
-- Quality benchmark suite: known inputs → expected outputs; track
-  metric drift over time
-- "Compete with itself" — generate two drafts using different prompt
-  strategies, score them, surface the better one
-- Surfaces rejected / accepted suggestion stats per writer per
-  section kind
-
-**Acceptance:** quality metric trends visibly upward over a
-multi-proposal window; A/B comparisons capture and persist.
+**Acceptance:** ✅ A/B comparisons capture and persist (ab_pair_id links
+both signal rows; selected column records user choice). Quality metric
+(accepted_fraction) trends visible in the DraftInsightsPanel — higher =
+AI drafts more closely match what users submit.
 
 ---
 

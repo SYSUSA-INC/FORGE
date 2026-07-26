@@ -496,6 +496,18 @@ export const proposals = pgTable("proposal", {
     onDelete: "set null",
   }),
   notes: text("notes").notNull().default(""),
+  // BL-FB-GEN-THEMES — 1-3 win themes the AI threads into every
+  // section draft. Capped at 3 by app code; each theme is a short
+  // title + a one-sentence statement.
+  winThemes: jsonb("win_themes")
+    .$type<{ title: string; statement: string }[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  // BL-FB-SCAN-CONTINUOUS — marker for "content changed since the
+  // last health scan". NULL = fresh; set to the timestamp of the
+  // first dirtying edit so callers can decide whether a re-scan is
+  // worth firing (debounce window).
+  scanDirtySince: timestamp("scan_dirty_since"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -504,6 +516,104 @@ export const proposals = pgTable("proposal", {
 }, (t) => ({
   organizationIdIdx: index("proposal_organization_id_idx").on(t.organizationId),
 }));
+
+export type ProposalWinTheme = { title: string; statement: string };
+
+/**
+ * BL-FB-SCAN-CONTINUOUS — persisted health-scan result, one row per
+ * proposal (UPSERT on each scan run).
+ *
+ * Mirrors the on-demand shape from `runProposalScanAction`:
+ *   - overallScore: strong / needs_work / critical
+ *   - summary: 2-3 sentence health summary
+ *   - sectionIssues: array of { sectionId, sectionTitle, issue, severity }
+ *   - topRecommendations: array of strings
+ *   - stubbed: provider was in stub mode
+ *
+ * Indexed by both `proposal_id` (UNIQUE, drives the UPSERT) and
+ * `organization_id` (tenant-scope query path).
+ */
+export type ProposalScanSectionIssue = {
+  sectionId: string;
+  sectionTitle: string;
+  issue: string;
+  severity: "high" | "medium" | "low";
+};
+
+export const proposalScanResults = pgTable(
+  "proposal_scan_result",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .unique()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    overallScore: text("overall_score").notNull().default("needs_work"),
+    summary: text("summary").notNull().default(""),
+    sectionIssues: jsonb("section_issues")
+      .$type<ProposalScanSectionIssue[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    topRecommendations: jsonb("top_recommendations")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    stubbed: boolean("stubbed").notNull().default(false),
+    generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("proposal_scan_result_org_idx").on(t.organizationId),
+  }),
+);
+
+export type ProposalScanResult = typeof proposalScanResults.$inferSelect;
+export type NewProposalScanResult = typeof proposalScanResults.$inferInsert;
+
+// BL-11 — Brain self-improvement loop. One row per AI draft generated;
+// `accepted_fraction` is computed when the user saves the section and
+// measures how much of the AI text survived editing (0 = replaced, 1 = kept).
+// A/B comparisons share an `ab_pair_id`; `selected` marks the chosen variant.
+export const sectionDraftSignals = pgTable(
+  "section_draft_signal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id").notNull(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    mode: text("mode").notNull().default("draft"),
+    sectionKind: text("section_kind").notNull().default(""),
+    draftText: text("draft_text").notNull(),
+    draftWordCount: integer("draft_word_count").notNull().default(0),
+    acceptedWordCount: integer("accepted_word_count"),
+    acceptedFraction: real("accepted_fraction"),
+    stubbed: boolean("stubbed").notNull().default(false),
+    abPairId: uuid("ab_pair_id"),
+    abVariant: text("ab_variant"),
+    selected: boolean("selected"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => ({
+    orgCreatedIdx: index("sds_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    sectionIdx: index("sds_section_idx").on(t.sectionId),
+  }),
+);
+
+export type SectionDraftSignal = typeof sectionDraftSignals.$inferSelect;
+export type NewSectionDraftSignal = typeof sectionDraftSignals.$inferInsert;
 
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -771,6 +881,14 @@ export const complianceStatusEnum = pgEnum("compliance_status", [
   "not_applicable",
 ]);
 
+export const complianceOwnerStatusEnum = pgEnum("compliance_owner_status", [
+  "unassigned",
+  "assigned",
+  "in_progress",
+  "complete",
+  "blocked",
+]);
+
 /**
  * Phase 14c — compliance pre-flight AI assessment.
  *
@@ -807,6 +925,9 @@ export const complianceItems = pgTable("compliance_item", {
   ownerUserId: text("owner_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
+  ownerStatus: complianceOwnerStatusEnum("owner_status")
+    .notNull()
+    .default("unassigned"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -825,6 +946,53 @@ export type ComplianceCategory =
   (typeof complianceCategoryEnum.enumValues)[number];
 export type ComplianceStatus =
   (typeof complianceStatusEnum.enumValues)[number];
+export type ComplianceOwnerStatus =
+  (typeof complianceOwnerStatusEnum.enumValues)[number];
+
+/**
+ * BL-FB-CM-EVIDENCE — evidence linked to a compliance item.
+ *
+ * Each row is one piece of evidence supporting one requirement.
+ * Label + snippet are cached at attach time so the matrix exports
+ * cleanly even if the referenced entry is later edited or removed.
+ */
+export const complianceEvidenceKindEnum = pgEnum("compliance_evidence_kind", [
+  "past_performance",
+  "knowledge_entry",
+  "section_paragraph",
+]);
+
+export const complianceItemEvidence = pgTable(
+  "compliance_item_evidence",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    complianceItemId: uuid("compliance_item_id")
+      .notNull()
+      .references(() => complianceItems.id, { onDelete: "cascade" }),
+    kind: complianceEvidenceKindEnum("kind").notNull(),
+    refId: text("ref_id").notNull().default(""),
+    label: text("label").notNull().default(""),
+    snippet: text("snippet").notNull().default(""),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    itemIdx: index("compliance_item_evidence_item_idx").on(t.complianceItemId),
+    orgIdx: index("compliance_item_evidence_org_idx").on(t.organizationId),
+  }),
+);
+
+export type ComplianceItemEvidence =
+  typeof complianceItemEvidence.$inferSelect;
+export type NewComplianceItemEvidence =
+  typeof complianceItemEvidence.$inferInsert;
+export type ComplianceEvidenceKind =
+  (typeof complianceEvidenceKindEnum.enumValues)[number];
 
 export const notificationKindEnum = pgEnum("notification_kind", [
   "review_assigned",
@@ -1378,6 +1546,15 @@ export const solicitations = pgTable("solicitation", {
   postedDate: timestamp("posted_date", { mode: "date" }),
   source: text("source").notNull().default("uploaded"),
 
+  // BL-FB-SOL-AMEND-DIFF — amendment relationship. Child amendments
+  // point at the original solicitation; cascade-delete keeps the tree
+  // clean. `amendmentNumber` is free text ("0001", "A-1", "Mod 3").
+  parentSolicitationId: uuid("parent_solicitation_id").references(
+    (): AnyPgColumn => solicitations.id,
+    { onDelete: "cascade" },
+  ),
+  amendmentNumber: text("amendment_number").notNull().default(""),
+
   // File metadata
   fileName: text("file_name").notNull().default(""),
   fileSize: integer("file_size").notNull().default(0),
@@ -1415,7 +1592,11 @@ export const solicitations = pgTable("solicitation", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-FB-SOL-AMEND-DIFF — speeds up "list amendments for this parent"
+  // and "list ancestors of this amendment" lookups.
+  parentIdx: index("solicitation_parent_idx").on(t.parentSolicitationId),
+}));
 
 export type Solicitation = typeof solicitations.$inferSelect;
 export type NewSolicitation = typeof solicitations.$inferInsert;

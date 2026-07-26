@@ -1,7 +1,8 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
+  complianceItemEvidence,
   complianceItems,
   proposalSections,
   proposals,
@@ -13,6 +14,9 @@ import {
   CATEGORIES,
   CATEGORY_COLORS,
   CATEGORY_LABELS,
+  OWNER_STATUS_COLORS,
+  OWNER_STATUS_LABELS,
+  OWNER_STATUSES,
   STATUS_COLORS,
   STATUS_LABELS,
   STATUSES,
@@ -57,6 +61,7 @@ export default async function ProposalCompliancePage({
       notes: complianceItems.notes,
       ordering: complianceItems.ordering,
       ownerUserId: complianceItems.ownerUserId,
+      ownerStatus: complianceItems.ownerStatus,
       ownerName: users.name,
       ownerEmail: users.email,
       sectionTitle: proposalSections.title,
@@ -82,6 +87,24 @@ export default async function ProposalCompliancePage({
     .from(proposalSections)
     .where(eq(proposalSections.proposalId, params.id))
     .orderBy(asc(proposalSections.ordering));
+
+  // BL-FB-CM-EVIDENCE — load evidence for every item in this proposal.
+  // Single SELECT scoped to the proposal's item ids; the page already
+  // verified tenant ownership above.
+  const itemIds = items.map((i) => i.id);
+  const evidenceRows = itemIds.length > 0
+    ? await db
+        .select()
+        .from(complianceItemEvidence)
+        .where(inArray(complianceItemEvidence.complianceItemId, itemIds))
+        .orderBy(asc(complianceItemEvidence.createdAt))
+    : [];
+  const evidenceByItem = new Map<string, typeof evidenceRows>();
+  for (const e of evidenceRows) {
+    const arr = evidenceByItem.get(e.complianceItemId) ?? [];
+    arr.push(e);
+    evidenceByItem.set(e.complianceItemId, arr);
+  }
 
   const team = await listProposalTeamCandidates();
 
@@ -132,6 +155,9 @@ export default async function ProposalCompliancePage({
         proposalId={params.id}
         categories={CATEGORIES}
         statuses={STATUSES}
+        ownerStatuses={OWNER_STATUSES}
+        ownerStatusLabels={OWNER_STATUS_LABELS}
+        ownerStatusColors={OWNER_STATUS_COLORS}
         categoryLabels={CATEGORY_LABELS}
         categoryColors={CATEGORY_COLORS}
         statusLabels={STATUS_LABELS}
@@ -155,6 +181,7 @@ export default async function ProposalCompliancePage({
           status: i.status,
           notes: i.notes,
           ownerUserId: i.ownerUserId,
+          ownerStatus: i.ownerStatus,
           ownerName: i.ownerName,
           ownerEmail: i.ownerEmail,
           sectionTitle: i.sectionTitle ?? null,
@@ -163,6 +190,14 @@ export default async function ProposalCompliancePage({
           aiAssessedAt: i.aiAssessedAt
             ? i.aiAssessedAt.toISOString()
             : null,
+          evidence: (evidenceByItem.get(i.id) ?? []).map((e) => ({
+            id: e.id,
+            kind: e.kind,
+            refId: e.refId,
+            label: e.label,
+            snippet: e.snippet,
+            createdAt: e.createdAt.toISOString(),
+          })),
         }))}
       />
     </div>

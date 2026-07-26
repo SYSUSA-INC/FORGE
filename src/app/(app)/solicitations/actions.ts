@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -56,6 +56,41 @@ export async function uploadSolicitationAction(
     };
   }
 
+  // BL-FB-SOL-AMEND-DIFF — optional amendment parent. When set, the
+  // upload becomes a child amendment of the parent solicitation.
+  const parentSolicitationIdRaw = formData.get("parentSolicitationId");
+  const amendmentNumberRaw = formData.get("amendmentNumber");
+  const parentSolicitationId =
+    typeof parentSolicitationIdRaw === "string" &&
+    parentSolicitationIdRaw.trim().length > 0
+      ? parentSolicitationIdRaw.trim()
+      : null;
+  const amendmentNumber =
+    typeof amendmentNumberRaw === "string"
+      ? amendmentNumberRaw.trim().slice(0, 64)
+      : "";
+
+  // Verify the parent belongs to this org so a hand-typed UUID can't
+  // attach an amendment to another tenant's solicitation.
+  if (parentSolicitationId) {
+    const [parentRow] = await db
+      .select({ id: solicitations.id })
+      .from(solicitations)
+      .where(
+        and(
+          eq(solicitations.id, parentSolicitationId),
+          eq(solicitations.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    if (!parentRow) {
+      return {
+        ok: false,
+        error: "Parent solicitation not found in this organization.",
+      };
+    }
+  }
+
   const bytes = new Uint8Array(await file.arrayBuffer());
 
   // Insert the row first so the user sees an entry immediately.
@@ -73,6 +108,8 @@ export async function uploadSolicitationAction(
       parseStatus: "uploaded",
       uploadedByUserId: user.id,
       source: "uploaded",
+      parentSolicitationId,
+      amendmentNumber,
     })
     .returning({ id: solicitations.id });
   if (!row) return { ok: false, error: "Could not record solicitation." };
@@ -120,13 +157,18 @@ export async function uploadSolicitationAction(
   await recordAudit({
     organizationId,
     actor: { userId: user.id, email: user.email },
-    action: "solicitation.upload",
+    action: parentSolicitationId
+      ? "solicitation.amendment.upload"
+      : "solicitation.upload",
     resourceType: "solicitation",
     resourceId: row.id,
     metadata: {
       fileName: file.name,
       fileSize: file.size,
       contentType: resolvedContentType,
+      ...(parentSolicitationId
+        ? { parentSolicitationId, amendmentNumber }
+        : {}),
     },
   });
 
@@ -537,4 +579,164 @@ export async function convertToOpportunityAction(
       error: err instanceof Error ? err.message : "Convert failed.",
     };
   }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-SOL-AMEND-DIFF — amendment list + diff actions
+// ────────────────────────────────────────────────────────────────────
+
+export type AmendmentListRow = {
+  id: string;
+  amendmentNumber: string;
+  title: string;
+  fileName: string;
+  parseStatus: string;
+  responseDueDate: string | null;
+  createdAt: string;
+};
+
+export async function listAmendmentsAction(
+  parentSolicitationId: string,
+): Promise<AmendmentListRow[]> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  // Verify the parent belongs to this org first.
+  const [parentRow] = await db
+    .select({ id: solicitations.id })
+    .from(solicitations)
+    .where(
+      and(
+        eq(solicitations.id, parentSolicitationId),
+        eq(solicitations.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!parentRow) return [];
+
+  const rows = await db
+    .select({
+      id: solicitations.id,
+      amendmentNumber: solicitations.amendmentNumber,
+      title: solicitations.title,
+      fileName: solicitations.fileName,
+      parseStatus: solicitations.parseStatus,
+      responseDueDate: solicitations.responseDueDate,
+      createdAt: solicitations.createdAt,
+    })
+    .from(solicitations)
+    .where(
+      and(
+        eq(solicitations.parentSolicitationId, parentSolicitationId),
+        eq(solicitations.organizationId, organizationId),
+      ),
+    )
+    .orderBy(asc(solicitations.createdAt));
+
+  return rows.map((r) => ({
+    id: r.id,
+    amendmentNumber: r.amendmentNumber,
+    title: r.title,
+    fileName: r.fileName,
+    parseStatus: r.parseStatus,
+    responseDueDate: r.responseDueDate
+      ? r.responseDueDate.toISOString().slice(0, 10)
+      : null,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+export type AmendmentDiffResult =
+  | {
+      ok: true;
+      base: { id: string; label: string };
+      amendment: { id: string; label: string };
+      diff: import("@/lib/solicitation-amendment-diff").AmendmentDiff;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Compute the diff between an amendment and a comparison base.
+ * When `baseSolicitationId` is omitted, diffs against the amendment's
+ * parent.
+ */
+export async function getAmendmentDiffAction(
+  amendmentId: string,
+  baseSolicitationId?: string,
+): Promise<AmendmentDiffResult> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const { computeAmendmentDiff } = await import(
+    "@/lib/solicitation-amendment-diff"
+  );
+
+  const [amendment] = await db
+    .select()
+    .from(solicitations)
+    .where(
+      and(
+        eq(solicitations.id, amendmentId),
+        eq(solicitations.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!amendment) return { ok: false, error: "Amendment not found." };
+
+  const baseId = baseSolicitationId ?? amendment.parentSolicitationId;
+  if (!baseId) {
+    return {
+      ok: false,
+      error:
+        "This solicitation is not linked to a parent. Mark it as an amendment first.",
+    };
+  }
+
+  const [base] = await db
+    .select()
+    .from(solicitations)
+    .where(
+      and(
+        eq(solicitations.id, baseId),
+        eq(solicitations.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!base) {
+    return { ok: false, error: "Base solicitation not found." };
+  }
+
+  if (base.parseStatus !== "parsed") {
+    return {
+      ok: false,
+      error: "Base solicitation hasn't finished parsing — wait for it, then re-try.",
+    };
+  }
+  if (amendment.parseStatus !== "parsed") {
+    return {
+      ok: false,
+      error: "Amendment hasn't finished parsing — wait for it, then re-try.",
+    };
+  }
+
+  const diff = computeAmendmentDiff(base, amendment);
+
+  return {
+    ok: true,
+    base: {
+      id: base.id,
+      label:
+        base.amendmentNumber
+          ? `Amendment ${base.amendmentNumber}`
+          : base.title || base.fileName || "Base solicitation",
+    },
+    amendment: {
+      id: amendment.id,
+      label:
+        amendment.amendmentNumber
+          ? `Amendment ${amendment.amendmentNumber}`
+          : amendment.title || amendment.fileName || "Amendment",
+    },
+    diff,
+  };
 }

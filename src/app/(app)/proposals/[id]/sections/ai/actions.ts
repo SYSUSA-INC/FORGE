@@ -39,16 +39,21 @@ export type SectionDraftResult =
       inputTokens?: number;
       outputTokens?: number;
       generatedAt: string;
+      /** BL-11: id of the captured draft signal row, present for draft/draft_alt modes. */
+      signalId?: string;
     }
   | { ok: false; error: string };
 
-const MODES: SectionDraftMode[] = ["draft", "improve", "tighten"];
+const MODES: SectionDraftMode[] = ["draft", "improve", "tighten", "draft_alt"];
 
 export async function generateSectionDraftAction(input: {
   sectionId: string;
   mode: SectionDraftMode;
+  /** BL-11 A/B: caller-supplied UUID linking the two competing variants. */
+  abPairId?: string;
+  abVariant?: "a" | "b";
 }): Promise<SectionDraftResult> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   // BL-16 Phase B-2 — gate AI section generation on `aiAutoDraft`.
@@ -186,6 +191,13 @@ export async function generateSectionDraftAction(input: {
     pastPerformance,
     patternIntel,
     solicitation: solicitationContext,
+    // BL-FB-GEN-THEMES — pass per-proposal win themes through so the
+    // drafter weaves them into every section. Cap at 3 (the same cap
+    // applied at write time) as a defence-in-depth.
+    winThemes: (row.proposal.winThemes ?? []).slice(0, 3).map((t) => ({
+      title: t.title ?? "",
+      statement: t.statement ?? "",
+    })),
   };
 
   // Improve / tighten require existing content to be useful.
@@ -220,6 +232,30 @@ export async function generateSectionDraftAction(input: {
       return { ok: false, error: "AI returned an empty response." };
     }
 
+    // BL-11 — capture draft signal for the self-improvement loop.
+    // Only for "draft" and "draft_alt" modes (improve/tighten edit existing
+    // content so the overlap metric wouldn't be meaningful). Best-effort.
+    let signalId: string | undefined;
+    if (input.mode === "draft" || input.mode === "draft_alt") {
+      try {
+        const { recordDraftSignal } = await import("@/lib/draft-signal");
+        signalId = await recordDraftSignal({
+          organizationId,
+          proposalId: row.proposal.id,
+          sectionId: input.sectionId,
+          createdByUserId: user.id,
+          mode: input.mode,
+          sectionKind: row.section.kind,
+          draftText: text,
+          stubbed: ai.stubbed,
+          abPairId: input.abPairId,
+          abVariant: input.abVariant,
+        });
+      } catch (err) {
+        log.warn("[generateSectionDraftAction]", "draft signal capture failed", { error: err });
+      }
+    }
+
     return {
       ok: true,
       mode: input.mode,
@@ -231,6 +267,7 @@ export async function generateSectionDraftAction(input: {
       inputTokens: ai.inputTokens,
       outputTokens: ai.outputTokens,
       generatedAt: new Date().toISOString(),
+      signalId,
     };
   } catch (err) {
     // BL-16 Phase B-3d — AI call failed (network / provider error). Refund

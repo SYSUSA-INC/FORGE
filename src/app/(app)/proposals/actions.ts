@@ -312,6 +312,74 @@ export async function updateProposalAction(
   }
 }
 
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-GEN-THEMES — win themes
+// ────────────────────────────────────────────────────────────────────
+
+const MAX_THEMES = 3;
+const MAX_THEME_TITLE_LEN = 80;
+const MAX_THEME_STATEMENT_LEN = 360;
+
+export async function updateWinThemesAction(
+  id: string,
+  themes: { title: string; statement: string }[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(id, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  // Clean + cap. Empty rows are dropped so the operator can stage a
+  // theme by leaving statement blank without persisting noise.
+  const cleaned = themes
+    .map((t) => ({
+      title: (t.title ?? "").trim().slice(0, MAX_THEME_TITLE_LEN),
+      statement: (t.statement ?? "").trim().slice(0, MAX_THEME_STATEMENT_LEN),
+    }))
+    .filter((t) => t.title.length > 0 || t.statement.length > 0)
+    .slice(0, MAX_THEMES);
+
+  // Refuse half-filled themes — a theme without a statement is just
+  // a label, and the AI prompt expects both.
+  for (const t of cleaned) {
+    if (!t.title) {
+      return { ok: false, error: "Every theme needs a title." };
+    }
+    if (!t.statement) {
+      return {
+        ok: false,
+        error: `Theme "${t.title}" is missing its statement.`,
+      };
+    }
+  }
+
+  try {
+    await db
+      .update(proposals)
+      .set({ winThemes: cleaned, updatedAt: new Date() })
+      .where(
+        and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)),
+      );
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.win_themes.update",
+      resourceType: "proposal",
+      resourceId: id,
+      metadata: { themeCount: cleaned.length },
+    });
+    revalidatePath(`/proposals/${id}`);
+    return { ok: true };
+  } catch (err) {
+    log.error("[updateWinThemesAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Save failed.",
+    };
+  }
+}
+
 export async function advanceProposalStageAction(
   id: string,
   nextStage: ProposalStage,
@@ -489,6 +557,40 @@ export async function saveSectionAction(input: {
         });
       } catch (err) {
         log.warn("[saveSectionAction]", "auto-snapshot failed", { error: err });
+      }
+    }
+
+    // BL-FB-SCAN-CONTINUOUS — flag the proposal as dirty so the next
+    // overview-page load can fire a debounced re-scan. Only when the
+    // save actually touched content (title alone doesn't move the
+    // scan needle). Best-effort — failure here MUST NOT block the
+    // save itself.
+    if (
+      input.bodyDoc !== undefined ||
+      input.content !== undefined ||
+      input.status !== undefined ||
+      input.pageLimit !== undefined
+    ) {
+      try {
+        const { markScanDirty } = await import("@/lib/proposal-scan-dirty");
+        await markScanDirty(input.proposalId, organizationId);
+      } catch (err) {
+        log.warn("[saveSectionAction]", "markScanDirty failed", { error: err });
+      }
+    }
+
+    // BL-11 — resolve any pending draft signal so we can measure how
+    // much of the AI draft the user retained. Only when body content
+    // actually changed. Best-effort — never blocks the save.
+    if (input.bodyDoc !== undefined || input.content !== undefined) {
+      const savedText = input.bodyDoc !== undefined
+        ? projectToPlain(validateDoc(input.bodyDoc) ?? EMPTY_DOC)
+        : (input.content ?? "");
+      try {
+        const { resolveDraftSignal } = await import("@/lib/draft-signal");
+        await resolveDraftSignal({ sectionId: input.sectionId, organizationId, savedText });
+      } catch (err) {
+        log.warn("[saveSectionAction]", "resolveDraftSignal failed", { error: err });
       }
     }
 

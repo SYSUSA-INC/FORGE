@@ -271,7 +271,7 @@ export function buildGsaExtractPrompt(rawText: string): {
   };
 }
 
-export type SectionDraftMode = "draft" | "improve" | "tighten";
+export type SectionDraftMode = "draft" | "improve" | "tighten" | "draft_alt";
 
 /**
  * Phase 14d — pattern intel attached to the snapshot.
@@ -339,6 +339,12 @@ export type SectionDraftSnapshot = {
     sectionMSummary: string;
     requirements: { kind: string; text: string; ref: string }[];
   };
+  /**
+   * BL-FB-GEN-THEMES — proposal-level win themes the drafter is
+   * expected to weave through every section. 1-3 entries, each with
+   * a short title and a one-sentence statement.
+   */
+  winThemes?: { title: string; statement: string }[];
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -364,6 +370,8 @@ const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
     "The author has a draft and wants you to strengthen it. Keep the structure but tighten the prose, add specificity, surface win themes, and fix weak phrasing. Do NOT change facts. Preserve TBD placeholders in [BRACKETS] when present.",
   tighten:
     "The author needs the draft reduced to fit. Cut filler aggressively, merge paragraphs, remove redundant sentences. Preserve every concrete fact, citation, and number. Aim for the section's page cap if one is given (assume 350 words/page).",
+  draft_alt:
+    "BL-11 A/B variant: produce an alternative first draft that leads with the organization's single strongest differentiator or win theme. Challenge conventional section structure if it better serves the reader — front-load the most compelling claim, then support it. Aim for the same word/page targets as the standard draft mode but choose a distinctly different structural approach.",
 };
 
 export function buildSectionDraftPrompt(
@@ -395,15 +403,37 @@ export function buildSectionDraftPrompt(
         .join("\n")
     : "";
 
-  // Pass the snapshot as JSON but omit the solicitation field (already
-  // formatted above) to avoid double-printing large text.
-  const { solicitation: _omit, ...snapshotForJson } = snapshot;
-  void _omit;
+  // BL-FB-GEN-THEMES — emit a dedicated win-themes block so the model
+  // treats themes as first-class direction, not just another snapshot
+  // field. Themes appear BEFORE the solicitation block because they're
+  // the higher-altitude framing the model should hold while writing.
+  const themesBlock =
+    snapshot.winThemes && snapshot.winThemes.length > 0
+      ? [
+          `Proposal win themes — every section MUST reinforce these themes naturally; do NOT force every theme into every paragraph, but weave them into the section's substance where relevant. Avoid quoting the title verbatim — show the theme through specifics.`,
+          ...snapshot.winThemes.map(
+            (t, i) =>
+              `Theme ${i + 1} (${t.title}): ${t.statement}`,
+          ),
+        ].join("\n")
+      : "";
+
+  // Pass the snapshot as JSON but omit the solicitation + winThemes
+  // fields (formatted above) so we don't double-print large text.
+  const {
+    solicitation: _omitSol,
+    winThemes: _omitThemes,
+    ...snapshotForJson
+  } = snapshot;
+  void _omitSol;
+  void _omitThemes;
 
   const userPrompt = [
     `Mode: ${mode}.`,
     MODE_INSTRUCTIONS[mode],
     ``,
+    themesBlock,
+    themesBlock ? `` : "",
     solicitationBlock,
     solicitationBlock ? `` : "",
     `Section + proposal snapshot (JSON):`,
@@ -1072,6 +1102,122 @@ export const compliancePreflightVerdictSchema = z.object({
 /** The compliance prompt returns `{ verdicts: [...] }`. */
 export const compliancePreflightResponseSchema = z.object({
   verdicts: z.array(compliancePreflightVerdictSchema),
+});
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-CM-AUTOMAP — Auto-map requirements to proposal sections
+// ────────────────────────────────────────────────────────────────────
+
+export type ComplianceAutoMapItem = {
+  itemId: string;
+  number: string;
+  category: string;
+  requirementText: string;
+};
+
+export type ComplianceAutoMapSection = {
+  sectionId: string;
+  title: string;
+  kind: string;
+};
+
+export type ComplianceAutoMapInput = {
+  items: ComplianceAutoMapItem[];
+  sections: ComplianceAutoMapSection[];
+};
+
+export type ComplianceAutoMapVerdict = {
+  itemId: string;
+  /** Section id to assign, or "" to leave unmapped. */
+  sectionId: string;
+  /** AI confidence in the mapping. */
+  confidence: "high" | "medium" | "low";
+  /** 1 short sentence explaining the choice. */
+  rationale: string;
+};
+
+const COMPLIANCE_AUTOMAP_SYSTEM = `You are a federal proposal compliance analyst inside FORGE. Your job: assign each Section L/M requirement to the most appropriate proposal section so the team can build a compliance crosswalk fast.
+
+You receive:
+  - A list of compliance items (Section L instructions or Section M evaluation criteria) — each with an id, number, category, and the requirement text.
+  - A list of proposal sections — each with an id, title, and kind (e.g. executive_summary, technical, management, past_performance, pricing, compliance).
+
+Your job: for each item, pick the single best section to address it.
+
+Output ONLY a single JSON object:
+{
+  "mappings": [
+    {
+      "itemId": "<echo the supplied id>",
+      "sectionId": "<id of the best-fit section, or empty string '' if no section is a good fit>",
+      "confidence": "high" | "medium" | "low",
+      "rationale": "<one short sentence explaining the choice>"
+    }
+  ]
+}
+
+Heuristics:
+- Section L instructions about technical approach → kind=technical or "Technical Approach"-titled section.
+- Section L instructions about management approach, staffing, transition, risk → kind=management.
+- Section L instructions about past performance → kind=past_performance.
+- Pricing / cost / CLIN instructions → kind=pricing.
+- Cover letter, executive summary, theme statements → kind=executive_summary.
+- Cross-cutting requirements (page limits, font, format, table-of-contents, certifications) → kind=compliance OR no mapping if no compliance volume exists.
+- Section M evaluation factors: map to the section whose CONTENT will be evaluated against that factor (e.g. Factor 1: Technical → technical section; Factor 2: Past Performance → past_performance section).
+
+Confidence rules:
+- high: the requirement's topic clearly matches the section's kind / title.
+- medium: plausible match but the section could overlap with another (e.g. risk could go in technical or management).
+- low: weak signal; the requirement is generic or there's no clear best section.
+
+Hard rules:
+- Echo each itemId exactly. Return one mapping per supplied item, in the same order.
+- If no section is a reasonable fit (e.g. the proposal has no compliance volume), set sectionId to "" with rationale explaining why.
+- rationale ≤ 200 characters. Plain prose, no markdown.
+- Do NOT invent section ids. sectionId must be either an id from the input list or "".`;
+
+export function buildComplianceAutoMapPrompt(
+  input: ComplianceAutoMapInput,
+): { system: string; messages: AIMessage[] } {
+  const itemLines = input.items
+    .map(
+      (it, i) =>
+        `${i + 1}. id=${it.itemId} | number=${it.number || "(none)"} | category=${it.category} | text="${it.requirementText.replace(/"/g, '\\"').slice(0, 400)}"`,
+    )
+    .join("\n");
+
+  const sectionLines = input.sections
+    .map(
+      (s, i) =>
+        `${i + 1}. id=${s.sectionId} | kind=${s.kind} | title="${s.title.replace(/"/g, '\\"')}"`,
+    )
+    .join("\n");
+
+  const userPrompt = [
+    `Compliance items to map (${input.items.length}):`,
+    itemLines || "(none)",
+    ``,
+    `Proposal sections available (${input.sections.length}):`,
+    sectionLines || "(none)",
+    ``,
+    `Return strict JSON per the schema in the system prompt. One mapping per item, in the same order.`,
+  ].join("\n");
+
+  return {
+    system: COMPLIANCE_AUTOMAP_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+export const complianceAutoMapVerdictSchema = z.object({
+  itemId: z.string(),
+  sectionId: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+  rationale: z.string(),
+});
+
+export const complianceAutoMapResponseSchema = z.object({
+  mappings: z.array(complianceAutoMapVerdictSchema),
 });
 
 /**

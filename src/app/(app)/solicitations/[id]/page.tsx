@@ -14,6 +14,8 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { safeQuery } from "@/lib/schema-resilience";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { listAmendmentsAction } from "../actions";
+import { AmendmentsPanel } from "./AmendmentsPanel";
 import { SolicitationActions } from "./SolicitationActions";
 import { SolicitationReviewPanel } from "./SolicitationReviewPanel";
 import { TeamPanel } from "./TeamPanel";
@@ -69,6 +71,33 @@ export default async function SolicitationDetail({
   const s = row.s;
   const statusColor = STATUS_COLOR[s.parseStatus] ?? "#9BC9D9";
   const assignments = await listSolicitationAssignmentsAction(s.id);
+
+  // BL-FB-SOL-AMEND-DIFF — load amendment context. If this solicitation
+  // is itself an amendment, fetch the parent's display info; otherwise
+  // list its child amendments so the panel can render the right view.
+  const amendments = await listAmendmentsAction(s.id);
+  let parentSolicitation: {
+    id: string;
+    amendmentNumber: string;
+    title: string;
+  } | null = null;
+  if (s.parentSolicitationId) {
+    const [parent] = await db
+      .select({
+        id: solicitations.id,
+        amendmentNumber: solicitations.amendmentNumber,
+        title: solicitations.title,
+      })
+      .from(solicitations)
+      .where(
+        and(
+          eq(solicitations.id, s.parentSolicitationId),
+          eq(solicitations.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    parentSolicitation = parent ?? null;
+  }
 
   // BL-23: review + matrix + question state for the review panel.
   // Wrapped in safeQuery so a missing 0033 migration on a deployed
@@ -239,6 +268,14 @@ export default async function SolicitationDetail({
             View linked opportunity →
           </Link>
         ) : null}
+      </div>
+
+      <div className="mb-4">
+        <AmendmentsPanel
+          solicitationId={s.id}
+          parentSolicitation={parentSolicitation}
+          amendments={amendments}
+        />
       </div>
 
       <div className="mb-4">

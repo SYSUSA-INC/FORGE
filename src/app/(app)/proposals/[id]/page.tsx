@@ -5,11 +5,20 @@ import { proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
+import { BrainMinePanel } from "./BrainMinePanel";
+import { getBrainMineStatusAction } from "./brain-actions";
+import { DraftInsightsPanel } from "./DraftInsightsPanel";
 import { ProposalOverviewForm } from "./ProposalOverviewForm";
 import { ProposalScanPanel } from "./ProposalScanPanel";
+import {
+  getStoredProposalScanAction,
+  triggerProposalScanIfStaleAction,
+} from "./scan-actions";
 import { StageAdvancePanel } from "./StageAdvancePanel";
+import { WinThemesPanel } from "./WinThemesPanel";
 import { ExportPanel } from "./pdf/ExportPanel";
 import {
+  getComplianceGateStatusAction,
   getDocxToPdfStatusAction,
   getProposalExportCapabilityAction,
   getProviderStatusAction,
@@ -54,17 +63,33 @@ export default async function ProposalOverviewPage({
   const totalWords = sections.reduce((a, s) => a + s.wordCount, 0);
   const approved = sections.filter((s) => s.status === "approved").length;
 
-  const [recentRenders, providerStatus, exportCapability, docxToPdfStatus] =
-    await Promise.all([
-      listRecentRendersAction(params.id, 5),
-      getProviderStatusAction(),
-      getProposalExportCapabilityAction(params.id),
-      getDocxToPdfStatusAction(),
-    ]);
+  const [
+    recentRenders,
+    providerStatus,
+    exportCapability,
+    docxToPdfStatus,
+    complianceGate,
+    brainMineStatus,
+    storedScan,
+    scanTrigger,
+  ] = await Promise.all([
+    listRecentRendersAction(params.id, 5),
+    getProviderStatusAction(),
+    getProposalExportCapabilityAction(params.id),
+    getDocxToPdfStatusAction(),
+    getComplianceGateStatusAction(params.id),
+    getBrainMineStatusAction(params.id),
+    getStoredProposalScanAction(params.id),
+    // BL-FB-SCAN-CONTINUOUS — on every page load, ask the trigger to
+    // re-scan if the proposal is dirty + outside the debounce window.
+    // Fire-and-forget at the server-action layer; we just surface
+    // whether a scan was launched so the panel can show a notice.
+    triggerProposalScanIfStaleAction(params.id),
+  ]);
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <div className="xl:col-span-2">
+      <div className="flex flex-col gap-4 xl:col-span-2">
         <Panel title="Proposal details">
           <ProposalOverviewForm
             proposalId={p.id}
@@ -78,6 +103,12 @@ export default async function ProposalOverviewPage({
             team={team}
           />
         </Panel>
+        <WinThemesPanel
+          proposalId={p.id}
+          initial={(p.winThemes ?? []) as { title: string; statement: string }[]}
+        />
+        <BrainMinePanel proposalId={p.id} initial={brainMineStatus} />
+        <DraftInsightsPanel proposalId={p.id} />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -89,10 +120,15 @@ export default async function ProposalOverviewPage({
           pdfStatus={providerStatus.pdf.active}
           storageStatus={providerStatus.storage.active}
           exportCapability={exportCapability}
+          complianceGate={complianceGate}
           docxToPdfProvider={docxToPdfStatus.active.name}
         />
 
-        <ProposalScanPanel proposalId={p.id} />
+        <ProposalScanPanel
+          proposalId={p.id}
+          initial={storedScan}
+          backgroundScanRunning={scanTrigger.triggered}
+        />
 
         <Panel title="Sections" eyebrow={`${approved}/${sections.length} approved · ${totalWords} words`}>
           <ul className="flex flex-col gap-1.5">

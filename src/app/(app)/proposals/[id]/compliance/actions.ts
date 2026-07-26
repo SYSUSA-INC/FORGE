@@ -4,19 +4,27 @@ import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
+  complianceItemEvidence,
   complianceItems,
+  knowledgeEntries,
+  organizations,
   proposalSections,
   proposals,
   type ComplianceAIAssessment,
   type ComplianceCategory,
+  type ComplianceEvidenceKind,
+  type ComplianceOwnerStatus,
   type ComplianceStatus,
   type TipTapDoc,
 } from "@/db/schema";
 import { completeForTenant } from "@/lib/ai";
 import {
+  buildComplianceAutoMapPrompt,
   buildCompliancePreflightPrompt,
+  complianceAutoMapResponseSchema,
   compliancePreflightResponseSchema,
   parseAiJson,
+  type ComplianceAutoMapVerdict,
   type CompliancePreflightItem,
   type CompliancePreflightVerdict,
 } from "@/lib/ai-prompts";
@@ -76,6 +84,7 @@ export type ComplianceItemInput = {
   status: ComplianceStatus;
   notes: string;
   ownerUserId: string | null;
+  ownerStatus?: ComplianceOwnerStatus;
 };
 
 export async function createComplianceItemAction(
@@ -120,6 +129,7 @@ export async function createComplianceItemAction(
         notes: input.notes.trim(),
         ordering: (maxOrder?.max ?? 0) + 1,
         ownerUserId: input.ownerUserId,
+        ownerStatus: input.ownerUserId ? (input.ownerStatus ?? "assigned") : "unassigned",
         createdByUserId: actor.id,
       })
       .returning({ id: complianceItems.id });
@@ -184,8 +194,14 @@ export async function updateComplianceItemAction(
       update.proposalPageReference = input.proposalPageReference.trim();
     if (input.status !== undefined) update.status = input.status;
     if (input.notes !== undefined) update.notes = input.notes.trim();
-    if (input.ownerUserId !== undefined)
+    if (input.ownerUserId !== undefined) {
       update.ownerUserId = input.ownerUserId;
+      // When clearing the owner, reset owner status to unassigned.
+      if (!input.ownerUserId && input.ownerStatus === undefined) {
+        update.ownerStatus = "unassigned";
+      }
+    }
+    if (input.ownerStatus !== undefined) update.ownerStatus = input.ownerStatus;
 
     await db
       .update(complianceItems)
@@ -690,6 +706,580 @@ export async function dismissComplianceAIAssessmentAction(
     metadata: { proposalId },
   });
   revalidatePath(`/proposals/${proposalId}/compliance`);
+  return { ok: true };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-CM-AUTOMAP — Auto-map compliance items to proposal sections
+// ────────────────────────────────────────────────────────────────────
+
+export type AutoMapSuggestion = {
+  itemId: string;
+  itemNumber: string;
+  itemText: string;
+  currentSectionId: string | null;
+  suggestedSectionId: string;
+  suggestedSectionTitle: string;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+};
+
+export type RunComplianceAutoMapResult =
+  | {
+      ok: true;
+      suggestions: AutoMapSuggestion[];
+      unchanged: number;
+      stubbed: boolean;
+      model: string;
+    }
+  | { ok: false; error: string };
+
+const AUTOMAP_CONFIDENCE: Set<"high" | "medium" | "low"> = new Set([
+  "high",
+  "medium",
+  "low",
+]);
+
+/**
+ * BL-FB-CM-AUTOMAP — Phase 1.
+ *
+ * Asks the AI to map every compliance item to the best-fit proposal
+ * section. Returns a suggestion list (does NOT write to DB on its own —
+ * the user reviews and applies). Each suggestion carries a confidence
+ * level so the UI can render an "Accept all high-confidence" affordance.
+ *
+ * Rate-limited 5/hour per proposal. AI quota counted per attempt;
+ * refunded on early failure (no AI call) or empty result.
+ */
+export async function runComplianceAutoMapAction(
+  proposalId: string,
+): Promise<RunComplianceAutoMapResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  try {
+    await ensureFeature(organizationId, "complianceMatrix");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
+  } catch (err) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
+
+  const limit = await enforceRateLimit({
+    key: `automap:proposal:${proposalId}`,
+    limit: 5,
+    windowSeconds: 3600,
+  });
+  if (!limit.ok) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error: `Auto-map limit (5/hour) reached for this proposal. Retry in ${Math.ceil(limit.retryAfter / 60)} min.`,
+    };
+  }
+
+  const items = await db
+    .select({
+      id: complianceItems.id,
+      number: complianceItems.number,
+      category: complianceItems.category,
+      requirementText: complianceItems.requirementText,
+      proposalSectionId: complianceItems.proposalSectionId,
+    })
+    .from(complianceItems)
+    .where(eq(complianceItems.proposalId, proposalId))
+    .orderBy(asc(complianceItems.ordering));
+
+  const sections = await db
+    .select({
+      id: proposalSections.id,
+      title: proposalSections.title,
+      kind: proposalSections.kind,
+    })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId))
+    .orderBy(asc(proposalSections.ordering));
+
+  if (items.length === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error: "No compliance items to map. Import or add items first.",
+    };
+  }
+  if (sections.length === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error: "Proposal has no sections to map to. Add sections first.",
+    };
+  }
+
+  // Cap items per call to keep prompts in bounds. 80 items per request
+  // is well within Anthropic limits and covers nearly every proposal.
+  const ITEMS_PER_BATCH = 80;
+  const sectionLookup = new Map(sections.map((s) => [s.id, s.title]));
+
+  let stubbed = false;
+  let model = "stub";
+  const aggregated: ComplianceAutoMapVerdict[] = [];
+
+  for (let i = 0; i < items.length; i += ITEMS_PER_BATCH) {
+    const batch = items.slice(i, i + ITEMS_PER_BATCH);
+    const prompt = buildComplianceAutoMapPrompt({
+      items: batch.map((it) => ({
+        itemId: it.id,
+        number: it.number,
+        category: it.category,
+        requirementText: it.requirementText,
+      })),
+      sections: sections.map((s) => ({
+        sectionId: s.id,
+        title: s.title,
+        kind: s.kind,
+      })),
+    });
+
+    let raw = "";
+    try {
+      const res = await completeForTenant({
+        organizationId,
+        system: prompt.system,
+        messages: prompt.messages,
+        maxTokens: 3000,
+        temperature: 0,
+        cacheSystem: true,
+      });
+      raw = res.text;
+      stubbed = stubbed || res.stubbed;
+      model = `${res.provider}:${res.model}`;
+    } catch (err) {
+      log.warn("[runComplianceAutoMapAction]", "AI call failed", { error: err });
+      continue;
+    }
+
+    const parseResult = parseAiJson(raw, complianceAutoMapResponseSchema);
+    if (!parseResult.ok) {
+      log.warn("[runComplianceAutoMapAction]", "JSON parse failed", {
+        parseError: parseResult.error,
+        rawSnippet: raw.slice(0, 240),
+      });
+      continue;
+    }
+    aggregated.push(...parseResult.data.mappings);
+  }
+
+  if (aggregated.length === 0) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return {
+      ok: false,
+      error:
+        "AI returned no usable mappings. Re-run, or check the AI provider configuration.",
+    };
+  }
+
+  // Build suggestions, filtering invalid section ids + low-quality entries.
+  const validSectionIds = new Set(sections.map((s) => s.id));
+  const itemIndex = new Map(items.map((it) => [it.id, it]));
+  const suggestions: AutoMapSuggestion[] = [];
+  let unchanged = 0;
+
+  for (const v of aggregated) {
+    if (!AUTOMAP_CONFIDENCE.has(v.confidence)) continue;
+    const item = itemIndex.get(v.itemId);
+    if (!item) continue;
+
+    // Empty sectionId means AI declined to map — skip and let the
+    // user map manually.
+    if (!v.sectionId) continue;
+    if (!validSectionIds.has(v.sectionId)) continue;
+
+    // If the AI's suggestion matches the current mapping, count as
+    // unchanged so the UI can summarize "AI confirmed N mappings,
+    // suggests M changes".
+    if (item.proposalSectionId === v.sectionId) {
+      unchanged += 1;
+      continue;
+    }
+
+    suggestions.push({
+      itemId: v.itemId,
+      itemNumber: item.number,
+      itemText: item.requirementText.slice(0, 240),
+      currentSectionId: item.proposalSectionId ?? null,
+      suggestedSectionId: v.sectionId,
+      suggestedSectionTitle: sectionLookup.get(v.sectionId) ?? "(unknown)",
+      confidence: v.confidence,
+      rationale: v.rationale.slice(0, 240),
+    });
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.automap.run",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      proposalId,
+      totalItems: items.length,
+      suggestionCount: suggestions.length,
+      unchanged,
+      stubbed,
+      model,
+    },
+  });
+
+  return { ok: true, suggestions, unchanged, stubbed, model };
+}
+
+/**
+ * Apply a set of auto-map suggestions. Used by the "Accept all high-
+ * confidence" button or per-row apply. Caller passes the itemId →
+ * sectionId pairs they want to commit.
+ */
+export async function applyComplianceAutoMapAction(
+  proposalId: string,
+  mappings: { itemId: string; sectionId: string }[],
+): Promise<
+  { ok: true; applied: number } | { ok: false; error: string }
+> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+  if (mappings.length === 0) {
+    return { ok: true, applied: 0 };
+  }
+
+  // Validate every section id belongs to this proposal — refuse the
+  // whole batch on any cross-proposal section reference.
+  const sectionIds = Array.from(new Set(mappings.map((m) => m.sectionId)));
+  const sectionRows = await db
+    .select({ id: proposalSections.id })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId));
+  const validIds = new Set(sectionRows.map((r) => r.id));
+  for (const sid of sectionIds) {
+    if (!validIds.has(sid)) {
+      return {
+        ok: false,
+        error: "One or more sections do not belong to this proposal.",
+      };
+    }
+  }
+
+  // Apply sequentially per Neon-pgbouncer rule.
+  let applied = 0;
+  const now = new Date();
+  for (const m of mappings) {
+    const r = await db
+      .update(complianceItems)
+      .set({ proposalSectionId: m.sectionId, updatedAt: now })
+      .where(
+        and(
+          eq(complianceItems.id, m.itemId),
+          eq(complianceItems.proposalId, proposalId),
+        ),
+      )
+      .returning({ id: complianceItems.id });
+    if (r.length > 0) applied += 1;
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.automap.apply",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: { proposalId, requested: mappings.length, applied },
+  });
+
+  revalidatePath(`/proposals/${proposalId}/compliance`);
+  return { ok: true, applied };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// BL-FB-CM-EVIDENCE — per-row evidence linking
+// ────────────────────────────────────────────────────────────────────
+
+export type EvidenceRow = {
+  id: string;
+  kind: ComplianceEvidenceKind;
+  refId: string;
+  label: string;
+  snippet: string;
+  createdAt: string;
+};
+
+export type AvailableEvidence = {
+  pastPerformance: {
+    refId: string;
+    customer: string;
+    contract: string;
+    description: string;
+  }[];
+  knowledgeEntries: {
+    id: string;
+    kind: string;
+    title: string;
+    body: string;
+  }[];
+  sections: {
+    id: string;
+    title: string;
+    ordering: number;
+    contentSnippets: string[];
+  }[];
+};
+
+/**
+ * Owns the proposal AND the compliance item belongs to that proposal.
+ * Used to gate writes against cross-proposal item ids.
+ */
+async function ownsComplianceItem(
+  itemId: string,
+  organizationId: string,
+): Promise<{ ok: true; proposalId: string } | { ok: false }> {
+  const [row] = await db
+    .select({
+      itemId: complianceItems.id,
+      proposalId: complianceItems.proposalId,
+    })
+    .from(complianceItems)
+    .innerJoin(proposals, eq(proposals.id, complianceItems.proposalId))
+    .where(
+      and(
+        eq(complianceItems.id, itemId),
+        eq(proposals.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!row) return { ok: false };
+  return { ok: true, proposalId: row.proposalId };
+}
+
+export async function listAvailableEvidenceAction(
+  proposalId: string,
+): Promise<
+  { ok: true; data: AvailableEvidence } | { ok: false; error: string }
+> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  const [orgRow] = await db
+    .select({ pastPerformance: organizations.pastPerformance })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+
+  // Past performance lives as an array of jsonb objects on the org;
+  // each entry has a stable `id` we'll use as refId.
+  const pastPerformance = (orgRow?.pastPerformance ?? [])
+    .filter((p) => p && (p.customer || p.contract || p.description))
+    .map((p) => ({
+      refId: p.id,
+      customer: p.customer ?? "",
+      contract: p.contract ?? "",
+      description: (p.description ?? "").slice(0, 400),
+    }));
+
+  const knowledge = await db
+    .select({
+      id: knowledgeEntries.id,
+      kind: knowledgeEntries.kind,
+      title: knowledgeEntries.title,
+      body: knowledgeEntries.body,
+    })
+    .from(knowledgeEntries)
+    .where(eq(knowledgeEntries.organizationId, organizationId))
+    .orderBy(asc(knowledgeEntries.title))
+    .limit(200);
+
+  const sectionRows = await db
+    .select({
+      id: proposalSections.id,
+      title: proposalSections.title,
+      ordering: proposalSections.ordering,
+      bodyDoc: proposalSections.bodyDoc,
+      content: proposalSections.content,
+    })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId))
+    .orderBy(asc(proposalSections.ordering));
+
+  // Break each section's plain text into paragraph-sized snippets so
+  // the picker can show pickable paragraphs (rather than full sections).
+  const sections = sectionRows.map((s) => {
+    const plain =
+      projectToPlain(s.bodyDoc as TipTapDoc | null) || s.content || "";
+    const paragraphs = plain
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 40)
+      .slice(0, 25);
+    return {
+      id: s.id,
+      title: s.title,
+      ordering: s.ordering,
+      contentSnippets: paragraphs.map((p) => p.slice(0, 500)),
+    };
+  });
+
+  return {
+    ok: true,
+    data: {
+      pastPerformance,
+      knowledgeEntries: knowledge.map((k) => ({
+        id: k.id,
+        kind: k.kind,
+        title: k.title,
+        body: k.body.slice(0, 1000),
+      })),
+      sections,
+    },
+  };
+}
+
+export async function attachComplianceEvidenceAction(input: {
+  proposalId: string;
+  itemId: string;
+  kind: ComplianceEvidenceKind;
+  refId: string;
+  label: string;
+  snippet: string;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(input.proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+
+  const owns = await ownsComplianceItem(input.itemId, organizationId);
+  if (!owns.ok || owns.proposalId !== input.proposalId) {
+    return { ok: false, error: "Compliance item does not belong to this proposal." };
+  }
+
+  // Validate the refId against the kind so we don't store dangling
+  // pointers. For section_paragraph, confirm the section belongs to
+  // this proposal. For knowledge_entry, confirm the entry belongs to
+  // this org. For past_performance, the refId is the array entry's
+  // stable id — no DB check possible, accept as-is.
+  if (input.kind === "section_paragraph") {
+    if (!(await sectionBelongsToProposal(input.refId, input.proposalId))) {
+      return {
+        ok: false,
+        error: "Section does not belong to this proposal.",
+      };
+    }
+  } else if (input.kind === "knowledge_entry") {
+    const [k] = await db
+      .select({ id: knowledgeEntries.id })
+      .from(knowledgeEntries)
+      .where(
+        and(
+          eq(knowledgeEntries.id, input.refId),
+          eq(knowledgeEntries.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    if (!k) {
+      return {
+        ok: false,
+        error: "Knowledge entry not found in this organization.",
+      };
+    }
+  }
+
+  try {
+    const [row] = await db
+      .insert(complianceItemEvidence)
+      .values({
+        organizationId,
+        complianceItemId: input.itemId,
+        kind: input.kind,
+        refId: input.refId,
+        label: input.label.slice(0, 256),
+        snippet: input.snippet.slice(0, 2000),
+        createdByUserId: actor.id,
+      })
+      .returning({ id: complianceItemEvidence.id });
+    if (!row) return { ok: false, error: "Could not attach evidence." };
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "proposal.compliance.evidence.attach",
+      resourceType: "compliance_item_evidence",
+      resourceId: row.id,
+      metadata: {
+        proposalId: input.proposalId,
+        itemId: input.itemId,
+        kind: input.kind,
+      },
+    });
+    revalidatePath(`/proposals/${input.proposalId}/compliance`);
+    return { ok: true, id: row.id };
+  } catch (err) {
+    log.error("[attachComplianceEvidenceAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Attach failed.",
+    };
+  }
+}
+
+export async function detachComplianceEvidenceAction(
+  evidenceId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  // Cross-tenant-safe delete: scope by both id AND organizationId so a
+  // hand-typed UUID can't reach into another org's evidence rows.
+  const result = await db
+    .delete(complianceItemEvidence)
+    .where(
+      and(
+        eq(complianceItemEvidence.id, evidenceId),
+        eq(complianceItemEvidence.organizationId, organizationId),
+      ),
+    )
+    .returning({
+      id: complianceItemEvidence.id,
+      itemId: complianceItemEvidence.complianceItemId,
+    });
+
+  if (result.length === 0) {
+    return { ok: false, error: "Evidence not found." };
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.compliance.evidence.detach",
+    resourceType: "compliance_item_evidence",
+    resourceId: evidenceId,
+    metadata: { itemId: result[0].itemId },
+  });
+
+  // Best-effort lookup of the proposal id to revalidate the page.
+  const [prow] = await db
+    .select({ proposalId: complianceItems.proposalId })
+    .from(complianceItems)
+    .where(eq(complianceItems.id, result[0].itemId))
+    .limit(1);
+  if (prow) revalidatePath(`/proposals/${prow.proposalId}/compliance`);
+
   return { ok: true };
 }
 

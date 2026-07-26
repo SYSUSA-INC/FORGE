@@ -1,5 +1,6 @@
 import type {
   ComplianceCategory,
+  ComplianceOwnerStatus,
   ComplianceStatus,
 } from "@/db/schema";
 
@@ -71,6 +72,28 @@ export const STATUS_COLORS: Record<ComplianceStatus, string> =
   Object.fromEntries(
     STATUSES.map((s) => [s.key, s.color]),
   ) as Record<ComplianceStatus, string>;
+
+export const OWNER_STATUSES: {
+  key: ComplianceOwnerStatus;
+  label: string;
+  color: string;
+}[] = [
+  { key: "unassigned", label: "Unassigned", color: "#64748B" },
+  { key: "assigned", label: "Assigned", color: "#60A5FA" },
+  { key: "in_progress", label: "In progress", color: "#FBBF24" },
+  { key: "complete", label: "Done", color: "#10B981" },
+  { key: "blocked", label: "Blocked", color: "#F87171" },
+];
+
+export const OWNER_STATUS_LABELS: Record<ComplianceOwnerStatus, string> =
+  Object.fromEntries(
+    OWNER_STATUSES.map((s) => [s.key, s.label]),
+  ) as Record<ComplianceOwnerStatus, string>;
+
+export const OWNER_STATUS_COLORS: Record<ComplianceOwnerStatus, string> =
+  Object.fromEntries(
+    OWNER_STATUSES.map((s) => [s.key, s.color]),
+  ) as Record<ComplianceOwnerStatus, string>;
 
 export function computeCompletion(items: { status: ComplianceStatus }[]): {
   complete: number;
