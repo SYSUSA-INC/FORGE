@@ -3115,7 +3115,7 @@ the questions a procurement attorney would ask, and the deadline math
 email. Recorded on the debrief row.
 
 ### BL-FB-WIN-PROTEST — Protest viability check
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #257)
 
 Given the debrief weaknesses + the awardee's USAspending profile +
 the solicitation's evaluation criteria, surface "is there a credible

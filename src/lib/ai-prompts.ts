@@ -1259,3 +1259,148 @@ export function parseAiJson<T>(
   }
   return { ok: true, data: parsed.data };
 }
+
+// ─────────────────────────────────────────────────────────────────
+// BL-FB-WIN-PROTEST — protest viability check
+// ─────────────────────────────────────────────────────────────────
+
+export type ProtestViabilityInput = {
+  proposalTitle: string;
+  agency: string;
+  solicitationNumber: string;
+  naicsCode: string;
+  setAside: string;
+  sectionMSummary: string;
+  sectionLSummary: string;
+  debrief: {
+    strengths: string;
+    weaknesses: string;
+    improvements: string;
+    pastPerformanceCitation: string;
+    notes: string;
+  } | null;
+  outcome: {
+    awardedToCompetitor: string;
+    decisionDate: string;
+    summary: string;
+  };
+};
+
+const PROTEST_VIABILITY_SYSTEM = `You are a senior bid-protest attorney with deep expertise in GAO, Court of Federal Claims, and agency-level protests. Your task is to perform a sober, calibrated viability assessment of a potential bid protest on behalf of a disappointed offeror.
+
+IMPORTANT CALIBRATION GUIDANCE:
+- Surface a protest ONLY when specific facts from the debrief directly support a recognized legal ground. Do not speculate or invent grounds.
+- Most losses do not produce viable protests. If the debrief is thin, vague, or consistent with a lawful best-value tradeoff, return riskTier "none" with a brief explanation.
+- A "colorable" ground means there is a non-frivolous legal argument supported by specific facts. A "strong" ground means the facts squarely meet a recognized GAO violation standard and controlling precedent.
+- Always tie each ground to specific debrief language, not generalities.
+- Controlling cases must be real GAO decisions or COFC opinions. Do not hallucinate citations.
+- The disclaimer field must note that this is preliminary analysis only, not legal advice, and that counsel review is required before filing.
+
+RECOGNIZED GAO PROTEST GROUNDS (non-exhaustive):
+1. Unequal evaluation — evaluators applied different standards to offerors for the same factor.
+2. Disparate treatment — awardee's weakness ignored but same issue penalized in protester.
+3. Unstated evaluation criteria — agency evaluated on factors not disclosed in the solicitation.
+4. Flawed best-value tradeoff — price/technical tradeoff was irrational or unsupported.
+5. Past performance evaluation error — ratings not supported by record or wrong projects considered.
+6. Technical evaluation error — findings inconsistent with proposal content.
+7. Conflict of interest — evaluator had undisclosed financial or personal stake.
+8. Procurement integrity — source selection information disclosed to a competitor.
+9. Scope of award — contract performance exceeds the scope of the solicitation.
+10. Timeliness of award — award made outside statutory or regulatory timeframes.
+
+OUTPUT: Return strict JSON matching the schema below. No prose outside the JSON object.
+Schema:
+{
+  "riskTier": "none" | "weak" | "colorable" | "strong",
+  "summary": "<2-4 sentence plain-English assessment of whether a viable protest exists and why>",
+  "grounds": [
+    {
+      "groundType": "<name of the legal ground>",
+      "description": "<specific facts from the debrief that support this ground>",
+      "strength": "weak" | "colorable" | "strong",
+      "controllingCases": [
+        {
+          "citation": "<Docket No., Year, e.g. DXC Technology Co., B-421253 (2023)>",
+          "holding": "<one-sentence holding>",
+          "relevance": "<one sentence on why this case supports the ground here>"
+        }
+      ]
+    }
+  ],
+  "disclaimer": "<Required disclaimer text>"
+}
+The "grounds" array must be empty ([]) when riskTier is "none". Include only grounds that are directly supported by the debrief evidence provided.`;
+
+export function buildProtestViabilityPrompt(input: ProtestViabilityInput): {
+  system: string;
+  messages: Array<{ role: "user"; content: string }>;
+} {
+  const parts = [
+    `PROPOSAL: ${input.proposalTitle}`,
+    `AGENCY: ${input.agency || "(not specified)"}`,
+    `SOLICITATION NUMBER: ${input.solicitationNumber || "(not specified)"}`,
+    `NAICS: ${input.naicsCode || "(not specified)"}`,
+    `SET-ASIDE: ${input.setAside || "None / full-and-open"}`,
+    ``,
+    `OUTCOME: Awarded to ${input.outcome.awardedToCompetitor || "(unknown)"}${input.outcome.decisionDate ? ` on ${input.outcome.decisionDate}` : ""}`,
+    input.outcome.summary ? `Outcome summary: ${input.outcome.summary}` : "",
+    ``,
+    `EVALUATION CRITERIA (Section M):`,
+    input.sectionMSummary || "(not available — solicitation not parsed)",
+    ``,
+    `INSTRUCTIONS TO OFFERORS (Section L):`,
+    input.sectionLSummary || "(not available)",
+    ``,
+    `DEBRIEF RECORD:`,
+  ];
+
+  if (!input.debrief) {
+    parts.push("No debrief recorded. Analysis is limited to publicly available information.");
+  } else {
+    if (input.debrief.weaknesses.trim()) {
+      parts.push(`Weaknesses cited by agency:\n${input.debrief.weaknesses}`);
+    }
+    if (input.debrief.strengths.trim()) {
+      parts.push(`Strengths cited by agency:\n${input.debrief.strengths}`);
+    }
+    if (input.debrief.improvements.trim()) {
+      parts.push(`Areas for improvement:\n${input.debrief.improvements}`);
+    }
+    if (input.debrief.pastPerformanceCitation.trim()) {
+      parts.push(`Past performance note:\n${input.debrief.pastPerformanceCitation}`);
+    }
+    if (input.debrief.notes.trim()) {
+      parts.push(`Other debrief notes:\n${input.debrief.notes}`);
+    }
+  }
+
+  parts.push(
+    ``,
+    `Based on the debrief evidence above, analyze the protest viability. Return strict JSON per the schema in the system prompt.`,
+  );
+
+  return {
+    system: PROTEST_VIABILITY_SYSTEM,
+    messages: [{ role: "user", content: parts.filter(Boolean).join("\n") }],
+  };
+}
+
+export const protestGroundSchema = z.object({
+  groundType: z.string(),
+  description: z.string(),
+  strength: z.enum(["weak", "colorable", "strong"]),
+  controllingCases: z.array(
+    z.object({
+      citation: z.string(),
+      holding: z.string(),
+      relevance: z.string(),
+    }),
+  ),
+});
+
+export const protestViabilitySchema = z.object({
+  riskTier: z.enum(["none", "weak", "colorable", "strong"]),
+  summary: z.string(),
+  grounds: z.array(protestGroundSchema),
+  disclaimer: z.string(),
+});

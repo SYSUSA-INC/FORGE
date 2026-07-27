@@ -24,6 +24,7 @@ import {
   saveOutcomeAction,
 } from "./actions";
 import { WinnerAnalysisPanel } from "./WinnerAnalysisPanel";
+import { ProtestViabilityPanel } from "./ProtestViabilityPanel";
 
 type OutcomeForm = {
   outcomeType: ProposalOutcomeType;
@@ -125,6 +126,12 @@ export function OutcomeClient({
                   }
                 : null
             }
+          />
+        ) : null}
+        {outcome?.outcomeType === "lost" ? (
+          <ProtestViabilityPanel
+            proposalId={proposalId}
+            outcomeType={outcome.outcomeType}
           />
         ) : null}
       </div>
