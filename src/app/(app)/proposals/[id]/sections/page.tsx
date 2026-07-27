@@ -63,7 +63,10 @@ export default async function ProposalSectionsPage({
   // Also fire a debounced re-scan if the proposal is stale (dirty +
   // outside the debounce window) so the next page load reflects edits.
   const [scanRow] = await db
-    .select({ sectionIssues: proposalScanResults.sectionIssues })
+    .select({
+      sectionIssues: proposalScanResults.sectionIssues,
+      sectionThemeCoverage: proposalScanResults.sectionThemeCoverage,
+    })
     .from(proposalScanResults)
     .where(
       and(
@@ -82,6 +85,16 @@ export default async function ProposalSectionsPage({
       issue: i.issue,
     });
   }
+  const coverageBySection = new Map<
+    string,
+    { reinforced: number; total: number }
+  >();
+  for (const c of scanRow?.sectionThemeCoverage ?? []) {
+    coverageBySection.set(c.sectionId, {
+      reinforced: c.reinforced.length,
+      total: c.reinforced.length + c.missing.length,
+    });
+  }
   void triggerProposalScanIfStaleAction(params.id);
 
   return (
@@ -94,6 +107,7 @@ export default async function ProposalSectionsPage({
         proposalId={params.id}
         sections={sectionRows.map((s) => {
           const issue = issueBySection.get(s.id);
+          const coverage = coverageBySection.get(s.id);
           return {
             id: s.id,
             kind: s.kind,
@@ -109,6 +123,8 @@ export default async function ProposalSectionsPage({
             authorEmail: s.authorEmail,
             scanSeverity: issue?.severity ?? null,
             scanIssue: issue?.issue ?? null,
+            themeReinforced: coverage?.reinforced ?? null,
+            themeTotal: coverage?.total ?? null,
           };
         })}
         team={team}

@@ -48,6 +48,10 @@ type Section = {
   // section. Drives the red/amber/green dot in the section list.
   scanSeverity: "high" | "medium" | "low" | null;
   scanIssue: string | null;
+  // BL-FB-SCAN-THEMES — theme coverage counts from the latest scan.
+  // null when no scan exists or no themes are configured.
+  themeReinforced: number | null;
+  themeTotal: number | null;
 };
 
 type TeamMember = { id: string; name: string | null; email: string };
@@ -422,6 +426,13 @@ function SectionRow({
             </span>
             {/* BL-FB-SCAN-CONTINUOUS — health dot per section */}
             <ScanDot severity={section.scanSeverity} issue={section.scanIssue} />
+            {/* BL-FB-SCAN-THEMES — win-theme coverage badge */}
+            {section.themeTotal !== null && section.themeReinforced !== null ? (
+              <ThemeBadge
+                reinforced={section.themeReinforced}
+                total={section.themeTotal}
+              />
+            ) : null}
             <span className="truncate font-display text-[14px] font-semibold text-text">
               {section.title}
             </span>
@@ -628,5 +639,39 @@ function ScanDot({
         boxShadow: `0 0 0 1px ${color}55`,
       }}
     />
+  );
+}
+
+// BL-FB-SCAN-THEMES — per-section win-theme coverage badge.
+function ThemeBadge({
+  reinforced,
+  total,
+}: {
+  reinforced: number;
+  total: number;
+}) {
+  if (total === 0) return null;
+  const color =
+    reinforced === total
+      ? "#34d399"
+      : reinforced > 0
+        ? "#fbbf24"
+        : "#f87171";
+  const title =
+    reinforced === total
+      ? `All ${total} win theme${total === 1 ? "" : "s"} reinforced`
+      : `${reinforced}/${total} win theme${total === 1 ? "" : "s"} reinforced`;
+  return (
+    <span
+      className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] tabular-nums tracking-widest"
+      style={{
+        color,
+        backgroundColor: `${color}1A`,
+        border: `1px solid ${color}50`,
+      }}
+      title={title}
+    >
+      {reinforced}/{total}
+    </span>
   );
 }

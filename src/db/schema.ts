@@ -540,6 +540,14 @@ export type ProposalScanSectionIssue = {
   severity: "high" | "medium" | "low";
 };
 
+// BL-FB-SCAN-THEMES — per-section win-theme coverage returned by the scan.
+export type SectionThemeCoverage = {
+  sectionId: string;
+  sectionTitle: string;
+  reinforced: string[];
+  missing: string[];
+};
+
 export const proposalScanResults = pgTable(
   "proposal_scan_result",
   {
@@ -559,6 +567,10 @@ export const proposalScanResults = pgTable(
       .default(sql`'[]'::jsonb`),
     topRecommendations: jsonb("top_recommendations")
       .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    sectionThemeCoverage: jsonb("section_theme_coverage")
+      .$type<SectionThemeCoverage[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
     stubbed: boolean("stubbed").notNull().default(false),

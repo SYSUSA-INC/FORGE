@@ -21,6 +21,7 @@ import {
   proposalSections,
   proposals,
   solicitations,
+  type SectionThemeCoverage,
   type TipTapDoc,
 } from "@/db/schema";
 import { completeForTenant } from "@/lib/ai";
@@ -49,7 +50,15 @@ Output ONLY a single JSON object:
       "severity": "high" | "medium" | "low"
     }
   ],
-  "topRecommendations": ["<specific next action>", ...]
+  "topRecommendations": ["<specific next action>", ...],
+  "sectionThemeCoverage": [
+    {
+      "sectionId": "<echo the id from input>",
+      "sectionTitle": "<echo the title>",
+      "reinforced": ["<theme title that this section clearly reinforces>"],
+      "missing": ["<theme title not reinforced or contradicted in this section>"]
+    }
+  ]
 }
 
 Score calibration:
@@ -61,7 +70,8 @@ Rules:
 - Only include sections with genuine issues in sectionIssues. Skip sections that look good.
 - topRecommendations: 3-5 specific actions for the next 48 hours.
 - Echo sectionId and sectionTitle exactly from the input.
-- Be direct. No flattery.`;
+- Be direct. No flattery.
+- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].`;
 
 export type CronScanSummary = {
   scanned: number;
@@ -292,6 +302,7 @@ async function runSingleProposalScan(
       severity: "high" | "medium" | "low";
     }>;
     topRecommendations: string[];
+    sectionThemeCoverage?: SectionThemeCoverage[];
   };
 
   const result = {
@@ -303,6 +314,7 @@ async function runSingleProposalScan(
     summary: (parsed.summary ?? "").slice(0, 1200),
     sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
     topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
+    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
     stubbed,
     generatedAt: new Date(),
   };
@@ -322,6 +334,7 @@ async function runSingleProposalScan(
         summary: result.summary,
         sectionIssues: result.sectionIssues,
         topRecommendations: result.topRecommendations,
+        sectionThemeCoverage: result.sectionThemeCoverage,
         stubbed: result.stubbed,
         generatedAt: result.generatedAt,
       })
@@ -334,6 +347,7 @@ async function runSingleProposalScan(
       summary: result.summary,
       sectionIssues: result.sectionIssues,
       topRecommendations: result.topRecommendations,
+      sectionThemeCoverage: result.sectionThemeCoverage,
       stubbed: result.stubbed,
       generatedAt: result.generatedAt,
     });

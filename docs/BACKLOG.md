@@ -3157,7 +3157,7 @@ into a single proposal-level scan every N minutes. Foundation for
 all downstream scan enhancements (themes, contradiction, tone).
 
 ### BL-FB-SCAN-THEMES — Win-theme consistency check
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #258)
 
 Set 3 win themes upfront on the proposal (e.g. "FedRAMP High depth,"
 "lowest-risk transition," "DEI in workforce"). The scan checks every
