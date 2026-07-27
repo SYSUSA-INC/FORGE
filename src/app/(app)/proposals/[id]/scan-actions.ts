@@ -9,6 +9,7 @@ import {
   proposals,
   solicitations,
   type SectionThemeCoverage,
+  type ProposalScanContradiction,
   type TipTapDoc,
 } from "@/db/schema";
 import { completeForTenant } from "@/lib/ai";
@@ -39,6 +40,7 @@ export type ProposalScanResult =
       sectionIssues: ProposalScanIssue[];
       topRecommendations: string[];
       sectionThemeCoverage: SectionThemeCoverage[];
+      contradictions: ProposalScanContradiction[];
       stubbed: boolean;
       generatedAt: string;
     }
@@ -66,6 +68,18 @@ Output ONLY a single JSON object:
       "reinforced": ["<theme title that this section clearly reinforces>"],
       "missing": ["<theme title not reinforced or contradicted in this section>"]
     }
+  ],
+  "contradictions": [
+    {
+      "section1Id": "<echo id of first section>",
+      "section1Title": "<echo title>",
+      "section2Id": "<echo id of second section>",
+      "section2Title": "<echo title>",
+      "claim1": "<specific claim from section 1 that conflicts>",
+      "claim2": "<specific claim from section 2 that contradicts claim1>",
+      "explanation": "<1-2 sentences explaining the incompatibility>",
+      "severity": "high" | "medium" | "low"
+    }
   ]
 }
 
@@ -79,7 +93,8 @@ Rules:
 - topRecommendations: 3-5 specific actions for the next 48 hours.
 - Echo sectionId and sectionTitle exactly from the input.
 - Be direct. No flattery.
-- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].`;
+- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].
+- contradictions: only include pairs where two sections make specific, mutually incompatible factual claims (e.g., one says 24/7 operations, another implies 9-5 staffing). Skip empty/thin sections. Max 5 entries. Return [] when none found.`;
 
 export async function runProposalScanAction(
   proposalId: string,
@@ -260,6 +275,7 @@ export async function runProposalScanAction(
       sectionIssues: ProposalScanIssue[];
       topRecommendations: string[];
       sectionThemeCoverage?: SectionThemeCoverage[];
+      contradictions?: ProposalScanContradiction[];
     };
     const result = {
       overallScore: (["strong", "needs_work", "critical"] as const).includes(
@@ -271,6 +287,7 @@ export async function runProposalScanAction(
       sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
       topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
       sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
+      contradictions: (parsed.contradictions ?? []).slice(0, 5) as ProposalScanContradiction[],
       stubbed,
       generatedAt: new Date(),
     };
@@ -293,6 +310,7 @@ export async function runProposalScanAction(
             sectionIssues: result.sectionIssues,
             topRecommendations: result.topRecommendations,
             sectionThemeCoverage: result.sectionThemeCoverage,
+            contradictions: result.contradictions,
             stubbed: result.stubbed,
             generatedAt: result.generatedAt,
           })
@@ -306,6 +324,7 @@ export async function runProposalScanAction(
           sectionIssues: result.sectionIssues,
           topRecommendations: result.topRecommendations,
           sectionThemeCoverage: result.sectionThemeCoverage,
+          contradictions: result.contradictions,
           stubbed: result.stubbed,
           generatedAt: result.generatedAt,
         });
@@ -327,6 +346,7 @@ export async function runProposalScanAction(
       sectionIssues: result.sectionIssues,
       topRecommendations: result.topRecommendations,
       sectionThemeCoverage: result.sectionThemeCoverage,
+      contradictions: result.contradictions,
       stubbed: result.stubbed,
       generatedAt: result.generatedAt.toISOString(),
     };
@@ -352,6 +372,7 @@ export type StoredProposalScan = {
   sectionIssues: ProposalScanIssue[];
   topRecommendations: string[];
   sectionThemeCoverage: SectionThemeCoverage[];
+  contradictions: ProposalScanContradiction[];
   stubbed: boolean;
   generatedAt: string;
   dirtySince: string | null;
@@ -401,6 +422,7 @@ export async function getStoredProposalScanAction(
     sectionIssues: row.sectionIssues,
     topRecommendations: row.topRecommendations,
     sectionThemeCoverage: (row.sectionThemeCoverage ?? []) as SectionThemeCoverage[],
+    contradictions: (row.contradictions ?? []) as ProposalScanContradiction[],
     stubbed: row.stubbed,
     generatedAt: row.generatedAt.toISOString(),
     dirtySince: own.scanDirtySince ? own.scanDirtySince.toISOString() : null,

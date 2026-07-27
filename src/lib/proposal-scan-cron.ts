@@ -21,6 +21,7 @@ import {
   proposalSections,
   proposals,
   solicitations,
+  type ProposalScanContradiction,
   type SectionThemeCoverage,
   type TipTapDoc,
 } from "@/db/schema";
@@ -58,6 +59,18 @@ Output ONLY a single JSON object:
       "reinforced": ["<theme title that this section clearly reinforces>"],
       "missing": ["<theme title not reinforced or contradicted in this section>"]
     }
+  ],
+  "contradictions": [
+    {
+      "section1Id": "<id of first section>",
+      "section1Title": "<title of first section>",
+      "section2Id": "<id of second section>",
+      "section2Title": "<title of second section>",
+      "claim1": "<the specific claim made in section 1>",
+      "claim2": "<the specific claim made in section 2 that contradicts claim 1>",
+      "explanation": "<1-2 sentences explaining why these claims are mutually incompatible>",
+      "severity": "high" | "medium" | "low"
+    }
   ]
 }
 
@@ -71,7 +84,8 @@ Rules:
 - topRecommendations: 3-5 specific actions for the next 48 hours.
 - Echo sectionId and sectionTitle exactly from the input.
 - Be direct. No flattery.
-- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].`;
+- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].
+- contradictions: only include pairs where two sections make specific, mutually incompatible factual claims (e.g., Technical Volume claims 24/7 operations while Management Volume staffs only business hours). Skip empty/thin sections. Max 5 entries. Return [] when none found.`;
 
 export type CronScanSummary = {
   scanned: number;
@@ -303,6 +317,7 @@ async function runSingleProposalScan(
     }>;
     topRecommendations: string[];
     sectionThemeCoverage?: SectionThemeCoverage[];
+    contradictions?: ProposalScanContradiction[];
   };
 
   const result = {
@@ -315,6 +330,7 @@ async function runSingleProposalScan(
     sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
     topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
     sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
+    contradictions: (parsed.contradictions ?? []).slice(0, 5) as ProposalScanContradiction[],
     stubbed,
     generatedAt: new Date(),
   };
@@ -335,6 +351,7 @@ async function runSingleProposalScan(
         sectionIssues: result.sectionIssues,
         topRecommendations: result.topRecommendations,
         sectionThemeCoverage: result.sectionThemeCoverage,
+        contradictions: result.contradictions,
         stubbed: result.stubbed,
         generatedAt: result.generatedAt,
       })
@@ -348,6 +365,7 @@ async function runSingleProposalScan(
       sectionIssues: result.sectionIssues,
       topRecommendations: result.topRecommendations,
       sectionThemeCoverage: result.sectionThemeCoverage,
+      contradictions: result.contradictions,
       stubbed: result.stubbed,
       generatedAt: result.generatedAt,
     });

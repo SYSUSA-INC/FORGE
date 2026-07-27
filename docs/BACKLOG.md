@@ -3165,7 +3165,7 @@ section reinforces them; flags sections that drift off-theme.
 Surfaces theme coverage as a per-section badge.
 
 ### BL-FB-SCAN-CONTRADICTION — Cross-volume contradiction detection
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
 
 Detect inconsistencies between volumes — e.g., Technical Volume claims
 24/7 operations, Management Volume staffs only business hours.

@@ -548,6 +548,18 @@ export type SectionThemeCoverage = {
   missing: string[];
 };
 
+// BL-FB-SCAN-CONTRADICTION — a cross-section factual inconsistency.
+export type ProposalScanContradiction = {
+  section1Id: string;
+  section1Title: string;
+  section2Id: string;
+  section2Title: string;
+  claim1: string;
+  claim2: string;
+  explanation: string;
+  severity: "high" | "medium" | "low";
+};
+
 export const proposalScanResults = pgTable(
   "proposal_scan_result",
   {
@@ -571,6 +583,11 @@ export const proposalScanResults = pgTable(
       .default(sql`'[]'::jsonb`),
     sectionThemeCoverage: jsonb("section_theme_coverage")
       .$type<SectionThemeCoverage[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    // BL-FB-SCAN-CONTRADICTION — cross-section conflicting claims.
+    contradictions: jsonb("contradictions")
+      .$type<ProposalScanContradiction[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
     stubbed: boolean("stubbed").notNull().default(false),

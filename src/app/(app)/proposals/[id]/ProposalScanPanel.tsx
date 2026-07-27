@@ -62,6 +62,7 @@ export function ProposalScanPanel({
           sectionIssues: initial.sectionIssues,
           topRecommendations: initial.topRecommendations,
           sectionThemeCoverage: initial.sectionThemeCoverage,
+          contradictions: initial.contradictions,
           stubbed: initial.stubbed,
           generatedAt: initial.generatedAt,
         }
@@ -240,6 +241,54 @@ export function ProposalScanPanel({
                         </span>
                       ))}
                     </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Contradictions */}
+          {scan.contradictions && scan.contradictions.length > 0 ? (
+            <div>
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                Cross-volume contradictions ({scan.contradictions.length})
+              </div>
+              <ul className="space-y-2">
+                {scan.contradictions.map((c, i) => (
+                  <li
+                    key={i}
+                    className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-mono text-[11px] text-text">
+                        {c.section1Title}{" "}
+                        <span className="text-muted">vs</span>{" "}
+                        {c.section2Title}
+                      </div>
+                      <span
+                        className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        style={{
+                          color: SEVERITY_COLOR[c.severity] ?? "#94a3b8",
+                          background: `${SEVERITY_COLOR[c.severity] ?? "#94a3b8"}1a`,
+                          border: `1px solid ${SEVERITY_COLOR[c.severity] ?? "#94a3b8"}40`,
+                        }}
+                      >
+                        {c.severity}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 space-y-0.5 font-mono text-[10px] text-muted">
+                      <div>
+                        <span className="text-text">{c.section1Title}:</span>{" "}
+                        {c.claim1}
+                      </div>
+                      <div>
+                        <span className="text-text">{c.section2Title}:</span>{" "}
+                        {c.claim2}
+                      </div>
+                    </div>
+                    <p className="mt-1.5 font-body text-[12px] leading-relaxed text-muted">
+                      {c.explanation}
+                    </p>
                   </li>
                 ))}
               </ul>
