@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ProposalSectionKind,
@@ -28,6 +28,7 @@ import {
   removeSectionAction,
   saveSectionAction,
 } from "../../actions";
+import { triggerProposalScanIfStaleAction } from "../scan-actions";
 
 type Section = {
   id: string;
@@ -321,6 +322,21 @@ function SectionRow({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // BL-FB-SCAN-CONTINUOUS — after-save background scan timer.
+  // 65 seconds after the last successful save we fire the server-side
+  // trigger (which enforces its own 60s debounce). If the trigger
+  // actually fires a scan, refresh the page ~20s later to pick up
+  // the updated health dots. Using refs so multiple saves within the
+  // debounce window cancel-and-restart cleanly.
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
   const [title, setTitle] = useState(section.title);
   const initialDoc: TipTapDoc =
     section.bodyDoc?.content?.length
@@ -353,6 +369,27 @@ function SectionRow({
       if (!res.ok) return setError(res.error);
       setNotice("Saved.");
       router.refresh();
+
+      // BL-FB-SCAN-CONTINUOUS — schedule a background scan trigger after
+      // the debounce window. Cancels any pending timer so rapid saves
+      // collapse into a single scan attempt.
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      scanTimerRef.current = setTimeout(() => {
+        triggerProposalScanIfStaleAction(proposalId)
+          .then((r) => {
+            if (r.triggered) {
+              // Scan is running in the background — refresh dots once it lands.
+              refreshTimerRef.current = setTimeout(
+                () => router.refresh(),
+                20_000,
+              );
+            }
+          })
+          .catch(() => {
+            // best effort — dots update on next page load at latest
+          });
+      }, 65_000);
     });
   }
 

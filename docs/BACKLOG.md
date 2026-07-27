@@ -3148,7 +3148,7 @@ strip. Includes the original outcome, debrief, and winner analysis.
 The on-demand scan shipped in PR #243 is v1. The v2 is **continuous**.
 
 ### BL-FB-SCAN-CONTINUOUS — Background health scan on every save
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #258)
 
 Move the health scan from on-demand to background-on-save. Section
 list shows live red/amber/green dots driven by the latest scan.

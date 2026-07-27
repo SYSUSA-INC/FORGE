@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/notification-sla",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/proposal-scan",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
