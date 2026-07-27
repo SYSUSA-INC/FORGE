@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ProposalSectionKind,
@@ -28,6 +28,7 @@ import {
   removeSectionAction,
   saveSectionAction,
 } from "../../actions";
+import { triggerProposalScanIfStaleAction } from "../scan-actions";
 
 type Section = {
   id: string;
@@ -47,6 +48,10 @@ type Section = {
   // section. Drives the red/amber/green dot in the section list.
   scanSeverity: "high" | "medium" | "low" | null;
   scanIssue: string | null;
+  // BL-FB-SCAN-THEMES — theme coverage counts from the latest scan.
+  // null when no scan exists or no themes are configured.
+  themeReinforced: number | null;
+  themeTotal: number | null;
 };
 
 type TeamMember = { id: string; name: string | null; email: string };
@@ -321,6 +326,21 @@ function SectionRow({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // BL-FB-SCAN-CONTINUOUS — after-save background scan timer.
+  // 65 seconds after the last successful save we fire the server-side
+  // trigger (which enforces its own 60s debounce). If the trigger
+  // actually fires a scan, refresh the page ~20s later to pick up
+  // the updated health dots. Using refs so multiple saves within the
+  // debounce window cancel-and-restart cleanly.
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
   const [title, setTitle] = useState(section.title);
   const initialDoc: TipTapDoc =
     section.bodyDoc?.content?.length
@@ -353,6 +373,27 @@ function SectionRow({
       if (!res.ok) return setError(res.error);
       setNotice("Saved.");
       router.refresh();
+
+      // BL-FB-SCAN-CONTINUOUS — schedule a background scan trigger after
+      // the debounce window. Cancels any pending timer so rapid saves
+      // collapse into a single scan attempt.
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      scanTimerRef.current = setTimeout(() => {
+        triggerProposalScanIfStaleAction(proposalId)
+          .then((r) => {
+            if (r.triggered) {
+              // Scan is running in the background — refresh dots once it lands.
+              refreshTimerRef.current = setTimeout(
+                () => router.refresh(),
+                20_000,
+              );
+            }
+          })
+          .catch(() => {
+            // best effort — dots update on next page load at latest
+          });
+      }, 65_000);
     });
   }
 
@@ -385,6 +426,13 @@ function SectionRow({
             </span>
             {/* BL-FB-SCAN-CONTINUOUS — health dot per section */}
             <ScanDot severity={section.scanSeverity} issue={section.scanIssue} />
+            {/* BL-FB-SCAN-THEMES — win-theme coverage badge */}
+            {section.themeTotal !== null && section.themeReinforced !== null ? (
+              <ThemeBadge
+                reinforced={section.themeReinforced}
+                total={section.themeTotal}
+              />
+            ) : null}
             <span className="truncate font-display text-[14px] font-semibold text-text">
               {section.title}
             </span>
@@ -591,5 +639,39 @@ function ScanDot({
         boxShadow: `0 0 0 1px ${color}55`,
       }}
     />
+  );
+}
+
+// BL-FB-SCAN-THEMES — per-section win-theme coverage badge.
+function ThemeBadge({
+  reinforced,
+  total,
+}: {
+  reinforced: number;
+  total: number;
+}) {
+  if (total === 0) return null;
+  const color =
+    reinforced === total
+      ? "#34d399"
+      : reinforced > 0
+        ? "#fbbf24"
+        : "#f87171";
+  const title =
+    reinforced === total
+      ? `All ${total} win theme${total === 1 ? "" : "s"} reinforced`
+      : `${reinforced}/${total} win theme${total === 1 ? "" : "s"} reinforced`;
+  return (
+    <span
+      className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] tabular-nums tracking-widest"
+      style={{
+        color,
+        backgroundColor: `${color}1A`,
+        border: `1px solid ${color}50`,
+      }}
+      title={title}
+    >
+      {reinforced}/{total}
+    </span>
   );
 }

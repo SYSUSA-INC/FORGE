@@ -3148,7 +3148,7 @@ strip. Includes the original outcome, debrief, and winner analysis.
 The on-demand scan shipped in PR #243 is v1. The v2 is **continuous**.
 
 ### BL-FB-SCAN-CONTINUOUS — Background health scan on every save
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #258)
 
 Move the health scan from on-demand to background-on-save. Section
 list shows live red/amber/green dots driven by the latest scan.
@@ -3157,7 +3157,7 @@ into a single proposal-level scan every N minutes. Foundation for
 all downstream scan enhancements (themes, contradiction, tone).
 
 ### BL-FB-SCAN-THEMES — Win-theme consistency check
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #258)
 
 Set 3 win themes upfront on the proposal (e.g. "FedRAMP High depth,"
 "lowest-risk transition," "DEI in workforce"). The scan checks every

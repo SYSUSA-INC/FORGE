@@ -61,6 +61,7 @@ export function ProposalScanPanel({
           summary: initial.summary,
           sectionIssues: initial.sectionIssues,
           topRecommendations: initial.topRecommendations,
+          sectionThemeCoverage: initial.sectionThemeCoverage,
           stubbed: initial.stubbed,
           generatedAt: initial.generatedAt,
         }
@@ -195,6 +196,55 @@ export function ProposalScanPanel({
               No section issues found.
             </div>
           )}
+
+          {/* Theme coverage */}
+          {scan.sectionThemeCoverage && scan.sectionThemeCoverage.length > 0 ? (
+            <div>
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                Win-theme coverage
+              </div>
+              <ul className="space-y-1.5">
+                {scan.sectionThemeCoverage.map((c) => (
+                  <li
+                    key={c.sectionId}
+                    className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                  >
+                    <div className="mb-1.5 font-mono text-[11px] text-text">
+                      {c.sectionTitle}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {c.reinforced.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          style={{
+                            color: "#34d399",
+                            backgroundColor: "rgba(52,211,153,0.1)",
+                            border: "1px solid rgba(52,211,153,0.3)",
+                          }}
+                        >
+                          ✓ {t}
+                        </span>
+                      ))}
+                      {c.missing.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          style={{
+                            color: "#f87171",
+                            backgroundColor: "rgba(248,113,113,0.1)",
+                            border: "1px solid rgba(248,113,113,0.3)",
+                          }}
+                        >
+                          ✗ {t}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {/* Recommendations */}
           {scan.topRecommendations.length > 0 ? (
