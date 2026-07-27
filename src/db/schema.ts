@@ -1653,6 +1653,14 @@ export const solicitations = pgTable("solicitation", {
   uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
+  // BL-FB-SOL-CALENDAR — AI-extracted key milestones beyond the single
+  // responseDueDate field. Each entry carries a human-readable label, an
+  // ISO date, and a type tag so the timeline can apply per-type styling.
+  keyDates: jsonb("key_dates")
+    .$type<SolicitationKeyDate[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -1676,6 +1684,22 @@ export type SolicitationRequirement = {
   text: string;
   ref: string;
   sourceDocId?: string;
+};
+
+// BL-FB-SOL-CALENDAR — a single AI-extracted key milestone date.
+export type SolicitationKeyDate = {
+  label: string;
+  isoDate: string;
+  type:
+    | "qa_cutoff"
+    | "site_visit"
+    | "final_rfp"
+    | "proposal_due"
+    | "oral_presentation"
+    | "expected_award"
+    | "debrief_window"
+    | "protest_window"
+    | "other";
 };
 
 /**

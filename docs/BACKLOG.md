@@ -3041,7 +3041,7 @@ matrix. Persists Q&A history with timestamps; auto-flags the row in
 the matrix as "amended by Q&A".
 
 ### BL-FB-SOL-CALENDAR — Key-date calendar with reminders
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #259)
 
 Auto-extract every key milestone from the solicitation (Q&A cutoff,
 site visit, final RFP, proposal due, oral presentation, expected award,

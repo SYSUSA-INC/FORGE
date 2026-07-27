@@ -22,6 +22,7 @@ import { TeamPanel } from "./TeamPanel";
 import { listSolicitationAssignmentsAction } from "./team-actions";
 import { listSolicitationDocumentsAction } from "./document-actions";
 import { SolicitationDocumentsPanel } from "./SolicitationDocumentsPanel";
+import { KeyDateTimeline } from "./KeyDateTimeline";
 
 export const dynamic = "force-dynamic";
 
@@ -408,6 +409,10 @@ export default async function SolicitationDetail({
 
         <div className="flex flex-col gap-4">
           <TeamPanel solicitationId={s.id} initial={assignments} />
+
+          {(s.keyDates?.length ?? 0) > 0 ? (
+            <KeyDateTimeline keyDates={s.keyDates ?? []} />
+          ) : null}
 
           <Panel title="Extracted facts">
             <dl className="flex flex-col gap-1.5 font-mono text-[11px]">

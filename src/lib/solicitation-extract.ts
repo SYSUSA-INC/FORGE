@@ -109,6 +109,7 @@ export async function aiExtractSolicitation(
             "AI extraction is in stub mode. Set ANTHROPIC_API_KEY on Vercel to enable live extraction.",
           sectionMSummary: "",
           requirements: [],
+          keyDates: [],
         },
       };
     }
@@ -311,6 +312,34 @@ function normalizeExtraction(
         .filter((r) => r.text.trim().length > 0)
         .slice(0, 50)
     : [];
+  const allowedKeyDateTypes = [
+    "qa_cutoff",
+    "site_visit",
+    "final_rfp",
+    "proposal_due",
+    "oral_presentation",
+    "expected_award",
+    "debrief_window",
+    "protest_window",
+    "other",
+  ] as const;
+  const keyDates = Array.isArray(raw.keyDates)
+    ? raw.keyDates
+        .filter((kd) => kd && typeof kd === "object" && typeof kd.label === "string")
+        .map((kd) => ({
+          label: (kd.label as string).slice(0, 128),
+          isoDate:
+            typeof kd.isoDate === "string" && kd.isoDate.match(/^\d{4}-\d{2}-\d{2}/)
+              ? kd.isoDate.slice(0, 10)
+              : null,
+          type: allowedKeyDateTypes.includes(kd.type as (typeof allowedKeyDateTypes)[number])
+            ? (kd.type as (typeof allowedKeyDateTypes)[number])
+            : "other",
+        }))
+        .filter((kd) => kd.label.trim().length > 0)
+        .slice(0, 20)
+    : [];
+
   return {
     title: typeof raw.title === "string" ? raw.title.slice(0, 256) : "",
     agency: typeof raw.agency === "string" ? raw.agency.slice(0, 256) : "",
@@ -335,5 +364,6 @@ function normalizeExtraction(
         ? raw.sectionMSummary.slice(0, 2000)
         : "",
     requirements,
+    keyDates,
   };
 }
