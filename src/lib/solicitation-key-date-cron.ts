@@ -56,7 +56,7 @@ export async function dispatchKeyDateReminders(): Promise<KeyDateCronSummary> {
       ),
     );
 
-  let solicitationsScanned = rows.length;
+  const solicitationsScanned = rows.length;
   let remindersDispatched = 0;
   let duplicatesSkipped = 0;
   let errors = 0;
