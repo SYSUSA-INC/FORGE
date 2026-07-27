@@ -1402,6 +1402,55 @@ export type ProposalWinnerAnalysis =
 export type NewProposalWinnerAnalysis =
   typeof proposalWinnerAnalyses.$inferInsert;
 
+// BL-FB-WIN-PROTEST — protest viability check.
+export const protestRiskTierEnum = pgEnum("protest_risk_tier", [
+  "none",
+  "weak",
+  "colorable",
+  "strong",
+]);
+
+export type ProtestGround = {
+  groundType: string;
+  description: string;
+  strength: "weak" | "colorable" | "strong";
+  controllingCases: Array<{
+    citation: string;
+    holding: string;
+    relevance: string;
+  }>;
+};
+
+export const proposalProtestChecks = pgTable("proposal_protest_check", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  proposalId: uuid("proposal_id")
+    .unique()
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  riskTier: protestRiskTierEnum("risk_tier").notNull().default("none"),
+  summary: text("summary").notNull().default(""),
+  grounds: jsonb("grounds")
+    .$type<ProtestGround[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  model: text("model").notNull().default(""),
+  stubbed: boolean("stubbed").notNull().default(false),
+  createdByUserId: text("created_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type ProposalProtestCheck = typeof proposalProtestChecks.$inferSelect;
+export type NewProposalProtestCheck =
+  typeof proposalProtestChecks.$inferInsert;
+export type ProtestRiskTier =
+  (typeof protestRiskTierEnum.enumValues)[number];
+
 /**
  * Templates can be either:
  *   - "docx": user uploads a real Word template (header, footer,
