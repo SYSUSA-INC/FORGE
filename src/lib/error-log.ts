@@ -113,6 +113,11 @@ export async function captureProductionError(
         set: {
           lastSeenAt: sql`now()`,
           occurrenceCount: sql`${productionErrors.occurrenceCount} + 1`,
+          // Latest occurrence wins for attribution too, so a fingerprint
+          // first seen for tenant A is not frozen to A when the same bug
+          // fires for tenant B (BL-TENANT-AUDIT 2026-09).
+          organizationId: sql`excluded.organization_id`,
+          userId: sql`excluded.user_id`,
           message: sql`excluded.message`,
           stack: sql`excluded.stack`,
           runtime: sql`excluded.runtime`,

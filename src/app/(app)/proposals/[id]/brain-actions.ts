@@ -81,7 +81,12 @@ export async function getBrainMineStatusAction(
   const [outcomeRow] = await db
     .select({ outcomeType: proposalOutcomes.outcomeType })
     .from(proposalOutcomes)
-    .where(eq(proposalOutcomes.proposalId, proposalId))
+    .where(
+      and(
+        eq(proposalOutcomes.organizationId, organizationId),
+        eq(proposalOutcomes.proposalId, proposalId),
+      ),
+    )
     .limit(1);
 
   if (!artifactRow) {

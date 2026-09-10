@@ -145,7 +145,7 @@ export async function inviteUserAction(input: {
         usPersonAttested: attestUsPerson,
         usPersonAttestedAt: attestUsPersonAt,
       })
-      .where(eq(allowlist.id, existingPending.id));
+      .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, existingPending.id)));
     inviteId = existingPending.id;
   } else {
     const [row] = await db
@@ -279,7 +279,7 @@ export async function resendInviteAction(
   await db
     .update(allowlist)
     .set({ invitedAt: new Date() })
-    .where(eq(allowlist.id, inv.id));
+    .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, inv.id)));
 
   revalidatePath("/users");
   return { ok: true };

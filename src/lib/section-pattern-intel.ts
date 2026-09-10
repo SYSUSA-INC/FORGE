@@ -22,11 +22,11 @@
  * and the drafter still works — pattern intel is additive context.
  */
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   complianceItems,
-  proposalSections,
+  proposals,
   type ProposalSectionKind,
 } from "@/db/schema";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
@@ -70,7 +70,7 @@ export async function gatherPatternIntelForSection(input: {
     await Promise.all([
       retrieveCorpusByOutcome(input.organizationId, composed, "won", TOP_WIN),
       retrieveCorpusByOutcome(input.organizationId, composed, "lost", TOP_LOSS),
-      gatherComplianceGapsForSection(input.sectionId),
+      gatherComplianceGapsForSection(input.organizationId, input.sectionId),
       gatherSectionSignal(input.organizationId, input.sectionKind),
     ]);
 
@@ -134,12 +134,15 @@ async function retrieveCorpusByOutcome(
 }
 
 async function gatherComplianceGapsForSection(
+  organizationId: string,
   sectionId: string,
 ): Promise<SectionDraftPatternIntel["complianceGaps"]> {
   // Pull all compliance items mapped to this section. Surface gaps
   // for items the human marked as not_addressed/partial, OR for
   // items where the AI pre-flight (Phase 14c) flagged the same.
-  // Items already 'complete' are skipped.
+  // Items already 'complete' are skipped. compliance_item has no
+  // organization_id of its own, so the tenant filter rides the
+  // proposals join (BL-TENANT-AUDIT 2026-09).
   type Row = {
     id: string;
     number: string;
@@ -160,7 +163,13 @@ async function gatherComplianceGapsForSection(
       aiAssessment: complianceItems.aiAssessment,
     })
     .from(complianceItems)
-    .where(eq(complianceItems.proposalSectionId, sectionId))) as Row[];
+    .innerJoin(proposals, eq(proposals.id, complianceItems.proposalId))
+    .where(
+      and(
+        eq(proposals.organizationId, organizationId),
+        eq(complianceItems.proposalSectionId, sectionId),
+      ),
+    )) as Row[];
 
   const gaps: SectionDraftPatternIntel["complianceGaps"] = [];
   for (const r of rows) {
@@ -200,22 +209,4 @@ async function gatherSectionSignal(
     log.warn("[14d]", "section signal lookup failed", { error: err });
     return null;
   }
-}
-
-/**
- * Helper to load just the section row needed by gatherPatternIntelForSection
- * — keeps the action site lean.
- */
-export async function loadSectionForPatternIntel(sectionId: string) {
-  const [row] = await db
-    .select({
-      id: proposalSections.id,
-      title: proposalSections.title,
-      kind: proposalSections.kind,
-      proposalId: proposalSections.proposalId,
-    })
-    .from(proposalSections)
-    .where(eq(proposalSections.id, sectionId))
-    .limit(1);
-  return row ?? null;
 }

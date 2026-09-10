@@ -82,7 +82,12 @@ export async function dispatchKeyDateReminders(): Promise<KeyDateCronSummary> {
       const assignments = await db
         .select({ userId: solicitationAssignments.userId })
         .from(solicitationAssignments)
-        .where(eq(solicitationAssignments.solicitationId, row.id));
+        .where(
+          and(
+            eq(solicitationAssignments.organizationId, row.organizationId),
+            eq(solicitationAssignments.solicitationId, row.id),
+          ),
+        );
       const userIdSet = new Set<string>();
       for (const a of assignments) {
         userIdSet.add(a.userId as string);

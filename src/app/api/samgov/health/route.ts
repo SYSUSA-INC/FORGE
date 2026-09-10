@@ -20,31 +20,33 @@ export async function GET() {
 
   const probeUrl = `${SAM_BASE}?api_key=${encodeURIComponent(key!)}&samRegistered=Yes&registrationStatus=A&page=0&size=1`;
 
+  // This route is public (auth.config allow-lists it for uptime probes),
+  // so it reports reachability only. It never echoes the upstream body
+  // or error text, which could carry key-related detail
+  // (BL-TENANT-AUDIT 2026-09).
   try {
     const res = await fetch(probeUrl, { cache: "no-store" });
     const bodyText = await res.text();
-    let parsed: unknown = null;
+    let totalRecords: number | null = null;
     try {
-      parsed = JSON.parse(bodyText);
+      const parsed: unknown = JSON.parse(bodyText);
+      if (typeof parsed === "object" && parsed !== null && "totalRecords" in parsed) {
+        const n = (parsed as { totalRecords: unknown }).totalRecords;
+        totalRecords = typeof n === "number" ? n : null;
+      }
     } catch {
-      parsed = bodyText.slice(0, 400);
+      // Non-JSON upstream body — reachability is all we report.
     }
-    const totalRecords =
-      typeof parsed === "object" && parsed !== null && "totalRecords" in parsed
-        ? (parsed as { totalRecords: number }).totalRecords
-        : null;
     return NextResponse.json({
       keyConfigured: true,
       apiReachable: res.ok,
       status: res.status,
       totalRecords,
-      samplePreview: res.ok ? null : parsed,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({
       keyConfigured: true,
       apiReachable: false,
-      error: err instanceof Error ? err.message : String(err),
     });
   }
 }

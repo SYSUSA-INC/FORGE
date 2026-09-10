@@ -24,12 +24,17 @@ because no other CI gate catches them:
   See §2 of `docs/ENGINEERING_STANDARDS.md`.
 
 - **Subtle isolation issues.** The static isolation check
-  (`scripts/check-isolation.mjs`) verifies that server actions
-  touching tenant tables call an auth gate AND reference
-  `organizationId` in the function body. It can miss cases where
-  `organizationId` is referenced but not actually used in the query's
-  `where` clause. Confirm every tenant-table query has the org filter
-  in its `where`.
+  (`scripts/check-isolation.mjs`) verifies that server actions and API
+  route handlers touching tenant tables call an auth gate AND reference
+  `organizationId`, that server-only lib functions under `src/lib`
+  touching tenant tables reference `organizationId`, and that every
+  pgvector `<=>` statement filters `organization_id`. It can miss cases
+  where `organizationId` is referenced but not actually used in the
+  query's `where` clause. Confirm every tenant-table query has the org
+  filter in its `where`. `scripts/check-tenant-firewall.mjs` separately
+  asserts the DB-level guarantees (NOT NULL org column, CASCADE FK,
+  leading org index) for every tenant-scoped table; a new table needs
+  all three in its migration.
 
 - **Session-derived org context.** Using `user.organizationId` from
   the session in a query is an anti-pattern — the session can lag

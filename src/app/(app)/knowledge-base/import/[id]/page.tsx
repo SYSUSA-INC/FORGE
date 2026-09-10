@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getArtifactWithCandidatesAction } from "./actions";
 import { CandidateReviewClient } from "./CandidateReviewClient";
 
@@ -12,6 +13,10 @@ export default async function ArtifactDetailPage({
 }: {
   params: { id: string };
 }) {
+  // The action re-gates and org-scopes; the gate is repeated here so the
+  // route's protection is visible in the route file (BL-TENANT-AUDIT 2026-09).
+  await requireAuth();
+  await requireCurrentOrg();
   const data = await getArtifactWithCandidatesAction(params.id);
   if (!data) notFound();
 

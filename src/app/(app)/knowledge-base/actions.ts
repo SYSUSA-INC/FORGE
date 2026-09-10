@@ -147,7 +147,7 @@ export async function createKnowledgeEntryAction(input: {
     if (row) {
       // Embed best-effort so Brain Suggest can rank this entry. Don't
       // block creation if it fails — backfill can patch later.
-      await embedKnowledgeEntry(row.id, finalTitle, finalBody).catch((err) => {
+      await embedKnowledgeEntry(organizationId, row.id, finalTitle, finalBody).catch((err) => {
         log.warn("[createKnowledgeEntryAction]", "embed failed", { error: err });
       });
     }
@@ -256,10 +256,15 @@ export async function updateKnowledgeEntryAction(
           body: knowledgeEntries.body,
         })
         .from(knowledgeEntries)
-        .where(eq(knowledgeEntries.id, id))
+        .where(
+          and(
+            eq(knowledgeEntries.organizationId, organizationId),
+            eq(knowledgeEntries.id, id),
+          ),
+        )
         .limit(1);
       if (latest) {
-        await embedKnowledgeEntry(id, latest.title, latest.body).catch(
+        await embedKnowledgeEntry(organizationId, id, latest.title, latest.body).catch(
           (err) => {
             log.warn("[updateKnowledgeEntryAction]", "re-embed failed", { error: err });
           },

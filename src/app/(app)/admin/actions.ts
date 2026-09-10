@@ -255,7 +255,7 @@ export async function resendOrgAdminInviteAction(
   await db
     .update(allowlist)
     .set({ invitedAt: new Date() })
-    .where(eq(allowlist.id, inv.id));
+    .where(and(eq(allowlist.organizationId, inv.organizationId), eq(allowlist.id, inv.id)));
 
   await recordAudit({
     organizationId: inv.organizationId,

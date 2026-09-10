@@ -1,0 +1,6 @@
+{
+  "production_error:not_null": "Pre-auth crashes (sign-in page, webhook parsing) happen before any tenant context exists and must still be logged. Read only via the requireSuperadmin-gated /admin/errors triage surface. Documented in docs/audits/06-multi-tenant-firewall-2026-06.md §3.3.",
+  "production_error:fk_cascade": "ON DELETE SET NULL by design: an error row outlives the tenant it was attributed to so ops history is not erased when an org is deleted. Same superadmin-only read path as above.",
+  "payment_event:not_null": "Stripe webhook events arrive before we can bind stripe_customer_id to a tenant (test fixtures, customers not yet linked). Stored with organization_id NULL until resolved; read only by the STRIPE_WEBHOOK_SECRET-verified handler and superadmin billing views. See drizzle/0056_stripe_payment_columns.sql.",
+  "payment_event:fk_cascade": "ON DELETE SET NULL by design: the raw Stripe event ledger must survive tenant deletion for reconciliation with Stripe. Never read on a tenant path."
+}

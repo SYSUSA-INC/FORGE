@@ -63,8 +63,17 @@ export async function chatWithSectionAction(input: {
     throw err;
   }
 
+  // BL-TENANT-AUDIT 2026-09: verify the section belongs to this tenant
+  // before spending the per-section rate limit, and key the limit by
+  // tenant, so one org can never burn another org's chat budget.
+  const owned = await findSectionForOrg({ organizationId, sectionId: input.sectionId });
+  if (!owned) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return { ok: false, error: "Section not found." };
+  }
+
   const limit = await enforceRateLimit({
-    key: `section-chat:${input.sectionId}`,
+    key: `section-chat:${organizationId}:${input.sectionId}`,
     ...CHAT_RATE_LIMIT,
   });
   if (!limit.ok) {

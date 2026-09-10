@@ -140,15 +140,17 @@ async function writebackSection(
     .split(/\s+/)
     .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
-  // Scope update through `proposals` join to prevent cross-tenant writes
-  // even if the JWT were somehow misconfigured.
+  // Scope update through the `proposal` join to prevent cross-tenant
+  // writes even if the JWT were somehow misconfigured. (The table is
+  // `proposal`, singular — the Drizzle const is `proposals`; the earlier
+  // plural here would have failed at runtime. BL-TENANT-AUDIT 2026-09.)
   await pool.query(
     `UPDATE proposal_section ps
         SET body_doc   = $1::jsonb,
             content    = $2,
             word_count = $3,
             updated_at = now()
-       FROM proposals p
+       FROM proposal p
       WHERE ps.id             = $4
         AND ps.proposal_id    = p.id
         AND p.organization_id = $5`,
@@ -194,6 +196,25 @@ const server = new Server<ConnectionContext>({
     const existingOrgId = rows[0]?.organization_id;
     if (existingOrgId && existingOrgId !== claims.organizationId) {
       throw new Error("doc belongs to a different organization");
+    }
+
+    // The entity behind the doc name must belong to the token's org as
+    // well. Without this, the first tenant to open `section/<uuid>` for a
+    // section it does not own would bind the doc to itself and lock the
+    // real owner out at the check above (BL-TENANT-AUDIT 2026-09).
+    if (parsed.namespace === "section") {
+      const { rows: owner } = await pool.query(
+        `SELECT 1
+           FROM proposal_section ps
+           JOIN proposal p ON p.id = ps.proposal_id
+          WHERE ps.id = $1
+            AND p.organization_id = $2
+          LIMIT 1`,
+        [parsed.entityId, claims.organizationId],
+      );
+      if (owner.length === 0) {
+        throw new Error("section not found in organization");
+      }
     }
 
     return { ...claims, docKey };

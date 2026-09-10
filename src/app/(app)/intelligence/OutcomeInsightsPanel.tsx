@@ -10,6 +10,7 @@ import {
   type ProposalOutcomeType,
 } from "@/db/schema";
 import { Panel } from "@/components/ui/Panel";
+import { requireCurrentOrg } from "@/lib/auth-helpers";
 import {
   DEBRIEF_STATUS_LABELS,
   OUTCOME_REASON_LABELS,
@@ -20,11 +21,12 @@ import {
 const TOP_REASON_LIMIT = 5;
 const RECENT_LESSONS_LIMIT = 5;
 
-export async function OutcomeInsightsPanel({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
+export async function OutcomeInsightsPanel() {
+  // A server component that queries tenant tables derives the tenant
+  // from the gate itself rather than trusting a prop (BL-TENANT-AUDIT
+  // 2026-09). auth() is request-memoised, so this is one cached call.
+  const { organizationId } = await requireCurrentOrg();
+
   // Pull every outcome for this org joined to its proposal title.
   const outcomeRows = await db
     .select({

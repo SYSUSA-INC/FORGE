@@ -150,7 +150,7 @@ export async function assignSolicitationRoleAction(input: {
           assignedAt: new Date(),
         })
         .where(
-          and(
+          and(eq(solicitationAssignments.organizationId, organizationId), 
             eq(solicitationAssignments.solicitationId, input.solicitationId),
             eq(solicitationAssignments.userId, input.userId),
             eq(solicitationAssignments.role, input.role),

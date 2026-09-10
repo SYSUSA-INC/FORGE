@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -262,7 +262,7 @@ export async function createOpportunityFromGsaAction(
           storagePath: stored.storagePath,
           updatedAt: new Date(),
         })
-        .where(eq(solicitations.id, row.id));
+        .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, row.id)));
 
       solicitationIds.push(row.id);
     } catch (err) {

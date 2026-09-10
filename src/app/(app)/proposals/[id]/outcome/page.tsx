@@ -46,7 +46,12 @@ export default async function ProposalOutcomePage({
     })
     .from(proposalOutcomes)
     .leftJoin(users, eq(users.id, proposalOutcomes.createdByUserId))
-    .where(eq(proposalOutcomes.proposalId, params.id))
+    .where(
+      and(
+        eq(proposalOutcomes.organizationId, organizationId),
+        eq(proposalOutcomes.proposalId, params.id),
+      ),
+    )
     .limit(1);
 
   const [debriefRow] = await db
@@ -57,7 +62,12 @@ export default async function ProposalOutcomePage({
     })
     .from(proposalDebriefs)
     .leftJoin(users, eq(users.id, proposalDebriefs.createdByUserId))
-    .where(eq(proposalDebriefs.proposalId, params.id))
+    .where(
+      and(
+        eq(proposalDebriefs.organizationId, organizationId),
+        eq(proposalDebriefs.proposalId, params.id),
+      ),
+    )
     .limit(1);
 
   return (

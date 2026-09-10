@@ -7,7 +7,13 @@
  * because entries weren't embedded yet).
  *
  * Entries are batch-friendly — we embed up to 64 at a time.
+ *
+ * Every write is scoped by organizationId as well as the entry id
+ * (BL-TENANT-AUDIT 2026-09): callers verify ownership first, but the
+ * embedding text is caller-supplied, so the UPDATE carries the tenant
+ * filter itself rather than trusting the id.
  */
+import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
@@ -20,6 +26,7 @@ const BATCH = 64;
  * new entries are searchable immediately.
  */
 export async function embedKnowledgeEntry(
+  organizationId: string,
   entryId: string,
   title: string,
   body: string,
@@ -35,6 +42,7 @@ export async function embedKnowledgeEntry(
       SET embedding = ${literal}::vector,
           embedded_at = now()
       WHERE id = ${entryId}
+        AND organization_id = ${organizationId}
     `);
     return { ok: true };
   } catch (err) {
@@ -105,6 +113,7 @@ export async function backfillEntryEmbeddings(
           SET embedding = ${literal}::vector,
               embedded_at = now()
           WHERE id = ${valid[j]!.row.id}
+            AND organization_id = ${organizationId}
         `);
         embedded += 1;
       } catch (err) {

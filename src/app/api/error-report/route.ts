@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { captureProductionError } from "@/lib/error-log";
+import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,11 +14,12 @@ export const dynamic = "force-dynamic";
  * `captureProductionError`. Auth-optional — pre-auth crashes (sign-in
  * page errors, etc.) still get logged, just without user/org context.
  *
- * Rate limiting: piggy-backs on Vercel's per-IP edge limits — a flood
- * of client-side errors from one IP gets dropped at the edge before
- * hitting this handler. We also dedupe by fingerprint inside
- * captureProductionError, so a runaway client-side loop firing the
- * same error 1000 times collapses into 1 row.
+ * Rate limiting: a per-IP ceiling inside the handler (BL-TENANT-AUDIT
+ * 2026-09) on top of Vercel's edge limits, because the fingerprint used
+ * for dedupe inside captureProductionError is built from caller-
+ * supplied fields and an anonymous client could otherwise fill the
+ * table with distinct rows. Over the limit we still return 204 — the
+ * report is simply dropped.
  *
  * Returns 204 in all cases (including parse errors) so the client
  * never sees an error from the error-report endpoint itself — that'd
@@ -25,6 +27,13 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   try {
+    const limit = await enforceRateLimit({
+      key: `error-report:ip:${ipFromRequest(req)}`,
+      limit: 60,
+      windowSeconds: 3600,
+    });
+    if (!limit.ok) return new NextResponse(null, { status: 204 });
+
     const body = (await req.json()) as {
       message?: unknown;
       stack?: unknown;

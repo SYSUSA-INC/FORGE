@@ -253,6 +253,8 @@ export const memberships = pgTable(
   },
   (m) => ({
     pk: primaryKey({ columns: [m.userId, m.organizationId] }),
+    // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+    organizationIdIdx: index("membership_organization_id_idx").on(m.organizationId, m.status),
   }),
 );
 
@@ -276,7 +278,10 @@ export const allowlist = pgTable("allowlist", {
   // don't need to join through this (eventually expired) row.
   usPersonAttested: boolean("us_person_attested").notNull().default(false),
   usPersonAttestedAt: timestamp("us_person_attested_at"),
-});
+}, (t) => ({
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  organizationIdIdx: index("allowlist_organization_id_idx").on(t.organizationId),
+}));
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -396,6 +401,10 @@ export const opportunityReviewRequests = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
+  (t) => ({
+    // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+    organizationIdIdx: index("opportunity_review_request_organization_id_idx").on(t.organizationId, t.opportunityId),
+  }),
 );
 
 export type OpportunityReviewRequest =
@@ -1214,6 +1223,8 @@ export const notifications = pgTable("notification", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   recipientUserIdIdx: index("notification_recipient_user_id_idx").on(t.recipientUserId),
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  orgCreatedIdx: index("notification_org_created_idx").on(t.organizationId, t.createdAt),
 }));
 
 export type Notification = typeof notifications.$inferSelect;
@@ -1474,7 +1485,10 @@ export const proposalOutcomes = pgTable("proposal_outcome", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  organizationIdIdx: index("proposal_outcome_org_updated_idx").on(t.organizationId, t.updatedAt),
+}));
 
 export const proposalDebriefs = pgTable("proposal_debrief", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1507,7 +1521,10 @@ export const proposalDebriefs = pgTable("proposal_debrief", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  organizationIdIdx: index("proposal_debrief_organization_id_idx").on(t.organizationId, t.updatedAt),
+}));
 
 export type ProposalOutcome = typeof proposalOutcomes.$inferSelect;
 export type NewProposalOutcome = typeof proposalOutcomes.$inferInsert;
@@ -1576,6 +1593,10 @@ export const proposalWinnerAnalyses = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
+  (t) => ({
+    // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+    organizationIdIdx: index("proposal_winner_analysis_organization_id_idx").on(t.organizationId),
+  }),
 );
 
 export type ProposalWinnerAnalysis =
@@ -1698,7 +1719,10 @@ export const proposalTemplates = pgTable("proposal_template", {
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  organizationIdIdx: index("proposal_template_organization_id_idx").on(t.organizationId, t.isDefault),
+}));
 
 export type ProposalTemplateKind =
   (typeof proposalTemplateKindEnum.enumValues)[number];
@@ -1739,7 +1763,10 @@ export const proposalPdfRenders = pgTable("proposal_pdf_render", {
   downloadUrl: text("download_url").notNull().default(""),
   expiresAt: timestamp("expires_at"),
   renderedAt: timestamp("rendered_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  organizationIdIdx: index("proposal_pdf_render_organization_id_idx").on(t.organizationId, t.proposalId),
+}));
 
 export type ProposalPdfRender = typeof proposalPdfRenders.$inferSelect;
 export type NewProposalPdfRender = typeof proposalPdfRenders.$inferInsert;
@@ -1836,6 +1863,9 @@ export const solicitations = pgTable("solicitation", {
   // BL-FB-SOL-AMEND-DIFF — speeds up "list amendments for this parent"
   // and "list ancestors of this amendment" lookups.
   parentIdx: index("solicitation_parent_idx").on(t.parentSolicitationId),
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077); the
+  // intake loaders read solicitations by org, newest first.
+  orgCreatedIdx: index("solicitation_org_created_idx").on(t.organizationId, t.createdAt),
 }));
 
 export type Solicitation = typeof solicitations.$inferSelect;
@@ -1981,6 +2011,8 @@ export const solicitationAssignments = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.solicitationId, t.userId, t.role] }),
+    // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+    organizationIdIdx: index("solicitation_assignment_organization_id_idx").on(t.organizationId),
   }),
 );
 
@@ -2233,7 +2265,10 @@ export const knowledgeExtractionRuns = pgTable("knowledge_extraction_run", {
     onDelete: "set null",
   }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+  organizationIdIdx: index("knowledge_extraction_run_organization_id_idx").on(t.organizationId, t.artifactId),
+}));
 
 export const knowledgeExtractionCandidates = pgTable(
   "knowledge_extraction_candidate",
@@ -2281,6 +2316,10 @@ export const knowledgeExtractionCandidates = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
+  (t) => ({
+    // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
+    organizationIdIdx: index("knowledge_extraction_candidate_organization_id_idx").on(t.organizationId, t.artifactId),
+  }),
 );
 
 export type KnowledgeExtractionRun =

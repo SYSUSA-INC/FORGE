@@ -138,7 +138,7 @@ async function runSingleProposalScan(
     })
     .from(proposals)
     .innerJoin(opportunities, eq(opportunities.id, proposals.opportunityId))
-    .where(eq(proposals.id, proposalId))
+    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)))
     .limit(1);
 
   if (!propRow) {
@@ -242,7 +242,12 @@ async function runSingleProposalScan(
   const [existing] = await db
     .select({ id: proposalScanResults.id })
     .from(proposalScanResults)
-    .where(eq(proposalScanResults.proposalId, proposalId))
+    .where(
+      and(
+        eq(proposalScanResults.organizationId, organizationId),
+        eq(proposalScanResults.proposalId, proposalId),
+      ),
+    )
     .limit(1);
 
   if (existing) {
@@ -258,7 +263,12 @@ async function runSingleProposalScan(
         stubbed: result.stubbed,
         generatedAt: result.generatedAt,
       })
-      .where(eq(proposalScanResults.id, existing.id));
+      .where(
+        and(
+          eq(proposalScanResults.organizationId, organizationId),
+          eq(proposalScanResults.id, existing.id),
+        ),
+      );
   } else {
     await db.insert(proposalScanResults).values({
       organizationId,
@@ -278,5 +288,5 @@ async function runSingleProposalScan(
   await db
     .update(proposals)
     .set({ scanDirtySince: null })
-    .where(eq(proposals.id, proposalId));
+    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)));
 }

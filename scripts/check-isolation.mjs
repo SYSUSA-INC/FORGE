@@ -1,35 +1,49 @@
 #!/usr/bin/env node
 /**
- * Multi-tenant isolation check — static analyzer for server actions.
+ * Multi-tenant isolation check — static analyzer.
  *
  * BL-19 acceptance criterion: "CI fails if any new server action
  * lacks the isolation assertion." This script enforces it without
  * needing a runtime test framework. It catches the regression class
- * where a developer adds a new server action that queries a
- * tenant-scoped table without scoping by `organizationId`.
+ * where a developer adds code that queries a tenant-scoped table
+ * without scoping by `organizationId`.
+ *
+ * Surfaces (BL-TENANT-AUDIT follow-up widened the original
+ * server-action-only check, because most DB reads now live in
+ * server-only libs and API routes the first version never saw):
+ *
+ *   A. Server actions — every "use server" file under src/; each
+ *      exported async function that touches a tenant-scoped table must
+ *      call an auth gate AND reference `organizationId`.
+ *   B. API route handlers — src/app/api/** /route.ts; same rule as A.
+ *      Handlers gated by the cron bearer secret (`CRON_SECRET`) are
+ *      cross-tenant by design and are exempt from the org reference;
+ *      they are counted and printed so the exemption stays visible.
+ *   C. Server-only libs — every module under src/lib that imports
+ *      "@/db"; each exported async function that touches a tenant-scoped
+ *      table must reference `organizationId` (or `organization_id` in
+ *      raw SQL). No gate requirement: libs are called by gated code,
+ *      but they must still take and apply the tenant.
+ *   D. pgvector statements — every `<=>` / `<->` must sit inside a
+ *      sql`` template that filters `organization_id`. The IVFFlat index
+ *      is on the embedding alone, so a missing filter silently scans
+ *      every tenant.
  *
  * Pipeline:
  *   1. Parse every drizzle/*.sql migration to derive the set of
  *      tenant-scoped tables (those with an `organization_id` column).
  *   2. Map each scoped SQL table to its Drizzle TypeScript identifier
  *      (read from src/db/schema.ts).
- *   3. Walk every "use server" file under src/ and check each exported
- *      async function:
- *        a. If the function reads/writes a scoped table (`.from(X)`,
- *           `.insert(X)`, `.update(X)`, `.delete(X)` where X is a
- *           scoped identifier), it must:
- *           - Call one of `requireCurrentOrg`, `requireOrgAdmin`,
- *             `requireSuperadmin` (auth gate)
- *           - Reference `organizationId` in the same function (WHERE
- *             clause or insert values)
- *        b. Otherwise it's not a concern of this check.
+ *   3. Walk each surface and check every exported async function that
+ *      reads/writes a scoped table (`.from(X)`, `.insert(X)`,
+ *      `.update(X)`, `.delete(X)` where X is a scoped identifier).
  *   4. Violations are reported. CI fails non-zero.
  *
  * Allow-list:
  *   .isolation-allow.json maps "file:functionName" → "reason". Used
- *   for legitimately cross-tenant actions (super-admin platform ops,
- *   reference-data lookups, etc.). Every allow-listed entry MUST
- *   have a documented reason.
+ *   for legitimately cross-tenant code (super-admin platform ops,
+ *   token-scoped public surfaces, reference-data lookups, etc.). Every
+ *   allow-listed entry MUST have a documented reason.
  *
  * Exit codes:
  *   0 — clean
@@ -37,12 +51,14 @@
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 
 const REPO_ROOT = process.cwd();
 const MIGRATIONS_DIR = join(REPO_ROOT, "drizzle");
 const SCHEMA_FILE = join(REPO_ROOT, "src/db/schema.ts");
 const SRC_DIR = join(REPO_ROOT, "src");
+const API_DIR = join(REPO_ROOT, "src/app/api");
+const LIB_DIR = join(REPO_ROOT, "src/lib");
 const ALLOW_LIST_FILE = join(REPO_ROOT, ".isolation-allow.json");
 
 const AUTH_GATES = [
@@ -51,6 +67,7 @@ const AUTH_GATES = [
   "requireOrgAdmin",
   "requireOrgMember",
   "requireSuperadmin",
+  "requireApiTenant",
 ];
 
 // ── step 1: which SQL tables are tenant-scoped? ─────────────────────
@@ -120,12 +137,18 @@ function buildTableConstMap() {
   return map;
 }
 
-// ── step 3: walk server actions ─────────────────────────────────────
+// ── step 3: walk the surfaces ───────────────────────────────────────
 
-function listServerFiles(dir) {
+function walkFiles(dir, predicate) {
   const out = [];
   function walk(d) {
-    for (const entry of readdirSync(d)) {
+    let entries;
+    try {
+      entries = readdirSync(d);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
       const p = join(d, entry);
       const st = statSync(p);
       if (st.isDirectory()) {
@@ -135,13 +158,7 @@ function listServerFiles(dir) {
         (p.endsWith(".ts") || p.endsWith(".tsx")) &&
         !p.endsWith(".d.ts")
       ) {
-        // Cheap pre-filter: only files that start with "use server"
-        // (or contain it on the first non-empty line) qualify.
-        const head = readFileSync(p, "utf-8").slice(0, 200);
-        if (/^\s*"use server"|^\s*'use server'/m.test(head.split("\n")[0]) ||
-          /^\s*"use server"|^\s*'use server'/m.test(head)) {
-          out.push(p);
-        }
+        if (predicate(p)) out.push(p);
       }
     }
   }
@@ -149,20 +166,42 @@ function listServerFiles(dir) {
   return out;
 }
 
+/** Surface A: files that start with "use server". */
+function listServerActionFiles() {
+  return walkFiles(SRC_DIR, (p) => {
+    const head = readFileSync(p, "utf-8").slice(0, 200);
+    return /^\s*"use server"|^\s*'use server'/m.test(head);
+  });
+}
+
+/** Surface B: App Router route handlers. */
+function listRouteFiles() {
+  return walkFiles(API_DIR, (p) => basename(p) === "route.ts");
+}
+
+/** Surface C: lib modules that talk to the database. */
+function listDbLibFiles() {
+  return walkFiles(LIB_DIR, (p) => /from\s+"@\/db"/.test(readFileSync(p, "utf-8")));
+}
+
 /**
- * Splits a file's source into top-level exported async functions
- * with their bodies, by walking braces. Returns [{ name, body, line }].
- * Not a real parser — relies on canonical formatting where the
- * `export async function name(...) {` lives on its own line.
+ * Splits a file's source into top-level async functions with their
+ * bodies, by walking braces. Returns [{ name, body, line, exported }].
+ * Exported functions get every rule; non-exported helpers only get the
+ * write rule (they are reached through a gated export, but a write by
+ * bare id is a write by bare id wherever it lives). Not a real parser —
+ * relies on canonical formatting where `async function name(...) {`
+ * starts its own line.
  */
 function extractExportedFunctions(src) {
   const out = [];
   const lines = src.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const m = line.match(/^export\s+async\s+function\s+(\w+)/);
+    const m = line.match(/^(export\s+)?async\s+function\s+(\w+)/);
     if (!m) continue;
-    const name = m[1];
+    const exported = Boolean(m[1]);
+    const name = m[2];
     // Find the opening brace of the function body.
     let braceLine = i;
     while (braceLine < lines.length && !lines[braceLine].includes("{")) braceLine++;
@@ -185,6 +224,8 @@ function extractExportedFunctions(src) {
       name,
       body: bodyLines.join("\n"),
       line: i + 1,
+      bodyStartLine: braceLine + 1,
+      exported,
     });
   }
   return out;
@@ -203,6 +244,319 @@ function loadAllowList() {
   }
 }
 
+function touchedScopedTables(body, scopedConsts) {
+  const touched = [];
+  for (const c of scopedConsts) {
+    // Look for any of: .from(c) .insert(c) .update(c) .delete(c)
+    // Use word boundary so `companies` doesn't match `companies2`.
+    const re = new RegExp(`\\.(from|insert|update|delete)\\(\\s*${c}\\b`);
+    if (re.test(body)) touched.push(c);
+  }
+  return touched;
+}
+
+function hasAuthGate(body) {
+  return AUTH_GATES.some((g) => new RegExp(`\\b${g}\\s*\\(`).test(body));
+}
+
+function hasOrgRef(body) {
+  return /\borganizationId\b|\borganization_id\b/.test(body);
+}
+
+/** Index just past the matching close paren for the "(" at `openIdx`. */
+function matchParen(src, openIdx) {
+  let depth = 0;
+  for (let i = openIdx; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return src.length;
+}
+
+/** Index of the ";" that ends the statement containing `from`, at depth 0. */
+function statementEnd(src, from) {
+  let depth = 0;
+  for (let i = from; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === "(" || ch === "{" || ch === "[") depth++;
+    else if (ch === ")" || ch === "}" || ch === "]") depth--;
+    else if (ch === ";" && depth <= 0) return i;
+  }
+  return src.length;
+}
+
+/**
+ * Rule E — every UPDATE / DELETE on a tenant-scoped table must carry
+ * the organization filter in its own WHERE clause. The body-level
+ * check accepts "organizationId appears somewhere in the function",
+ * which lets the classic slip through: verify the parent by org, then
+ * write the child by bare id. Writes are where a slip becomes another
+ * tenant's data loss, so they get the strict rule.
+ */
+function checkWriteStatements(fn, scopedConsts) {
+  const problems = [];
+  const body = fn.body;
+  const lineOf = (idx) => fn.bodyStartLine + (body.slice(0, idx).match(/\n/g) ?? []).length;
+  for (const c of scopedConsts) {
+    const re = new RegExp(`\\.(update|delete)\\(\\s*${c}\\b\\s*\\)`, "g");
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      const stmt = body.slice(m.index, statementEnd(body, m.index));
+      const whereIdx = stmt.indexOf(".where(");
+      if (whereIdx === -1) {
+        problems.push({ line: lineOf(m.index), text: `${m[1]}(${c}) has no .where() clause` });
+        continue;
+      }
+      const open = whereIdx + ".where".length;
+      const whereArg = stmt.slice(open, matchParen(stmt, open));
+      if (!hasOrgRef(whereArg)) {
+        problems.push({ line: lineOf(m.index), text: `${m[1]}(${c}).where(...) lacks organizationId` });
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Checks one surface. `mode` decides the rule:
+ *   "action" / "route" — gate + org reference (cron handlers exempt from org ref)
+ *   "lib"              — org reference only
+ */
+function checkSurface(files, scopedConsts, allowList, mode) {
+  const violations = [];
+  let fnCount = 0;
+  let touching = 0;
+  let cronExempt = 0;
+
+  for (const file of files) {
+    const src = readFileSync(file, "utf-8");
+    const relativeFile = file.slice(REPO_ROOT.length + 1);
+    for (const fn of extractExportedFunctions(src)) {
+      if (fn.exported) fnCount++;
+      const allowKey = `${relativeFile}:${fn.name}`;
+      if (allowList[allowKey]) continue;
+
+      const tables = touchedScopedTables(fn.body, scopedConsts);
+      if (tables.length === 0) continue;
+
+      if (!fn.exported) {
+        // Helper: write rule only.
+        for (const problem of checkWriteStatements(fn, scopedConsts)) {
+          violations.push({
+            file: relativeFile,
+            line: problem.line,
+            name: fn.name,
+            tables,
+            missing: `organizationId in the WHERE of the write — ${problem.text}`,
+          });
+        }
+        continue;
+      }
+
+      touching++;
+
+      const isCron = mode === "route" && /\bCRON_SECRET\b/.test(fn.body);
+      if (isCron) {
+        cronExempt++;
+        continue;
+      }
+
+      if (mode !== "lib" && !hasAuthGate(fn.body)) {
+        violations.push({
+          file: relativeFile,
+          line: fn.line,
+          name: fn.name,
+          tables,
+          missing:
+            "auth gate (requireCurrentOrg / requireOrgAdmin / requireSuperadmin / requireApiTenant)",
+        });
+      }
+      if (!hasOrgRef(fn.body)) {
+        violations.push({
+          file: relativeFile,
+          line: fn.line,
+          name: fn.name,
+          tables,
+          missing:
+            mode === "lib"
+              ? "organizationId reference (lib loaders must take and apply the tenant)"
+              : "organizationId reference (queries must scope by org)",
+        });
+      }
+      for (const problem of checkWriteStatements(fn, scopedConsts)) {
+        violations.push({
+          file: relativeFile,
+          line: problem.line,
+          name: fn.name,
+          tables,
+          missing: `organizationId in the WHERE of the write — ${problem.text}`,
+        });
+      }
+    }
+  }
+  return { violations, fnCount, touching, cronExempt };
+}
+
+/**
+ * Surface D: pgvector distance operators. Finds the enclosing sql``
+ * template for each `<=>` / `<->` and requires `organization_id` in
+ * the same statement.
+ */
+function findTemplateEnd(src, from) {
+  let depth = 0;
+  for (let i = from; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "$" && src[i + 1] === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === "}" && depth > 0) {
+      depth--;
+      continue;
+    }
+    if (ch === "`" && depth === 0) return i;
+  }
+  return src.length;
+}
+
+function lineAt(src, idx) {
+  return src.slice(0, idx).split("\n").length;
+}
+
+/**
+ * Surface D: raw SQL that touches embeddings. Every sql`` template that
+ * uses a pgvector operator, or names the embedding column inside a
+ * SELECT / UPDATE / INSERT / DELETE, must filter organization_id in the
+ * same statement. The IVFFlat index is org-blind, and an org-blind
+ * UPDATE of an embedding is a cross-tenant write by another name.
+ */
+function checkVectorStatements(allowList) {
+  const violations = [];
+  let statements = 0;
+  for (const file of walkFiles(SRC_DIR, () => true)) {
+    const src = readFileSync(file, "utf-8");
+    if (!src.includes("sql`")) continue;
+    const relativeFile = file.slice(REPO_ROOT.length + 1);
+    let idx = 0;
+    while ((idx = src.indexOf("sql`", idx)) !== -1) {
+      const at = idx;
+      const end = findTemplateEnd(src, idx + 4);
+      idx = end + 1;
+      const stmt = src.slice(at, end);
+      const isVector = /<=>|<->|<#>/.test(stmt);
+      const touchesEmbedding =
+        /\bembedding\b/.test(stmt) && /\b(select|update|insert|delete)\b/i.test(stmt);
+      if (!isVector && !touchesEmbedding) continue;
+      statements++;
+      const lineNo = lineAt(src, at);
+      if (allowList[`${relativeFile}:${lineNo}`]) continue;
+      if (!/\borganization_id\b|\borganizationId\b/.test(stmt)) {
+        violations.push({
+          file: relativeFile,
+          line: lineNo,
+          name: isVector ? "<vector statement>" : "<embedding statement>",
+          tables: ["embedding"],
+          missing:
+            "organization_id filter in the same sql`` statement (IVFFlat index and embedding writes are org-blind)",
+        });
+      }
+    }
+  }
+  return { violations, statements };
+}
+
+/**
+ * Surface E: server components — every non-"use client" .tsx under
+ * src/app and src/components that imports "@/db". A component that reads
+ * a tenant-scoped table must call a gate itself, and every
+ * .from() / join of a tenant-scoped table must carry organizationId in
+ * the same statement. Function granularity is not enough here: the
+ * "parent first, then children by params.id" pattern is one reorder
+ * away from a leak, and the statement is the unit that survives a
+ * refactor. Superadmin and public token pages are allow-listed by path.
+ */
+function listComponentFiles() {
+  const out = [];
+  for (const dir of [join(REPO_ROOT, "src/app"), join(REPO_ROOT, "src/components")]) {
+    for (const p of walkFiles(dir, (f) => f.endsWith(".tsx"))) {
+      const src = readFileSync(p, "utf-8");
+      if (/^\s*["']use client["']/m.test(src.slice(0, 400))) continue;
+      if (!/from\s+"@\/db"/.test(src)) continue;
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+function fileAllowed(allowList, relativeFile) {
+  if (allowList[`${relativeFile}:*`]) return true;
+  return Object.keys(allowList).some(
+    (k) => k.endsWith("/**") && relativeFile.startsWith(k.slice(0, -2)),
+  );
+}
+
+function checkComponents(files, scopedConsts, allowList) {
+  const violations = [];
+  let touching = 0;
+  for (const file of files) {
+    const relativeFile = file.slice(REPO_ROOT.length + 1);
+    if (fileAllowed(allowList, relativeFile)) continue;
+    const src = readFileSync(file, "utf-8");
+    const touches = [...scopedConsts].filter((c) =>
+      new RegExp(`\\.(from|innerJoin|leftJoin|insert|update|delete)\\(\\s*${c}\\b`).test(src),
+    );
+    if (touches.length === 0) continue;
+    touching++;
+
+    if (!hasAuthGate(src)) {
+      violations.push({
+        file: relativeFile,
+        line: 1,
+        name: "<component>",
+        tables: touches,
+        missing:
+          "auth gate (a server component reading tenant tables must call requireCurrentOrg / requireSuperadmin itself)",
+      });
+    }
+    for (const c of touches) {
+      const re = new RegExp(`\\.(from|innerJoin|leftJoin)\\(\\s*${c}\\b`, "g");
+      let m;
+      while ((m = re.exec(src)) !== null) {
+        const start = src.lastIndexOf(";", m.index) + 1;
+        const stmt = src.slice(start, statementEnd(src, m.index));
+        if (!hasOrgRef(stmt)) {
+          violations.push({
+            file: relativeFile,
+            line: lineAt(src, m.index),
+            name: "<component>",
+            tables: [c],
+            missing: `organizationId in the same statement as .${m[1]}(${c})`,
+          });
+        }
+      }
+    }
+    for (const problem of checkWriteStatements({ body: src, bodyStartLine: 1 }, scopedConsts)) {
+      violations.push({
+        file: relativeFile,
+        line: problem.line,
+        name: "<component>",
+        tables: touches,
+        missing: `organizationId in the WHERE of the write — ${problem.text}`,
+      });
+    }
+  }
+  return { violations, count: files.length, touching };
+}
+
 function check() {
   const scopedSqlTables = deriveScopedTableNames();
   const tableConstMap = buildTableConstMap();
@@ -213,65 +567,45 @@ function check() {
     if (constName) scopedConsts.add(constName);
   }
 
-  const serverFiles = listServerFiles(SRC_DIR);
   const allowList = loadAllowList();
-  const violations = [];
+  const actions = checkSurface(listServerActionFiles(), scopedConsts, allowList, "action");
+  const routes = checkSurface(listRouteFiles(), scopedConsts, allowList, "route");
+  const libs = checkSurface(listDbLibFiles(), scopedConsts, allowList, "lib");
+  const vectors = checkVectorStatements(allowList);
+  const components = checkComponents(listComponentFiles(), scopedConsts, allowList);
 
-  for (const file of serverFiles) {
-    const src = readFileSync(file, "utf-8");
-    const fns = extractExportedFunctions(src);
-    for (const fn of fns) {
-      // Skip if explicitly allow-listed.
-      const relativeFile = file.slice(REPO_ROOT.length + 1);
-      const allowKey = `${relativeFile}:${fn.name}`;
-      if (allowList[allowKey]) continue;
-
-      // Find which scoped tables this function touches.
-      const touchedConsts = [];
-      for (const c of scopedConsts) {
-        // Look for any of: .from(c) .insert(c) .update(c) .delete(c)
-        // Use word boundary so `companies` doesn't match `companies2`.
-        const re = new RegExp(`\\.(from|insert|update|delete)\\(\\s*${c}\\b`);
-        if (re.test(fn.body)) touchedConsts.push(c);
-      }
-      if (touchedConsts.length === 0) continue;
-
-      // Now enforce: must have an auth gate AND reference organizationId.
-      const hasAuthGate = AUTH_GATES.some((g) =>
-        new RegExp(`\\b${g}\\s*\\(`).test(fn.body),
-      );
-      const hasOrgRef = /\borganizationId\b/.test(fn.body);
-
-      if (!hasAuthGate) {
-        violations.push({
-          file: relativeFile,
-          line: fn.line,
-          name: fn.name,
-          tables: touchedConsts,
-          missing: "auth gate (requireCurrentOrg / requireOrgAdmin / requireSuperadmin)",
-        });
-      }
-      if (!hasOrgRef) {
-        violations.push({
-          file: relativeFile,
-          line: fn.line,
-          name: fn.name,
-          tables: touchedConsts,
-          missing: "organizationId reference (queries must scope by org)",
-        });
-      }
-    }
-  }
-
-  return { scopedSqlTables, scopedConsts, violations };
+  return {
+    scopedSqlTables,
+    scopedConsts,
+    actions,
+    routes,
+    libs,
+    vectors,
+    components,
+    violations: [
+      ...actions.violations,
+      ...routes.violations,
+      ...libs.violations,
+      ...vectors.violations,
+      ...components.violations,
+    ],
+  };
 }
 
 // ── main ────────────────────────────────────────────────────────────
 
-const { scopedSqlTables, scopedConsts, violations } = check();
+const { scopedSqlTables, scopedConsts, actions, routes, libs, vectors, components, violations } =
+  check();
 
 console.log(
   `[isolation] ${scopedSqlTables.size} tenant-scoped SQL tables; ${scopedConsts.size} Drizzle consts watched.`,
+);
+console.log(
+  `[isolation] surfaces — actions: ${actions.fnCount} fns (${actions.touching} touch tenant tables); ` +
+    `routes: ${routes.fnCount} handlers (${routes.touching} touch, ${routes.cronExempt} cron-exempt); ` +
+    `libs: ${libs.fnCount} fns (${libs.touching} touch); ` +
+    `components: ${components.count} files (${components.touching} touch); ` +
+    `embedding/vector statements: ${vectors.statements}.`,
 );
 
 if (violations.length === 0) {
@@ -289,6 +623,7 @@ for (const v of violations) {
 }
 console.error(
   "To allow-list a legitimate exception, add it to .isolation-allow.json\n" +
-    'with a one-line reason. Example: { "src/app/(app)/admin/foo.ts:bar": "super-admin platform op, no tenant context" }',
+    'with a one-line reason. Example: { "src/app/(app)/admin/foo.ts:bar": "super-admin platform op, no tenant context" }\n' +
+    'Vector statements are keyed by line: { "src/lib/foo.ts:123": "reason" }',
 );
 process.exit(1);

@@ -9,6 +9,7 @@ import {
   anySignupAllowed,
   selfServiceRegistrationAllowed,
 } from "@/lib/signup-mode";
+import { peekToken } from "@/lib/tokens";
 import { SignUpForm } from "./SignUpForm";
 
 export const dynamic = "force-dynamic";
@@ -49,14 +50,23 @@ export default async function SignUpPage({
       .where(eq(allowlist.id, inviteId))
       .limit(1);
 
+    // BL-TENANT-AUDIT 2026-09: this page is public and the row is looked
+    // up by invite id, so nothing about the invitee or the org is shown
+    // until the token in the link actually matches a live invite token.
+    // A consumed invite has no token left to match; it gets a generic
+    // "already used" state with no details.
     if (row && !row.revoked) {
-      invite = {
-        id: row.id,
-        email: row.email,
-        role: row.role,
-        organizationName: row.orgName,
-        consumed: !!row.consumedAt,
-      };
+      if (row.consumedAt) {
+        invite = { id: row.id, email: "", role: "", organizationName: "", consumed: true };
+      } else if (await peekToken("invite", row.id, inviteToken)) {
+        invite = {
+          id: row.id,
+          email: row.email,
+          role: row.role,
+          organizationName: row.orgName,
+          consumed: false,
+        };
+      }
     }
   }
 
@@ -127,7 +137,7 @@ export default async function SignUpPage({
                 Invitation already used
               </h1>
               <p className="mt-2 text-sm text-muted">
-                Sign in to access <strong>{invite.organizationName}</strong>.
+                This invitation has already been accepted. Sign in to access your workspace.
               </p>
               <Link
                 href="/sign-in"

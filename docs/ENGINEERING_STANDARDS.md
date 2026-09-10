@@ -46,18 +46,50 @@ that touches a tenant-scoped table MUST:**
    `eq(table.organizationId, organizationId)`.
 
 **Enforcement:** `scripts/check-isolation.mjs` runs in CI on every PR.
-It parses every `"use server"` file, derives the set of tenant-scoped
-tables from the migrations (any table with an `organization_id`
-column), and asserts each exported async function that touches one
-of those tables:
+It derives the set of tenant-scoped tables from the migrations (any
+table with an `organization_id` column) and checks four surfaces:
 
-- calls one of the auth gates above, AND
-- references `organizationId` in the function body (proxy for "the
-  query is scoped").
+- **Server actions** (every `"use server"` file) and **API route
+  handlers** (`src/app/api/**/route.ts`): each exported async function
+  that touches a tenant-scoped table must call one of the auth gates
+  above AND reference `organizationId` in its body (proxy for "the
+  query is scoped"). Handlers gated by `CRON_SECRET` are cross-tenant
+  by design and exempt from the org reference.
+- **Server-only libs** (every module under `src/lib` that imports
+  `@/db`): each exported async function that touches a tenant-scoped
+  table must reference `organizationId`. Libs are called by gated code,
+  so no gate is required, but they must take and apply the tenant
+  rather than trusting a bare row id.
+- **Server components** (every non-`"use client"` `.tsx` under
+  `src/app` and `src/components` that imports `@/db`): the file must call
+  a gate itself, and every `.from()` / join of a tenant-scoped table must
+  carry `organizationId` in the same statement. "Parent first, then
+  children by `params.id`" does not pass; put the org predicate on the
+  child query too. Superadmin and public token pages are allow-listed by
+  path (`"src/app/(app)/admin/**"`, `"<file>:*"`).
+- **Raw SQL touching embeddings**: every sql`` template that uses a
+  pgvector operator or names the `embedding` column in a SELECT /
+  UPDATE / INSERT / DELETE must filter `organization_id` in the same
+  statement, because the IVFFlat index is on the embedding alone and a
+  missing filter silently scans (or writes) every tenant.
+- **Writes, strictly**: every `.update(table)` / `.delete(table)` on a
+  tenant-scoped table must carry `eq(table.organizationId, …)` in its
+  own `.where(...)`, in every function including non-exported helpers.
+  "Verify the parent by org, then write the child by bare id" is the
+  pattern the May 2026 audit found six P0s in; the body-level rule above
+  cannot see it, so writes get the strict rule.
 
 Legitimate exceptions (public token-scoped surfaces, share-link
-loads, etc.) live in `.isolation-allow.json` with a one-line
-documented reason.
+loads, Stripe-signed webhooks, cron sweeps, superadmin ops) live in
+`.isolation-allow.json` with a one-line documented reason.
+
+`scripts/check-tenant-firewall.mjs` runs alongside it and re-derives
+the DB-level guarantees from the migrations: every tenant-scoped table
+has `organization_id NOT NULL`, a `REFERENCES organization(id) ON
+DELETE CASCADE` foreign key, an index (or PK / UNIQUE) that leads with
+`organization_id`, and a matching `pgTable` in `src/db/schema.ts`. A
+new tenant table needs all of these in its migration. Intentional
+exceptions live in `.tenant-firewall-allow.json` with a reason.
 
 ### Common patterns
 

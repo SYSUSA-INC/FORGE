@@ -130,7 +130,7 @@ export async function uploadSolicitationAction(
         storagePath: stored.storagePath,
         updatedAt: new Date(),
       })
-      .where(eq(solicitations.id, row.id));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, row.id)));
   } catch (err) {
     log.error("[uploadSolicitationAction]", "storage", { error: err });
     await db
@@ -141,7 +141,7 @@ export async function uploadSolicitationAction(
           err instanceof Error ? err.message : "Storage write failed.",
         updatedAt: new Date(),
       })
-      .where(eq(solicitations.id, row.id));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, row.id)));
     return {
       ok: false,
       error: "Upload saved metadata but failed to store the file bytes.",
@@ -189,7 +189,7 @@ async function parseSolicitationFromBytes(
   await db
     .update(solicitations)
     .set({ parseStatus: "parsing", parseError: "", updatedAt: new Date() })
-    .where(eq(solicitations.id, solicitationId));
+    .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
 
   // Look up the file's stored name + content type so we can dispatch.
   const meta = await getFileMeta(solicitationId);
@@ -230,7 +230,7 @@ async function parseSolicitationFromBytes(
           parseError: visionRes.error,
           updatedAt: new Date(),
         })
-        .where(eq(solicitations.id, solicitationId));
+        .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
       return;
     }
     const d = visionRes.data;
@@ -256,7 +256,7 @@ async function parseSolicitationFromBytes(
         keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
-      .where(eq(solicitations.id, solicitationId));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
     revalidatePath(`/solicitations/${solicitationId}`);
     return;
   }
@@ -276,7 +276,7 @@ async function parseSolicitationFromBytes(
           rawText: rawText.slice(0, 500_000),
           updatedAt: new Date(),
         })
-        .where(eq(solicitations.id, solicitationId));
+        .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
       return;
     }
     const d = visionRes.data;
@@ -302,7 +302,7 @@ async function parseSolicitationFromBytes(
         keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
-      .where(eq(solicitations.id, solicitationId));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
     revalidatePath(`/solicitations/${solicitationId}`);
     return;
   }
@@ -320,7 +320,7 @@ async function parseSolicitationFromBytes(
         parseError: `${format?.toUpperCase() ?? "Document"} appears to have no extractable text. Confirm the file isn't password-protected or empty.`,
         updatedAt: new Date(),
       })
-      .where(eq(solicitations.id, solicitationId));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
     return;
   }
 
@@ -334,7 +334,7 @@ async function parseSolicitationFromBytes(
         rawText: rawText.slice(0, 500_000),
         updatedAt: new Date(),
       })
-      .where(eq(solicitations.id, solicitationId));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
     return;
   }
 
@@ -359,7 +359,7 @@ async function parseSolicitationFromBytes(
       keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
       updatedAt: new Date(),
     })
-    .where(eq(solicitations.id, solicitationId));
+    .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
   revalidatePath(`/solicitations/${solicitationId}`);
 }
 

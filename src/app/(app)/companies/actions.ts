@@ -212,7 +212,7 @@ export async function refreshCompanyFromSamGovAction(
         lastSyncedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(companies.id, id));
+      .where(and(eq(companies.organizationId, organizationId), eq(companies.id, id)));
     await recordAudit({
       organizationId,
       actor: { userId: actor.id, email: actor.email },

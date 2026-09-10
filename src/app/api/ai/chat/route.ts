@@ -10,6 +10,7 @@ import {
   CHAT_MAX_TOKENS,
   CHAT_RATE_LIMIT,
   CHAT_TEMPERATURE,
+  findSectionForOrg,
   loadSectionChatModelHistory,
   prepareSectionChat,
 } from "@/lib/section-chat";
@@ -67,8 +68,17 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
+  // BL-TENANT-AUDIT 2026-09: verify the section belongs to this tenant
+  // before spending the per-section rate limit, and key the limit by
+  // tenant, so one org can never burn another org's chat budget.
+  const owned = await findSectionForOrg({ organizationId, sectionId: body.sectionId });
+  if (!owned) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return NextResponse.json({ ok: false, error: "Section not found." }, { status: 404 });
+  }
+
   const limit = await enforceRateLimit({
-    key: `section-chat:${body.sectionId}`,
+    key: `section-chat:${organizationId}:${body.sectionId}`,
     ...CHAT_RATE_LIMIT,
   });
   if (!limit.ok) {
