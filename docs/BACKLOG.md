@@ -2123,7 +2123,7 @@ configured, giving the migration test real production schema shape.
 ---
 
 ### BL-QC-links — Internal link check + the `/onboarding` dead end — **shipped**
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #263)
 
 Reported as "many links in the side menu are not working". Root cause:
 `requireCurrentOrg()` (`src/lib/auth-helpers.ts`) redirects to
