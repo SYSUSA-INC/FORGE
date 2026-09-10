@@ -3050,12 +3050,31 @@ strip with email/in-app reminders at T-7 / T-3 / T-1 days. Integrates
 with the notification rules engine (BL-13).
 
 ### BL-FB-SOL-CUSTOMER-PATTERN — Past-customer intelligence
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
 
 When a new solicitation arrives, surface "you've seen this agency
 N times before — here's what they buy, who wins, average award size,
 evaluator priorities, and your historical PWin against this customer".
 Cross-joins solicitations + opportunities + outcomes + USAspending.
+
+**Delivered:**
+- `src/lib/customer-patterns.ts` (pure): fuzzy agency matching on
+  normalised names, `summarizeCustomerHistory` (record, win rate, open
+  pursuits, NAICS / set-aside mix, average estimate vs award, who beat
+  us, last three Section M summaries as evaluator priorities, recent
+  pursuits) and `summarizeMarket` (USAspending awards rolled up by
+  recipient).
+- `src/lib/customer-intelligence.ts` (server-only): loads the org's
+  opportunities, newest decided outcome per opportunity and past
+  solicitations for the agency; USAspending market view gated by
+  `AWARDS_INTEL_ENABLED=1` and time-boxed to 4s; model PWin for the
+  linked opportunity via the calibrated scorer. Scoped by
+  `organizationId`.
+- `CustomerHistoryPanel` on the solicitation page, above amendments:
+  stat tiles, what they buy / evaluator priorities / your record,
+  market view, model PWin with a "why →" link to the opportunity.
+  Renders a first-time state when the agency is new.
+- `tests/ai/customer-patterns.test.ts`.
 
 ---
 
@@ -3170,12 +3189,39 @@ can see across pursuits.
   clean record, each pattern's trigger and threshold, severity ordering.
 
 ### BL-FB-WIN-RECOMPETE — Re-compete radar
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
 
 When a solicitation reappears (NAICS + agency + scope similarity above
 threshold), flag the past loss and the lessons learned automatically.
 Surfaces in SAM.gov import results and the dashboard "needs attention"
 strip. Includes the original outcome, debrief, and winner analysis.
+
+**Delivered:**
+- `src/lib/recompete-match.ts` (pure): deterministic scorer. Same
+  SAM.gov notice is certain; same solicitation number is 0.95; otherwise
+  agency (0.25), NAICS (0.20, family 0.10), issuing-office stem (0.10),
+  scope similarity (up to 0.55; cosine over stemmed unigrams + bigrams
+  with GovCon boilerplate removed) and an incumbent who is the
+  competitor that beat us (0.15). Flags at 0.55, "likely" at 0.75.
+  Agency + NAICS alone never flags; that is customer history.
+  Thresholds and weights exported.
+- `src/lib/recompete-radar.ts` (server-only): loads decided pursuits
+  with outcome, debrief, winner analysis and the converted
+  solicitation's requirements; matches a solicitation (excluding its
+  own and its parent's pursuit), an opportunity, a page of SAM.gov
+  results, or the org's open work. Text capped in SQL. Scoped by
+  `organizationId`.
+- `RecompeteRadarPanel` on the solicitation and opportunity pages:
+  outcome chip, signals, awarded-to / value / reasons, lessons learned,
+  debrief fixes, why the winner won and what to do before the next bid;
+  won priors show what the evaluators credited. Renders nothing when
+  clear.
+- SAM.gov import results carry a "Recompete · lost to X 2024" chip and a
+  "bid before as …" line with the lessons; `ImportableOpportunity`
+  gains `recompete`.
+- Command Center "Needs attention" strip listing flagged open
+  opportunities and fresh solicitations, linking to loss intelligence.
+- `tests/ai/recompete-match.test.ts`.
 
 ---
 

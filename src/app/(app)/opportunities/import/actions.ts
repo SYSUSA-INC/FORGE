@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { opportunities, organizations } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { log } from "@/lib/log";
+import type { RecompeteFlag } from "@/lib/recompete-match";
+import { flagSamResults } from "@/lib/recompete-radar";
 import {
   GSA_VEHICLES,
   searchSamGovOpportunities,
@@ -15,6 +18,8 @@ const GSA_DEPARTMENT = "General Services Administration";
 
 export type ImportableOpportunity = SamOpportunity & {
   alreadyImported: boolean;
+  /** BL-FB-WIN-RECOMPETE — best prior pursuit this looks like, if any. */
+  recompete: RecompeteFlag | null;
 };
 
 export async function loadSamGovOpportunitiesAction(input?: {
@@ -102,11 +107,21 @@ export async function loadSamGovOpportunitiesAction(input?: {
           );
   const existingSet = new Set(existing.map((r) => r.noticeId));
 
+  // BL-FB-WIN-RECOMPETE — flag results that look like a pursuit we
+  // already decided. Best-effort: a failure here never blocks the list.
+  let recompeteFlags: Record<string, RecompeteFlag> = {};
+  try {
+    recompeteFlags = await flagSamResults(organizationId, result.opportunities);
+  } catch (err) {
+    log.warn("[samgov-import]", "recompete flagging failed", { error: err });
+  }
+
   return {
     ok: true,
     opportunities: result.opportunities.map((o) => ({
       ...o,
       alreadyImported: existingSet.has(o.noticeId),
+      recompete: recompeteFlags[o.noticeId] ?? null,
     })),
     totalRecords: result.totalRecords,
     usedNaics: naicsCodes,

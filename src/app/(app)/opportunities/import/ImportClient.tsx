@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { GSA_VEHICLES } from "@/lib/gsa-vehicles";
@@ -337,6 +338,22 @@ function OpportunityRow({
                 Already imported
               </span>
             ) : null}
+            {o.recompete ? (
+              <span
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                  o.recompete.outcome === "lost"
+                    ? "bg-rose/15 text-rose"
+                    : "bg-emerald-400/15 text-emerald-300"
+                }`}
+                title={o.recompete.signals.join(" · ")}
+              >
+                {o.recompete.confidence === "high" ? "Recompete" : "Possible recompete"} ·{" "}
+                {o.recompete.outcome === "lost"
+                  ? `lost${o.recompete.awardedTo ? ` to ${o.recompete.awardedTo}` : ""}`
+                  : "won"}
+                {o.recompete.decidedAt ? ` ${o.recompete.decidedAt.slice(0, 4)}` : ""}
+              </span>
+            ) : null}
             {o.type ? (
               <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 {o.type}
@@ -359,6 +376,25 @@ function OpportunityRow({
           {o.description ? (
             <div className="mt-2 line-clamp-3 font-body text-[12px] text-muted">
               {o.description.replace(/<[^>]*>/g, "")}
+            </div>
+          ) : null}
+          {o.recompete ? (
+            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] px-2.5 py-1.5 font-body text-[12px] text-muted">
+              Bid before as{" "}
+              <Link
+                href={`/proposals/${o.recompete.proposalId}/outcome`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-text underline"
+              >
+                {o.recompete.title}
+              </Link>
+              <span className="font-mono text-[10px] uppercase tracking-widest">
+                {" · "}
+                {o.recompete.signals.join(" · ")}
+              </span>
+              {o.recompete.lessons ? (
+                <span className="mt-0.5 block line-clamp-2">{o.recompete.lessons}</span>
+              ) : null}
             </div>
           ) : null}
         </div>
