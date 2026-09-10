@@ -3124,7 +3124,7 @@ surfaces the protest **only** when grounds exist. Output: a risk-tier
 summary (none / weak / colorable / strong) and the controlling cases.
 
 ### BL-FB-WIN-CROSS-LOSS — Cross-loss pattern detection
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #259)
 
 Aggregate-level loss intelligence: "you've lost 3 of the last 5 to
 Booz on defense IT — the pattern is price (18% high on average)" or
