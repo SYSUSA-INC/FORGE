@@ -13,10 +13,9 @@
 import {
   buildGsaExtractPrompt,
   gsaExtractionSchema,
-  parseAiJson,
   type GsaExtractionResult,
 } from "@/lib/ai-prompts";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type GsaExtractOk = {
@@ -54,9 +53,11 @@ export async function aiExtractGsa(
 
   try {
     const prompt = buildGsaExtractPrompt(rawText);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId,
       feature: "gsa_extract",
+      schema: gsaExtractionSchema,
+      toolName: "record_gsa_notice",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 1800,
@@ -91,18 +92,22 @@ export async function aiExtractGsa(
       };
     }
 
-    const cleaned = stripCodeFences(ai.text);
-    const parseResult = parseAiJson(cleaned, gsaExtractionSchema);
-    if (!parseResult.ok) {
-      log.error("[aiExtractGsa]", "parse", { error: parseResult.error });
-      return { ok: false, error: parseResult.error };
+    if (!ai.data) {
+      log.error("[aiExtractGsa]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalize(parseResult.data),
+      data: normalize(ai.data),
     };
   } catch (err) {
     log.error("[aiExtractGsa]", "error", { error: err });
@@ -111,17 +116,6 @@ export async function aiExtractGsa(
       error: err instanceof Error ? err.message : "AI extraction failed.",
     };
   }
-}
-
-function stripCodeFences(t: string): string {
-  const s = t.trim();
-  if (s.startsWith("```")) {
-    return s
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/```\s*$/i, "")
-      .trim();
-  }
-  return s;
 }
 
 function normalize(raw: GsaExtractionResult): GsaExtractionResult {

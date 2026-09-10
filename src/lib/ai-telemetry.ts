@@ -38,6 +38,11 @@ export type AiCallRecord = {
   stubbed?: boolean;
   cacheSystem?: boolean;
   hasDocuments?: boolean;
+  /** BL-AI-TOOLS — provider answered via the forced tool call. */
+  viaTool?: boolean;
+  /** BL-AI-TOOLS — schema validation outcome; null when not applicable. */
+  parseOk?: boolean | null;
+  parseError?: string | null;
 };
 
 const ERROR_CAP = 500;
@@ -63,6 +68,9 @@ export async function recordAiCall(rec: AiCallRecord): Promise<void> {
       stubbed: rec.stubbed ?? false,
       cacheSystem: rec.cacheSystem ?? false,
       hasDocuments: rec.hasDocuments ?? false,
+      viaTool: rec.viaTool ?? false,
+      parseOk: rec.parseOk ?? null,
+      parseError: rec.parseError ? rec.parseError.slice(0, ERROR_CAP) : null,
     });
   } catch (err) {
     log.warn("[ai-telemetry]", "record failed", {
@@ -86,6 +94,10 @@ export type AiFeatureBreakdownRow = {
   avgLatencyMs: number;
   maxLatencyMs: number;
   tenants: number;
+  /** BL-AI-TOOLS — calls answered through the forced tool path. */
+  viaTool: number;
+  /** BL-AI-TOOLS — calls whose payload failed schema validation. */
+  parseFailures: number;
 };
 
 /**
@@ -114,6 +126,8 @@ export async function getAiFeatureBreakdown(
       avgLatencyMs: sql<string>`coalesce(avg(${aiCallLogs.latencyMs}) filter (where ${aiCallLogs.status} = 'ok'), 0)`,
       maxLatencyMs: sql<string>`coalesce(max(${aiCallLogs.latencyMs}), 0)`,
       tenants: sql<string>`count(distinct ${aiCallLogs.organizationId})`,
+      viaTool: sql<string>`count(*) filter (where ${aiCallLogs.viaTool})`,
+      parseFailures: sql<string>`count(*) filter (where ${aiCallLogs.parseOk} = false)`,
     })
     .from(aiCallLogs)
     .where(where)
@@ -136,6 +150,8 @@ export async function getAiFeatureBreakdown(
     avgLatencyMs: Math.round(Number(r.avgLatencyMs)),
     maxLatencyMs: Number(r.maxLatencyMs),
     tenants: Number(r.tenants),
+    viaTool: Number(r.viaTool),
+    parseFailures: Number(r.parseFailures),
   }));
 }
 

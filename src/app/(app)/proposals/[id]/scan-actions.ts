@@ -12,7 +12,8 @@ import {
   type ProposalScanContradiction,
   type TipTapDoc,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
+import { proposalScanSchema } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
@@ -242,20 +243,47 @@ export async function runProposalScanAction(
     .filter(Boolean)
     .join("\n");
 
-  let raw = "";
+  // BL-AI-TOOLS — the scan answers through a forced tool call validated
+  // against proposalScanSchema, so no fence-stripping or manual field
+  // coercion is needed here.
+  let parsed;
   let stubbed = true;
   try {
-    const res = await completeForTenant({
+    const res = await completeStructuredForTenant({
       organizationId,
       feature: "proposal_scan",
+      schema: proposalScanSchema,
+      toolName: "record_health_scan",
+      toolDescription:
+        "Record the proposal health check: overall score, per-section issues, recommendations, win-theme coverage and cross-section contradictions.",
       system: SCAN_SYSTEM,
       messages: [{ role: "user", content: userPrompt }],
       maxTokens: 2000,
       temperature: 0.2,
       cacheSystem: true,
     });
-    raw = res.text;
     stubbed = res.stubbed;
+    if (res.stubbed) {
+      await refundQuota(organizationId, "aiRequestsPerMonth");
+      return {
+        ok: false,
+        error:
+          "AI provider is in stub mode — configure a provider to run scans.",
+      };
+    }
+    if (!res.data) {
+      await refundQuota(organizationId, "aiRequestsPerMonth");
+      log.warn("[runProposalScanAction]", "structured parse failed", {
+        parseError: res.parseError,
+        viaTool: res.viaTool,
+        rawSnippet: res.text.slice(0, 240),
+      });
+      return {
+        ok: false,
+        error: "AI returned an unexpected format. Re-run the scan.",
+      };
+    }
+    parsed = res.data;
   } catch (err) {
     await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[runProposalScanAction]", "AI call failed", { error: err });
@@ -265,61 +293,30 @@ export async function runProposalScanAction(
     };
   }
 
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "");
+  const result = {
+    overallScore: parsed.overallScore,
+    summary: parsed.summary.slice(0, 1200),
+    sectionIssues: parsed.sectionIssues.slice(0, 20),
+    topRecommendations: parsed.topRecommendations.slice(0, 5),
+    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40),
+    contradictions: (parsed.contradictions ?? []).slice(0, 5),
+    stubbed,
+    generatedAt: new Date(),
+  };
+
+  // BL-FB-SCAN-CONTINUOUS — persist the scan and clear the dirty flag.
+  // Sequential UPSERT pattern per Neon-pgbouncer rule (no transactions).
   try {
-    const parsed = JSON.parse(cleaned) as {
-      overallScore: "strong" | "needs_work" | "critical";
-      summary: string;
-      sectionIssues: ProposalScanIssue[];
-      topRecommendations: string[];
-      sectionThemeCoverage?: SectionThemeCoverage[];
-      contradictions?: ProposalScanContradiction[];
-    };
-    const result = {
-      overallScore: (["strong", "needs_work", "critical"] as const).includes(
-        parsed.overallScore,
-      )
-        ? parsed.overallScore
-        : ("needs_work" as const),
-      summary: (parsed.summary ?? "").slice(0, 1200),
-      sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
-      topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
-      sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
-      contradictions: (parsed.contradictions ?? []).slice(0, 5) as ProposalScanContradiction[],
-      stubbed,
-      generatedAt: new Date(),
-    };
+    const [existing] = await db
+      .select({ id: proposalScanResults.id })
+      .from(proposalScanResults)
+      .where(eq(proposalScanResults.proposalId, proposalId))
+      .limit(1);
 
-    // BL-FB-SCAN-CONTINUOUS — persist the scan and clear the dirty flag.
-    // Sequential UPSERT pattern per Neon-pgbouncer rule (no transactions).
-    try {
-      const [existing] = await db
-        .select({ id: proposalScanResults.id })
-        .from(proposalScanResults)
-        .where(eq(proposalScanResults.proposalId, proposalId))
-        .limit(1);
-
-      if (existing) {
-        await db
-          .update(proposalScanResults)
-          .set({
-            overallScore: result.overallScore,
-            summary: result.summary,
-            sectionIssues: result.sectionIssues,
-            topRecommendations: result.topRecommendations,
-            sectionThemeCoverage: result.sectionThemeCoverage,
-            contradictions: result.contradictions,
-            stubbed: result.stubbed,
-            generatedAt: result.generatedAt,
-          })
-          .where(eq(proposalScanResults.id, existing.id));
-      } else {
-        await db.insert(proposalScanResults).values({
-          organizationId,
-          proposalId,
+    if (existing) {
+      await db
+        .update(proposalScanResults)
+        .set({
           overallScore: result.overallScore,
           summary: result.summary,
           sectionIssues: result.sectionIssues,
@@ -328,39 +325,43 @@ export async function runProposalScanAction(
           contradictions: result.contradictions,
           stubbed: result.stubbed,
           generatedAt: result.generatedAt,
-        });
-      }
-
-      // Clear the dirty flag — this scan covers all content as of now.
-      await db
-        .update(proposals)
-        .set({ scanDirtySince: null })
-        .where(eq(proposals.id, proposalId));
-    } catch (err) {
-      log.warn("[runProposalScanAction]", "persist failed", { error: err });
+        })
+        .where(eq(proposalScanResults.id, existing.id));
+    } else {
+      await db.insert(proposalScanResults).values({
+        organizationId,
+        proposalId,
+        overallScore: result.overallScore,
+        summary: result.summary,
+        sectionIssues: result.sectionIssues,
+        topRecommendations: result.topRecommendations,
+        sectionThemeCoverage: result.sectionThemeCoverage,
+        contradictions: result.contradictions,
+        stubbed: result.stubbed,
+        generatedAt: result.generatedAt,
+      });
     }
 
-    return {
-      ok: true,
-      overallScore: result.overallScore,
-      summary: result.summary,
-      sectionIssues: result.sectionIssues,
-      topRecommendations: result.topRecommendations,
-      sectionThemeCoverage: result.sectionThemeCoverage,
-      contradictions: result.contradictions,
-      stubbed: result.stubbed,
-      generatedAt: result.generatedAt.toISOString(),
-    };
-  } catch {
-    await refundQuota(organizationId, "aiRequestsPerMonth");
-    log.warn("[runProposalScanAction]", "JSON parse failed", {
-      rawSnippet: raw.slice(0, 240),
-    });
-    return {
-      ok: false,
-      error: "AI returned an unexpected format. Re-run the scan.",
-    };
+    // Clear the dirty flag — this scan covers all content as of now.
+    await db
+      .update(proposals)
+      .set({ scanDirtySince: null })
+      .where(eq(proposals.id, proposalId));
+  } catch (err) {
+    log.warn("[runProposalScanAction]", "persist failed", { error: err });
   }
+
+  return {
+    ok: true,
+    overallScore: result.overallScore,
+    summary: result.summary,
+    sectionIssues: result.sectionIssues,
+    topRecommendations: result.topRecommendations,
+    sectionThemeCoverage: result.sectionThemeCoverage,
+    contradictions: result.contradictions,
+    stubbed: result.stubbed,
+    generatedAt: result.generatedAt.toISOString(),
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────

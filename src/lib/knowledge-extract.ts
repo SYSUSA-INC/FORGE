@@ -11,11 +11,10 @@
 import {
   buildKnowledgeExtractPrompt,
   knowledgeExtractionSchema,
-  parseAiJson,
   type KnowledgeExtractionCandidateOutput,
   type KnowledgeKindEnumLike,
 } from "@/lib/ai-prompts";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type KnowledgeExtractOk = {
@@ -54,9 +53,11 @@ export async function aiExtractKnowledgeFromArtifact(input: {
 
   try {
     const prompt = buildKnowledgeExtractPrompt(input);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId: input.organizationId,
       feature: "knowledge_extract",
+      schema: knowledgeExtractionSchema,
+      toolName: "record_knowledge_candidates",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3500,
@@ -85,11 +86,15 @@ export async function aiExtractKnowledgeFromArtifact(input: {
       };
     }
 
-    const cleaned = stripCodeFences(ai.text);
-    const parseResult = parseAiJson(cleaned, knowledgeExtractionSchema);
-    if (!parseResult.ok) {
-      log.error("[aiExtractKnowledgeFromArtifact]", "parse", { error: parseResult.error });
-      return { ok: false, error: parseResult.error };
+    if (!ai.data) {
+      log.error("[aiExtractKnowledgeFromArtifact]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
 
     return {
@@ -97,8 +102,8 @@ export async function aiExtractKnowledgeFromArtifact(input: {
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      candidates: normalizeCandidates(parseResult.data.candidates),
-      notes: parseResult.data.notes.slice(0, 1000),
+      candidates: normalizeCandidates(ai.data.candidates),
+      notes: ai.data.notes.slice(0, 1000),
     };
   } catch (err) {
     log.error("[aiExtractKnowledgeFromArtifact]", "error", { error: err });
@@ -107,17 +112,6 @@ export async function aiExtractKnowledgeFromArtifact(input: {
       error: err instanceof Error ? err.message : "Extraction failed.",
     };
   }
-}
-
-function stripCodeFences(t: string): string {
-  const s = t.trim();
-  if (s.startsWith("```")) {
-    return s
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/```\s*$/i, "")
-      .trim();
-  }
-  return s;
 }
 
 function normalizeCandidates(

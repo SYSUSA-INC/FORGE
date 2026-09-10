@@ -3395,17 +3395,51 @@ structured output is a gateway concern, schema-validation failures become
 a gateway status rather than a caller-side regex miss.
 
 ### BL-AI-TOOLS — Native tool use + structured output in the gateway
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
 
-Every JSON-returning feature today asks the model for JSON in prose,
-then finds the first `{` and last `}` and runs `parseAiJson` + zod.
-Replace with Anthropic `tools` / `tool_choice` (forced tool call whose
-input schema is the zod schema), degrade to the current path on providers
-without tool support, and expose `completeStructured<T>(schema)`.
-Migrate the seven `parseAiJson` callers. Record `parse_ok` in
-`ai_call_log`. This is also the prerequisite for any agentic loop: a
-drafter that can call "search the Brain" mid-generation, or a scan that
-can pull a full section when it suspects a contradiction.
+Every JSON-returning feature used to ask the model for JSON in prose,
+then find the first `{` and last `}` and run `parseAiJson` + zod. The
+gateway now turns a zod schema into a single forced tool call, so the
+model returns a typed object, and validates it before the caller sees
+it. This is also the prerequisite for any agentic loop: a drafter that
+can call "search the Brain" mid-generation, or a scan that can pull a
+full section when it suspects a contradiction.
+
+**Delivered:**
+- `src/lib/ai.ts` — `AIToolSpec` on `AICompleteOptions`; `structured` +
+  `stopReason` on `AICompleteResult`. Anthropic sends `tools` +
+  `tool_choice: { type: "tool", disable_parallel_tool_use }`; Azure
+  OpenAI and vLLM send OpenAI function calling (`VLLM_SUPPORTS_TOOLS=1`
+  opts vLLM in — tool support there depends on the served model).
+  Request builders and response parsers are exported with a `__` prefix
+  so tests pin the wire format without network.
+- `zodToToolSchema` (zod 4 `toJSONSchema`, input mode, object root
+  enforced), `validateStructured` (tool payload first, JSON-in-text
+  fallback), `completeStructuredForTenant<T>` returning
+  `{ ...result, data, parseError, viaTool }`. Same quota, telemetry and
+  post-record semantics as `completeForTenant`; both share
+  `runTenantCompletion` so the parse outcome lands on the same
+  `ai_call_log` row as the call.
+- Migration `0074_ai_call_log_parse.sql` — `via_tool`, `parse_ok`
+  (NULL for free-text and stub), `parse_error`. `/admin/usage` gains
+  "Parse fail" and "Via tool" columns.
+- `proposalScanSchema` in `ai-prompts.ts` — the health scan (on-demand
+  and cron) now validates through the same schema instead of a bare
+  `JSON.parse` with manual coercion.
+- All 16 JSON-returning call sites migrated: compliance pre-flight and
+  auto-map, protest viability, winner analysis, both scan paths, eBuy /
+  GSA / solicitation (text, PDF, image) extraction, knowledge classify
+  and extract, solicitation review, capability matrix, question
+  generator. Each carries a descriptive `toolName`. The local
+  `stripCodeFences` helpers and `parseAiJson` imports are gone from
+  callers; `parseAiJson` itself stays exported for anything else.
+- `tests/ai/gateway-structured.test.ts` — wire-format assertions for
+  both provider families, validation precedence and fallback, and
+  gateway behaviour through the seam including the telemetry columns.
+
+**Prompt note:** the "Output ONLY a single JSON object" instructions
+stay in the system prompts. They are what the text fallback relies on
+when a provider cannot or does not call the tool.
 
 ### BL-AI-ROUTING — Per-task model routing
 **Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued  ·  **Depends on:** BL-AI-TELEMETRY

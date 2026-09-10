@@ -1277,6 +1277,54 @@ export function parseAiJson<T>(
 }
 
 // ─────────────────────────────────────────────────────────────────
+// BL-AI-TOOLS — health-scan response schema. Shared by the on-demand
+// scan action and the background scan cron so both validate identically
+// through completeStructuredForTenant.
+// ─────────────────────────────────────────────────────────────────
+
+const scanSeveritySchema = z.enum(["high", "medium", "low"]);
+
+export const proposalScanSchema = z.object({
+  overallScore: z.enum(["strong", "needs_work", "critical"]),
+  summary: z.string(),
+  sectionIssues: z.array(
+    z.object({
+      sectionId: z.string(),
+      sectionTitle: z.string(),
+      issue: z.string(),
+      severity: scanSeveritySchema,
+    }),
+  ),
+  topRecommendations: z.array(z.string()),
+  sectionThemeCoverage: z
+    .array(
+      z.object({
+        sectionId: z.string(),
+        sectionTitle: z.string(),
+        reinforced: z.array(z.string()),
+        missing: z.array(z.string()),
+      }),
+    )
+    .optional(),
+  contradictions: z
+    .array(
+      z.object({
+        section1Id: z.string(),
+        section1Title: z.string(),
+        section2Id: z.string(),
+        section2Title: z.string(),
+        claim1: z.string(),
+        claim2: z.string(),
+        explanation: z.string(),
+        severity: scanSeveritySchema,
+      }),
+    )
+    .optional(),
+});
+
+export type ProposalScanPayload = z.infer<typeof proposalScanSchema>;
+
+// ─────────────────────────────────────────────────────────────────
 // BL-FB-WIN-PROTEST — protest viability check
 // ─────────────────────────────────────────────────────────────────
 

@@ -21,11 +21,10 @@ import {
   proposalSections,
   proposals,
   solicitations,
-  type ProposalScanContradiction,
-  type SectionThemeCoverage,
   type TipTapDoc,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
+import { proposalScanSchema } from "@/lib/ai-prompts";
 import {
   enforceQuota,
   ensureFeature,
@@ -289,50 +288,40 @@ async function runSingleProposalScan(
     .filter(Boolean)
     .join("\n");
 
-  let raw = "";
-  let stubbed = true;
-  const res = await completeForTenant({
+  // BL-AI-TOOLS — forced tool call validated against proposalScanSchema.
+  // A validation failure throws so runStaleProposalScans logs it and
+  // refunds the quota slot, same as a provider error.
+  const res = await completeStructuredForTenant({
     organizationId,
     feature: "proposal_scan_background",
+    schema: proposalScanSchema,
+    toolName: "record_health_scan",
+    toolDescription:
+      "Record the proposal health check: overall score, per-section issues, recommendations, win-theme coverage and cross-section contradictions.",
     system: SCAN_SYSTEM,
     messages: [{ role: "user", content: userPrompt }],
     maxTokens: 2000,
     temperature: 0.2,
     cacheSystem: true,
   });
-  raw = res.text;
-  stubbed = res.stubbed;
-
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "");
-  const parsed = JSON.parse(cleaned) as {
-    overallScore: "strong" | "needs_work" | "critical";
-    summary: string;
-    sectionIssues: Array<{
-      sectionId: string;
-      sectionTitle: string;
-      issue: string;
-      severity: "high" | "medium" | "low";
-    }>;
-    topRecommendations: string[];
-    sectionThemeCoverage?: SectionThemeCoverage[];
-    contradictions?: ProposalScanContradiction[];
-  };
+  if (res.stubbed) {
+    throw new Error("AI provider is in stub mode — background scan skipped.");
+  }
+  if (!res.data) {
+    throw new Error(
+      `scan response did not match schema: ${res.parseError ?? "unknown"}`,
+    );
+  }
+  const parsed = res.data;
 
   const result = {
-    overallScore: (["strong", "needs_work", "critical"] as const).includes(
-      parsed.overallScore,
-    )
-      ? parsed.overallScore
-      : ("needs_work" as const),
-    summary: (parsed.summary ?? "").slice(0, 1200),
-    sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
-    topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
-    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
-    contradictions: (parsed.contradictions ?? []).slice(0, 5) as ProposalScanContradiction[],
-    stubbed,
+    overallScore: parsed.overallScore,
+    summary: parsed.summary.slice(0, 1200),
+    sectionIssues: parsed.sectionIssues.slice(0, 20),
+    topRecommendations: parsed.topRecommendations.slice(0, 5),
+    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40),
+    contradictions: (parsed.contradictions ?? []).slice(0, 5),
+    stubbed: res.stubbed,
     generatedAt: new Date(),
   };
 

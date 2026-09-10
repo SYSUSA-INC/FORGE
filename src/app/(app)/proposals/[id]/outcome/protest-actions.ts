@@ -13,10 +13,9 @@ import {
   type ProtestGround,
   type ProtestRiskTier,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import {
   buildProtestViabilityPrompt,
-  parseAiJson,
   protestViabilitySchema,
 } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
@@ -207,22 +206,25 @@ export async function runProtestCheckAction(
       : null,
   });
 
-  let raw = "";
   let model = "stub";
   let stubbed = true;
+  let structured;
   try {
-    const res = await completeForTenant({
+    structured = await completeStructuredForTenant({
       organizationId,
       feature: "protest_viability",
+      schema: protestViabilitySchema,
+      toolName: "record_protest_viability",
+      toolDescription:
+        "Record the protest viability assessment: verdict, grounds, deadlines and recommendation.",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3000,
       temperature: 0.1,
       cacheSystem: true,
     });
-    raw = res.text;
-    model = `${res.provider}:${res.model}`;
-    stubbed = res.stubbed;
+    model = `${structured.provider}:${structured.model}`;
+    stubbed = structured.stubbed;
   } catch (err) {
     await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[protest-check]", "AI call failed", { error: err });
@@ -232,18 +234,18 @@ export async function runProtestCheckAction(
     };
   }
 
-  const parseResult = parseAiJson(raw, protestViabilitySchema);
-  if (!parseResult.ok) {
-    log.warn("[protest-check]", "JSON parse failed", {
-      parseError: parseResult.error,
-      rawSnippet: raw.slice(0, 240),
+  if (!structured.data) {
+    log.warn("[protest-check]", "structured parse failed", {
+      parseError: structured.parseError,
+      viaTool: structured.viaTool,
+      rawSnippet: structured.text.slice(0, 240),
     });
     return {
       ok: false,
-      error: `${parseResult.error} Re-run, or check the API key.`,
+      error: `${structured.parseError ?? "AI response did not match the expected shape."} Re-run, or check the API key.`,
     };
   }
-  const parsed = parseResult.data;
+  const parsed = structured.data;
 
   const now = new Date();
   const checkValues = {

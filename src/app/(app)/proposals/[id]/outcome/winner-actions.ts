@@ -12,10 +12,9 @@ import {
   proposals,
   type TipTapDoc,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import {
   buildWinnerAnalysisPrompt,
-  parseAiJson,
   winnerAnalysisSchema,
 } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
@@ -282,22 +281,25 @@ export async function runWinnerAnalysisAction(
     competitorAwards,
   });
 
-  let raw = "";
   let model = "stub";
   let stubbed = true;
+  let structured;
   try {
-    const res = await completeForTenant({
+    structured = await completeStructuredForTenant({
       organizationId,
       feature: "winner_analysis",
+      schema: winnerAnalysisSchema,
+      toolName: "record_winner_analysis",
+      toolDescription:
+        "Record the winner analysis: winner profile, our gaps, unrecognized strengths and recommendations.",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
       temperature: 0.2,
       cacheSystem: true,
     });
-    raw = res.text;
-    model = `${res.provider}:${res.model}`;
-    stubbed = res.stubbed;
+    model = `${structured.provider}:${structured.model}`;
+    stubbed = structured.stubbed;
   } catch (err) {
     // BL-16 Phase B-3d — refund the request slot when the AI call fails;
     // the user got no analysis, shouldn't burn a slot.
@@ -309,18 +311,18 @@ export async function runWinnerAnalysisAction(
     };
   }
 
-  const parseResult = parseAiJson(raw, winnerAnalysisSchema);
-  if (!parseResult.ok) {
-    log.warn("[winner-analysis]", "JSON parse failed", {
-      parseError: parseResult.error,
-      rawSnippet: raw.slice(0, 240),
+  if (!structured.data) {
+    log.warn("[winner-analysis]", "structured parse failed", {
+      parseError: structured.parseError,
+      viaTool: structured.viaTool,
+      rawSnippet: structured.text.slice(0, 240),
     });
     return {
       ok: false,
-      error: `${parseResult.error} Re-run, or check the API key.`,
+      error: `${structured.parseError ?? "AI response did not match the expected shape."} Re-run, or check the API key.`,
     };
   }
-  const parsed = parseResult.data;
+  const parsed = structured.data;
 
   const cap = (s: string, n = 1200) => s.slice(0, n);
 

@@ -674,6 +674,12 @@ export const aiCallLogs = pgTable(
     stubbed: boolean("stubbed").notNull().default(false),
     cacheSystem: boolean("cache_system").notNull().default(false),
     hasDocuments: boolean("has_documents").notNull().default(false),
+    // BL-AI-TOOLS — structured-output outcome. `viaTool` = the provider
+    // answered through the forced tool call; `parseOk` = payload passed
+    // the caller's zod schema (null for free-text calls and stub answers).
+    viaTool: boolean("via_tool").notNull().default(false),
+    parseOk: boolean("parse_ok"),
+    parseError: text("parse_error"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

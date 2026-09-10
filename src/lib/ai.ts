@@ -9,8 +9,18 @@
  * Anthropic is implemented via direct fetch to api.anthropic.com so we
  * don't pull in the SDK for a single endpoint. Bedrock requires AWS
  * SigV4 signing and is left as a deliberate stub until we need it.
+ *
+ * BL-AI-TOOLS — structured output. A caller that wants JSON passes a
+ * zod schema to `completeStructuredForTenant`. The gateway turns it into
+ * a single forced tool call on providers that support tools (Anthropic,
+ * Azure OpenAI, vLLM when VLLM_SUPPORTS_TOOLS=1) so the model returns a
+ * typed object rather than prose we have to brace-hunt through. On other
+ * providers, or when a tool call does not come back, it falls back to
+ * extracting JSON from the text. Either way the payload is validated
+ * against the schema and the outcome is recorded in ai_call_log.
  */
 
+import { z } from "zod";
 import type { AiFeature } from "@/lib/ai-features";
 
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
@@ -44,6 +54,17 @@ export type AIDocument = {
   bytes: Uint8Array;
 };
 
+/**
+ * BL-AI-TOOLS — a single tool the model is forced to call. `inputSchema`
+ * is JSON Schema with an object at the root (Anthropic and OpenAI both
+ * require that). Build it with `zodToToolSchema`.
+ */
+export type AIToolSpec = {
+  name: string;
+  description?: string;
+  inputSchema: Record<string, unknown>;
+};
+
 export type AICompleteOptions = {
   system?: string;
   messages: AIMessage[];
@@ -62,6 +83,12 @@ export type AICompleteOptions = {
    * note in place of the document.
    */
   documents?: AIDocument[];
+  /**
+   * BL-AI-TOOLS — when set, the provider is asked to answer by calling
+   * this tool (forced). The tool input comes back in `structured`.
+   * Providers without tool support ignore it and answer in text.
+   */
+  tool?: AIToolSpec;
 };
 
 export type AICompleteResult = {
@@ -72,6 +99,10 @@ export type AICompleteResult = {
   outputTokens?: number;
   /** True when the call used the StubProvider (no live AI). */
   stubbed: boolean;
+  /** BL-AI-TOOLS — the tool input object when the provider answered via the forced tool. */
+  structured?: unknown;
+  /** Provider stop / finish reason, when reported. */
+  stopReason?: string;
 };
 
 export type AIProviderName = "anthropic" | "bedrock" | "azure" | "vllm" | "stub";
@@ -87,6 +118,112 @@ export interface AIProvider {
   complete(opts: AICompleteOptions): Promise<AICompleteResult>;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Anthropic request / response shaping. Exported with a __ prefix so
+// tests can pin the wire format without a network call.
+// ─────────────────────────────────────────────────────────────────────
+
+export function __buildAnthropicBody(
+  opts: AICompleteOptions,
+  model: string,
+): Record<string, unknown> {
+  const docs = opts.documents ?? [];
+  let firstUserSeen = false;
+  const messages = opts.messages.map((m) => {
+    if (m.role === "user" && !firstUserSeen && docs.length > 0) {
+      firstUserSeen = true;
+      const blocks: unknown[] = docs.map((d) => {
+        // Anthropic uses different block types for PDF vs image.
+        // PDFs go through "document"; images through "image".
+        if (d.mediaType === "application/pdf") {
+          return {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: d.mediaType,
+              data: bytesToBase64(d.bytes),
+            },
+            ...(d.name ? { title: d.name } : {}),
+          };
+        }
+        return {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: d.mediaType,
+            data: bytesToBase64(d.bytes),
+          },
+        };
+      });
+      blocks.push({ type: "text", text: m.content });
+      return { role: m.role, content: blocks };
+    }
+    return { role: m.role, content: m.content };
+  });
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: opts.maxTokens ?? 1024,
+    messages,
+  };
+  if (typeof opts.temperature === "number") body.temperature = opts.temperature;
+  if (opts.system) {
+    body.system = opts.cacheSystem
+      ? [
+          {
+            type: "text",
+            text: opts.system,
+            cache_control: { type: "ephemeral" },
+          },
+        ]
+      : opts.system;
+  }
+  if (opts.tool) {
+    body.tools = [
+      {
+        name: opts.tool.name,
+        description:
+          opts.tool.description ?? "Return the result as structured data.",
+        input_schema: opts.tool.inputSchema,
+      },
+    ];
+    // Force exactly this tool, exactly once.
+    body.tool_choice = {
+      type: "tool",
+      name: opts.tool.name,
+      disable_parallel_tool_use: true,
+    };
+  }
+  return body;
+}
+
+type AnthropicResponse = {
+  content?: { type: string; text?: string; name?: string; input?: unknown }[];
+  usage?: { input_tokens?: number; output_tokens?: number };
+  model?: string;
+  stop_reason?: string;
+};
+
+export function __parseAnthropicResponse(
+  json: AnthropicResponse,
+  fallbackModel: string,
+): Omit<AICompleteResult, "provider" | "stubbed"> {
+  const blocks = json.content ?? [];
+  const text = blocks
+    .filter((c) => c.type === "text")
+    .map((c) => c.text ?? "")
+    .join("\n")
+    .trim();
+  const toolBlock = blocks.find((c) => c.type === "tool_use");
+  return {
+    text,
+    model: json.model ?? fallbackModel,
+    inputTokens: json.usage?.input_tokens,
+    outputTokens: json.usage?.output_tokens,
+    structured: toolBlock ? toolBlock.input : undefined,
+    stopReason: json.stop_reason,
+  };
+}
+
 class AnthropicProvider implements AIProvider {
   readonly name = "anthropic" as const;
   constructor(
@@ -96,56 +233,7 @@ class AnthropicProvider implements AIProvider {
 
   async complete(opts: AICompleteOptions): Promise<AICompleteResult> {
     const model = opts.model ?? this.defaultModel;
-    const docs = opts.documents ?? [];
-    let firstUserSeen = false;
-    const messages = opts.messages.map((m) => {
-      if (m.role === "user" && !firstUserSeen && docs.length > 0) {
-        firstUserSeen = true;
-        const blocks: unknown[] = docs.map((d) => {
-          // Anthropic uses different block types for PDF vs image.
-          // PDFs go through "document"; images through "image".
-          if (d.mediaType === "application/pdf") {
-            return {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: d.mediaType,
-                data: bytesToBase64(d.bytes),
-              },
-              ...(d.name ? { title: d.name } : {}),
-            };
-          }
-          return {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: d.mediaType,
-              data: bytesToBase64(d.bytes),
-            },
-          };
-        });
-        blocks.push({ type: "text", text: m.content });
-        return { role: m.role, content: blocks };
-      }
-      return { role: m.role, content: m.content };
-    });
-    const body: Record<string, unknown> = {
-      model,
-      max_tokens: opts.maxTokens ?? 1024,
-      messages,
-    };
-    if (typeof opts.temperature === "number") body.temperature = opts.temperature;
-    if (opts.system) {
-      body.system = opts.cacheSystem
-        ? [
-            {
-              type: "text",
-              text: opts.system,
-              cache_control: { type: "ephemeral" },
-            },
-          ]
-        : opts.system;
-    }
+    const body = __buildAnthropicBody(opts, model);
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -160,26 +248,88 @@ class AnthropicProvider implements AIProvider {
       const errBody = await res.text();
       throw new Error(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`);
     }
-    const json = (await res.json()) as {
-      content?: { type: string; text?: string }[];
-      usage?: { input_tokens?: number; output_tokens?: number };
-      model?: string;
-    };
-    const text =
-      json.content
-        ?.filter((c) => c.type === "text")
-        .map((c) => c.text ?? "")
-        .join("\n")
-        .trim() ?? "";
+    const json = (await res.json()) as AnthropicResponse;
     return {
-      text,
+      ...__parseAnthropicResponse(json, model),
       provider: this.name,
-      model: json.model ?? model,
-      inputTokens: json.usage?.input_tokens,
-      outputTokens: json.usage?.output_tokens,
       stubbed: false,
     };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// OpenAI-compatible request / response shaping — shared by Azure OpenAI
+// and vLLM. Same __ export convention for tests.
+// ─────────────────────────────────────────────────────────────────────
+
+export function __buildOpenAiCompatBody(
+  opts: AICompleteOptions,
+  includeTools: boolean,
+  model?: string,
+): Record<string, unknown> {
+  const messages: { role: string; content: string }[] = [];
+  if (opts.system) messages.push({ role: "system", content: opts.system });
+  for (const m of opts.messages) messages.push({ role: m.role, content: m.content });
+
+  const body: Record<string, unknown> = {
+    messages,
+    max_tokens: opts.maxTokens ?? 1024,
+  };
+  if (model) body.model = model;
+  if (typeof opts.temperature === "number") body.temperature = opts.temperature;
+  if (opts.tool && includeTools) {
+    body.tools = [
+      {
+        type: "function",
+        function: {
+          name: opts.tool.name,
+          description:
+            opts.tool.description ?? "Return the result as structured data.",
+          parameters: opts.tool.inputSchema,
+        },
+      },
+    ];
+    body.tool_choice = { type: "function", function: { name: opts.tool.name } };
+  }
+  return body;
+}
+
+type OpenAiCompatResponse = {
+  choices?: {
+    message?: {
+      content?: string | null;
+      tool_calls?: { function?: { name?: string; arguments?: string } }[];
+    };
+    finish_reason?: string;
+  }[];
+  model?: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+};
+
+export function __parseOpenAiCompatResponse(
+  json: OpenAiCompatResponse,
+  fallbackModel: string,
+): Omit<AICompleteResult, "provider" | "stubbed"> {
+  const choice = json.choices?.[0];
+  const text = choice?.message?.content?.trim() ?? "";
+  let structured: unknown = undefined;
+  const args = choice?.message?.tool_calls?.[0]?.function?.arguments;
+  if (typeof args === "string" && args.trim()) {
+    try {
+      structured = JSON.parse(args);
+    } catch {
+      // Malformed arguments — leave undefined so the caller's text
+      // fallback gets a chance, and validation reports the failure.
+    }
+  }
+  return {
+    text,
+    model: json.model ?? fallbackModel,
+    inputTokens: json.usage?.prompt_tokens,
+    outputTokens: json.usage?.completion_tokens,
+    structured,
+    stopReason: choice?.finish_reason,
+  };
 }
 
 class AzureOpenAIProvider implements AIProvider {
@@ -196,15 +346,8 @@ class AzureOpenAIProvider implements AIProvider {
       this.deployment,
     )}/chat/completions?api-version=${encodeURIComponent(this.apiVersion)}`;
 
-    const messages: { role: string; content: string }[] = [];
-    if (opts.system) messages.push({ role: "system", content: opts.system });
-    for (const m of opts.messages) messages.push({ role: m.role, content: m.content });
-
-    const body: Record<string, unknown> = {
-      messages,
-      max_tokens: opts.maxTokens ?? 1024,
-    };
-    if (typeof opts.temperature === "number") body.temperature = opts.temperature;
+    // Azure deployments are model-pinned; the model is the deployment.
+    const body = __buildOpenAiCompatBody(opts, true);
 
     const res = await fetch(url, {
       method: "POST",
@@ -215,17 +358,10 @@ class AzureOpenAIProvider implements AIProvider {
       const errBody = await res.text();
       throw new Error(`Azure OpenAI ${res.status}: ${errBody.slice(0, 300)}`);
     }
-    const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-      model?: string;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
+    const json = (await res.json()) as OpenAiCompatResponse;
     return {
-      text: json.choices?.[0]?.message?.content?.trim() ?? "",
+      ...__parseOpenAiCompatResponse(json, this.deployment),
       provider: this.name,
-      model: json.model ?? this.deployment,
-      inputTokens: json.usage?.prompt_tokens,
-      outputTokens: json.usage?.completion_tokens,
       stubbed: false,
     };
   }
@@ -237,20 +373,15 @@ class VLLMProvider implements AIProvider {
     private baseUrl: string,
     private apiKey: string | null,
     private defaultModel = DEFAULT_VLLM_MODEL,
+    // Tool calling on vLLM depends on the served model and the
+    // --enable-auto-tool-choice flag; opt in explicitly.
+    private supportsTools = false,
   ) {}
 
   async complete(opts: AICompleteOptions): Promise<AICompleteResult> {
     const url = `${this.baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
-    const messages: { role: string; content: string }[] = [];
-    if (opts.system) messages.push({ role: "system", content: opts.system });
-    for (const m of opts.messages) messages.push({ role: m.role, content: m.content });
-
-    const body: Record<string, unknown> = {
-      model: opts.model ?? this.defaultModel,
-      messages,
-      max_tokens: opts.maxTokens ?? 1024,
-    };
-    if (typeof opts.temperature === "number") body.temperature = opts.temperature;
+    const model = opts.model ?? this.defaultModel;
+    const body = __buildOpenAiCompatBody(opts, this.supportsTools, model);
 
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (this.apiKey) headers["authorization"] = `Bearer ${this.apiKey}`;
@@ -264,17 +395,10 @@ class VLLMProvider implements AIProvider {
       const errBody = await res.text();
       throw new Error(`vLLM ${res.status}: ${errBody.slice(0, 300)}`);
     }
-    const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-      model?: string;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
+    const json = (await res.json()) as OpenAiCompatResponse;
     return {
-      text: json.choices?.[0]?.message?.content?.trim() ?? "",
+      ...__parseOpenAiCompatResponse(json, model),
       provider: this.name,
-      model: json.model ?? body.model as string,
-      inputTokens: json.usage?.prompt_tokens,
-      outputTokens: json.usage?.completion_tokens,
       stubbed: false,
     };
   }
@@ -426,6 +550,7 @@ export function getAIProvider(): AIProvider {
         readEnv("VLLM_BASE_URL")!,
         readEnv("VLLM_API_KEY"),
         readEnv("VLLM_MODEL") ?? DEFAULT_VLLM_MODEL,
+        readEnv("VLLM_SUPPORTS_TOOLS") === "1",
       );
     case "bedrock":
       return new BedrockNotWiredProvider();
@@ -449,6 +574,94 @@ export function __setCompleteImplForTest(fn: typeof complete | null): void {
   _completeImpl = fn ?? complete;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// BL-AI-TOOLS — schema helpers
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Convert a zod schema into the JSON Schema a tool `input_schema` needs.
+ * Uses zod 4's built-in exporter in "input" mode (the model produces the
+ * *input* to our validator). Root must be an object — both Anthropic and
+ * OpenAI reject anything else, so we fail fast at build time rather than
+ * at the provider.
+ */
+export function zodToToolSchema(schema: z.ZodType): Record<string, unknown> {
+  const json = z.toJSONSchema(schema, {
+    io: "input",
+    unrepresentable: "any",
+  }) as Record<string, unknown>;
+  delete json.$schema;
+  if (json.type !== "object") {
+    throw new Error(
+      "zodToToolSchema: tool input schemas must be an object at the root",
+    );
+  }
+  return json;
+}
+
+export type AIStructuredValidation<T> = {
+  /** Validated payload, or null when validation failed. */
+  data: T | null;
+  /** Human-readable reason when `data` is null. */
+  parseError: string | null;
+  /** True when the payload came from the provider's tool-call path. */
+  viaTool: boolean;
+};
+
+function describeIssues(err: z.ZodError): string {
+  const issues = err.issues
+    .slice(0, 3)
+    .map((i) => `${i.path.map(String).join(".") || "(root)"}: ${i.message}`)
+    .join("; ");
+  return `AI response didn't match the expected shape (${issues}).`;
+}
+
+/**
+ * Validate a completion against a schema. Prefers the tool-call payload;
+ * falls back to extracting the outermost JSON object from the text for
+ * providers that answered in prose.
+ */
+export function validateStructured<T>(
+  schema: z.ZodType<T>,
+  result: AICompleteResult,
+): AIStructuredValidation<T> {
+  if (result.structured !== undefined) {
+    const parsed = schema.safeParse(result.structured);
+    return parsed.success
+      ? { data: parsed.data, parseError: null, viaTool: true }
+      : { data: null, parseError: describeIssues(parsed.error), viaTool: true };
+  }
+
+  const raw = result.text ?? "";
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  const slice = start === -1 || end < start ? raw : raw.slice(start, end + 1);
+  let json: unknown;
+  try {
+    json = JSON.parse(slice);
+  } catch {
+    return {
+      data: null,
+      parseError: "AI response was not valid JSON.",
+      viaTool: false,
+    };
+  }
+  const parsed = schema.safeParse(json);
+  return parsed.success
+    ? { data: parsed.data, parseError: null, viaTool: false }
+    : { data: null, parseError: describeIssues(parsed.error), viaTool: false };
+}
+
+function sanitizeToolName(name: string): string {
+  // Anthropic: ^[a-zA-Z0-9_-]{1,64}$. OpenAI is compatible with that.
+  const cleaned = name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+  return cleaned || "result";
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Tenant-gated completion
+// ─────────────────────────────────────────────────────────────────────
+
 /**
  * BL-AI-TELEMETRY — options for tenant-gated calls. `feature` is
  * required so every call site declares the product surface it serves;
@@ -464,52 +677,22 @@ export type AITenantCompleteOptions = AICompleteOptions & {
   promptVersion?: string;
 };
 
+type TenantRun<T> = {
+  result: AICompleteResult;
+  validation: AIStructuredValidation<T> | null;
+};
+
 /**
- * BL-PACKAGES Slice 1 — tenant-gated AI completion.
- *
- * Use this in EVERY server action or API route that runs AI on behalf
- * of a tenant. The plain `complete()` above remains for unkeyed contexts
- * (cron + future ingest pipelines that don't have an `organizationId`),
- * but the long-term goal is for those callers to migrate too so we have
- * full per-tenant cost visibility.
- *
- * Enforcement model:
- *   1. **Pre-check.** Read the tenant's current `aiTokensPerMonth`
- *      usage and the effective quota. If usage is already ≥ the
- *      cap, refuse the call with `QuotaExceededError` before any
- *      provider request fires (no wasted dollar).
- *   2. **Provider call.** Identical to `complete()` — same provider,
- *      same shape, same return.
- *   3. **Post-record.** On success, atomically add the actual
- *      `inputTokens + outputTokens` to the counter via the existing
- *      `enforceQuota` machinery. Concurrent calls compose correctly.
- *
- * Why post-record rather than pre-reserve: tokens aren't known until
- * the provider responds, and the worst overshoot is bounded by a
- * single call's max_tokens (default 1024, capped at 4-8k in practice).
- * For Bronze/Free tiers with small caps we lose at most one call of
- * over-budget tokens — well below the cost of a failed reserve
- * + reconcile dance.
- *
- * Why a separate function rather than parameter on `complete`: the
- * existing `complete()` has ~15 callers; threading `organizationId`
- * everywhere is a coordinated refactor (BL-PACKAGES Slice 2). Until
- * then, `completeForTenant` is the canonical path for new code AND
- * the migration target for old code.
- *
- * Failure modes:
- *   - No subscription row → throws (deny-by-default, same as the
- *     existing `ensureFeature` posture)
- *   - Quota = 0 (unlimited) → no counter increment; the
- *     `enforceQuota` helper already short-circuits in this case
- *   - Stub provider returns 0 tokens → no counter increment;
- *     fine, the stub doesn't cost anything
- *   - Provider call throws → counter is NOT incremented; aligns
- *     with "you don't pay for failed calls"
+ * Shared implementation behind `completeForTenant` and
+ * `completeStructuredForTenant`. Runs the quota pre-check, the provider
+ * call, optional schema validation, telemetry, and the usage post-record.
+ * Validation happens here rather than in the caller so the parse outcome
+ * lands on the same ai_call_log row as the call itself.
  */
-export async function completeForTenant(
+async function runTenantCompletion<T>(
   opts: AITenantCompleteOptions,
-): Promise<AICompleteResult> {
+  validate: ((result: AICompleteResult) => AIStructuredValidation<T>) | null,
+): Promise<TenantRun<T>> {
   const { organizationId, feature, variant, promptVersion, ...rest } = opts;
   // Dynamic imports keep the AI gateway free of a hard dep on the
   // subscription-gates / telemetry modules — useful for the future
@@ -571,6 +754,8 @@ export async function completeForTenant(
     throw err;
   }
 
+  const validation = validate ? validate(result) : null;
+
   await recordAiCall({
     ...telemetryBase,
     status: "ok",
@@ -581,6 +766,10 @@ export async function completeForTenant(
     outputTokens: result.outputTokens ?? 0,
     outputChars: result.text.length,
     stubbed: result.stubbed,
+    viaTool: result.structured !== undefined,
+    // Stub prose can never validate; don't count it as a parse failure.
+    parseOk: validation && !result.stubbed ? validation.parseError === null : null,
+    parseError: validation?.parseError ?? null,
   });
 
   // Post-record: atomically add this call's actual token usage. The
@@ -606,5 +795,88 @@ export async function completeForTenant(
     }
   }
 
+  return { result, validation };
+}
+
+/**
+ * BL-PACKAGES Slice 1 — tenant-gated AI completion.
+ *
+ * Use this in EVERY server action or API route that runs AI on behalf
+ * of a tenant. The plain `complete()` above remains for unkeyed contexts
+ * (cron + future ingest pipelines that don't have an `organizationId`),
+ * but the long-term goal is for those callers to migrate too so we have
+ * full per-tenant cost visibility.
+ *
+ * Enforcement model:
+ *   1. **Pre-check.** Read the tenant's current `aiTokensPerMonth`
+ *      usage and the effective quota. If usage is already ≥ the
+ *      cap, refuse the call with `QuotaExceededError` before any
+ *      provider request fires (no wasted dollar).
+ *   2. **Provider call.** Identical to `complete()` — same provider,
+ *      same shape, same return.
+ *   3. **Post-record.** On success, atomically add the actual
+ *      `inputTokens + outputTokens` to the counter via the existing
+ *      `enforceQuota` machinery. Concurrent calls compose correctly.
+ *
+ * Why post-record rather than pre-reserve: tokens aren't known until
+ * the provider responds, and the worst overshoot is bounded by a
+ * single call's max_tokens (default 1024, capped at 4-8k in practice).
+ * For Bronze/Free tiers with small caps we lose at most one call of
+ * over-budget tokens — well below the cost of a failed reserve
+ * + reconcile dance.
+ *
+ * Failure modes:
+ *   - No subscription row → throws (deny-by-default, same as the
+ *     existing `ensureFeature` posture)
+ *   - Quota = 0 (unlimited) → no counter increment; the
+ *     `enforceQuota` helper already short-circuits in this case
+ *   - Stub provider returns 0 tokens → no counter increment;
+ *     fine, the stub doesn't cost anything
+ *   - Provider call throws → counter is NOT incremented; aligns
+ *     with "you don't pay for failed calls"
+ */
+export async function completeForTenant(
+  opts: AITenantCompleteOptions,
+): Promise<AICompleteResult> {
+  const { result } = await runTenantCompletion<never>(opts, null);
   return result;
+}
+
+export type AIStructuredOptions<T> = AITenantCompleteOptions & {
+  /** Shape the model must return. Root must be a zod object. */
+  schema: z.ZodType<T>;
+  /** Tool name shown to the model; defaults to `<feature>_result`. */
+  toolName?: string;
+  /** One line telling the model what the tool records. */
+  toolDescription?: string;
+};
+
+export type AIStructuredResult<T> = AICompleteResult & AIStructuredValidation<T>;
+
+/**
+ * BL-AI-TOOLS — tenant-gated completion that returns a validated object.
+ *
+ * Same gates, telemetry and quota semantics as `completeForTenant`. The
+ * schema becomes a forced tool call on tool-capable providers; otherwise
+ * the text is JSON-extracted. `data` is null when validation fails —
+ * callers decide whether that is retryable, a refund, or a hard error.
+ * Check `stubbed` before `data`: the stub provider never validates.
+ */
+export async function completeStructuredForTenant<T>(
+  opts: AIStructuredOptions<T>,
+): Promise<AIStructuredResult<T>> {
+  const { schema, toolName, toolDescription, ...rest } = opts;
+  const tool: AIToolSpec = {
+    name: sanitizeToolName(toolName ?? `${rest.feature}_result`),
+    description:
+      toolDescription ??
+      "Record the result as structured data matching the schema exactly.",
+    inputSchema: zodToToolSchema(schema),
+  };
+  const { result, validation } = await runTenantCompletion<T>(
+    { ...rest, tool },
+    (r) => validateStructured(schema, r),
+  );
+  const v = validation ?? { data: null, parseError: "No validation ran.", viaTool: false };
+  return { ...result, ...v };
 }

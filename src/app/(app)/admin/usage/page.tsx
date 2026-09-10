@@ -378,6 +378,12 @@ export default async function AdminUsagePage() {
                       Refused
                     </th>
                     <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Parse fail
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Via tool
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
                       Stub
                     </th>
                     <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
@@ -435,6 +441,14 @@ export default async function AdminUsagePage() {
                         <td className="px-2 py-1.5 text-right text-muted">
                           {f.quotaRefused}
                         </td>
+                        <td
+                          className={`px-2 py-1.5 text-right ${f.parseFailures > 0 ? "text-amber-200" : "text-muted"}`}
+                        >
+                          {f.parseFailures}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {f.viaTool}
+                        </td>
                         <td className="px-2 py-1.5 text-right text-muted">
                           {f.stubbed}
                         </td>
@@ -466,9 +480,11 @@ export default async function AdminUsagePage() {
 
           <p className="mt-3 font-mono text-[10px] text-muted">
             Source: ai_call_log, one row per gateway call. Refused = blocked
-            at the token-cap pre-check. Latency is provider round-trip on
-            successful calls. Rows are pruned after {retentionDays} days
-            (AI_CALL_LOG_RETENTION_DAYS).
+            at the token-cap pre-check. Parse fail = the model&apos;s answer did
+            not match the feature&apos;s schema. Via tool = answered through a
+            forced tool call rather than prose. Latency is provider
+            round-trip on successful calls. Rows are pruned after{" "}
+            {retentionDays} days (AI_CALL_LOG_RETENTION_DAYS).
             {featureRefused > 0
               ? ` ${featureRefused.toLocaleString()} refusals in window — tenants are hitting caps.`
               : ""}

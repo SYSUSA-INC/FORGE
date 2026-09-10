@@ -11,11 +11,14 @@
 import {
   buildSolicitationExtractPrompt,
   buildSolicitationVisionPrompt,
-  parseAiJson,
   solicitationExtractionSchema,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
-import { completeForTenant, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
+import {
+  completeStructuredForTenant,
+  getAIProviderStatus,
+  type AIDocumentMedia,
+} from "@/lib/ai";
 import {
   detectFormat,
   extractTextFromDocx,
@@ -78,10 +81,12 @@ export async function aiExtractSolicitation(
   if (!rawText.trim()) return { ok: false, error: "No text extracted from the file." };
   try {
     const prompt = buildSolicitationExtractPrompt(rawText);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId,
       feature: "solicitation_extract",
       variant: "text",
+      schema: solicitationExtractionSchema,
+      toolName: "record_solicitation",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -116,11 +121,15 @@ export async function aiExtractSolicitation(
       };
     }
 
-    const cleaned = stripCodeFences(ai.text);
-    const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
-    if (!parseResult.ok) {
-      log.error("[aiExtractSolicitation]", "parse", { error: parseResult.error });
-      return { ok: false, error: parseResult.error };
+    if (!ai.data) {
+      log.error("[aiExtractSolicitation]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
 
     return {
@@ -128,7 +137,7 @@ export async function aiExtractSolicitation(
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(parseResult.data),
+      data: normalizeExtraction(ai.data),
     };
   } catch (err) {
     log.error("[aiExtractSolicitation]", "error", { error: err });
@@ -177,10 +186,12 @@ export async function aiExtractSolicitationFromPdf(
 
   try {
     const prompt = buildSolicitationVisionPrompt();
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId,
       feature: "solicitation_extract",
       variant: "pdf_vision",
+      schema: solicitationExtractionSchema,
+      toolName: "record_solicitation",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -194,18 +205,22 @@ export async function aiExtractSolicitationFromPdf(
       // Shouldn't happen given the provider check above, but stay safe.
       return { ok: false, error: "AI provider unexpectedly returned stub mode." };
     }
-    const cleaned = stripCodeFences(ai.text);
-    const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
-    if (!parseResult.ok) {
-      log.error("[aiExtractSolicitationFromPdf]", "parse", { error: parseResult.error });
-      return { ok: false, error: parseResult.error };
+    if (!ai.data) {
+      log.error("[aiExtractSolicitationFromPdf]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(parseResult.data),
+      data: normalizeExtraction(ai.data),
     };
   } catch (err) {
     log.error("[aiExtractSolicitationFromPdf]", "error", { error: err });
@@ -252,10 +267,12 @@ export async function aiExtractSolicitationFromImage(
 
   try {
     const prompt = buildSolicitationVisionPrompt();
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId,
       feature: "solicitation_extract",
       variant: "image_vision",
+      schema: solicitationExtractionSchema,
+      toolName: "record_solicitation",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -266,18 +283,22 @@ export async function aiExtractSolicitationFromImage(
     if (ai.stubbed) {
       return { ok: false, error: "AI provider unexpectedly returned stub mode." };
     }
-    const cleaned = stripCodeFences(ai.text);
-    const parseResult = parseAiJson(cleaned, solicitationExtractionSchema);
-    if (!parseResult.ok) {
-      log.error("[aiExtractSolicitationVision]", "parse", { error: parseResult.error });
-      return { ok: false, error: parseResult.error };
+    if (!ai.data) {
+      log.error("[aiExtractSolicitationVision]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(parseResult.data),
+      data: normalizeExtraction(ai.data),
     };
   } catch (err) {
     log.error("[aiExtractSolicitationFromImage]", "error", { error: err });
@@ -286,15 +307,6 @@ export async function aiExtractSolicitationFromImage(
       error: err instanceof Error ? err.message : "Image vision failed.",
     };
   }
-}
-
-function stripCodeFences(text: string): string {
-  const t = text.trim();
-  if (t.startsWith("```")) {
-    const without = t.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-    return without.trim();
-  }
-  return t;
 }
 
 function normalizeExtraction(
