@@ -3227,7 +3227,7 @@ sections" matches Sarah's voice; for Mike, matches Mike's. Eliminates
 the "this reads like AI" tell.
 
 ### BL-FB-GEN-CITE — Citation-required draft mode
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #258)
 
 Every concrete claim in the generated draft must link to a knowledge
 entry, past performance row, or named contract. Un-cited claims are
