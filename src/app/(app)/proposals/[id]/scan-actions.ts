@@ -10,11 +10,16 @@ import {
   solicitations,
   type SectionThemeCoverage,
   type ProposalScanContradiction,
-  type TipTapDoc,
 } from "@/db/schema";
 import { completeStructuredForTenant } from "@/lib/ai";
 import { proposalScanSchema } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  buildScanUserPrompt,
+  SCAN_MAX_TOKENS,
+  SCAN_SYSTEM,
+  SCAN_TEMPERATURE,
+} from "@/lib/proposal-scan-input";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   enforceQuota,
@@ -23,7 +28,6 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
-import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
 
 export type ProposalScanIssue = {
@@ -47,55 +51,9 @@ export type ProposalScanResult =
     }
   | { ok: false; error: string };
 
-const SCAN_SYSTEM = `You are a proposal quality analyst inside FORGE reviewing an in-progress federal proposal. Your job is an honest health check: flag what's missing, thin, or off-target so the team knows exactly what to fix before submission.
-
-Output ONLY a single JSON object:
-{
-  "overallScore": "strong" | "needs_work" | "critical",
-  "summary": "<2-3 sentences — overall health and the single most important gap to close>",
-  "sectionIssues": [
-    {
-      "sectionId": "<echo the id from input>",
-      "sectionTitle": "<echo the title>",
-      "issue": "<1-2 sentences describing the specific problem>",
-      "severity": "high" | "medium" | "low"
-    }
-  ],
-  "topRecommendations": ["<specific next action>", ...],
-  "sectionThemeCoverage": [
-    {
-      "sectionId": "<echo the id from input>",
-      "sectionTitle": "<echo the title>",
-      "reinforced": ["<theme title that this section clearly reinforces>"],
-      "missing": ["<theme title not reinforced or contradicted in this section>"]
-    }
-  ],
-  "contradictions": [
-    {
-      "section1Id": "<echo id of first section>",
-      "section1Title": "<echo title>",
-      "section2Id": "<echo id of second section>",
-      "section2Title": "<echo title>",
-      "claim1": "<specific claim from section 1 that conflicts>",
-      "claim2": "<specific claim from section 2 that contradicts claim1>",
-      "explanation": "<1-2 sentences explaining the incompatibility>",
-      "severity": "high" | "medium" | "low"
-    }
-  ]
-}
-
-Score calibration:
-- strong: most sections drafted and on-target, minor gaps only
-- needs_work: key sections empty or thin, deadline risk if not addressed soon
-- critical: majority empty or compliance is at risk, immediate action required
-
-Rules:
-- Only include sections with genuine issues in sectionIssues. Skip sections that look good.
-- topRecommendations: 3-5 specific actions for the next 48 hours.
-- Echo sectionId and sectionTitle exactly from the input.
-- Be direct. No flattery.
-- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].
-- contradictions: only include pairs where two sections make specific, mutually incompatible factual claims (e.g., one says 24/7 operations, another implies 9-5 staffing). Skip empty/thin sections. Max 5 entries. Return [] when none found.`;
+// SCAN_SYSTEM and the prompt layout live in src/lib/proposal-scan-input.ts
+// (BL-AI-SCAN-FULLTEXT) so this action and the background cron cannot
+// drift apart.
 
 export async function runProposalScanAction(
   proposalId: string,
@@ -187,61 +145,19 @@ export async function runProposalScanAction(
     // best effort
   }
 
-  const wordsPerPage = 350;
-  const sectionLines = sections.map((s) => {
-    const plain = (
-      projectToPlain(s.bodyDoc as TipTapDoc | null) ||
-      s.content ||
-      ""
-    ).slice(0, 500);
-    const expectedMin = s.pageLimit ? s.pageLimit * wordsPerPage * 0.6 : 80;
-    const flag = s.wordCount < 30 ? "EMPTY" : s.pageLimit && s.wordCount < expectedMin ? "THIN" : "OK";
-    return [
-      `id=${s.id} | "${s.title}" | kind=${s.kind} | status=${s.status} | words=${s.wordCount}${s.pageLimit ? `/${Math.round(expectedMin)}min` : ""} | ${flag}`,
-      plain ? `  excerpt: ${plain}` : "  (no content)",
-    ].join("\n");
+  // BL-AI-SCAN-FULLTEXT — full section bodies under a shared budget,
+  // same builder as the background cron.
+  const { prompt: userPrompt, input: scanInput } = buildScanUserPrompt({
+    proposalTitle: propRow.proposal.title,
+    agency: propRow.agency,
+    solicitationNumber: propRow.solicitationNumber,
+    naicsCode: propRow.naicsCode,
+    setAside: propRow.setAside,
+    winThemes: propRow.proposal.winThemes ?? [],
+    sectionMSummary,
+    requirements: solRequirements,
+    sections,
   });
-
-  const requirementsBlock =
-    solRequirements.length > 0
-      ? `\nEvaluation criteria (Section M): ${sectionMSummary.slice(0, 400)}\n` +
-        `Requirements (top ${Math.min(solRequirements.length, 20)}):\n` +
-        solRequirements
-          .slice(0, 20)
-          .map(
-            (r, i) =>
-              `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, 200)}`,
-          )
-          .join("\n")
-      : "";
-
-  // BL-FB-GEN-THEMES — feed win themes into the scan so it can flag
-  // sections that drift off-theme (e.g. a Technical Approach that
-  // never mentions the proposal's headline differentiator).
-  const winThemes = (propRow.proposal.winThemes ?? []).slice(0, 3);
-  const themesBlock =
-    winThemes.length > 0
-      ? `\nWin themes (the proposal team committed to these — flag any section that doesn't reinforce them):\n${winThemes
-          .map((t, i) => `  ${i + 1}. ${t.title}: ${t.statement}`)
-          .join("\n")}`
-      : "";
-
-  const userPrompt = [
-    `Proposal: ${propRow.proposal.title}`,
-    `Agency: ${propRow.agency || "(unknown)"}`,
-    `Solicitation: ${propRow.solicitationNumber || "(none)"}`,
-    `NAICS: ${propRow.naicsCode || "(unknown)"}`,
-    `Set-aside: ${propRow.setAside || "(unrestricted)"}`,
-    themesBlock,
-    requirementsBlock,
-    ``,
-    `Sections (${sections.length} total):`,
-    ...sectionLines,
-    ``,
-    `Return strict JSON per the schema in the system prompt. Echo each sectionId and sectionTitle exactly.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
 
   // BL-AI-TOOLS — the scan answers through a forced tool call validated
   // against proposalScanSchema, so no fence-stripping or manual field
@@ -252,14 +168,16 @@ export async function runProposalScanAction(
     const res = await completeStructuredForTenant({
       organizationId,
       feature: "proposal_scan",
+      // Telemetry variant records whether the model saw every body in full.
+      variant: scanInput.truncatedSections > 0 ? "truncated" : "full",
       schema: proposalScanSchema,
       toolName: "record_health_scan",
       toolDescription:
         "Record the proposal health check: overall score, per-section issues, recommendations, win-theme coverage and cross-section contradictions.",
       system: SCAN_SYSTEM,
       messages: [{ role: "user", content: userPrompt }],
-      maxTokens: 2000,
-      temperature: 0.2,
+      maxTokens: SCAN_MAX_TOKENS,
+      temperature: SCAN_TEMPERATURE,
       cacheSystem: true,
     });
     stubbed = res.stubbed;

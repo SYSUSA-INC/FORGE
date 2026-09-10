@@ -3529,15 +3529,47 @@ for token accounting) is a small addition once either provider is in
 production use.
 
 ### BL-AI-SCAN-FULLTEXT — Full-text health scan
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #257)
 
-The scan reads a 500-character excerpt per section. Win-theme coverage
-and contradiction detection (BL-FB-SCAN-THEMES / -CONTRADICTION) inherit
-that limit and will miss anything mid-body. Either send full section
-text under a token budget, or run two passes: excerpt pass flags
-candidate pairs, targeted pass compares those sections in full. Both
-`SCAN_SYSTEM` copies (scan-actions.ts, proposal-scan-cron.ts) stay in
-sync.
+The scan read a 500-character excerpt per section, so win-theme
+coverage and contradiction detection (BL-FB-SCAN-THEMES /
+-CONTRADICTION) could only see section openings. The two `SCAN_SYSTEM`
+copies had also already drifted. Both scan paths now send full section
+bodies under a shared budget through one builder.
+
+**Delivered:**
+- `src/lib/proposal-scan-input.ts` (pure) — single source of truth for
+  `SCAN_SYSTEM`, `SCAN_MAX_TOKENS`, `SCAN_TEMPERATURE`, the section
+  block format and `buildScanUserPrompt`. The action and the cron
+  import it; their local prompt copies and excerpt builders are gone.
+- Budget: `DEFAULT_SCAN_BUDGET` = 10k chars per section, 80k total
+  (~20k tokens of body), 1.5k floor. Every section gets its full body up
+  to the cap; when the sum exceeds the total, allowances scale
+  proportionally to length but never below the floor, so a long
+  Technical Volume cannot starve a short Pricing narrative. If floors
+  alone exceed the budget the floor halves down to 250. Cuts land on a
+  word boundary and end with
+  `[… truncated: showing X of Y characters]` so the model knows it is
+  reading a prefix. `allocateScanAllowances` is exported for tests.
+- Prompt: sections arrive as `=== SECTION id=… | title | kind | status
+  | words | FLAG ===` blocks with the body inside and a coverage note
+  stating how many were truncated. `SCAN_SYSTEM` describes the block
+  format, tells the model not to infer past a cut, asks theme coverage
+  to judge the whole body, and widens the contradiction rule to concrete
+  claims across ALL bodies (staffing and hours, dates, quantities,
+  locations, tools, roles, past-performance facts) with quoted claims.
+- Telemetry: both scan features set `variant` to `full` or `truncated`,
+  so `/admin/usage` can show how often a proposal outgrows the budget.
+- `tests/ai/scan-input.test.ts` — flags, allowance arithmetic (under
+  budget, proportional scaling with floor, floor halving, empty
+  sections), block format and truncation marker, bodyDoc precedence,
+  prompt layout, system-prompt contract.
+
+**Cost note:** a four-section proposal previously sent at most 2k
+characters of body; it can now send up to 40k. That is the point, and
+the scan already sits in the `strong` routing class. Watch
+`proposal_scan_background` tokens on `/admin/usage`; lower
+`DEFAULT_SCAN_BUDGET` or the cron batch size if it runs hot.
 
 ---
 
