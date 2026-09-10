@@ -104,16 +104,18 @@ single write path; optionally a `scripts/check-schema-drift.mjs` that
 diffs `pg_indexes` against both sources in CI.
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slices 1–4: PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ⏳ remaining: à la carte add-on system
 
-Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work; the new build:
-- Super-admin UI to create/edit packages with feature flags + quotas
-- Add-on system (AI, advanced reporting, etc.)
-- **Per-package AI token cap** (Anthropic input + output tokens) with enforcement at the AI gateway, so a runaway tenant cannot burn through profits
-- Landing page surfacing available packages
-- Tenant-facing upgrade flow
-- Promo codes already in schema; surface in checkout
-- Stripe / Paddle integration TBD (BL-17)
+Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
+
+**Delivered:**
+- Super-admin UI to create/edit packages with feature flags + quotas — `/admin/tiers` (BL-16).
+- **Per-package AI token cap** (`aiTokensPerMonth`, input + output) enforced server-side in the AI gateway (`runTenantCompletion`): pre-check refuses before the provider call when usage ≥ cap, post-record adds the actual tokens, refusals are recorded as `quota_refused` in `ai_call_log`. 100% of tenant AI paths go through it (Slice 2). Over-quota → `QuotaExceededError` → 402 on the API routes, error state in the actions, upgrade path on `/settings/billing`.
+- Per-tenant token consumption panel for super-admins (`/admin/usage`, Slice 3; per-feature breakdown added by BL-AI-TELEMETRY #257).
+- Public pricing page surfacing the packages (Slice 4) and tenant-facing upgrade flow via Stripe Checkout + customer portal (BL-17 Slices 3–4).
+- Promo codes: Stripe promotion codes accepted at checkout (`allow_promotion_codes`); the FORGE-side `promo_code` table is managed at `/admin/promo-codes`.
+
+**Remaining (not started):** the à la carte add-on system (AI top-ups, advanced reporting) — needs `tier_addon` / `tenant_addon` tables, Stripe price mapping and a tenant-facing picker. Paused with BL-17 Slice 5 pending launch readiness; token top-ups can be handled by a tier change until then.
 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 
