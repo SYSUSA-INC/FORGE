@@ -8,6 +8,7 @@ import { OpportunityForm } from "../OpportunityForm";
 import { listOpportunityOwners } from "../actions";
 import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
 import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
+import { PwinPanel } from "./PwinPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export default async function OpportunityOverviewPage({
         />
       </Panel>
       <div className="flex flex-col gap-4">
+        <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
         <OpportunityBriefPanel opportunityId={opp.id} />
         <OpportunityDocsAndAIPanel
           opportunityId={opp.id}

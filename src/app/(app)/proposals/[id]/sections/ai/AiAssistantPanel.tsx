@@ -9,16 +9,95 @@ import {
   selectABVariantAction,
   type ABDraftResult,
 } from "./ab-actions";
-import type { ChatMessage } from "./chat-actions";
+import {
+  clearSectionChatAction,
+  getSectionChatHistoryAction,
+  type ChatMessage,
+} from "./chat-actions";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
 import {
   isChatStreamEvent,
   isDraftStreamEvent,
+  type DraftSource,
 } from "@/lib/ai-stream-types";
+import { extractCitationStats } from "@/lib/citations";
 import { readSseStream } from "@/lib/sse";
 
 type Success = Extract<SectionDraftResult, { ok: true }>;
 type ActiveTab = "generate" | "chat";
+
+/**
+ * BL-FB-GEN-CITE — legend for the numbered sources the drafter could
+ * cite, with live counts parsed from the text: which sources were used
+ * and how many claims still need a citation.
+ */
+function SourceLegend({
+  sources,
+  stubbed,
+  text,
+}: {
+  sources: DraftSource[];
+  stubbed: boolean;
+  text: string;
+}) {
+  const stats = extractCitationStats(text);
+  const cited = new Set(stats.citedSources);
+  return (
+    <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+        <span>
+          Sources · {cited.size}/{sources.length} cited
+          {stubbed ? " · stub embeddings" : ""}
+        </span>
+        {stats.needsCitation > 0 ? (
+          <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 tracking-widest text-amber-200">
+            {stats.needsCitation} needs citation
+          </span>
+        ) : text.trim() ? (
+          <span className="rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 tracking-widest text-emerald-300">
+            no unsupported claims
+          </span>
+        ) : null}
+      </div>
+      <ul className="space-y-1">
+        {sources.map((s) => {
+          const used = cited.has(s.index);
+          return (
+            <li
+              key={s.index}
+              className={`flex gap-2 font-body text-[11px] leading-relaxed ${used ? "text-text" : "text-muted"}`}
+            >
+              <span
+                className={`shrink-0 rounded px-1 font-mono text-[10px] ${
+                  used
+                    ? "border border-teal/40 bg-teal/10 text-teal"
+                    : "border border-white/10 text-muted"
+                }`}
+              >
+                S{s.index}
+              </span>
+              <span className="min-w-0">
+                {s.href ? (
+                  <a href={s.href} target="_blank" rel="noreferrer" className="hover:underline">
+                    {s.label}
+                  </a>
+                ) : (
+                  <span>{s.label}</span>
+                )}
+                {s.outcomeLabel && s.outcomeLabel !== "none" ? (
+                  <span className="ml-1 font-mono text-[9px] uppercase tracking-wider text-muted">
+                    {s.outcomeLabel}
+                  </span>
+                ) : null}
+                <span className="block truncate text-muted">{s.excerpt}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 /**
  * BL-AI-STREAMING — read a failed (non-SSE) response into a message the
@@ -79,6 +158,10 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
   const [mode, setMode] = useState<SectionDraftMode>(
     hasContent ? "improve" : "draft",
   );
+  // BL-FB-GEN-CITE — citation mode + the legend streamed before the body.
+  const [cite, setCite] = useState(false);
+  const [sources, setSources] = useState<DraftSource[]>([]);
+  const [sourcesStubbed, setSourcesStubbed] = useState(false);
   // One in-flight stream per panel; a new request or Discard aborts it.
   const draftAbortRef = useRef<AbortController | null>(null);
   const chatAbortRef = useRef<AbortController | null>(null);
@@ -102,6 +185,40 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
   const [chatError, setChatError] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
+  // BL-FB-CHAT-PERSIST — load the section's thread the first time the
+  // chat tab is shown, so reopening a section resumes the conversation.
+  const [chatLoaded, setChatLoaded] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  useEffect(() => {
+    if (!open || activeTab !== "chat" || chatLoaded || chatLoading) return;
+    let cancelled = false;
+    setChatLoading(true);
+    getSectionChatHistoryAction(sectionId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          setChatHistory(
+            res.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              authorName: m.authorName,
+              isMine: m.isMine,
+            })),
+          );
+        }
+        setChatLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setChatLoaded(true);
+      })
+      .finally(() => {
+        if (!cancelled) setChatLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, activeTab, chatLoaded, chatLoading, sectionId]);
+
   function cancelDraft() {
     draftAbortRef.current?.abort();
     draftAbortRef.current = null;
@@ -118,6 +235,8 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
     setResult(null);
     setMode(forMode);
     setStreamText("");
+    setSources([]);
+    setSourcesStubbed(false);
     setPending(true);
 
     let acc = "";
@@ -126,7 +245,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
       const res = await fetch("/api/ai/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sectionId, mode: forMode }),
+        body: JSON.stringify({ sectionId, mode: forMode, cite }),
         signal: ac.signal,
       });
       const isSse = (res.headers.get("content-type") ?? "").includes(
@@ -140,7 +259,10 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
         res,
         (ev) => {
           if (!isDraftStreamEvent(ev)) return;
-          if (ev.type === "delta") {
+          if (ev.type === "sources") {
+            setSources(ev.sources);
+            setSourcesStubbed(ev.stubbed);
+          } else if (ev.type === "delta") {
             acc += ev.text;
             setStreamText(acc);
           } else if (ev.type === "done") {
@@ -221,7 +343,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
     // deltas arrive. Both are rolled back on failure.
     setChatHistory([
       ...priorHistory,
-      { role: "user", content: msg },
+      { role: "user", content: msg, isMine: true },
       { role: "assistant", content: "" },
     ]);
     setChatPending(true);
@@ -252,7 +374,8 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sectionId, message: msg, history: priorHistory }),
+        // History is read server-side from the persisted thread.
+        body: JSON.stringify({ sectionId, message: msg }),
         signal: ac.signal,
       });
       const isSse = (res.headers.get("content-type") ?? "").includes(
@@ -446,6 +569,26 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                 );
               })}
             </div>
+            {/* Cite sources — BL-FB-GEN-CITE */}
+            <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+              <input
+                type="checkbox"
+                checked={cite}
+                onChange={(e) => setCite(e.target.checked)}
+                disabled={pending}
+                className="mt-0.5 accent-teal"
+              />
+              <span className="flex flex-col gap-0.5">
+                <span className="font-display text-[13px] font-semibold text-text">
+                  Cite sources
+                </span>
+                <span className="font-body text-[11px] leading-relaxed text-muted">
+                  Ground the draft in your Brain. Supported claims get [S#]
+                  markers you can verify; anything unsupported is flagged
+                  [NEEDS CITATION] instead of invented.
+                </span>
+              </span>
+            </label>
             {/* A/B Compare button — BL-11 */}
             <button
               type="button"
@@ -488,6 +631,13 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                     <span className="ml-0.5 inline-block h-[1em] w-[2px] animate-pulse bg-teal align-text-bottom" />
                   </div>
                 ) : null}
+                {cite && sources.length > 0 ? (
+                  <SourceLegend
+                    sources={sources}
+                    stubbed={sourcesStubbed}
+                    text={streamText}
+                  />
+                ) : null}
               </div>
             ) : abPending ? (
               <div className="mt-2 font-mono text-[10px] text-muted">
@@ -509,6 +659,13 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
             <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-white/10 bg-canvas px-3 py-2 font-body text-[13px] leading-relaxed text-text">
               {result.text}
             </div>
+            {result.sources && result.sources.length > 0 ? (
+              <SourceLegend
+                sources={result.sources}
+                stubbed={Boolean(result.sourcesStubbed)}
+                text={result.text}
+              />
+            ) : null}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-subtle">
               <div className="flex flex-wrap gap-x-3 gap-y-1">
                 {result.stubbed ? <StubModeBanner variant="inline" /> : null}
@@ -559,8 +716,12 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
           <p className="font-body text-[11px] text-muted">
             Ask questions, request specific language, or get feedback on this
             section. The AI has full context about the opportunity and
-            solicitation requirements.
+            solicitation requirements. The thread is saved with the section
+            and shared with your team.
           </p>
+          {chatLoading ? (
+            <div className="font-mono text-[10px] text-muted">Loading thread…</div>
+          ) : null}
 
           {/* Message history */}
           {chatHistory.length > 0 ? (
@@ -571,7 +732,11 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                   className={`flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
                 >
                   <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
-                    {msg.role === "user" ? "You" : "AI"}
+                    {msg.role === "assistant"
+                      ? "AI"
+                      : msg.isMine === false && msg.authorName
+                        ? msg.authorName
+                        : "You"}
                   </span>
                   <div
                     className={`max-w-[90%] rounded-md px-3 py-2 font-body text-[12px] leading-relaxed ${
@@ -637,8 +802,13 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
             <button
               type="button"
               onClick={() => {
+                chatAbortRef.current?.abort();
                 setChatHistory([]);
                 setChatError(null);
+                // BL-FB-CHAT-PERSIST — clear the saved thread too.
+                void clearSectionChatAction(sectionId).then((res) => {
+                  if (!res.ok) setChatError(res.error);
+                });
               }}
               className="self-start font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
             >

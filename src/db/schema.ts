@@ -699,6 +699,103 @@ export const aiCallLogs = pgTable(
 export type AiCallLog = typeof aiCallLogs.$inferSelect;
 export type NewAiCallLog = typeof aiCallLogs.$inferInsert;
 
+// BL-FB-CHAT-PERSIST — one row per turn of the AI-assist chat on a
+// proposal section. The server reads the last N turns as model context
+// and appends the new pair after a successful reply. `user_id` is the
+// author of a user turn (and the requester for the assistant turn);
+// null once the user is deleted.
+export type SectionChatRole = "user" | "assistant";
+
+export const sectionChatMessages = pgTable(
+  "section_chat_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    role: text("role").$type<SectionChatRole>().notNull(),
+    content: text("content").notNull(),
+    stubbed: boolean("stubbed").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    sectionCreatedIdx: index("scm_section_created_idx").on(
+      t.sectionId,
+      t.createdAt,
+    ),
+    orgCreatedIdx: index("scm_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type SectionChatMessage = typeof sectionChatMessages.$inferSelect;
+export type NewSectionChatMessage = typeof sectionChatMessages.$inferInsert;
+
+// BL-FB-X-PWIN-MODEL — frozen PWin estimates. `trigger` is "apply"
+// (a user applied the model value to the opportunity record) or
+// "outcome" (a proposal was decided; `outcome` is set). The outcome rows
+// are what the Brier score is computed from.
+export type PwinSnapshotTriggerKind = "apply" | "outcome";
+
+export const pwinSnapshots = pgTable(
+  "pwin_snapshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id").references(() => proposals.id, {
+      onDelete: "set null",
+    }),
+    probability: real("probability").notNull(),
+    pwin: integer("pwin").notNull(),
+    manualPwin: integer("manual_pwin"),
+    confidence: text("confidence").notNull().default("low"),
+    factors: jsonb("factors")
+      .$type<{ key: string; label: string; logOdds: number; detail: string }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    prior: jsonb("prior").$type<Record<string, unknown>>().notNull().default({}),
+    calibration: jsonb("calibration")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    modelVersion: text("model_version").notNull(),
+    trigger: text("trigger").$type<PwinSnapshotTriggerKind>().notNull(),
+    outcome: text("outcome"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    oppCreatedIdx: index("pwin_snapshot_opp_created_idx").on(
+      t.opportunityId,
+      t.createdAt,
+    ),
+    orgCreatedIdx: index("pwin_snapshot_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type PwinSnapshot = typeof pwinSnapshots.$inferSelect;
+export type NewPwinSnapshot = typeof pwinSnapshots.$inferInsert;
+
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
   proposalId: uuid("proposal_id")

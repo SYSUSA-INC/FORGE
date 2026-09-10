@@ -1,50 +1,12 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  knowledgeEntries,
-  opportunities,
-  proposalSections,
-  proposals,
-} from "@/db/schema";
+import { opportunities, proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
-import { log } from "@/lib/log";
+import { searchBrain, type BrainHit } from "@/lib/brain-retrieval";
 
-export type BrainHit = {
-  source: "corpus" | "entry";
-  /** Stable id — chunkId for corpus, entry id for entries. */
-  id: string;
-  artifactId?: string;
-  artifactTitle?: string;
-  artifactKind?: string;
-  entryKind?: "capability" | "past_performance" | "personnel" | "boilerplate";
-  /** Phase 14a — provenance signal so the writer can prefer winning content. */
-  outcomeLabel?: "none" | "won" | "lost" | "no_bid" | "withdrawn";
-  title: string;
-  content: string;
-  similarity: number;
-};
-
-/**
- * Phase 14a — outcome-aware retrieval bonus.
- *
- * Bumps content from won proposals to the top, slightly demotes
- * content from lost proposals so a known-loser sentence doesn't
- * shoulder out an equally-similar neutral one. no_bid / withdrawn /
- * none stay neutral — they don't carry signal about what wins.
- */
-function outcomeBoost(label: string | null | undefined): number {
-  switch (label) {
-    case "won":
-      return 0.1;
-    case "lost":
-      return -0.05;
-    default:
-      return 0;
-  }
-}
+export type { BrainHit } from "@/lib/brain-retrieval";
 
 export type BrainSuggestResult =
   | { ok: true; hits: BrainHit[]; provider: string; stubbed: boolean }
@@ -58,12 +20,10 @@ export type BrainSuggestResult =
  * The query is composed from:
  *   1. The user's optional free-text query (highest weight)
  *   2. The section title + kind
- *   3. The opportunity's agency / NAICS / set-aside / keywords
+ *   3. The opportunity's agency / NAICS / set-aside / description
  *
- * We search BOTH the chunked corpus (knowledge_artifact_chunk) and
- * the curated knowledge entries (knowledge_entry) and merge results.
- * Curated entries get a small similarity bonus because they've been
- * reviewer-approved.
+ * Retrieval itself lives in src/lib/brain-retrieval.ts (shared with
+ * the citation-required drafter, BL-FB-GEN-CITE).
  */
 export async function brainSuggestForSectionAction(
   sectionId: string,
@@ -76,8 +36,6 @@ export async function brainSuggestForSectionAction(
     .select({
       sectionTitle: proposalSections.title,
       sectionKind: proposalSections.kind,
-      proposalId: proposalSections.proposalId,
-      proposalTitle: proposals.title,
       agency: opportunities.agency,
       naicsCode: opportunities.naicsCode,
       setAside: opportunities.setAside,
@@ -95,9 +53,6 @@ export async function brainSuggestForSectionAction(
     .limit(1);
   if (!row) return { ok: false, error: "Section not found." };
 
-  // Compose the query. Free text is the strongest signal; the rest
-  // adds context so the embedding lands in roughly the right
-  // neighborhood when the user just hits Suggest with no input.
   const composed = [
     freeText.trim(),
     `Section: ${row.sectionTitle} (${row.sectionKind.replace(/_/g, " ")})`,
@@ -113,225 +68,5 @@ export async function brainSuggestForSectionAction(
     return { ok: false, error: "Not enough context to suggest." };
   }
 
-  let queryVec: number[];
-  let provider = "stub";
-  let stubbed = true;
-  try {
-    const r = await embedBatch([composed]);
-    queryVec = r.vectors[0]!;
-    provider = r.provider;
-    stubbed = r.stubbed;
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Embedding failed.",
-    };
-  }
-  const literal = vectorToPgLiteral(queryVec);
-
-  // Pull top corpus chunks (up to 8) and top approved entries (up to
-  // 6) in parallel. We over-fetch slightly so the merge has room to
-  // dedupe and rank.
-  let corpusRows: Array<{
-    chunk_id: string;
-    artifact_id: string;
-    artifact_title: string;
-    artifact_kind: string;
-    artifact_outcome: string;
-    content: string;
-    similarity: number;
-  }> = [];
-  let entryRows: Array<{
-    id: string;
-    kind: "capability" | "past_performance" | "personnel" | "boilerplate";
-    title: string;
-    body: string;
-    outcome_label: string;
-    similarity: number;
-  }> = [];
-
-  try {
-    const r1 = await db.execute(sql`
-      SELECT
-        c.id              AS chunk_id,
-        c.content         AS content,
-        a.id              AS artifact_id,
-        a.title           AS artifact_title,
-        a.kind            AS artifact_kind,
-        a.outcome_label   AS artifact_outcome,
-        1 - (c.embedding <=> ${literal}::vector) AS similarity
-      FROM knowledge_artifact_chunk c
-      INNER JOIN knowledge_artifact a ON a.id = c.artifact_id
-      WHERE c.organization_id = ${organizationId}
-        AND a.archived_at IS NULL
-        AND c.embedding IS NOT NULL
-      ORDER BY c.embedding <=> ${literal}::vector
-      LIMIT 8
-    `);
-    corpusRows = ((r1 as unknown as { rows?: typeof corpusRows }).rows ??
-      (r1 as unknown as typeof corpusRows)) as typeof corpusRows;
-  } catch (err) {
-    log.warn("[brainSuggest]", "corpus query failed", { error: err });
-  }
-
-  // Phase 10f: knowledge_entry rows now carry embeddings, so we can
-  // run real cosine similarity instead of token overlap. We
-  // gracefully fall back to overlap if no entries are embedded yet
-  // (e.g. backfill hasn't run on a fresh deploy).
-  try {
-    const r2 = await db.execute(sql`
-      SELECT
-        id,
-        kind,
-        title,
-        body,
-        outcome_label,
-        1 - (embedding <=> ${literal}::vector) AS similarity
-      FROM knowledge_entry
-      WHERE organization_id = ${organizationId}
-        AND archived_at IS NULL
-        AND embedding IS NOT NULL
-      ORDER BY embedding <=> ${literal}::vector
-      LIMIT 6
-    `);
-    entryRows = ((r2 as unknown as { rows?: typeof entryRows }).rows ??
-      (r2 as unknown as typeof entryRows)) as typeof entryRows;
-    entryRows = entryRows.map((e) => ({
-      ...e,
-      similarity:
-        typeof e.similarity === "string" ? Number(e.similarity) : e.similarity,
-    }));
-  } catch (err) {
-    log.warn("[brainSuggest]", "entry vector query failed, falling back to token overlap", { error: err });
-  }
-
-  if (entryRows.length === 0) {
-    // Fallback: token-overlap on un-embedded entries.
-    try {
-      const all = await db
-        .select({
-          id: knowledgeEntries.id,
-          kind: knowledgeEntries.kind,
-          title: knowledgeEntries.title,
-          body: knowledgeEntries.body,
-          outcomeLabel: knowledgeEntries.outcomeLabel,
-        })
-        .from(knowledgeEntries)
-        .where(eq(knowledgeEntries.organizationId, organizationId))
-        .limit(200);
-
-      const queryLower = composed.toLowerCase();
-      const tokens = Array.from(
-        new Set(
-          queryLower
-            .match(/[a-z0-9]{3,}/g)
-            ?.filter((t) => !STOPWORDS.has(t)) ?? [],
-        ),
-      );
-      if (tokens.length > 0) {
-        entryRows = all
-          .map((e) => ({
-            id: e.id,
-            kind: e.kind,
-            title: e.title,
-            body: e.body,
-            outcome_label: e.outcomeLabel,
-            similarity: scoreOverlap(
-              (e.title + " " + e.body).toLowerCase(),
-              tokens,
-            ),
-          }))
-          .filter((e) => e.similarity > 0)
-          .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 6);
-      }
-    } catch (err) {
-      log.warn("[brainSuggest]", "entry overlap query failed", { error: err });
-    }
-  }
-
-  // Merge + rank. Curated entries get a +0.05 bonus to break ties in
-  // their favor when a corpus chunk and an entry score equally. On
-  // top of that, Phase 14a applies an outcome boost so won content
-  // surfaces ahead of equally-similar neutral content.
-  const hits: BrainHit[] = [
-    ...corpusRows.map<BrainHit>((r) => ({
-      source: "corpus",
-      id: r.chunk_id,
-      artifactId: r.artifact_id,
-      artifactTitle: r.artifact_title,
-      artifactKind: r.artifact_kind,
-      outcomeLabel: (r.artifact_outcome ?? "none") as BrainHit["outcomeLabel"],
-      title: r.artifact_title || "(untitled artifact)",
-      content: r.content,
-      similarity:
-        (typeof r.similarity === "string"
-          ? Number(r.similarity)
-          : r.similarity) + outcomeBoost(r.artifact_outcome),
-    })),
-    ...entryRows.map<BrainHit>((r) => ({
-      source: "entry",
-      id: r.id,
-      entryKind: r.kind,
-      outcomeLabel: (r.outcome_label ?? "none") as BrainHit["outcomeLabel"],
-      title: r.title,
-      content: r.body,
-      similarity: r.similarity + 0.05 + outcomeBoost(r.outcome_label),
-    })),
-  ]
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 8);
-
-  return { ok: true, hits, provider, stubbed };
+  return searchBrain({ organizationId, query: composed });
 }
-
-function scoreOverlap(haystack: string, tokens: string[]): number {
-  let matched = 0;
-  for (const t of tokens) {
-    if (haystack.includes(t)) matched += 1;
-  }
-  if (tokens.length === 0) return 0;
-  // Normalize to [0, 1] roughly — gives entries similar shape to
-  // cosine similarity. Not strictly comparable but close enough for
-  // ranking.
-  return matched / tokens.length;
-}
-
-const STOPWORDS = new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "this",
-  "that",
-  "are",
-  "was",
-  "were",
-  "from",
-  "into",
-  "they",
-  "their",
-  "have",
-  "has",
-  "had",
-  "but",
-  "not",
-  "you",
-  "your",
-  "our",
-  "any",
-  "all",
-  "each",
-  "such",
-  "shall",
-  "will",
-  "may",
-  "include",
-  "including",
-  "section",
-  "agency",
-  "naics",
-  "proposal",
-  "naics",
-  "rfp",
-]);

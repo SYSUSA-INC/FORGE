@@ -28,6 +28,12 @@ import {
   type SectionDraftMode,
   type SectionDraftSnapshot,
 } from "@/lib/ai-prompts";
+import { searchBrain } from "@/lib/brain-retrieval";
+import {
+  MAX_DRAFT_SOURCES,
+  SOURCE_EXCERPT_CHARS,
+  type DraftSource,
+} from "@/lib/citations";
 import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
 import { log } from "@/lib/log";
 
@@ -58,6 +64,10 @@ export type PreparedSectionDraft =
       sectionKind: ProposalSectionKind;
       maxTokens: number;
       temperature: number;
+      /** BL-FB-GEN-CITE — sources offered to the model; empty unless `cite`. */
+      sources: DraftSource[];
+      /** True when the embedding provider was the stub (sources are not meaningful). */
+      sourcesStubbed: boolean;
     }
   | { ok: false; error: string };
 
@@ -65,6 +75,8 @@ export async function prepareSectionDraft(input: {
   organizationId: string;
   sectionId: string;
   mode: SectionDraftMode;
+  /** BL-FB-GEN-CITE — retrieve Brain sources and require inline citations. */
+  cite?: boolean;
 }): Promise<PreparedSectionDraft> {
   const { organizationId } = input;
 
@@ -204,6 +216,34 @@ export async function prepareSectionDraft(input: {
     };
   }
 
+  // BL-FB-GEN-CITE — gather citable sources: Brain retrieval for this
+  // section plus the org's own past-performance rows. Best-effort: a
+  // retrieval failure degrades to past-performance-only sources rather
+  // than blocking the draft.
+  let sources: DraftSource[] = [];
+  let sourcesStubbed = false;
+  if (input.cite) {
+    const gathered = await gatherDraftSources({
+      organizationId,
+      sectionTitle: row.section.title,
+      sectionKind: row.section.kind,
+      agency: row.agency ?? "",
+      naicsCode: row.naicsCode ?? "",
+      opportunityDescription: row.opportunityDescription ?? "",
+      currentBodyPlain: snapshot.section.currentBodyPlain,
+      pastPerformance,
+    });
+    sources = gathered.sources;
+    sourcesStubbed = gathered.stubbed;
+    snapshot.sources = sources.map((s) => ({
+      index: s.index,
+      kind: s.kind,
+      label: s.label,
+      excerpt: s.excerpt,
+      outcomeLabel: s.outcomeLabel,
+    }));
+  }
+
   return {
     ok: true,
     prompt: buildSectionDraftPrompt(input.mode, snapshot),
@@ -211,7 +251,93 @@ export async function prepareSectionDraft(input: {
     sectionKind: row.section.kind,
     maxTokens: draftMaxTokens(input.mode),
     temperature: draftTemperature(input.mode),
+    sources,
+    sourcesStubbed,
   };
+}
+
+/**
+ * BL-FB-GEN-CITE — build the numbered source list for citation mode.
+ * Brain hits come first (ranked by similarity with the outcome boost),
+ * then the org's past-performance rows, capped at MAX_DRAFT_SOURCES.
+ */
+export async function gatherDraftSources(input: {
+  organizationId: string;
+  sectionTitle: string;
+  sectionKind: string;
+  agency: string;
+  naicsCode: string;
+  opportunityDescription: string;
+  currentBodyPlain: string;
+  pastPerformance: { customer: string; contract: string; description: string }[];
+}): Promise<{ sources: DraftSource[]; stubbed: boolean }> {
+  const query = [
+    `Section: ${input.sectionTitle} (${input.sectionKind.replace(/_/g, " ")})`,
+    input.agency ? `Agency: ${input.agency}` : "",
+    input.naicsCode ? `NAICS ${input.naicsCode}` : "",
+    input.opportunityDescription
+      ? `Opportunity: ${input.opportunityDescription.slice(0, 600)}`
+      : "",
+    input.currentBodyPlain ? `Current draft: ${input.currentBodyPlain.slice(0, 600)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const sources: DraftSource[] = [];
+  let stubbed = false;
+
+  try {
+    const res = await searchBrain({
+      organizationId: input.organizationId,
+      query,
+      take: MAX_DRAFT_SOURCES,
+    });
+    if (res.ok) {
+      stubbed = res.stubbed;
+      for (const hit of res.hits) {
+        if (sources.length >= MAX_DRAFT_SOURCES) break;
+        const excerpt = hit.content.replace(/\s+/g, " ").trim().slice(0, SOURCE_EXCERPT_CHARS);
+        if (!excerpt) continue;
+        sources.push({
+          index: sources.length + 1,
+          kind: hit.source,
+          label:
+            hit.source === "corpus"
+              ? `${hit.artifactKind ?? "artifact"} · ${hit.title}`
+              : `${(hit.entryKind ?? "entry").replace(/_/g, " ")} · ${hit.title}`,
+          excerpt,
+          outcomeLabel: hit.outcomeLabel,
+          href:
+            hit.source === "corpus" && hit.artifactId
+              ? `/knowledge-base/import/${hit.artifactId}`
+              : hit.source === "entry"
+                ? `/knowledge-base/${hit.id}`
+                : undefined,
+        });
+      }
+    } else {
+      log.warn("[gatherDraftSources]", "brain search declined", { error: res.error });
+    }
+  } catch (err) {
+    log.warn("[gatherDraftSources]", "brain search failed", { error: err });
+  }
+
+  for (const pp of input.pastPerformance) {
+    if (sources.length >= MAX_DRAFT_SOURCES) break;
+    const excerpt = [pp.customer, pp.contract, pp.description]
+      .filter(Boolean)
+      .join(" — ")
+      .slice(0, SOURCE_EXCERPT_CHARS);
+    if (!excerpt) continue;
+    sources.push({
+      index: sources.length + 1,
+      kind: "past_performance",
+      label: `past performance · ${pp.customer || pp.contract || "org record"}`,
+      excerpt,
+    });
+  }
+
+  return { sources, stubbed };
 }
 
 /**

@@ -1,13 +1,20 @@
 "use server";
 
 import { completeForTenant } from "@/lib/ai";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
+  appendSectionChatTurns,
   CHAT_MAX_TOKENS,
   CHAT_RATE_LIMIT,
   CHAT_TEMPERATURE,
+  clearSectionChat,
+  findSectionForOrg,
+  loadSectionChatHistory,
+  loadSectionChatModelHistory,
   prepareSectionChat,
+  type SectionChatTurn,
 } from "@/lib/section-chat";
 import {
   enforceQuota,
@@ -18,7 +25,13 @@ import {
 } from "@/lib/subscription-gates";
 import { log } from "@/lib/log";
 
-export type ChatMessage = { role: "user" | "assistant"; content: string };
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  /** BL-FB-CHAT-PERSIST — author of a user turn when it is not the viewer. */
+  authorName?: string;
+  isMine?: boolean;
+};
 
 export type ChatWithSectionResult =
   | { ok: true; reply: string; stubbed: boolean }
@@ -27,14 +40,17 @@ export type ChatWithSectionResult =
 /**
  * Non-streaming section chat. The interactive panel streams through
  * /api/ai/chat; both paths share `prepareSectionChat` so the prompt and
- * context cannot drift (BL-AI-STREAMING).
+ * context cannot drift (BL-AI-STREAMING), and both persist the exchange
+ * to the section's thread (BL-FB-CHAT-PERSIST). Model history comes from
+ * the persisted thread; a caller-supplied `history` is accepted for
+ * compatibility but not used.
  */
 export async function chatWithSectionAction(input: {
   sectionId: string;
   message: string;
-  history: ChatMessage[];
+  history?: ChatMessage[];
 }): Promise<ChatWithSectionResult> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   try {
@@ -59,10 +75,14 @@ export async function chatWithSectionAction(input: {
     };
   }
 
+  const history = await loadSectionChatModelHistory({
+    organizationId,
+    sectionId: input.sectionId,
+  });
   const prepared = await prepareSectionChat({
     organizationId,
     sectionId: input.sectionId,
-    history: input.history,
+    history,
     message: input.message,
   });
   if (!prepared.ok) {
@@ -80,8 +100,25 @@ export async function chatWithSectionAction(input: {
       temperature: CHAT_TEMPERATURE,
       cacheSystem: false,
     });
+    const reply = res.text.trim();
 
-    return { ok: true, reply: res.text.trim(), stubbed: res.stubbed };
+    if (reply) {
+      try {
+        await appendSectionChatTurns({
+          organizationId,
+          proposalId: prepared.proposalId,
+          sectionId: input.sectionId,
+          userId: user.id,
+          userMessage: input.message,
+          assistantReply: reply,
+          stubbed: res.stubbed,
+        });
+      } catch (err) {
+        log.warn("[chatWithSectionAction]", "thread persist failed", { error: err });
+      }
+    }
+
+    return { ok: true, reply, stubbed: res.stubbed };
   } catch (err) {
     await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[chatWithSectionAction]", "AI call failed", { error: err });
@@ -90,4 +127,50 @@ export async function chatWithSectionAction(input: {
       error: err instanceof Error ? err.message : "Chat request failed.",
     };
   }
+}
+
+export type SectionChatHistoryResult =
+  | { ok: true; messages: SectionChatTurn[] }
+  | { ok: false; error: string };
+
+/** BL-FB-CHAT-PERSIST — the section's thread for display, oldest first. */
+export async function getSectionChatHistoryAction(
+  sectionId: string,
+): Promise<SectionChatHistoryResult> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const messages = await loadSectionChatHistory({
+    organizationId,
+    sectionId,
+    viewerUserId: user.id,
+  });
+  return { ok: true, messages };
+}
+
+export type ClearSectionChatResult =
+  | { ok: true; deleted: number }
+  | { ok: false; error: string };
+
+/** BL-FB-CHAT-PERSIST — delete the section's thread. Audited. */
+export async function clearSectionChatAction(
+  sectionId: string,
+): Promise<ClearSectionChatResult> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  const owned = await findSectionForOrg({ organizationId, sectionId });
+  if (!owned) return { ok: false, error: "Section not found." };
+
+  const deleted = await clearSectionChat({ organizationId, sectionId });
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "section_chat.clear",
+    resourceType: "proposal_section",
+    resourceId: sectionId,
+    metadata: { proposalId: owned.proposalId, deleted },
+  });
+
+  return { ok: true, deleted };
 }

@@ -9,14 +9,17 @@
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   opportunities,
   organizations,
   proposalSections,
   proposals,
+  sectionChatMessages,
   solicitations,
+  users,
+  type SectionChatRole,
 } from "@/db/schema";
 import type { AIMessage } from "@/lib/ai";
 import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
@@ -41,7 +44,7 @@ export const CHAT_TEMPERATURE = 0.4;
 export const CHAT_HISTORY_TURNS = 6;
 
 export type PreparedSectionChat =
-  | { ok: true; system: string; messages: AIMessage[] }
+  | { ok: true; system: string; messages: AIMessage[]; proposalId: string }
   | { ok: false; error: string };
 
 export async function prepareSectionChat(input: {
@@ -157,5 +160,164 @@ export async function prepareSectionChat(input: {
     ok: true,
     system: `${CHAT_SYSTEM}\n\n--- CONTEXT ---\n${contextBlock}`,
     messages,
+    proposalId: row.proposal.id,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-FB-CHAT-PERSIST — persisted thread per section
+// ─────────────────────────────────────────────────────────────────────
+
+/** Most recent turns shown when a thread is reopened. */
+export const CHAT_LOAD_LIMIT = 40;
+
+export type SectionChatTurn = {
+  id: string;
+  role: SectionChatRole;
+  content: string;
+  createdAt: string;
+  /** Display name of the user who wrote a user turn (or asked, for assistant turns). */
+  authorName: string;
+  /** True when the viewer wrote this turn. */
+  isMine: boolean;
+  stubbed: boolean;
+};
+
+/**
+ * Confirm a section belongs to the org and return its proposal id.
+ * Callers use this before mutating a thread so a foreign section id can
+ * never be written to.
+ */
+export async function findSectionForOrg(input: {
+  organizationId: string;
+  sectionId: string;
+}): Promise<{ proposalId: string } | null> {
+  const [row] = await db
+    .select({ proposalId: proposalSections.proposalId })
+    .from(proposalSections)
+    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+    .where(
+      and(
+        eq(proposalSections.id, input.sectionId),
+        eq(proposals.organizationId, input.organizationId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** The last `limit` turns of a section's thread, oldest first, for display. */
+export async function loadSectionChatHistory(input: {
+  organizationId: string;
+  sectionId: string;
+  viewerUserId: string;
+  limit?: number;
+}): Promise<SectionChatTurn[]> {
+  const rows = await db
+    .select({
+      id: sectionChatMessages.id,
+      role: sectionChatMessages.role,
+      content: sectionChatMessages.content,
+      createdAt: sectionChatMessages.createdAt,
+      userId: sectionChatMessages.userId,
+      stubbed: sectionChatMessages.stubbed,
+      authorName: users.name,
+    })
+    .from(sectionChatMessages)
+    .leftJoin(users, eq(users.id, sectionChatMessages.userId))
+    .where(
+      and(
+        eq(sectionChatMessages.organizationId, input.organizationId),
+        eq(sectionChatMessages.sectionId, input.sectionId),
+      ),
+    )
+    .orderBy(desc(sectionChatMessages.createdAt))
+    .limit(input.limit ?? CHAT_LOAD_LIMIT);
+
+  return rows.reverse().map((r) => ({
+    id: r.id,
+    role: r.role,
+    content: r.content,
+    createdAt: r.createdAt.toISOString(),
+    authorName: r.authorName ?? "",
+    isMine: r.userId === input.viewerUserId,
+    stubbed: r.stubbed,
+  }));
+}
+
+/**
+ * The last `turns` messages as model context, oldest first. The server
+ * owns this so a client cannot feed the model a history it never had.
+ */
+export async function loadSectionChatModelHistory(input: {
+  organizationId: string;
+  sectionId: string;
+  turns?: number;
+}): Promise<ChatHistoryMessage[]> {
+  const rows = await db
+    .select({
+      role: sectionChatMessages.role,
+      content: sectionChatMessages.content,
+    })
+    .from(sectionChatMessages)
+    .where(
+      and(
+        eq(sectionChatMessages.organizationId, input.organizationId),
+        eq(sectionChatMessages.sectionId, input.sectionId),
+      ),
+    )
+    .orderBy(desc(sectionChatMessages.createdAt))
+    .limit(input.turns ?? CHAT_HISTORY_TURNS);
+
+  return rows.reverse().map((r) => ({ role: r.role, content: r.content }));
+}
+
+/**
+ * Persist one exchange. Two sequential inserts (Neon-pgbouncer rule, no
+ * transaction); a failure between them leaves a lone user turn, which
+ * the next reply simply follows.
+ */
+export async function appendSectionChatTurns(input: {
+  organizationId: string;
+  proposalId: string;
+  sectionId: string;
+  userId: string | null;
+  userMessage: string;
+  assistantReply: string;
+  stubbed: boolean;
+}): Promise<void> {
+  await db.insert(sectionChatMessages).values({
+    organizationId: input.organizationId,
+    proposalId: input.proposalId,
+    sectionId: input.sectionId,
+    userId: input.userId,
+    role: "user",
+    content: input.userMessage,
+  });
+  await db.insert(sectionChatMessages).values({
+    organizationId: input.organizationId,
+    proposalId: input.proposalId,
+    sectionId: input.sectionId,
+    userId: input.userId,
+    role: "assistant",
+    content: input.assistantReply,
+    stubbed: input.stubbed,
+  });
+}
+
+/** Delete a section's thread; returns rows removed. */
+export async function clearSectionChat(input: {
+  organizationId: string;
+  sectionId: string;
+}): Promise<number> {
+  const deleted = await db
+    .delete(sectionChatMessages)
+    .where(
+      and(
+        eq(sectionChatMessages.organizationId, input.organizationId),
+        eq(sectionChatMessages.sectionId, input.sectionId),
+      ),
+    )
+    .returning({ id: sectionChatMessages.id });
+  return deleted.length;
 }

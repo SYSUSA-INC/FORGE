@@ -3022,7 +3022,7 @@ each requirement came from. Schema: new `solicitation_document` table
 with FK to `solicitation` (parent) — extractions roll up to the parent.
 
 ### BL-FB-SOL-AMEND-DIFF — Amendment diff viewer
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #248) — canonical entry under Active priorities
 
 When Amendment 0002 drops, render a side-by-side diff vs Amendment 0001
 showing what changed in due dates, page limits, and requirements.
@@ -3062,7 +3062,7 @@ Cross-joins solicitations + opportunities + outcomes + USAspending.
 ### Area 2 — Compliance matrix ("Section L/M crosswalk that auto-builds")
 
 ### BL-FB-CM-AUTOMAP — Auto-mapping of requirements to sections
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #245) — canonical entry under Active priorities
 
 When a proposal template is applied to an opportunity, AI assigns each
 Section L/M requirement to the most appropriate proposal section
@@ -3072,7 +3072,7 @@ mapping with confidence scores per assignment and a single-click
 "accept all high-confidence" action.
 
 ### BL-FB-CM-EVIDENCE — Evidence linking per requirement
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #246) — canonical entry under Active priorities
 
 Per-row evidence dock: drag-drop a past-performance citation,
 knowledge entry, or specific paragraph from a proposal section onto
@@ -3081,21 +3081,21 @@ crosswalk in the back of the proposal volume with auto-built page
 references. Replaces hand-built compliance crosswalks.
 
 ### BL-FB-CM-GATE — Pre-submission compliance gate
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #247) — canonical entry under Active priorities
 
 Block proposal export/submit when any requirement is `not_addressed`.
 Configurable per-tier (Enterprise can hard-block, Bronze can soft-warn).
 Compliance crosswalk PDF auto-attaches to the export bundle.
 
 ### BL-FB-CM-OWNERS — Per-row owner assignment
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252) — canonical entry under Active priorities
 
 Assign a team member to each requirement with status (assigned /
 in-progress / complete / blocked) and reminder cadence. Owner dashboard
 shows "my rows across all proposals" with overdue flags.
 
 ### BL-FB-CM-HEATMAP — Compliance heat-map view
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252) — canonical entry under Active priorities
 
 Alternate matrix view: colored grid (rows = requirements, columns =
 sections, cells = status). One screen for the capture manager to see
@@ -3106,7 +3106,7 @@ coverage holes. Drill-down opens the row in the full matrix.
 ### Area 3 — Winner analysis & debrief ("Loss intelligence engine")
 
 ### BL-FB-WIN-DEBRIEF-REQ — Auto-generate debrief request letter
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252) — canonical entry under Active priorities
 
 One-click generation of the formal debrief request with the right FAR
 citation (FAR 15.506 / 8.405-2 / 16.505) based on procurement type,
@@ -3148,7 +3148,7 @@ strip. Includes the original outcome, debrief, and winner analysis.
 The on-demand scan shipped in PR #243 is v1. The v2 is **continuous**.
 
 ### BL-FB-SCAN-CONTINUOUS — Background health scan on every save
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #258)
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #256) — canonical entry under Active priorities
 
 Move the health scan from on-demand to background-on-save. Section
 list shows live red/amber/green dots driven by the latest scan.
@@ -3194,7 +3194,7 @@ to typing; just constant visibility. Companion to the existing
 ### Area 5 — Content generation ("Voice-aware drafting")
 
 ### BL-FB-GEN-THEMES — Win themes as first-class draft inputs
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #249) — canonical entry under Active priorities
 
 Promote win themes from a prompt afterthought to a structured input.
 Per-proposal theme editor with 1-3 themes; the section draft prompt
@@ -3227,12 +3227,56 @@ sections" matches Sarah's voice; for Mike, matches Mike's. Eliminates
 the "this reads like AI" tell.
 
 ### BL-FB-GEN-CITE — Citation-required draft mode
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #258)
 
 Every concrete claim in the generated draft must link to a knowledge
 entry, past performance row, or named contract. Un-cited claims are
 flagged with `[NEEDS CITATION]` brackets the human must resolve.
 Prevents AI-fabricated past performance.
+
+**Delivered:**
+- `src/lib/brain-retrieval.ts` (server-only) — `searchBrain` extracted
+  from Brain Suggest: corpus chunks + curated entries by cosine
+  similarity with the Phase 14a outcome boost and the token-overlap
+  fallback. `brainSuggestForSectionAction` now calls it; behaviour
+  unchanged.
+- `src/lib/citations.ts` (pure) — the marker contract: `[Sn]` for a
+  supported claim, `[NEEDS CITATION]` for an unsupported one;
+  `extractCitationStats` (distinct sources cited, marker count,
+  needs-citation count); `DraftSource`; caps (10 sources, 600-char
+  excerpts).
+- `prepareSectionDraft({ cite: true })` — `gatherDraftSources` composes
+  a query from section title/kind, agency, NAICS, opportunity and the
+  current body, ranks Brain hits, then appends the org's
+  past-performance rows; attaches numbered sources to the snapshot and
+  returns them for the UI. Retrieval failure degrades to
+  past-performance-only sources.
+- `buildSectionDraftPrompt` — "CITATION MODE IS ON" block: what counts
+  as a concrete claim, marker placement, never invent a source or a
+  marker number, no bibliography; sources listed with label, outcome
+  and excerpt; output instruction keeps markers inline. Sources are
+  omitted from the JSON snapshot so they print once.
+- `/api/ai/draft` and `generateSectionDraftAction` accept `cite`;
+  telemetry variant becomes `<mode>+cite`. The route streams a
+  `sources` event before the first delta so markers resolve live; the
+  `done` payload carries `sources`, `citations` stats and
+  `sourcesStubbed`.
+- `AiAssistantPanel` — "Cite sources" toggle in the Generate tab; a
+  `SourceLegend` under the live preview and the finished draft shows
+  each source (linked to its Brain record, outcome label, excerpt),
+  highlights the ones cited, and shows an amber "N needs citation"
+  badge or an emerald "no unsupported claims" badge.
+- `tests/ai/citations.test.ts` — marker parsing and the prompt block.
+
+**Design notes:** markers stay in the inserted text on purpose, like
+the existing `[BRACKETS]` placeholders, so a reviewer sees provenance
+in the document and the author removes them while editing. Citation
+mode streams; it does not use the structured-output path, because the
+markers are parseable from plain text and streaming matters more for a
+2,000-token draft than a typed envelope. Sources come from what is
+already in the Brain — the auto-harvest of won proposals
+(BL-FB-X-BRAIN-MINE, PR #250) is what makes the legend fill up over
+time.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
@@ -3278,13 +3322,43 @@ Particularly valuable for capture managers driving between customer
 meetings.
 
 ### BL-FB-CHAT-PERSIST — Persisted history per section
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #258)
 
 Save chat history to a per-section thread; reopen the section and pick
 up where you left off. Schema: `section_chat_message` table.
 Foundation for BL-FB-CHAT-MULTI (multi-user). Pairs with the existing
 proposal comment threads but lives separately so AI-assist
 conversations don't clutter human comment streams.
+
+**Delivered:**
+- Migration `0075_section_chat_message.sql` — `section_chat_message`
+  (org, proposal, section, user, role, content, stubbed, created_at)
+  with (section, created_at) and (org, created_at) indexes; cascades
+  with the section.
+- `src/lib/section-chat.ts` — `findSectionForOrg`,
+  `loadSectionChatHistory` (last 40 turns, oldest first, author name
+  and `isMine`), `loadSectionChatModelHistory` (last 6 turns as model
+  context), `appendSectionChatTurns` (sequential user + assistant
+  inserts), `clearSectionChat`. `prepareSectionChat` returns
+  `proposalId` for persistence.
+- The server owns model history: `/api/ai/chat` and
+  `chatWithSectionAction` read the last turns from the thread instead
+  of trusting a client-supplied list, and append the exchange after a
+  non-empty reply (before `done`, so a reload is consistent). The
+  route's body no longer accepts `history`; the action keeps it as an
+  ignored optional field for compatibility.
+- `getSectionChatHistoryAction` and `clearSectionChatAction` (audited
+  as `section_chat.clear` after confirming section ownership).
+- `AiAssistantPanel` loads the thread the first time the chat tab is
+  shown ("Loading thread…"), labels turns from teammates by name,
+  and Clear chat clears the saved thread too.
+- `tests/ai/section-chat-persist.test.ts` — ownership check, append +
+  display history with attribution, model-history trimming and order,
+  tenant and section isolation, clear scope and count.
+
+**Not audited per turn.** Individual messages are conversational
+telemetry, same posture as `section_draft_signal`; clearing a thread
+is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
@@ -3299,7 +3373,7 @@ threads tied to the work.
 ### Cross-cutting intelligence multipliers
 
 ### BL-FB-X-BRAIN-MINE — Auto-mine past wins into the Brain
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #250) — canonical entry under Active priorities
 
 Every won proposal you've uploaded gets mined back into the KB as
 structured knowledge entries (capability statements, past performance
@@ -3309,13 +3383,58 @@ direct path to "less generic content" (the issue #6 we already
 addressed) becoming "deeply specific, on-brand content."
 
 ### BL-FB-X-PWIN-MODEL — Calibrated PWin model
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #258)
 
 Train a model on your historical outcomes (NAICS × agency × set-aside
 × incumbent × company size × proposal stage × time-in-stage) to
 produce a calibrated PWin number, not the current guess. Replaces
 the manual slider on the opportunity record. Brier-score tracked over
 time so the model is honestly graded.
+
+**Delivered (v1):**
+- `src/lib/pwin-model.ts` (pure) — additive log-odds scorer. Prior =
+  org win rate blended toward a 30% default (weight n/(n+5)), clamped
+  5–95%. Factors, each bounded and returned with a label and detail:
+  five evaluation dimensions centred at 50/100 (customer relationship
+  and competitive posture weighted highest), incumbency (we are the
+  incumbent +1.0 / competitor is incumbent −0.8 / incumbent named
+  −0.4), crowded field (−0.15 per competitor past two, cap −0.6),
+  set-aside eligibility from the org's socio-economic profile (+0.3 /
+  −2.0), NAICS in org list (±0.2), agency and NAICS track record vs the
+  prior (needs ≥3 decided, caps ±0.8 / ±0.6), proposal readiness (scan
+  strong +0.3 / critical −0.4, compliance coverage once ≥5 items).
+  Confidence low / medium / high. `fitCalibrationShift` fits one
+  per-org log-odds shift by grid search once ≥10 decided outcomes
+  exist; `brierScore` grades.
+- `src/lib/pwin.ts` (server-only) — `computePwin` gathers features
+  (evaluation, competitors, org profile, latest proposal's scan +
+  compliance, the org's decided outcomes excluding this opportunity),
+  fits calibration on static features only (no history or readiness,
+  so the fit cannot see the outcome it is fitted to), scores, and
+  reads the grade. `recordPwinOutcome` freezes an `outcome` snapshot;
+  `snapshotPwin` freezes an `apply` snapshot; `getPwinTrack` returns
+  the Brier score over outcome snapshots.
+- Migration `0076_pwin_snapshot.sql` — `pwin_snapshot` (org,
+  opportunity, proposal, probability, pwin, manual_pwin, confidence,
+  factors, prior, calibration, model_version, trigger, outcome).
+- `applyPwinEstimateAction` writes the model value to `opportunity.pWin`
+  (the field the pipeline, Command Center and briefs read), snapshots,
+  audits `opportunity.pwin.apply`. The manual slider stays editable.
+- `saveOutcomeAction` calls `recordPwinOutcome` for won/lost
+  (best-effort), so every decision grades the model from now on.
+- `PwinPanel` on the opportunity page: headline %, confidence, record
+  value and delta, base rate and its source, calibration status, Brier
+  grade, and a bar per factor (sign-coloured, relative weight) with its
+  detail. "Set PWin to N%" button.
+- `tests/ai/pwin-model.test.ts` (pure) and `tests/ai/pwin.test.ts`
+  (runtime: default prior, evaluation effect, tenant isolation, outcome
+  snapshot → Brier, apply snapshots excluded from the grade).
+
+**What v1 is not:** a trained model. The weights are heuristic and
+documented; the calibration shift corrects the org-level bias with one
+parameter on purpose, because tens of outcomes cannot support more. The
+`outcome` snapshots this ships are the training set a fitted model
+needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { completeForTenant } from "@/lib/ai";
 import type { DraftStreamEvent } from "@/lib/ai-stream-types";
 import { requireApiTenant } from "@/lib/api-tenant";
+import { extractCitationStats } from "@/lib/citations";
 import { log } from "@/lib/log";
 import {
   captureDraftSignal,
@@ -37,6 +38,8 @@ export const maxDuration = 120;
 const bodySchema = z.object({
   sectionId: z.string().uuid(),
   mode: z.enum(DRAFT_MODES as [string, ...string[]]),
+  /** BL-FB-GEN-CITE — require inline citations against Brain sources. */
+  cite: z.boolean().optional().default(false),
 });
 
 export async function POST(req: NextRequest) {
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
     organizationId,
     sectionId: body.sectionId,
     mode,
+    cite: body.cite,
   });
   if (!prepared.ok) {
     await refundQuota(organizationId, "aiRequestsPerMonth");
@@ -91,10 +95,20 @@ export async function POST(req: NextRequest) {
       };
 
       try {
+        // BL-FB-GEN-CITE — the legend is known before generation starts;
+        // ship it first so markers resolve as they stream in.
+        if (body.cite) {
+          send({
+            type: "sources",
+            sources: prepared.sources,
+            stubbed: prepared.sourcesStubbed,
+          });
+        }
+
         const ai = await completeForTenant({
           organizationId,
           feature: "section_draft",
-          variant: mode,
+          variant: body.cite ? `${mode}+cite` : mode,
           system: prepared.prompt.system,
           messages: prepared.prompt.messages,
           maxTokens: prepared.maxTokens,
@@ -134,6 +148,13 @@ export async function POST(req: NextRequest) {
             outputTokens: ai.outputTokens,
             generatedAt: new Date().toISOString(),
             signalId,
+            ...(body.cite
+              ? {
+                  sources: prepared.sources,
+                  citations: extractCitationStats(text),
+                  sourcesStubbed: prepared.sourcesStubbed,
+                }
+              : {}),
           },
         });
       } catch (err) {

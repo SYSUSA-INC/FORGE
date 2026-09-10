@@ -6,9 +6,11 @@ import { requireApiTenant } from "@/lib/api-tenant";
 import { log } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
+  appendSectionChatTurns,
   CHAT_MAX_TOKENS,
   CHAT_RATE_LIMIT,
   CHAT_TEMPERATURE,
+  loadSectionChatModelHistory,
   prepareSectionChat,
 } from "@/lib/section-chat";
 import { encodeSseEvent, sseHeaders } from "@/lib/sse";
@@ -29,25 +31,21 @@ export const maxDuration = 60;
  *
  * Same gates, rate limit and prompt as `chatWithSectionAction`; streams
  * the reply as SSE `delta` events and finishes with `done` (or `error`).
+ *
+ * BL-FB-CHAT-PERSIST — model history is read from the section's
+ * persisted thread (the server decides what the model sees), and the
+ * exchange is appended to the thread before `done` is sent so a
+ * subsequent history load is consistent with what the user just saw.
  */
 const bodySchema = z.object({
   sectionId: z.string().uuid(),
   message: z.string().trim().min(1).max(4000),
-  history: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().max(8000),
-      }),
-    )
-    .max(12)
-    .default([]),
 });
 
 export async function POST(req: NextRequest) {
   const tenant = await requireApiTenant();
   if (!tenant.ok) return tenant.response;
-  const { organizationId } = tenant.ctx;
+  const { user, organizationId } = tenant.ctx;
 
   let body: z.infer<typeof bodySchema>;
   try {
@@ -84,10 +82,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const history = await loadSectionChatModelHistory({
+    organizationId,
+    sectionId: body.sectionId,
+  });
   const prepared = await prepareSectionChat({
     organizationId,
     sectionId: body.sectionId,
-    history: body.history,
+    history,
     message: body.message,
   });
   if (!prepared.ok) {
@@ -118,7 +120,25 @@ export async function POST(req: NextRequest) {
           cacheSystem: false,
           onDelta: (text) => send({ type: "delta", text }),
         });
-        send({ type: "done", reply: ai.text.trim(), stubbed: ai.stubbed });
+        const reply = ai.text.trim();
+
+        if (reply) {
+          try {
+            await appendSectionChatTurns({
+              organizationId,
+              proposalId: prepared.proposalId,
+              sectionId: body.sectionId,
+              userId: user.id,
+              userMessage: body.message,
+              assistantReply: reply,
+              stubbed: ai.stubbed,
+            });
+          } catch (err) {
+            log.warn("[api/ai/chat]", "thread persist failed", { error: err });
+          }
+        }
+
+        send({ type: "done", reply, stubbed: ai.stubbed });
       } catch (err) {
         await refundQuota(organizationId, "aiRequestsPerMonth").catch(() => {});
         log.error("[api/ai/chat]", "stream failed", { error: err });
