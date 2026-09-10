@@ -73,6 +73,14 @@ export default async function IntelligencePage() {
       </section>
 
       <section className="mb-8">
+        <div className="mb-3 flex items-center justify-end">
+          <Link
+            href="/intelligence/losses"
+            className="aur-btn aur-btn-ghost text-[11px]"
+          >
+            Cross-loss patterns →
+          </Link>
+        </div>
         <OutcomeInsightsPanel organizationId={organizationId} />
       </section>
 

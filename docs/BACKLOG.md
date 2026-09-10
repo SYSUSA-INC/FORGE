@@ -3124,7 +3124,7 @@ surfaces the protest **only** when grounds exist. Output: a risk-tier
 summary (none / weak / colorable / strong) and the controlling cases.
 
 ### BL-FB-WIN-CROSS-LOSS — Cross-loss pattern detection
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #259)
 
 Aggregate-level loss intelligence: "you've lost 3 of the last 5 to
 Booz on defense IT — the pattern is price (18% high on average)" or
@@ -3132,6 +3132,42 @@ Booz on defense IT — the pattern is price (18% high on average)" or
 patterns across all your debriefs + outcomes; surfaces in the loss
 intelligence dashboard. Operationalizes what no single capture manager
 can see across pursuits.
+
+**Delivered:**
+- `src/lib/loss-patterns.ts` (pure) — `detectLossPatterns` over decided
+  pursuits. Deterministic, threshold-based, every pattern carries its
+  evidence: **competitor** (named winner on ≥2 losses; "Lost N of M
+  against X" where M counts tracked appearances; high at ≥3 or ≥60%),
+  **segment × reason** (agency / NAICS / set-aside with ≥3 losses where
+  one reason covers ≥50%; "Every … loss cites …" when unanimous; high at
+  ≥75%), **price** (≥2 price-cited losses with award values; median of
+  estimate-vs-award, flagged above 5%, high above 15%, worded as
+  estimates not bid prices), **eligibility** (≥2 losses on set-asides
+  the org profile does not qualify for), **trend** (win rate down ≥15
+  points between the last two 12-month windows with ≥3 decided each),
+  **debrief gap** (<50% of ≥3 losses have debrief notes). Competitor
+  record (faced / lost to / won against / leading reason / last loss),
+  reason totals, `parseMoney`, name normalisation. Thresholds exported
+  so the UI explains them.
+- `src/lib/loss-intelligence.ts` (server-only) — loads outcomes joined
+  to proposal, opportunity, debrief and tracked competitors (500 most
+  recent), derives estimate midpoints and set-aside eligibility via the
+  PWin model's mapping, and runs the detector.
+- `src/lib/ai-prompts-loss.ts` — structured narrative prompt + zod
+  schema (headline, 2–4 insights each with an action and cited pattern
+  ids, caveats). The model is told to use only the supplied patterns.
+- `generateLossNarrativeAction` — gated, rate-limited (10/hour/org),
+  needs ≥3 decided outcomes, `completeStructuredForTenant` with the new
+  `loss_intelligence` feature (standard model class); pattern ids the
+  detector did not produce are stripped from the result.
+- `/intelligence/losses` — header stats (decided, win rate, losses,
+  debrief coverage, patterns), detected patterns with severity, kind,
+  detail and evidence links to each proposal's Outcome tab, competitor
+  record table, loss-reason bars, and the "What to change" narrative
+  panel whose insights anchor to the pattern cards. Linked from the
+  FORGE Brain page and the Platform Intelligence nav.
+- `tests/ai/loss-patterns.test.ts` — money parsing, name normalisation,
+  clean record, each pattern's trigger and threshold, severity ordering.
 
 ### BL-FB-WIN-RECOMPETE — Re-compete radar
 **Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
