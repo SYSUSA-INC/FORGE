@@ -3383,13 +3383,58 @@ direct path to "less generic content" (the issue #6 we already
 addressed) becoming "deeply specific, on-brand content."
 
 ### BL-FB-X-PWIN-MODEL — Calibrated PWin model
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #TBD)
 
 Train a model on your historical outcomes (NAICS × agency × set-aside
 × incumbent × company size × proposal stage × time-in-stage) to
 produce a calibrated PWin number, not the current guess. Replaces
 the manual slider on the opportunity record. Brier-score tracked over
 time so the model is honestly graded.
+
+**Delivered (v1):**
+- `src/lib/pwin-model.ts` (pure) — additive log-odds scorer. Prior =
+  org win rate blended toward a 30% default (weight n/(n+5)), clamped
+  5–95%. Factors, each bounded and returned with a label and detail:
+  five evaluation dimensions centred at 50/100 (customer relationship
+  and competitive posture weighted highest), incumbency (we are the
+  incumbent +1.0 / competitor is incumbent −0.8 / incumbent named
+  −0.4), crowded field (−0.15 per competitor past two, cap −0.6),
+  set-aside eligibility from the org's socio-economic profile (+0.3 /
+  −2.0), NAICS in org list (±0.2), agency and NAICS track record vs the
+  prior (needs ≥3 decided, caps ±0.8 / ±0.6), proposal readiness (scan
+  strong +0.3 / critical −0.4, compliance coverage once ≥5 items).
+  Confidence low / medium / high. `fitCalibrationShift` fits one
+  per-org log-odds shift by grid search once ≥10 decided outcomes
+  exist; `brierScore` grades.
+- `src/lib/pwin.ts` (server-only) — `computePwin` gathers features
+  (evaluation, competitors, org profile, latest proposal's scan +
+  compliance, the org's decided outcomes excluding this opportunity),
+  fits calibration on static features only (no history or readiness,
+  so the fit cannot see the outcome it is fitted to), scores, and
+  reads the grade. `recordPwinOutcome` freezes an `outcome` snapshot;
+  `snapshotPwin` freezes an `apply` snapshot; `getPwinTrack` returns
+  the Brier score over outcome snapshots.
+- Migration `0076_pwin_snapshot.sql` — `pwin_snapshot` (org,
+  opportunity, proposal, probability, pwin, manual_pwin, confidence,
+  factors, prior, calibration, model_version, trigger, outcome).
+- `applyPwinEstimateAction` writes the model value to `opportunity.pWin`
+  (the field the pipeline, Command Center and briefs read), snapshots,
+  audits `opportunity.pwin.apply`. The manual slider stays editable.
+- `saveOutcomeAction` calls `recordPwinOutcome` for won/lost
+  (best-effort), so every decision grades the model from now on.
+- `PwinPanel` on the opportunity page: headline %, confidence, record
+  value and delta, base rate and its source, calibration status, Brier
+  grade, and a bar per factor (sign-coloured, relative weight) with its
+  detail. "Set PWin to N%" button.
+- `tests/ai/pwin-model.test.ts` (pure) and `tests/ai/pwin.test.ts`
+  (runtime: default prior, evaluation effect, tenant isolation, outcome
+  snapshot → Brier, apply snapshots excluded from the grade).
+
+**What v1 is not:** a trained model. The weights are heuristic and
+documented; the calibration shift corrects the org-level bias with one
+parameter on purpose, because tens of outcomes cannot support more. The
+`outcome` snapshots this ships are the training set a fitted model
+needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued

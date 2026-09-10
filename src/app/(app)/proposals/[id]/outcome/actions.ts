@@ -165,6 +165,18 @@ export async function saveOutcomeAction(
     } catch (err) {
       log.warn("[saveOutcomeAction]", "propagateOutcomeToCorpus failed", { error: err });
     }
+
+    // BL-FB-X-PWIN-MODEL — freeze the model's estimate against the
+    // decided outcome so the model is graded (Brier) over time. The
+    // estimate excludes this outcome from its own history. Best-effort.
+    if (outcomeType === "won" || outcomeType === "lost") {
+      try {
+        const { recordPwinOutcome } = await import("@/lib/pwin");
+        await recordPwinOutcome({ organizationId, proposalId, outcome: outcomeType });
+      } catch (err) {
+        log.warn("[saveOutcomeAction]", "pwin outcome snapshot failed", { error: err });
+      }
+    }
     await recordAudit({
       organizationId,
       actor: { userId: user.id, email: user.email },

@@ -742,6 +742,60 @@ export const sectionChatMessages = pgTable(
 export type SectionChatMessage = typeof sectionChatMessages.$inferSelect;
 export type NewSectionChatMessage = typeof sectionChatMessages.$inferInsert;
 
+// BL-FB-X-PWIN-MODEL — frozen PWin estimates. `trigger` is "apply"
+// (a user applied the model value to the opportunity record) or
+// "outcome" (a proposal was decided; `outcome` is set). The outcome rows
+// are what the Brier score is computed from.
+export type PwinSnapshotTriggerKind = "apply" | "outcome";
+
+export const pwinSnapshots = pgTable(
+  "pwin_snapshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id").references(() => proposals.id, {
+      onDelete: "set null",
+    }),
+    probability: real("probability").notNull(),
+    pwin: integer("pwin").notNull(),
+    manualPwin: integer("manual_pwin"),
+    confidence: text("confidence").notNull().default("low"),
+    factors: jsonb("factors")
+      .$type<{ key: string; label: string; logOdds: number; detail: string }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    prior: jsonb("prior").$type<Record<string, unknown>>().notNull().default({}),
+    calibration: jsonb("calibration")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    modelVersion: text("model_version").notNull(),
+    trigger: text("trigger").$type<PwinSnapshotTriggerKind>().notNull(),
+    outcome: text("outcome"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    oppCreatedIdx: index("pwin_snapshot_opp_created_idx").on(
+      t.opportunityId,
+      t.createdAt,
+    ),
+    orgCreatedIdx: index("pwin_snapshot_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type PwinSnapshot = typeof pwinSnapshots.$inferSelect;
+export type NewPwinSnapshot = typeof pwinSnapshots.$inferInsert;
+
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
   proposalId: uuid("proposal_id")
