@@ -3050,12 +3050,31 @@ strip with email/in-app reminders at T-7 / T-3 / T-1 days. Integrates
 with the notification rules engine (BL-13).
 
 ### BL-FB-SOL-CUSTOMER-PATTERN — Past-customer intelligence
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
 
 When a new solicitation arrives, surface "you've seen this agency
 N times before — here's what they buy, who wins, average award size,
 evaluator priorities, and your historical PWin against this customer".
 Cross-joins solicitations + opportunities + outcomes + USAspending.
+
+**Delivered:**
+- `src/lib/customer-patterns.ts` (pure): fuzzy agency matching on
+  normalised names, `summarizeCustomerHistory` (record, win rate, open
+  pursuits, NAICS / set-aside mix, average estimate vs award, who beat
+  us, last three Section M summaries as evaluator priorities, recent
+  pursuits) and `summarizeMarket` (USAspending awards rolled up by
+  recipient).
+- `src/lib/customer-intelligence.ts` (server-only): loads the org's
+  opportunities, newest decided outcome per opportunity and past
+  solicitations for the agency; USAspending market view gated by
+  `AWARDS_INTEL_ENABLED=1` and time-boxed to 4s; model PWin for the
+  linked opportunity via the calibrated scorer. Scoped by
+  `organizationId`.
+- `CustomerHistoryPanel` on the solicitation page, above amendments:
+  stat tiles, what they buy / evaluator priorities / your record,
+  market view, model PWin with a "why →" link to the opportunity.
+  Renders a first-time state when the agency is new.
+- `tests/ai/customer-patterns.test.ts`.
 
 ---
 
