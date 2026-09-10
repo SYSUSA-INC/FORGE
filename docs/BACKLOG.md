@@ -62,7 +62,18 @@ Effort key:
 Before the first paying customer onboards, production must be isolated from staging/dev so a developer error cannot touch real customer data. Operator runbook in `docs/ENVIRONMENTS.md`; production-deploy gate in `docs/PRODUCTION_DEPLOY_GATE.md`. Code-side guards (env validation, non-prod banners, blocked-in-staging operations) land in a follow-on PR.
 
 ### BL-TENANT-AUDIT — Multi-tenant data firewall audit
-**Priority:** P0  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  🚧 2026-09 quarterly re-run + CI gates (PR #TBD)
+
+**2026-09 re-run (PR #TBD):** the codebase grew from 14 to 20 API routes
+and 32 to 43 tenant-scoped tables since June, and Phases A–C moved most
+DB reads into `src/lib` server-only modules that the static checker
+never inspected. This pass (a) widens `scripts/check-isolation.mjs` to
+API route handlers, server-only libs and pgvector statements, (b) adds
+`scripts/check-tenant-firewall.mjs` asserting NOT NULL + CASCADE FK +
+leading org index + schema parity for every tenant-scoped table
+(follow-ups #1 and #3 from the June report), and (c) re-audits all four
+surfaces into `docs/audits/07-multi-tenant-firewall-2026-09.md` with
+fixes in the same PR.
 
 Comprehensive audit of every server action, API route, server-component DB query, and admin path for `organizationId` scoping. We have `npm run check:isolation` covering server actions today, but the audit covers cases the static checker can't see:
 - API route handlers (not server actions)
@@ -549,7 +560,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b shipped; 2c operator-pending; Slice 5c in-flight
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c shipped (5c: PR #238); 2c operator-pending; Slices 6–7 queued
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company

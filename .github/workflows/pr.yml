@@ -84,22 +84,30 @@ jobs:
   isolation:
     name: Multi-tenant isolation check
     runs-on: ubuntu-latest
-    # BL-19: static analyzer that asserts every server action touching
-    # a tenant-scoped table (table with an `organization_id` column)
-    # also includes an auth gate (requireAuth / requireCurrentOrg /
-    # requireOrgAdmin / requireSuperadmin) AND references
-    # `organizationId` in the query. Legitimate exceptions (token-
-    # scoped public surfaces, etc.) live in .isolation-allow.json with
-    # a documented reason.
+    # BL-19: static analyzer that asserts every server action, API route
+    # handler and server-only lib function touching a tenant-scoped
+    # table (table with an `organization_id` column) also includes an
+    # auth gate (actions/routes) AND references `organizationId` in the
+    # query, and that every pgvector `<=>` statement filters
+    # organization_id. Legitimate exceptions (token-scoped public
+    # surfaces, superadmin ops, cron sweeps) live in
+    # .isolation-allow.json with a documented reason.
     #
-    # Static so it can run without a DB. Pairs with future runtime
-    # tests that exercise actual cross-tenant query attempts.
+    # BL-TENANT-AUDIT follow-up: check-tenant-firewall.mjs re-derives
+    # the DB-level guarantees from the migrations — every tenant-scoped
+    # table has NOT NULL organization_id, a CASCADE FK to organization,
+    # a leading org index, and a matching pgTable. Exceptions live in
+    # .tenant-firewall-allow.json.
+    #
+    # Static so it can run without a DB. Pairs with the runtime
+    # isolation tests below that exercise actual cross-tenant queries.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - run: node scripts/check-isolation.mjs
+      - run: node scripts/check-tenant-firewall.mjs
 
   migrations-fresh:
     name: Fresh-DB migration verification

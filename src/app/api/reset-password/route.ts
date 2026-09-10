@@ -42,12 +42,13 @@ export async function POST(req: Request) {
 
   const passwordHash = await hashPassword(password);
 
-  const result = await db
+  const updated = await db
     .update(users)
     .set({ passwordHash, updatedAt: new Date() })
-    .where(eq(users.email, email));
+    .where(eq(users.email, email))
+    .returning({ id: users.id });
 
-  if (!result) {
+  if (updated.length === 0) {
     return NextResponse.json(
       { ok: false, error: "Account not found." },
       { status: 404 },

@@ -4,5 +4,8 @@
   "src/app/(app)/admin/errors/actions.ts:acknowledgeErrorAction": "Platform-wide superadmin operation on production_error (ops data, not tenant data). Gated by requireSuperadmin(); the row's id is the lookup key. Cross-tenant view is the intended behavior of the /admin/errors triage surface.",
   "src/app/(app)/admin/errors/actions.ts:resolveErrorAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction.",
   "src/app/(app)/admin/errors/actions.ts:unresolveErrorAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction.",
-  "src/app/(app)/admin/errors/actions.ts:updateErrorNotesAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction."
+  "src/app/(app)/admin/errors/actions.ts:updateErrorNotesAction": "Platform-wide superadmin operation on production_error. Same rationale as acknowledgeErrorAction.",
+  "src/app/api/webhooks/stripe/route.ts:POST": "Stripe webhook. No session exists; the request is authenticated by verifying the Stripe signature with STRIPE_WEBHOOK_SECRET, and the tenant is resolved from the event's stripe_customer_id binding, never from the payload's own claims.",
+  "src/lib/ai-telemetry.ts:pruneAiCallLogs": "Retention sweep across all tenants, called only from the CRON_SECRET-gated prune cron. Deletes rows older than the retention window; reads nothing back.",
+  "src/app/(app)/opportunities/import/source-requests/actions.ts:updateSourceRequestAction": "Superadmin platform triage of tenants' data-source requests (requireSuperadmin). The request row is the unit of work and is looked up by id across all tenants by design; there is no tenant context to scope by."
 }

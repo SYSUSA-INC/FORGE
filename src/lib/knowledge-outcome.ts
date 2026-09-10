@@ -7,6 +7,11 @@
  * promoted from candidates of that artifact.
  *
  * Idempotent and Neon-safe (sequential queries, no transactions).
+ *
+ * Every query is scoped by the caller's organizationId as well as the
+ * proposal id (BL-TENANT-AUDIT 2026-09): the proposal id is a UUID the
+ * gated caller has already verified, but the corpus tables carry their
+ * own organization_id and the filter costs nothing.
  */
 import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -30,11 +35,13 @@ export type PropagationResult = {
   entriesTagged: number;
 };
 
-export async function propagateOutcomeToCorpus(
-  proposalId: string,
-  outcomeType: ProposalOutcomeType,
-): Promise<PropagationResult> {
-  const label = toLabel(outcomeType);
+export async function propagateOutcomeToCorpus(input: {
+  organizationId: string;
+  proposalId: string;
+  outcomeType: ProposalOutcomeType;
+}): Promise<PropagationResult> {
+  const { organizationId, proposalId } = input;
+  const label = toLabel(input.outcomeType);
 
   // 1. Find all harvested artifacts for this proposal. We stored
   //    metadata.proposalId on harvest; query by jsonb path.
@@ -43,6 +50,7 @@ export async function propagateOutcomeToCorpus(
     .from(knowledgeArtifacts)
     .where(
       and(
+        eq(knowledgeArtifacts.organizationId, organizationId),
         eq(knowledgeArtifacts.source, "mined_from_proposal"),
         sql`${knowledgeArtifacts.metadata} ->> 'proposalId' = ${proposalId}`,
       ),
@@ -58,7 +66,12 @@ export async function propagateOutcomeToCorpus(
   await db
     .update(knowledgeArtifacts)
     .set({ outcomeLabel: label, updatedAt: new Date() })
-    .where(inArray(knowledgeArtifacts.id, artifactIds));
+    .where(
+      and(
+        eq(knowledgeArtifacts.organizationId, organizationId),
+        inArray(knowledgeArtifacts.id, artifactIds),
+      ),
+    );
 
   // 3. Find every entry promoted from a candidate of any of these
   //    artifacts.
@@ -67,6 +80,7 @@ export async function propagateOutcomeToCorpus(
     .from(knowledgeExtractionCandidates)
     .where(
       and(
+        eq(knowledgeExtractionCandidates.organizationId, organizationId),
         inArray(knowledgeExtractionCandidates.artifactId, artifactIds),
         sql`${knowledgeExtractionCandidates.promotedEntryId} IS NOT NULL`,
       ),
@@ -84,7 +98,12 @@ export async function propagateOutcomeToCorpus(
   await db
     .update(knowledgeEntries)
     .set({ outcomeLabel: label, updatedAt: new Date() })
-    .where(inArray(knowledgeEntries.id, entryIds));
+    .where(
+      and(
+        eq(knowledgeEntries.organizationId, organizationId),
+        inArray(knowledgeEntries.id, entryIds),
+      ),
+    );
 
   return {
     artifactsTagged: artifactIds.length,

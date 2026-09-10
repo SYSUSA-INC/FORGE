@@ -152,7 +152,7 @@ export async function uploadKnowledgeArtifactAction(
     await db
       .update(knowledgeArtifacts)
       .set({ storagePath: stored.storagePath, updatedAt: new Date() })
-      .where(eq(knowledgeArtifacts.id, row.id));
+      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, row.id)));
   } catch (err) {
     log.error("[uploadKnowledgeArtifact]", "storage", { error: err });
     await db
@@ -163,7 +163,7 @@ export async function uploadKnowledgeArtifactAction(
           err instanceof Error ? err.message : "Storage write failed.",
         updatedAt: new Date(),
       })
-      .where(eq(knowledgeArtifacts.id, row.id));
+      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, row.id)));
     return {
       ok: false,
       error: "Saved metadata but failed to store the file bytes.",
@@ -225,7 +225,7 @@ async function extractAndIndex(
       statusError: "",
       updatedAt: new Date(),
     })
-    .where(eq(knowledgeArtifacts.id, id));
+    .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
 
   let rawText = "";
   try {
@@ -266,7 +266,7 @@ async function extractAndIndex(
               statusError: ocr.error,
               updatedAt: new Date(),
             })
-            .where(eq(knowledgeArtifacts.id, id));
+            .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
         }
         break;
       }
@@ -283,7 +283,7 @@ async function extractAndIndex(
             : "Text extraction failed.",
         updatedAt: new Date(),
       })
-      .where(eq(knowledgeArtifacts.id, id));
+      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
     return;
   }
 
@@ -295,7 +295,7 @@ async function extractAndIndex(
       indexedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(knowledgeArtifacts.id, id));
+    .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
 
   // BL-10 Phase A — AI kind classification on auto-detect uploads.
   // Best-effort: any failure here logs and leaves the heuristic kind in
@@ -326,7 +326,7 @@ async function extractAndIndex(
             aiClassificationReasoning: classified.reasoning,
             updatedAt: new Date(),
           })
-          .where(eq(knowledgeArtifacts.id, id));
+          .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
       }
     } catch (err) {
       log.error("[knowledge-artifact classify]", "error", { error: err });

@@ -274,7 +274,7 @@ export async function runProtestCheckAction(
     await db
       .update(proposalProtestChecks)
       .set(update)
-      .where(eq(proposalProtestChecks.id, existing.id));
+      .where(and(eq(proposalProtestChecks.organizationId, organizationId), eq(proposalProtestChecks.id, existing.id)));
     const [refreshed] = await db
       .select({ createdAt: proposalProtestChecks.createdAt })
       .from(proposalProtestChecks)

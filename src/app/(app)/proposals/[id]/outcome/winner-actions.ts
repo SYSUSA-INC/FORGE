@@ -354,7 +354,7 @@ export async function runWinnerAnalysisAction(
     await db
       .update(proposalWinnerAnalyses)
       .set(update)
-      .where(eq(proposalWinnerAnalyses.id, existing.id));
+      .where(and(eq(proposalWinnerAnalyses.organizationId, organizationId), eq(proposalWinnerAnalyses.id, existing.id)));
   } else {
     await db.insert(proposalWinnerAnalyses).values(analysisValues);
   }

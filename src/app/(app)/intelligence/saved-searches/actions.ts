@@ -119,7 +119,7 @@ export async function updateSavedSearchAction(
     await db
       .update(bdSavedSearches)
       .set(update)
-      .where(eq(bdSavedSearches.id, id));
+      .where(and(eq(bdSavedSearches.organizationId, organizationId), eq(bdSavedSearches.id, id)));
 
     await recordAudit({
       organizationId,

@@ -226,7 +226,7 @@ export async function runSolicitationReviewAction(
         error: "",
         updatedAt: now,
       })
-      .where(eq(solicitationReviews.id, existing.id));
+      .where(and(eq(solicitationReviews.organizationId, organizationId), eq(solicitationReviews.id, existing.id)));
   } else {
     await db.insert(solicitationReviews).values({
       organizationId,
@@ -513,7 +513,7 @@ export async function runCapabilityMatrixAction(
         solicitationReviewId: review.id,
         updatedAt: now,
       })
-      .where(eq(solicitationCapabilityMatrices.id, existing.id));
+      .where(and(eq(solicitationCapabilityMatrices.organizationId, organizationId), eq(solicitationCapabilityMatrices.id, existing.id)));
     matrixId = existing.id;
   } else {
     const [row] = await db
@@ -663,7 +663,7 @@ export async function runQuestionGeneratorAction(
         solicitationReviewId: review.id,
         updatedAt: now,
       })
-      .where(eq(solicitationQuestionSets.id, existing.id));
+      .where(and(eq(solicitationQuestionSets.organizationId, organizationId), eq(solicitationQuestionSets.id, existing.id)));
     questionSetId = existing.id;
   } else {
     const [row] = await db

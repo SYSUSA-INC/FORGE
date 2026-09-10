@@ -117,7 +117,7 @@ export async function saveOutcomeAction(
       await db
         .update(proposalOutcomes)
         .set(update)
-        .where(eq(proposalOutcomes.id, existing.id));
+        .where(and(eq(proposalOutcomes.organizationId, organizationId), eq(proposalOutcomes.id, existing.id)));
     } else {
       await db.insert(proposalOutcomes).values(payload);
     }
@@ -135,7 +135,7 @@ export async function saveOutcomeAction(
           stage: stageMap[outcomeType] as never,
           updatedAt: new Date(),
         })
-        .where(eq(proposals.id, proposalId));
+        .where(and(eq(proposals.organizationId, organizationId), eq(proposals.id, proposalId)));
     }
 
     // Phase 14a: propagate the outcome to the harvested artifact and
@@ -143,10 +143,11 @@ export async function saveOutcomeAction(
     // if the corpus update errors, since the outcome row is the
     // source of truth.
     try {
-      const propagated = await propagateOutcomeToCorpus(
+      const propagated = await propagateOutcomeToCorpus({
+        organizationId,
         proposalId,
         outcomeType,
-      );
+      });
 
       // BL-FB-X-BRAIN-MINE — wins must end up in the Brain. The
       // standard pipeline harvests on stage=submitted transition;
@@ -262,7 +263,7 @@ export async function saveDebriefAction(
       await db
         .update(proposalDebriefs)
         .set(update)
-        .where(eq(proposalDebriefs.id, existing.id));
+        .where(and(eq(proposalDebriefs.organizationId, organizationId), eq(proposalDebriefs.id, existing.id)));
     } else {
       await db.insert(proposalDebriefs).values(payload);
     }

@@ -91,7 +91,7 @@ export async function startKnowledgeExtractionAction(
         errorMessage: aiRes.error,
         finishedAt: new Date(),
       })
-      .where(eq(knowledgeExtractionRuns.id, run.id));
+      .where(and(eq(knowledgeExtractionRuns.organizationId, organizationId), eq(knowledgeExtractionRuns.id, run.id)));
     return { ok: false, error: aiRes.error };
   }
 
@@ -119,7 +119,7 @@ export async function startKnowledgeExtractionAction(
       model: aiRes.model,
       finishedAt: new Date(),
     })
-    .where(eq(knowledgeExtractionRuns.id, run.id));
+    .where(and(eq(knowledgeExtractionRuns.organizationId, organizationId), eq(knowledgeExtractionRuns.id, run.id)));
 
   await recordAudit({
     organizationId,
@@ -334,7 +334,7 @@ export async function approveCandidateAction(
   // Embed the new entry so Brain Suggest can rank it via real cosine
   // similarity. Best-effort: failures don't block the approval — the
   // backfill action can fix it later.
-  await embedKnowledgeEntry(entry.id, finalTitle, finalBody).catch((err) => {
+  await embedKnowledgeEntry(organizationId, entry.id, finalTitle, finalBody).catch((err) => {
     log.warn("[approveCandidateAction]", "embed failed (non-fatal)", { error: err });
   });
 

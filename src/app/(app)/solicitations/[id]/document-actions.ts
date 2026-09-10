@@ -183,7 +183,7 @@ export async function addSolicitationDocumentAction(
     await db
       .update(solicitationDocuments)
       .set({ storagePath: stored.storagePath, updatedAt: new Date() })
-      .where(eq(solicitationDocuments.id, row.id));
+      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, row.id)));
   } catch (err) {
     log.error("[addSolicitationDocumentAction]", "storage", { error: err });
     await db
@@ -193,7 +193,7 @@ export async function addSolicitationDocumentAction(
         parseError: err instanceof Error ? err.message : "Storage write failed.",
         updatedAt: new Date(),
       })
-      .where(eq(solicitationDocuments.id, row.id));
+      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, row.id)));
     return { ok: false, error: "Upload saved metadata but file storage failed." };
   }
 
@@ -344,7 +344,7 @@ async function parseSolicitationDocumentFromBytes(
   await db
     .update(solicitationDocuments)
     .set({ parseStatus: "parsing", parseError: "", updatedAt: new Date() })
-    .where(eq(solicitationDocuments.id, documentId));
+    .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
 
   const fail = async (msg: string, rawText = "") => {
     await db
@@ -355,7 +355,7 @@ async function parseSolicitationDocumentFromBytes(
         rawText: rawText.slice(0, 500_000),
         updatedAt: new Date(),
       })
-      .where(eq(solicitationDocuments.id, documentId));
+      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
     revalidatePath(`/solicitations/${solicitationId}`);
   };
 
@@ -523,7 +523,7 @@ async function mergeDocumentRequirementsHelper(
   await db
     .update(solicitations)
     .set({ extractedRequirements: merged, updatedAt: new Date() })
-    .where(eq(solicitations.id, solicitationId));
+    .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
 }
 
 const JACCARD_THRESHOLD = 0.6;

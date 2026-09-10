@@ -474,7 +474,7 @@ export async function uploadTemplateDocxAction(
       variablesDetected: scan.variables,
       updatedAt: new Date(),
     })
-    .where(eq(proposalTemplates.id, templateId));
+    .where(and(eq(proposalTemplates.organizationId, organizationId), eq(proposalTemplates.id, templateId)));
 
   await recordAudit({
     organizationId,

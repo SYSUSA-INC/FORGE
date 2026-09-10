@@ -115,12 +115,23 @@ export async function POST(req: NextRequest) {
   // 3) Resolve tenant if we have a customer id.
   let organizationId: string | null = null;
   if (stripeCustomerId) {
-    const [tenant] = await db
+    // stripe_customer_id is indexed but not unique. If two tenants ever
+    // share one (a binding bug), attributing the event to either would
+    // let a payment on one account flip the other's tier, so fail closed
+    // and leave the event unattributed for ops to resolve
+    // (BL-TENANT-AUDIT 2026-09).
+    const tenants = await db
       .select({ organizationId: tenantSubscriptions.organizationId })
       .from(tenantSubscriptions)
       .where(eq(tenantSubscriptions.stripeCustomerId, stripeCustomerId))
-      .limit(1);
-    organizationId = tenant?.organizationId ?? null;
+      .limit(2);
+    if (tenants.length > 1) {
+      log.error("[stripe-webhook]", "stripe customer bound to multiple tenants; not attributing", {
+        eventId: event.id,
+        stripeCustomerId,
+      });
+    }
+    organizationId = tenants.length === 1 ? tenants[0]!.organizationId : null;
     if (organizationId) {
       await db
         .update(paymentEvents)

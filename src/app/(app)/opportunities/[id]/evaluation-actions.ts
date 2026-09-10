@@ -128,7 +128,7 @@ export async function setStageWithLogAction(
   await db
     .update(opportunities)
     .set({ stage: newStage, updatedAt: new Date() })
-    .where(eq(opportunities.id, opportunityId));
+    .where(and(eq(opportunities.organizationId, organizationId), eq(opportunities.id, opportunityId)));
 
   const isGate = newStage === "no_bid" || newStage === "lost";
   await db.insert(opportunityActivities).values({

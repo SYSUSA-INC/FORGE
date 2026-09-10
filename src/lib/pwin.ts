@@ -276,7 +276,12 @@ export async function computePwin(
     const [scan] = await db
       .select({ overallScore: proposalScanResults.overallScore })
       .from(proposalScanResults)
-      .where(eq(proposalScanResults.proposalId, prop.id))
+      .where(
+        and(
+          eq(proposalScanResults.organizationId, organizationId),
+          eq(proposalScanResults.proposalId, prop.id),
+        ),
+      )
       .limit(1);
     const items = await db
       .select({ status: complianceItems.status })

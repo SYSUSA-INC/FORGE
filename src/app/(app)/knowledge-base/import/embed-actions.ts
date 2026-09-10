@@ -66,7 +66,7 @@ export async function embedArtifactAction(
   // Replace existing chunks for this artifact.
   await db
     .delete(knowledgeArtifactChunks)
-    .where(eq(knowledgeArtifactChunks.artifactId, artifactId));
+    .where(and(eq(knowledgeArtifactChunks.organizationId, organizationId), eq(knowledgeArtifactChunks.artifactId, artifactId)));
 
   // Batch embed — OpenAI accepts arrays; stub does too.
   let provider = "stub";
@@ -121,7 +121,7 @@ export async function embedArtifactAction(
     // if it fails too, we at least logged the original failure.
     await db
       .delete(knowledgeArtifactChunks)
-      .where(eq(knowledgeArtifactChunks.artifactId, artifactId))
+      .where(and(eq(knowledgeArtifactChunks.organizationId, organizationId), eq(knowledgeArtifactChunks.artifactId, artifactId)))
       .catch((cleanupErr) => {
         log.error(
           "[embedArtifactAction]",

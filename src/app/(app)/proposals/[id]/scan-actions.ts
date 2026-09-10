@@ -244,7 +244,7 @@ export async function runProposalScanAction(
           stubbed: result.stubbed,
           generatedAt: result.generatedAt,
         })
-        .where(eq(proposalScanResults.id, existing.id));
+        .where(and(eq(proposalScanResults.organizationId, organizationId), eq(proposalScanResults.id, existing.id)));
     } else {
       await db.insert(proposalScanResults).values({
         organizationId,
@@ -264,7 +264,7 @@ export async function runProposalScanAction(
     await db
       .update(proposals)
       .set({ scanDirtySince: null })
-      .where(eq(proposals.id, proposalId));
+      .where(and(eq(proposals.organizationId, organizationId), eq(proposals.id, proposalId)));
   } catch (err) {
     log.warn("[runProposalScanAction]", "persist failed", { error: err });
   }

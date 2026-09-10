@@ -80,7 +80,7 @@ export async function resolveDraftSignal(input: {
   await db
     .update(sectionDraftSignals)
     .set({ acceptedFraction: fraction, acceptedWordCount, resolvedAt: new Date() })
-    .where(eq(sectionDraftSignals.id, signal.id));
+    .where(and(eq(sectionDraftSignals.organizationId, input.organizationId), eq(sectionDraftSignals.id, signal.id)));
 }
 
 export async function markABVariantSelected(input: {
@@ -101,6 +101,6 @@ export async function markABVariantSelected(input: {
     await db
       .update(sectionDraftSignals)
       .set({ selected: row.abVariant === input.selectedVariant })
-      .where(eq(sectionDraftSignals.id, row.id));
+      .where(and(eq(sectionDraftSignals.organizationId, input.organizationId), eq(sectionDraftSignals.id, row.id)));
   }
 }
