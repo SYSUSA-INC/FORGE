@@ -3050,7 +3050,7 @@ strip with email/in-app reminders at T-7 / T-3 / T-1 days. Integrates
 with the notification rules engine (BL-13).
 
 ### BL-FB-SOL-CUSTOMER-PATTERN — Past-customer intelligence
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
 
 When a new solicitation arrives, surface "you've seen this agency
 N times before — here's what they buy, who wins, average award size,
