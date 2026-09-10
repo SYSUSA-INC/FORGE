@@ -3022,7 +3022,7 @@ each requirement came from. Schema: new `solicitation_document` table
 with FK to `solicitation` (parent) — extractions roll up to the parent.
 
 ### BL-FB-SOL-AMEND-DIFF — Amendment diff viewer
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #248) — canonical entry under Active priorities
 
 When Amendment 0002 drops, render a side-by-side diff vs Amendment 0001
 showing what changed in due dates, page limits, and requirements.
@@ -3062,7 +3062,7 @@ Cross-joins solicitations + opportunities + outcomes + USAspending.
 ### Area 2 — Compliance matrix ("Section L/M crosswalk that auto-builds")
 
 ### BL-FB-CM-AUTOMAP — Auto-mapping of requirements to sections
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #245) — canonical entry under Active priorities
 
 When a proposal template is applied to an opportunity, AI assigns each
 Section L/M requirement to the most appropriate proposal section
@@ -3072,7 +3072,7 @@ mapping with confidence scores per assignment and a single-click
 "accept all high-confidence" action.
 
 ### BL-FB-CM-EVIDENCE — Evidence linking per requirement
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #246) — canonical entry under Active priorities
 
 Per-row evidence dock: drag-drop a past-performance citation,
 knowledge entry, or specific paragraph from a proposal section onto
@@ -3081,21 +3081,21 @@ crosswalk in the back of the proposal volume with auto-built page
 references. Replaces hand-built compliance crosswalks.
 
 ### BL-FB-CM-GATE — Pre-submission compliance gate
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #247) — canonical entry under Active priorities
 
 Block proposal export/submit when any requirement is `not_addressed`.
 Configurable per-tier (Enterprise can hard-block, Bronze can soft-warn).
 Compliance crosswalk PDF auto-attaches to the export bundle.
 
 ### BL-FB-CM-OWNERS — Per-row owner assignment
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252) — canonical entry under Active priorities
 
 Assign a team member to each requirement with status (assigned /
 in-progress / complete / blocked) and reminder cadence. Owner dashboard
 shows "my rows across all proposals" with overdue flags.
 
 ### BL-FB-CM-HEATMAP — Compliance heat-map view
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252) — canonical entry under Active priorities
 
 Alternate matrix view: colored grid (rows = requirements, columns =
 sections, cells = status). One screen for the capture manager to see
@@ -3106,7 +3106,7 @@ coverage holes. Drill-down opens the row in the full matrix.
 ### Area 3 — Winner analysis & debrief ("Loss intelligence engine")
 
 ### BL-FB-WIN-DEBRIEF-REQ — Auto-generate debrief request letter
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #252) — canonical entry under Active priorities
 
 One-click generation of the formal debrief request with the right FAR
 citation (FAR 15.506 / 8.405-2 / 16.505) based on procurement type,
@@ -3148,7 +3148,7 @@ strip. Includes the original outcome, debrief, and winner analysis.
 The on-demand scan shipped in PR #243 is v1. The v2 is **continuous**.
 
 ### BL-FB-SCAN-CONTINUOUS — Background health scan on every save
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #258)
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #256) — canonical entry under Active priorities
 
 Move the health scan from on-demand to background-on-save. Section
 list shows live red/amber/green dots driven by the latest scan.
@@ -3194,7 +3194,7 @@ to typing; just constant visibility. Companion to the existing
 ### Area 5 — Content generation ("Voice-aware drafting")
 
 ### BL-FB-GEN-THEMES — Win themes as first-class draft inputs
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #249) — canonical entry under Active priorities
 
 Promote win themes from a prompt afterthought to a structured input.
 Per-proposal theme editor with 1-3 themes; the section draft prompt
@@ -3299,7 +3299,7 @@ threads tied to the work.
 ### Cross-cutting intelligence multipliers
 
 ### BL-FB-X-BRAIN-MINE — Auto-mine past wins into the Brain
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #250) — canonical entry under Active priorities
 
 Every won proposal you've uploaded gets mined back into the KB as
 structured knowledge entries (capability statements, past performance
