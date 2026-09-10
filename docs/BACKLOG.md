@@ -57,7 +57,7 @@ Effort key:
 | 11 | **BL-17 Slice 5** — Enterprise wire-invoice flow | P1 | M | ✅ shipped (PR #222) — paused pending launch readiness |
 
 ### BL-ENV-SEP — Dev/staging/prod environment separation
-**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 code guards shipped (PR #216: `_forge_env` marker that refuses to boot on mismatch + non-prod banner; PR #TBD: `staging` recognised by the marker check, marker readout + relabel affordance on `/admin/migrations`, production destructive-migration acknowledgement)  ·  operator setup pending (Neon project split, staging Vercel project, `release` branch, deploy gate — `docs/ENVIRONMENTS.md` §10 checklist)
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🟡 code guards shipped (PR #216: `_forge_env` marker that refuses to boot on mismatch + non-prod banner; PR #262: `staging` recognised by the marker check, marker readout + relabel affordance on `/admin/migrations`, production destructive-migration acknowledgement)  ·  operator setup pending (Neon project split, staging Vercel project, `release` branch, deploy gate — `docs/ENVIRONMENTS.md` §10 checklist)
 
 Before the first paying customer onboards, production must be isolated from staging/dev so a developer error cannot touch real customer data. Operator runbook in `docs/ENVIRONMENTS.md`; production-deploy gate in `docs/PRODUCTION_DEPLOY_GATE.md`. The code-side guards are in; what remains is the one-time operator setup the runbook walks through.
 

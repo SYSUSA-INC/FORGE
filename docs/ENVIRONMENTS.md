@@ -162,9 +162,9 @@ Staging keeps the old keys for now; we rotate quarterly per `docs/SECRETS_ROTATI
 
 ### Step 10: Env-validation guards in code — landed
 
-Code-level defense-in-depth, shipped in PR #216 and PR #TBD:
+Code-level defense-in-depth, shipped in PR #216 and PR #262:
 
-- **Environment marker** (`_forge_env`, `src/lib/env-marker.ts`): the database records which environment owns it. Every cold start compares the runtime label (`FORGE_ENV_OVERRIDE` → `VERCEL_ENV`) to the marker and **exits the process on a mismatch**, so a staging deploy pointed at the prod database never serves a request. This is stronger than a host-pattern check: it works no matter how the connection string looks. `VERCEL_ENV=staging` (set by hand on the staging project) is a recognised label; before PR #TBD it was not, and the check was skipped on staging.
+- **Environment marker** (`_forge_env`, `src/lib/env-marker.ts`): the database records which environment owns it. Every cold start compares the runtime label (`FORGE_ENV_OVERRIDE` → `VERCEL_ENV`) to the marker and **exits the process on a mismatch**, so a staging deploy pointed at the prod database never serves a request. This is stronger than a host-pattern check: it works no matter how the connection string looks. `VERCEL_ENV=staging` (set by hand on the staging project) is a recognised label; before PR #262 it was not, and the check was skipped on staging.
 - **Non-prod banner** (`src/components/shell/NonProdBanner.tsx`): a sticky amber bar on every page whenever the label is anything but `production`.
 - **Destructive migrations in production need acknowledgement**: `/admin/migrations` refuses to apply pending migrations that contain destructive operations while the runtime label is `production` until the operator confirms a snapshot was taken and each one was reviewed. Staging and preview apply without the extra step.
 - **Marker relabel affordance**: `/admin/migrations` shows the runtime label, the database marker and when it was last verified, and lets a superadmin relabel the marker during a cutover by typing the new label in capitals. Audited.
@@ -271,4 +271,4 @@ Track progress here:
 - [ ] Step 7: GitHub environment protection rule set
 - [ ] Step 8: prod secrets rotated
 - [ ] Step 9: smoke test passed
-- [x] Step 10: code-side env guards landed (PR #216: marker + banner; PR #TBD: staging label, relabel affordance, production destructive-apply acknowledgement)
+- [x] Step 10: code-side env guards landed (PR #216: marker + banner; PR #262: staging label, relabel affordance, production destructive-apply acknowledgement)
