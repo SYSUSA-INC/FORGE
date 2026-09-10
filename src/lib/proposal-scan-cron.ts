@@ -21,10 +21,15 @@ import {
   proposalSections,
   proposals,
   solicitations,
-  type SectionThemeCoverage,
-  type TipTapDoc,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
+import { proposalScanSchema } from "@/lib/ai-prompts";
+import {
+  buildScanUserPrompt,
+  SCAN_MAX_TOKENS,
+  SCAN_SYSTEM,
+  SCAN_TEMPERATURE,
+} from "@/lib/proposal-scan-input";
 import {
   enforceQuota,
   ensureFeature,
@@ -32,46 +37,10 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
-import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
 
-// Synced with SCAN_SYSTEM in scan-actions.ts — update both if the prompt changes.
-const SCAN_SYSTEM = `You are a proposal quality analyst inside FORGE reviewing an in-progress federal proposal. Your job is an honest health check: flag what's missing, thin, or off-target so the team knows exactly what to fix before submission.
-
-Output ONLY a single JSON object:
-{
-  "overallScore": "strong" | "needs_work" | "critical",
-  "summary": "<2-3 sentences — overall health and the single most important gap to close>",
-  "sectionIssues": [
-    {
-      "sectionId": "<echo the id from input>",
-      "sectionTitle": "<echo the title>",
-      "issue": "<1-2 sentences describing the specific problem>",
-      "severity": "high" | "medium" | "low"
-    }
-  ],
-  "topRecommendations": ["<specific next action>", ...],
-  "sectionThemeCoverage": [
-    {
-      "sectionId": "<echo the id from input>",
-      "sectionTitle": "<echo the title>",
-      "reinforced": ["<theme title that this section clearly reinforces>"],
-      "missing": ["<theme title not reinforced or contradicted in this section>"]
-    }
-  ]
-}
-
-Score calibration:
-- strong: most sections drafted and on-target, minor gaps only
-- needs_work: key sections empty or thin, deadline risk if not addressed soon
-- critical: majority empty or compliance is at risk, immediate action required
-
-Rules:
-- Only include sections with genuine issues in sectionIssues. Skip sections that look good.
-- topRecommendations: 3-5 specific actions for the next 48 hours.
-- Echo sectionId and sectionTitle exactly from the input.
-- Be direct. No flattery.
-- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].`;
+// SCAN_SYSTEM and the prompt layout live in src/lib/proposal-scan-input.ts
+// (BL-AI-SCAN-FULLTEXT), shared with the on-demand scan action.
 
 export type CronScanSummary = {
   scanned: number;
@@ -217,105 +186,55 @@ async function runSingleProposalScan(
     // best effort
   }
 
-  const wordsPerPage = 350;
-  const sectionLines = sections.map((s) => {
-    const plain = (
-      projectToPlain(s.bodyDoc as TipTapDoc | null) ||
-      s.content ||
-      ""
-    ).slice(0, 500);
-    const expectedMin = s.pageLimit ? s.pageLimit * wordsPerPage * 0.6 : 80;
-    const flag =
-      s.wordCount < 30
-        ? "EMPTY"
-        : s.pageLimit && s.wordCount < expectedMin
-          ? "THIN"
-          : "OK";
-    return [
-      `id=${s.id} | "${s.title}" | kind=${s.kind} | status=${s.status} | words=${s.wordCount}${s.pageLimit ? `/${Math.round(expectedMin)}min` : ""} | ${flag}`,
-      plain ? `  excerpt: ${plain}` : "  (no content)",
-    ].join("\n");
+  // BL-AI-SCAN-FULLTEXT — full section bodies under a shared budget,
+  // same builder as the on-demand action.
+  const { prompt: userPrompt, input: scanInput } = buildScanUserPrompt({
+    proposalTitle: propRow.proposal.title,
+    agency: propRow.agency,
+    solicitationNumber: propRow.solicitationNumber,
+    naicsCode: propRow.naicsCode,
+    setAside: propRow.setAside,
+    winThemes: propRow.proposal.winThemes ?? [],
+    sectionMSummary,
+    requirements: solRequirements,
+    sections,
   });
 
-  const requirementsBlock =
-    solRequirements.length > 0
-      ? `\nEvaluation criteria (Section M): ${sectionMSummary.slice(0, 400)}\n` +
-        `Requirements (top ${Math.min(solRequirements.length, 20)}):\n` +
-        solRequirements
-          .slice(0, 20)
-          .map(
-            (r, i) =>
-              `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, 200)}`,
-          )
-          .join("\n")
-      : "";
-
-  const winThemes = (propRow.proposal.winThemes ?? []).slice(0, 3);
-  const themesBlock =
-    winThemes.length > 0
-      ? `\nWin themes (flag any section that doesn't reinforce them):\n${winThemes
-          .map((t, i) => `  ${i + 1}. ${t.title}: ${t.statement}`)
-          .join("\n")}`
-      : "";
-
-  const userPrompt = [
-    `Proposal: ${propRow.proposal.title}`,
-    `Agency: ${propRow.agency || "(unknown)"}`,
-    `Solicitation: ${propRow.solicitationNumber || "(none)"}`,
-    `NAICS: ${propRow.naicsCode || "(unknown)"}`,
-    `Set-aside: ${propRow.setAside || "(unrestricted)"}`,
-    themesBlock,
-    requirementsBlock,
-    ``,
-    `Sections (${sections.length} total):`,
-    ...sectionLines,
-    ``,
-    `Return strict JSON per the schema in the system prompt. Echo each sectionId and sectionTitle exactly.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  let raw = "";
-  let stubbed = true;
-  const res = await completeForTenant({
+  // BL-AI-TOOLS — forced tool call validated against proposalScanSchema.
+  // A validation failure throws so runStaleProposalScans logs it and
+  // refunds the quota slot, same as a provider error.
+  const res = await completeStructuredForTenant({
     organizationId,
+    feature: "proposal_scan_background",
+    variant: scanInput.truncatedSections > 0 ? "truncated" : "full",
+    schema: proposalScanSchema,
+    toolName: "record_health_scan",
+    toolDescription:
+      "Record the proposal health check: overall score, per-section issues, recommendations, win-theme coverage and cross-section contradictions.",
     system: SCAN_SYSTEM,
     messages: [{ role: "user", content: userPrompt }],
-    maxTokens: 2000,
-    temperature: 0.2,
+    maxTokens: SCAN_MAX_TOKENS,
+    temperature: SCAN_TEMPERATURE,
     cacheSystem: true,
   });
-  raw = res.text;
-  stubbed = res.stubbed;
-
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "");
-  const parsed = JSON.parse(cleaned) as {
-    overallScore: "strong" | "needs_work" | "critical";
-    summary: string;
-    sectionIssues: Array<{
-      sectionId: string;
-      sectionTitle: string;
-      issue: string;
-      severity: "high" | "medium" | "low";
-    }>;
-    topRecommendations: string[];
-    sectionThemeCoverage?: SectionThemeCoverage[];
-  };
+  if (res.stubbed) {
+    throw new Error("AI provider is in stub mode — background scan skipped.");
+  }
+  if (!res.data) {
+    throw new Error(
+      `scan response did not match schema: ${res.parseError ?? "unknown"}`,
+    );
+  }
+  const parsed = res.data;
 
   const result = {
-    overallScore: (["strong", "needs_work", "critical"] as const).includes(
-      parsed.overallScore,
-    )
-      ? parsed.overallScore
-      : ("needs_work" as const),
-    summary: (parsed.summary ?? "").slice(0, 1200),
-    sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
-    topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
-    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
-    stubbed,
+    overallScore: parsed.overallScore,
+    summary: parsed.summary.slice(0, 1200),
+    sectionIssues: parsed.sectionIssues.slice(0, 20),
+    topRecommendations: parsed.topRecommendations.slice(0, 5),
+    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40),
+    contradictions: (parsed.contradictions ?? []).slice(0, 5),
+    stubbed: res.stubbed,
     generatedAt: new Date(),
   };
 
@@ -335,6 +254,7 @@ async function runSingleProposalScan(
         sectionIssues: result.sectionIssues,
         topRecommendations: result.topRecommendations,
         sectionThemeCoverage: result.sectionThemeCoverage,
+        contradictions: result.contradictions,
         stubbed: result.stubbed,
         generatedAt: result.generatedAt,
       })
@@ -348,6 +268,7 @@ async function runSingleProposalScan(
       sectionIssues: result.sectionIssues,
       topRecommendations: result.topRecommendations,
       sectionThemeCoverage: result.sectionThemeCoverage,
+      contradictions: result.contradictions,
       stubbed: result.stubbed,
       generatedAt: result.generatedAt,
     });

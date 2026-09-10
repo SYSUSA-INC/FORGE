@@ -548,6 +548,18 @@ export type SectionThemeCoverage = {
   missing: string[];
 };
 
+// BL-FB-SCAN-CONTRADICTION — a cross-section factual inconsistency.
+export type ProposalScanContradiction = {
+  section1Id: string;
+  section1Title: string;
+  section2Id: string;
+  section2Title: string;
+  claim1: string;
+  claim2: string;
+  explanation: string;
+  severity: "high" | "medium" | "low";
+};
+
 export const proposalScanResults = pgTable(
   "proposal_scan_result",
   {
@@ -571,6 +583,11 @@ export const proposalScanResults = pgTable(
       .default(sql`'[]'::jsonb`),
     sectionThemeCoverage: jsonb("section_theme_coverage")
       .$type<SectionThemeCoverage[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    // BL-FB-SCAN-CONTRADICTION — cross-section conflicting claims.
+    contradictions: jsonb("contradictions")
+      .$type<ProposalScanContradiction[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
     stubbed: boolean("stubbed").notNull().default(false),
@@ -626,6 +643,61 @@ export const sectionDraftSignals = pgTable(
 
 export type SectionDraftSignal = typeof sectionDraftSignals.$inferSelect;
 export type NewSectionDraftSignal = typeof sectionDraftSignals.$inferInsert;
+
+// BL-AI-TELEMETRY — per-call AI ledger. One row per completeForTenant
+// invocation (ok / error / quota_refused). `feature` + `variant` name the
+// product surface; tokens, latency and model make cost and quality
+// measurable per feature rather than per tenant only. Pruned by the daily
+// prune cron (AI_CALL_LOG_RETENTION_DAYS, default 90).
+export type AiCallStatus = "ok" | "error" | "quota_refused";
+
+export const aiCallLogs = pgTable(
+  "ai_call_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull().default("unknown"),
+    variant: text("variant").notNull().default(""),
+    promptVersion: text("prompt_version").notNull().default(""),
+    provider: text("provider").notNull().default(""),
+    model: text("model").notNull().default(""),
+    requestedModel: text("requested_model").notNull().default(""),
+    status: text("status").$type<AiCallStatus>().notNull(),
+    error: text("error"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    outputChars: integer("output_chars").notNull().default(0),
+    maxTokens: integer("max_tokens"),
+    latencyMs: integer("latency_ms").notNull().default(0),
+    stubbed: boolean("stubbed").notNull().default(false),
+    cacheSystem: boolean("cache_system").notNull().default(false),
+    hasDocuments: boolean("has_documents").notNull().default(false),
+    // BL-AI-TOOLS — structured-output outcome. `viaTool` = the provider
+    // answered through the forced tool call; `parseOk` = payload passed
+    // the caller's zod schema (null for free-text calls and stub answers).
+    viaTool: boolean("via_tool").notNull().default(false),
+    parseOk: boolean("parse_ok"),
+    parseError: text("parse_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("acl_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    featureCreatedIdx: index("acl_feature_created_idx").on(
+      t.feature,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type AiCallLog = typeof aiCallLogs.$inferSelect;
+export type NewAiCallLog = typeof aiCallLogs.$inferInsert;
 
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1653,6 +1725,14 @@ export const solicitations = pgTable("solicitation", {
   uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
+  // BL-FB-SOL-CALENDAR — AI-extracted key milestones beyond the single
+  // responseDueDate field. Each entry carries a human-readable label, an
+  // ISO date, and a type tag so the timeline can apply per-type styling.
+  keyDates: jsonb("key_dates")
+    .$type<SolicitationKeyDate[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -1676,6 +1756,22 @@ export type SolicitationRequirement = {
   text: string;
   ref: string;
   sourceDocId?: string;
+};
+
+// BL-FB-SOL-CALENDAR — a single AI-extracted key milestone date.
+export type SolicitationKeyDate = {
+  label: string;
+  isoDate: string;
+  type:
+    | "qa_cutoff"
+    | "site_visit"
+    | "final_rfp"
+    | "proposal_due"
+    | "oral_presentation"
+    | "expected_award"
+    | "debrief_window"
+    | "protest_window"
+    | "other";
 };
 
 /**
@@ -2758,12 +2854,16 @@ export const tenantSubscriptions = pgTable(
      * the merged TierFeatureFlags + TierQuotas. Examples:
      *   { "quotas": { "aiRequestsPerMonth": 5000 } }
      *   { "featureFlags": { "winnerAnalysis": true } }
+     *   { "aiModels": { "section_draft": "claude-opus-5", "fast": "claude-haiku-4-5-20251001" } }
      * The runtime gate reads tier.X then applies overrides.X on top.
+     * `aiModels` (BL-AI-ROUTING) is keyed by AI feature or model class
+     * and read by the AI gateway; see src/lib/ai-routing.ts.
      */
     customOverrides: jsonb("custom_overrides")
       .$type<{
         featureFlags?: Partial<TierFeatureFlags>;
         quotas?: Partial<TierQuotas>;
+        aiModels?: Record<string, string>;
       }>()
       .notNull()
       .default({}),

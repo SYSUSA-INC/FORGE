@@ -71,6 +71,12 @@ export type CurrentTier = {
   overrides: {
     featureFlags?: Partial<TierFeatureFlags>;
     quotas?: Partial<TierQuotas>;
+    /**
+     * BL-AI-ROUTING — per-tenant model overrides keyed by AI feature
+     * (e.g. "section_draft") or model class ("fast" | "standard" |
+     * "strong"). Read by the AI gateway; see src/lib/ai-routing.ts.
+     */
+    aiModels?: Record<string, string>;
   };
   /** Effective flags = tier × overrides. */
   effectiveFlags: TierFeatureFlags;
@@ -114,6 +120,7 @@ export async function getCurrentTier(
   const overrides = (row.overrides ?? {}) as {
     featureFlags?: Partial<TierFeatureFlags>;
     quotas?: Partial<TierQuotas>;
+    aiModels?: Record<string, string>;
   };
 
   const effectiveFlags: TierFeatureFlags = row.tierActive

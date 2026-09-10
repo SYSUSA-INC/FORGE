@@ -3041,7 +3041,7 @@ matrix. Persists Q&A history with timestamps; auto-flags the row in
 the matrix as "amended by Q&A".
 
 ### BL-FB-SOL-CALENDAR — Key-date calendar with reminders
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #259)
 
 Auto-extract every key milestone from the solicitation (Q&A cutoff,
 site visit, final RFP, proposal due, oral presentation, expected award,
@@ -3165,7 +3165,7 @@ section reinforces them; flags sections that drift off-theme.
 Surfaces theme coverage as a per-section badge.
 
 ### BL-FB-SCAN-CONTRADICTION — Cross-volume contradiction detection
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
 
 Detect inconsistencies between volumes — e.g., Technical Volume claims
 24/7 operations, Management Volume staffs only business hours.
@@ -3332,6 +3332,244 @@ Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer
 checklists. Automates the manual "schedule a red team for Friday"
 process most contractors run in email + Word.
+
+---
+
+## AI substrate (2026-09-10)
+
+Reassessment after the post-pilot feature wave. FORGE's **data**
+architecture is platform-grade: outcome labels propagate onto the
+Brain, retrieval boosts won content, the drafter receives winning and
+losing patterns plus open compliance gaps, and every draft records how
+much of it survived the user's edits. The **AI gateway** beneath it is
+still single-shot text completion: JSON recovered by brace-hunting, no
+tool use, no streaming, one model for every task, and no per-call
+visibility beyond monthly token counters. Each further single-shot
+feature compounds that debt. These items harden the substrate first;
+the remaining BL-FB-* items resume after.
+
+### BL-AI-TELEMETRY — Per-call AI telemetry
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #257)
+
+Until now the only AI visibility was `tenant_usage_counter` (tokens +
+requests per month per tenant). Nothing recorded which feature made a
+call, which model answered, how long it took, or whether it failed. That
+made model routing, prompt regression checks and per-feature pricing
+impossible to reason about.
+
+**Delivered:**
+- Migration `0073_ai_call_log.sql` — `ai_call_log` table: org, feature,
+  variant, prompt_version, provider, model, requested_model, status
+  (`ok` / `error` / `quota_refused`), error, input/output tokens,
+  output_chars, max_tokens, latency_ms, stubbed, cache_system,
+  has_documents, created_at. Indexes on (org, created_at) and
+  (feature, created_at).
+- `src/lib/ai-features.ts` — append-only vocabulary of feature keys +
+  labels (`AiFeature`). Keys are stored verbatim; never rename a shipped
+  key.
+- `src/lib/ai-telemetry.ts` (server-only) — `recordAiCall` (best-effort,
+  never throws), `getAiFeatureBreakdown(since, organizationId?)`,
+  `pruneAiCallLogs`, `aiCallLogRetentionDays`.
+- `completeForTenant` now takes `AITenantCompleteOptions` with a
+  **required** `feature` and optional `variant` / `promptVersion`. It
+  writes one row per outcome: `quota_refused` at the pre-check, `error`
+  when the provider throws (then rethrows), `ok` with tokens, model,
+  output size and provider round-trip latency.
+- All 21 call sites tagged (`section_draft` carries the draft mode as
+  variant; `solicitation_extract` carries text / pdf_vision /
+  image_vision; the background scan is `proposal_scan_background` so it
+  can be compared against on-demand scans).
+- `/admin/usage` — new "AI calls by feature" panel (30-day window, all
+  tenants): calls, errors + rate, refusals, stub count, tokens in/out,
+  avg and max latency, tenants, est. cost. Header meta gains "AI call
+  errors (30d)".
+- `/api/cron/prune-audit-logs` also prunes `ai_call_log`
+  (`AI_CALL_LOG_RETENTION_DAYS`, default 90) in its own try/catch so a
+  telemetry prune failure cannot mask the audit prune result.
+- `tests/ai/gateway-telemetry.test.ts` — six runtime assertions: ok row
+  shape, error row + rethrow, quota_refused without provider call,
+  tenant isolation, per-feature aggregation for one tenant, prune window.
+
+**Not in scope (lands with BL-AI-TOOLS):** parse-outcome tracking. Once
+structured output is a gateway concern, schema-validation failures become
+a gateway status rather than a caller-side regex miss.
+
+### BL-AI-TOOLS — Native tool use + structured output in the gateway
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
+
+Every JSON-returning feature used to ask the model for JSON in prose,
+then find the first `{` and last `}` and run `parseAiJson` + zod. The
+gateway now turns a zod schema into a single forced tool call, so the
+model returns a typed object, and validates it before the caller sees
+it. This is also the prerequisite for any agentic loop: a drafter that
+can call "search the Brain" mid-generation, or a scan that can pull a
+full section when it suspects a contradiction.
+
+**Delivered:**
+- `src/lib/ai.ts` — `AIToolSpec` on `AICompleteOptions`; `structured` +
+  `stopReason` on `AICompleteResult`. Anthropic sends `tools` +
+  `tool_choice: { type: "tool", disable_parallel_tool_use }`; Azure
+  OpenAI and vLLM send OpenAI function calling (`VLLM_SUPPORTS_TOOLS=1`
+  opts vLLM in — tool support there depends on the served model).
+  Request builders and response parsers are exported with a `__` prefix
+  so tests pin the wire format without network.
+- `zodToToolSchema` (zod 4 `toJSONSchema`, input mode, object root
+  enforced), `validateStructured` (tool payload first, JSON-in-text
+  fallback), `completeStructuredForTenant<T>` returning
+  `{ ...result, data, parseError, viaTool }`. Same quota, telemetry and
+  post-record semantics as `completeForTenant`; both share
+  `runTenantCompletion` so the parse outcome lands on the same
+  `ai_call_log` row as the call.
+- Migration `0074_ai_call_log_parse.sql` — `via_tool`, `parse_ok`
+  (NULL for free-text and stub), `parse_error`. `/admin/usage` gains
+  "Parse fail" and "Via tool" columns.
+- `proposalScanSchema` in `ai-prompts.ts` — the health scan (on-demand
+  and cron) now validates through the same schema instead of a bare
+  `JSON.parse` with manual coercion.
+- All 16 JSON-returning call sites migrated: compliance pre-flight and
+  auto-map, protest viability, winner analysis, both scan paths, eBuy /
+  GSA / solicitation (text, PDF, image) extraction, knowledge classify
+  and extract, solicitation review, capability matrix, question
+  generator. Each carries a descriptive `toolName`. The local
+  `stripCodeFences` helpers and `parseAiJson` imports are gone from
+  callers; `parseAiJson` itself stays exported for anything else.
+- `tests/ai/gateway-structured.test.ts` — wire-format assertions for
+  both provider families, validation precedence and fallback, and
+  gateway behaviour through the seam including the telemetry columns.
+
+**Prompt note:** the "Output ONLY a single JSON object" instructions
+stay in the system prompts. They are what the text fallback relies on
+when a provider cannot or does not call the tool.
+
+### BL-AI-ROUTING — Per-task model routing
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #257)  ·  **Depends on:** BL-AI-TELEMETRY
+
+One default model used to serve classification, OCR, extraction,
+drafting and scan alike. Each feature now belongs to a model class and
+the gateway requests the class model unless the caller pins one.
+`ai_call_log.requested_model` records the routed model and `model`
+records what answered, so the before/after is measurable per feature.
+
+**Delivered:**
+- `src/lib/ai-routing.ts` (pure, no DB) — `AiModelClass` = fast |
+  standard | strong; `AI_FEATURE_MODEL_CLASS: Record<AiFeature, …>` so
+  every new feature forces a routing decision at compile time.
+  Fast: knowledge_classify, image_ocr, ebuy_extract, gsa_extract.
+  Strong: section_draft, proposal_scan(+background), winner_analysis,
+  protest_viability. Everything else standard.
+- `modelTableFor(provider)` from env. Anthropic: `ANTHROPIC_MODEL_FAST`
+  (default claude-haiku-4-5-20251001), `ANTHROPIC_MODEL` (existing
+  default), `ANTHROPIC_MODEL_STRONG` (defaults to standard — routing
+  never silently raises cost). vLLM: `VLLM_MODEL_FAST` / `VLLM_MODEL` /
+  `VLLM_MODEL_STRONG`. Azure is deployment-pinned; Bedrock and stub are
+  not routed. `AI_MODEL_ROUTING=off` disables.
+- Precedence: caller `model` › tenant override by feature key › tenant
+  override by class key › provider table. Tenant overrides live in
+  `tenant_subscription.custom_overrides.aiModels` (JSONB, no migration);
+  `CurrentTier.overrides.aiModels` plumbs them to the gateway.
+- Gateway hook in `runTenantCompletion` runs after the tier lookup and
+  before telemetry so `requested_model` reflects the routed choice.
+- `/admin/usage` gains a "Model routing" panel: active provider,
+  routing on/off, per-class model and the features in each class.
+- `tests/ai/gateway-routing.test.ts` — table defaults and env
+  overrides per provider, class mapping, tenant precedence, routing
+  off, and gateway behaviour through the seam including
+  `requested_model`.
+- `docs/FAQ.md` env table documents the new variables.
+
+### BL-AI-STREAMING — Streaming draft + chat
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
+
+Every AI call used to block until the full response arrived; users
+watched a spinner for the whole draft. Section drafts and section chat
+now stream token-by-token into the AI assist panel, with the same gates,
+quota, draft-signal capture and telemetry as before.
+
+**Delivered:**
+- Gateway: `onDelta?: (text) => void` on `AICompleteOptions`;
+  `streamed?: boolean` on the result. Anthropic streams natively
+  (`stream: true`, SSE reducer over `message_start` /
+  `content_block_delta` / `message_delta` / `error`, exported as
+  `__applyAnthropicStreamEvent` for tests). Providers that do not stream
+  return the whole text and the gateway delivers it through the same
+  callback once, so callers never branch on provider. Stub streams its
+  text as one delta. `onDelta` is ignored when `tool` is set. Quota,
+  telemetry and validation run on the aggregate exactly as before.
+- `src/lib/sse.ts` (pure): `encodeSseEvent`, `sseHeaders`,
+  `createSseParser` (chunk-boundary safe, multi-line data, CRLF),
+  `readSseStream` for the browser.
+- `src/lib/ai-stream-types.ts` (pure): `DraftStreamEvent`,
+  `ChatStreamEvent` wire types + guards shared by routes and panel.
+- `src/lib/api-tenant.ts` (server-only): `requireApiTenant` wraps
+  `requireCurrentOrg` and converts its `redirect()` into a JSON 401 so
+  fetch callers get a usable error. Impersonation handling unchanged.
+- `src/lib/section-draft.ts` / `src/lib/section-chat.ts` (server-only):
+  the context assembly and prompt building extracted from the actions so
+  the streaming routes and the actions share one implementation.
+  `generateSectionDraftAction` (still used by A/B) and
+  `chatWithSectionAction` now call them; behaviour unchanged except the
+  request slot is refunded when preparation fails.
+- `POST /api/ai/draft` and `POST /api/ai/chat`: zod-validated body,
+  feature + quota gates (402), chat rate limit (429), `text/event-stream`
+  of `delta` events then `done` or `error`. Refund on empty / failure.
+  `maxDuration` 120 / 60.
+- `AiAssistantPanel`: fetch + `readSseStream`; live preview with word
+  count and a Stop button for drafts; the assistant bubble fills in as
+  chat streams. Non-SSE responses (401 / 402 / 429 / middleware 403 /
+  sign-in HTML) surface as readable errors. In-flight streams abort on
+  Discard, Close, unmount and re-request.
+- `tests/ai/gateway-streaming.test.ts`: SSE parser edge cases, encode →
+  read round-trip, Anthropic reducer, gateway onDelta pass-through,
+  non-streaming fallback delta, throwing consumer isolation, stub
+  streaming.
+
+**Follow-up:** Azure OpenAI and vLLM currently take the one-shot
+fallback path. Native OpenAI-style streaming (`stream_options.include_usage`
+for token accounting) is a small addition once either provider is in
+production use.
+
+### BL-AI-SCAN-FULLTEXT — Full-text health scan
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #257)
+
+The scan read a 500-character excerpt per section, so win-theme
+coverage and contradiction detection (BL-FB-SCAN-THEMES /
+-CONTRADICTION) could only see section openings. The two `SCAN_SYSTEM`
+copies had also already drifted. Both scan paths now send full section
+bodies under a shared budget through one builder.
+
+**Delivered:**
+- `src/lib/proposal-scan-input.ts` (pure) — single source of truth for
+  `SCAN_SYSTEM`, `SCAN_MAX_TOKENS`, `SCAN_TEMPERATURE`, the section
+  block format and `buildScanUserPrompt`. The action and the cron
+  import it; their local prompt copies and excerpt builders are gone.
+- Budget: `DEFAULT_SCAN_BUDGET` = 10k chars per section, 80k total
+  (~20k tokens of body), 1.5k floor. Every section gets its full body up
+  to the cap; when the sum exceeds the total, allowances scale
+  proportionally to length but never below the floor, so a long
+  Technical Volume cannot starve a short Pricing narrative. If floors
+  alone exceed the budget the floor halves down to 250. Cuts land on a
+  word boundary and end with
+  `[… truncated: showing X of Y characters]` so the model knows it is
+  reading a prefix. `allocateScanAllowances` is exported for tests.
+- Prompt: sections arrive as `=== SECTION id=… | title | kind | status
+  | words | FLAG ===` blocks with the body inside and a coverage note
+  stating how many were truncated. `SCAN_SYSTEM` describes the block
+  format, tells the model not to infer past a cut, asks theme coverage
+  to judge the whole body, and widens the contradiction rule to concrete
+  claims across ALL bodies (staffing and hours, dates, quantities,
+  locations, tools, roles, past-performance facts) with quoted claims.
+- Telemetry: both scan features set `variant` to `full` or `truncated`,
+  so `/admin/usage` can show how often a proposal outgrows the budget.
+- `tests/ai/scan-input.test.ts` — flags, allowance arithmetic (under
+  budget, proportional scaling with floor, floor halving, empty
+  sections), block format and truncation marker, bodyDoc precedence,
+  prompt layout, system-prompt contract.
+
+**Cost note:** a four-section proposal previously sent at most 2k
+characters of body; it can now send up to 40k. That is the point, and
+the scan already sits in the `strong` routing class. Watch
+`proposal_scan_background` tokens on `/admin/usage`; lower
+`DEFAULT_SCAN_BUDGET` or the cron batch size if it runs hot.
 
 ---
 

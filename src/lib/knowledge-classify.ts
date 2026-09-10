@@ -18,9 +18,8 @@
 import {
   artifactKindClassifySchema,
   buildArtifactKindClassifyPrompt,
-  parseAiJson,
 } from "@/lib/ai-prompts";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 import type { KnowledgeArtifactKind } from "@/db/schema";
 
@@ -56,8 +55,11 @@ export async function classifyArtifactKind(input: {
 
   try {
     const prompt = buildArtifactKindClassifyPrompt(input);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId: input.organizationId,
+      feature: "knowledge_classify",
+      schema: artifactKindClassifySchema,
+      toolName: "record_artifact_kind",
       system: prompt.system,
       messages: prompt.messages,
       // Classification is short — 200 tokens covers JSON {kind, confidence, reasoning}.
@@ -81,18 +83,22 @@ export async function classifyArtifactKind(input: {
       };
     }
 
-    const cleaned = stripCodeFences(ai.text);
-    const parsed = parseAiJson(cleaned, artifactKindClassifySchema);
-    if (!parsed.ok) {
-      log.error("[classifyArtifactKind]", "parse", { error: parsed.error });
-      return { ok: false, error: parsed.error };
+    if (!ai.data) {
+      log.error("[classifyArtifactKind]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
 
     return {
       ok: true,
-      kind: parsed.data.kind,
-      confidence: parsed.data.confidence,
-      reasoning: parsed.data.reasoning.slice(0, 300),
+      kind: ai.data.kind,
+      confidence: ai.data.confidence,
+      reasoning: ai.data.reasoning.slice(0, 300),
       stubbed: false,
       provider: ai.provider,
       model: ai.model,
@@ -104,15 +110,4 @@ export async function classifyArtifactKind(input: {
       error: err instanceof Error ? err.message : "Classification failed.",
     };
   }
-}
-
-function stripCodeFences(t: string): string {
-  const s = t.trim();
-  if (s.startsWith("```")) {
-    return s
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/```\s*$/i, "")
-      .trim();
-  }
-  return s;
 }

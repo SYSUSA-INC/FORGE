@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { pruneAuditLogsAcrossTenants } from "@/lib/audit-log";
+import { pruneAiCallLogs } from "@/lib/ai-telemetry";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -48,7 +49,21 @@ export async function GET(req: NextRequest) {
   try {
     const result = await pruneAuditLogsAcrossTenants();
     log.info("[audit-prune-cron]", "prune complete", result);
-    return NextResponse.json({ ok: true, ...result });
+
+    // BL-AI-TELEMETRY — the AI call ledger rides this cron rather than
+    // adding another schedule. Its failure must not mask a successful
+    // audit prune, so it gets its own try/catch and its own log line.
+    let aiCallLog: { rowsDeleted: number; retentionDays: number } | { error: string };
+    try {
+      aiCallLog = await pruneAiCallLogs();
+      log.info("[audit-prune-cron]", "ai_call_log prune complete", aiCallLog);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.error("[audit-prune-cron]", "ai_call_log prune failed", { error: message });
+      aiCallLog = { error: message };
+    }
+
+    return NextResponse.json({ ok: true, ...result, aiCallLog });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.error("[audit-prune-cron]", "cron run failed", { error: message });

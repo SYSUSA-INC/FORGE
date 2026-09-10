@@ -9,10 +9,17 @@ import {
   proposals,
   solicitations,
   type SectionThemeCoverage,
-  type TipTapDoc,
+  type ProposalScanContradiction,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
+import { proposalScanSchema } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  buildScanUserPrompt,
+  SCAN_MAX_TOKENS,
+  SCAN_SYSTEM,
+  SCAN_TEMPERATURE,
+} from "@/lib/proposal-scan-input";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   enforceQuota,
@@ -21,7 +28,6 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
-import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
 
 export type ProposalScanIssue = {
@@ -39,47 +45,15 @@ export type ProposalScanResult =
       sectionIssues: ProposalScanIssue[];
       topRecommendations: string[];
       sectionThemeCoverage: SectionThemeCoverage[];
+      contradictions: ProposalScanContradiction[];
       stubbed: boolean;
       generatedAt: string;
     }
   | { ok: false; error: string };
 
-const SCAN_SYSTEM = `You are a proposal quality analyst inside FORGE reviewing an in-progress federal proposal. Your job is an honest health check: flag what's missing, thin, or off-target so the team knows exactly what to fix before submission.
-
-Output ONLY a single JSON object:
-{
-  "overallScore": "strong" | "needs_work" | "critical",
-  "summary": "<2-3 sentences — overall health and the single most important gap to close>",
-  "sectionIssues": [
-    {
-      "sectionId": "<echo the id from input>",
-      "sectionTitle": "<echo the title>",
-      "issue": "<1-2 sentences describing the specific problem>",
-      "severity": "high" | "medium" | "low"
-    }
-  ],
-  "topRecommendations": ["<specific next action>", ...],
-  "sectionThemeCoverage": [
-    {
-      "sectionId": "<echo the id from input>",
-      "sectionTitle": "<echo the title>",
-      "reinforced": ["<theme title that this section clearly reinforces>"],
-      "missing": ["<theme title not reinforced or contradicted in this section>"]
-    }
-  ]
-}
-
-Score calibration:
-- strong: most sections drafted and on-target, minor gaps only
-- needs_work: key sections empty or thin, deadline risk if not addressed soon
-- critical: majority empty or compliance is at risk, immediate action required
-
-Rules:
-- Only include sections with genuine issues in sectionIssues. Skip sections that look good.
-- topRecommendations: 3-5 specific actions for the next 48 hours.
-- Echo sectionId and sectionTitle exactly from the input.
-- Be direct. No flattery.
-- sectionThemeCoverage: include ALL sections when win themes are provided. For empty/thin sections put all themes in missing. When no win themes are in the prompt, return "sectionThemeCoverage": [].`;
+// SCAN_SYSTEM and the prompt layout live in src/lib/proposal-scan-input.ts
+// (BL-AI-SCAN-FULLTEXT) so this action and the background cron cannot
+// drift apart.
 
 export async function runProposalScanAction(
   proposalId: string,
@@ -171,75 +145,63 @@ export async function runProposalScanAction(
     // best effort
   }
 
-  const wordsPerPage = 350;
-  const sectionLines = sections.map((s) => {
-    const plain = (
-      projectToPlain(s.bodyDoc as TipTapDoc | null) ||
-      s.content ||
-      ""
-    ).slice(0, 500);
-    const expectedMin = s.pageLimit ? s.pageLimit * wordsPerPage * 0.6 : 80;
-    const flag = s.wordCount < 30 ? "EMPTY" : s.pageLimit && s.wordCount < expectedMin ? "THIN" : "OK";
-    return [
-      `id=${s.id} | "${s.title}" | kind=${s.kind} | status=${s.status} | words=${s.wordCount}${s.pageLimit ? `/${Math.round(expectedMin)}min` : ""} | ${flag}`,
-      plain ? `  excerpt: ${plain}` : "  (no content)",
-    ].join("\n");
+  // BL-AI-SCAN-FULLTEXT — full section bodies under a shared budget,
+  // same builder as the background cron.
+  const { prompt: userPrompt, input: scanInput } = buildScanUserPrompt({
+    proposalTitle: propRow.proposal.title,
+    agency: propRow.agency,
+    solicitationNumber: propRow.solicitationNumber,
+    naicsCode: propRow.naicsCode,
+    setAside: propRow.setAside,
+    winThemes: propRow.proposal.winThemes ?? [],
+    sectionMSummary,
+    requirements: solRequirements,
+    sections,
   });
 
-  const requirementsBlock =
-    solRequirements.length > 0
-      ? `\nEvaluation criteria (Section M): ${sectionMSummary.slice(0, 400)}\n` +
-        `Requirements (top ${Math.min(solRequirements.length, 20)}):\n` +
-        solRequirements
-          .slice(0, 20)
-          .map(
-            (r, i) =>
-              `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, 200)}`,
-          )
-          .join("\n")
-      : "";
-
-  // BL-FB-GEN-THEMES — feed win themes into the scan so it can flag
-  // sections that drift off-theme (e.g. a Technical Approach that
-  // never mentions the proposal's headline differentiator).
-  const winThemes = (propRow.proposal.winThemes ?? []).slice(0, 3);
-  const themesBlock =
-    winThemes.length > 0
-      ? `\nWin themes (the proposal team committed to these — flag any section that doesn't reinforce them):\n${winThemes
-          .map((t, i) => `  ${i + 1}. ${t.title}: ${t.statement}`)
-          .join("\n")}`
-      : "";
-
-  const userPrompt = [
-    `Proposal: ${propRow.proposal.title}`,
-    `Agency: ${propRow.agency || "(unknown)"}`,
-    `Solicitation: ${propRow.solicitationNumber || "(none)"}`,
-    `NAICS: ${propRow.naicsCode || "(unknown)"}`,
-    `Set-aside: ${propRow.setAside || "(unrestricted)"}`,
-    themesBlock,
-    requirementsBlock,
-    ``,
-    `Sections (${sections.length} total):`,
-    ...sectionLines,
-    ``,
-    `Return strict JSON per the schema in the system prompt. Echo each sectionId and sectionTitle exactly.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  let raw = "";
+  // BL-AI-TOOLS — the scan answers through a forced tool call validated
+  // against proposalScanSchema, so no fence-stripping or manual field
+  // coercion is needed here.
+  let parsed;
   let stubbed = true;
   try {
-    const res = await completeForTenant({
+    const res = await completeStructuredForTenant({
       organizationId,
+      feature: "proposal_scan",
+      // Telemetry variant records whether the model saw every body in full.
+      variant: scanInput.truncatedSections > 0 ? "truncated" : "full",
+      schema: proposalScanSchema,
+      toolName: "record_health_scan",
+      toolDescription:
+        "Record the proposal health check: overall score, per-section issues, recommendations, win-theme coverage and cross-section contradictions.",
       system: SCAN_SYSTEM,
       messages: [{ role: "user", content: userPrompt }],
-      maxTokens: 2000,
-      temperature: 0.2,
+      maxTokens: SCAN_MAX_TOKENS,
+      temperature: SCAN_TEMPERATURE,
       cacheSystem: true,
     });
-    raw = res.text;
     stubbed = res.stubbed;
+    if (res.stubbed) {
+      await refundQuota(organizationId, "aiRequestsPerMonth");
+      return {
+        ok: false,
+        error:
+          "AI provider is in stub mode — configure a provider to run scans.",
+      };
+    }
+    if (!res.data) {
+      await refundQuota(organizationId, "aiRequestsPerMonth");
+      log.warn("[runProposalScanAction]", "structured parse failed", {
+        parseError: res.parseError,
+        viaTool: res.viaTool,
+        rawSnippet: res.text.slice(0, 240),
+      });
+      return {
+        ok: false,
+        error: "AI returned an unexpected format. Re-run the scan.",
+      };
+    }
+    parsed = res.data;
   } catch (err) {
     await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[runProposalScanAction]", "AI call failed", { error: err });
@@ -249,97 +211,75 @@ export async function runProposalScanAction(
     };
   }
 
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "");
+  const result = {
+    overallScore: parsed.overallScore,
+    summary: parsed.summary.slice(0, 1200),
+    sectionIssues: parsed.sectionIssues.slice(0, 20),
+    topRecommendations: parsed.topRecommendations.slice(0, 5),
+    sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40),
+    contradictions: (parsed.contradictions ?? []).slice(0, 5),
+    stubbed,
+    generatedAt: new Date(),
+  };
+
+  // BL-FB-SCAN-CONTINUOUS — persist the scan and clear the dirty flag.
+  // Sequential UPSERT pattern per Neon-pgbouncer rule (no transactions).
   try {
-    const parsed = JSON.parse(cleaned) as {
-      overallScore: "strong" | "needs_work" | "critical";
-      summary: string;
-      sectionIssues: ProposalScanIssue[];
-      topRecommendations: string[];
-      sectionThemeCoverage?: SectionThemeCoverage[];
-    };
-    const result = {
-      overallScore: (["strong", "needs_work", "critical"] as const).includes(
-        parsed.overallScore,
-      )
-        ? parsed.overallScore
-        : ("needs_work" as const),
-      summary: (parsed.summary ?? "").slice(0, 1200),
-      sectionIssues: (parsed.sectionIssues ?? []).slice(0, 20),
-      topRecommendations: (parsed.topRecommendations ?? []).slice(0, 5),
-      sectionThemeCoverage: (parsed.sectionThemeCoverage ?? []).slice(0, 40) as SectionThemeCoverage[],
-      stubbed,
-      generatedAt: new Date(),
-    };
+    const [existing] = await db
+      .select({ id: proposalScanResults.id })
+      .from(proposalScanResults)
+      .where(eq(proposalScanResults.proposalId, proposalId))
+      .limit(1);
 
-    // BL-FB-SCAN-CONTINUOUS — persist the scan and clear the dirty flag.
-    // Sequential UPSERT pattern per Neon-pgbouncer rule (no transactions).
-    try {
-      const [existing] = await db
-        .select({ id: proposalScanResults.id })
-        .from(proposalScanResults)
-        .where(eq(proposalScanResults.proposalId, proposalId))
-        .limit(1);
-
-      if (existing) {
-        await db
-          .update(proposalScanResults)
-          .set({
-            overallScore: result.overallScore,
-            summary: result.summary,
-            sectionIssues: result.sectionIssues,
-            topRecommendations: result.topRecommendations,
-            sectionThemeCoverage: result.sectionThemeCoverage,
-            stubbed: result.stubbed,
-            generatedAt: result.generatedAt,
-          })
-          .where(eq(proposalScanResults.id, existing.id));
-      } else {
-        await db.insert(proposalScanResults).values({
-          organizationId,
-          proposalId,
+    if (existing) {
+      await db
+        .update(proposalScanResults)
+        .set({
           overallScore: result.overallScore,
           summary: result.summary,
           sectionIssues: result.sectionIssues,
           topRecommendations: result.topRecommendations,
           sectionThemeCoverage: result.sectionThemeCoverage,
+          contradictions: result.contradictions,
           stubbed: result.stubbed,
           generatedAt: result.generatedAt,
-        });
-      }
-
-      // Clear the dirty flag — this scan covers all content as of now.
-      await db
-        .update(proposals)
-        .set({ scanDirtySince: null })
-        .where(eq(proposals.id, proposalId));
-    } catch (err) {
-      log.warn("[runProposalScanAction]", "persist failed", { error: err });
+        })
+        .where(eq(proposalScanResults.id, existing.id));
+    } else {
+      await db.insert(proposalScanResults).values({
+        organizationId,
+        proposalId,
+        overallScore: result.overallScore,
+        summary: result.summary,
+        sectionIssues: result.sectionIssues,
+        topRecommendations: result.topRecommendations,
+        sectionThemeCoverage: result.sectionThemeCoverage,
+        contradictions: result.contradictions,
+        stubbed: result.stubbed,
+        generatedAt: result.generatedAt,
+      });
     }
 
-    return {
-      ok: true,
-      overallScore: result.overallScore,
-      summary: result.summary,
-      sectionIssues: result.sectionIssues,
-      topRecommendations: result.topRecommendations,
-      sectionThemeCoverage: result.sectionThemeCoverage,
-      stubbed: result.stubbed,
-      generatedAt: result.generatedAt.toISOString(),
-    };
-  } catch {
-    await refundQuota(organizationId, "aiRequestsPerMonth");
-    log.warn("[runProposalScanAction]", "JSON parse failed", {
-      rawSnippet: raw.slice(0, 240),
-    });
-    return {
-      ok: false,
-      error: "AI returned an unexpected format. Re-run the scan.",
-    };
+    // Clear the dirty flag — this scan covers all content as of now.
+    await db
+      .update(proposals)
+      .set({ scanDirtySince: null })
+      .where(eq(proposals.id, proposalId));
+  } catch (err) {
+    log.warn("[runProposalScanAction]", "persist failed", { error: err });
   }
+
+  return {
+    ok: true,
+    overallScore: result.overallScore,
+    summary: result.summary,
+    sectionIssues: result.sectionIssues,
+    topRecommendations: result.topRecommendations,
+    sectionThemeCoverage: result.sectionThemeCoverage,
+    contradictions: result.contradictions,
+    stubbed: result.stubbed,
+    generatedAt: result.generatedAt.toISOString(),
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -352,6 +292,7 @@ export type StoredProposalScan = {
   sectionIssues: ProposalScanIssue[];
   topRecommendations: string[];
   sectionThemeCoverage: SectionThemeCoverage[];
+  contradictions: ProposalScanContradiction[];
   stubbed: boolean;
   generatedAt: string;
   dirtySince: string | null;
@@ -401,6 +342,7 @@ export async function getStoredProposalScanAction(
     sectionIssues: row.sectionIssues,
     topRecommendations: row.topRecommendations,
     sectionThemeCoverage: (row.sectionThemeCoverage ?? []) as SectionThemeCoverage[],
+    contradictions: (row.contradictions ?? []) as ProposalScanContradiction[],
     stubbed: row.stubbed,
     generatedAt: row.generatedAt.toISOString(),
     dirtySince: own.scanDirtySince ? own.scanDirtySince.toISOString() : null,

@@ -8,6 +8,7 @@ import {
   opportunityActivities,
   solicitations,
   type SolicitationType,
+  type SolicitationKeyDate,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
@@ -252,6 +253,7 @@ async function parseSolicitationFromBytes(
           "\n\n[Extracted from image via vision OCR.]",
         sectionMSummary: d.sectionMSummary,
         extractedRequirements: d.requirements,
+        keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
       .where(eq(solicitations.id, solicitationId));
@@ -297,6 +299,7 @@ async function parseSolicitationFromBytes(
           "\n\n[Extracted via vision OCR — text layer was unreadable.]",
         sectionMSummary: d.sectionMSummary,
         extractedRequirements: d.requirements,
+        keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
       .where(eq(solicitations.id, solicitationId));
@@ -353,6 +356,7 @@ async function parseSolicitationFromBytes(
       sectionLSummary: d.sectionLSummary,
       sectionMSummary: d.sectionMSummary,
       extractedRequirements: d.requirements,
+      keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
       updatedAt: new Date(),
     })
     .where(eq(solicitations.id, solicitationId));

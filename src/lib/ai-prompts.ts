@@ -27,6 +27,20 @@ export type SolicitationExtractionResult = {
   sectionLSummary: string;
   sectionMSummary: string;
   requirements: { kind: "shall" | "should" | "may"; text: string; ref: string }[];
+  keyDates: {
+    label: string;
+    isoDate: string | null;
+    type:
+      | "qa_cutoff"
+      | "site_visit"
+      | "final_rfp"
+      | "proposal_due"
+      | "oral_presentation"
+      | "expected_award"
+      | "debrief_window"
+      | "protest_window"
+      | "other";
+  }[];
 };
 
 const SOLICITATION_EXTRACT_SYSTEM = `You are a federal solicitation analyst inside FORGE — a proposal operations platform. You read raw RFP/RFI/RFQ/SS text and return structured facts as strict JSON.
@@ -42,6 +56,7 @@ Rules:
 - Section L summary: 2–4 sentences describing what offerors must submit, page caps, and format requirements you found.
 - Section M summary: 2–4 sentences describing evaluation factors and weights you found.
 - If the document is clearly not a federal solicitation, set title to "" and return mostly empty fields.
+- keyDates: extract ALL explicitly-stated milestone dates. Include the proposal due date as type="proposal_due". Never fabricate dates — only include dates literally present in the document. Use null for isoDate if the date is mentioned but not specific (e.g., "TBD"). Max 20 entries.
 
 Schema:
 {
@@ -55,7 +70,8 @@ Schema:
   "responseDueDate": string | null,
   "sectionLSummary": string,
   "sectionMSummary": string,
-  "requirements": [{ "kind": "shall" | "should" | "may", "text": string, "ref": string }]
+  "requirements": [{ "kind": "shall" | "should" | "may", "text": string, "ref": string }],
+  "keyDates": [{ "label": string, "isoDate": "YYYY-MM-DD" | null, "type": "qa_cutoff" | "site_visit" | "final_rfp" | "proposal_due" | "oral_presentation" | "expected_award" | "debrief_window" | "protest_window" | "other" }]
 }`;
 
 export function buildSolicitationExtractPrompt(
@@ -1259,6 +1275,54 @@ export function parseAiJson<T>(
   }
   return { ok: true, data: parsed.data };
 }
+
+// ─────────────────────────────────────────────────────────────────
+// BL-AI-TOOLS — health-scan response schema. Shared by the on-demand
+// scan action and the background scan cron so both validate identically
+// through completeStructuredForTenant.
+// ─────────────────────────────────────────────────────────────────
+
+const scanSeveritySchema = z.enum(["high", "medium", "low"]);
+
+export const proposalScanSchema = z.object({
+  overallScore: z.enum(["strong", "needs_work", "critical"]),
+  summary: z.string(),
+  sectionIssues: z.array(
+    z.object({
+      sectionId: z.string(),
+      sectionTitle: z.string(),
+      issue: z.string(),
+      severity: scanSeveritySchema,
+    }),
+  ),
+  topRecommendations: z.array(z.string()),
+  sectionThemeCoverage: z
+    .array(
+      z.object({
+        sectionId: z.string(),
+        sectionTitle: z.string(),
+        reinforced: z.array(z.string()),
+        missing: z.array(z.string()),
+      }),
+    )
+    .optional(),
+  contradictions: z
+    .array(
+      z.object({
+        section1Id: z.string(),
+        section1Title: z.string(),
+        section2Id: z.string(),
+        section2Title: z.string(),
+        claim1: z.string(),
+        claim2: z.string(),
+        explanation: z.string(),
+        severity: scanSeveritySchema,
+      }),
+    )
+    .optional(),
+});
+
+export type ProposalScanPayload = z.infer<typeof proposalScanSchema>;
 
 // ─────────────────────────────────────────────────────────────────
 // BL-FB-WIN-PROTEST — protest viability check

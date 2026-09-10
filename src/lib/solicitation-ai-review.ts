@@ -4,8 +4,7 @@
  * mode handling and zod validation, mirroring the pattern from
  * `solicitation-extract.ts` and `ebuy-extract.ts`.
  */
-import { completeForTenant } from "@/lib/ai";
-import { parseAiJson } from "@/lib/ai-prompts";
+import { completeStructuredForTenant } from "@/lib/ai";
 import {
   buildCapabilityMatrixPrompt,
   buildQuestionGeneratorPrompt,
@@ -48,8 +47,11 @@ export async function aiRunSolicitationReview(input: {
 
   try {
     const prompt = buildSolicitationReviewPrompt(input);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId: input.organizationId,
+      feature: "solicitation_review",
+      schema: solicitationReviewSchema,
+      toolName: "record_solicitation_review",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 4000,
@@ -67,12 +69,15 @@ export async function aiRunSolicitationReview(input: {
       };
     }
 
-    const parseResult = parseAiJson(ai.text, solicitationReviewSchema);
-    if (!parseResult.ok) {
+    if (!ai.data) {
       log.error("[aiRunSolicitationReview]", "parse", {
-        error: parseResult.error,
+        error: ai.parseError,
+        viaTool: ai.viaTool,
       });
-      return { ok: false, error: parseResult.error };
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
 
     return {
@@ -80,7 +85,7 @@ export async function aiRunSolicitationReview(input: {
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: parseResult.data,
+      data: ai.data,
     };
   } catch (err) {
     log.error("[aiRunSolicitationReview]", "error", { error: err });
@@ -119,8 +124,11 @@ export async function aiRunCapabilityMatrix(input: {
 
   try {
     const prompt = buildCapabilityMatrixPrompt(input);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId: input.organizationId,
+      feature: "capability_matrix",
+      schema: capabilityMatrixSchema,
+      toolName: "record_capability_matrix",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 4000,
@@ -138,12 +146,15 @@ export async function aiRunCapabilityMatrix(input: {
       };
     }
 
-    const parseResult = parseAiJson(ai.text, capabilityMatrixSchema);
-    if (!parseResult.ok) {
+    if (!ai.data) {
       log.error("[aiRunCapabilityMatrix]", "parse", {
-        error: parseResult.error,
+        error: ai.parseError,
+        viaTool: ai.viaTool,
       });
-      return { ok: false, error: parseResult.error };
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
 
     return {
@@ -151,7 +162,7 @@ export async function aiRunCapabilityMatrix(input: {
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: parseResult.data,
+      data: ai.data,
     };
   } catch (err) {
     log.error("[aiRunCapabilityMatrix]", "error", { error: err });
@@ -179,8 +190,11 @@ export async function aiRunQuestionGenerator(input: {
 }): Promise<Ok<QuestionSetVerdict> | Err> {
   try {
     const prompt = buildQuestionGeneratorPrompt(input);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId: input.organizationId,
+      feature: "question_generator",
+      schema: questionSetSchema,
+      toolName: "record_question_set",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3000,
@@ -198,12 +212,15 @@ export async function aiRunQuestionGenerator(input: {
       };
     }
 
-    const parseResult = parseAiJson(ai.text, questionSetSchema);
-    if (!parseResult.ok) {
+    if (!ai.data) {
       log.error("[aiRunQuestionGenerator]", "parse", {
-        error: parseResult.error,
+        error: ai.parseError,
+        viaTool: ai.viaTool,
       });
-      return { ok: false, error: parseResult.error };
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
 
     return {
@@ -211,7 +228,7 @@ export async function aiRunQuestionGenerator(input: {
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: parseResult.data,
+      data: ai.data,
     };
   } catch (err) {
     log.error("[aiRunQuestionGenerator]", "error", { error: err });

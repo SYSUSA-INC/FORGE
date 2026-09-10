@@ -10,10 +10,9 @@
 import {
   buildEbuyExtractPrompt,
   ebuyExtractionSchema,
-  parseAiJson,
   type EbuyExtractionResult,
 } from "@/lib/ai-prompts";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import { log } from "@/lib/log";
 
 export type EbuyExtractOk = {
@@ -42,8 +41,11 @@ export async function aiExtractEbuy(
 
   try {
     const prompt = buildEbuyExtractPrompt(rawText);
-    const ai = await completeForTenant({
+    const ai = await completeStructuredForTenant({
       organizationId,
+      feature: "ebuy_extract",
+      schema: ebuyExtractionSchema,
+      toolName: "record_ebuy_rfq",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 1800,
@@ -77,18 +79,22 @@ export async function aiExtractEbuy(
       };
     }
 
-    const cleaned = stripCodeFences(ai.text);
-    const parseResult = parseAiJson(cleaned, ebuyExtractionSchema);
-    if (!parseResult.ok) {
-      log.error("[aiExtractEbuy]", "parse", { error: parseResult.error });
-      return { ok: false, error: parseResult.error };
+    if (!ai.data) {
+      log.error("[aiExtractEbuy]", "parse", {
+        error: ai.parseError,
+        viaTool: ai.viaTool,
+      });
+      return {
+        ok: false,
+        error: ai.parseError ?? "AI response did not match the expected shape.",
+      };
     }
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalize(parseResult.data),
+      data: normalize(ai.data),
     };
   } catch (err) {
     log.error("[aiExtractEbuy]", "error", { error: err });
@@ -97,17 +103,6 @@ export async function aiExtractEbuy(
       error: err instanceof Error ? err.message : "AI extraction failed.",
     };
   }
-}
-
-function stripCodeFences(t: string): string {
-  const s = t.trim();
-  if (s.startsWith("```")) {
-    return s
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/```\s*$/i, "")
-      .trim();
-  }
-  return s;
 }
 
 function normalize(raw: Partial<EbuyExtractionResult>): EbuyExtractionResult {

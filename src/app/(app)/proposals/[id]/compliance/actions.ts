@@ -17,13 +17,12 @@ import {
   type ComplianceStatus,
   type TipTapDoc,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeStructuredForTenant } from "@/lib/ai";
 import {
   buildComplianceAutoMapPrompt,
   buildCompliancePreflightPrompt,
   complianceAutoMapResponseSchema,
   compliancePreflightResponseSchema,
-  parseAiJson,
   type ComplianceAutoMapVerdict,
   type CompliancePreflightItem,
   type CompliancePreflightVerdict,
@@ -514,32 +513,35 @@ export async function runCompliancePreflightAction(
       items: group.items,
     });
 
-    let raw = "";
+    let verdicts: CompliancePreflightVerdict[] = [];
     try {
-      const res = await completeForTenant({
+      const res = await completeStructuredForTenant({
         organizationId,
+        feature: "compliance_preflight",
+        schema: compliancePreflightResponseSchema,
+        toolName: "record_compliance_verdicts",
+        toolDescription:
+          "Record one verdict per compliance item: suggested status, confidence, gap and suggestion.",
         system: prompt.system,
         messages: prompt.messages,
         maxTokens: 2000,
         temperature: 0,
       });
-      raw = res.text;
       stubbed = stubbed || res.stubbed;
       provider = res.provider;
+      if (!res.data) {
+        log.warn("[runCompliancePreflightAction]", "structured parse failed", {
+          parseError: res.parseError,
+          viaTool: res.viaTool,
+          rawSnippet: res.text.slice(0, 240),
+        });
+        continue;
+      }
+      verdicts = res.data.verdicts;
     } catch (err) {
       log.warn("[runCompliancePreflightAction]", "AI call failed", { error: err });
       continue;
     }
-
-    const parseResult = parseAiJson(raw, compliancePreflightResponseSchema);
-    if (!parseResult.ok) {
-      log.warn("[runCompliancePreflightAction]", "JSON parse failed", {
-        parseError: parseResult.error,
-        rawSnippet: raw.slice(0, 240),
-      });
-      continue;
-    }
-    const verdicts: CompliancePreflightVerdict[] = parseResult.data.verdicts;
 
     // Apply each verdict back to its item, sequentially per Neon rule.
     for (const v of verdicts) {
@@ -845,33 +847,35 @@ export async function runComplianceAutoMapAction(
       })),
     });
 
-    let raw = "";
     try {
-      const res = await completeForTenant({
+      const res = await completeStructuredForTenant({
         organizationId,
+        feature: "compliance_automap",
+        schema: complianceAutoMapResponseSchema,
+        toolName: "record_requirement_mappings",
+        toolDescription:
+          "Record the proposal section each compliance item should be answered in, with confidence.",
         system: prompt.system,
         messages: prompt.messages,
         maxTokens: 3000,
         temperature: 0,
         cacheSystem: true,
       });
-      raw = res.text;
       stubbed = stubbed || res.stubbed;
       model = `${res.provider}:${res.model}`;
+      if (!res.data) {
+        log.warn("[runComplianceAutoMapAction]", "structured parse failed", {
+          parseError: res.parseError,
+          viaTool: res.viaTool,
+          rawSnippet: res.text.slice(0, 240),
+        });
+        continue;
+      }
+      aggregated.push(...res.data.mappings);
     } catch (err) {
       log.warn("[runComplianceAutoMapAction]", "AI call failed", { error: err });
       continue;
     }
-
-    const parseResult = parseAiJson(raw, complianceAutoMapResponseSchema);
-    if (!parseResult.ok) {
-      log.warn("[runComplianceAutoMapAction]", "JSON parse failed", {
-        parseError: parseResult.error,
-        rawSnippet: raw.slice(0, 240),
-      });
-      continue;
-    }
-    aggregated.push(...parseResult.data.mappings);
   }
 
   if (aggregated.length === 0) {
