@@ -3478,13 +3478,55 @@ records what answered, so the before/after is measurable per feature.
 - `docs/FAQ.md` env table documents the new variables.
 
 ### BL-AI-STREAMING — Streaming draft + chat
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
 
-Every AI call blocks until the full response arrives; users watch a
-spinner for the whole draft. Route handler with SSE for `section_draft`
-and `section_chat`, progressive insert into the TipTap editor, quota
-and telemetry semantics preserved (record on stream end with final
-usage).
+Every AI call used to block until the full response arrived; users
+watched a spinner for the whole draft. Section drafts and section chat
+now stream token-by-token into the AI assist panel, with the same gates,
+quota, draft-signal capture and telemetry as before.
+
+**Delivered:**
+- Gateway: `onDelta?: (text) => void` on `AICompleteOptions`;
+  `streamed?: boolean` on the result. Anthropic streams natively
+  (`stream: true`, SSE reducer over `message_start` /
+  `content_block_delta` / `message_delta` / `error`, exported as
+  `__applyAnthropicStreamEvent` for tests). Providers that do not stream
+  return the whole text and the gateway delivers it through the same
+  callback once, so callers never branch on provider. Stub streams its
+  text as one delta. `onDelta` is ignored when `tool` is set. Quota,
+  telemetry and validation run on the aggregate exactly as before.
+- `src/lib/sse.ts` (pure): `encodeSseEvent`, `sseHeaders`,
+  `createSseParser` (chunk-boundary safe, multi-line data, CRLF),
+  `readSseStream` for the browser.
+- `src/lib/ai-stream-types.ts` (pure): `DraftStreamEvent`,
+  `ChatStreamEvent` wire types + guards shared by routes and panel.
+- `src/lib/api-tenant.ts` (server-only): `requireApiTenant` wraps
+  `requireCurrentOrg` and converts its `redirect()` into a JSON 401 so
+  fetch callers get a usable error. Impersonation handling unchanged.
+- `src/lib/section-draft.ts` / `src/lib/section-chat.ts` (server-only):
+  the context assembly and prompt building extracted from the actions so
+  the streaming routes and the actions share one implementation.
+  `generateSectionDraftAction` (still used by A/B) and
+  `chatWithSectionAction` now call them; behaviour unchanged except the
+  request slot is refunded when preparation fails.
+- `POST /api/ai/draft` and `POST /api/ai/chat`: zod-validated body,
+  feature + quota gates (402), chat rate limit (429), `text/event-stream`
+  of `delta` events then `done` or `error`. Refund on empty / failure.
+  `maxDuration` 120 / 60.
+- `AiAssistantPanel`: fetch + `readSseStream`; live preview with word
+  count and a Stop button for drafts; the assistant bubble fills in as
+  chat streams. Non-SSE responses (401 / 402 / 429 / middleware 403 /
+  sign-in HTML) surface as readable errors. In-flight streams abort on
+  Discard, Close, unmount and re-request.
+- `tests/ai/gateway-streaming.test.ts`: SSE parser edge cases, encode →
+  read round-trip, Anthropic reducer, gateway onDelta pass-through,
+  non-streaming fallback delta, throwing consumer isolation, stub
+  streaming.
+
+**Follow-up:** Azure OpenAI and vLLM currently take the one-shot
+fallback path. Native OpenAI-style streaming (`stream_options.include_usage`
+for token accounting) is a small addition once either provider is in
+production use.
 
 ### BL-AI-SCAN-FULLTEXT — Full-text health scan
 **Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued

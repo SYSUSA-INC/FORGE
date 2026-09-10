@@ -23,6 +23,11 @@
  * tenant gateway picks one per feature: fast / standard / strong classes
  * mapped to concrete models per provider, with per-tenant overrides.
  * See src/lib/ai-routing.ts.
+ *
+ * BL-AI-STREAMING — pass `onDelta` to receive text as it is generated.
+ * Anthropic streams natively; other providers deliver the whole text in
+ * one callback when they finish. The returned result is always the
+ * complete aggregate, so quota, telemetry and validation are unchanged.
  */
 
 import { z } from "zod";
@@ -33,6 +38,7 @@ import {
   resolveModelForFeature,
   routingEnabled,
 } from "@/lib/ai-routing";
+import { createSseParser } from "@/lib/sse";
 
 export type AIRole = "user" | "assistant";
 
@@ -97,6 +103,13 @@ export type AICompleteOptions = {
    * Providers without tool support ignore it and answer in text.
    */
   tool?: AIToolSpec;
+  /**
+   * BL-AI-STREAMING — receive text deltas as they arrive. Ignored when
+   * `tool` is set (structured output is not streamed). Providers that
+   * cannot stream call this once with the full text at the end, so a
+   * caller can always render progressively without branching.
+   */
+  onDelta?: (text: string) => void;
 };
 
 export type AICompleteResult = {
@@ -111,6 +124,8 @@ export type AICompleteResult = {
   structured?: unknown;
   /** Provider stop / finish reason, when reported. */
   stopReason?: string;
+  /** BL-AI-STREAMING — true when `onDelta` received incremental deltas from the provider. */
+  streamed?: boolean;
 };
 
 export type AIProviderName = "anthropic" | "bedrock" | "azure" | "vllm" | "stub";
@@ -232,6 +247,73 @@ export function __parseAnthropicResponse(
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// BL-AI-STREAMING — Anthropic Messages streaming. Events we care about:
+//   message_start        → model, usage.input_tokens
+//   content_block_delta  → delta.text_delta.text (appended, forwarded)
+//   message_delta        → delta.stop_reason, usage.output_tokens
+//   error                → thrown
+// Everything else (ping, content_block_start/stop, message_stop) is noise.
+// ─────────────────────────────────────────────────────────────────────
+
+export type AnthropicStreamState = {
+  text: string;
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  stopReason?: string;
+};
+
+type AnthropicStreamEvent = {
+  type: string;
+  message?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number } };
+  delta?: { type?: string; text?: string; stop_reason?: string };
+  usage?: { output_tokens?: number };
+  error?: { type?: string; message?: string };
+};
+
+export function __newAnthropicStreamState(model: string): AnthropicStreamState {
+  return { text: "", model };
+}
+
+/** Apply one parsed stream event to the state; forwards text deltas. */
+export function __applyAnthropicStreamEvent(
+  state: AnthropicStreamState,
+  ev: AnthropicStreamEvent,
+  onDelta?: (text: string) => void,
+): void {
+  switch (ev.type) {
+    case "message_start": {
+      if (ev.message?.model) state.model = ev.message.model;
+      if (typeof ev.message?.usage?.input_tokens === "number") {
+        state.inputTokens = ev.message.usage.input_tokens;
+      }
+      return;
+    }
+    case "content_block_delta": {
+      if (ev.delta?.type === "text_delta" && typeof ev.delta.text === "string") {
+        state.text += ev.delta.text;
+        onDelta?.(ev.delta.text);
+      }
+      return;
+    }
+    case "message_delta": {
+      if (ev.delta?.stop_reason) state.stopReason = ev.delta.stop_reason;
+      if (typeof ev.usage?.output_tokens === "number") {
+        state.outputTokens = ev.usage.output_tokens;
+      }
+      return;
+    }
+    case "error": {
+      throw new Error(
+        `Anthropic stream error: ${ev.error?.type ?? "unknown"}: ${ev.error?.message ?? ""}`.trim(),
+      );
+    }
+    default:
+      return;
+  }
+}
+
 class AnthropicProvider implements AIProvider {
   readonly name = "anthropic" as const;
   constructor(
@@ -239,17 +321,26 @@ class AnthropicProvider implements AIProvider {
     private defaultModel = DEFAULT_ANTHROPIC_MODEL,
   ) {}
 
+  private headers(): Record<string, string> {
+    return {
+      "content-type": "application/json",
+      "x-api-key": this.apiKey,
+      "anthropic-version": "2023-06-01",
+    };
+  }
+
   async complete(opts: AICompleteOptions): Promise<AICompleteResult> {
     const model = opts.model ?? this.defaultModel;
     const body = __buildAnthropicBody(opts, model);
 
+    // Structured output is not streamed; everything else can be.
+    if (opts.onDelta && !opts.tool) {
+      return this.completeStreaming(opts.onDelta, model, body);
+    }
+
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: this.headers(),
       body: JSON.stringify(body),
     });
     if (!res.ok) {
@@ -261,6 +352,57 @@ class AnthropicProvider implements AIProvider {
       ...__parseAnthropicResponse(json, model),
       provider: this.name,
       stubbed: false,
+    };
+  }
+
+  private async completeStreaming(
+    onDelta: (text: string) => void,
+    model: string,
+    body: Record<string, unknown>,
+  ): Promise<AICompleteResult> {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ ...body, stream: true }),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`);
+    }
+    if (!res.body) throw new Error("Anthropic streaming response had no body.");
+
+    const state = __newAnthropicStreamState(model);
+    const parser = createSseParser();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    const apply = (payloads: string[]) => {
+      for (const p of payloads) {
+        let ev: AnthropicStreamEvent;
+        try {
+          ev = JSON.parse(p) as AnthropicStreamEvent;
+        } catch {
+          continue;
+        }
+        __applyAnthropicStreamEvent(state, ev, onDelta);
+      }
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      apply(parser.push(decoder.decode(value, { stream: true })));
+    }
+    apply(parser.push(decoder.decode()));
+    apply(parser.flush());
+
+    return {
+      text: state.text.trim(),
+      provider: this.name,
+      model: state.model,
+      inputTokens: state.inputTokens,
+      outputTokens: state.outputTokens,
+      stubbed: false,
+      stopReason: state.stopReason,
+      streamed: true,
     };
   }
 }
@@ -441,6 +583,10 @@ class StubProvider implements AIProvider {
       .filter(Boolean)
       .join("\n");
 
+    // Simulate a one-chunk stream so streaming callers see the same
+    // callback shape they get from a live provider.
+    if (opts.onDelta && !opts.tool) opts.onDelta(text);
+
     return {
       text,
       provider: this.name,
@@ -448,6 +594,7 @@ class StubProvider implements AIProvider {
       inputTokens: 0,
       outputTokens: 0,
       stubbed: true,
+      streamed: Boolean(opts.onDelta && !opts.tool),
     };
   }
 }
@@ -773,6 +920,17 @@ async function runTenantCompletion<T>(
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;
+  }
+
+  // BL-AI-STREAMING — providers that cannot stream return the whole
+  // text at once; deliver it through the same callback so callers never
+  // have to branch on provider capability.
+  if (rest.onDelta && !rest.tool && !result.streamed && result.text) {
+    try {
+      rest.onDelta(result.text);
+    } catch {
+      // A failing consumer must not fail the call.
+    }
   }
 
   const validation = validate ? validate(result) : null;

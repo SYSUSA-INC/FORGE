@@ -1,22 +1,45 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import type { TipTapDoc } from "@/db/schema";
-import {
-  generateSectionDraftAction,
-  type SectionDraftResult,
-} from "./actions";
+import type { SectionDraftResult } from "./actions";
 import {
   generateSectionDraftABAction,
   selectABVariantAction,
   type ABDraftResult,
 } from "./ab-actions";
-import { chatWithSectionAction, type ChatMessage } from "./chat-actions";
+import type { ChatMessage } from "./chat-actions";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
+import {
+  isChatStreamEvent,
+  isDraftStreamEvent,
+} from "@/lib/ai-stream-types";
+import { readSseStream } from "@/lib/sse";
 
 type Success = Extract<SectionDraftResult, { ok: true }>;
 type ActiveTab = "generate" | "chat";
+
+/**
+ * BL-AI-STREAMING — read a failed (non-SSE) response into a message the
+ * user can act on. Middleware and the route both answer JSON on refusal;
+ * an HTML body means the session bounced to sign-in.
+ */
+async function readErrorMessage(res: Response): Promise<string> {
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) {
+    try {
+      const j = (await res.json()) as { error?: unknown };
+      if (typeof j.error === "string" && j.error) return j.error;
+    } catch {
+      // fall through
+    }
+  }
+  if (res.status === 401 || ct.includes("text/html")) {
+    return "Your session has expired. Sign in again to continue.";
+  }
+  return `Request failed (${res.status}).`;
+}
 
 type Props = {
   sectionId: string;
@@ -47,13 +70,24 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
 
-  // Generate tab state
-  const [pending, startTransition] = useTransition();
+  // Generate tab state. `pending` is plain state (not useTransition)
+  // because the draft streams over fetch rather than a server action.
+  const [pending, setPending] = useState(false);
+  const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Success | null>(null);
   const [mode, setMode] = useState<SectionDraftMode>(
     hasContent ? "improve" : "draft",
   );
+  // One in-flight stream per panel; a new request or Discard aborts it.
+  const draftAbortRef = useRef<AbortController | null>(null);
+  const chatAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => {
+      draftAbortRef.current?.abort();
+      chatAbortRef.current?.abort();
+    };
+  }, []);
 
   // A/B compare state (BL-11)
   type ABSuccess = Extract<ABDraftResult, { ok: true }>;
@@ -64,25 +98,75 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
   // Chat tab state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
-  const [chatPending, startChatTransition] = useTransition();
+  const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  function generate(forMode: SectionDraftMode) {
+  function cancelDraft() {
+    draftAbortRef.current?.abort();
+    draftAbortRef.current = null;
+    setPending(false);
+    setStreamText("");
+  }
+
+  async function generate(forMode: SectionDraftMode) {
+    draftAbortRef.current?.abort();
+    const ac = new AbortController();
+    draftAbortRef.current = ac;
+
     setError(null);
     setResult(null);
     setMode(forMode);
-    startTransition(async () => {
-      const res = await generateSectionDraftAction({
-        sectionId,
-        mode: forMode,
+    setStreamText("");
+    setPending(true);
+
+    let acc = "";
+    let finished = false;
+    try {
+      const res = await fetch("/api/ai/draft", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sectionId, mode: forMode }),
+        signal: ac.signal,
       });
-      if (!res.ok) {
-        setError(res.error);
+      const isSse = (res.headers.get("content-type") ?? "").includes(
+        "text/event-stream",
+      );
+      if (!res.ok || !isSse) {
+        setError(await readErrorMessage(res));
         return;
       }
-      setResult(res);
-    });
+      await readSseStream(
+        res,
+        (ev) => {
+          if (!isDraftStreamEvent(ev)) return;
+          if (ev.type === "delta") {
+            acc += ev.text;
+            setStreamText(acc);
+          } else if (ev.type === "done") {
+            finished = true;
+            setResult({ ok: true, ...ev.result });
+          } else {
+            finished = true;
+            setError(ev.error);
+          }
+        },
+        ac.signal,
+      );
+      if (!finished && !ac.signal.aborted) {
+        setError("The connection closed before the draft finished. Try again.");
+      }
+    } catch (err) {
+      if (!ac.signal.aborted) {
+        setError(err instanceof Error ? err.message : "AI request failed.");
+      }
+    } finally {
+      if (draftAbortRef.current === ac) {
+        draftAbortRef.current = null;
+        setPending(false);
+        setStreamText("");
+      }
+    }
   }
 
   function accept() {
@@ -126,35 +210,94 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
     setAbResult(null);
   }
 
-  function sendChat() {
+  async function sendChat() {
     const msg = chatInput.trim();
     if (!msg || chatPending) return;
     setChatInput("");
     setChatError(null);
-    const nextHistory: ChatMessage[] = [
-      ...chatHistory,
+
+    const priorHistory = chatHistory;
+    // Optimistic user turn + an empty assistant bubble that fills in as
+    // deltas arrive. Both are rolled back on failure.
+    setChatHistory([
+      ...priorHistory,
       { role: "user", content: msg },
-    ];
-    setChatHistory(nextHistory);
-    startChatTransition(async () => {
-      const res = await chatWithSectionAction({
-        sectionId,
-        message: msg,
-        history: chatHistory,
+      { role: "assistant", content: "" },
+    ]);
+    setChatPending(true);
+
+    chatAbortRef.current?.abort();
+    const ac = new AbortController();
+    chatAbortRef.current = ac;
+
+    const setAssistant = (content: string) =>
+      setChatHistory((h) => {
+        if (h.length === 0) return h;
+        const next = h.slice();
+        const last = next[next.length - 1];
+        if (last && last.role === "assistant") {
+          next[next.length - 1] = { role: "assistant", content };
+        }
+        return next;
       });
-      if (!res.ok) {
-        setChatError(res.error);
-        setChatHistory((h) => h.slice(0, -1));
-        return;
-      }
-      setChatHistory((h) => [
-        ...h,
-        { role: "assistant", content: res.reply },
-      ]);
+    const rollback = () => setChatHistory(priorHistory);
+    const scroll = () =>
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 50);
-    });
+
+    let acc = "";
+    let finished = false;
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sectionId, message: msg, history: priorHistory }),
+        signal: ac.signal,
+      });
+      const isSse = (res.headers.get("content-type") ?? "").includes(
+        "text/event-stream",
+      );
+      if (!res.ok || !isSse) {
+        setChatError(await readErrorMessage(res));
+        rollback();
+        return;
+      }
+      await readSseStream(
+        res,
+        (ev) => {
+          if (!isChatStreamEvent(ev)) return;
+          if (ev.type === "delta") {
+            acc += ev.text;
+            setAssistant(acc);
+            scroll();
+          } else if (ev.type === "done") {
+            finished = true;
+            setAssistant(ev.reply);
+            scroll();
+          } else {
+            finished = true;
+            setChatError(ev.error);
+            rollback();
+          }
+        },
+        ac.signal,
+      );
+      if (!finished && !ac.signal.aborted) {
+        setChatError("The connection closed before the reply finished.");
+        rollback();
+      }
+    } catch (err) {
+      if (!ac.signal.aborted) {
+        setChatError(err instanceof Error ? err.message : "Chat request failed.");
+        rollback();
+      }
+    } finally {
+      if (chatAbortRef.current === ac) {
+        chatAbortRef.current = null;
+        setChatPending(false);
+      }
+    }
   }
 
   function applyChatSuggestion(text: string) {
@@ -206,6 +349,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
         <button
           type="button"
           onClick={() => {
+            cancelDraft();
             setOpen(false);
             setResult(null);
             setError(null);
@@ -321,7 +465,31 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                 <span className="font-mono text-[10px] text-teal">generating…</span>
               ) : null}
             </button>
-            {(pending || abPending) ? (
+            {pending ? (
+              /* BL-AI-STREAMING — live preview fills in as the model writes. */
+              <div className="mt-2 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between font-mono text-[10px] text-muted">
+                  <span>
+                    {streamText
+                      ? `Writing… ${streamText.split(/\s+/).filter(Boolean).length} words`
+                      : "Reading proposal context…"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={cancelDraft}
+                    className="font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
+                  >
+                    Stop
+                  </button>
+                </div>
+                {streamText ? (
+                  <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-teal/20 bg-canvas px-3 py-2 font-body text-[13px] leading-relaxed text-text">
+                    {streamText}
+                    <span className="ml-0.5 inline-block h-[1em] w-[2px] animate-pulse bg-teal align-text-bottom" />
+                  </div>
+                ) : null}
+              </div>
+            ) : abPending ? (
               <div className="mt-2 font-mono text-[10px] text-muted">
                 Generating…
               </div>
@@ -425,7 +593,8 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                   </div>
                 </div>
               ))}
-              {chatPending ? (
+              {chatPending &&
+              !(chatHistory[chatHistory.length - 1]?.content ?? "") ? (
                 <div className="font-mono text-[10px] text-muted">
                   Thinking…
                 </div>
