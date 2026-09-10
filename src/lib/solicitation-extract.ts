@@ -80,6 +80,8 @@ export async function aiExtractSolicitation(
     const prompt = buildSolicitationExtractPrompt(rawText);
     const ai = await completeForTenant({
       organizationId,
+      feature: "solicitation_extract",
+      variant: "text",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -177,6 +179,8 @@ export async function aiExtractSolicitationFromPdf(
     const prompt = buildSolicitationVisionPrompt();
     const ai = await completeForTenant({
       organizationId,
+      feature: "solicitation_extract",
+      variant: "pdf_vision",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,
@@ -250,6 +254,8 @@ export async function aiExtractSolicitationFromImage(
     const prompt = buildSolicitationVisionPrompt();
     const ai = await completeForTenant({
       organizationId,
+      feature: "solicitation_extract",
+      variant: "image_vision",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,

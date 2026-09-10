@@ -518,6 +518,7 @@ export async function runCompliancePreflightAction(
     try {
       const res = await completeForTenant({
         organizationId,
+        feature: "compliance_preflight",
         system: prompt.system,
         messages: prompt.messages,
         maxTokens: 2000,
@@ -849,6 +850,7 @@ export async function runComplianceAutoMapAction(
     try {
       const res = await completeForTenant({
         organizationId,
+        feature: "compliance_automap",
         system: prompt.system,
         messages: prompt.messages,
         maxTokens: 3000,

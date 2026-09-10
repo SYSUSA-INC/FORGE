@@ -63,6 +63,7 @@ export async function extractTextFromImageViaVision(input: {
   try {
     const ai = await completeForTenant({
       organizationId: input.organizationId,
+      feature: "image_ocr",
       system: SYSTEM,
       messages: [
         {

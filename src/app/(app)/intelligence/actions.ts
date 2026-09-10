@@ -180,6 +180,7 @@ export async function generatePipelineBriefAction(
     const prompt = buildPipelineBriefPrompt(snapshot);
     const ai = await completeForTenant({
       organizationId,
+      feature: "pipeline_brief",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 600,

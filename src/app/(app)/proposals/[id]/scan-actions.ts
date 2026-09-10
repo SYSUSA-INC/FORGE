@@ -247,6 +247,7 @@ export async function runProposalScanAction(
   try {
     const res = await completeForTenant({
       organizationId,
+      feature: "proposal_scan",
       system: SCAN_SYSTEM,
       messages: [{ role: "user", content: userPrompt }],
       maxTokens: 2000,

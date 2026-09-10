@@ -56,6 +56,7 @@ export async function aiExtractKnowledgeFromArtifact(input: {
     const prompt = buildKnowledgeExtractPrompt(input);
     const ai = await completeForTenant({
       organizationId: input.organizationId,
+      feature: "knowledge_extract",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3500,

@@ -185,6 +185,7 @@ export async function generateOpportunityBriefAction(
     const prompt = buildOpportunityBriefPrompt(snapshot);
     const ai = await completeForTenant({
       organizationId,
+      feature: "opportunity_brief",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 600,

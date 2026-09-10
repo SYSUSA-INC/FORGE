@@ -56,6 +56,7 @@ export async function aiExtractGsa(
     const prompt = buildGsaExtractPrompt(rawText);
     const ai = await completeForTenant({
       organizationId,
+      feature: "gsa_extract",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 1800,

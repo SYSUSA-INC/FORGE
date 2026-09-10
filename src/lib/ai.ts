@@ -11,6 +11,8 @@
  * SigV4 signing and is left as a deliberate stub until we need it.
  */
 
+import type { AiFeature } from "@/lib/ai-features";
+
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const DEFAULT_VLLM_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct";
 
@@ -448,6 +450,21 @@ export function __setCompleteImplForTest(fn: typeof complete | null): void {
 }
 
 /**
+ * BL-AI-TELEMETRY — options for tenant-gated calls. `feature` is
+ * required so every call site declares the product surface it serves;
+ * TypeScript refuses a call that forgets. Stored in ai_call_log.
+ */
+export type AITenantCompleteOptions = AICompleteOptions & {
+  organizationId: string;
+  /** Product surface making the call (see src/lib/ai-features.ts). */
+  feature: AiFeature;
+  /** Optional sub-mode — draft mode, extraction path, review kind. */
+  variant?: string;
+  /** Optional prompt revision tag so prompt changes are comparable. */
+  promptVersion?: string;
+};
+
+/**
  * BL-PACKAGES Slice 1 — tenant-gated AI completion.
  *
  * Use this in EVERY server action or API route that runs AI on behalf
@@ -491,14 +508,27 @@ export function __setCompleteImplForTest(fn: typeof complete | null): void {
  *     with "you don't pay for failed calls"
  */
 export async function completeForTenant(
-  opts: AICompleteOptions & { organizationId: string },
+  opts: AITenantCompleteOptions,
 ): Promise<AICompleteResult> {
-  const { organizationId, ...rest } = opts;
-  // Dynamic import keeps the AI gateway free of a hard dep on the
-  // subscription-gates module — useful for the future ingest /
-  // worker contexts that may use this file without the gates layer.
+  const { organizationId, feature, variant, promptVersion, ...rest } = opts;
+  // Dynamic imports keep the AI gateway free of a hard dep on the
+  // subscription-gates / telemetry modules — useful for the future
+  // ingest / worker contexts that may use this file without them.
   const { enforceQuota, getCurrentUsage, getCurrentTier, QuotaExceededError } =
     await import("@/lib/subscription-gates");
+  const { recordAiCall } = await import("@/lib/ai-telemetry");
+
+  // BL-AI-TELEMETRY — fields common to every outcome row.
+  const telemetryBase = {
+    organizationId,
+    feature,
+    variant,
+    promptVersion,
+    requestedModel: rest.model ?? "",
+    maxTokens: rest.maxTokens ?? null,
+    cacheSystem: rest.cacheSystem ?? false,
+    hasDocuments: (rest.documents?.length ?? 0) > 0,
+  };
 
   // Pre-check: refuse before calling the provider when the tenant is
   // already over their token cap. The check is best-effort — a tenant
@@ -509,6 +539,13 @@ export async function completeForTenant(
   if (tier && tier.effectiveQuotas.aiTokensPerMonth > 0) {
     const used = await getCurrentUsage(organizationId, "aiTokensPerMonth");
     if (used >= tier.effectiveQuotas.aiTokensPerMonth) {
+      // Refusals are demand we could not serve — worth counting.
+      await recordAiCall({
+        ...telemetryBase,
+        status: "quota_refused",
+        latencyMs: 0,
+        error: `aiTokensPerMonth cap ${tier.effectiveQuotas.aiTokensPerMonth} reached (${used} used)`,
+      });
       throw new QuotaExceededError(
         "aiTokensPerMonth",
         tier.effectiveQuotas.aiTokensPerMonth,
@@ -518,7 +555,33 @@ export async function completeForTenant(
     }
   }
 
-  const result = await _completeImpl(rest);
+  // Latency is measured around the provider call only, so the number
+  // compares models rather than our own DB round-trips.
+  const providerStartedAt = Date.now();
+  let result: AICompleteResult;
+  try {
+    result = await _completeImpl(rest);
+  } catch (err) {
+    await recordAiCall({
+      ...telemetryBase,
+      status: "error",
+      latencyMs: Date.now() - providerStartedAt,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+
+  await recordAiCall({
+    ...telemetryBase,
+    status: "ok",
+    latencyMs: Date.now() - providerStartedAt,
+    provider: result.provider,
+    model: result.model,
+    inputTokens: result.inputTokens ?? 0,
+    outputTokens: result.outputTokens ?? 0,
+    outputChars: result.text.length,
+    stubbed: result.stubbed,
+  });
 
   // Post-record: atomically add this call's actual token usage. The
   // helper itself throws `QuotaExceededError` if the new total exceeds

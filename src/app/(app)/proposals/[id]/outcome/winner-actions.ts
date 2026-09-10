@@ -288,6 +288,7 @@ export async function runWinnerAnalysisAction(
   try {
     const res = await completeForTenant({
       organizationId,
+      feature: "winner_analysis",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 2400,

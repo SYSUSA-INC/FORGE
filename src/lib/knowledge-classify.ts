@@ -58,6 +58,7 @@ export async function classifyArtifactKind(input: {
     const prompt = buildArtifactKindClassifyPrompt(input);
     const ai = await completeForTenant({
       organizationId: input.organizationId,
+      feature: "knowledge_classify",
       system: prompt.system,
       messages: prompt.messages,
       // Classification is short — 200 tokens covers JSON {kind, confidence, reasoning}.

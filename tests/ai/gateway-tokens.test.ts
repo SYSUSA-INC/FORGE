@@ -171,6 +171,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     nextProviderResult = { text: "seed", inputTokens: 50, outputTokens: 50 };
     await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
@@ -186,6 +187,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     await expect(
       completeForTenant({
         organizationId: fx.orgA.organizationId,
+        feature: "section_draft",
         system: "x",
         messages: [{ role: "user", content: "y" }],
       }),
@@ -207,6 +209,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     nextProviderResult = { text: "ok", inputTokens: 30, outputTokens: 70 };
     const result = await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
@@ -237,6 +240,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     };
     const result = await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
@@ -265,6 +269,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     await expect(
       completeForTenant({
         organizationId: fx.orgA.organizationId,
+        feature: "section_draft",
         system: "x",
         messages: [{ role: "user", content: "y" }],
       }),
@@ -300,16 +305,19 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     nextProviderResult = { text: "ok", inputTokens: 100, outputTokens: 200 };
     await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
     await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
     await completeForTenant({
       organizationId: fx.orgB.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
@@ -346,6 +354,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     nextProviderResult = { text: "ok", inputTokens: 500, outputTokens: 500 };
     const result = await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });
@@ -361,6 +370,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     await expect(
       completeForTenant({
         organizationId: fx.orgA.organizationId,
+        feature: "section_draft",
         system: "x",
         messages: [{ role: "user", content: "y" }],
       }),
@@ -379,6 +389,7 @@ describe("BL-PACKAGES — completeForTenant token cap (runtime)", () => {
     // refuse based on missing tier).
     const result = await completeForTenant({
       organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
       system: "x",
       messages: [{ role: "user", content: "y" }],
     });

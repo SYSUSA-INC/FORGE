@@ -3335,6 +3335,111 @@ process most contractors run in email + Word.
 
 ---
 
+## AI substrate (2026-09-10)
+
+Reassessment after the post-pilot feature wave. FORGE's **data**
+architecture is platform-grade: outcome labels propagate onto the
+Brain, retrieval boosts won content, the drafter receives winning and
+losing patterns plus open compliance gaps, and every draft records how
+much of it survived the user's edits. The **AI gateway** beneath it is
+still single-shot text completion: JSON recovered by brace-hunting, no
+tool use, no streaming, one model for every task, and no per-call
+visibility beyond monthly token counters. Each further single-shot
+feature compounds that debt. These items harden the substrate first;
+the remaining BL-FB-* items resume after.
+
+### BL-AI-TELEMETRY — Per-call AI telemetry
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #257)
+
+Until now the only AI visibility was `tenant_usage_counter` (tokens +
+requests per month per tenant). Nothing recorded which feature made a
+call, which model answered, how long it took, or whether it failed. That
+made model routing, prompt regression checks and per-feature pricing
+impossible to reason about.
+
+**Delivered:**
+- Migration `0073_ai_call_log.sql` — `ai_call_log` table: org, feature,
+  variant, prompt_version, provider, model, requested_model, status
+  (`ok` / `error` / `quota_refused`), error, input/output tokens,
+  output_chars, max_tokens, latency_ms, stubbed, cache_system,
+  has_documents, created_at. Indexes on (org, created_at) and
+  (feature, created_at).
+- `src/lib/ai-features.ts` — append-only vocabulary of feature keys +
+  labels (`AiFeature`). Keys are stored verbatim; never rename a shipped
+  key.
+- `src/lib/ai-telemetry.ts` (server-only) — `recordAiCall` (best-effort,
+  never throws), `getAiFeatureBreakdown(since, organizationId?)`,
+  `pruneAiCallLogs`, `aiCallLogRetentionDays`.
+- `completeForTenant` now takes `AITenantCompleteOptions` with a
+  **required** `feature` and optional `variant` / `promptVersion`. It
+  writes one row per outcome: `quota_refused` at the pre-check, `error`
+  when the provider throws (then rethrows), `ok` with tokens, model,
+  output size and provider round-trip latency.
+- All 21 call sites tagged (`section_draft` carries the draft mode as
+  variant; `solicitation_extract` carries text / pdf_vision /
+  image_vision; the background scan is `proposal_scan_background` so it
+  can be compared against on-demand scans).
+- `/admin/usage` — new "AI calls by feature" panel (30-day window, all
+  tenants): calls, errors + rate, refusals, stub count, tokens in/out,
+  avg and max latency, tenants, est. cost. Header meta gains "AI call
+  errors (30d)".
+- `/api/cron/prune-audit-logs` also prunes `ai_call_log`
+  (`AI_CALL_LOG_RETENTION_DAYS`, default 90) in its own try/catch so a
+  telemetry prune failure cannot mask the audit prune result.
+- `tests/ai/gateway-telemetry.test.ts` — six runtime assertions: ok row
+  shape, error row + rethrow, quota_refused without provider call,
+  tenant isolation, per-feature aggregation for one tenant, prune window.
+
+**Not in scope (lands with BL-AI-TOOLS):** parse-outcome tracking. Once
+structured output is a gateway concern, schema-validation failures become
+a gateway status rather than a caller-side regex miss.
+
+### BL-AI-TOOLS — Native tool use + structured output in the gateway
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Every JSON-returning feature today asks the model for JSON in prose,
+then finds the first `{` and last `}` and runs `parseAiJson` + zod.
+Replace with Anthropic `tools` / `tool_choice` (forced tool call whose
+input schema is the zod schema), degrade to the current path on providers
+without tool support, and expose `completeStructured<T>(schema)`.
+Migrate the seven `parseAiJson` callers. Record `parse_ok` in
+`ai_call_log`. This is also the prerequisite for any agentic loop: a
+drafter that can call "search the Brain" mid-generation, or a scan that
+can pull a full section when it suspects a contradiction.
+
+### BL-AI-ROUTING — Per-task model routing
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued  ·  **Depends on:** BL-AI-TELEMETRY
+
+One default model serves classification, OCR, extraction, drafting and
+scan alike. Add `modelFor(feature)`: a fast, cheap model for
+`knowledge_classify` / `image_ocr` / the extractors, the strongest
+available for `section_draft` / `proposal_scan` / `winner_analysis` /
+`protest_viability`. Env override per feature, tier override per
+tenant. `ai_call_log.model` already records what answered, so the
+before/after is measurable.
+
+### BL-AI-STREAMING — Streaming draft + chat
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
+
+Every AI call blocks until the full response arrives; users watch a
+spinner for the whole draft. Route handler with SSE for `section_draft`
+and `section_chat`, progressive insert into the TipTap editor, quota
+and telemetry semantics preserved (record on stream end with final
+usage).
+
+### BL-AI-SCAN-FULLTEXT — Full-text health scan
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+The scan reads a 500-character excerpt per section. Win-theme coverage
+and contradiction detection (BL-FB-SCAN-THEMES / -CONTRADICTION) inherit
+that limit and will miss anything mid-body. Either send full section
+text under a token budget, or run two passes: excerpt pass flags
+candidate pairs, targeted pass compares those sections in full. Both
+`SCAN_SYSTEM` copies (scan-actions.ts, proposal-scan-cron.ts) stay in
+sync.
+
+---
+
 ## Effort summary
 
 | Category | Items | Total effort |

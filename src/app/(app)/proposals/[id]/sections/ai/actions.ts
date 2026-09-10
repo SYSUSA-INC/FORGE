@@ -218,6 +218,8 @@ export async function generateSectionDraftAction(input: {
     const prompt = buildSectionDraftPrompt(input.mode, snapshot);
     const ai = await completeForTenant({
       organizationId,
+      feature: "section_draft",
+      variant: input.mode,
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: input.mode === "tighten" ? 1200 : 2200,

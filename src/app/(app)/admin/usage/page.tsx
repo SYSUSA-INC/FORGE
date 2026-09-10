@@ -11,8 +11,15 @@ import {
   type TierQuotas,
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { aiFeatureLabel } from "@/lib/ai-features";
+import {
+  aiCallLogRetentionDays,
+  getAiFeatureBreakdown,
+} from "@/lib/ai-telemetry";
 
 export const dynamic = "force-dynamic";
+
+const FEATURE_WINDOW_DAYS = 30;
 
 /**
  * BL-PACKAGES Slice 3 — per-tenant AI usage & cost dashboard.
@@ -162,6 +169,23 @@ export default async function AdminUsagePage() {
   // Sort by tokens used (descending) so heaviest tenants surface first.
   rows.sort((a, b) => b.tokensUsed - a.tokensUsed);
 
+  // BL-AI-TELEMETRY — per-feature breakdown across all tenants for the
+  // trailing window. Best-effort: an empty table renders the empty state
+  // and a query failure must not take the tenant table down with it.
+  const featureSince = new Date(
+    Date.now() - FEATURE_WINDOW_DAYS * 24 * 60 * 60_000,
+  );
+  let featureRows: Awaited<ReturnType<typeof getAiFeatureBreakdown>> = [];
+  try {
+    featureRows = await getAiFeatureBreakdown(featureSince);
+  } catch {
+    featureRows = [];
+  }
+  const featureErrors = featureRows.reduce((s, r) => s + r.errors, 0);
+  const featureRefused = featureRows.reduce((s, r) => s + r.quotaRefused, 0);
+  const featureCalls = featureRows.reduce((s, r) => s + r.calls, 0);
+  const retentionDays = aiCallLogRetentionDays();
+
   const totalTokens = rows.reduce((sum, r) => sum + r.tokensUsed, 0);
   const totalRequests = rows.reduce((sum, r) => sum + r.requestsUsed, 0);
   const totalCostUsd = (totalTokens / 1_000_000) * costPerMTok;
@@ -213,6 +237,11 @@ export default async function AdminUsagePage() {
             label: "Tenants ≥80% cap",
             value: String(nearCapCount),
             accent: nearCapCount > 0 ? "hazard" : "emerald",
+          },
+          {
+            label: `AI call errors (${FEATURE_WINDOW_DAYS}d)`,
+            value: featureCalls === 0 ? "—" : String(featureErrors),
+            accent: featureErrors > 0 ? "rose" : "emerald",
           },
         ]}
       />
@@ -319,8 +348,141 @@ export default async function AdminUsagePage() {
           </p>
         </Panel>
       </div>
+
+      <div className="mt-4">
+        <Panel
+          title="AI calls by feature"
+          eyebrow={`Last ${FEATURE_WINDOW_DAYS} days · all tenants · ${featureRows.length} feature${featureRows.length === 1 ? "" : "s"} · ${featureCalls.toLocaleString()} calls`}
+        >
+          {featureRows.length === 0 ? (
+            <p className="font-body text-[13px] leading-relaxed text-muted">
+              No AI calls recorded in the last {FEATURE_WINDOW_DAYS} days.
+              Every tenant AI call through the gateway writes one row here
+              with its feature, model, tokens, latency and outcome.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-mono text-[11px]">
+                <thead>
+                  <tr className="border-b border-white/10 text-muted">
+                    <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                      Feature
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Calls
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Errors
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Refused
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Stub
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Tokens in
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Tokens out
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Avg latency
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Max
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Tenants
+                    </th>
+                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                      Est. cost
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {featureRows.map((f) => {
+                    const cost =
+                      ((f.inputTokens + f.outputTokens) / 1_000_000) *
+                      costPerMTok;
+                    const errorRate =
+                      f.calls > 0 ? (f.errors / f.calls) * 100 : 0;
+                    const errorTone =
+                      f.errors === 0
+                        ? "text-muted"
+                        : errorRate >= 10
+                          ? "text-rose"
+                          : "text-amber-200";
+                    return (
+                      <tr
+                        key={f.feature}
+                        className="border-b border-white/[0.04] text-text/90 hover:bg-white/[0.03]"
+                      >
+                        <td className="px-2 py-1.5">
+                          {aiFeatureLabel(f.feature)}
+                          <div className="font-mono text-[10px] text-muted">
+                            {f.feature}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          {f.calls.toLocaleString()}
+                        </td>
+                        <td className={`px-2 py-1.5 text-right ${errorTone}`}>
+                          {f.errors === 0
+                            ? "0"
+                            : `${f.errors} (${errorRate.toFixed(0)}%)`}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {f.quotaRefused}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {f.stubbed}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          {f.inputTokens.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          {f.outputTokens.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          {formatLatency(f.avgLatencyMs)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {formatLatency(f.maxLatencyMs)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {f.tenants}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          ${cost.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="mt-3 font-mono text-[10px] text-muted">
+            Source: ai_call_log, one row per gateway call. Refused = blocked
+            at the token-cap pre-check. Latency is provider round-trip on
+            successful calls. Rows are pruned after {retentionDays} days
+            (AI_CALL_LOG_RETENTION_DAYS).
+            {featureRefused > 0
+              ? ` ${featureRefused.toLocaleString()} refusals in window — tenants are hitting caps.`
+              : ""}
+          </p>
+        </Panel>
+      </div>
     </>
   );
+}
+
+function formatLatency(ms: number): string {
+  if (ms <= 0) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
 }
 
 function verdictFor(percent: number | null): {

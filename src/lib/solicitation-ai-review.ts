@@ -50,6 +50,7 @@ export async function aiRunSolicitationReview(input: {
     const prompt = buildSolicitationReviewPrompt(input);
     const ai = await completeForTenant({
       organizationId: input.organizationId,
+      feature: "solicitation_review",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 4000,
@@ -121,6 +122,7 @@ export async function aiRunCapabilityMatrix(input: {
     const prompt = buildCapabilityMatrixPrompt(input);
     const ai = await completeForTenant({
       organizationId: input.organizationId,
+      feature: "capability_matrix",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 4000,
@@ -181,6 +183,7 @@ export async function aiRunQuestionGenerator(input: {
     const prompt = buildQuestionGeneratorPrompt(input);
     const ai = await completeForTenant({
       organizationId: input.organizationId,
+      feature: "question_generator",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3000,

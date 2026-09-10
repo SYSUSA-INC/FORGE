@@ -644,6 +644,55 @@ export const sectionDraftSignals = pgTable(
 export type SectionDraftSignal = typeof sectionDraftSignals.$inferSelect;
 export type NewSectionDraftSignal = typeof sectionDraftSignals.$inferInsert;
 
+// BL-AI-TELEMETRY — per-call AI ledger. One row per completeForTenant
+// invocation (ok / error / quota_refused). `feature` + `variant` name the
+// product surface; tokens, latency and model make cost and quality
+// measurable per feature rather than per tenant only. Pruned by the daily
+// prune cron (AI_CALL_LOG_RETENTION_DAYS, default 90).
+export type AiCallStatus = "ok" | "error" | "quota_refused";
+
+export const aiCallLogs = pgTable(
+  "ai_call_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull().default("unknown"),
+    variant: text("variant").notNull().default(""),
+    promptVersion: text("prompt_version").notNull().default(""),
+    provider: text("provider").notNull().default(""),
+    model: text("model").notNull().default(""),
+    requestedModel: text("requested_model").notNull().default(""),
+    status: text("status").$type<AiCallStatus>().notNull(),
+    error: text("error"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    outputChars: integer("output_chars").notNull().default(0),
+    maxTokens: integer("max_tokens"),
+    latencyMs: integer("latency_ms").notNull().default(0),
+    stubbed: boolean("stubbed").notNull().default(false),
+    cacheSystem: boolean("cache_system").notNull().default(false),
+    hasDocuments: boolean("has_documents").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("acl_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    featureCreatedIdx: index("acl_feature_created_idx").on(
+      t.feature,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type AiCallLog = typeof aiCallLogs.$inferSelect;
+export type NewAiCallLog = typeof aiCallLogs.$inferInsert;
+
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
   proposalId: uuid("proposal_id")

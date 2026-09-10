@@ -293,6 +293,7 @@ async function runSingleProposalScan(
   let stubbed = true;
   const res = await completeForTenant({
     organizationId,
+    feature: "proposal_scan_background",
     system: SCAN_SYSTEM,
     messages: [{ role: "user", content: userPrompt }],
     maxTokens: 2000,

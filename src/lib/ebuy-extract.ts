@@ -44,6 +44,7 @@ export async function aiExtractEbuy(
     const prompt = buildEbuyExtractPrompt(rawText);
     const ai = await completeForTenant({
       organizationId,
+      feature: "ebuy_extract",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 1800,

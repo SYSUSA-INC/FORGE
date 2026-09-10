@@ -213,6 +213,7 @@ export async function runProtestCheckAction(
   try {
     const res = await completeForTenant({
       organizationId,
+      feature: "protest_viability",
       system: prompt.system,
       messages: prompt.messages,
       maxTokens: 3000,

@@ -183,6 +183,7 @@ export async function chatWithSectionAction(input: {
   try {
     const res = await completeForTenant({
       organizationId,
+      feature: "section_chat",
       system: systemWithContext,
       messages,
       maxTokens: 1200,
