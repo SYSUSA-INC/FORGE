@@ -9,7 +9,11 @@ import {
   selectABVariantAction,
   type ABDraftResult,
 } from "./ab-actions";
-import type { ChatMessage } from "./chat-actions";
+import {
+  clearSectionChatAction,
+  getSectionChatHistoryAction,
+  type ChatMessage,
+} from "./chat-actions";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
 import {
   isChatStreamEvent,
@@ -181,6 +185,40 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
   const [chatError, setChatError] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
+  // BL-FB-CHAT-PERSIST — load the section's thread the first time the
+  // chat tab is shown, so reopening a section resumes the conversation.
+  const [chatLoaded, setChatLoaded] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  useEffect(() => {
+    if (!open || activeTab !== "chat" || chatLoaded || chatLoading) return;
+    let cancelled = false;
+    setChatLoading(true);
+    getSectionChatHistoryAction(sectionId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          setChatHistory(
+            res.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              authorName: m.authorName,
+              isMine: m.isMine,
+            })),
+          );
+        }
+        setChatLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setChatLoaded(true);
+      })
+      .finally(() => {
+        if (!cancelled) setChatLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, activeTab, chatLoaded, chatLoading, sectionId]);
+
   function cancelDraft() {
     draftAbortRef.current?.abort();
     draftAbortRef.current = null;
@@ -305,7 +343,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
     // deltas arrive. Both are rolled back on failure.
     setChatHistory([
       ...priorHistory,
-      { role: "user", content: msg },
+      { role: "user", content: msg, isMine: true },
       { role: "assistant", content: "" },
     ]);
     setChatPending(true);
@@ -336,7 +374,8 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sectionId, message: msg, history: priorHistory }),
+        // History is read server-side from the persisted thread.
+        body: JSON.stringify({ sectionId, message: msg }),
         signal: ac.signal,
       });
       const isSse = (res.headers.get("content-type") ?? "").includes(
@@ -677,8 +716,12 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
           <p className="font-body text-[11px] text-muted">
             Ask questions, request specific language, or get feedback on this
             section. The AI has full context about the opportunity and
-            solicitation requirements.
+            solicitation requirements. The thread is saved with the section
+            and shared with your team.
           </p>
+          {chatLoading ? (
+            <div className="font-mono text-[10px] text-muted">Loading thread…</div>
+          ) : null}
 
           {/* Message history */}
           {chatHistory.length > 0 ? (
@@ -689,7 +732,11 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
                   className={`flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
                 >
                   <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
-                    {msg.role === "user" ? "You" : "AI"}
+                    {msg.role === "assistant"
+                      ? "AI"
+                      : msg.isMine === false && msg.authorName
+                        ? msg.authorName
+                        : "You"}
                   </span>
                   <div
                     className={`max-w-[90%] rounded-md px-3 py-2 font-body text-[12px] leading-relaxed ${
@@ -755,8 +802,13 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
             <button
               type="button"
               onClick={() => {
+                chatAbortRef.current?.abort();
                 setChatHistory([]);
                 setChatError(null);
+                // BL-FB-CHAT-PERSIST — clear the saved thread too.
+                void clearSectionChatAction(sectionId).then((res) => {
+                  if (!res.ok) setChatError(res.error);
+                });
               }}
               className="self-start font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
             >

@@ -699,6 +699,49 @@ export const aiCallLogs = pgTable(
 export type AiCallLog = typeof aiCallLogs.$inferSelect;
 export type NewAiCallLog = typeof aiCallLogs.$inferInsert;
 
+// BL-FB-CHAT-PERSIST — one row per turn of the AI-assist chat on a
+// proposal section. The server reads the last N turns as model context
+// and appends the new pair after a successful reply. `user_id` is the
+// author of a user turn (and the requester for the assistant turn);
+// null once the user is deleted.
+export type SectionChatRole = "user" | "assistant";
+
+export const sectionChatMessages = pgTable(
+  "section_chat_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    role: text("role").$type<SectionChatRole>().notNull(),
+    content: text("content").notNull(),
+    stubbed: boolean("stubbed").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    sectionCreatedIdx: index("scm_section_created_idx").on(
+      t.sectionId,
+      t.createdAt,
+    ),
+    orgCreatedIdx: index("scm_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type SectionChatMessage = typeof sectionChatMessages.$inferSelect;
+export type NewSectionChatMessage = typeof sectionChatMessages.$inferInsert;
+
 export const proposalSections = pgTable("proposal_section", {
   id: uuid("id").primaryKey().defaultRandom(),
   proposalId: uuid("proposal_id")

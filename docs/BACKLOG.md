@@ -3322,13 +3322,43 @@ Particularly valuable for capture managers driving between customer
 meetings.
 
 ### BL-FB-CHAT-PERSIST — Persisted history per section
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #258)
 
 Save chat history to a per-section thread; reopen the section and pick
 up where you left off. Schema: `section_chat_message` table.
 Foundation for BL-FB-CHAT-MULTI (multi-user). Pairs with the existing
 proposal comment threads but lives separately so AI-assist
 conversations don't clutter human comment streams.
+
+**Delivered:**
+- Migration `0075_section_chat_message.sql` — `section_chat_message`
+  (org, proposal, section, user, role, content, stubbed, created_at)
+  with (section, created_at) and (org, created_at) indexes; cascades
+  with the section.
+- `src/lib/section-chat.ts` — `findSectionForOrg`,
+  `loadSectionChatHistory` (last 40 turns, oldest first, author name
+  and `isMine`), `loadSectionChatModelHistory` (last 6 turns as model
+  context), `appendSectionChatTurns` (sequential user + assistant
+  inserts), `clearSectionChat`. `prepareSectionChat` returns
+  `proposalId` for persistence.
+- The server owns model history: `/api/ai/chat` and
+  `chatWithSectionAction` read the last turns from the thread instead
+  of trusting a client-supplied list, and append the exchange after a
+  non-empty reply (before `done`, so a reload is consistent). The
+  route's body no longer accepts `history`; the action keeps it as an
+  ignored optional field for compatibility.
+- `getSectionChatHistoryAction` and `clearSectionChatAction` (audited
+  as `section_chat.clear` after confirming section ownership).
+- `AiAssistantPanel` loads the thread the first time the chat tab is
+  shown ("Loading thread…"), labels turns from teammates by name,
+  and Clear chat clears the saved thread too.
+- `tests/ai/section-chat-persist.test.ts` — ownership check, append +
+  display history with attribution, model-history trimming and order,
+  tenant and section isolation, clear scope and count.
+
+**Not audited per turn.** Individual messages are conversational
+telemetry, same posture as `section_draft_signal`; clearing a thread
+is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
