@@ -83,6 +83,15 @@ Legitimate exceptions (public token-scoped surfaces, share-link
 loads, Stripe-signed webhooks, cron sweeps, superadmin ops) live in
 `.isolation-allow.json` with a one-line documented reason.
 
+`scripts/check-links.mjs` asserts that every in-app link target — `href`,
+`redirect()`, `revalidatePath()` — resolves to a `page.tsx`, a
+`route.ts`, or a file in `public/`. Dynamic segments and template
+interpolations are matched against the route's shape. This is the class
+of bug the build cannot see: a redirect to a path no page provides
+compiles, type-checks and deploys, then 404s at runtime. Deliberate
+exceptions live in `.link-allow.json` with a reason. A new redirect
+target needs its route in the same PR.
+
 `scripts/check-tenant-firewall.mjs` runs alongside it and re-derives
 the DB-level guarantees from the migrations: every tenant-scoped table
 has `organization_id NOT NULL`, a `REFERENCES organization(id) ON

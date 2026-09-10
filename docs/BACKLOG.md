@@ -2122,6 +2122,51 @@ configured, giving the migration test real production schema shape.
 
 ---
 
+### BL-QC-links — Internal link check + the `/onboarding` dead end — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #TBD)
+
+Reported as "many links in the side menu are not working". Root cause:
+`requireCurrentOrg()` (`src/lib/auth-helpers.ts`) redirects to
+`/onboarding` when the session carries no `organizationId`, and no
+`page.tsx` ever provided that route — so the redirect landed on the
+app's 404 page. 24 of the 36 side-menu destinations call that gate; the
+12 that don't (3 Help pages on `requireAuth`, 9 Platform Administration
+pages on `requireSuperadmin`) kept working, which is exactly the
+"some links work, most don't" shape that was reported.
+
+The session's `organizationId` is null in three situations, all of which
+hit this: no membership row, the membership's status is `disabled`, or
+the organization itself is disabled (`enrichFromDb` in `src/auth.ts`
+filters all three out). A platform admin with no workspace membership is
+the most likely way to land here, since that account still sees a full
+side menu.
+
+Nothing in CI could catch it: the app builds, types check, every
+individual page exists, and the dangling target is a string in a
+redirect.
+
+**Shipped:**
+- `src/app/(app)/onboarding/page.tsx` — the missing route. Gated by
+  `requireAuth()` only (calling `requireCurrentOrg()` here would loop),
+  it diagnoses which of the three situations applies, lists the user's
+  workspaces with their real status, and routes on: Platform
+  Administration for superadmins, Help for everyone.
+- `scripts/check-links.mjs` + `npm run check:links` + an `Internal link
+  check` CI job: every `href`, `redirect()` and `revalidatePath()`
+  target must resolve to a `page.tsx`, `route.ts` or a file in
+  `public/`, with dynamic segments and template interpolations matched
+  against the route shape. 97 targets checked; `/onboarding` was the
+  only unresolved one in the codebase. Exceptions live in
+  `.link-allow.json` with a reason.
+- Documented in `docs/ENGINEERING_STANDARDS.md`.
+
+**Not verified live:** this container has no pgvector and no Docker
+daemon, so the app could not be booted against a real schema. The
+diagnosis is static (route table vs. link targets vs. per-page gates)
+and the checker reproduces the failure with the new page removed.
+
+---
+
 ### BL-QC-combined-job — Consolidate typecheck + lint
 **Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** queued
 
