@@ -3383,7 +3383,7 @@ direct path to "less generic content" (the issue #6 we already
 addressed) becoming "deeply specific, on-brand content."
 
 ### BL-FB-X-PWIN-MODEL — Calibrated PWin model
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #TBD)
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #258)
 
 Train a model on your historical outcomes (NAICS × agency × set-aside
 × incumbent × company size × proposal stage × time-in-stage) to
