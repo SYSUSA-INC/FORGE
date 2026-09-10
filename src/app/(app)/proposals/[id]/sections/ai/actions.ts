@@ -14,6 +14,11 @@ import {
 } from "@/lib/subscription-gates";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
 import {
+  extractCitationStats,
+  type CitationStats,
+  type DraftSource,
+} from "@/lib/citations";
+import {
   captureDraftSignal,
   isDraftMode,
   prepareSectionDraft,
@@ -35,6 +40,10 @@ export type SectionDraftResult =
       generatedAt: string;
       /** BL-11: id of the captured draft signal row, present for draft/draft_alt modes. */
       signalId?: string;
+      /** BL-FB-GEN-CITE — present when the draft was generated in citation mode. */
+      sources?: DraftSource[];
+      citations?: CitationStats;
+      sourcesStubbed?: boolean;
     }
   | { ok: false; error: string };
 
@@ -51,6 +60,8 @@ export async function generateSectionDraftAction(input: {
   /** BL-11 A/B: caller-supplied UUID linking the two competing variants. */
   abPairId?: string;
   abVariant?: "a" | "b";
+  /** BL-FB-GEN-CITE — require inline citations against Brain sources. */
+  cite?: boolean;
 }): Promise<SectionDraftResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -76,6 +87,7 @@ export async function generateSectionDraftAction(input: {
     organizationId,
     sectionId: input.sectionId,
     mode: input.mode,
+    cite: input.cite,
   });
   if (!prepared.ok) {
     // Nothing was generated — give the request slot back.
@@ -87,7 +99,7 @@ export async function generateSectionDraftAction(input: {
     const ai = await completeForTenant({
       organizationId,
       feature: "section_draft",
-      variant: input.mode,
+      variant: input.cite ? `${input.mode}+cite` : input.mode,
       system: prepared.prompt.system,
       messages: prepared.prompt.messages,
       maxTokens: prepared.maxTokens,
@@ -127,6 +139,13 @@ export async function generateSectionDraftAction(input: {
       outputTokens: ai.outputTokens,
       generatedAt: new Date().toISOString(),
       signalId,
+      ...(input.cite
+        ? {
+            sources: prepared.sources,
+            citations: extractCitationStats(text),
+            sourcesStubbed: prepared.sourcesStubbed,
+          }
+        : {}),
     };
   } catch (err) {
     // BL-16 Phase B-3d — AI call failed (network / provider error). Refund

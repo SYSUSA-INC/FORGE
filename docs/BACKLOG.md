@@ -3227,12 +3227,56 @@ sections" matches Sarah's voice; for Mike, matches Mike's. Eliminates
 the "this reads like AI" tell.
 
 ### BL-FB-GEN-CITE — Citation-required draft mode
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
 
 Every concrete claim in the generated draft must link to a knowledge
 entry, past performance row, or named contract. Un-cited claims are
 flagged with `[NEEDS CITATION]` brackets the human must resolve.
 Prevents AI-fabricated past performance.
+
+**Delivered:**
+- `src/lib/brain-retrieval.ts` (server-only) — `searchBrain` extracted
+  from Brain Suggest: corpus chunks + curated entries by cosine
+  similarity with the Phase 14a outcome boost and the token-overlap
+  fallback. `brainSuggestForSectionAction` now calls it; behaviour
+  unchanged.
+- `src/lib/citations.ts` (pure) — the marker contract: `[Sn]` for a
+  supported claim, `[NEEDS CITATION]` for an unsupported one;
+  `extractCitationStats` (distinct sources cited, marker count,
+  needs-citation count); `DraftSource`; caps (10 sources, 600-char
+  excerpts).
+- `prepareSectionDraft({ cite: true })` — `gatherDraftSources` composes
+  a query from section title/kind, agency, NAICS, opportunity and the
+  current body, ranks Brain hits, then appends the org's
+  past-performance rows; attaches numbered sources to the snapshot and
+  returns them for the UI. Retrieval failure degrades to
+  past-performance-only sources.
+- `buildSectionDraftPrompt` — "CITATION MODE IS ON" block: what counts
+  as a concrete claim, marker placement, never invent a source or a
+  marker number, no bibliography; sources listed with label, outcome
+  and excerpt; output instruction keeps markers inline. Sources are
+  omitted from the JSON snapshot so they print once.
+- `/api/ai/draft` and `generateSectionDraftAction` accept `cite`;
+  telemetry variant becomes `<mode>+cite`. The route streams a
+  `sources` event before the first delta so markers resolve live; the
+  `done` payload carries `sources`, `citations` stats and
+  `sourcesStubbed`.
+- `AiAssistantPanel` — "Cite sources" toggle in the Generate tab; a
+  `SourceLegend` under the live preview and the finished draft shows
+  each source (linked to its Brain record, outcome label, excerpt),
+  highlights the ones cited, and shows an amber "N needs citation"
+  badge or an emerald "no unsupported claims" badge.
+- `tests/ai/citations.test.ts` — marker parsing and the prompt block.
+
+**Design notes:** markers stay in the inserted text on purpose, like
+the existing `[BRACKETS]` placeholders, so a reviewer sees provenance
+in the document and the author removes them while editing. Citation
+mode streams; it does not use the structured-output path, because the
+markers are parseable from plain text and streaming matters more for a
+2,000-token draft than a typed envelope. Sources come from what is
+already in the Brain — the auto-harvest of won proposals
+(BL-FB-X-BRAIN-MINE, PR #250) is what makes the legend fill up over
+time.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued

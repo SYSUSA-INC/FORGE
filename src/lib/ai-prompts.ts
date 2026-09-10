@@ -361,6 +361,19 @@ export type SectionDraftSnapshot = {
    * a short title and a one-sentence statement.
    */
   winThemes?: { title: string; statement: string }[];
+  /**
+   * BL-FB-GEN-CITE — when present, citation mode is on. Numbered
+   * sources the drafter may cite with "[Sn]"; unsupported concrete
+   * claims must carry "[NEEDS CITATION]". Built by prepareSectionDraft
+   * from Brain retrieval + the org's past-performance rows.
+   */
+  sources?: {
+    index: number;
+    kind: "corpus" | "entry" | "past_performance";
+    label: string;
+    excerpt: string;
+    outcomeLabel?: string;
+  }[];
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -434,15 +447,44 @@ export function buildSectionDraftPrompt(
         ].join("\n")
       : "";
 
-  // Pass the snapshot as JSON but omit the solicitation + winThemes
-  // fields (formatted above) so we don't double-print large text.
+  // BL-FB-GEN-CITE — numbered sources + the citation contract. Present
+  // only in citation mode. The markers are the whole interface: the
+  // route and panel parse "[Sn]" and "[NEEDS CITATION]" (src/lib/citations.ts).
+  const citationBlock =
+    snapshot.sources && snapshot.sources.length > 0
+      ? [
+          `CITATION MODE IS ON.`,
+          `- Every concrete claim — contract or customer names, dollar values, dates, durations, quantities, metrics, certifications, named staff, past-performance facts — must be supported by one of the numbered sources below or by the snapshot's own proposal facts.`,
+          `- Immediately after each supported claim, add the marker of the source it came from, e.g. "[S2]". Several sources: "[S1][S3]". Cite only what the source actually says.`,
+          `- Any concrete claim you cannot support must be followed by "[NEEDS CITATION]" so the author can resolve it. Prefer fewer, supported claims over many unsupported ones.`,
+          `- Never invent a source, a marker number that is not listed, or a fact to fit a source. Do not add a bibliography; the inline markers are enough.`,
+          ``,
+          `Sources:`,
+          ...snapshot.sources.map(
+            (s) =>
+              `[S${s.index}] ${s.label}${s.outcomeLabel && s.outcomeLabel !== "none" ? ` · outcome: ${s.outcomeLabel}` : ""}\n${s.excerpt}`,
+          ),
+        ].join("\n")
+      : "";
+
+  // Pass the snapshot as JSON but omit the solicitation + winThemes +
+  // sources fields (formatted above) so we don't double-print large text.
   const {
     solicitation: _omitSol,
     winThemes: _omitThemes,
+    sources: _omitSources,
     ...snapshotForJson
   } = snapshot;
   void _omitSol;
   void _omitThemes;
+  void _omitSources;
+
+  const outputInstruction =
+    mode === "draft"
+      ? `Produce the section body. Output ONLY the body text — no title, no preamble, no commentary about your process.`
+      : mode === "improve"
+        ? `Return the improved body. Output ONLY the body text — no diff, no commentary about what you changed.`
+        : `Return the tightened body. Output ONLY the body text — no commentary about what you cut.`;
 
   const userPrompt = [
     `Mode: ${mode}.`,
@@ -452,16 +494,16 @@ export function buildSectionDraftPrompt(
     themesBlock ? `` : "",
     solicitationBlock,
     solicitationBlock ? `` : "",
+    citationBlock,
+    citationBlock ? `` : "",
     `Section + proposal snapshot (JSON):`,
     "```json",
     JSON.stringify(snapshotForJson, null, 2),
     "```",
     ``,
-    mode === "draft"
-      ? `Produce the section body. Output ONLY the body text — no title, no preamble, no commentary about your process.`
-      : mode === "improve"
-        ? `Return the improved body. Output ONLY the body text — no diff, no commentary about what you changed.`
-        : `Return the tightened body. Output ONLY the body text — no commentary about what you cut.`,
+    citationBlock
+      ? `${outputInstruction} Keep the "[Sn]" and "[NEEDS CITATION]" markers inline in the body.`
+      : outputInstruction,
   ]
     .filter((l) => l !== undefined && l !== null)
     .join("\n");
