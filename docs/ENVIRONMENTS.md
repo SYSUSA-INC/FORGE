@@ -92,13 +92,13 @@ The cost difference: minimal. Neon Pro projects start at $19/mo; the second proj
 
 ### Step 3: Apply all migrations to the new prod project (10 min)
 
-The prod project starts empty. Run all migrations:
+The prod project starts empty. Deploy the prod Vercel project (next step) and let the boot-time auto-apply run every migration on the first cold start; any migration flagged as destructive is applied from `/admin/migrations` after acknowledgement. To apply ahead of the deploy from a trusted machine:
 
 ```sh
-DATABASE_URL='<new prod connection string>' npx drizzle-kit push
+DATABASE_URL='<new prod connection string>' node scripts/apply-schema.mjs
 ```
 
-Or rely on auto-apply: deploy the prod Vercel project (next step) and let migrations run on cold start.
+**Do not use `drizzle-kit push`.** It diffs the live database against `src/db/schema.ts`, and several indexes and column details exist only in the SQL migrations (see BL-TENANT-DRIFT); `push` would drop them.
 
 ### Step 4: Create the second Vercel project (15 min)
 
@@ -160,12 +160,14 @@ Staging keeps the old keys for now; we rotate quarterly per `docs/SECRETS_ROTATI
 4. Try to sign up on staging — verify it lands in the **staging Neon project**, not prod
 5. Cross-check: query both Neon projects' `user` table — confirm the new test users are in the right one
 
-### Step 10: Add env-validation guards in code (next PR)
+### Step 10: Env-validation guards in code — landed
 
-Code-level defense-in-depth — a future PR will:
-- Validate `VERCEL_ENV` against `DATABASE_URL` host pattern at boot. If `VERCEL_ENV=production` but `DATABASE_URL` points at the staging host, crash with a loud error.
-- Render a non-prod banner when `VERCEL_ENV !== "production"` so developers can never confuse the two during testing.
-- Block destructive admin actions in `VERCEL_ENV=staging` from being run against prod data.
+Code-level defense-in-depth, shipped in PR #216 and PR #TBD:
+
+- **Environment marker** (`_forge_env`, `src/lib/env-marker.ts`): the database records which environment owns it. Every cold start compares the runtime label (`FORGE_ENV_OVERRIDE` → `VERCEL_ENV`) to the marker and **exits the process on a mismatch**, so a staging deploy pointed at the prod database never serves a request. This is stronger than a host-pattern check: it works no matter how the connection string looks. `VERCEL_ENV=staging` (set by hand on the staging project) is a recognised label; before PR #TBD it was not, and the check was skipped on staging.
+- **Non-prod banner** (`src/components/shell/NonProdBanner.tsx`): a sticky amber bar on every page whenever the label is anything but `production`.
+- **Destructive migrations in production need acknowledgement**: `/admin/migrations` refuses to apply pending migrations that contain destructive operations while the runtime label is `production` until the operator confirms a snapshot was taken and each one was reviewed. Staging and preview apply without the extra step.
+- **Marker relabel affordance**: `/admin/migrations` shows the runtime label, the database marker and when it was last verified, and lets a superadmin relabel the marker during a cutover by typing the new label in capitals. Audited.
 
 ---
 
@@ -202,7 +204,7 @@ Open a PR `main` → `release`. CI re-runs. Founder approves. Deploy fires.
 
 ## 6. Data flow rules
 
-These rules are not enforced by code yet — they are operational discipline until we add code guards (next PR).
+The first two "NEVER" rules are now backed by code (§4 step 10: the environment marker refuses to boot a mislabelled deploy). The rest remain operational discipline.
 
 ### NEVER
 
@@ -250,7 +252,7 @@ For ~$40/month, we get hard production isolation. That's table stakes.
 ## 9. Open questions for the founder
 
 1. **Custom domain `staging.forge.app`** — confirm registrar access to add the DNS record.
-2. **`VERCEL_ENV=staging` env var** — Vercel exposes `VERCEL_ENV` as `production` / `preview` / `development`. We may need a custom env var for our own logic (e.g. `FORGE_ENV=staging`).
+2. ~~**`VERCEL_ENV=staging` env var**~~ — resolved: `src/lib/env-label.ts` recognises `staging` alongside Vercel's three labels, and `FORGE_ENV_OVERRIDE` takes precedence for anything unusual.
 3. **Who in addition to the founder approves prod deploys?** Recommend: founder + engineering lead. Document in `docs/PRODUCTION_DEPLOY_GATE.md`.
 4. **Should staging accept signups from the public?** Recommend NO — IP allow-list or basic auth in front of staging to keep it private.
 
@@ -269,4 +271,4 @@ Track progress here:
 - [ ] Step 7: GitHub environment protection rule set
 - [ ] Step 8: prod secrets rotated
 - [ ] Step 9: smoke test passed
-- [ ] Step 10: code-side env guards landed (separate PR)
+- [x] Step 10: code-side env guards landed (PR #216: marker + banner; PR #TBD: staging label, relabel affordance, production destructive-apply acknowledgement)

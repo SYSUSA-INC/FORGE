@@ -2,11 +2,14 @@ import Link from "next/link";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { KNOWN_ENV_LABELS, resolveEnvLabel } from "@/lib/env-label";
+import { readEnvMarker } from "@/lib/env-marker";
 import {
   detectLedgerDrift,
   getMigrationStatus,
   scanPendingForDestructive,
 } from "@/lib/migration-runner";
+import { EnvMarkerClient } from "./EnvMarkerClient";
 import { MigrationsClient } from "./MigrationsClient";
 
 export const dynamic = "force-dynamic";
@@ -16,14 +19,24 @@ export default async function MigrationsPage() {
 
   const status = await getMigrationStatus();
   const inSync = status.pendingFiles.length === 0;
-  const [destructiveBlockers, ledgerDrift] = await Promise.all([
+  const [destructiveBlockers, ledgerDrift, marker] = await Promise.all([
     inSync ? Promise.resolve([]) : scanPendingForDestructive(),
     detectLedgerDrift(),
+    readEnvMarker(),
   ]);
   const autoApplyEnabled = process.env.DISABLE_AUTO_MIGRATE !== "1";
   const neonSnapshotsEnabled = !!(
     process.env.NEON_API_KEY && process.env.NEON_PROJECT_ID
   );
+  const runtimeEnv = resolveEnvLabel();
+  const markerState: "match" | "mismatch" | "unset" | "unlabelled" = !marker
+    ? "unset"
+    : !runtimeEnv
+      ? "unlabelled"
+      : marker.expectedEnv === runtimeEnv
+        ? "match"
+        : "mismatch";
+  const fmt = (d: Date | null) => (d ? d.toISOString().replace("T", " ").slice(0, 16) + "Z" : "—");
 
   return (
     <>
@@ -150,8 +163,74 @@ export default async function MigrationsPage() {
       </Panel>
 
       <Panel
+        title="Environment marker"
+        eyebrow="BL-ENV-SEP"
+        accent={markerState === "mismatch" ? "rose" : markerState === "match" ? "emerald" : "gold"}
+        className="mt-4"
+      >
+        <p className="font-body text-[13px] leading-relaxed text-muted">
+          The database records which environment owns it
+          (<code className="font-mono">_forge_env.expected_env</code>). Every cold
+          start compares that to the runtime&apos;s label
+          (<code className="font-mono">FORGE_ENV_OVERRIDE</code> →{" "}
+          <code className="font-mono">VERCEL_ENV</code>) and refuses to boot on a
+          mismatch, so a staging deploy can never serve traffic against
+          production data.
+        </p>
+        <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] md:grid-cols-4">
+          <div>
+            <dt className="text-muted/70">Runtime label</dt>
+            <dd className="text-text">{runtimeEnv ?? "— (unset)"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted/70">Database marker</dt>
+            <dd className="text-text">{marker?.expectedEnv ?? "— (not recorded)"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted/70">First seen</dt>
+            <dd className="text-muted">{fmt(marker?.firstSeenAt ?? null)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted/70">Last verified</dt>
+            <dd className="text-muted">{fmt(marker?.lastVerifiedAt ?? null)}</dd>
+          </div>
+        </dl>
+        <div
+          className={`mt-3 font-mono text-[11px] ${
+            markerState === "match"
+              ? "text-emerald-300"
+              : markerState === "mismatch"
+                ? "text-rose"
+                : "text-amber-300"
+          }`}
+        >
+          {markerState === "match"
+            ? "● Runtime and database agree."
+            : markerState === "mismatch"
+              ? "● MISMATCH — this process should not have booted; check FORGE_ENV_OVERRIDE / VERCEL_ENV and DATABASE_URL."
+              : markerState === "unset"
+                ? "○ No marker recorded yet — it is written on the first boot with a recognised label."
+                : "○ Runtime has no environment label, so the marker check is skipped on this machine."}
+        </div>
+        <EnvMarkerClient
+          status={{
+            runtime: runtimeEnv,
+            marker: marker
+              ? {
+                  expectedEnv: marker.expectedEnv,
+                  firstSeenAt: marker.firstSeenAt?.toISOString() ?? null,
+                  lastVerifiedAt: marker.lastVerifiedAt?.toISOString() ?? null,
+                }
+              : null,
+            knownLabels: KNOWN_ENV_LABELS,
+          }}
+        />
+      </Panel>
+
+      <Panel
         title="Migration ledger"
         eyebrow={`${status.expectedFiles.length} files in drizzle/`}
+        className="mt-4"
       >
         <p className="font-body text-[13px] leading-relaxed text-muted">
           The deployed code expects these migrations to be applied. The

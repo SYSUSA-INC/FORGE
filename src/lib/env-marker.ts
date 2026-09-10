@@ -1,5 +1,7 @@
+import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { resolveEnvLabel } from "@/lib/env-label";
 import { log } from "@/lib/log";
 
 /**
@@ -32,26 +34,58 @@ export type EnvMarkerResult =
   | { kind: "mismatch"; expected: string; current: string }
   | { kind: "skipped"; reason: string };
 
-/**
- * Returns the runtime environment label. `FORGE_ENV_OVERRIDE` takes
- * precedence (lets operators explicitly tag a non-Vercel runtime
- * like a local dev machine connected to staging for debugging).
- * Otherwise falls back to `VERCEL_ENV`.
- *
- * Returns null on unknown / unset — the caller treats that as a skip.
- */
-function currentEnvLabel(): string | null {
-  const override = (process.env.FORGE_ENV_OVERRIDE || "").trim().toLowerCase();
-  if (override) return override;
-  const vercel = (process.env.VERCEL_ENV || "").trim().toLowerCase();
-  if (vercel === "production" || vercel === "preview" || vercel === "development") {
-    return vercel;
+export type EnvMarker = {
+  expectedEnv: string;
+  firstSeenAt: Date | null;
+  lastVerifiedAt: Date | null;
+};
+
+/** The stored marker, or null when the table is absent or empty. */
+export async function readEnvMarker(): Promise<EnvMarker | null> {
+  try {
+    const rows = await db.execute<{
+      expected_env: string;
+      first_seen_at: Date | string | null;
+      last_verified_at: Date | string | null;
+    }>(
+      sql`SELECT expected_env, first_seen_at, last_verified_at FROM "_forge_env" WHERE id = 1 LIMIT 1`,
+    );
+    const row = rows.rows[0];
+    if (!row) return null;
+    const toDate = (v: Date | string | null) => (v ? new Date(v) : null);
+    return {
+      expectedEnv: row.expected_env,
+      firstSeenAt: toDate(row.first_seen_at),
+      lastVerifiedAt: toDate(row.last_verified_at),
+    };
+  } catch {
+    return null;
   }
-  return null;
+}
+
+/**
+ * Re-label the database's environment marker. Used only during a
+ * cutover (e.g. demoting a former-prod DB to staging). After this, any
+ * deploy whose runtime label differs refuses to boot. Superadmin-gated
+ * and audited by the caller.
+ */
+export async function relabelEnvMarker(newLabel: string): Promise<{ previous: string | null }> {
+  const previous = (await readEnvMarker())?.expectedEnv ?? null;
+  await db.execute(
+    sql`INSERT INTO "_forge_env" (id, expected_env)
+        VALUES (1, ${newLabel})
+        ON CONFLICT (id) DO UPDATE
+          SET expected_env = EXCLUDED.expected_env,
+              last_verified_at = now()`,
+  );
+  return { previous };
 }
 
 export async function verifyEnvMarker(): Promise<EnvMarkerResult> {
-  const current = currentEnvLabel();
+  // One shared definition with the non-prod banner (src/lib/env-label.ts),
+  // so "staging" — set by hand on the staging Vercel project — is
+  // checked rather than skipped.
+  const current = resolveEnvLabel();
   if (!current) {
     return {
       kind: "skipped",

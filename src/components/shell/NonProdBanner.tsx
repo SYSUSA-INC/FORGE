@@ -1,37 +1,25 @@
+import { envDisplayLabel, resolveEnvLabel } from "@/lib/env-label";
+
 /**
  * BL-ENV-SEP — non-prod banner.
  *
- * Renders a thin sticky bar at the top of the app shell whenever
- * `VERCEL_ENV !== "production"` (or `FORGE_ENV_OVERRIDE` is set to a
- * non-prod value). The bar is loud on purpose so anyone testing on
- * staging never confuses it with the live customer environment.
+ * Renders a thin sticky bar at the top of the app shell whenever the
+ * runtime's environment label is anything other than "production"
+ * (staging, preview, development, or an operator override). The bar is
+ * loud on purpose so anyone testing on staging never confuses it with
+ * the live customer environment.
  *
  * Stays hidden in production so customer pages aren't visually
- * polluted.
+ * polluted, and when no label is set at all (a bare local run).
  *
- * Server component — reads env vars at render time. Cheap.
+ * Server component — reads env vars at render time via the same
+ * resolver the boot-time marker check uses. Cheap.
  */
-
-function currentEnvLabel(): string | null {
-  const override = (process.env.FORGE_ENV_OVERRIDE || "").trim().toLowerCase();
-  if (override) return override;
-  const vercel = (process.env.VERCEL_ENV || "").trim().toLowerCase();
-  if (vercel === "preview" || vercel === "development" || vercel === "staging") {
-    return vercel;
-  }
-  return null;
-}
-
 export function NonProdBanner() {
-  const env = currentEnvLabel();
-  if (!env) return null;
+  const env = resolveEnvLabel();
+  if (!env || env === "production") return null;
 
-  const label =
-    env === "preview"
-      ? "PREVIEW"
-      : env === "development"
-        ? "DEV"
-        : env.toUpperCase();
+  const label = envDisplayLabel(env);
 
   return (
     <div

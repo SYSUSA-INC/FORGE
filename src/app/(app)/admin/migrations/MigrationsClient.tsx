@@ -19,13 +19,17 @@ export function MigrationsClient({
     null,
   );
 
-  const appliedSet = new Set(initialStatus.appliedFiles);
+  const [acknowledged, setAcknowledged] = useState(false);
 
-  function apply() {
+  const appliedSet = new Set(initialStatus.appliedFiles);
+  const needsAck = lastResult !== null && !lastResult.ok && lastResult.needsAcknowledgement === true;
+
+  function apply(acknowledgeDestructive = false) {
     setLastResult(null);
     startTransition(async () => {
-      const result = await runMigrationsAction();
+      const result = await runMigrationsAction({ acknowledgeDestructive });
       setLastResult(result);
+      if (result.ok || !result.needsAcknowledgement) setAcknowledged(false);
       router.refresh();
     });
   }
@@ -35,7 +39,7 @@ export function MigrationsClient({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={apply}
+          onClick={() => apply(false)}
           disabled={pending || initialStatus.pendingFiles.length === 0}
           className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
         >
@@ -77,7 +81,7 @@ export function MigrationsClient({
             </>
           ) : (
             <>
-              <strong>Failed:</strong> {lastResult.error}
+              <strong>{needsAck ? "Acknowledgement required:" : "Failed:"}</strong> {lastResult.error}
               {lastResult.appliedFilenames.length > 0 ? (
                 <div className="mt-1 text-muted">
                   Successfully applied before failure: {lastResult.appliedFilenames.join(", ")}
@@ -85,6 +89,40 @@ export function MigrationsClient({
               ) : null}
             </>
           )}
+        </div>
+      ) : null}
+
+      {needsAck && lastResult && !lastResult.ok && lastResult.destructive ? (
+        <div className="rounded-md border border-rose/40 bg-rose/[0.06] p-3">
+          <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-widest text-rose">
+            Production — destructive operations pending
+          </div>
+          <ul className="flex flex-col gap-1 font-mono text-[11px] text-muted">
+            {lastResult.destructive.map((d) => (
+              <li key={d.filename}>
+                <span className="text-text">{d.filename}</span>{" "}
+                <span className="text-rose/80">contains: {d.matches.join(", ")}</span>
+              </li>
+            ))}
+          </ul>
+          <label className="mt-3 flex items-start gap-2 font-body text-[12px] leading-relaxed text-text">
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => setAcknowledged(e.target.checked)}
+              className="mt-0.5 accent-rose"
+            />
+            I have taken a Neon snapshot, reviewed each destructive migration
+            above, and accept that this cannot be undone by rollback.
+          </label>
+          <button
+            type="button"
+            onClick={() => apply(true)}
+            disabled={pending || !acknowledged}
+            className="aur-btn mt-3 text-[12px] disabled:opacity-60"
+          >
+            {pending ? "Applying…" : "Apply with acknowledgement"}
+          </button>
         </div>
       ) : null}
 
