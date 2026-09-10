@@ -156,6 +156,27 @@ A required provider env var is missing on Vercel. The most common ones:
 
 Check the integration status under `Settings → Integrations`.
 
+### Which model answers which AI feature?
+
+Each AI feature belongs to a model class, and the gateway requests the
+class model unless the call pins one (BL-AI-ROUTING). The live table,
+per class and per feature, is on `/admin/usage` under "Model routing".
+
+| Var | Default | Class |
+|---|---|---|
+| `ANTHROPIC_MODEL_FAST` | `claude-haiku-4-5-20251001` | fast — classification, image OCR, eBuy and GSA extraction |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | standard — solicitation extraction and review, compliance, chat, briefs |
+| `ANTHROPIC_MODEL_STRONG` | same as `ANTHROPIC_MODEL` | strong — section drafts, health scan, winner analysis, protest viability |
+| `VLLM_MODEL_FAST` / `VLLM_MODEL` / `VLLM_MODEL_STRONG` | `VLLM_MODEL` | same three classes for a vLLM deployment |
+| `VLLM_SUPPORTS_TOOLS` | unset | set to `1` when the served model supports OpenAI-style tool calls (BL-AI-TOOLS) |
+| `AI_MODEL_ROUTING` | `on` | set to `off` to send every feature to the provider default |
+
+Azure OpenAI is deployment-pinned and is not routed. A tenant can be
+pinned to specific models with `customOverrides.aiModels` on its
+subscription row, keyed by feature (`"section_draft"`) or by class
+(`"strong"`). Every call records the model requested and the model that
+answered in `ai_call_log`, so a change here is measurable per feature.
+
 ### The page errors with "relation does not exist"
 
 A migration hasn't run on the deployed database. Run

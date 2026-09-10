@@ -2854,12 +2854,16 @@ export const tenantSubscriptions = pgTable(
      * the merged TierFeatureFlags + TierQuotas. Examples:
      *   { "quotas": { "aiRequestsPerMonth": 5000 } }
      *   { "featureFlags": { "winnerAnalysis": true } }
+     *   { "aiModels": { "section_draft": "claude-opus-5", "fast": "claude-haiku-4-5-20251001" } }
      * The runtime gate reads tier.X then applies overrides.X on top.
+     * `aiModels` (BL-AI-ROUTING) is keyed by AI feature or model class
+     * and read by the AI gateway; see src/lib/ai-routing.ts.
      */
     customOverrides: jsonb("custom_overrides")
       .$type<{
         featureFlags?: Partial<TierFeatureFlags>;
         quotas?: Partial<TierQuotas>;
+        aiModels?: Record<string, string>;
       }>()
       .notNull()
       .default({}),

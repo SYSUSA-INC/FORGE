@@ -11,7 +11,15 @@ import {
   type TierQuotas,
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
-import { aiFeatureLabel } from "@/lib/ai-features";
+import { getAIProviderStatus } from "@/lib/ai";
+import { AI_FEATURES, aiFeatureLabel, type AiFeature } from "@/lib/ai-features";
+import {
+  AI_FEATURE_MODEL_CLASS,
+  AI_MODEL_CLASSES,
+  AI_MODEL_CLASS_LABELS,
+  modelTableFor,
+  routingEnabled,
+} from "@/lib/ai-routing";
 import {
   aiCallLogRetentionDays,
   getAiFeatureBreakdown,
@@ -185,6 +193,19 @@ export default async function AdminUsagePage() {
   const featureRefused = featureRows.reduce((s, r) => s + r.quotaRefused, 0);
   const featureCalls = featureRows.reduce((s, r) => s + r.calls, 0);
   const retentionDays = aiCallLogRetentionDays();
+
+  // BL-AI-ROUTING — what the gateway will request per class for the
+  // active provider, and which features sit in each class.
+  const activeProvider = getAIProviderStatus().active;
+  const routingOn = routingEnabled();
+  const routingTable = modelTableFor(activeProvider.name);
+  const featuresByClass = AI_MODEL_CLASSES.map((cls) => ({
+    cls,
+    model: routingTable[cls],
+    features: (Object.keys(AI_FEATURES) as AiFeature[]).filter(
+      (f) => AI_FEATURE_MODEL_CLASS[f] === cls,
+    ),
+  }));
 
   const totalTokens = rows.reduce((sum, r) => sum + r.tokensUsed, 0);
   const totalRequests = rows.reduce((sum, r) => sum + r.requestsUsed, 0);
@@ -489,6 +510,63 @@ export default async function AdminUsagePage() {
               ? ` ${featureRefused.toLocaleString()} refusals in window — tenants are hitting caps.`
               : ""}
           </p>
+        </Panel>
+      </div>
+
+      <div className="mt-4">
+        <Panel
+          title="Model routing"
+          eyebrow={`Provider: ${activeProvider.name} · routing ${routingOn ? "on" : "off (AI_MODEL_ROUTING=off)"}`}
+        >
+          <p className="mb-3 font-body text-[12px] leading-relaxed text-muted">
+            Each AI feature belongs to a model class. Unless a call pins a
+            model, the gateway requests the class model below. Tenants can
+            override per feature or per class via{" "}
+            <span className="font-mono">customOverrides.aiModels</span> on
+            their subscription. Env: ANTHROPIC_MODEL_FAST, ANTHROPIC_MODEL,
+            ANTHROPIC_MODEL_STRONG (and VLLM_MODEL_* for vLLM). Azure is
+            deployment-pinned and is not routed.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left font-mono text-[11px]">
+              <thead>
+                <tr className="border-b border-white/10 text-muted">
+                  <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                    Class
+                  </th>
+                  <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                    Model requested
+                  </th>
+                  <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                    Features
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {featuresByClass.map((row) => (
+                  <tr
+                    key={row.cls}
+                    className="border-b border-white/[0.04] text-text/90"
+                  >
+                    <td className="px-2 py-1.5 align-top">
+                      {row.cls}
+                      <div className="font-mono text-[10px] text-muted">
+                        {AI_MODEL_CLASS_LABELS[row.cls]}
+                      </div>
+                    </td>
+                    <td className="px-2 py-1.5 align-top">
+                      {!routingOn
+                        ? "provider default (routing off)"
+                        : row.model ?? "provider default"}
+                    </td>
+                    <td className="px-2 py-1.5 align-top text-muted">
+                      {row.features.map((f) => aiFeatureLabel(f)).join(" · ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Panel>
       </div>
     </>

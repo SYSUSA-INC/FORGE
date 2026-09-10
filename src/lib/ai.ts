@@ -18,13 +18,21 @@
  * providers, or when a tool call does not come back, it falls back to
  * extracting JSON from the text. Either way the payload is validated
  * against the schema and the outcome is recorded in ai_call_log.
+ *
+ * BL-AI-ROUTING — model routing. Unless a caller pins `model`, the
+ * tenant gateway picks one per feature: fast / standard / strong classes
+ * mapped to concrete models per provider, with per-tenant overrides.
+ * See src/lib/ai-routing.ts.
  */
 
 import { z } from "zod";
 import type { AiFeature } from "@/lib/ai-features";
-
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
-const DEFAULT_VLLM_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct";
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_VLLM_MODEL,
+  resolveModelForFeature,
+  routingEnabled,
+} from "@/lib/ai-routing";
 
 export type AIRole = "user" | "assistant";
 
@@ -701,6 +709,20 @@ async function runTenantCompletion<T>(
     await import("@/lib/subscription-gates");
   const { recordAiCall } = await import("@/lib/ai-telemetry");
 
+  const tier = await getCurrentTier(organizationId);
+
+  // BL-AI-ROUTING — pick the model for this feature unless the caller
+  // pinned one. Tenant overrides come from the subscription row; the
+  // provider table comes from env. `null` leaves the provider default.
+  if (!rest.model && routingEnabled()) {
+    const route = resolveModelForFeature({
+      feature,
+      provider: getAIProviderStatus().active.name,
+      tenantOverrides: tier?.overrides.aiModels ?? null,
+    });
+    if (route.model) rest.model = route.model;
+  }
+
   // BL-AI-TELEMETRY — fields common to every outcome row.
   const telemetryBase = {
     organizationId,
@@ -718,7 +740,6 @@ async function runTenantCompletion<T>(
   // can sneak one final call through if multiple workers race past the
   // threshold simultaneously; same advisory-ceiling semantics as the
   // existing request-count quota.
-  const tier = await getCurrentTier(organizationId);
   if (tier && tier.effectiveQuotas.aiTokensPerMonth > 0) {
     const used = await getCurrentUsage(organizationId, "aiTokensPerMonth");
     if (used >= tier.effectiveQuotas.aiTokensPerMonth) {

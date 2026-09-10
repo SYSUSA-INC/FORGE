@@ -3442,15 +3442,40 @@ stay in the system prompts. They are what the text fallback relies on
 when a provider cannot or does not call the tool.
 
 ### BL-AI-ROUTING — Per-task model routing
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** ⏳ queued  ·  **Depends on:** BL-AI-TELEMETRY
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #257)  ·  **Depends on:** BL-AI-TELEMETRY
 
-One default model serves classification, OCR, extraction, drafting and
-scan alike. Add `modelFor(feature)`: a fast, cheap model for
-`knowledge_classify` / `image_ocr` / the extractors, the strongest
-available for `section_draft` / `proposal_scan` / `winner_analysis` /
-`protest_viability`. Env override per feature, tier override per
-tenant. `ai_call_log.model` already records what answered, so the
-before/after is measurable.
+One default model used to serve classification, OCR, extraction,
+drafting and scan alike. Each feature now belongs to a model class and
+the gateway requests the class model unless the caller pins one.
+`ai_call_log.requested_model` records the routed model and `model`
+records what answered, so the before/after is measurable per feature.
+
+**Delivered:**
+- `src/lib/ai-routing.ts` (pure, no DB) — `AiModelClass` = fast |
+  standard | strong; `AI_FEATURE_MODEL_CLASS: Record<AiFeature, …>` so
+  every new feature forces a routing decision at compile time.
+  Fast: knowledge_classify, image_ocr, ebuy_extract, gsa_extract.
+  Strong: section_draft, proposal_scan(+background), winner_analysis,
+  protest_viability. Everything else standard.
+- `modelTableFor(provider)` from env. Anthropic: `ANTHROPIC_MODEL_FAST`
+  (default claude-haiku-4-5-20251001), `ANTHROPIC_MODEL` (existing
+  default), `ANTHROPIC_MODEL_STRONG` (defaults to standard — routing
+  never silently raises cost). vLLM: `VLLM_MODEL_FAST` / `VLLM_MODEL` /
+  `VLLM_MODEL_STRONG`. Azure is deployment-pinned; Bedrock and stub are
+  not routed. `AI_MODEL_ROUTING=off` disables.
+- Precedence: caller `model` › tenant override by feature key › tenant
+  override by class key › provider table. Tenant overrides live in
+  `tenant_subscription.custom_overrides.aiModels` (JSONB, no migration);
+  `CurrentTier.overrides.aiModels` plumbs them to the gateway.
+- Gateway hook in `runTenantCompletion` runs after the tier lookup and
+  before telemetry so `requested_model` reflects the routed choice.
+- `/admin/usage` gains a "Model routing" panel: active provider,
+  routing on/off, per-class model and the features in each class.
+- `tests/ai/gateway-routing.test.ts` — table defaults and env
+  overrides per provider, class mapping, tenant precedence, routing
+  off, and gateway behaviour through the seam including
+  `requested_model`.
+- `docs/FAQ.md` env table documents the new variables.
 
 ### BL-AI-STREAMING — Streaming draft + chat
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ⏳ queued
