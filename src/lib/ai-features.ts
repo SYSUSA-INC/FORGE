@@ -29,6 +29,7 @@ export const AI_FEATURES = {
   image_ocr: "Image OCR",
   knowledge_classify: "Knowledge classification",
   knowledge_extract: "Knowledge extraction",
+  loss_intelligence: "Loss intelligence narrative",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

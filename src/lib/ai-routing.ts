@@ -66,6 +66,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   question_generator: "standard",
   compliance_preflight: "standard",
   compliance_automap: "standard",
+  loss_intelligence: "standard",
   // Strong: what the customer submits or decides on.
   section_draft: "strong",
   proposal_scan: "strong",
