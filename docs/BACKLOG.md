@@ -3189,12 +3189,39 @@ can see across pursuits.
   clean record, each pattern's trigger and threshold, severity ordering.
 
 ### BL-FB-WIN-RECOMPETE — Re-compete radar
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
 
 When a solicitation reappears (NAICS + agency + scope similarity above
 threshold), flag the past loss and the lessons learned automatically.
 Surfaces in SAM.gov import results and the dashboard "needs attention"
 strip. Includes the original outcome, debrief, and winner analysis.
+
+**Delivered:**
+- `src/lib/recompete-match.ts` (pure): deterministic scorer. Same
+  SAM.gov notice is certain; same solicitation number is 0.95; otherwise
+  agency (0.25), NAICS (0.20, family 0.10), issuing-office stem (0.10),
+  scope similarity (up to 0.55; cosine over stemmed unigrams + bigrams
+  with GovCon boilerplate removed) and an incumbent who is the
+  competitor that beat us (0.15). Flags at 0.55, "likely" at 0.75.
+  Agency + NAICS alone never flags; that is customer history.
+  Thresholds and weights exported.
+- `src/lib/recompete-radar.ts` (server-only): loads decided pursuits
+  with outcome, debrief, winner analysis and the converted
+  solicitation's requirements; matches a solicitation (excluding its
+  own and its parent's pursuit), an opportunity, a page of SAM.gov
+  results, or the org's open work. Text capped in SQL. Scoped by
+  `organizationId`.
+- `RecompeteRadarPanel` on the solicitation and opportunity pages:
+  outcome chip, signals, awarded-to / value / reasons, lessons learned,
+  debrief fixes, why the winner won and what to do before the next bid;
+  won priors show what the evaluators credited. Renders nothing when
+  clear.
+- SAM.gov import results carry a "Recompete · lost to X 2024" chip and a
+  "bid before as …" line with the lessons; `ImportableOpportunity`
+  gains `recompete`.
+- Command Center "Needs attention" strip listing flagged open
+  opportunities and fresh solicitations, linking to loss intelligence.
+- `tests/ai/recompete-match.test.ts`.
 
 ---
 

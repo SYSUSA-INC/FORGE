@@ -24,6 +24,7 @@ import { listSolicitationDocumentsAction } from "./document-actions";
 import { SolicitationDocumentsPanel } from "./SolicitationDocumentsPanel";
 import { KeyDateTimeline } from "./KeyDateTimeline";
 import { CustomerHistoryPanel } from "./CustomerHistoryPanel";
+import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -276,6 +277,13 @@ export default async function SolicitationDetail({
           </Link>
         ) : null}
       </div>
+
+      {/* BL-FB-WIN-RECOMPETE — have we bid this before? Renders nothing when not. */}
+      <RecompeteRadarPanel
+        organizationId={organizationId}
+        target={{ kind: "solicitation", id: s.id }}
+        className="mb-4"
+      />
 
       {/* BL-FB-SOL-CUSTOMER-PATTERN — what we already know about this agency */}
       <div className="mb-4">

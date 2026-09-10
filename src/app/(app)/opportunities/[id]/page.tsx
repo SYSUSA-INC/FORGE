@@ -9,6 +9,7 @@ import { listOpportunityOwners } from "../actions";
 import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
 import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
 import { PwinPanel } from "./PwinPanel";
+import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,11 @@ export default async function OpportunityOverviewPage({
         />
       </Panel>
       <div className="flex flex-col gap-4">
+        {/* BL-FB-WIN-RECOMPETE — have we bid this before? Renders nothing when not. */}
+        <RecompeteRadarPanel
+          organizationId={organizationId}
+          target={{ kind: "opportunity", id: opp.id }}
+        />
         <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
         <OpportunityBriefPanel opportunityId={opp.id} />
         <OpportunityDocsAndAIPanel
