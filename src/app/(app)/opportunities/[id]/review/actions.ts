@@ -273,6 +273,13 @@ export async function getReviewRequestByTokenAction(
     },
   });
 
+  // An expired link keeps its audit trail but stops carrying the
+  // opportunity payload; only the submit path refused expired tokens
+  // before (BL-TENANT-AUDIT 2026-09).
+  if (expired) {
+    return { ok: false, error: "This review link has expired. Ask the sender for a new one." };
+  }
+
   return {
     ok: true,
     requestId: row.r.id,

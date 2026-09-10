@@ -16,10 +16,11 @@ import { log } from "@/lib/log";
  * function logs rather than mysterious 500s on table queries.
  *
  * Bumping `EXPECTED_LATEST_MIGRATION` is part of the workflow when
- * adding a new drizzle/0NNN migration file. The build will fail
- * loudly if forgotten.
+ * adding a new drizzle/0NNN migration file. `tests/ai/migration-check.test.ts`
+ * fails when a newer file exists in drizzle/ (BL-TENANT-AUDIT 2026-09
+ * found it pinned 24 migrations behind).
  */
-const EXPECTED_LATEST_MIGRATION = "0052_repair_false_applied_ledger.sql";
+export const EXPECTED_LATEST_MIGRATION = "0077_tenant_org_indexes.sql";
 
 let didCheck = false;
 

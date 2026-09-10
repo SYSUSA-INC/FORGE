@@ -41,6 +41,32 @@ export async function issueToken(
   return raw;
 }
 
+/**
+ * Non-consuming check: does this raw token match a live token for the
+ * purpose + subject? Used to gate what a landing page may reveal before
+ * the token is actually spent on submit (BL-TENANT-AUDIT 2026-09).
+ */
+export async function peekToken(
+  purpose: TokenPurpose,
+  subject: string,
+  rawToken: string,
+): Promise<boolean> {
+  if (!rawToken) return false;
+  const identifier = prefix(purpose, subject);
+  const hashed = hashToken(rawToken);
+  const [row] = await db
+    .select({ expires: verificationTokens.expires })
+    .from(verificationTokens)
+    .where(
+      and(
+        eq(verificationTokens.identifier, identifier),
+        eq(verificationTokens.token, hashed),
+      ),
+    )
+    .limit(1);
+  return Boolean(row && row.expires.getTime() >= Date.now());
+}
+
 export async function consumeToken(
   purpose: TokenPurpose,
   subject: string,

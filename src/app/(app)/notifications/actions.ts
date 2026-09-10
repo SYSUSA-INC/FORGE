@@ -85,14 +85,22 @@ export async function listMyNotificationsAction(
 
 export async function getMyUnreadCount(): Promise<number> {
   const user = await requireAuth();
-  if (!user.organizationId) return 0;
+  // The session's organizationId can lag the active org (impersonation,
+  // org switch); resolve it the same way the bell list does. No org yet
+  // (onboarding) means nothing to count (BL-TENANT-AUDIT 2026-09).
+  let organizationId: string;
+  try {
+    ({ organizationId } = await requireCurrentOrg());
+  } catch {
+    return 0;
+  }
   const [row] = await db
     .select({ n: count() })
     .from(notifications)
     .where(
       and(
         eq(notifications.recipientUserId, user.id),
-        eq(notifications.organizationId, user.organizationId),
+        eq(notifications.organizationId, organizationId),
         isNull(notifications.readAt),
       ),
     );

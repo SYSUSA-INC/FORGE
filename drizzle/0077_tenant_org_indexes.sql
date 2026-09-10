@@ -11,16 +11,17 @@
 -- solicitation by org), so these are performance fixes as well as the
 -- firewall invariant.
 --
--- Where the read pattern is "by org, newest first" the index is a
--- composite on (organization_id, <timestamp> DESC) so the ORDER BY is
--- served by the index too. Every statement is idempotent; safe to
+-- Where the audited read pattern filters or orders on a second column
+-- the index is a composite led by organization_id (org + status,
+-- org + artifact_id, org + proposal_id, org + timestamp DESC) so the
+-- whole predicate is served by the index. Every statement is idempotent; safe to
 -- re-run; forward-only; additive.
 
 CREATE INDEX IF NOT EXISTS "allowlist_organization_id_idx"
   ON "allowlist" ("organization_id");
 
 CREATE INDEX IF NOT EXISTS "membership_organization_id_idx"
-  ON "membership" ("organization_id");
+  ON "membership" ("organization_id", "status");
 
 CREATE INDEX IF NOT EXISTS "notification_org_created_idx"
   ON "notification" ("organization_id", "created_at" DESC);
@@ -32,25 +33,25 @@ CREATE INDEX IF NOT EXISTS "proposal_outcome_org_updated_idx"
   ON "proposal_outcome" ("organization_id", "updated_at" DESC);
 
 CREATE INDEX IF NOT EXISTS "proposal_debrief_organization_id_idx"
-  ON "proposal_debrief" ("organization_id");
+  ON "proposal_debrief" ("organization_id", "updated_at" DESC);
 
 CREATE INDEX IF NOT EXISTS "proposal_template_organization_id_idx"
-  ON "proposal_template" ("organization_id");
+  ON "proposal_template" ("organization_id", "is_default");
 
 CREATE INDEX IF NOT EXISTS "proposal_pdf_render_organization_id_idx"
-  ON "proposal_pdf_render" ("organization_id");
+  ON "proposal_pdf_render" ("organization_id", "proposal_id");
 
 CREATE INDEX IF NOT EXISTS "proposal_winner_analysis_organization_id_idx"
   ON "proposal_winner_analysis" ("organization_id");
 
 CREATE INDEX IF NOT EXISTS "opportunity_review_request_organization_id_idx"
-  ON "opportunity_review_request" ("organization_id");
+  ON "opportunity_review_request" ("organization_id", "opportunity_id");
 
 CREATE INDEX IF NOT EXISTS "solicitation_assignment_organization_id_idx"
   ON "solicitation_assignment" ("organization_id");
 
 CREATE INDEX IF NOT EXISTS "knowledge_extraction_run_organization_id_idx"
-  ON "knowledge_extraction_run" ("organization_id");
+  ON "knowledge_extraction_run" ("organization_id", "artifact_id");
 
 CREATE INDEX IF NOT EXISTS "knowledge_extraction_candidate_organization_id_idx"
-  ON "knowledge_extraction_candidate" ("organization_id");
+  ON "knowledge_extraction_candidate" ("organization_id", "artifact_id");

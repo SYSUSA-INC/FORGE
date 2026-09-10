@@ -62,7 +62,13 @@ export async function loadDecidedPursuits(organizationId: string): Promise<Decid
     .from(proposalOutcomes)
     .innerJoin(proposals, eq(proposals.id, proposalOutcomes.proposalId))
     .innerJoin(opportunities, eq(opportunities.id, proposals.opportunityId))
-    .leftJoin(proposalDebriefs, eq(proposalDebriefs.proposalId, proposals.id))
+    .leftJoin(
+      proposalDebriefs,
+      and(
+        eq(proposalDebriefs.proposalId, proposals.id),
+        eq(proposalDebriefs.organizationId, organizationId),
+      ),
+    )
     .where(
       and(
         eq(proposalOutcomes.organizationId, organizationId),

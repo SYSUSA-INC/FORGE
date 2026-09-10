@@ -36,13 +36,8 @@ export default async function PipelinePage({
       ? null
       : new Date(Date.now() - Number(windowKey) * 24 * 60 * 60 * 1000);
 
-  const whereClause = sinceCutoff
-    ? and(
-        eq(opportunities.organizationId, organizationId),
-        gte(opportunities.createdAt, sinceCutoff),
-      )
-    : eq(opportunities.organizationId, organizationId);
-
+  // Tenant predicate stays inline with the statement (the isolation
+  // checker reads it per statement); `and()` drops the undefined arm.
   const rows = await db
     .select({
       stage: opportunities.stage,
@@ -51,7 +46,12 @@ export default async function PipelinePage({
       valueHigh: opportunities.valueHigh,
     })
     .from(opportunities)
-    .where(whereClause);
+    .where(
+      and(
+        eq(opportunities.organizationId, organizationId),
+        sinceCutoff ? gte(opportunities.createdAt, sinceCutoff) : undefined,
+      ),
+    );
 
   const data = buildFunnelData(rows);
 

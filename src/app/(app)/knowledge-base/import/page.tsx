@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { ClassifyBackfillButton } from "./ClassifyBackfillButton";
 import { CorpusList } from "./CorpusList";
 import { CorpusUploader } from "./CorpusUploader";
@@ -17,6 +18,10 @@ import { getEmbeddingsStatusAction } from "./embed-actions";
 export const dynamic = "force-dynamic";
 
 export default async function CorpusImportPage() {
+  // Every action below re-gates, but the route's protection should be
+  // visible in the route file itself (BL-TENANT-AUDIT 2026-09).
+  await requireAuth();
+  await requireCurrentOrg();
   const [artifacts, embedStatus, classifyCandidateCount, tagUsage] =
     await Promise.all([
       listKnowledgeArtifactsAction(),

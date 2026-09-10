@@ -256,7 +256,12 @@ export async function updateKnowledgeEntryAction(
           body: knowledgeEntries.body,
         })
         .from(knowledgeEntries)
-        .where(eq(knowledgeEntries.id, id))
+        .where(
+          and(
+            eq(knowledgeEntries.organizationId, organizationId),
+            eq(knowledgeEntries.id, id),
+          ),
+        )
         .limit(1);
       if (latest) {
         await embedKnowledgeEntry(organizationId, id, latest.title, latest.body).catch(

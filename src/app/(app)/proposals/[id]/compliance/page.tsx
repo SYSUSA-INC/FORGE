@@ -89,14 +89,19 @@ export default async function ProposalCompliancePage({
     .orderBy(asc(proposalSections.ordering));
 
   // BL-FB-CM-EVIDENCE — load evidence for every item in this proposal.
-  // Single SELECT scoped to the proposal's item ids; the page already
-  // verified tenant ownership above.
+  // Single SELECT scoped to the proposal's item ids AND the org, so the
+  // read does not depend on the parent check above staying in place.
   const itemIds = items.map((i) => i.id);
   const evidenceRows = itemIds.length > 0
     ? await db
         .select()
         .from(complianceItemEvidence)
-        .where(inArray(complianceItemEvidence.complianceItemId, itemIds))
+        .where(
+          and(
+            eq(complianceItemEvidence.organizationId, organizationId),
+            inArray(complianceItemEvidence.complianceItemId, itemIds),
+          ),
+        )
         .orderBy(asc(complianceItemEvidence.createdAt))
     : [];
   const evidenceByItem = new Map<string, typeof evidenceRows>();

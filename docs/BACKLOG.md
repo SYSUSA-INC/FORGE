@@ -62,9 +62,9 @@ Effort key:
 Before the first paying customer onboards, production must be isolated from staging/dev so a developer error cannot touch real customer data. Operator runbook in `docs/ENVIRONMENTS.md`; production-deploy gate in `docs/PRODUCTION_DEPLOY_GATE.md`. Code-side guards (env validation, non-prod banners, blocked-in-staging operations) land in a follow-on PR.
 
 ### BL-TENANT-AUDIT — Multi-tenant data firewall audit
-**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  🚧 2026-09 quarterly re-run + CI gates (PR #TBD)
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  🚧 2026-09 quarterly re-run + CI gates (PR #261)
 
-**2026-09 re-run (PR #TBD):** the codebase grew from 14 to 20 API routes
+**2026-09 re-run (PR #261):** the codebase grew from 14 to 20 API routes
 and 32 to 43 tenant-scoped tables since June, and Phases A–C moved most
 DB reads into `src/lib` server-only modules that the static checker
 never inspected. This pass (a) widens `scripts/check-isolation.mjs` to
@@ -82,6 +82,26 @@ Comprehensive audit of every server action, API route, server-component DB query
 - DB-level guarantees: every `organization_id` column has a NOT NULL constraint + an index covering tenant-scoped queries
 
 Deliverable: `docs/audits/06-multi-tenant-firewall-2026-06.md` with findings + a remediation PR for each hole.
+
+### BL-TENANT-DRIFT — schema.ts ↔ SQL mirror + drizzle-kit push guard
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+
+Found by the 2026-09 firewall re-run
+(`docs/audits/07-multi-tenant-firewall-2026-09.md`, schema F-10): eight
+index and column details exist only in `drizzle/*.sql` and not in
+`src/db/schema.ts` — the `knowledge_artifact_chunk` and
+`solicitation_assignment` indexes, the protest-check org index and
+`timestamptz` columns, the `section_draft_signal` section FK, the
+`knowledge_artifact` partial unique + outcome-label indexes, the
+`payment_event` / `tenant_subscription` partial indexes, and the
+`vector(1536)` column types. Harmless while migrations are applied from
+the SQL files, but `npm run db:push` would compute a diff from
+`schema.ts` and drop every one of them. Deliver: mirror them into
+`schema.ts` index callbacks (`.where(sql\`…\`)` for partials,
+`{ withTimezone: true }`, the FK); put `db:push` / `db:generate` behind
+an explicit confirmation wrapper so the SQL-file pipeline stays the
+single write path; optionally a `scripts/check-schema-drift.mjs` that
+diffs `pg_indexes` against both sources in CI.
 
 ### BL-PACKAGES — Subscription packages + AI token caps
 **Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued

@@ -79,10 +79,7 @@ export default async function OpportunityOverviewPage({
         />
         <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
         <OpportunityBriefPanel opportunityId={opp.id} />
-        <OpportunityDocsAndAIPanel
-          opportunityId={opp.id}
-          organizationId={organizationId}
-        />
+        <OpportunityDocsAndAIPanel opportunityId={opp.id} />
       </div>
     </div>
   );

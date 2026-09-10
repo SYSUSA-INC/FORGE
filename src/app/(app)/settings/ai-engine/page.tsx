@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getAIEngineStatus } from "@/lib/settings-status";
 import { AIEngineTab } from "../AIEngineTab";
@@ -8,10 +7,7 @@ import { AIEngineTab } from "../AIEngineTab";
 export const dynamic = "force-dynamic";
 
 export default async function AiEnginePage() {
-  const user = await requireAuth();
-  if (!user.organizationId) {
-    redirect("/");
-  }
+  await requireCurrentOrg();
 
   const aiStatus = getAIEngineStatus();
 

@@ -60,10 +60,18 @@ table with an `organization_id` column) and checks four surfaces:
   table must reference `organizationId`. Libs are called by gated code,
   so no gate is required, but they must take and apply the tenant
   rather than trusting a bare row id.
-- **pgvector statements**: every `<=>` / `<->` must sit in a sql``
-  template that filters `organization_id`, because the IVFFlat index is
-  on the embedding alone and a missing filter silently scans every
-  tenant.
+- **Server components** (every non-`"use client"` `.tsx` under
+  `src/app` and `src/components` that imports `@/db`): the file must call
+  a gate itself, and every `.from()` / join of a tenant-scoped table must
+  carry `organizationId` in the same statement. "Parent first, then
+  children by `params.id`" does not pass; put the org predicate on the
+  child query too. Superadmin and public token pages are allow-listed by
+  path (`"src/app/(app)/admin/**"`, `"<file>:*"`).
+- **Raw SQL touching embeddings**: every sql`` template that uses a
+  pgvector operator or names the `embedding` column in a SELECT /
+  UPDATE / INSERT / DELETE must filter `organization_id` in the same
+  statement, because the IVFFlat index is on the embedding alone and a
+  missing filter silently scans (or writes) every tenant.
 - **Writes, strictly**: every `.update(table)` / `.delete(table)` on a
   tenant-scoped table must carry `eq(table.organizationId, …)` in its
   own `.where(...)`, in every function including non-exported helpers.

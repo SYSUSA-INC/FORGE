@@ -8,6 +8,7 @@ import {
   solicitationReviews,
 } from "@/db/schema";
 import { Panel } from "@/components/ui/Panel";
+import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { OpportunityDocsAndAIClient } from "./OpportunityDocsAndAIClient";
 
 /**
@@ -28,11 +29,15 @@ import { OpportunityDocsAndAIClient } from "./OpportunityDocsAndAIClient";
  */
 export async function OpportunityDocsAndAIPanel({
   opportunityId,
-  organizationId,
 }: {
   opportunityId: string;
-  organizationId: string;
 }) {
+  // A server component that queries tenant tables derives the tenant
+  // from the gate itself rather than trusting a prop (BL-TENANT-AUDIT
+  // 2026-09). The parent page has already verified the opportunity
+  // belongs to this org; the predicate below repeats it per statement.
+  const { organizationId } = await requireCurrentOrg();
+
   // Solicitations linked to this opportunity.
   const linkedSolicitations = await db
     .select({

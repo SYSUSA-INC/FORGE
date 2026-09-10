@@ -428,67 +428,133 @@ function findTemplateEnd(src, from) {
   return src.length;
 }
 
+function lineAt(src, idx) {
+  return src.slice(0, idx).split("\n").length;
+}
+
+/**
+ * Surface D: raw SQL that touches embeddings. Every sql`` template that
+ * uses a pgvector operator, or names the embedding column inside a
+ * SELECT / UPDATE / INSERT / DELETE, must filter organization_id in the
+ * same statement. The IVFFlat index is org-blind, and an org-blind
+ * UPDATE of an embedding is a cross-tenant write by another name.
+ */
 function checkVectorStatements(allowList) {
   const violations = [];
   let statements = 0;
-  const files = walkFiles(SRC_DIR, () => true);
-  for (const file of files) {
+  for (const file of walkFiles(SRC_DIR, () => true)) {
     const src = readFileSync(file, "utf-8");
-    if (!/<=>|<->/.test(src)) continue;
+    if (!src.includes("sql`")) continue;
     const relativeFile = file.slice(REPO_ROOT.length + 1);
-    const re = /<=>|<->/g;
-    let m;
-    const seenStatements = new Set();
-    while ((m = re.exec(src)) !== null) {
-      const lineStart = src.lastIndexOf("\n", m.index) + 1;
-      const lineEndIdx = src.indexOf("\n", m.index);
-      const lineText = src
-        .slice(lineStart, lineEndIdx === -1 ? undefined : lineEndIdx)
-        .trim();
-      // Skip comments and doc blocks.
-      if (/^(\*|\/\/|\/\*)/.test(lineText)) continue;
-      const lineNo = src.slice(0, m.index).split("\n").length;
-      if (allowList[`${relativeFile}:${lineNo}`]) continue;
-
-      const start = src.lastIndexOf("sql`", m.index);
-      if (start === -1) {
-        violations.push({
-          file: relativeFile,
-          line: lineNo,
-          name: "<vector operator>",
-          tables: ["embedding"],
-          missing: "sql`` template (vector operator found outside a tagged SQL statement)",
-        });
-        continue;
-      }
-      const end = findTemplateEnd(src, start + 4);
-      if (end < m.index) {
-        // The nearest sql`` closed before this operator — not inside a template.
-        violations.push({
-          file: relativeFile,
-          line: lineNo,
-          name: "<vector operator>",
-          tables: ["embedding"],
-          missing: "sql`` template (vector operator found outside a tagged SQL statement)",
-        });
-        continue;
-      }
-      if (seenStatements.has(start)) continue;
-      seenStatements.add(start);
+    let idx = 0;
+    while ((idx = src.indexOf("sql`", idx)) !== -1) {
+      const at = idx;
+      const end = findTemplateEnd(src, idx + 4);
+      idx = end + 1;
+      const stmt = src.slice(at, end);
+      const isVector = /<=>|<->|<#>/.test(stmt);
+      const touchesEmbedding =
+        /\bembedding\b/.test(stmt) && /\b(select|update|insert|delete)\b/i.test(stmt);
+      if (!isVector && !touchesEmbedding) continue;
       statements++;
-      const stmt = src.slice(start, end);
-      if (!/\borganization_id\b/.test(stmt)) {
+      const lineNo = lineAt(src, at);
+      if (allowList[`${relativeFile}:${lineNo}`]) continue;
+      if (!/\borganization_id\b|\borganizationId\b/.test(stmt)) {
         violations.push({
           file: relativeFile,
           line: lineNo,
-          name: "<vector statement>",
+          name: isVector ? "<vector statement>" : "<embedding statement>",
           tables: ["embedding"],
-          missing: "organization_id filter in the same sql`` statement (IVFFlat index is org-blind)",
+          missing:
+            "organization_id filter in the same sql`` statement (IVFFlat index and embedding writes are org-blind)",
         });
       }
     }
   }
   return { violations, statements };
+}
+
+/**
+ * Surface E: server components — every non-"use client" .tsx under
+ * src/app and src/components that imports "@/db". A component that reads
+ * a tenant-scoped table must call a gate itself, and every
+ * .from() / join of a tenant-scoped table must carry organizationId in
+ * the same statement. Function granularity is not enough here: the
+ * "parent first, then children by params.id" pattern is one reorder
+ * away from a leak, and the statement is the unit that survives a
+ * refactor. Superadmin and public token pages are allow-listed by path.
+ */
+function listComponentFiles() {
+  const out = [];
+  for (const dir of [join(REPO_ROOT, "src/app"), join(REPO_ROOT, "src/components")]) {
+    for (const p of walkFiles(dir, (f) => f.endsWith(".tsx"))) {
+      const src = readFileSync(p, "utf-8");
+      if (/^\s*["']use client["']/m.test(src.slice(0, 400))) continue;
+      if (!/from\s+"@\/db"/.test(src)) continue;
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+function fileAllowed(allowList, relativeFile) {
+  if (allowList[`${relativeFile}:*`]) return true;
+  return Object.keys(allowList).some(
+    (k) => k.endsWith("/**") && relativeFile.startsWith(k.slice(0, -2)),
+  );
+}
+
+function checkComponents(files, scopedConsts, allowList) {
+  const violations = [];
+  let touching = 0;
+  for (const file of files) {
+    const relativeFile = file.slice(REPO_ROOT.length + 1);
+    if (fileAllowed(allowList, relativeFile)) continue;
+    const src = readFileSync(file, "utf-8");
+    const touches = [...scopedConsts].filter((c) =>
+      new RegExp(`\\.(from|innerJoin|leftJoin|insert|update|delete)\\(\\s*${c}\\b`).test(src),
+    );
+    if (touches.length === 0) continue;
+    touching++;
+
+    if (!hasAuthGate(src)) {
+      violations.push({
+        file: relativeFile,
+        line: 1,
+        name: "<component>",
+        tables: touches,
+        missing:
+          "auth gate (a server component reading tenant tables must call requireCurrentOrg / requireSuperadmin itself)",
+      });
+    }
+    for (const c of touches) {
+      const re = new RegExp(`\\.(from|innerJoin|leftJoin)\\(\\s*${c}\\b`, "g");
+      let m;
+      while ((m = re.exec(src)) !== null) {
+        const start = src.lastIndexOf(";", m.index) + 1;
+        const stmt = src.slice(start, statementEnd(src, m.index));
+        if (!hasOrgRef(stmt)) {
+          violations.push({
+            file: relativeFile,
+            line: lineAt(src, m.index),
+            name: "<component>",
+            tables: [c],
+            missing: `organizationId in the same statement as .${m[1]}(${c})`,
+          });
+        }
+      }
+    }
+    for (const problem of checkWriteStatements({ body: src, bodyStartLine: 1 }, scopedConsts)) {
+      violations.push({
+        file: relativeFile,
+        line: problem.line,
+        name: "<component>",
+        tables: touches,
+        missing: `organizationId in the WHERE of the write — ${problem.text}`,
+      });
+    }
+  }
+  return { violations, count: files.length, touching };
 }
 
 function check() {
@@ -506,6 +572,7 @@ function check() {
   const routes = checkSurface(listRouteFiles(), scopedConsts, allowList, "route");
   const libs = checkSurface(listDbLibFiles(), scopedConsts, allowList, "lib");
   const vectors = checkVectorStatements(allowList);
+  const components = checkComponents(listComponentFiles(), scopedConsts, allowList);
 
   return {
     scopedSqlTables,
@@ -514,18 +581,21 @@ function check() {
     routes,
     libs,
     vectors,
+    components,
     violations: [
       ...actions.violations,
       ...routes.violations,
       ...libs.violations,
       ...vectors.violations,
+      ...components.violations,
     ],
   };
 }
 
 // ── main ────────────────────────────────────────────────────────────
 
-const { scopedSqlTables, scopedConsts, actions, routes, libs, vectors, violations } = check();
+const { scopedSqlTables, scopedConsts, actions, routes, libs, vectors, components, violations } =
+  check();
 
 console.log(
   `[isolation] ${scopedSqlTables.size} tenant-scoped SQL tables; ${scopedConsts.size} Drizzle consts watched.`,
@@ -533,7 +603,9 @@ console.log(
 console.log(
   `[isolation] surfaces — actions: ${actions.fnCount} fns (${actions.touching} touch tenant tables); ` +
     `routes: ${routes.fnCount} handlers (${routes.touching} touch, ${routes.cronExempt} cron-exempt); ` +
-    `libs: ${libs.fnCount} fns (${libs.touching} touch); vector statements: ${vectors.statements}.`,
+    `libs: ${libs.fnCount} fns (${libs.touching} touch); ` +
+    `components: ${components.count} files (${components.touching} touch); ` +
+    `embedding/vector statements: ${vectors.statements}.`,
 );
 
 if (violations.length === 0) {

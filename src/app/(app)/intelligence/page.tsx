@@ -81,7 +81,7 @@ export default async function IntelligencePage() {
             Cross-loss patterns →
           </Link>
         </div>
-        <OutcomeInsightsPanel organizationId={organizationId} />
+        <OutcomeInsightsPanel />
       </section>
 
       <section className="mb-8">
