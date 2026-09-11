@@ -104,16 +104,18 @@ single write path; optionally a `scripts/check-schema-drift.mjs` that
 diffs `pg_indexes` against both sources in CI.
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slices 1–4: PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ⏳ remaining: à la carte add-on system
 
-Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work; the new build:
-- Super-admin UI to create/edit packages with feature flags + quotas
-- Add-on system (AI, advanced reporting, etc.)
-- **Per-package AI token cap** (Anthropic input + output tokens) with enforcement at the AI gateway, so a runaway tenant cannot burn through profits
-- Landing page surfacing available packages
-- Tenant-facing upgrade flow
-- Promo codes already in schema; surface in checkout
-- Stripe / Paddle integration TBD (BL-17)
+Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
+
+**Delivered:**
+- Super-admin UI to create/edit packages with feature flags + quotas — `/admin/tiers` (BL-16).
+- **Per-package AI token cap** (`aiTokensPerMonth`, input + output) enforced server-side in the AI gateway (`runTenantCompletion`): pre-check refuses before the provider call when usage ≥ cap, post-record adds the actual tokens, refusals are recorded as `quota_refused` in `ai_call_log`. 100% of tenant AI paths go through it (Slice 2). Over-quota → `QuotaExceededError` → 402 on the API routes, error state in the actions, upgrade path on `/settings/billing`.
+- Per-tenant token consumption panel for super-admins (`/admin/usage`, Slice 3; per-feature breakdown added by BL-AI-TELEMETRY #257).
+- Public pricing page surfacing the packages (Slice 4) and tenant-facing upgrade flow via Stripe Checkout + customer portal (BL-17 Slices 3–4).
+- Promo codes: Stripe promotion codes accepted at checkout (`allow_promotion_codes`); the FORGE-side `promo_code` table is managed at `/admin/promo-codes`.
+
+**Remaining (not started):** the à la carte add-on system (AI top-ups, advanced reporting) — needs `tier_addon` / `tenant_addon` tables, Stripe price mapping and a tenant-facing picker. Paused with BL-17 Slice 5 pending launch readiness; token top-ups can be handled by a tier change until then.
 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 
@@ -2117,6 +2119,51 @@ configured, giving the migration test real production schema shape.
   boots (services run for the whole job) but is unused when the
   Neon path resolves. Trade-off accepted: ~5–10s of CI time on
   Neon-configured runs vs. splitting into two parallel jobs.
+
+---
+
+### BL-QC-links — Internal link check + the `/onboarding` dead end — **shipped**
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #263)
+
+Reported as "many links in the side menu are not working". Root cause:
+`requireCurrentOrg()` (`src/lib/auth-helpers.ts`) redirects to
+`/onboarding` when the session carries no `organizationId`, and no
+`page.tsx` ever provided that route — so the redirect landed on the
+app's 404 page. 24 of the 36 side-menu destinations call that gate; the
+12 that don't (3 Help pages on `requireAuth`, 9 Platform Administration
+pages on `requireSuperadmin`) kept working, which is exactly the
+"some links work, most don't" shape that was reported.
+
+The session's `organizationId` is null in three situations, all of which
+hit this: no membership row, the membership's status is `disabled`, or
+the organization itself is disabled (`enrichFromDb` in `src/auth.ts`
+filters all three out). A platform admin with no workspace membership is
+the most likely way to land here, since that account still sees a full
+side menu.
+
+Nothing in CI could catch it: the app builds, types check, every
+individual page exists, and the dangling target is a string in a
+redirect.
+
+**Shipped:**
+- `src/app/(app)/onboarding/page.tsx` — the missing route. Gated by
+  `requireAuth()` only (calling `requireCurrentOrg()` here would loop),
+  it diagnoses which of the three situations applies, lists the user's
+  workspaces with their real status, and routes on: Platform
+  Administration for superadmins, Help for everyone.
+- `scripts/check-links.mjs` + `npm run check:links` + an `Internal link
+  check` CI job: every `href`, `redirect()` and `revalidatePath()`
+  target must resolve to a `page.tsx`, `route.ts` or a file in
+  `public/`, with dynamic segments and template interpolations matched
+  against the route shape. 97 targets checked; `/onboarding` was the
+  only unresolved one in the codebase. Exceptions live in
+  `.link-allow.json` with a reason.
+- Documented in `docs/ENGINEERING_STANDARDS.md`.
+
+**Not verified live:** this container has no pgvector and no Docker
+daemon, so the app could not be booted against a real schema. The
+diagnosis is static (route table vs. link targets vs. per-page gates)
+and the checker reproduces the failure with the new page removed.
 
 ---
 

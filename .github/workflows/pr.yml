@@ -81,6 +81,24 @@ jobs:
           node-version: "20"
       - run: node scripts/check-rsc-boundaries.mjs
 
+  links:
+    name: Internal link check
+    runs-on: ubuntu-latest
+    # Static check — no DB, no build needed. Every in-app link target
+    # (href, redirect, revalidatePath) must resolve to a page.tsx /
+    # route.ts or a file in public/. Catches the dangling-target class
+    # the build cannot see: `requireCurrentOrg()` redirected to
+    # `/onboarding`, which no page provided, so every gated page — about
+    # two dozen side-menu destinations — landed on the 404 page for any
+    # user whose session carried no organizationId. Deliberate
+    # exceptions live in .link-allow.json with a reason.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/check-links.mjs
+
   isolation:
     name: Multi-tenant isolation check
     runs-on: ubuntu-latest

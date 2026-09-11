@@ -17,10 +17,11 @@
     "check:rsc": "node scripts/check-rsc-boundaries.mjs",
     "check:isolation": "node scripts/check-isolation.mjs",
     "check:firewall": "node scripts/check-tenant-firewall.mjs",
+    "check:links": "node scripts/check-links.mjs",
     "check:migrations": "node scripts/check-migrations-fresh.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:all": "npm run typecheck && npm run check:rsc && npm run check:isolation && npm run check:firewall && npm run test && npm run build"
+    "check:all": "npm run typecheck && npm run check:rsc && npm run check:isolation && npm run check:firewall && npm run check:links && npm run test && npm run build"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
