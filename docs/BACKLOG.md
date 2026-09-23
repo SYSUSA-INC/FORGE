@@ -605,7 +605,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #TBD); 2c operator-pending; Slice 6 queued
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #268); 2c operator-pending; Slice 6 queued
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -707,7 +707,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     the diff (it's a read-only view), independent of ownership.
 - **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
 - **Slice 7** — Brain feedback loop: every accepted/rejected change
-  feeds the pattern-intel pipeline. ✅ *shipped (PR #TBD)*
+  feeds the pattern-intel pipeline. ✅ *shipped (PR #268)*
   - `section_change_decision` (drizzle/0078, org-scoped): one row per
     accept / reject — change type, decision, author, resolver, the
     affected text, bulk flag, section kind.
