@@ -605,7 +605,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c shipped (5c: PR #238); 2c operator-pending; Slices 6–7 queued
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #268); 2c operator-pending; Slice 6 queued
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -707,7 +707,31 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     the diff (it's a read-only view), independent of ownership.
 - **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
 - **Slice 7** — Brain feedback loop: every accepted/rejected change
-  feeds the pattern-intel pipeline.
+  feeds the pattern-intel pipeline. ✅ *shipped (PR #268)*
+  - `section_change_decision` (drizzle/0078, org-scoped): one row per
+    accept / reject — change type, decision, author, resolver, the
+    affected text, bulk flag, section kind.
+  - `TrackChanges` extension gains `onDecision`; `acceptChange` /
+    `rejectChange` / accept-all / reject-all capture the text before
+    mutating and emit the resolved changes. `RichSectionEditor` threads
+    it through a ref (stable across re-renders); `SectionsClient` calls
+    `recordChangeDecisionsAction` fire-and-forget.
+  - `recordChangeDecisionsAction`: auth + org scope through the
+    proposal, the editor's ownership rule (author / ownerless / org
+    admin) enforced server-side, input capped and sanitised, one audit
+    row per batch (`proposal_section.changes_resolved`; denials audited
+    as `changes_resolve_denied`) — the audit log Slice 3 deferred here.
+  - `src/lib/edit-feedback-summary.ts` (pure, tested) +
+    `src/lib/edit-feedback.ts`: the org's last 180 days of decisions
+    (same section kind first, org-wide fallback) become insert / delete
+    acceptance rates plus `preferredPhrases` (accepted insertions),
+    `rejectedPhrases` (struck insertions) and `removedPhrases` (accepted
+    deletions). `gatherPatternIntelForSection` runs it as the fifth
+    signal; the section-draft system prompt tells the model to match the
+    kept register, avoid the struck one and not produce the cut padding,
+    never copying verbatim. Null below 5 decisions.
+  - AI Draft Insights panel shows the proposal's decision count and
+    insertion / deletion keep rates; renders even when no AI draft exists.
 
 **Acceptance per slice:** measured against the existing TipTap editor
 + team workflow; specifics defined per slice when each starts.

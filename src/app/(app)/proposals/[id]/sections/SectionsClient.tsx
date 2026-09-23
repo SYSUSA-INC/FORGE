@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ProposalSectionKind,
@@ -16,6 +16,7 @@ import { fromPlainText } from "@/lib/tiptap-doc";
 import { pickColorForUser } from "@/lib/collab-user";
 import {
   RichSectionEditor,
+  type ChangeDecisionEvent,
   type CollabConfig,
   type CommentsConfig,
   type SnapshotsConfig,
@@ -28,6 +29,7 @@ import {
   removeSectionAction,
   saveSectionAction,
 } from "../../actions";
+import { recordChangeDecisionsAction } from "./change-decision-actions";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
 
 type Section = {
@@ -120,6 +122,7 @@ function buildCollabConfig(
 function buildTrackChangesConfig(
   user: CurrentUser,
   authorUserId: string | null,
+  onDecision?: (event: ChangeDecisionEvent) => void,
 ): TrackChangesConfig {
   return {
     author: {
@@ -128,6 +131,7 @@ function buildTrackChangesConfig(
       color: pickColorForUser(user.id),
     },
     isOwner: authorUserId === null || authorUserId === user.id,
+    onDecision,
   };
 }
 
@@ -306,9 +310,33 @@ function SectionRow({
   // Memoized via inline call: the inputs (section.id, currentUser) are
   // stable for this row's lifetime, so referential identity stays put.
   const collab = buildCollabConfig(section.id, currentUser);
+  // BL-9 Slice 7 — every accept / reject lands in section_change_decision
+  // (audited) so the Brain learns what owners keep and strike. Fire and
+  // forget: a failed record never blocks or surfaces in the editor.
+  const onDecision = useCallback(
+    (event: ChangeDecisionEvent) => {
+      void recordChangeDecisionsAction({
+        proposalId,
+        sectionId: section.id,
+        bulk: event.bulk,
+        decisions: event.decisions.map((d) => ({
+          id: d.id,
+          type: d.type,
+          decision: d.decision,
+          authorId: d.authorId,
+          authorName: d.authorName,
+          text: d.text,
+        })),
+      }).catch(() => undefined);
+    },
+    [proposalId, section.id],
+  );
   // BL-9 Slice 3 — track changes config (always provided).
   // Slice 5a — section author is the owner; non-authors can only suggest.
-  const trackChanges = buildTrackChangesConfig(currentUser, section.authorUserId);
+  const trackChanges = useMemo(
+    () => buildTrackChangesConfig(currentUser, section.authorUserId, onDecision),
+    [currentUser, section.authorUserId, onDecision],
+  );
   // BL-9 Slice 4 — comments config (activates only when collab is on).
   const comments = buildCommentsConfig(currentUser);
   const router = useRouter();
