@@ -126,6 +126,10 @@ jobs:
           node-version: "20"
       - run: node scripts/check-isolation.mjs
       - run: node scripts/check-tenant-firewall.mjs
+      # BL-TENANT-DRIFT: every index in drizzle/*.sql is declared in
+      # src/db/schema.ts with matching UNIQUE and partial-ness, and vice
+      # versa, so drizzle-kit can never see a diff that drops one.
+      - run: node scripts/check-schema-drift.mjs
 
   migrations-fresh:
     name: Fresh-DB migration verification

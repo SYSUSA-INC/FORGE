@@ -67,7 +67,10 @@ because no other CI gate catches them:
   partial index with a `WHERE` clause) lands in a SQL migration, the
   matching `index(...)` (with `.where(sql\`...\`)`) must also appear
   in `src/db/schema.ts`. Otherwise `drizzle-kit generate` regenerating
-  from schema would drop the index. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150).
+  from schema would drop the index. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150);
+  now enforced by `npm run check:drift` (BL-TENANT-DRIFT), which also
+  catches the reverse, an index declared in `schema.ts` that no
+  migration creates.
 
 - **Auth gate missing on admin-only pages.** Server components under
   `(app)/` that should be admin-only must call
