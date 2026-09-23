@@ -2188,7 +2188,7 @@ have a workspace (nothing changes for them):
   (which also resets their password).
 
 ### BL-QC-fonts — Hermetic `next build`: self-host Inter + JetBrains Mono
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #265)
 
 `next/font/google` fetched fonts.googleapis.com inside every `next build`,
 in CI and on Vercel. Google intermittently returns a font URL without a
