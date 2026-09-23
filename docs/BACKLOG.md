@@ -2186,6 +2186,39 @@ have a workspace (nothing changes for them):
   an invite-only deployment had no route to a working workspace except
   impersonation (read-only) or signing out to redeem an invite to themselves
   (which also resets their password).
+
+### BL-QC-fonts — Hermetic `next build`: self-host Inter + JetBrains Mono
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #265)
+
+`next/font/google` fetched fonts.googleapis.com inside every `next build`,
+in CI and on Vercel. Google intermittently returns a font URL without a
+file extension, and Next 14.2.15's loader dereferences a regex match on
+it with no null guard (`@next/font/dist/google/loader.js:112`,
+"Cannot read properties of null (reading '1')"). That redded PR #264's
+Next build gate (run 35857573781) with no code cause; the identical head
+passed on re-run. Three-lens adversarial review confirmed the cause as
+external; two judges ranked self-hosting first over a gated retry loop and
+over the undocumented `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` test hook,
+because it removes the failure class instead of papering over the check.
+
+**Delivered:**
+- `src/app/fonts/`: the exact latin variable woff2 files the Google loader
+  already emitted (Inter v20 wght 100–900, JetBrains Mono v24 wght 400–600),
+  OFL 1.1 licence texts, and a README with source URLs, byte counts and
+  SHA-256 sums.
+- `src/app/layout.tsx`: two `next/font/local` calls replace four
+  `next/font/google` calls; `globals.css` aliases `--font-body` and
+  `--font-stencil` to `--font-display`. Every consumer (Tailwind
+  `fontFamily`, chart SVGs, PDF templates) is untouched.
+- `tests/fonts/vendored-fonts.test.ts` pins magic bytes, size and SHA-256
+  (Next's local loader swallows font-parse errors, so a corrupt file would
+  otherwise build) and asserts `layout.tsx` no longer imports
+  `next/font/google`.
+- `.gitattributes` marks font binaries.
+- `next build` now makes no third-party network call; Vercel production
+  builds are hardened identically. Coverage is latin-only, as the preloaded
+  subset was before. Optional companion for later: restore `.next/cache` in
+  the CI build job via `actions/cache` to shorten builds.
 ---
 
 ### BL-QC-combined-job — Consolidate typecheck + lint
