@@ -2166,7 +2166,7 @@ diagnosis is static (route table vs. link targets vs. per-page gates)
 and the checker reproduces the failure with the new page removed.
 
 
-**Follow-up (PR #TBD) — the state itself, not just the missing page.** With
+**Follow-up (PR #264) — the state itself, not just the missing page.** With
 `/onboarding` in place the redirect landed somewhere real, but a signed-in
 account with no active workspace still saw the full side menu: two dozen
 links that every one redirected back to the same page, which reads as "the
