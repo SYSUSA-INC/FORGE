@@ -1,0 +1,4 @@
+# Binary assets: never diff, never normalise line endings.
+*.woff2 binary
+*.woff binary
+*.pdf binary
