@@ -64,6 +64,30 @@ export type PendingChange = {
   text: string;
 };
 
+export type ChangeDecision = "accept" | "reject";
+
+/** BL-9 Slice 7 — one resolved change, as handed to `onDecision`. */
+export type ResolvedChange = {
+  id: string;
+  type: ChangeType;
+  authorId: string;
+  authorName: string;
+  /** The affected text, captured before the document was mutated. */
+  text: string;
+  decision: ChangeDecision;
+};
+
+/**
+ * BL-9 Slice 7 — fired after an accept / reject command has applied its
+ * transaction. `bulk` is true for accept-all / reject-all. The host
+ * records the decisions server-side so the Brain can learn from them;
+ * the editor itself never waits on that.
+ */
+export type ChangeDecisionEvent = {
+  decisions: ResolvedChange[];
+  bulk: boolean;
+};
+
 // ────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ────────────────────────────────────────────────────────────────────────────
@@ -123,6 +147,28 @@ function collectChanges(state: EditorState): Map<string, ChangeInfo> {
   return map;
 }
 
+/** The text a change covers, read from the document as it stands. */
+function changeText(state: EditorState, info: ChangeInfo): string {
+  return info.ranges
+    .map((r) => state.doc.textBetween(r.from, r.to, " "))
+    .join(" ");
+}
+
+function toResolved(
+  state: EditorState,
+  info: ChangeInfo,
+  decision: ChangeDecision,
+): ResolvedChange {
+  return {
+    id: info.id,
+    type: info.type,
+    authorId: info.authorId,
+    authorName: info.authorName,
+    text: changeText(state, info),
+    decision,
+  };
+}
+
 /** Derive pending changes as a sorted array (newest timestamp first). */
 export function getPendingChanges(state: EditorState): PendingChange[] {
   const changes = collectChanges(state);
@@ -134,9 +180,7 @@ export function getPendingChanges(state: EditorState): PendingChange[] {
       authorName: info.authorName,
       authorColor: info.authorColor,
       ts: info.ts,
-      text: info.ranges
-        .map((r) => state.doc.textBetween(r.from, r.to, " "))
-        .join(" "),
+      text: changeText(state, info),
     }))
     .sort((a, b) => b.ts - a.ts);
 }
@@ -350,6 +394,13 @@ type TrackChangesOptions = {
    * doc-wide mode. Defaults to true to preserve pre-5a behaviour.
    */
   isOwner?: boolean;
+  /**
+   * BL-9 Slice 7 — called after each accept / reject command with the
+   * resolved changes (text captured before the mutation). Optional;
+   * failures inside the callback must not reach the editor, so hosts
+   * should swallow their own errors.
+   */
+  onDecision?: (event: ChangeDecisionEvent) => void;
 };
 
 type TrackChangesStorage = {
@@ -393,6 +444,7 @@ export const TrackChanges = Extension.create<
       authorColor: "#888",
       ydoc: undefined,
       isOwner: true,
+      onDecision: undefined,
     };
   },
 
@@ -508,6 +560,8 @@ export const TrackChanges = Extension.create<
 
           const { schema } = state;
           const tr = state.tr;
+          // Slice 7 — capture before the transaction moves the text.
+          const resolved = toResolved(state, change, "accept");
 
           if (change.type === "insert") {
             const insertType = schema.marks.tcInsert;
@@ -525,6 +579,7 @@ export const TrackChanges = Extension.create<
           }
 
           dispatch(tr);
+          this.options.onDecision?.({ decisions: [resolved], bulk: false });
           return true;
         },
 
@@ -538,6 +593,7 @@ export const TrackChanges = Extension.create<
 
           const { schema } = state;
           const tr = state.tr;
+          const resolved = toResolved(state, change, "reject");
 
           if (change.type === "insert") {
             // Reject insertion: remove the text (descending order).
@@ -555,6 +611,7 @@ export const TrackChanges = Extension.create<
           }
 
           dispatch(tr);
+          this.options.onDecision?.({ decisions: [resolved], bulk: false });
           return true;
         },
 
@@ -570,8 +627,10 @@ export const TrackChanges = Extension.create<
 
           const insertRanges: Array<{ from: number; to: number }> = [];
           const deleteRanges: Array<{ from: number; to: number }> = [];
+          const resolved: ResolvedChange[] = [];
 
           for (const change of changes.values()) {
+            resolved.push(toResolved(state, change, "accept"));
             if (change.type === "insert") insertRanges.push(...change.ranges);
             else deleteRanges.push(...change.ranges);
           }
@@ -591,6 +650,7 @@ export const TrackChanges = Extension.create<
           }
 
           dispatch(tr);
+          this.options.onDecision?.({ decisions: resolved, bulk: true });
           return true;
         },
 
@@ -606,8 +666,10 @@ export const TrackChanges = Extension.create<
 
           const insertRanges: Array<{ from: number; to: number }> = [];
           const deleteRanges: Array<{ from: number; to: number }> = [];
+          const resolved: ResolvedChange[] = [];
 
           for (const change of changes.values()) {
+            resolved.push(toResolved(state, change, "reject"));
             if (change.type === "insert") insertRanges.push(...change.ranges);
             else deleteRanges.push(...change.ranges);
           }
@@ -627,6 +689,7 @@ export const TrackChanges = Extension.create<
           }
 
           dispatch(tr);
+          this.options.onDecision?.({ decisions: resolved, bulk: true });
           return true;
         },
     };

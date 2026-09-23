@@ -21,8 +21,11 @@ import {
   TcInsert,
   TcDelete,
   TrackChanges,
+  type ChangeDecisionEvent,
 } from "./extensions/TrackChanges";
 import { TrackChangesSidebar } from "./TrackChangesSidebar";
+
+export type { ChangeDecisionEvent } from "./extensions/TrackChanges";
 import { CommentAnchor, Comments } from "./extensions/Comments";
 import { CommentsSidebar } from "./CommentsSidebar";
 import { SnapshotsSidebar } from "./SnapshotsSidebar";
@@ -72,6 +75,13 @@ export type TrackChangesConfig = {
     color: string;
   };
   isOwner?: boolean;
+  /**
+   * BL-9 Slice 7 — receives every accept / reject the owner makes
+   * (individually or in bulk) so the host can record it. Read through a
+   * ref, so a new function identity on re-render is picked up without
+   * rebuilding the editor.
+   */
+  onDecision?: (event: ChangeDecisionEvent) => void;
 };
 
 /**
@@ -154,6 +164,13 @@ export function RichSectionEditor({
   // BL-9 Slice 5b — snapshots sidebar visibility + reload key.
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [snapshotsReloadKey, setSnapshotsReloadKey] = useState(0);
+  // BL-9 Slice 7 — latest decision handler. The extension is configured
+  // once (TipTap keeps the extensions it was created with), so it calls
+  // a stable wrapper that reads whatever the parent passed most recently.
+  const onDecisionRef = useRef<((event: ChangeDecisionEvent) => void) | undefined>(
+    trackChanges?.onDecision,
+  );
+  onDecisionRef.current = trackChanges?.onDecision;
 
   // Yjs doc + Hocuspocus provider live for the lifetime of the editor
   // instance. Stored in refs so React renders don't tear them down.
@@ -265,6 +282,14 @@ export function RichSectionEditor({
           // the pre-5a UX where every keystroke is freely editable and
           // any tracked change is accept/rejectable.
           isOwner: trackChanges.isOwner ?? true,
+          // Slice 7 — never let a host callback failure reach the editor.
+          onDecision: (event) => {
+            try {
+              onDecisionRef.current?.(event);
+            } catch {
+              // The record is best-effort; the accept/reject already applied.
+            }
+          },
         }),
       );
     }

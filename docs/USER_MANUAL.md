@@ -585,7 +585,9 @@ Closed reviews are read-only. You can open a closed review months later and repl
 
 ### 9.7 Section status changes
 
-Every proposal section carries `status`, `author`, `updatedAt`, and a free-text body. Updates to any of those bump `updatedAt` and stamp the editor; the previous body is overwritten in place (FORGE doesn't yet keep prior versions of section text — that's planned). For "who has touched this section recently?" use the updatedAt + author. For substantive content history, use review comments and verdicts.
+Every proposal section carries `status`, `author`, `updatedAt`, and a free-text body. Updates to any of those bump `updatedAt` and stamp the editor. Prior versions of the body live in the editor's **Snapshots** sidebar: take one manually, or let FORGE capture one automatically when the section crosses a status milestone; every create, restore and delete is audited, and any snapshot can be diffed against the current text.
+
+Tracked changes leave a trail too. When a section owner accepts or rejects a suggestion (one at a time or with Accept all / Reject all), FORGE records each decision — what was inserted or deleted, who suggested it, who resolved it — and writes an audit entry for the batch (`proposal_section.changes_resolved`). The Brain reads those decisions: phrasing owners keep becomes the register the AI drafter matches for your team, struck text becomes what it avoids. The proposal overview's **AI Draft Insights** panel shows how many decisions have been recorded and how often insertions and deletions are kept.
 
 ### 9.8 Compliance matrix history
 

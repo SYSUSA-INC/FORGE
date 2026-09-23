@@ -18,7 +18,11 @@
  *   4. sectionSignal — Phase 14b reviewer pass-rate deltas for this
  *      section kind, so the model knows where the bar sits.
  *
- * All four are best-effort. Any missing signal returns empty/null
+ *   5. editFeedback — BL-9 Slice 7: what this team's section owners
+ *      keep and strike when they resolve tracked changes, so drafts
+ *      move toward the phrasing that survives review.
+ *
+ * All five are best-effort. Any missing signal returns empty/null
  * and the drafter still works — pattern intel is additive context.
  */
 import "server-only";
@@ -29,6 +33,7 @@ import {
   proposals,
   type ProposalSectionKind,
 } from "@/db/schema";
+import { gatherEditFeedbackForSection } from "@/lib/edit-feedback";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
 import { getSectionSignals } from "@/lib/section-signals";
 import type {
@@ -64,14 +69,18 @@ export async function gatherPatternIntelForSection(input: {
     .filter(Boolean)
     .join("\n");
 
-  // Run the three queries in parallel. None of them block draft
-  // generation — failures degrade silently to empty arrays.
-  const [winningPatterns, lostPatterns, complianceGaps, sectionSignal] =
+  // Run the queries in parallel. None of them block draft generation —
+  // failures degrade silently to empty arrays / null.
+  const [winningPatterns, lostPatterns, complianceGaps, sectionSignal, editFeedback] =
     await Promise.all([
       retrieveCorpusByOutcome(input.organizationId, composed, "won", TOP_WIN),
       retrieveCorpusByOutcome(input.organizationId, composed, "lost", TOP_LOSS),
       gatherComplianceGapsForSection(input.organizationId, input.sectionId),
       gatherSectionSignal(input.organizationId, input.sectionKind),
+      gatherEditFeedbackForSection({
+        organizationId: input.organizationId,
+        sectionKind: input.sectionKind,
+      }),
     ]);
 
   return {
@@ -79,6 +88,7 @@ export async function gatherPatternIntelForSection(input: {
     lostPatterns,
     complianceGaps,
     sectionSignal,
+    editFeedback,
   };
 }
 

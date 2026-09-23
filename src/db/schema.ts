@@ -884,6 +884,59 @@ export const proposalSectionSnapshots = pgTable(
   }),
 );
 
+/**
+ * BL-9 Slice 7 — one row per accept / reject of a tracked change,
+ * written by `recordChangeDecisionsAction` (drizzle/0078). The section
+ * drafter reads the org's recent rows to learn what owners keep and
+ * strike (src/lib/edit-feedback.ts); the AI Draft Insights panel reads
+ * the per-proposal acceptance rates.
+ */
+export const sectionChangeDecisions = pgTable(
+  "section_change_decision",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    sectionKind: text("section_kind").notNull().default(""),
+    /** The client-side change id carried on the TipTap mark. */
+    changeId: text("change_id").notNull(),
+    /** "insert" | "delete" — which mark the change carried. */
+    changeType: text("change_type").notNull(),
+    /** "accept" | "reject". */
+    decision: text("decision").notNull(),
+    /** True when resolved by accept-all / reject-all. */
+    bulk: boolean("bulk").notNull().default(false),
+    authorUserId: text("author_user_id").notNull().default(""),
+    authorNameSnapshot: text("author_name_snapshot").notNull().default(""),
+    decidedByUserId: text("decided_by_user_id").notNull(),
+    /** The affected text, capped at write time. */
+    changeText: text("text").notNull().default(""),
+    wordCount: integer("word_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("scd_org_created_idx").on(t.organizationId, t.createdAt),
+    orgKindDecisionIdx: index("scd_org_kind_decision_idx").on(
+      t.organizationId,
+      t.sectionKind,
+      t.decision,
+      t.createdAt,
+    ),
+    proposalIdx: index("scd_proposal_idx").on(t.proposalId),
+    sectionIdx: index("scd_section_idx").on(t.sectionId),
+  }),
+);
+
+export type SectionChangeDecision = typeof sectionChangeDecisions.$inferSelect;
+export type NewSectionChangeDecision = typeof sectionChangeDecisions.$inferInsert;
+
 export type TipTapDoc = {
   type: "doc";
   content: TipTapNode[];

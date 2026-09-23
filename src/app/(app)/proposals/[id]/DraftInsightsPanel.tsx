@@ -35,7 +35,12 @@ export async function DraftInsightsPanel({
   proposalId: string;
 }) {
   const result = await getDraftInsightsAction(proposalId);
-  if (!result.ok || result.data.totalDrafts === 0) return null;
+  if (
+    !result.ok ||
+    (result.data.totalDrafts === 0 && result.data.editDecisions.total === 0)
+  ) {
+    return null;
+  }
 
   const { data } = result;
 
@@ -102,6 +107,38 @@ export async function DraftInsightsPanel({
                 {Math.round(data.abVariantBWinRate * 100)}% of the time
               </span>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* BL-9 Slice 7 — track-changes decisions */}
+        {data.editDecisions.total > 0 ? (
+          <div className="flex flex-col gap-1.5 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-body text-[12px] text-muted">
+                Track-changes decisions
+              </span>
+              <span className="font-mono text-[10px] text-subtle">
+                {data.editDecisions.total} resolved
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] text-muted">
+              <span className="flex items-center gap-1.5">
+                insertions kept{" "}
+                {fractionBadge(data.editDecisions.insertAcceptRate) ?? (
+                  <span className="text-subtle">—</span>
+                )}
+              </span>
+              <span className="flex items-center gap-1.5">
+                deletions kept{" "}
+                {fractionBadge(data.editDecisions.deleteAcceptRate) ?? (
+                  <span className="text-subtle">—</span>
+                )}
+              </span>
+            </div>
+            <p className="font-body text-[11px] leading-relaxed text-subtle">
+              The drafter reads these decisions: phrasing owners keep becomes
+              the register to match, struck text becomes what to avoid.
+            </p>
           </div>
         ) : null}
 

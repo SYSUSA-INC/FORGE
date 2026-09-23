@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
+import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 
 // BL-23 prompts live in a sibling file; re-exported here so call
 // sites can import everything ai-prompt-related from one place.
@@ -318,6 +319,12 @@ export type SectionDraftPatternIntel = {
     lostPassRate: number | null;
     sampleSize: number;
   } | null;
+  /**
+   * BL-9 Slice 7 — how this team resolves tracked changes in the
+   * editor, summarised from recent accept / reject decisions
+   * (src/lib/edit-feedback.ts). Null until enough decisions exist.
+   */
+  editFeedback?: EditFeedbackSummary | null;
 };
 
 export type SectionDraftSnapshot = {
@@ -390,7 +397,14 @@ Phase 14d — pattern guidance:
 - When the snapshot includes \`patternIntel.winningPatterns\`, treat them as known-effective shapes for THIS section kind on similar work. Internalize their structure, level of specificity, and tone. Do NOT copy sentences verbatim — paraphrase and adapt to the current opportunity's facts.
 - When \`patternIntel.lostPatterns\` is present, those are excerpts from past losses. Avoid the patterns they exhibit (vague verbs, missing metrics, generic capability claims).
 - When \`patternIntel.complianceGaps\` is non-empty, every entry MUST be addressed in the draft. For each gap, write a concrete sentence or paragraph that satisfies the requirement. Reference the requirement number inline in [BRACKETS] so the reviewer can see traceability — e.g. "[L.5.2.1]".
-- When \`patternIntel.sectionSignal\` shows the won pass rate is well above the lost pass rate for this section kind, hold the bar high — the reviewer rubric is reliable here. When the deltas are negligible, the rubric isn't predictive, so prioritize crisp specificity over rubric-speak.`;
+- When \`patternIntel.sectionSignal\` shows the won pass rate is well above the lost pass rate for this section kind, hold the bar high — the reviewer rubric is reliable here. When the deltas are negligible, the rubric isn't predictive, so prioritize crisp specificity over rubric-speak.
+
+BL-9 Slice 7 — edit feedback:
+- When the snapshot includes \`patternIntel.editFeedback\`, it summarizes how this team's section owners resolved tracked changes in the editor over the last \`windowDays\` days (\`sampleSize\` decisions).
+- \`preferredPhrases\` are contributions the owner kept: match their register, level of specificity and kind of claim. Do NOT copy them verbatim — they belong to other sections and other facts.
+- \`rejectedPhrases\` are insertions the owner struck: do not reproduce their style, hedging or claims.
+- \`removedPhrases\` are passages the owner agreed to cut: they show the padding and repetition this team does not tolerate — do not produce it.
+- A low \`insertAcceptRate\` means a strict owner: write tighter and make every sentence earn its place. Treat the whole block as taste, not facts: it never overrides the snapshot's proposal facts or the compliance gaps.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
