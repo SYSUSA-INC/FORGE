@@ -53,35 +53,61 @@ coupling** CI gate (`.github/workflows/pr-quality.yml`).
 
 ## Auto-apply on deploy
 
-**Lives in:** `src/instrumentation.ts` → `register()` → `runAutoMigrateThenVerify()`
+**Lives in:** `src/instrumentation.ts` → `register()`
+
+**Prerequisite:** `experimental.instrumentationHook: true` in
+`next.config.mjs`. On Next 14 the hook is opt-in and the file is
+silently ignored without it — which is how production ran with none
+of this executing until BL-QC-boot-hook (the ledger sat at 0 of 76
+applied). `tests/ai/instrumentation-hook.test.ts` pins the flag.
 
 **Triggered on:** every Node.js runtime cold start (i.e., every fresh
-server function boot).
+server function boot). Not during `next build` — the hook returns
+immediately when `NEXT_PHASE` is the production build phase.
+
+**Awaited, with a budget:** Next runs `register()` to completion before
+it serves the first request, so a normal deploy (zero or one pending
+migration, well under a second) is migrated before any page renders.
+The wait is bounded by `AUTO_MIGRATE_BOOT_BUDGET_MS` (default 8 s):
+a large catch-up batch keeps running in the background after that and
+is reported with a `[boot]` error; check `/admin/migrations`.
 
 **Single-flight:** uses a Postgres advisory lock
 (`pg_try_advisory_lock(7240613514)`). Only one server instance applies
 at a time; others see "lock-held" and exit cleanly without retrying.
+The lock, every per-file transaction and the unlock run on **one
+pinned connection** (`pool.connect()`), never through the pool-backed
+`db` — statements handed to the pool can land on different
+connections, which put `SAVEPOINT`s outside their `BEGIN` and leaked
+the lock on a connection that never ran the unlock.
 
 **Flow:**
 
 1. Skip if `DISABLE_AUTO_MIGRATE=1` env var is set
 2. Skip if no pending migrations (the common case)
-3. Refuse + log a warning if any pending migration contains
+3. Refuse + log an error if any pending migration contains
    destructive ops — operator must apply manually via `/admin/migrations`
-4. Acquire the advisory lock (non-blocking try)
+4. Pin a connection and acquire the advisory lock on it (non-blocking try)
 5. Take a Neon branch snapshot (if `NEON_API_KEY` is configured)
-6. Apply pending migrations sequentially, each in its own transaction
-7. Release the lock
+6. Apply pending migrations sequentially on that connection, each in
+   its own transaction
+7. Release the lock, release the connection
 
 **What gets logged:**
+
+`log.error` lines are also captured into `/admin/errors`
+(BL-QC-errors-autocapture), so every state that needs an operator is
+visible in the app, not only in Vercel's logs.
 
 | Outcome | Log level | Where to look |
 |---|---|---|
 | Applied 1+ migrations | `info` | Vercel logs, tag `[auto-migrate]` |
 | Nothing pending | (silent — common case) | — |
-| Destructive ops blocked | `warn` | Vercel logs + `/admin/migrations` UI |
-| Lock held by another instance | `info` | Vercel logs |
-| Apply failed | `error` | Vercel logs |
+| Destructive ops blocked | `error` | `/admin/errors` + `/admin/migrations` UI |
+| Lock held by another instance | `warn` (with the pending count) | Vercel logs |
+| Apply failed | `error` | `/admin/errors` + Vercel logs |
+| Boot budget exceeded, batch still running | `error`, tag `[boot]` | `/admin/errors`; then `/admin/migrations` |
+| Schema still behind after boot | `error`, tag `[migration-check]` | `/admin/errors` |
 
 ## What auto-apply refuses
 

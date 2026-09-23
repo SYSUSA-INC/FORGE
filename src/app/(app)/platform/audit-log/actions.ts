@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, gte, ilike, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, max, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, memberships, organizations, users } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
@@ -186,7 +186,13 @@ export async function listPlatformAuditTenantsAction(): Promise<
           name: organizations.name,
           slug: organizations.slug,
           totalEvents: sql<number>`count(${auditLogs.id})::int`,
-          lastEventAt: sql<Date | null>`max(${auditLogs.createdAt})`,
+          // `max()` decodes through the column, so this is a Date like
+          // every other `createdAt` read. A bare sql`max(...)` came back
+          // as the driver's raw string (node-postgres returns timestamps
+          // untouched for Drizzle) and `.toISOString()` on it threw the
+          // moment one audit row existed — the /platform/audit-log 500
+          // fixed in BL-QC-boot-hook.
+          lastEventAt: max(auditLogs.createdAt),
         })
         .from(organizations)
         .innerJoin(
@@ -204,8 +210,15 @@ export async function listPlatformAuditTenantsAction(): Promise<
     name: r.name,
     slug: r.slug,
     totalEvents: Number(r.totalEvents),
-    lastEventAt: r.lastEventAt ? r.lastEventAt.toISOString() : null,
+    lastEventAt: toIso(r.lastEventAt),
   }));
+}
+
+/** Accepts a Date or the driver's raw timestamp string; null for neither. */
+function toIso(v: Date | string | null | undefined): string | null {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export type PlatformActorSummary = {

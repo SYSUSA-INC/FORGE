@@ -121,6 +121,26 @@ because no other CI gate catches them:
   tenant-configured field (omissions should appear in a comment,
   e.g., "skip large blob `raw_text`" or "skip computed column X").
 
+- **Raw-SQL timestamps are strings, not Dates.** Drizzle's node-postgres
+  driver returns `timestamp` / `timestamptz` / `date` values untouched so
+  the column's own decoder can map them; a bare `` sql`max(${t.createdAt})` ``
+  (or any aggregate / expression typed as `sql<Date>`) skips that decoder
+  and arrives as the driver's string. `.toISOString()` on it throws at
+  runtime the first time a row exists — which is how
+  `/platform/audit-log` went down (BL-QC-boot-hook). Use the typed
+  aggregates (`max(column)`, `min(column)` from `drizzle-orm`), or
+  `.mapWith(column)` on the template, or normalise with `new Date(v)`.
+  Grep for `sql<Date` before pushing.
+
+- **Boot-time code has to be wired up, not just written.** Anything that
+  relies on `src/instrumentation.ts` (auto-migrate, schema check, env
+  marker) only runs because `next.config.mjs` sets
+  `experimental.instrumentationHook: true` on Next 14. Production ran
+  for months without it. If you change the config or upgrade Next, run
+  `tests/ai/instrumentation-hook.test.ts` and check `/admin/migrations`
+  shows "Auto-apply: Enabled" *and* the env marker recorded after the
+  first boot.
+
 ## What you do NOT need to confirm (already enforced by CI)
 
 Don't put effort into these — they're already covered:

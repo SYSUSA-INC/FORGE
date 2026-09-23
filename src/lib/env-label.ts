@@ -36,6 +36,20 @@ export function isProductionEnv(env: Record<string, string | undefined> = proces
   return resolveEnvLabel(env) === "production";
 }
 
+/**
+ * Whether a marker mismatch on this runtime should refuse to boot.
+ *
+ * Production, staging and any operator override own their database, so
+ * a marker that names another environment means the deploy is pointed
+ * at the wrong DB — crash. Preview and development databases are copies
+ * (per-PR Neon branches are created off `main` and inherit its
+ * `_forge_env` row), so a mismatch there is expected and only logged;
+ * they also never record a marker of their own.
+ */
+export function isEnvMarkerEnforced(label: string): boolean {
+  return label !== "preview" && label !== "development";
+}
+
 /** Short banner text for a label. */
 export function envDisplayLabel(label: string): string {
   if (label === "development") return "DEV";
