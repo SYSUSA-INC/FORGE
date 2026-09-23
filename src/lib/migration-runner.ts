@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { sql } from "drizzle-orm";
-import { db } from "@/db";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { PoolClient } from "pg";
+import { db, pool } from "@/db";
 import { log } from "@/lib/log";
 
 /**
@@ -19,7 +21,10 @@ import { log } from "@/lib/log";
  *
  * Each migration applies inside a transaction. The `_forge_migration`
  * ledger gets the row in the same transaction so visibility is
- * atomic.
+ * atomic. The whole batch runs on ONE pinned connection: `db` hands
+ * every statement to whichever pooled connection is idle, so a
+ * BEGIN on one connection and the next statement on another silently
+ * ran outside the transaction (BL-QC-boot-hook).
  *
  * Bootstrap-friendly: tolerates pre-ledger DBs by treating PG
  * duplicate-object errors as no-ops on the first recorded run.
@@ -45,9 +50,36 @@ const DUPLICATE_PG_CODES = new Set([
   "42723", // duplicate_function
 ]);
 
-export async function runMigrations(): Promise<
-  MigrationResult | MigrationError
-> {
+/** Anything with Drizzle's `execute`: the pool-backed `db`, or a pinned client. */
+export type SqlExecutor = Pick<typeof db, "execute">;
+
+export async function runMigrations(
+  executor?: SqlExecutor,
+): Promise<MigrationResult | MigrationError> {
+  if (executor) return runMigrationsOn(executor);
+
+  // Pin one connection for the whole batch so BEGIN / SAVEPOINT /
+  // COMMIT and the ledger insert share a session.
+  let client: PoolClient;
+  try {
+    client = await pool.connect();
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Could not open a database connection for the migration batch: ${err instanceof Error ? err.message : "unknown"}`,
+      appliedFilenames: [],
+    };
+  }
+  try {
+    return await runMigrationsOn(drizzle(client));
+  } finally {
+    client.release();
+  }
+}
+
+async function runMigrationsOn(
+  conn: SqlExecutor,
+): Promise<MigrationResult | MigrationError> {
   const dir = join(process.cwd(), "drizzle");
   let files: string[];
   try {
@@ -72,7 +104,7 @@ export async function runMigrations(): Promise<
 
   // Ensure ledger exists before we look at it.
   try {
-    await db.execute(sql`
+    await conn.execute(sql`
       CREATE TABLE IF NOT EXISTS "_forge_migration" (
         "filename" text PRIMARY KEY,
         "sha256" text NOT NULL,
@@ -91,7 +123,7 @@ export async function runMigrations(): Promise<
   }
 
   // Pull existing ledger entries.
-  const ledgerResult = await db.execute(
+  const ledgerResult = await conn.execute(
     sql`SELECT filename, sha256 FROM "_forge_migration"`,
   );
   const applied = new Map<string, string>();
@@ -146,7 +178,7 @@ export async function runMigrations(): Promise<
       // can't easily use db.transaction() because Neon's pgbouncer
       // proxy breaks long-running transactions; sequential exec
       // with manual rollback on first failure is safer here.
-      await db.execute(sql.raw("BEGIN"));
+      await conn.execute(sql.raw("BEGIN"));
 
       let aborted = false;
       for (let i = 0; i < statements.length; i++) {
@@ -158,21 +190,21 @@ export async function runMigrations(): Promise<
         // "current transaction is aborted". With a savepoint we
         // ROLLBACK TO it and the transaction stays healthy.
         const sp = `s${i}`;
-        await db.execute(sql.raw(`SAVEPOINT ${sp}`));
+        await conn.execute(sql.raw(`SAVEPOINT ${sp}`));
         try {
-          await db.execute(sql.raw(stmt));
-          await db.execute(sql.raw(`RELEASE SAVEPOINT ${sp}`));
+          await conn.execute(sql.raw(stmt));
+          await conn.execute(sql.raw(`RELEASE SAVEPOINT ${sp}`));
           stmtsRun += 1;
         } catch (err) {
           const code = (err as { code?: string }).code;
           if (code && DUPLICATE_PG_CODES.has(code)) {
-            await db
+            await conn
               .execute(sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`))
               .catch(() => undefined);
             stmtsSkipped += 1;
             continue;
           }
-          await db.execute(sql.raw("ROLLBACK")).catch(() => undefined);
+          await conn.execute(sql.raw("ROLLBACK")).catch(() => undefined);
           aborted = true;
           return {
             ok: false,
@@ -187,10 +219,10 @@ export async function runMigrations(): Promise<
 
       if (aborted) break;
 
-      await db.execute(
+      await conn.execute(
         sql`INSERT INTO "_forge_migration" (filename, sha256) VALUES (${file}, ${hash})`,
       );
-      await db.execute(sql.raw("COMMIT"));
+      await conn.execute(sql.raw("COMMIT"));
       appliedFilenames.push(file);
       log.info("[migration-runner]", "applied", {
         filename: file,
@@ -198,7 +230,7 @@ export async function runMigrations(): Promise<
         skipped: stmtsSkipped,
       });
     } catch (err) {
-      await db.execute(sql.raw("ROLLBACK")).catch(() => undefined);
+      await conn.execute(sql.raw("ROLLBACK")).catch(() => undefined);
       return {
         ok: false,
         error:
@@ -346,7 +378,7 @@ export type AutoApplyResult =
       kind: "blocked-destructive";
       blockers: DestructiveFinding[];
     }
-  | { kind: "lock-held" }
+  | { kind: "lock-held"; pending: number }
   | { kind: "disabled" }
   | { kind: "failed"; error: string; snapshotId: string | null };
 
@@ -391,49 +423,70 @@ export async function tryAutoApplyMigrations(): Promise<AutoApplyResult> {
     return { kind: "blocked-destructive", blockers };
   }
 
-  // Try to acquire the advisory lock. pg_try_advisory_lock returns
-  // immediately — true if we got it, false if another process holds
-  // it. Non-blocking: a second cold-start instance just sees
-  // "lock-held" and exits, letting the first one finish.
-  const lockResult = await db.execute(
-    sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS got`,
-  );
-  const got = (lockResult.rows[0] as { got?: boolean } | undefined)?.got;
-  if (!got) {
-    return { kind: "lock-held" };
-  }
-
-  let snapshotId: string | null = null;
+  // Pin one connection for the lock, the apply and the unlock. The
+  // advisory lock is session-level: taken through `db` it landed on
+  // whichever pooled connection was idle, the apply's BEGIN on another,
+  // and the unlock on a third (which then returned false and leaked
+  // the lock until that connection closed).
+  let client: PoolClient;
   try {
-    // Try to snapshot before applying. If Neon API isn't configured
-    // or the call fails, we LOG and continue — snapshotting is
-    // best-effort, not a blocker. The user can also take a manual
-    // snapshot via the Neon dashboard.
-    const { tryCreateBranchSnapshot } = await import("./neon-snapshot");
-    snapshotId = await tryCreateBranchSnapshot(
-      `auto-migrate-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`,
-    );
-
-    const result = await runMigrations();
-    if (!result.ok) {
-      return { kind: "failed", error: result.error, snapshotId };
-    }
-    return {
-      kind: "ok",
-      appliedFilenames: result.appliedFilenames,
-      skippedFilenames: result.skippedFilenames,
-      snapshotId,
-    };
+    client = await pool.connect();
   } catch (err) {
     return {
       kind: "failed",
-      error: err instanceof Error ? err.message : "unknown apply failure",
-      snapshotId,
+      error: `Could not open a database connection: ${err instanceof Error ? err.message : "unknown"}`,
+      snapshotId: null,
     };
+  }
+  const conn = drizzle(client);
+
+  try {
+    // pg_try_advisory_lock returns immediately — true if we got it,
+    // false if another process holds it. Non-blocking: a second
+    // cold-start instance just sees "lock-held" and exits, letting the
+    // first one finish.
+    const lockResult = await conn.execute(
+      sql`SELECT pg_try_advisory_lock(${ADVISORY_LOCK_KEY}) AS got`,
+    );
+    const got = (lockResult.rows[0] as { got?: boolean } | undefined)?.got;
+    if (!got) {
+      return { kind: "lock-held", pending: status.pendingFiles.length };
+    }
+
+    let snapshotId: string | null = null;
+    try {
+      // Try to snapshot before applying. If Neon API isn't configured
+      // or the call fails, we LOG and continue — snapshotting is
+      // best-effort, not a blocker. The user can also take a manual
+      // snapshot via the Neon dashboard.
+      const { tryCreateBranchSnapshot } = await import("./neon-snapshot");
+      snapshotId = await tryCreateBranchSnapshot(
+        `auto-migrate-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`,
+      );
+
+      const result = await runMigrations(conn);
+      if (!result.ok) {
+        return { kind: "failed", error: result.error, snapshotId };
+      }
+      return {
+        kind: "ok",
+        appliedFilenames: result.appliedFilenames,
+        skippedFilenames: result.skippedFilenames,
+        snapshotId,
+      };
+    } catch (err) {
+      return {
+        kind: "failed",
+        error: err instanceof Error ? err.message : "unknown apply failure",
+        snapshotId,
+      };
+    } finally {
+      await conn
+        .execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`)
+        .catch(() => undefined);
+    }
   } finally {
-    await db
-      .execute(sql`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY})`)
-      .catch(() => undefined);
+    client.release();
   }
 }
 

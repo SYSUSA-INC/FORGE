@@ -10,10 +10,11 @@ import { log } from "@/lib/log";
  * Called once from `src/instrumentation.ts` after env validation.
  *
  * Doesn't throw — logs a loud error if schema is behind. The
- * primary defense is the build-time migration (package.json
- * `build` runs `apply-schema.mjs` first), but if that's bypassed
- * we want a clear log so the cause is obvious in Vercel's
- * function logs rather than mysterious 500s on table queries.
+ * primary defense is the boot-time auto-apply in instrumentation.ts
+ * (awaited before the first request); if that is disabled, blocked
+ * or still running, this log makes the cause obvious in Vercel's
+ * function logs (and, via log.error autocapture, /admin/errors)
+ * rather than mysterious 500s on table queries.
  *
  * Bumping `EXPECTED_LATEST_MIGRATION` is part of the workflow when
  * adding a new drizzle/0NNN migration file. `tests/ai/migration-check.test.ts`

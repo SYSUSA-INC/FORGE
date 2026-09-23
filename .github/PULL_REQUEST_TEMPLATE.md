@@ -41,6 +41,7 @@ gate. Fill in **every row** before pushing.
 | Inbox-parity: any new `in_app` `notification_delivery` write also inserts a matching `notification` row | N/A / addressed: <how> |
 | SELECT-then-UPDATE pattern: UPDATE filters by collected IDs (`inArray(id, ...)`), NOT by the same predicate as the SELECT | N/A / addressed: <how> |
 | Export completeness: data-export endpoints' projections include every tenant-configured field from the source table (skip large blobs deliberately with a comment) | N/A / addressed: <how> |
+| Raw-SQL timestamps treated as Dates (a bare `` sql`max(...)` `` / `sql<Date>` arrives as a string under node-postgres — use `max(column)` / `.mapWith(column)` / `new Date(v)`) | N/A / addressed: <how> |
 
 ## Test plan
 

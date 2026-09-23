@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import {
   envDisplayLabel,
+  isEnvMarkerEnforced,
   isKnownEnvLabel,
   isProductionEnv,
   KNOWN_ENV_LABELS,
@@ -39,6 +40,18 @@ describe("env-label", () => {
     expect(isProductionEnv({ FORGE_ENV_OVERRIDE: "production" })).toBe(true);
     expect(isProductionEnv({ FORGE_ENV_OVERRIDE: "staging", VERCEL_ENV: "production" })).toBe(false);
     expect(isProductionEnv({})).toBe(false);
+  });
+
+  it("isEnvMarkerEnforced: a mismatch refuses to boot only where the database is the environment's own", () => {
+    expect(isEnvMarkerEnforced("production")).toBe(true);
+    expect(isEnvMarkerEnforced("staging")).toBe(true);
+    // An operator override names an environment that owns its database.
+    expect(isEnvMarkerEnforced("qa-lab")).toBe(true);
+    // Per-PR Neon branches are copies of `main` and inherit its
+    // `production` marker; a local `vercel dev` database is whatever the
+    // developer pointed it at. Neither may record a marker or crash.
+    expect(isEnvMarkerEnforced("preview")).toBe(false);
+    expect(isEnvMarkerEnforced("development")).toBe(false);
   });
 
   it("known labels and display labels", () => {

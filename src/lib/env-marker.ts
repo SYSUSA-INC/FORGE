@@ -1,7 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { resolveEnvLabel } from "@/lib/env-label";
+import { isEnvMarkerEnforced, resolveEnvLabel } from "@/lib/env-label";
 import { log } from "@/lib/log";
 
 /**
@@ -31,7 +31,18 @@ import { log } from "@/lib/log";
 export type EnvMarkerResult =
   | { kind: "ok"; expected: string; current: string }
   | { kind: "first-boot"; recorded: string }
-  | { kind: "mismatch"; expected: string; current: string }
+  | {
+      kind: "mismatch";
+      expected: string;
+      current: string;
+      /**
+       * true → the caller must refuse to boot (production / staging / an
+       * operator override pointed at another environment's database).
+       * false → preview / development runtime on a copied database; log
+       * and carry on.
+       */
+      enforce: boolean;
+    }
   | { kind: "skipped"; reason: string };
 
 export type EnvMarker = {
@@ -113,7 +124,18 @@ export async function verifyEnvMarker(): Promise<EnvMarkerResult> {
     };
   }
 
+  const enforce = isEnvMarkerEnforced(current);
+
   if (!existing) {
+    if (!enforce) {
+      // A preview / development runtime never claims a database: its DB
+      // is a copy of some other environment's, and stamping it would
+      // make the next boot of that environment's real deploy refuse.
+      return {
+        kind: "skipped",
+        reason: `${current} runtime does not record a marker (its database is a copy)`,
+      };
+    }
     // First boot: record the marker.
     try {
       await db.execute(
@@ -138,6 +160,7 @@ export async function verifyEnvMarker(): Promise<EnvMarkerResult> {
       kind: "mismatch",
       expected: existing.expected_env,
       current,
+      enforce,
     };
   }
 

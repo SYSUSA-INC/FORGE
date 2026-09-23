@@ -2244,6 +2244,74 @@ because it removes the failure class instead of papering over the check.
   the CI build job via `actions/cache` to shorten builds.
 ---
 
+### BL-QC-boot-hook — The boot hook never ran: enable it, make auto-apply real, fix the platform audit log
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-auto-migrate, BL-ENV-SEP  ·  **Status:** ✅ shipped (PR #TBD)
+
+**Incident (2026-09-23).** `/settings`, `/settings/billing`, `/users` and
+`/admin/tiers` returned the bare "Something went wrong" page; the in-app
+error log only had the generic Server Components digest. `/admin/
+migrations` showed the ledger at **0 applied / 76 pending** on a database
+whose tables mostly existed. Clicking apply brought it in sync (the
+runner treats duplicate-object errors as no-ops) and those pages
+recovered. `/platform/audit-log` stayed broken.
+
+**Root cause.** `src/instrumentation.ts` had never executed in
+production. On Next 14 the hook is opt-in
+(`experimental.instrumentationHook: true`) and `next.config.mjs` never
+set it, so everything BL-QC-auto-migrate, BL-QC-ledger-drift-detector
+and BL-ENV-SEP put there — auto-apply, the boot schema check, the drift
+detector, the env marker — was dead code. Evidence: the env-marker panel
+still read "(not recorded)" months after PR #216 shipped first-boot
+recording. Schema drift accumulated silently until a page read a column
+the database did not have.
+
+Two latent bugs sat behind it:
+- The runner sent `BEGIN` / `SAVEPOINT` / `COMMIT` and the advisory lock
+  / unlock through the pool-backed `db`, so consecutive statements could
+  land on different connections — statements outside their transaction,
+  and a lock leaked on a connection that never ran the unlock.
+- `/platform/audit-log` built `max(created_at)` from a bare `sql` template;
+  node-postgres hands Drizzle raw timestamp strings, so `.toISOString()`
+  threw as soon as one audit row existed.
+
+**Shipped:**
+- `next.config.mjs`: `experimental.instrumentationHook: true`, pinned by
+  `tests/ai/instrumentation-hook.test.ts` (asserts the flag on Next 14 and
+  its absence on 15, where the hook is stable and the option is gone).
+- `src/instrumentation.ts`: returns immediately during `next build`
+  (`NEXT_PHASE`), and awaits the boot work with a budget
+  (`AUTO_MIGRATE_BOOT_BUDGET_MS`, default 8 s) so the first request is
+  served against the migrated schema; a batch that outlives the budget
+  keeps running and is reported with `log.error`. Destructive-blocked
+  batches log at `error` (autocaptured into `/admin/errors`) instead of
+  `warn`; lock-held logs the pending count.
+- `src/lib/migration-runner.ts`: the whole apply — lock, per-file
+  transactions, ledger inserts, unlock — runs on one pinned `pg` client;
+  `runMigrations()` takes an executor and pins its own when called without
+  one (the `/admin/migrations` button). `pool` is exported from `src/db`.
+- `src/lib/env-marker.ts` + `isEnvMarkerEnforced()` in `env-label.ts`: a
+  preview / development runtime never records a marker and a mismatch there
+  only logs. Per-PR Neon branches are copies of `main` and inherit its
+  `production` row; enforcing would have crash-looped every preview from
+  the moment production first recorded its marker. Production, staging
+  and operator overrides still exit on mismatch.
+- `/platform/audit-log`: `max(auditLogs.createdAt)` (decodes through the
+  column) plus a tolerant `toIso()`.
+- `src/app/(app)/error.tsx`: in-shell error boundary — navigation stays,
+  digest shown, report posted to `/api/error-report`, link to
+  `/admin/errors`. `global-error.tsx` always described this companion; it
+  never existed.
+- Docs: MIGRATION_PROTOCOL (prerequisite, awaited boot, pinned
+  connection, log levels), ENVIRONMENTS §4 step 10 (preview policy),
+  PRE_PUSH_CHECKLIST + PR template row for raw-SQL timestamps.
+
+**Operator note.** The first production boot after this deploy records
+the env marker as `production` and applies nothing (the ledger is in
+sync). Nothing to configure. Vercel's build log will show Next's
+"experimental feature (instrumentationHook)" notice; that is expected.
+
+---
+
 ### BL-QC-combined-job — Consolidate typecheck + lint
 **Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** queued
 
@@ -2717,6 +2785,13 @@ pending non-destructive migrations, applies them + logs
 [auto-migrate] applied N pending migration(s). With pending
 destructive migrations, logs a warn and refuses, preserving the
 manual /admin/migrations flow.
+
+**2026-09-23 correction (BL-QC-boot-hook):** none of this ran in
+production until then — `src/instrumentation.ts` needs
+`experimental.instrumentationHook: true` on Next 14 and the flag was
+never set. The acceptance above was never actually observed. The hook
+is now enabled, awaited before the first request, and the apply runs on
+a pinned connection.
 
 ---
 

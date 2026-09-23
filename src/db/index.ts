@@ -48,7 +48,12 @@ function shouldUseSsl(url: string): boolean {
 
 const globalForDb = globalThis as unknown as { __pgPool?: Pool };
 
-const pool =
+/**
+ * Exported for the migration runner, which pins one connection for a
+ * whole apply batch (advisory lock + BEGIN/COMMIT + unlock must share a
+ * session). Everything else goes through `db`.
+ */
+export const pool =
   globalForDb.__pgPool ??
   new Pool({
     connectionString,
