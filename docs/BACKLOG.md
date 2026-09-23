@@ -2245,7 +2245,7 @@ because it removes the failure class instead of papering over the check.
 ---
 
 ### BL-QC-boot-hook — The boot hook never ran: enable it, make auto-apply real, fix the platform audit log
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-auto-migrate, BL-ENV-SEP  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC-auto-migrate, BL-ENV-SEP  ·  **Status:** ✅ shipped (PR #267)
 
 **Incident (2026-09-23).** `/settings`, `/settings/billing`, `/users` and
 `/admin/tiers` returned the bare "Something went wrong" page; the in-app
