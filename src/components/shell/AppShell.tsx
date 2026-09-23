@@ -8,12 +8,22 @@ import { ImpersonationBanner } from "@/components/shell/ImpersonationBanner";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { auth } from "@/auth";
+import { getActiveImpersonationSession } from "@/lib/impersonation";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const user = session?.user ?? null;
   const isSuperadmin = user?.isSuperadmin ?? false;
   const isOrgAdmin = (user?.role === "admin" || isSuperadmin) ?? false;
+
+  // BL-QC-links — does this session resolve to a workspace? The same
+  // rule requireCurrentOrg() applies: the session's own organizationId,
+  // or, for a superadmin, an active impersonation session. Without one,
+  // every org-gated page redirects to /onboarding, so the nav hides
+  // those groups instead of offering two dozen dead links.
+  const hasWorkspace =
+    Boolean(user?.organizationId) ||
+    (isSuperadmin && !!user?.id && !!(await getActiveImpersonationSession(user.id)));
 
   // Trim down to what the nav needs — avoid passing the full session
   // user object across the client boundary.
@@ -34,6 +44,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <SideNav
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
+        hasWorkspace={hasWorkspace}
         user={navUser}
       />
 
@@ -42,6 +53,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <MobileNav
             isOrgAdmin={isOrgAdmin}
             isSuperadmin={isSuperadmin}
+            hasWorkspace={hasWorkspace}
             user={navUser}
           />
 
@@ -71,9 +83,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 <NotificationBell />
               </Suspense>
             ) : null}
-            <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
-              Settings
-            </Link>
+            {hasWorkspace ? (
+              <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
+                Settings
+              </Link>
+            ) : null}
             <UserMenu user={user} />
           </div>
         </header>

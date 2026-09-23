@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { visibleNavChildren, visibleNavGroups } from "@/lib/nav-visibility";
 
 type NavItem = {
   href: string;
@@ -21,6 +22,12 @@ type NavGroup = {
   admin?: boolean;
   /** Group visible only to superadmins. */
   superadmin?: boolean;
+  /**
+   * Every page in the group calls `requireCurrentOrg()`. Hidden when the
+   * session has no active workspace, because each link would redirect to
+   * /onboarding and the menu would read as two dozen broken links.
+   */
+  needsWorkspace?: boolean;
   children?: NavItem[];
 };
 
@@ -40,12 +47,14 @@ const NAV: NavGroup[] = [
     label: "Command Center",
     icon: "▦",
     href: "/",
+    needsWorkspace: true,
   },
   {
     id: "ops",
     label: "Operations Management",
     icon: "⚙",
     admin: true,
+    needsWorkspace: true,
     children: [
       { href: "/settings", label: "Settings" },
       { href: "/settings/billing", label: "Billing", admin: true },
@@ -62,6 +71,7 @@ const NAV: NavGroup[] = [
     id: "opps",
     label: "Opportunities",
     icon: "✸",
+    needsWorkspace: true,
     children: [
       { href: "/opportunities", label: "Dashboard" },
       { href: "/pipeline", label: "Pipeline" },
@@ -75,6 +85,7 @@ const NAV: NavGroup[] = [
     id: "intel",
     label: "Platform Intelligence",
     icon: "◈",
+    needsWorkspace: true,
     children: [
       { href: "/companies", label: "Company Search" },
       { href: "/intelligence", label: "FORGE Brain" },
@@ -187,6 +198,7 @@ export function NavContent({
   onNavigate,
   isOrgAdmin = false,
   isSuperadmin = false,
+  hasWorkspace = true,
   user,
   /** When true, parent shell can disable the rail toggle — useful in the
    *  mobile drawer where the nav is always full-width. */
@@ -195,6 +207,8 @@ export function NavContent({
   onNavigate?: () => void;
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
+  /** False when the session has no active workspace; hides org-gated groups. */
+  hasWorkspace?: boolean;
   user: NavUser | null;
   hideRailToggle?: boolean;
 }) {
@@ -241,18 +255,11 @@ export function NavContent({
     });
   }
 
-  const visibleGroups = NAV.filter((g) => {
-    if (g.superadmin && !isSuperadmin) return false;
-    if (g.admin && !isOrgAdmin && !isSuperadmin) return false;
-    return true;
-  });
+  const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace };
+  const visibleGroups = visibleNavGroups(NAV, visibility);
 
   function visibleChildren(group: NavGroup): NavItem[] {
-    if (!group.children) return [];
-    return group.children.filter((c) => {
-      if (c.admin && !isOrgAdmin && !isSuperadmin) return false;
-      return true;
-    });
+    return visibleNavChildren(group.children, visibility);
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -274,6 +281,21 @@ export function NavContent({
         </div>
 
         <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-3">
+          {!hasWorkspace ? (
+            <Link
+              href="/onboarding"
+              onClick={onNavigate}
+              title="No active workspace — set one up"
+              aria-label="No active workspace — set one up"
+              className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
+                hrefMatches(pathname, "/onboarding")
+                  ? "bg-amber-400/20 text-amber-200 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.4)]"
+                  : "text-amber-300 hover:bg-amber-400/10"
+              }`}
+            >
+              ⚠
+            </Link>
+          ) : null}
           {visibleGroups.map((g) => {
             const children = visibleChildren(g);
             const groupActive = g.href
@@ -383,6 +405,25 @@ export function NavContent({
       </div>
 
       <nav className="mt-3 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-4">
+        {!hasWorkspace ? (
+          <Link
+            href="/onboarding"
+            onClick={onNavigate}
+            className={`mb-2 block rounded-lg border px-3 py-2.5 transition-colors ${
+              hrefMatches(pathname, "/onboarding")
+                ? "border-amber-400/50 bg-amber-400/15"
+                : "border-amber-400/30 bg-amber-400/[0.06] hover:border-amber-400/50"
+            }`}
+          >
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-200">
+              No active workspace
+            </div>
+            <div className="mt-0.5 font-body text-[12px] leading-snug text-muted">
+              Pages that read proposal data are hidden until your account is
+              attached to a workspace. See why, and what to do →
+            </div>
+          </Link>
+        ) : null}
         {visibleGroups.map((g) => {
           const children = visibleChildren(g);
           const groupActive = g.href

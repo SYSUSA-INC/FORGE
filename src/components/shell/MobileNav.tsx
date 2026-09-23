@@ -13,10 +13,12 @@ type NavUser = {
 export function MobileNav({
   isOrgAdmin = false,
   isSuperadmin = false,
+  hasWorkspace = true,
   user,
 }: {
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
+  hasWorkspace?: boolean;
   user: NavUser | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -90,6 +92,7 @@ export function MobileNav({
           onNavigate={() => setOpen(false)}
           isOrgAdmin={isOrgAdmin}
           isSuperadmin={isSuperadmin}
+          hasWorkspace={hasWorkspace}
           user={user}
           hideRailToggle
         />
