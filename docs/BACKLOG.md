@@ -84,7 +84,7 @@ Comprehensive audit of every server action, API route, server-component DB query
 Deliverable: `docs/audits/06-multi-tenant-firewall-2026-06.md` with findings + a remediation PR for each hole.
 
 ### BL-TENANT-DRIFT — schema.ts ↔ SQL mirror + drizzle-kit push guard
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #266)
 
 Found by the 2026-09 firewall re-run
 (`docs/audits/07-multi-tenant-firewall-2026-09.md`, schema F-10): eight
