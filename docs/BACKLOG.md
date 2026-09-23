@@ -84,7 +84,7 @@ Comprehensive audit of every server action, API route, server-component DB query
 Deliverable: `docs/audits/06-multi-tenant-firewall-2026-06.md` with findings + a remediation PR for each hole.
 
 ### BL-TENANT-DRIFT — schema.ts ↔ SQL mirror + drizzle-kit push guard
-**Priority:** P2  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #TBD)
 
 Found by the 2026-09 firewall re-run
 (`docs/audits/07-multi-tenant-firewall-2026-09.md`, schema F-10): eight
@@ -103,6 +103,29 @@ an explicit confirmation wrapper so the SQL-file pipeline stays the
 single write path; optionally a `scripts/check-schema-drift.mjs` that
 diffs `pg_indexes` against both sources in CI.
 
+
+**Delivered:**
+- `src/db/schema.ts` now declares everything the SQL created: the
+  `knowledge_artifact_chunk` artifact/org indexes and its `ivfflat`
+  cosine index (`.using("ivfflat", …op("vector_cosine_ops")).with({lists:100})`),
+  `solicitation_assignment` solicitation/user indexes, the
+  `protest_check_org_idx` plus `timestamptz` on `proposal_protest_check` and
+  `solicitation_document`, the `section_draft_signal.section_id` FK to
+  `proposal_section`, the `knowledge_artifact` outcome-label index and the
+  partial unique `knowledge_artifact_proposal_harvest_unique` (expression +
+  `.where`), the `knowledge_entry` outcome-label index, and `.where()` on the
+  four `payment_event` / `tenant_subscription` partial indexes. Both
+  `embedding` columns use a `vector1536` `customType` so the declared SQL type
+  is `vector(1536)` while the JS type stays the string every call site uses.
+- `scripts/drizzle-kit-guard.mjs`: `db:push`, `db:generate`, `db:migrate`
+  refuse to run unless `FORGE_ALLOW_DRIZZLE_KIT=1`, with the reason printed.
+- `scripts/check-schema-drift.mjs` (`check:drift`, in the isolation CI job and
+  `check:all`): static parity of index names, UNIQUE flag and partial-ness
+  between `drizzle/*.sql` (net of DROP/RENAME) and `schema.ts`, both
+  directions; exceptions in `.schema-drift-allow.json`. Tested in
+  `tests/ai/schema-drift.test.ts`.
+- No SQL change: the database already has all of this. The PR carries the
+  `schema-no-migration` label for the coupling gate.
 ### BL-PACKAGES — Subscription packages + AI token caps
 **Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slices 1–4: PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ⏳ remaining: à la carte add-on system
 

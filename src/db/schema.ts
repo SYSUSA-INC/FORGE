@@ -624,7 +624,10 @@ export const sectionDraftSignals = pgTable(
     proposalId: uuid("proposal_id")
       .notNull()
       .references(() => proposals.id, { onDelete: "cascade" }),
-    sectionId: uuid("section_id").notNull(),
+    // FK to proposal_section per drizzle/0067 (BL-TENANT-DRIFT mirror).
+    sectionId: uuid("section_id")
+      .notNull()
+      .references((): AnyPgColumn => proposalSections.id, { onDelete: "cascade" }),
     createdByUserId: text("created_by_user_id").notNull(),
     mode: text("mode").notNull().default("draft"),
     sectionKind: text("section_kind").notNull().default(""),
@@ -1643,9 +1646,13 @@ export const proposalProtestChecks = pgTable("proposal_protest_check", {
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+  // timestamptz in drizzle/0069 (BL-TENANT-DRIFT mirror).
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  // drizzle/0069 (BL-TENANT-DRIFT mirror).
+  orgIdx: index("protest_check_org_idx").on(t.organizationId, t.createdAt),
+}));
 
 export type ProposalProtestCheck = typeof proposalProtestChecks.$inferSelect;
 export type NewProposalProtestCheck =
@@ -1943,8 +1950,9 @@ export const solicitationDocuments = pgTable(
     uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    // timestamptz in drizzle/0068 (BL-TENANT-DRIFT mirror).
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     solicitationIdx: index("sol_doc_solicitation_idx").on(t.solicitationId),
@@ -2013,6 +2021,9 @@ export const solicitationAssignments = pgTable(
     pk: primaryKey({ columns: [t.solicitationId, t.userId, t.role] }),
     // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
     organizationIdIdx: index("solicitation_assignment_organization_id_idx").on(t.organizationId),
+    // drizzle/0024 (BL-TENANT-DRIFT mirror).
+    solicitationIdx: index("solicitation_assignment_solicitation_id_idx").on(t.solicitationId),
+    userIdx: index("solicitation_assignment_user_id_idx").on(t.userId),
   }),
 );
 
@@ -2053,6 +2064,19 @@ export const knowledgeOutcomeLabelEnum = pgEnum("knowledge_outcome_label", [
 export type KnowledgeOutcomeLabel =
   (typeof knowledgeOutcomeLabelEnum.enumValues)[number];
 
+/**
+ * pgvector column (BL-TENANT-DRIFT). The JS side keeps the text form it
+ * always had — reads parse JSON, writes cast `[…]::vector` in raw SQL —
+ * so no call site changes. Declaring the real SQL type means drizzle-kit
+ * sees `vector(1536)` rather than `text` and would no longer try to
+ * convert the column if anyone ran a schema diff against a live DB.
+ */
+const vector1536 = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return "vector(1536)";
+  },
+});
+
 export const knowledgeEntries = pgTable("knowledge_entry", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -2090,11 +2114,11 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
     .notNull()
     .default({}),
   qualityScoredAt: timestamp("quality_scored_at"),
-  // Phase 10f: real embedding for semantic Brain Suggest. Stored as
-  // text on the JS side; the actual column type is `vector(1536)` —
-  // see drizzle/0023 migration. Same provider/dim as the chunk
-  // table so we don't have to recreate the column to swap.
-  embedding: text("embedding"),
+  // Phase 10f: real embedding for semantic Brain Suggest. `vector(1536)`
+  // in SQL (drizzle/0023), text on the JS side — see `vector1536`. Same
+  // provider/dim as the chunk table so we don't have to recreate the
+  // column to swap.
+  embedding: vector1536("embedding"),
   embeddedAt: timestamp("embedded_at"),
   archivedAt: timestamp("archived_at"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
@@ -2104,6 +2128,13 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   organizationIdIdx: index("knowledge_entry_organization_id_idx").on(t.organizationId),
+  // drizzle/0026 (BL-TENANT-DRIFT mirror).
+  outcomeLabelIdx: index("knowledge_entry_outcome_label_idx").on(t.outcomeLabel),
+  // drizzle/0023 — IVFFlat cosine index for Brain Suggest; org-blind by
+  // nature, which is why every `<=>` query must filter organization_id.
+  embeddingCosineIdx: index("knowledge_entry_embedding_cosine_idx")
+    .using("ivfflat", t.embedding.op("vector_cosine_ops"))
+    .with({ lists: 50 }),
 }));
 
 export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
@@ -2209,6 +2240,13 @@ export const knowledgeArtifacts = pgTable("knowledge_artifact", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   organizationIdIdx: index("knowledge_artifact_organization_id_idx").on(t.organizationId),
+  // drizzle/0026 (BL-TENANT-DRIFT mirror).
+  outcomeLabelIdx: index("knowledge_artifact_outcome_label_idx").on(t.outcomeLabel),
+  // drizzle/0029 — one harvested artifact per proposal per org; partial so
+  // uploaded artifacts (no proposalId) are unconstrained.
+  proposalHarvestUnique: uniqueIndex("knowledge_artifact_proposal_harvest_unique")
+    .on(t.organizationId, sql`((${t.metadata} ->> 'proposalId'))`)
+    .where(sql`${t.source} = 'mined_from_proposal'`),
 }));
 
 export type KnowledgeArtifact = typeof knowledgeArtifacts.$inferSelect;
@@ -2360,11 +2398,10 @@ export const knowledgeArtifactChunks = pgTable("knowledge_artifact_chunk", {
     .references(() => knowledgeArtifacts.id, { onDelete: "cascade" }),
   chunkIndex: integer("chunk_index").notNull(),
   content: text("content").notNull(),
-  // Stored as text on the Drizzle side because pgvector isn't a
-  // first-class drizzle type. The actual column type is
-  // `vector(1536)` — the migration creates it. Reads parse JSON;
-  // writes serialize via `[1.0,2.0,...]::vector` casts in raw SQL.
-  embedding: text("embedding"),
+  // `vector(1536)` in SQL (drizzle/0022), text on the JS side — see
+  // `vector1536`. Reads parse JSON; writes serialize via
+  // `[1.0,2.0,...]::vector` casts in raw SQL.
+  embedding: vector1536("embedding"),
   tokenCount: integer("token_count").notNull().default(0),
   charStart: integer("char_start").notNull().default(0),
   charEnd: integer("char_end").notNull().default(0),
@@ -2372,7 +2409,16 @@ export const knowledgeArtifactChunks = pgTable("knowledge_artifact_chunk", {
   embeddingModel: text("embedding_model").notNull().default(""),
   embeddedAt: timestamp("embedded_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // drizzle/0022 (BL-TENANT-DRIFT mirror).
+  artifactIdx: index("knowledge_artifact_chunk_artifact_id_idx").on(t.artifactId),
+  organizationIdIdx: index("knowledge_artifact_chunk_organization_id_idx").on(t.organizationId),
+  // IVFFlat cosine index for semantic search; org-blind by nature, which is
+  // why every `<=>` query must filter organization_id (check-isolation D).
+  embeddingCosineIdx: index("knowledge_artifact_chunk_embedding_cosine_idx")
+    .using("ivfflat", t.embedding.op("vector_cosine_ops"))
+    .with({ lists: 100 }),
+}));
 
 export type KnowledgeArtifactChunk =
   typeof knowledgeArtifactChunks.$inferSelect;
@@ -3010,14 +3056,15 @@ export const tenantSubscriptions = pgTable(
   (t) => ({
     tierIdx: index("tenant_subscription_tier_idx").on(t.tierId),
     statusIdx: index("tenant_subscription_status_idx").on(t.status),
-    // Partial indexes — only Stripe-bound rows. Webhook handlers hit
-    // these to resolve tenant from a customer/subscription id payload.
-    stripeCustomerIdx: index("tenant_subscription_stripe_customer_idx").on(
-      t.stripeCustomerId,
-    ),
-    stripeSubscriptionIdx: index(
-      "tenant_subscription_stripe_subscription_idx",
-    ).on(t.stripeSubscriptionId),
+    // Partial indexes — only Stripe-bound rows, as created in drizzle/0056
+    // (BL-TENANT-DRIFT mirror). Webhook handlers hit these to resolve the
+    // tenant from a customer/subscription id payload.
+    stripeCustomerIdx: index("tenant_subscription_stripe_customer_idx")
+      .on(t.stripeCustomerId)
+      .where(sql`${t.stripeCustomerId} IS NOT NULL`),
+    stripeSubscriptionIdx: index("tenant_subscription_stripe_subscription_idx")
+      .on(t.stripeSubscriptionId)
+      .where(sql`${t.stripeSubscriptionId} IS NOT NULL`),
   }),
 );
 
@@ -3060,14 +3107,13 @@ export const paymentEvents = pgTable(
   },
   (t) => ({
     receivedIdx: index("payment_event_received_idx").on(t.receivedAt),
-    orgReceivedIdx: index("payment_event_org_received_idx").on(
-      t.organizationId,
-      t.receivedAt,
-    ),
-    handlerStatusIdx: index("payment_event_handler_status_idx").on(
-      t.handlerStatus,
-      t.receivedAt,
-    ),
+    // Partial indexes, as created in drizzle/0056 (BL-TENANT-DRIFT mirror).
+    orgReceivedIdx: index("payment_event_org_received_idx")
+      .on(t.organizationId, t.receivedAt)
+      .where(sql`${t.organizationId} IS NOT NULL`),
+    handlerStatusIdx: index("payment_event_handler_status_idx")
+      .on(t.handlerStatus, t.receivedAt)
+      .where(sql`${t.handlerStatus} IN ('failed', 'unhandled')`),
   }),
 );
 

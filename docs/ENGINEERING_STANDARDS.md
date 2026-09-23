@@ -206,6 +206,19 @@ deletes rows older than each tenant's configured window.
 - **Fresh-DB verification:** `scripts/check-migrations-fresh.mjs`
   boots an ephemeral Postgres in CI, applies every migration from
   scratch, and verifies a re-run is a no-op. Runs on every PR.
+- **Index parity:** `scripts/check-schema-drift.mjs` (`npm run
+  check:drift`, in the isolation CI job) asserts every index the SQL
+  creates is declared in `schema.ts` with the same UNIQUE flag and
+  partial-ness (`.where(sql\`…\`)`), and that nothing is declared in
+  `schema.ts` that no migration creates. Partial indexes, expression
+  indexes and the `ivfflat` index are all declared; pgvector columns use
+  the `vector1536` custom type so the declared SQL type is real.
+- **drizzle-kit is guarded:** `db:push`, `db:generate` and `db:migrate`
+  route through `scripts/drizzle-kit-guard.mjs` and refuse to run unless
+  `FORGE_ALLOW_DRIZZLE_KIT=1` is set for that one invocation. `push`
+  diffs `schema.ts` against a live database and drops whatever the SQL
+  created that the schema does not declare; `migrate` reads a journal
+  frozen at 0017. `db:apply`, `db:studio` and `db:info` are unaffected.
 
 ### Coupling rule
 
