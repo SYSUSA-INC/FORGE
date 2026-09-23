@@ -2165,6 +2165,27 @@ daemon, so the app could not be booted against a real schema. The
 diagnosis is static (route table vs. link targets vs. per-page gates)
 and the checker reproduces the failure with the new page removed.
 
+
+**Follow-up (PR #TBD) — the state itself, not just the missing page.** With
+`/onboarding` in place the redirect landed somewhere real, but a signed-in
+account with no active workspace still saw the full side menu: two dozen
+links that every one redirected back to the same page, which reads as "the
+whole platform has broken links". Two fixes, both safe for accounts that do
+have a workspace (nothing changes for them):
+- **Workspace-aware nav** — `src/lib/nav-visibility.ts` (pure, tested) adds
+  a `needsWorkspace` gate; Command Center, Operations Management,
+  Opportunities and Platform Intelligence are hidden when the session has no
+  workspace and no active impersonation, and a "No active workspace" notice
+  links to `/onboarding`. Help and Platform Administration stay. The header
+  Settings link follows the same rule.
+- **Superadmin self-provision** — `createWorkspaceForSelfAction`
+  (`admin/workspace-actions.ts`) creates an organization plus an active admin
+  membership for the caller in one step; idempotent, audited as `org.create`
+  with `selfProvisioned: true`. Offered on `/onboarding` to superadmins.
+  Before this, a platform admin created by `scripts/grant-superadmin.mjs` on
+  an invite-only deployment had no route to a working workspace except
+  impersonation (read-only) or signing out to redeem an invite to themselves
+  (which also resets their password).
 ---
 
 ### BL-QC-combined-job — Consolidate typecheck + lint

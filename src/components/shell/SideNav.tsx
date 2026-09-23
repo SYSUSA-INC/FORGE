@@ -29,10 +29,12 @@ function readRailCollapsed(): boolean {
 export function SideNav({
   isOrgAdmin = false,
   isSuperadmin = false,
+  hasWorkspace = true,
   user,
 }: {
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
+  hasWorkspace?: boolean;
   user: NavUser | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -60,6 +62,7 @@ export function SideNav({
       <NavContent
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
+        hasWorkspace={hasWorkspace}
         user={user}
       />
     </aside>

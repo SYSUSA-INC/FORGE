@@ -5,7 +5,9 @@ import { memberships, organizations } from "@/db/schema";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth } from "@/lib/auth-helpers";
+import { defaultOrgName } from "@/lib/org-defaults";
 import { getSignupMode } from "@/lib/signup-mode";
+import { CreateWorkspaceForm } from "./CreateWorkspaceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +147,24 @@ export default async function OnboardingPage() {
           </ul>
         ) : null}
       </Panel>
+
+      {user.isSuperadmin ? (
+        <Panel
+          title="Create your workspace"
+          eyebrow="Platform administrator"
+          accent="emerald"
+          className="mt-4"
+        >
+          <p className="mb-3 font-body text-[13px] leading-relaxed text-muted">
+            Platform administrators are created without a workspace, and on an
+            invite-only deployment nothing provisions one. Create one here and
+            your account becomes its admin — no invite, no password change, no
+            sign-out. Use Tenants instead if you meant to work inside a customer&apos;s
+            workspace.
+          </p>
+          <CreateWorkspaceForm suggestedName={defaultOrgName(user.name)} />
+        </Panel>
+      ) : null}
 
       <Panel title="Where you can go" className="mt-4">
         <div className="flex flex-col gap-2">
