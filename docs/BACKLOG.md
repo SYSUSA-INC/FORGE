@@ -294,7 +294,7 @@ rendering bug found on the way.
   that every colour family is a scale, and that no hex literal returns
   to the themed paths.
 
-**Slice 2 — light corporate default + theme toggle** (PR #TBD). User
+**Slice 2 — light corporate default + theme toggle** (PR #273). User
 feedback on #272: "same color scheme still" — the dark navy base read as
 unchanged. The default is now a **light** corporate theme (off-white
 canvas, white cards, navy type, cobalt actions, brass accent) and the
