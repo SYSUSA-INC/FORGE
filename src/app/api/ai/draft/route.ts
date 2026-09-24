@@ -40,6 +40,11 @@ const bodySchema = z.object({
   mode: z.enum(DRAFT_MODES as [string, ...string[]]),
   /** BL-FB-GEN-CITE — require inline citations against Brain sources. */
   cite: z.boolean().optional().default(false),
+  /**
+   * BL-AIP-2 — the section text as it stands in the editor, so Improve /
+   * Tighten work on what the writer sees rather than the last saved copy.
+   */
+  currentBodyPlain: z.string().max(60_000).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -74,6 +79,7 @@ export async function POST(req: NextRequest) {
     sectionId: body.sectionId,
     mode,
     cite: body.cite,
+    currentBodyPlain: body.currentBodyPlain,
   });
   if (!prepared.ok) {
     await refundQuota(organizationId, "aiRequestsPerMonth");

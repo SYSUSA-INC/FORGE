@@ -23,15 +23,71 @@ export function fromPlainText(text: string): TipTapDoc {
   };
 }
 
+/** Marks the track-changes extension leaves on pending suggestions. */
+const TC_INSERT = "tcInsert";
+const TC_DELETE = "tcDelete";
+
+function hasMark(node: TipTapNode, type: string): boolean {
+  return (node.marks ?? []).some((m) => m.type === type);
+}
+
+/**
+ * BL-AIP-2 — does the document carry unresolved tracked changes?
+ * Exports and AI input show the "final" view (see below); callers use
+ * this to warn that suggestions are still pending.
+ */
+export function hasPendingTrackedChanges(doc: TipTapDoc | null | undefined): boolean {
+  const walk = (nodes: TipTapNode[] | undefined): boolean =>
+    (nodes ?? []).some(
+      (n) =>
+        (n.type === "text" && (hasMark(n, TC_INSERT) || hasMark(n, TC_DELETE))) ||
+        walk(n.content),
+    );
+  return walk(doc?.content);
+}
+
+/**
+ * BL-AIP-2 — the "final" view of a document with tracked changes:
+ * pending insertions are kept (mark removed), pending deletions are
+ * removed. Until this existed, text a reviewer had struck still came
+ * out in PDF / DOCX exports, in the plain projection the AI reads and
+ * scans, and in word counts. A block that held only struck text is
+ * dropped rather than left as an empty paragraph. Returns the input
+ * untouched when there is nothing to resolve.
+ */
+export function resolveTrackedChanges(doc: TipTapDoc): TipTapDoc {
+  if (!hasPendingTrackedChanges(doc)) return doc;
+  const resolveNode = (node: TipTapNode): TipTapNode | null => {
+    if (node.type === "text") {
+      if (hasMark(node, TC_DELETE)) return null;
+      if (!hasMark(node, TC_INSERT)) return node;
+      const marks = (node.marks ?? []).filter((m) => m.type !== TC_INSERT);
+      return marks.length ? { ...node, marks } : { ...node, marks: undefined };
+    }
+    if (!node.content) return node;
+    const content = node.content.map(resolveNode).filter((n): n is TipTapNode => n !== null);
+    if (content.length === 0 && node.content.length > 0) return null;
+    return { ...node, content };
+  };
+  return {
+    type: "doc",
+    content: (doc.content ?? [])
+      .map(resolveNode)
+      .filter((n): n is TipTapNode => n !== null),
+  };
+}
+
 /**
  * Project a TipTap doc back to plain text so existing search,
  * compliance previews, AI prompts, and section rollups keep working
  * without changes. Block-level nodes are joined with double newlines;
- * inline text/code is concatenated within a block.
+ * inline text/code is concatenated within a block. Pending tracked
+ * changes are resolved to their final view first (BL-AIP-2).
  */
 export function projectToPlain(doc: TipTapDoc | null | undefined): string {
   if (!doc?.content?.length) return "";
-  return doc.content
+  const resolved = resolveTrackedChanges(doc);
+  return (resolved.content ?? [])
     .map(blockToText)
     .filter((s) => s.length > 0)
     .join("\n\n")

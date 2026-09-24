@@ -52,8 +52,16 @@ export async function prepareSectionChat(input: {
   sectionId: string;
   history: ChatHistoryMessage[];
   message: string;
+  /**
+   * BL-AIP-2 — the section as it stands in the editor; replaces the saved
+   * body in the context so "make this paragraph tighter" refers to what
+   * the writer is looking at.
+   */
+  currentBodyPlain?: string;
 }): Promise<PreparedSectionChat> {
   const { organizationId } = input;
+  const liveBody =
+    typeof input.currentBodyPlain === "string" ? input.currentBodyPlain.trim() : "";
 
   const [row] = await db
     .select({
@@ -142,8 +150,12 @@ export async function prepareSectionChat(input: {
     themesBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
-    row.section.content?.trim() &&
-      `\nCurrent draft (${row.section.wordCount} words):\n${row.section.content.slice(0, 3000)}`,
+    (liveBody || row.section.content?.trim()) &&
+      `\nCurrent draft (${
+        liveBody
+          ? liveBody.split(/\s+/g).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+          : row.section.wordCount
+      } words):\n${(liveBody || row.section.content || "").slice(0, 3000)}`,
   ]
     .filter(Boolean)
     .join("\n");

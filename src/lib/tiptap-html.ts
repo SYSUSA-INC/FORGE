@@ -10,10 +10,14 @@
  * Underline, Link, Image, Table, Placeholder).
  */
 import type { TipTapDoc, TipTapNode } from "@/db/schema";
+import { resolveTrackedChanges } from "@/lib/tiptap-doc";
 
 export function renderDocToHtml(doc: TipTapDoc | null | undefined): string {
   if (!doc?.content?.length) return "";
-  return doc.content.map(nodeToHtml).join("");
+  // BL-AIP-2 — exports show the final view: pending insertions kept,
+  // pending deletions removed. Struck text used to ship in the PDF.
+  const resolved = resolveTrackedChanges(doc);
+  return (resolved.content ?? []).map(nodeToHtml).join("");
 }
 
 function nodeToHtml(node: TipTapNode): string {

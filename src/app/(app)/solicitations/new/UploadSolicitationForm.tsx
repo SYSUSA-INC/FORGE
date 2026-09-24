@@ -110,8 +110,8 @@ export function UploadSolicitationForm() {
         <div className="flex items-center justify-between gap-3">
           <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
             {pending
-              ? "Uploading + parsing…"
-              : "Upload runs text extraction and AI parse synchronously."}
+              ? "Uploading…"
+              : "Upload stores the file, then text extraction and the AI parse run in the background."}
           </div>
           <button
             type="submit"

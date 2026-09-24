@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #TBD); BL-AIP-3 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -172,9 +172,50 @@ was confirmed in code before it was fixed:
   from the customer-facing review email; "BL-23b" ticket code removed
   from the opportunity panel eyebrow.
 
-**Queued slices (from the assessment, in order):** BL-AIP-2 editor
-hand-off + solicitations review panel state (accepted AI text never
-appears in the editor; review results never render after the AI call);
+**BL-AIP-2 — the hand-offs** ✅ (PR #TBD). The single highest-impact
+defect in the assessment plus its neighbours:
+- **Accepted AI text now reaches the editor.** TipTap reads `content`
+  once at mount and ignores later prop changes, so "Replace section with
+  this", chat "Apply to section", Brain Suggest insert and snapshot
+  restore changed page state while the visible text stayed and the next
+  Save discarded the AI text. `RichSectionEditor` takes a `docVersion`;
+  `SectionsClient` bumps it on every external replacement and the editor
+  pushes the document in with `setContent`, version-guarded so the
+  editor's own updates never re-apply (no cursor jumps).
+- **Server changes are adopted safely.** After a restore (or any refresh
+  while there are no unsaved edits) the section adopts the server's
+  document; never while dirty unless a restore was explicitly requested,
+  so typing is never thrown away by a background refresh.
+- **Unsaved-changes guard.** A `dirty` flag drives a `beforeunload`
+  prompt and an "unsaved" chip next to the word count; Save clears it.
+- **AI runs on what you see.** Improve / Tighten and Chat send the
+  editor's live text (`currentBodyPlain`, capped at 60k) to `/api/ai/draft`
+  and `/api/ai/chat`; `prepareSectionDraft` and `prepareSectionChat`
+  prefer it over the saved body. Passed as a getter so keystrokes do not
+  re-render the panel.
+- **Pending tracked changes no longer leak.** `resolveTrackedChanges`
+  (tiptap-doc.ts, tested) gives the final view — insertions kept,
+  deletions removed, emptied blocks dropped — and `projectToPlain` and
+  `renderDocToHtml` apply it, so struck text stops appearing in PDF /
+  DOCX exports, the plain text the AI and scans read, and word counts.
+  `hasPendingTrackedChanges` is available for an export warning
+  (BL-AIP-6).
+- **Solicitation review panel shows its results.** State is now synced
+  from props after each action's `router.refresh()`; a finished review
+  no longer reads "Not started" with the matrix and question buttons
+  disabled until a full reload.
+- **A/B variant B was contaminated:** `draft_alt` received the
+  "tightened body" output instruction; it now gets the first-draft one
+  (tested).
+- **Stub scans no longer spin forever:** the on-demand and cron stub
+  paths clear `scan_dirty_since`, so the overview stops showing
+  "Background scan running" on every page load and the cron stops
+  retrying the same five proposals.
+- **Stuck parses are recoverable:** Re-parse (as "Retry parse") appears
+  when a solicitation has been "parsing" for more than five minutes;
+  stale copy about OCR, storage and "synchronous" parsing corrected.
+
+**Queued slices (from the assessment, in order):**
 BL-AIP-3 notification engine truth (email channel, 7 un-emitted triggers,
 `ackedAt`, test-send scope); BL-AIP-4 outcome provenance + Brain indexing
 cron; BL-AIP-5 requirements-first pipeline (full-text extraction, seed

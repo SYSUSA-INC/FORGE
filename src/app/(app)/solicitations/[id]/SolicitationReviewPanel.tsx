@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
@@ -106,9 +106,16 @@ export function SolicitationReviewPanel({
   hasRawText: boolean;
 }) {
   const router = useRouter();
-  const [review, _setReview] = useState<ReviewState>(initialReview);
-  const [matrix, _setMatrix] = useState<MatrixState>(initialMatrix);
-  const [questions, _setQuestions] = useState<QuestionState>(initialQuestions);
+  const [review, setReview] = useState<ReviewState>(initialReview);
+  const [matrix, setMatrix] = useState<MatrixState>(initialMatrix);
+  const [questions, setQuestions] = useState<QuestionState>(initialQuestions);
+  // BL-AIP-2 — adopt fresh server state after each action's
+  // router.refresh(). The state was copied from props once and never
+  // updated, so a finished review kept showing "Not started" and the
+  // matrix / question buttons stayed disabled until a full reload.
+  useEffect(() => setReview(initialReview), [initialReview]);
+  useEffect(() => setMatrix(initialMatrix), [initialMatrix]);
+  useEffect(() => setQuestions(initialQuestions), [initialQuestions]);
   const [error, setError] = useState<string | null>(null);
   const [reviewing, startReview] = useTransition();
   const [matrixing, startMatrix] = useTransition();

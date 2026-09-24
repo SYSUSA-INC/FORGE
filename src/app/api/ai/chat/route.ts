@@ -41,6 +41,8 @@ export const maxDuration = 60;
 const bodySchema = z.object({
   sectionId: z.string().uuid(),
   message: z.string().trim().min(1).max(4000),
+  /** BL-AIP-2 — the section text as it stands in the editor. */
+  currentBodyPlain: z.string().max(60_000).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -101,6 +103,7 @@ export async function POST(req: NextRequest) {
     sectionId: body.sectionId,
     history,
     message: body.message,
+    currentBodyPlain: body.currentBodyPlain,
   });
   if (!prepared.ok) {
     await refundQuota(organizationId, "aiRequestsPerMonth");

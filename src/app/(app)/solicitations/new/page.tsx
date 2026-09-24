@@ -37,8 +37,8 @@ export default async function NewSolicitationPage() {
                   Upload
                 </div>
                 <div className="mt-0.5">
-                  PDF stored via the configured storage provider (memory in
-                  dev, R2 when wired up).
+                  The file is stored through the configured storage
+                  provider and parsed in the background.
                 </div>
               </div>
             </li>
@@ -51,8 +51,8 @@ export default async function NewSolicitationPage() {
                   Text extraction
                 </div>
                 <div className="mt-0.5">
-                  pdf-parse pulls the text layer. Scanned-image-only PDFs
-                  fail with an explicit message — OCR comes next.
+                  The text layer is extracted locally. Scanned-image PDFs
+                  and images fall through to vision OCR automatically.
                 </div>
               </div>
             </li>

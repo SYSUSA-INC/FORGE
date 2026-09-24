@@ -8,18 +8,32 @@ import {
   reparseSolicitationAction,
 } from "../actions";
 
+/** A parse still "running" after this long has died with its request. */
+const PARSE_STUCK_AFTER_MS = 5 * 60_000;
+
 export function SolicitationActions({
   id,
   parseStatus,
+  parseUpdatedAt,
   opportunityId,
   hasStorage,
 }: {
   id: string;
   parseStatus: string;
+  /** ISO timestamp of the row's last update; drives stuck-parse recovery. */
+  parseUpdatedAt?: string | null;
   opportunityId: string | null;
   hasStorage: boolean;
 }) {
   const router = useRouter();
+  // BL-AIP-2 — the parse runs fire-and-forget after the upload response;
+  // on serverless hosting it can be suspended and the row stays at
+  // "parsing" forever. Re-parse used to be hidden exactly then. Offer it
+  // once a parse has been "running" implausibly long.
+  const parseStuck =
+    parseStatus === "parsing" &&
+    !!parseUpdatedAt &&
+    Date.now() - new Date(parseUpdatedAt).getTime() > PARSE_STUCK_AFTER_MS;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -54,14 +68,19 @@ export function SolicitationActions({
 
   return (
     <>
-      {hasStorage && parseStatus !== "parsing" ? (
+      {hasStorage && (parseStatus !== "parsing" || parseStuck) ? (
         <button
           type="button"
           onClick={reparse}
           disabled={pending}
           className="aur-btn aur-btn-ghost"
+          title={
+            parseStuck
+              ? "This parse has been running for over five minutes and has probably stalled. Run it again."
+              : undefined
+          }
         >
-          Re-parse
+          {parseStuck ? "Retry parse" : "Re-parse"}
         </button>
       ) : null}
       {opportunityId ? (
