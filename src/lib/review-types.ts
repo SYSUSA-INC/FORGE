@@ -4,6 +4,7 @@ import type {
   ReviewVerdict,
 } from "@/db/schema";
 import type { ProposalStage } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const REVIEW_COLORS: {
   key: ReviewColor;
@@ -15,28 +16,28 @@ export const REVIEW_COLORS: {
   {
     key: "pink",
     label: "Pink Team",
-    color: "#F472B6",
+    color: THEME.plum,
     description: "First major review — strategy, themes, outline (~30%)",
     alignedStage: "pink_team",
   },
   {
     key: "red",
     label: "Red Team",
-    color: "#F43F5E",
+    color: THEME.red,
     description: "Independent review — evaluate against Section M (~80%)",
     alignedStage: "red_team",
   },
   {
     key: "gold",
     label: "Gold Team",
-    color: "#F59E0B",
+    color: THEME.brass,
     description: "Executive sign-off — near-final draft",
     alignedStage: "gold_team",
   },
   {
     key: "white_gloves",
     label: "White Gloves",
-    color: "#E2E8F0",
+    color: THEME.text,
     description: "Copy edit, compliance sweep, production polish",
     alignedStage: "white_gloves",
   },
@@ -59,10 +60,10 @@ export const STATUS_LABELS: Record<ReviewStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<ReviewStatus, string> = {
-  scheduled: "#64748B",
-  in_progress: "#F59E0B",
-  complete: "#10B981",
-  cancelled: "#94A3B8",
+  scheduled: THEME.subtle,
+  in_progress: THEME.brass,
+  complete: THEME.green,
+  cancelled: THEME.muted,
 };
 
 export const VERDICT_LABELS: Record<ReviewVerdict, string> = {
@@ -72,9 +73,9 @@ export const VERDICT_LABELS: Record<ReviewVerdict, string> = {
 };
 
 export const VERDICT_COLORS: Record<ReviewVerdict, string> = {
-  pass: "#10B981",
-  conditional: "#F59E0B",
-  fail: "#F43F5E",
+  pass: THEME.green,
+  conditional: THEME.brass,
+  fail: THEME.red,
 };
 
 export function computeOverallVerdict(

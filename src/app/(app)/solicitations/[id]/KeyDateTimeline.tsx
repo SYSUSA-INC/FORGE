@@ -1,5 +1,6 @@
 import { Panel } from "@/components/ui/Panel";
 import type { SolicitationKeyDate } from "@/db/schema";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 const KEY_DATE_TYPE_LABELS: Record<SolicitationKeyDate["type"], string> = {
   qa_cutoff: "Q&A Cutoff",
@@ -18,49 +19,49 @@ const KEY_DATE_TYPE_COLOR: Record<
   { color: string; bg: string; border: string }
 > = {
   proposal_due: {
-    color: "#f87171",
-    bg: "rgba(248,113,113,0.10)",
-    border: "rgba(248,113,113,0.30)",
+    color: THEME.red,
+    bg: withAlpha(THEME.red, 0.10),
+    border: withAlpha(THEME.red, 0.30),
   },
   final_rfp: {
-    color: "#fb923c",
-    bg: "rgba(251,146,60,0.10)",
-    border: "rgba(251,146,60,0.30)",
+    color: THEME.brassDeep,
+    bg: withAlpha(THEME.brassDeep, 0.10),
+    border: withAlpha(THEME.brassDeep, 0.30),
   },
   qa_cutoff: {
-    color: "#fbbf24",
-    bg: "rgba(251,191,36,0.10)",
-    border: "rgba(251,191,36,0.30)",
+    color: THEME.brass,
+    bg: withAlpha(THEME.brass, 0.10),
+    border: withAlpha(THEME.brass, 0.30),
   },
   oral_presentation: {
-    color: "#a78bfa",
-    bg: "rgba(167,139,250,0.10)",
-    border: "rgba(167,139,250,0.30)",
+    color: THEME.indigo,
+    bg: withAlpha(THEME.indigo, 0.10),
+    border: withAlpha(THEME.indigo, 0.30),
   },
   site_visit: {
-    color: "#60a5fa",
-    bg: "rgba(96,165,250,0.10)",
-    border: "rgba(96,165,250,0.30)",
+    color: THEME.cobalt,
+    bg: withAlpha(THEME.cobalt, 0.10),
+    border: withAlpha(THEME.cobalt, 0.30),
   },
   expected_award: {
-    color: "#34d399",
-    bg: "rgba(52,211,153,0.10)",
-    border: "rgba(52,211,153,0.30)",
+    color: THEME.green,
+    bg: withAlpha(THEME.green, 0.10),
+    border: withAlpha(THEME.green, 0.30),
   },
   debrief_window: {
-    color: "#94a3b8",
-    bg: "rgba(148,163,184,0.10)",
-    border: "rgba(148,163,184,0.30)",
+    color: THEME.muted,
+    bg: withAlpha(THEME.muted, 0.10),
+    border: withAlpha(THEME.muted, 0.30),
   },
   protest_window: {
-    color: "#94a3b8",
-    bg: "rgba(148,163,184,0.10)",
-    border: "rgba(148,163,184,0.30)",
+    color: THEME.muted,
+    bg: withAlpha(THEME.muted, 0.10),
+    border: withAlpha(THEME.muted, 0.30),
   },
   other: {
-    color: "#94a3b8",
-    bg: "rgba(148,163,184,0.10)",
-    border: "rgba(148,163,184,0.30)",
+    color: THEME.muted,
+    bg: withAlpha(THEME.muted, 0.10),
+    border: withAlpha(THEME.muted, 0.30),
   },
 };
 
@@ -75,13 +76,13 @@ function daysUntil(isoDate: string): number {
 }
 
 function urgencyStyle(days: number): { color: string; label: string } {
-  if (days < 0) return { color: "#475569", label: `${Math.abs(days)}d ago` };
-  if (days === 0) return { color: "#f87171", label: "Today" };
-  if (days === 1) return { color: "#f87171", label: "Tomorrow" };
-  if (days <= 3) return { color: "#f87171", label: `In ${days} days` };
-  if (days <= 7) return { color: "#fbbf24", label: `In ${days} days` };
-  if (days <= 14) return { color: "#fbbf24", label: `In ${days} days` };
-  return { color: "#94a3b8", label: `In ${days} days` };
+  if (days < 0) return { color: THEME.subtle, label: `${Math.abs(days)}d ago` };
+  if (days === 0) return { color: THEME.red, label: "Today" };
+  if (days === 1) return { color: THEME.red, label: "Tomorrow" };
+  if (days <= 3) return { color: THEME.red, label: `In ${days} days` };
+  if (days <= 7) return { color: THEME.brass, label: `In ${days} days` };
+  if (days <= 14) return { color: THEME.brass, label: `In ${days} days` };
+  return { color: THEME.muted, label: `In ${days} days` };
 }
 
 function formatDate(isoDate: string): string {

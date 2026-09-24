@@ -7,6 +7,7 @@ import {
   type EditorMode,
   type PendingChange,
 } from "./extensions/TrackChanges";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 /**
  * BL-9 Slice 3 — sidebar panel for reviewing pending tracked changes.
@@ -134,19 +135,19 @@ export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) 
 function ModeBadge({ mode }: { mode: EditorMode }) {
   const STYLE: Record<EditorMode, React.CSSProperties> = {
     edit: {
-      background: "rgba(74, 222, 128, 0.12)",
-      border: "1px solid rgba(74, 222, 128, 0.35)",
-      color: "#4ADE80",
+      background: withAlpha(THEME.green, 0.12),
+      border: `1px solid ${withAlpha(THEME.green, 0.35)}`,
+      color: THEME.green,
     },
     suggest: {
-      background: "rgba(251, 191, 36, 0.12)",
-      border: "1px solid rgba(251, 191, 36, 0.35)",
-      color: "#FBBF24",
+      background: withAlpha(THEME.brass, 0.12),
+      border: `1px solid ${withAlpha(THEME.brass, 0.35)}`,
+      color: THEME.brass,
     },
     view: {
-      background: "rgba(148, 163, 184, 0.12)",
-      border: "1px solid rgba(148, 163, 184, 0.35)",
-      color: "#94A3B8",
+      background: withAlpha(THEME.muted, 0.12),
+      border: `1px solid ${withAlpha(THEME.muted, 0.35)}`,
+      color: THEME.muted,
     },
   };
   return (
@@ -191,14 +192,14 @@ function ChangeRow({
             style={
               isInsert
                 ? {
-                    background: "rgba(74, 222, 128, 0.10)",
-                    border: "1px solid rgba(74, 222, 128, 0.25)",
-                    color: "#4ADE80",
+                    background: withAlpha(THEME.green, 0.10),
+                    border: `1px solid ${withAlpha(THEME.green, 0.25)}`,
+                    color: THEME.green,
                   }
                 : {
-                    background: "rgba(248, 113, 113, 0.10)",
-                    border: "1px solid rgba(248, 113, 113, 0.25)",
-                    color: "#F87171",
+                    background: withAlpha(THEME.red, 0.10),
+                    border: `1px solid ${withAlpha(THEME.red, 0.25)}`,
+                    color: THEME.red,
                   }
             }
           >
@@ -230,7 +231,7 @@ function ChangeRow({
       {preview && (
         <p
           className="font-mono text-[10px] leading-relaxed"
-          style={{ color: isInsert ? "#4ADE80" : "#F87171", opacity: 0.85 }}
+          style={{ color: isInsert ? THEME.green : THEME.red, opacity: 0.85 }}
         >
           {isInsert ? "+" : "−"} {preview}
         </p>

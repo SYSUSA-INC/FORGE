@@ -27,6 +27,7 @@ import {
   getSectionSnapshotBodyAction,
   type SectionSnapshotSummary,
 } from "@/app/(app)/proposals/[id]/sections/snapshot-actions";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 type Props = {
   proposalId: string;
@@ -173,8 +174,8 @@ function DiffOutput({ changes }: { changes: Change[] }) {
             <span
               key={idx}
               style={{
-                background: "rgba(74, 222, 128, 0.20)",
-                color: "#86EFAC",
+                background: withAlpha(THEME.green, 0.20),
+                color: THEME.greenLight,
               }}
             >
               {c.value}
@@ -186,10 +187,10 @@ function DiffOutput({ changes }: { changes: Change[] }) {
             <span
               key={idx}
               style={{
-                background: "rgba(248, 113, 113, 0.20)",
-                color: "#FCA5A5",
+                background: withAlpha(THEME.red, 0.20),
+                color: THEME.redLight,
                 textDecoration: "line-through",
-                textDecorationColor: "rgba(248, 113, 113, 0.6)",
+                textDecorationColor: withAlpha(THEME.red, 0.6),
               }}
             >
               {c.value}

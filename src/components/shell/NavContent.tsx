@@ -272,13 +272,7 @@ export function NavContent({
     return (
       <>
         <div className="flex h-14 items-center justify-center border-b border-white/10">
-          <div
-            className="grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow"
-            style={{
-              background:
-                "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)",
-            }}
-          >
+          <div className="aur-brand-mark grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow">
             F
           </div>
         </div>
@@ -292,7 +286,7 @@ export function NavContent({
               aria-label="No active workspace — set one up"
               className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                 hrefMatches(pathname, "/onboarding")
-                  ? "bg-amber-400/20 text-amber-200 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.4)]"
+                  ? "bg-amber-400/20 text-amber-200 shadow-[inset_0_0_0_1px_rgb(var(--c-brass-500)/0.4)]"
                   : "text-amber-300 hover:bg-amber-400/10"
               }`}
             >
@@ -316,7 +310,7 @@ export function NavContent({
                   aria-label={g.label}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                     groupActive
-                      ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.4)]"
+                      ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
                       : "text-muted hover:bg-white/[0.05] hover:text-text"
                   }`}
                 >
@@ -342,7 +336,7 @@ export function NavContent({
                 aria-label={g.label}
                 className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                   groupActive
-                    ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.4)]"
+                    ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
                     : "text-muted hover:bg-white/[0.05] hover:text-text"
                 }`}
               >
@@ -377,13 +371,7 @@ export function NavContent({
   return (
     <>
       <div className="flex h-14 items-center gap-3 border-b border-white/10 px-5">
-        <div
-          className="grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow"
-          style={{
-            background:
-              "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)",
-          }}
-        >
+        <div className="aur-brand-mark grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow">
           F
         </div>
         <div className="flex-1 leading-none">
@@ -447,17 +435,17 @@ export function NavContent({
                 onClick={onNavigate}
                 className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   active
-                    ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)]"
+                    ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.35)]"
                     : "text-muted hover:bg-white/[0.04] hover:text-text"
                 }`}
               >
                 {active && (
-                  <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal via-emerald to-magenta" />
+                  <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-cobalt via-cobalt-300 to-brass" />
                 )}
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
                     active
-                      ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
+                      ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text"
                       : "bg-white/5 text-muted"
                   }`}
                 >
@@ -567,12 +555,7 @@ function UserAvatar({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <span
-            className="grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white"
-            style={{
-              background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
-            }}
-          >
+          <span className="aur-brand-mark grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white">
             {initials}
           </span>
         )}
@@ -596,12 +579,7 @@ function UserAvatar({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <span
-            className="grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white"
-            style={{
-              background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
-            }}
-          >
+          <span className="aur-brand-mark grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white">
             {initials}
           </span>
         )}

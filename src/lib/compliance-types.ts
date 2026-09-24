@@ -3,6 +3,7 @@ import type {
   ComplianceOwnerStatus,
   ComplianceStatus,
 } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const CATEGORIES: {
   key: ComplianceCategory;
@@ -13,31 +14,31 @@ export const CATEGORIES: {
   {
     key: "section_l",
     label: "Section L",
-    color: "#F472B6",
+    color: THEME.plum,
     description: "Instructions to offerors — what must be submitted",
   },
   {
     key: "section_m",
     label: "Section M",
-    color: "#FBBF24",
+    color: THEME.brass,
     description: "Evaluation factors — how the government will score",
   },
   {
     key: "section_c",
     label: "Section C",
-    color: "#2DD4BF",
+    color: THEME.cobalt,
     description: "Statement of Work / PWS requirements",
   },
   {
     key: "far_clause",
     label: "FAR Clause",
-    color: "#A78BFA",
+    color: THEME.indigo,
     description: "FAR / DFARS provisions and certifications",
   },
   {
     key: "other",
     label: "Other",
-    color: "#94A3B8",
+    color: THEME.muted,
     description: "Any other requirement needing traceability",
   },
 ];
@@ -57,10 +58,10 @@ export const STATUSES: {
   label: string;
   color: string;
 }[] = [
-  { key: "not_addressed", label: "Not addressed", color: "#94A3B8" },
-  { key: "partial", label: "Partial", color: "#F59E0B" },
-  { key: "complete", label: "Complete", color: "#10B981" },
-  { key: "not_applicable", label: "N/A", color: "#64748B" },
+  { key: "not_addressed", label: "Not addressed", color: THEME.muted },
+  { key: "partial", label: "Partial", color: THEME.brass },
+  { key: "complete", label: "Complete", color: THEME.green },
+  { key: "not_applicable", label: "N/A", color: THEME.subtle },
 ];
 
 export const STATUS_LABELS: Record<ComplianceStatus, string> =
@@ -78,11 +79,11 @@ export const OWNER_STATUSES: {
   label: string;
   color: string;
 }[] = [
-  { key: "unassigned", label: "Unassigned", color: "#64748B" },
-  { key: "assigned", label: "Assigned", color: "#60A5FA" },
-  { key: "in_progress", label: "In progress", color: "#FBBF24" },
-  { key: "complete", label: "Done", color: "#10B981" },
-  { key: "blocked", label: "Blocked", color: "#F87171" },
+  { key: "unassigned", label: "Unassigned", color: THEME.subtle },
+  { key: "assigned", label: "Assigned", color: THEME.cobalt },
+  { key: "in_progress", label: "In progress", color: THEME.brass },
+  { key: "complete", label: "Done", color: THEME.green },
+  { key: "blocked", label: "Blocked", color: THEME.red },
 ];
 
 export const OWNER_STATUS_LABELS: Record<ComplianceOwnerStatus, string> =

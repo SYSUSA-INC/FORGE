@@ -42,7 +42,7 @@ export function UserMenu({ user }: { user: UserLike | null }) {
         <span
           className="grid h-7 w-7 place-items-center rounded-full font-mono text-[10px] font-bold text-white"
           style={{
-            background: "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
+            background: "var(--g-brand)",
           }}
         >
           {initials}

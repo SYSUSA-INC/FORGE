@@ -1,4 +1,5 @@
 import type { ProposalSectionKind, ProposalStage, ProposalSectionStatus } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const STAGES: {
   key: ProposalStage;
@@ -11,70 +12,70 @@ export const STAGES: {
     key: "draft",
     label: "Draft",
     shortLabel: "Draft",
-    color: "#94A3B8",
+    color: THEME.muted,
     description: "Initial authoring before color-team reviews begin",
   },
   {
     key: "pink_team",
     label: "Pink Team",
     shortLabel: "Pink",
-    color: "#F472B6",
+    color: THEME.plum,
     description: "First major review — strategy, themes, outline (~30% complete)",
   },
   {
     key: "red_team",
     label: "Red Team",
     shortLabel: "Red",
-    color: "#F43F5E",
+    color: THEME.red,
     description: "Independent evaluator review — score against Section M (~80%)",
   },
   {
     key: "gold_team",
     label: "Gold Team",
     shortLabel: "Gold",
-    color: "#F59E0B",
+    color: THEME.brass,
     description: "Executive / sign-off review — near-final draft",
   },
   {
     key: "white_gloves",
     label: "White Gloves",
     shortLabel: "White",
-    color: "#E2E8F0",
+    color: THEME.text,
     description: "Final copy edit, compliance sweep, production polish",
   },
   {
     key: "submitted",
     label: "Submitted",
     shortLabel: "Sub.",
-    color: "#2DD4BF",
+    color: THEME.cobalt,
     description: "Delivered to the customer",
   },
   {
     key: "awarded",
     label: "Awarded",
     shortLabel: "Won",
-    color: "#10B981",
+    color: THEME.green,
     description: "Contract won",
   },
   {
     key: "lost",
     label: "Lost",
     shortLabel: "Lost",
-    color: "#EF4444",
+    color: THEME.red,
     description: "Not selected",
   },
   {
     key: "no_bid",
     label: "No Bid",
     shortLabel: "NB",
-    color: "#64748B",
+    color: THEME.subtle,
     description: "Decided not to pursue",
   },
   {
     key: "archived",
     label: "Archived",
     shortLabel: "Arc.",
-    color: "#475569",
+    color: THEME.subtle,
     description: "Archived proposal",
   },
 ];
@@ -118,11 +119,11 @@ export const SECTION_STATUS_LABELS: Record<ProposalSectionStatus, string> = {
 };
 
 export const SECTION_STATUS_COLORS: Record<ProposalSectionStatus, string> = {
-  not_started: "#64748B",
-  in_progress: "#F59E0B",
-  draft_complete: "#2DD4BF",
-  in_review: "#A78BFA",
-  approved: "#10B981",
+  not_started: THEME.subtle,
+  in_progress: THEME.brass,
+  draft_complete: THEME.cobalt,
+  in_review: THEME.indigo,
+  approved: THEME.green,
 };
 
 export function countWords(text: string): number {

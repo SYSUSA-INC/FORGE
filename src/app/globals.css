@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  BL-UI-THEME — "Boardroom Navy".
+
+  Every color the UI uses is declared here once as an RGB triplet and
+  consumed by tailwind.config.ts as `rgb(var(--c-x) / <alpha>)`, so
+  `bg-canvas/70`, `text-emerald-300`, `border-teal/40` all resolve to
+  this palette. JavaScript-side colors (charts, inline status maps) come
+  from src/lib/theme-colors.ts, which mirrors these values and is tested
+  against this file.
+
+  Families:  cobalt = primary (actions, focus, links, in-progress)
+             brass  = signature (brand mark, AI, attention)
+             green / red = outcomes;  indigo / plum = analysis / review
+*/
 :root {
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -10,13 +24,71 @@
      next/font/local in layout.tsx) serves all three roles. */
   --font-stencil: var(--font-display);
   --font-body: var(--font-display);
+
+  /* Surfaces */
+  --c-canvas: 11 18 32;
+  --c-paper: 17 26 43;
+  --c-bone: 24 35 56;
+  --c-concrete: 36 52 82;
+  /* Type */
+  --c-text: 238 242 248;
+  --c-muted: 163 177 198;
+  --c-subtle: 107 122 147;
+  --c-faint: 75 88 110;
+  /* Cobalt — primary */
+  --c-cobalt-200: 191 213 255;
+  --c-cobalt-300: 147 184 255;
+  --c-cobalt-400: 106 161 255;
+  --c-cobalt-500: 76 141 255;
+  --c-cobalt-600: 47 111 224;
+  --c-cobalt-700: 36 91 184;
+  /* Brass — signature */
+  --c-brass-200: 240 221 170;
+  --c-brass-300: 230 201 126;
+  --c-brass-400: 221 184 100;
+  --c-brass-500: 211 168 76;
+  --c-brass-600: 185 140 54;
+  --c-brass-700: 148 112 42;
+  /* Green — success */
+  --c-green-200: 183 232 211;
+  --c-green-300: 138 216 184;
+  --c-green-400: 99 199 161;
+  --c-green-500: 63 184 138;
+  --c-green-600: 47 154 114;
+  --c-green-700: 37 122 91;
+  /* Red — danger */
+  --c-red-200: 245 195 201;
+  --c-red-300: 238 155 164;
+  --c-red-400: 231 125 137;
+  --c-red-500: 224 96 110;
+  --c-red-600: 194 73 87;
+  --c-red-700: 158 58 70;
+  /* Indigo — analysis / review */
+  --c-indigo-200: 205 211 249;
+  --c-indigo-300: 179 188 245;
+  --c-indigo-400: 152 165 239;
+  --c-indigo-500: 128 144 232;
+  --c-indigo-600: 102 115 207;
+  --c-indigo-700: 81 92 168;
+  /* Plum — pink team */
+  --c-plum-300: 213 179 224;
+  --c-plum-400: 199 155 214;
+  --c-plum-500: 185 132 204;
+  --c-plum-600: 157 106 176;
+
+  /* Gradients — referenced from inline styles as var(--g-*) so no
+     component carries palette numbers. */
+  --g-brand: linear-gradient(135deg, rgb(var(--c-cobalt-500)) 0%, rgb(var(--c-cobalt-700)) 58%, rgb(var(--c-brass-500)) 100%);
+  --g-brand-bar: linear-gradient(90deg, rgb(var(--c-cobalt-400)), rgb(var(--c-brass-500)));
+  --g-success: linear-gradient(90deg, rgb(var(--c-green-400)), rgb(var(--c-cobalt-400)));
+  --g-danger: linear-gradient(90deg, rgb(var(--c-red-500)), rgb(var(--c-plum-500)));
 }
 
 @layer base {
   html,
   body {
-    background: #041827;
-    color: #E8FAFF;
+    background: rgb(var(--c-canvas));
+    color: rgb(var(--c-text));
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
   }
@@ -26,46 +98,51 @@
     position: relative;
   }
 
+  /* Backdrop: one cool wash from the top-left, one warm brass wash from
+     the bottom-right, blurred well past recognition. Restraint is the
+     point — the proposal text is the hero. */
   body::before {
     content: "";
     position: fixed;
     inset: -10% -10% -10% -10%;
     z-index: -2;
     background:
-      radial-gradient(60% 55% at 20% 15%, rgba(45, 212, 191, 0.42), transparent 62%),
-      radial-gradient(50% 50% at 80% 20%, rgba(52, 211, 153, 0.30), transparent 60%),
-      radial-gradient(55% 50% at 70% 85%, rgba(139, 92, 246, 0.26), transparent 60%),
-      radial-gradient(45% 40% at 25% 80%, rgba(236, 72, 153, 0.22), transparent 60%),
-      radial-gradient(40% 35% at 50% 40%, rgba(165, 243, 252, 0.10), transparent 60%);
-    filter: blur(64px);
+      radial-gradient(70% 60% at 12% 0%, rgb(var(--c-cobalt-500) / 0.16), transparent 60%),
+      radial-gradient(50% 45% at 100% 100%, rgb(var(--c-brass-500) / 0.10), transparent 62%),
+      radial-gradient(40% 40% at 60% 30%, rgb(var(--c-indigo-500) / 0.06), transparent 60%);
+    filter: blur(72px);
     pointer-events: none;
   }
 
+  /* Engineering grid + paper grain over the wash. */
   body::after {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     background:
-      linear-gradient(180deg, rgba(4, 24, 39, 0.62) 0%, rgba(4, 24, 39, 0.86) 100%),
-      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.04'/></svg>");
+      linear-gradient(180deg, rgb(var(--c-canvas) / 0.55) 0%, rgb(var(--c-canvas) / 0.88) 100%),
+      linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.03'/></svg>");
+    background-size: auto, 48px 48px, 48px 48px, 200px 200px;
     pointer-events: none;
   }
 
   ::selection {
-    background: rgba(45, 212, 191, 0.45);
-    color: #ffffff;
+    background: rgb(var(--c-cobalt-500) / 0.35);
+    color: rgb(var(--c-text));
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: #E8FAFF;
+    color: rgb(var(--c-text));
   }
 
   *:focus-visible {
-    outline: 2px solid #2DD4BF;
+    outline: 2px solid rgb(var(--c-cobalt-400));
     outline-offset: 2px;
   }
 }
@@ -101,8 +178,8 @@
   }
 
   .aur-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 border border-teal/40 px-3.5 py-1.5 font-display text-sm font-semibold text-white shadow-glow-teal transition-all hover:border-teal/70;
-    background: linear-gradient(180deg, #5EEAD4 0%, #0D9488 100%);
+    @apply inline-flex items-center justify-center gap-2 border border-cobalt/50 px-3.5 py-1.5 font-display text-sm font-semibold text-white shadow-glow transition-all hover:border-cobalt/80 hover:brightness-110;
+    background: linear-gradient(180deg, rgb(var(--c-cobalt-400)) 0%, rgb(var(--c-cobalt-600)) 100%);
     border-radius: 10px;
   }
 
@@ -128,13 +205,13 @@
   }
 
   .aur-input {
-    @apply w-full border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-sm text-text placeholder:text-subtle focus:border-teal/60 focus:bg-white/[0.06] outline-none;
+    @apply w-full border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-sm text-text placeholder:text-subtle focus:border-cobalt/60 focus:bg-white/[0.06] outline-none;
     border-radius: 10px;
     color-scheme: dark;
   }
   .aur-input option {
-    background-color: #0f172a;
-    color: #e6edf7;
+    background-color: rgb(var(--c-paper));
+    color: rgb(var(--c-text));
   }
   .brut-input { @apply aur-input; }
 
@@ -157,9 +234,18 @@
 
   .aur-divider {
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.15) 50%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.15) 50%, transparent 100%);
   }
   .brut-divider { @apply aur-divider; }
+
+  /* Brand mark: the "F" tile in the nav and on the auth screens. Cobalt
+     into brass — the one place the two families meet head-on. */
+  .aur-brand-mark { background: var(--g-brand); }
+  .aur-brand-dot { background: var(--g-brand-bar); }
+  /* Brass hairline along the top edge of the chrome. */
+  .aur-topline {
+    box-shadow: inset 0 2px 0 rgb(var(--c-brass-500) / 0.65);
+  }
 
   .aur-ring { position: relative; }
   .aur-ring::before {
@@ -168,7 +254,7 @@
     inset: -1px;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(45, 212, 191, 0.6), rgba(52, 211, 153, 0.35), rgba(236, 72, 153, 0.35));
+    background: linear-gradient(135deg, rgb(var(--c-cobalt-500) / 0.6), rgb(var(--c-cobalt-500) / 0.25), rgb(var(--c-brass-500) / 0.45));
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -177,8 +263,8 @@
 
   .brut-grid {
     background-image:
-      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px);
     background-size: 40px 40px;
   }
 
@@ -204,16 +290,16 @@
 }
 
 mark {
-  background: rgba(45, 212, 191, 0.2);
-  color: #A5F3FC;
+  background: rgb(var(--c-brass-500) / 0.22);
+  color: rgb(var(--c-brass-200));
   padding: 0 2px;
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(45, 212, 191, 0.3); border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(45, 212, 191, 0.5); }
+::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.14); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-cobalt-500) / 0.45); }
 
 /* TipTap section editor styling */
 .tiptap-prose { white-space: pre-wrap; }
@@ -222,89 +308,89 @@ mark {
 .tiptap-prose p:last-child { margin-bottom: 0; }
 .tiptap-prose h1 {
   font-size: 1.4rem; font-weight: 600; margin: 1em 0 0.4em 0;
-  color: #E8FAFF; font-family: var(--font-display), Inter, sans-serif;
+  color: rgb(var(--c-text)); font-family: var(--font-display), Inter, sans-serif;
 }
 .tiptap-prose h2 {
   font-size: 1.2rem; font-weight: 600; margin: 0.9em 0 0.3em 0;
-  color: #E8FAFF; font-family: var(--font-display), Inter, sans-serif;
+  color: rgb(var(--c-text)); font-family: var(--font-display), Inter, sans-serif;
 }
 .tiptap-prose h3 {
   font-size: 1.05rem; font-weight: 600; margin: 0.8em 0 0.25em 0;
-  color: #E8FAFF; font-family: var(--font-display), Inter, sans-serif;
+  color: rgb(var(--c-text)); font-family: var(--font-display), Inter, sans-serif;
 }
 .tiptap-prose ul, .tiptap-prose ol { padding-left: 1.4em; margin: 0 0 0.75em 0; }
 .tiptap-prose ul { list-style: disc; }
 .tiptap-prose ol { list-style: decimal; }
-.tiptap-prose ul li::marker, .tiptap-prose ol li::marker { color: #2DD4BF; }
+.tiptap-prose ul li::marker, .tiptap-prose ol li::marker { color: rgb(var(--c-cobalt-400)); }
 .tiptap-prose blockquote {
-  border-left: 2px solid rgba(45, 212, 191, 0.5);
-  background: rgba(45, 212, 191, 0.05);
-  margin: 0.75em 0; padding: 0.5em 0.9em; color: #9BC9D9;
+  border-left: 2px solid rgb(var(--c-brass-500) / 0.6);
+  background: rgb(var(--c-brass-500) / 0.06);
+  margin: 0.75em 0; padding: 0.5em 0.9em; color: rgb(var(--c-muted));
 }
 .tiptap-prose .tiptap-codeblock, .tiptap-prose pre {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.08);
   border-radius: 6px; padding: 0.6em 0.8em;
   font-family: var(--font-mono), JetBrains Mono, monospace;
   font-size: 0.85rem; margin: 0.75em 0; overflow-x: auto;
 }
 .tiptap-prose code {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.08);
   border-radius: 3px; padding: 0 4px;
   font-family: var(--font-mono), JetBrains Mono, monospace;
   font-size: 0.85em;
 }
 .tiptap-prose pre code { background: transparent; border: 0; padding: 0; }
 .tiptap-prose .tiptap-link, .tiptap-prose a {
-  color: #2DD4BF; text-decoration: underline;
-  text-decoration-color: rgba(45, 212, 191, 0.5);
+  color: rgb(var(--c-cobalt-300)); text-decoration: underline;
+  text-decoration-color: rgb(var(--c-cobalt-300) / 0.5);
 }
 .tiptap-prose hr {
-  border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 1em 0;
+  border: 0; border-top: 1px solid rgb(255 255 255 / 0.12); margin: 1em 0;
 }
 .tiptap-prose .tiptap-image, .tiptap-prose img {
   max-width: 100%; border-radius: 6px; margin: 0.5em 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgb(255 255 255 / 0.08);
 }
 .tiptap-prose table {
   width: 100%; border-collapse: collapse; margin: 0.75em 0; font-size: 0.9em;
 }
 .tiptap-prose th, .tiptap-prose td {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgb(255 255 255 / 0.12);
   padding: 0.4em 0.6em; vertical-align: top;
 }
 .tiptap-prose th {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(255 255 255 / 0.04);
   font-family: var(--font-mono), JetBrains Mono, monospace;
   font-size: 0.78em; text-transform: uppercase;
-  letter-spacing: 0.12em; color: #9BC9D9;
+  letter-spacing: 0.12em; color: rgb(var(--c-muted));
 }
 .tiptap-prose p.is-editor-empty:first-child::before {
   content: attr(data-placeholder); float: left;
-  color: rgba(91, 138, 160, 0.7); pointer-events: none;
+  color: rgb(var(--c-subtle) / 0.7); pointer-events: none;
   height: 0; font-style: italic;
 }
 
 /* BL-9 Slice 3 — track-changes inline marks */
 .tc-insert {
-  background-color: rgba(74, 222, 128, 0.12);
-  border-bottom: 1.5px solid rgba(74, 222, 128, 0.55);
+  background-color: rgb(var(--c-green-500) / 0.14);
+  border-bottom: 1.5px solid rgb(var(--c-green-500) / 0.6);
   border-radius: 2px;
   text-decoration: underline;
-  text-decoration-color: rgba(74, 222, 128, 0.55);
+  text-decoration-color: rgb(var(--c-green-500) / 0.6);
   text-decoration-skip-ink: none;
 }
 .tc-delete {
   text-decoration: line-through;
-  text-decoration-color: rgba(248, 113, 113, 0.75);
-  color: #F87171;
-  background-color: rgba(248, 113, 113, 0.08);
+  text-decoration-color: rgb(var(--c-red-400) / 0.8);
+  color: rgb(var(--c-red-400));
+  background-color: rgb(var(--c-red-500) / 0.08);
   border-radius: 2px;
   opacity: 0.80;
   cursor: default;
 }
-/* Amber dot pulse for the "track" toolbar recording indicator */
+/* Pulse for the "track" toolbar recording indicator */
 @keyframes tc-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
@@ -313,11 +399,11 @@ mark {
 
 /* BL-9 Slice 4 — comment-thread inline highlight */
 .comment-anchor {
-  background-color: rgba(251, 191, 36, 0.16);
-  border-bottom: 1.5px dashed rgba(251, 191, 36, 0.55);
+  background-color: rgb(var(--c-brass-500) / 0.16);
+  border-bottom: 1.5px dashed rgb(var(--c-brass-500) / 0.55);
   border-radius: 2px;
   cursor: pointer;
 }
 .comment-anchor:hover {
-  background-color: rgba(251, 191, 36, 0.28);
+  background-color: rgb(var(--c-brass-500) / 0.28);
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { harvestProposalToCorpusAction } from "./harvest-actions";
 import type { BrainMineStatus } from "./brain-actions";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 const OUTCOME_TONE: Record<
   string,
@@ -13,33 +14,33 @@ const OUTCOME_TONE: Record<
 > = {
   won: {
     label: "WON",
-    color: "#34d399",
-    bg: "rgba(52,211,153,0.08)",
-    border: "rgba(52,211,153,0.30)",
+    color: THEME.green,
+    bg: withAlpha(THEME.green, 0.08),
+    border: withAlpha(THEME.green, 0.30),
   },
   lost: {
     label: "LOST",
-    color: "#f87171",
-    bg: "rgba(248,113,113,0.08)",
-    border: "rgba(248,113,113,0.30)",
+    color: THEME.red,
+    bg: withAlpha(THEME.red, 0.08),
+    border: withAlpha(THEME.red, 0.30),
   },
   no_bid: {
     label: "NO BID",
-    color: "#94a3b8",
-    bg: "rgba(148,163,184,0.06)",
-    border: "rgba(148,163,184,0.30)",
+    color: THEME.muted,
+    bg: withAlpha(THEME.muted, 0.06),
+    border: withAlpha(THEME.muted, 0.30),
   },
   withdrawn: {
     label: "WITHDRAWN",
-    color: "#fbbf24",
-    bg: "rgba(251,191,36,0.08)",
-    border: "rgba(251,191,36,0.30)",
+    color: THEME.brass,
+    bg: withAlpha(THEME.brass, 0.08),
+    border: withAlpha(THEME.brass, 0.30),
   },
   none: {
     label: "UNTAGGED",
-    color: "#94a3b8",
-    bg: "rgba(148,163,184,0.06)",
-    border: "rgba(148,163,184,0.30)",
+    color: THEME.muted,
+    bg: withAlpha(THEME.muted, 0.06),
+    border: withAlpha(THEME.muted, 0.30),
   },
 };
 

@@ -8,6 +8,7 @@ import {
   type ProposalScanResult,
   type StoredProposalScan,
 } from "./scan-actions";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 type ScanData = Extract<ProposalScanResult, { ok: true }>;
 
@@ -17,28 +18,28 @@ const SCORE_STYLES: Record<
 > = {
   strong: {
     label: "Strong",
-    color: "#34d399",
-    bg: "rgba(52,211,153,0.08)",
-    border: "rgba(52,211,153,0.30)",
+    color: THEME.green,
+    bg: withAlpha(THEME.green, 0.08),
+    border: withAlpha(THEME.green, 0.30),
   },
   needs_work: {
     label: "Needs work",
-    color: "#fbbf24",
-    bg: "rgba(251,191,36,0.08)",
-    border: "rgba(251,191,36,0.30)",
+    color: THEME.brass,
+    bg: withAlpha(THEME.brass, 0.08),
+    border: withAlpha(THEME.brass, 0.30),
   },
   critical: {
     label: "Critical gaps",
-    color: "#f87171",
-    bg: "rgba(248,113,113,0.08)",
-    border: "rgba(248,113,113,0.30)",
+    color: THEME.red,
+    bg: withAlpha(THEME.red, 0.08),
+    border: withAlpha(THEME.red, 0.30),
   },
 };
 
 const SEVERITY_COLOR: Record<string, string> = {
-  high: "#f87171",
-  medium: "#fbbf24",
-  low: "#94a3b8",
+  high: THEME.red,
+  medium: THEME.brass,
+  low: THEME.muted,
 };
 
 export function ProposalScanPanel({
@@ -177,9 +178,9 @@ export function ProposalScanPanel({
                       <span
                         className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                         style={{
-                          color: SEVERITY_COLOR[issue.severity] ?? "#94a3b8",
-                          background: `${SEVERITY_COLOR[issue.severity] ?? "#94a3b8"}1a`,
-                          border: `1px solid ${SEVERITY_COLOR[issue.severity] ?? "#94a3b8"}40`,
+                          color: SEVERITY_COLOR[issue.severity] ?? THEME.muted,
+                          background: `${SEVERITY_COLOR[issue.severity] ?? THEME.muted}1a`,
+                          border: `1px solid ${SEVERITY_COLOR[issue.severity] ?? THEME.muted}40`,
                         }}
                       >
                         {issue.severity}
@@ -219,9 +220,9 @@ export function ProposalScanPanel({
                           key={t}
                           className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                           style={{
-                            color: "#34d399",
-                            backgroundColor: "rgba(52,211,153,0.1)",
-                            border: "1px solid rgba(52,211,153,0.3)",
+                            color: THEME.green,
+                            backgroundColor: withAlpha(THEME.green, 0.1),
+                            border: `1px solid ${withAlpha(THEME.green, 0.3)}`,
                           }}
                         >
                           ✓ {t}
@@ -232,9 +233,9 @@ export function ProposalScanPanel({
                           key={t}
                           className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                           style={{
-                            color: "#f87171",
-                            backgroundColor: "rgba(248,113,113,0.1)",
-                            border: "1px solid rgba(248,113,113,0.3)",
+                            color: THEME.red,
+                            backgroundColor: withAlpha(THEME.red, 0.1),
+                            border: `1px solid ${withAlpha(THEME.red, 0.3)}`,
                           }}
                         >
                           ✗ {t}
@@ -268,9 +269,9 @@ export function ProposalScanPanel({
                       <span
                         className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                         style={{
-                          color: SEVERITY_COLOR[c.severity] ?? "#94a3b8",
-                          background: `${SEVERITY_COLOR[c.severity] ?? "#94a3b8"}1a`,
-                          border: `1px solid ${SEVERITY_COLOR[c.severity] ?? "#94a3b8"}40`,
+                          color: SEVERITY_COLOR[c.severity] ?? THEME.muted,
+                          background: `${SEVERITY_COLOR[c.severity] ?? THEME.muted}1a`,
+                          border: `1px solid ${SEVERITY_COLOR[c.severity] ?? THEME.muted}40`,
                         }}
                       >
                         {c.severity}

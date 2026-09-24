@@ -10,6 +10,7 @@ import {
   type AvailableEvidence,
   type EvidenceRow,
 } from "./actions";
+import { THEME } from "@/lib/theme-colors";
 
 const KIND_LABELS: Record<ComplianceEvidenceKind, string> = {
   past_performance: "Past performance",
@@ -18,9 +19,9 @@ const KIND_LABELS: Record<ComplianceEvidenceKind, string> = {
 };
 
 const KIND_COLORS: Record<ComplianceEvidenceKind, string> = {
-  past_performance: "#34d399",
-  knowledge_entry: "#a78bfa",
-  section_paragraph: "#fbbf24",
+  past_performance: THEME.green,
+  knowledge_entry: THEME.indigo,
+  section_paragraph: THEME.brass,
 };
 
 type Tab = ComplianceEvidenceKind;

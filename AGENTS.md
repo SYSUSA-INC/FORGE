@@ -41,6 +41,9 @@
   covers common shapes; flag anything ambiguous)
 - Auth gates inverted or missing on admin / super-admin routes
 - Cron handlers without `Authorization: Bearer ${CRON_SECRET}` check
+- Hard-coded `#RRGGBB` colours or `rgba(...)` palette values in
+  components (use Tailwind tokens or `THEME` from
+  `src/lib/theme-colors.ts`; see `docs/DESIGN_SYSTEM.md`)
 
 ❌ **Don't flag** (already enforced by gates — would be noise):
 
@@ -82,6 +85,8 @@ When writing code yourself (Claude, Cursor, etc.):
   authoritative reference)
 - `docs/BACKLOG.md` — planned work, in BL-N order
 - `docs/PR_QUALITY.md` — the gate stack in detail
+- `docs/DESIGN_SYSTEM.md` — colour tokens, semantic families and UI
+  conventions (BL-UI-THEME)
 - `docs/USER_MANUAL.md` / `docs/ADMIN_MANUAL.md` — user-facing
   feature docs (helpful for understanding domain language)
 - `.github/CODEOWNERS` — which paths need explicit human approval

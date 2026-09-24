@@ -6,6 +6,7 @@ import {
   brainSuggestForSectionAction,
   type BrainHit,
 } from "./brain-actions";
+import { THEME } from "@/lib/theme-colors";
 
 export function BrainSuggestPanel({
   sectionId,
@@ -193,9 +194,9 @@ function SourceTag({ hit }: { hit: BrainHit }) {
 }
 
 function simColor(s: number): string {
-  if (s >= 0.85) return "#10B981";
-  if (s >= 0.7) return "#34D399";
-  if (s >= 0.55) return "#2DD4BF";
-  if (s >= 0.4) return "#A78BFA";
-  return "#94A3B8";
+  if (s >= 0.85) return THEME.green;
+  if (s >= 0.7) return THEME.greenLight;
+  if (s >= 0.55) return THEME.cobalt;
+  if (s >= 0.4) return THEME.indigo;
+  return THEME.muted;
 }

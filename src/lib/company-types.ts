@@ -1,4 +1,5 @@
 import type { CompanyRelationship } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const RELATIONSHIPS: {
   key: CompanyRelationship;
@@ -9,37 +10,37 @@ export const RELATIONSHIPS: {
   {
     key: "customer",
     label: "Customer",
-    color: "#2DD4BF",
+    color: THEME.cobalt,
     description: "Buying agency or prime customer",
   },
   {
     key: "prime",
     label: "Prime",
-    color: "#34D399",
+    color: THEME.green,
     description: "A prime contractor you want to team with",
   },
   {
     key: "subcontractor",
     label: "Subcontractor",
-    color: "#8B5CF6",
+    color: THEME.indigo,
     description: "A potential subcontractor under your team",
   },
   {
     key: "competitor",
     label: "Competitor",
-    color: "#F43F5E",
+    color: THEME.red,
     description: "Likely competitor on bids",
   },
   {
     key: "teaming_partner",
     label: "Teaming partner",
-    color: "#EC4899",
+    color: THEME.plum,
     description: "Active or former teaming partner",
   },
   {
     key: "watchlist",
     label: "Watchlist",
-    color: "#94A3B8",
+    color: THEME.muted,
     description: "Keep an eye on — no current engagement",
   },
 ];

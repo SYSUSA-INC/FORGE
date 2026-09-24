@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { THEME } from "@/lib/theme-colors";
 
 type OutcomeLabel = "none" | "won" | "lost" | "no_bid" | "withdrawn";
 
@@ -20,10 +21,10 @@ type Entry = {
 };
 
 const KIND_COLOR: Record<string, string> = {
-  capability: "#2DD4BF",
-  past_performance: "#EC4899",
-  personnel: "#A78BFA",
-  boilerplate: "#9BC9D9",
+  capability: THEME.cobalt,
+  past_performance: THEME.plum,
+  personnel: THEME.indigo,
+  boilerplate: THEME.muted,
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -169,7 +170,7 @@ export function KnowledgeBaseClient({
         ) : (
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {entries.map((e) => {
-              const color = KIND_COLOR[e.kind] ?? "#9BC9D9";
+              const color = KIND_COLOR[e.kind] ?? THEME.muted;
               return (
                 <li key={e.id} className="aur-card flex flex-col gap-2 p-3">
                   <div className="flex items-center justify-between gap-2">

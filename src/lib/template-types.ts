@@ -1,4 +1,5 @@
 import type { TemplateSectionSeed, ProposalTemplate } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 /**
  * Three starter templates we ship in seed data so a new org can pick a
@@ -55,8 +56,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     headerHtml: defaultHeaderHtml(),
     footerHtml: defaultFooterHtml(),
     pageCss: defaultPageCss(),
-    brandPrimary: "#2DD4BF",
-    brandAccent: "#34D399",
+    brandPrimary: THEME.cobaltDeep,
+    brandAccent: THEME.brass,
     fontDisplay: "Inter",
     fontBody: "Inter",
     logoUrl: "",
@@ -70,8 +71,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     headerHtml: defaultHeaderHtml(),
     footerHtml: defaultFooterHtml(),
     pageCss: defaultPageCss(),
-    brandPrimary: "#1E40AF",
-    brandAccent: "#EAB308",
+    brandPrimary: "#1F3A6E",
+    brandAccent: THEME.brassDeep,
     fontDisplay: "Inter",
     fontBody: "Inter",
     logoUrl: "",
@@ -85,8 +86,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     headerHtml: defaultHeaderHtml(),
     footerHtml: defaultFooterHtml(),
     pageCss: defaultPageCss(),
-    brandPrimary: "#2DD4BF",
-    brandAccent: "#EC4899",
+    brandPrimary: THEME.cobaltDeep,
+    brandAccent: THEME.indigo,
     fontDisplay: "Inter",
     fontBody: "Inter",
     logoUrl: "",
@@ -144,7 +145,7 @@ body {
 
 h1, h2, h3 {
   font-family: var(--font-display, "Inter"), system-ui, sans-serif;
-  color: var(--brand-primary, #2DD4BF);
+  color: var(--brand-primary, ${THEME.cobaltDeep});
   page-break-after: avoid;
 }
 
@@ -157,7 +158,7 @@ h1, h2, h3 {
 }
 .cover header { display: flex; align-items: center; gap: 16px; margin-bottom: 64px; }
 .cover-logo { height: 48px; width: auto; }
-.cover-org { font-size: 11pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand-primary, #2DD4BF); }
+.cover-org { font-size: 11pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand-primary, ${THEME.cobaltDeep}); }
 .cover-title { font-size: 32pt; line-height: 1.15; margin: 0 0 32px 0; }
 .cover-meta { font-size: 10pt; }
 .cover-meta div { margin-bottom: 4px; }

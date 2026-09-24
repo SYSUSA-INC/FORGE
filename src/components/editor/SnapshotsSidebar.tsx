@@ -28,6 +28,7 @@ import {
   type SectionSnapshotSummary,
 } from "@/app/(app)/proposals/[id]/sections/snapshot-actions";
 import { SnapshotDiffViewer } from "./SnapshotDiffViewer";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 type Props = {
   proposalId: string;
@@ -232,14 +233,14 @@ function SnapshotRow({
             style={
               isAuto
                 ? {
-                    background: "rgba(94, 234, 212, 0.10)",
-                    border: "1px solid rgba(94, 234, 212, 0.25)",
-                    color: "#5EEAD4",
+                    background: withAlpha(THEME.cobaltLight, 0.10),
+                    border: `1px solid ${withAlpha(THEME.cobaltLight, 0.25)}`,
+                    color: THEME.cobaltLight,
                   }
                 : {
-                    background: "rgba(251, 191, 36, 0.10)",
-                    border: "1px solid rgba(251, 191, 36, 0.25)",
-                    color: "#FBBF24",
+                    background: withAlpha(THEME.brass, 0.10),
+                    border: `1px solid ${withAlpha(THEME.brass, 0.25)}`,
+                    color: THEME.brass,
                   }
             }
           >

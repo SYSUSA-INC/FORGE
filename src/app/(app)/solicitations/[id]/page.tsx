@@ -25,6 +25,7 @@ import { SolicitationDocumentsPanel } from "./SolicitationDocumentsPanel";
 import { KeyDateTimeline } from "./KeyDateTimeline";
 import { CustomerHistoryPanel } from "./CustomerHistoryPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
+import { THEME } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -36,16 +37,16 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  uploaded: "#9BC9D9",
-  parsing: "#A78BFA",
-  parsed: "#10B981",
-  failed: "#EF4444",
+  uploaded: THEME.muted,
+  parsing: THEME.indigo,
+  parsed: THEME.green,
+  failed: THEME.red,
 };
 
 const KIND_COLOR: Record<string, string> = {
-  shall: "#EF4444",
-  should: "#F59E0B",
-  may: "#9BC9D9",
+  shall: THEME.red,
+  should: THEME.brass,
+  may: THEME.muted,
 };
 
 export default async function SolicitationDetail({
@@ -74,7 +75,7 @@ export default async function SolicitationDetail({
 
   if (!row) notFound();
   const s = row.s;
-  const statusColor = STATUS_COLOR[s.parseStatus] ?? "#9BC9D9";
+  const statusColor = STATUS_COLOR[s.parseStatus] ?? THEME.muted;
   const assignments = await listSolicitationAssignmentsAction(s.id);
 
   // BL-FB-SOL-AMEND-DIFF — load amendment context. If this solicitation
@@ -377,7 +378,7 @@ export default async function SolicitationDetail({
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {s.extractedRequirements.map((r, i) => {
-                  const color = KIND_COLOR[r.kind] ?? "#9BC9D9";
+                  const color = KIND_COLOR[r.kind] ?? THEME.muted;
                   const sourceDoc = r.sourceDocId
                     ? companionDocs.find((d) => d.id === r.sourceDocId)
                     : null;
@@ -410,7 +411,7 @@ export default async function SolicitationDetail({
                             <span
                               className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest"
                               style={{
-                                color: "#9BC9D9",
+                                color: THEME.muted,
                                 backgroundColor: "#9BC9D91A",
                                 border: "1px solid #9BC9D930",
                               }}

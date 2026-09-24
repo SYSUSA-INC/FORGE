@@ -8,6 +8,7 @@ import {
   runComplianceAutoMapAction,
   type AutoMapSuggestion,
 } from "./actions";
+import { THEME } from "@/lib/theme-colors";
 
 type SectionLite = { id: string; title: string; ordering: number };
 
@@ -15,9 +16,9 @@ const CONFIDENCE_STYLE: Record<
   "high" | "medium" | "low",
   { color: string; label: string }
 > = {
-  high: { color: "#34d399", label: "HIGH" },
-  medium: { color: "#fbbf24", label: "MED" },
-  low: { color: "#94a3b8", label: "LOW" },
+  high: { color: THEME.green, label: "HIGH" },
+  medium: { color: THEME.brass, label: "MED" },
+  low: { color: THEME.muted, label: "LOW" },
 };
 
 export function AutoMapPanel({
