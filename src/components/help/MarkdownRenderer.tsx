@@ -23,7 +23,7 @@ export function MarkdownRenderer({ source }: { source: string }) {
           </h1>
         ),
         h2: ({ children }) => (
-          <h2 className="mt-10 border-b border-white/10 pb-2 font-display text-2xl font-semibold tracking-tight text-text">
+          <h2 className="mt-10 border-b border-layer/10 pb-2 font-display text-2xl font-semibold tracking-tight text-text">
             {children}
           </h2>
         ),
@@ -68,7 +68,7 @@ export function MarkdownRenderer({ source }: { source: string }) {
         ),
         em: ({ children }) => <em className="text-text">{children}</em>,
         blockquote: ({ children }) => (
-          <blockquote className="mt-4 border-l-2 border-teal/50 bg-white/[0.03] px-4 py-2 text-muted">
+          <blockquote className="mt-4 border-l-2 border-teal/50 bg-layer/[0.03] px-4 py-2 text-muted">
             {children}
           </blockquote>
         ),
@@ -77,7 +77,7 @@ export function MarkdownRenderer({ source }: { source: string }) {
           const inline = props.inline as boolean | undefined;
           if (inline) {
             return (
-              <code className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[12.5px] text-text">
+              <code className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5 font-mono text-[12.5px] text-text">
                 {children}
               </code>
             );
@@ -89,33 +89,33 @@ export function MarkdownRenderer({ source }: { source: string }) {
           );
         },
         pre: ({ children }) => (
-          <pre className="mt-4 overflow-x-auto rounded-lg border border-white/10 bg-black/30 p-4">
+          <pre className="mt-4 overflow-x-auto rounded-lg border border-layer/10 bg-black/30 p-4">
             {children}
           </pre>
         ),
-        hr: () => <hr className="my-10 border-white/10" />,
+        hr: () => <hr className="my-10 border-layer/10" />,
         table: ({ children }) => (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse border border-white/10 font-body text-sm">
+            <table className="w-full border-collapse border border-layer/10 font-body text-sm">
               {children}
             </table>
           </div>
         ),
         thead: ({ children }) => (
-          <thead className="bg-white/[0.04]">{children}</thead>
+          <thead className="bg-layer/[0.04]">{children}</thead>
         ),
         th: ({ children }) => (
-          <th className="border border-white/10 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-muted">
+          <th className="border border-layer/10 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-muted">
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td className="border border-white/10 px-3 py-2 text-muted">
+          <td className="border border-layer/10 px-3 py-2 text-muted">
             {children}
           </td>
         ),
         img: ({ src, alt }) => (
-          <span className="mt-4 block rounded-lg border border-dashed border-white/15 bg-white/[0.02] p-6 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-subtle">
+          <span className="mt-4 block rounded-lg border border-dashed border-layer/15 bg-layer/[0.02] p-6 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-subtle">
             screenshot · {alt || src}
           </span>
         ),

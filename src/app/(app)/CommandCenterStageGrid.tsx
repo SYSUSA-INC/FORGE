@@ -29,10 +29,10 @@ export function CommandCenterStageGrid({
       {/* Slot 0: navigate to the dashboard with no filter. */}
       <Link
         href="/opportunities"
-        className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-left transition-colors hover:border-white/30"
+        className="flex flex-col gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 text-left transition-colors hover:border-layer/30"
       >
         <div className="flex items-center justify-between">
-          <div className="rounded-sm border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
+          <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
             All
           </div>
           <span aria-hidden className="text-muted">→</span>
@@ -65,7 +65,7 @@ export function CommandCenterStageGrid({
           <Link
             key={s.key}
             href={`/opportunities?stage=${s.key}`}
-            className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-left transition-colors hover:border-white/30"
+            className="group flex flex-col gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 text-left transition-colors hover:border-layer/30"
           >
             <div className="flex items-center justify-between">
               <div

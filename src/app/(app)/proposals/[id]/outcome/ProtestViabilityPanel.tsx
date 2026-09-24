@@ -138,7 +138,7 @@ export function ProtestViabilityPanel({
       {!loaded ? (
         <div className="mt-3 font-mono text-[11px] text-subtle">Loading…</div>
       ) : !check ? (
-        <div className="mt-3 rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
+        <div className="mt-3 rounded-md border border-dashed border-layer/10 px-3 py-3 font-mono text-[11px] text-muted">
           No protest analysis yet. Click &quot;Run protest check&quot; above.
           For best results, record the official debrief first.
         </div>
@@ -163,7 +163,7 @@ export function ProtestViabilityPanel({
 
           {/* Grounds list */}
           {check.grounds.length > 0 ? (
-            <div className="border-t border-white/5 pt-4">
+            <div className="border-t border-layer/5 pt-4">
               <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
                 Identified grounds ({check.grounds.length})
               </div>
@@ -174,7 +174,7 @@ export function ProtestViabilityPanel({
                   return (
                     <li
                       key={i}
-                      className="rounded-md border border-white/10 bg-white/[0.02]"
+                      className="rounded-md border border-layer/10 bg-layer/[0.02]"
                     >
                       <button
                         type="button"
@@ -207,7 +207,7 @@ export function ProtestViabilityPanel({
                       </button>
 
                       {expanded && g.controllingCases.length > 0 ? (
-                        <div className="border-t border-white/5 px-3 pb-3 pt-2">
+                        <div className="border-t border-layer/5 px-3 pb-3 pt-2">
                           <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
                             Controlling cases
                           </div>
@@ -235,7 +235,7 @@ export function ProtestViabilityPanel({
 
           {/* Disclaimer */}
           {check.summary ? (
-            <div className="border-t border-white/5 pt-3">
+            <div className="border-t border-layer/5 pt-3">
               <p className="font-mono text-[10px] leading-relaxed text-subtle">
                 {check.grounds.length > 0
                   ? "This is preliminary legal analysis only, not legal advice. Consult qualified bid-protest counsel before filing any protest. GAO protests must be filed within 10 days of the debriefing (FAR 33.103)."

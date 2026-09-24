@@ -62,7 +62,7 @@ export function IsolationCheckPanel({ organizationId }: Props) {
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-4">
+    <section className="flex flex-col gap-3 rounded-md border border-layer/10 bg-layer/[0.02] p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <h3 className="font-stencil text-[12px] uppercase tracking-[0.25em] text-text">
@@ -115,7 +115,7 @@ function ResultRow({ result }: { result: IsolationCheckSummary }) {
       : "pass";
 
   return (
-    <li className="flex flex-col gap-1 rounded border border-white/[0.06] bg-white/[0.03] px-2.5 py-2">
+    <li className="flex flex-col gap-1 rounded border border-layer/[0.06] bg-layer/[0.03] px-2.5 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <StatusBadge tone={tone} />

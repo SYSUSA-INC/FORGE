@@ -99,7 +99,7 @@ export default async function OpportunitySimilarAwardsPage({
       <Panel title="Preview feature" eyebrow="Disabled by default">
         <p className="font-mono text-[12px] text-muted">
           Similar-awards lookup is gated behind{" "}
-          <code className="rounded bg-white/5 px-1.5 py-0.5">
+          <code className="rounded bg-layer/5 px-1.5 py-0.5">
             AWARDS_INTEL_ENABLED
           </code>
           .

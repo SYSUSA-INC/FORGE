@@ -103,7 +103,7 @@ export function DiffView({
       >
         <table className="w-full border-collapse text-[12px]">
           <thead>
-            <tr className="border-b border-white/10 text-left font-mono text-[10px] uppercase tracking-widest text-subtle">
+            <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-widest text-subtle">
               <th className="py-2 pr-3">Field</th>
               <th className="py-2 pr-3">Before</th>
               <th className="py-2 pr-3">After</th>
@@ -191,7 +191,7 @@ function SummaryCell({
           ? THEME.brass
           : THEME.muted;
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <div className="font-mono text-[10px] uppercase tracking-widest text-subtle">
         {label}
       </div>
@@ -208,7 +208,7 @@ function SummaryCell({
 function FieldRow({ field }: { field: ScalarFieldDiff }) {
   const isChange = field.status === "modified";
   return (
-    <tr className="border-b border-white/5 last:border-b-0">
+    <tr className="border-b border-layer/5 last:border-b-0">
       <td className="py-2 pr-3 font-mono text-[11px] uppercase tracking-widest text-subtle">
         {field.label}
       </td>

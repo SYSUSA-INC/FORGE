@@ -139,7 +139,7 @@ export function FunnelLegend({ stages }: { stages: FunnelStage[] }) {
         return (
           <li
             key={s.key}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2"
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-3 py-2"
           >
             <span
               className="h-6 w-2 rounded-sm"

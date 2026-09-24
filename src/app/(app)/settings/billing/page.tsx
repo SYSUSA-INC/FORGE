@@ -135,7 +135,7 @@ export default async function BillingPage({
             </div>
           ) : null}
           {!isAdmin ? (
-            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[10px] text-muted">
+            <div className="mt-3 rounded-md border border-layer/10 bg-layer/[0.03] px-3 py-2 font-mono text-[10px] text-muted">
               Only org admins can change the plan. Ask your admin to upgrade.
             </div>
           ) : current?.hasStripeCustomer ? (
@@ -167,7 +167,7 @@ export default async function BillingPage({
                     className={`rounded-lg border p-4 ${
                       isCurrent
                         ? "border-teal/40 bg-teal/[0.04]"
-                        : "border-white/10 bg-white/[0.02]"
+                        : "border-layer/10 bg-layer/[0.02]"
                     }`}
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-3">

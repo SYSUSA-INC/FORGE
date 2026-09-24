@@ -1,5 +1,5 @@
 import type { TemplateSectionSeed, ProposalTemplate } from "@/db/schema";
-import { THEME } from "@/lib/theme-colors";
+import { THEME_HEX } from "@/lib/theme-colors";
 
 /**
  * Three starter templates we ship in seed data so a new org can pick a
@@ -56,8 +56,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     headerHtml: defaultHeaderHtml(),
     footerHtml: defaultFooterHtml(),
     pageCss: defaultPageCss(),
-    brandPrimary: THEME.cobaltDeep,
-    brandAccent: THEME.brass,
+    brandPrimary: THEME_HEX.cobaltDeep,
+    brandAccent: THEME_HEX.brass,
     fontDisplay: "Inter",
     fontBody: "Inter",
     logoUrl: "",
@@ -72,7 +72,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     footerHtml: defaultFooterHtml(),
     pageCss: defaultPageCss(),
     brandPrimary: "#1F3A6E",
-    brandAccent: THEME.brassDeep,
+    brandAccent: THEME_HEX.brassDeep,
     fontDisplay: "Inter",
     fontBody: "Inter",
     logoUrl: "",
@@ -86,8 +86,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     headerHtml: defaultHeaderHtml(),
     footerHtml: defaultFooterHtml(),
     pageCss: defaultPageCss(),
-    brandPrimary: THEME.cobaltDeep,
-    brandAccent: THEME.indigo,
+    brandPrimary: THEME_HEX.cobaltDeep,
+    brandAccent: THEME_HEX.indigo,
     fontDisplay: "Inter",
     fontBody: "Inter",
     logoUrl: "",
@@ -145,7 +145,7 @@ body {
 
 h1, h2, h3 {
   font-family: var(--font-display, "Inter"), system-ui, sans-serif;
-  color: var(--brand-primary, ${THEME.cobaltDeep});
+  color: var(--brand-primary, ${THEME_HEX.cobaltDeep});
   page-break-after: avoid;
 }
 
@@ -158,7 +158,7 @@ h1, h2, h3 {
 }
 .cover header { display: flex; align-items: center; gap: 16px; margin-bottom: 64px; }
 .cover-logo { height: 48px; width: auto; }
-.cover-org { font-size: 11pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand-primary, ${THEME.cobaltDeep}); }
+.cover-org { font-size: 11pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brand-primary, ${THEME_HEX.cobaltDeep}); }
 .cover-title { font-size: 32pt; line-height: 1.15; margin: 0 0 32px 0; }
 .cover-meta { font-size: 10pt; }
 .cover-meta div { margin-bottom: 4px; }

@@ -31,7 +31,7 @@ function formatDelta(delta: number): { label: string; tone: string } {
   }
   return {
     label: `±${Math.abs(pp)} pp`,
-    tone: "text-muted bg-white/5 border-white/10",
+    tone: "text-muted bg-layer/5 border-layer/10",
   };
 }
 
@@ -64,7 +64,7 @@ export async function SectionSignalsPanel({
       </p>
 
       {!hasAnyData ? (
-        <div className="mt-4 rounded-md border border-dashed border-white/10 px-3 py-4 text-center font-mono text-[11px] text-muted">
+        <div className="mt-4 rounded-md border border-dashed border-layer/10 px-3 py-4 text-center font-mono text-[11px] text-muted">
           No signals yet. Sections need to receive verdicts during
           color-team review (Pink / Red / Gold / White Gloves) <em>and</em>
           the proposal needs a recorded outcome (Win / Loss / No-bid /
@@ -74,7 +74,7 @@ export async function SectionSignalsPanel({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full font-body text-[13px]">
             <thead>
-              <tr className="border-b border-white/10 text-left font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
                 <th className="pb-2 pr-3">Section kind</th>
                 <th className="pb-2 pr-3 text-right">Won — pass rate</th>
                 <th className="pb-2 pr-3 text-right">Lost — pass rate</th>
@@ -92,7 +92,7 @@ export async function SectionSignalsPanel({
                 return (
                   <tr
                     key={row.kind}
-                    className="border-b border-white/5 last:border-b-0"
+                    className="border-b border-layer/5 last:border-b-0"
                   >
                     <td className="py-2 pr-3 text-foreground">
                       {KIND_LABELS[row.kind]}
@@ -152,7 +152,7 @@ export async function SectionSignalsPanel({
         </div>
       )}
 
-      <div className="mt-4 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
+      <div className="mt-4 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
         Signal counts are <em>per-reviewer-per-section</em>: a section with
         three reviewers in Red Team contributes three signals. Pass rate
         = pass / (pass + conditional + fail).

@@ -39,7 +39,7 @@ export default async function FirmsIntelPage({
         <Panel title="Preview feature" eyebrow="Disabled by default">
           <p className="font-mono text-[12px] text-muted">
             Gated behind{" "}
-            <code className="rounded bg-white/5 px-1.5 py-0.5">
+            <code className="rounded bg-layer/5 px-1.5 py-0.5">
               AWARDS_INTEL_ENABLED
             </code>
             .

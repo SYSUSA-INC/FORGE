@@ -154,7 +154,7 @@ export function WinnerAnalysisPanel({
             ) : null}
           </div>
         ) : (
-          <div className="rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
+          <div className="rounded-md border border-dashed border-layer/10 px-3 py-3 font-mono text-[11px] text-muted">
             No debrief recorded yet. Record the agency&apos;s official feedback
             in the <strong>Debrief</strong> panel above — gaps and strengths
             should come from the agency, not the AI.
@@ -163,7 +163,7 @@ export function WinnerAnalysisPanel({
       </div>
 
       {/* ── AI Competitive Analysis ── */}
-      <div className="mt-5 border-t border-white/5 pt-4">
+      <div className="mt-5 border-t border-layer/5 pt-4">
         <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
           Competitive intelligence (AI)
         </div>
@@ -187,7 +187,7 @@ export function WinnerAnalysisPanel({
         {!loaded ? (
           <div className="mt-3 font-mono text-[11px] text-subtle">Loading…</div>
         ) : !analysis ? (
-          <div className="mt-3 rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
+          <div className="mt-3 rounded-md border border-dashed border-layer/10 px-3 py-3 font-mono text-[11px] text-muted">
             {hasCompetitor
               ? `No AI analysis yet. Click "Run AI competitor analysis" above.`
               : "Once an outcome with the winning competitor is recorded, run the analysis here."}
@@ -206,7 +206,7 @@ export function WinnerAnalysisPanel({
             />
 
             {analysis.sourceUsaspending.length > 0 ? (
-              <div className="border-t border-white/5 pt-3">
+              <div className="border-t border-layer/5 pt-3">
                 <button
                   type="button"
                   onClick={() => setShowSources((v) => !v)}
@@ -258,7 +258,7 @@ function AgencySection({
   body: string;
 }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <div
         className={`mb-1 font-mono text-[10px] uppercase tracking-[0.18em] ${tone}`}
       >

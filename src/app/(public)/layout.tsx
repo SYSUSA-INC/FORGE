@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { ThemeToggle } from "@/components/shell/ThemeToggle";
 
 export default async function PublicLayout({
   children,
@@ -26,6 +27,7 @@ export default async function PublicLayout({
           </div>
         </Link>
         <nav className="flex items-center gap-3">
+          <ThemeToggle />
           <Link
             href="/pricing"
             className="font-mono text-[11px] uppercase tracking-widest text-muted hover:text-text"
@@ -55,7 +57,7 @@ export default async function PublicLayout({
         </nav>
       </header>
       <main className="relative z-10 px-4 pb-20">{children}</main>
-      <footer className="relative z-10 border-t border-white/5 px-6 py-6 text-center font-mono text-[10px] uppercase tracking-widest text-muted md:px-10">
+      <footer className="relative z-10 border-t border-layer/5 px-6 py-6 text-center font-mono text-[10px] uppercase tracking-widest text-muted md:px-10">
         © {new Date().getFullYear()} FORGE · Proposal Ops for federal & commercial procurement
       </footer>
     </div>

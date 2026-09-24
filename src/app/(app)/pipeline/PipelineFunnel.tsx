@@ -56,7 +56,7 @@ export function PipelineFunnel({
           <div key={stat.key} className="flex flex-col">
             <Link
               href={`/opportunities?stage=${stat.key}`}
-              className="group flex items-center gap-3 rounded-md py-2 transition-colors hover:bg-white/[0.02]"
+              className="group flex items-center gap-3 rounded-md py-2 transition-colors hover:bg-layer/[0.02]"
             >
               <span
                 className="w-44 shrink-0 truncate font-mono text-[11px] uppercase tracking-widest"
@@ -65,7 +65,7 @@ export function PipelineFunnel({
               >
                 {stat.shortLabel} · {stat.label}
               </span>
-              <div className="relative h-9 flex-1 overflow-hidden rounded-md border border-white/10 bg-white/[0.02]">
+              <div className="relative h-9 flex-1 overflow-hidden rounded-md border border-layer/10 bg-layer/[0.02]">
                 <div
                   className="absolute inset-y-0 left-0 transition-[width] duration-200"
                   style={{
@@ -110,7 +110,7 @@ export function PipelineFunnel({
           bars sized against the peak active-stage metric so the
           visual weights stay comparable. */}
       {data.closed.length > 0 ? (
-        <div className="mt-6 border-t border-white/10 pt-4">
+        <div className="mt-6 border-t border-layer/10 pt-4">
           <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
             Outcomes
             {data.winRate !== null ? (
@@ -128,7 +128,7 @@ export function PipelineFunnel({
                 <Link
                   key={stat.key}
                   href={`/opportunities?stage=${stat.key}`}
-                  className="group flex items-center gap-3 rounded-md py-1.5 transition-colors hover:bg-white/[0.02]"
+                  className="group flex items-center gap-3 rounded-md py-1.5 transition-colors hover:bg-layer/[0.02]"
                 >
                   <span
                     className="w-44 shrink-0 truncate font-mono text-[11px] uppercase tracking-widest"
@@ -137,7 +137,7 @@ export function PipelineFunnel({
                   >
                     {stat.shortLabel} · {stat.label}
                   </span>
-                  <div className="relative h-7 flex-1 overflow-hidden rounded-md border border-white/10 bg-white/[0.02]">
+                  <div className="relative h-7 flex-1 overflow-hidden rounded-md border border-layer/10 bg-layer/[0.02]">
                     <div
                       className="absolute inset-y-0 left-0 transition-[width] duration-200"
                       style={{

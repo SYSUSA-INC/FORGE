@@ -66,7 +66,7 @@ export function ReviewClient({
           {state.sender.name} has been notified. You can close this tab.
         </p>
         {state.recommendation !== "pending" ? (
-          <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-4">
+          <div className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.02] p-4">
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
               Your recommendation
             </div>
@@ -94,7 +94,7 @@ export function ReviewClient({
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <div className="rounded-xl border border-layer/10 bg-layer/[0.02] p-5">
         <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           Review requested by {state.sender.name}
           {state.sender.email ? ` · ${state.sender.email}` : ""} —{" "}
@@ -124,7 +124,7 @@ export function ReviewClient({
         </dl>
 
         {state.opportunity.description ? (
-          <div className="mt-4 max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.015] p-3 font-body text-[13px] leading-relaxed text-muted">
+          <div className="mt-4 max-h-64 overflow-y-auto rounded-lg border border-layer/10 bg-layer/[0.015] p-3 font-body text-[13px] leading-relaxed text-muted">
             {state.opportunity.description}
           </div>
         ) : null}
@@ -141,7 +141,7 @@ export function ReviewClient({
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <div className="rounded-xl border border-layer/10 bg-layer/[0.02] p-5">
         <div className="font-display text-base font-semibold text-text">
           Your recommendation
         </div>

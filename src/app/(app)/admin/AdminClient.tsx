@@ -140,7 +140,7 @@ export function AdminClient({
         ]}
       />
 
-      <nav className="mb-6 flex flex-wrap gap-1 border-b border-white/10">
+      <nav className="mb-6 flex flex-wrap gap-1 border-b border-layer/10">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -388,7 +388,7 @@ function OrgRowItem({
   void currentUserId;
 
   return (
-    <li className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
       <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">
         <div className="min-w-0">
           <div className="truncate font-display text-[13px] font-semibold text-text">
@@ -569,13 +569,13 @@ function UserRowItem({
   }
 
   return (
-    <li className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
       <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-text">
             {u.name ?? u.email}
             {isSelf ? (
-              <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 You
               </span>
             ) : null}
@@ -590,7 +590,7 @@ function UserRowItem({
               </span>
             ) : null}
             {!u.verified ? (
-              <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 Unverified
               </span>
             ) : null}

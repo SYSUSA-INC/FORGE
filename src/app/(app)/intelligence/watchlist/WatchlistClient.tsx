@@ -64,7 +64,7 @@ export function WatchlistClient({ rows }: { rows: WatchlistRow[] }) {
         </div>
       ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-1 border-b border-white/10">
+        <div className="flex gap-1 border-b border-layer/10">
           <TabButton
             label={`Awards · ${awards.length}`}
             active={tab === "awards"}
@@ -108,7 +108,7 @@ export function WatchlistClient({ rows }: { rows: WatchlistRow[] }) {
             to add them here.
           </p>
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-layer/5">
             {current.map((r) => (
               <WatchlistRowView key={r.id} row={r} onRemove={() => remove(r.id)} />
             ))}

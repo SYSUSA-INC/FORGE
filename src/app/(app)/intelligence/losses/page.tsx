@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const SEVERITY_STYLE: Record<LossSeverity, { label: string; cls: string }> = {
   high: { label: "High", cls: "border-rose/40 bg-rose/10 text-rose" },
   medium: { label: "Medium", cls: "border-amber-400/40 bg-amber-400/10 text-amber-200" },
-  info: { label: "Data gap", cls: "border-white/15 bg-white/[0.04] text-muted" },
+  info: { label: "Data gap", cls: "border-layer/15 bg-layer/[0.04] text-muted" },
 };
 
 const KIND_LABEL: Record<LossPattern["kind"], string> = {
@@ -107,7 +107,7 @@ export default async function LossIntelligencePage() {
                     <li
                       key={p.id}
                       id={`pattern-${encodeURIComponent(p.id)}`}
-                      className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                      className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -130,7 +130,7 @@ export default async function LossIntelligencePage() {
                           <Link
                             key={e.proposalId}
                             href={`/proposals/${e.proposalId}/outcome`}
-                            className="max-w-[260px] truncate rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-muted hover:border-white/30 hover:text-text"
+                            className="max-w-[260px] truncate rounded border border-layer/10 px-1.5 py-0.5 font-mono text-[10px] text-muted hover:border-layer/30 hover:text-text"
                             title={e.title}
                           >
                             {e.title}
@@ -163,7 +163,7 @@ export default async function LossIntelligencePage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-mono text-[11px]">
                   <thead>
-                    <tr className="border-b border-white/10 text-muted">
+                    <tr className="border-b border-layer/10 text-muted">
                       <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Competitor</th>
                       <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Faced</th>
                       <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Lost to</th>
@@ -174,7 +174,7 @@ export default async function LossIntelligencePage() {
                   </thead>
                   <tbody>
                     {intel.competitors.slice(0, 25).map((c) => (
-                      <tr key={c.name} className="border-b border-white/[0.04] text-text/90">
+                      <tr key={c.name} className="border-b border-layer/[0.04] text-text/90">
                         <td className="px-2 py-1.5">
                           {c.name}
                           {c.agencies.length ? (
@@ -215,7 +215,7 @@ export default async function LossIntelligencePage() {
                   return (
                     <li key={r.reason} className="flex items-center gap-2">
                       <span className="w-32 shrink-0 truncate font-mono text-[11px] text-text">{r.label}</span>
-                      <div className="h-2 flex-1 overflow-hidden rounded bg-white/[0.05]">
+                      <div className="h-2 flex-1 overflow-hidden rounded bg-layer/[0.05]">
                         <div className="h-full bg-rose/70" style={{ width: `${Math.max(6, (r.count / max) * 100)}%` }} />
                       </div>
                       <span className="w-6 text-right font-mono text-[11px] text-rose">{r.count}</span>

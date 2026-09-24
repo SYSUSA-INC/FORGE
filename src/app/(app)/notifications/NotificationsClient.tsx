@@ -49,13 +49,13 @@ export function NotificationsClient({ initial }: { initial: NotificationRow[] })
       eyebrow={`${filtered.length} shown`}
       actions={
         <div className="flex items-center gap-2">
-          <div className="flex rounded-md border border-white/10 bg-white/[0.02] p-0.5 font-mono text-[10px] uppercase tracking-widest">
+          <div className="flex rounded-md border border-layer/10 bg-layer/[0.02] p-0.5 font-mono text-[10px] uppercase tracking-widest">
             <button
               type="button"
               onClick={() => setFilter("unread")}
               className={`px-2.5 py-1 ${
                 filter === "unread"
-                  ? "bg-white/10 text-text"
+                  ? "bg-layer/10 text-text"
                   : "text-muted hover:text-text"
               }`}
             >
@@ -66,7 +66,7 @@ export function NotificationsClient({ initial }: { initial: NotificationRow[] })
               onClick={() => setFilter("all")}
               className={`px-2.5 py-1 ${
                 filter === "all"
-                  ? "bg-white/10 text-text"
+                  ? "bg-layer/10 text-text"
                   : "text-muted hover:text-text"
               }`}
             >
@@ -85,7 +85,7 @@ export function NotificationsClient({ initial }: { initial: NotificationRow[] })
       }
     >
       {filtered.length === 0 ? (
-        <div className="rounded-md border border-dashed border-white/10 px-4 py-8 text-center font-mono text-[11px] text-muted">
+        <div className="rounded-md border border-dashed border-layer/10 px-4 py-8 text-center font-mono text-[11px] text-muted">
           {filter === "unread"
             ? "Nothing unread. Nice."
             : "No notifications yet — assignments and mentions will land here."}
@@ -100,8 +100,8 @@ export function NotificationsClient({ initial }: { initial: NotificationRow[] })
                 <div
                   className={`flex gap-3 rounded-md border px-3 py-3 transition-colors ${
                     isUnread
-                      ? "border-white/15 bg-white/[0.04]"
-                      : "border-white/10 bg-white/[0.02] opacity-70"
+                      ? "border-layer/15 bg-layer/[0.04]"
+                      : "border-layer/10 bg-layer/[0.02] opacity-70"
                   }`}
                 >
                   <span

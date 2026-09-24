@@ -271,7 +271,7 @@ export function NavContent({
   if (railCollapsed) {
     return (
       <>
-        <div className="flex h-14 items-center justify-center border-b border-white/10">
+        <div className="flex h-14 items-center justify-center border-b border-layer/10">
           <div className="aur-brand-mark grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow">
             F
           </div>
@@ -311,7 +311,7 @@ export function NavContent({
                   className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                     groupActive
                       ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
-                      : "text-muted hover:bg-white/[0.05] hover:text-text"
+                      : "text-muted hover:bg-layer/[0.05] hover:text-text"
                   }`}
                 >
                   {g.icon}
@@ -337,7 +337,7 @@ export function NavContent({
                 className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                   groupActive
                     ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
-                    : "text-muted hover:bg-white/[0.05] hover:text-text"
+                    : "text-muted hover:bg-layer/[0.05] hover:text-text"
                 }`}
               >
                 {g.icon}
@@ -346,14 +346,14 @@ export function NavContent({
           })}
         </nav>
 
-        <div className="flex flex-col items-center gap-2 border-t border-white/10 py-3">
+        <div className="flex flex-col items-center gap-2 border-t border-layer/10 py-3">
           {!hideRailToggle && (
             <button
               type="button"
               onClick={toggleRail}
               title="Expand sidebar"
               aria-label="Expand sidebar"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/[0.05] hover:text-text"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-layer/[0.05] hover:text-text"
             >
               {/* simple chevron-right */}
               <span aria-hidden className="font-mono text-[14px]">›</span>
@@ -370,7 +370,7 @@ export function NavContent({
   // ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="flex h-14 items-center gap-3 border-b border-white/10 px-5">
+      <div className="flex h-14 items-center gap-3 border-b border-layer/10 px-5">
         <div className="aur-brand-mark grid h-8 w-8 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow">
           F
         </div>
@@ -388,7 +388,7 @@ export function NavContent({
             onClick={toggleRail}
             title="Collapse sidebar"
             aria-label="Collapse sidebar"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-white/[0.05] hover:text-text"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-layer/[0.05] hover:text-text"
           >
             <span aria-hidden className="font-mono text-[14px]">‹</span>
           </button>
@@ -435,8 +435,8 @@ export function NavContent({
                 onClick={onNavigate}
                 className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   active
-                    ? "bg-white/10 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.35)]"
-                    : "text-muted hover:bg-white/[0.04] hover:text-text"
+                    ? "bg-layer/10 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.35)]"
+                    : "text-muted hover:bg-layer/[0.04] hover:text-text"
                 }`}
               >
                 {active && (
@@ -446,7 +446,7 @@ export function NavContent({
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
                     active
                       ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text"
-                      : "bg-white/5 text-muted"
+                      : "bg-layer/5 text-muted"
                   }`}
                 >
                   {g.icon}
@@ -468,14 +468,14 @@ export function NavContent({
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                   groupActive
                     ? "text-text"
-                    : "text-muted hover:bg-white/[0.04] hover:text-text"
+                    : "text-muted hover:bg-layer/[0.04] hover:text-text"
                 }`}
               >
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
                     groupActive
                       ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
-                      : "bg-white/5 text-muted"
+                      : "bg-layer/5 text-muted"
                   }`}
                 >
                   {g.icon}
@@ -483,7 +483,7 @@ export function NavContent({
                 <span className="flex-1 font-medium">{g.label}</span>
                 <span
                   aria-hidden
-                  className="grid h-5 w-5 place-items-center rounded-md border border-white/10 bg-white/[0.03] font-mono text-[12px] text-muted"
+                  className="grid h-5 w-5 place-items-center rounded-md border border-layer/10 bg-layer/[0.03] font-mono text-[12px] text-muted"
                 >
                   {showChildren ? "−" : "+"}
                 </span>
@@ -493,22 +493,22 @@ export function NavContent({
                   // Tree-connector line: the ul has a left border that
                   // forms the vertical trunk; each li uses a small ::before
                   // to draw the horizontal branch hook.
-                  className="ml-[1.4rem] mt-0.5 flex flex-col border-l border-white/[0.08] pl-0"
+                  className="ml-[1.4rem] mt-0.5 flex flex-col border-l border-layer/[0.08] pl-0"
                 >
                   {children.map((c) => {
                     const active = hrefMatches(pathname, c.href);
                     return (
                       <li
                         key={c.href}
-                        className="relative pl-3 before:absolute before:left-0 before:top-1/2 before:h-px before:w-2.5 before:bg-white/[0.08]"
+                        className="relative pl-3 before:absolute before:left-0 before:top-1/2 before:h-px before:w-2.5 before:bg-layer/[0.08]"
                       >
                         <Link
                           href={c.href}
                           onClick={onNavigate}
                           className={`relative block rounded-md px-2 py-1.5 text-[13px] transition-colors ${
                             active
-                              ? "bg-white/10 text-text"
-                              : "text-muted hover:bg-white/[0.04] hover:text-text"
+                              ? "bg-layer/10 text-text"
+                              : "text-muted hover:bg-layer/[0.04] hover:text-text"
                           }`}
                         >
                           {c.label}
@@ -523,7 +523,7 @@ export function NavContent({
         })}
       </nav>
 
-      <div className="border-t border-white/10 px-3 py-3">
+      <div className="border-t border-layer/10 px-3 py-3">
         {user ? <UserAvatar user={user} compact={false} /> : null}
       </div>
     </>
@@ -568,7 +568,7 @@ function UserAvatar({
   }
 
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
+    <div className="flex items-center gap-2.5 rounded-lg border border-layer/10 bg-layer/[0.03] px-2.5 py-2">
       <div className="relative h-9 w-9 shrink-0">
         {user.image ? (
           // eslint-disable-next-line @next/next/no-img-element

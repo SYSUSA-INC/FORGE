@@ -11,7 +11,7 @@ export function SessionClock() {
   }, []);
 
   return (
-    <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] tracking-widest text-muted md:flex">
+    <div className="hidden items-center gap-2 rounded-full border border-layer/10 bg-layer/5 px-3 py-1 font-mono text-[11px] tracking-widest text-muted md:flex">
       <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-violet" aria-hidden />
       <span>UTC {now}</span>
     </div>

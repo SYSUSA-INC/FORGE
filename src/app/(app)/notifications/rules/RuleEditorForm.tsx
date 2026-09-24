@@ -442,7 +442,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
           ) : null}
 
           {form.recipientStrategy === "mentioned_in_payload" ? (
-            <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
+            <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
               Fires for every user the triggering event tagged as
               mentioned (in <code>payload.mentionedUserIds</code>) who
               is still an active member of this org. No extra
@@ -474,7 +474,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
                     className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                       active && !disabled
                         ? "border-teal-400 bg-teal-400/10 text-text"
-                        : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                        : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
                     } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                   >
                     {label}
@@ -578,7 +578,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
               ) : null}
 
               {form.escalationStrategy === "mentioned_in_payload" ? (
-                <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
+                <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
                   Falls back to whoever the original event tagged as
                   mentioned. Same runtime lookup as the primary
                   strategy — no extra configuration.
@@ -710,7 +710,7 @@ function UserPicker({
           No active members yet.
         </div>
       ) : (
-        <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-white/10 bg-white/[0.02] p-2">
+        <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-layer/10 bg-layer/[0.02] p-2">
           {users.map((u) => {
             const active = selected.includes(u.id);
             return (
@@ -721,7 +721,7 @@ function UserPicker({
                 className={`flex items-center justify-between rounded px-2 py-1 text-left font-mono text-[11px] transition-colors ${
                   active
                     ? "bg-teal-400/10 text-text"
-                    : "text-muted hover:bg-white/[0.04]"
+                    : "text-muted hover:bg-layer/[0.04]"
                 }`}
               >
                 <span>{u.name ?? u.email}</span>
@@ -756,7 +756,7 @@ function RoleChecklist({
               className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                  : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
               {r}

@@ -42,9 +42,19 @@ export const metadata: Metadata = {
     "Framework for Optimized Response Generation & Execution — capture, compliance, and proposal collaboration for federal and commercial procurement.",
 };
 
+// BL-UI-THEME — apply the viewer's saved theme before first paint. Light
+// is the default (no attribute); "dark" sets data-theme="dark", which
+// globals.css keys its dark palette on. Inline so it runs before any
+// stylesheet resolves; the ThemeToggle component owns changes after that.
+const THEME_BOOT_SCRIPT =
+  '(function(){try{if(window.localStorage.getItem("forge.theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}})();';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

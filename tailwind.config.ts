@@ -53,6 +53,10 @@ const config: Config = {
         muted: v("muted"),
         subtle: v("subtle"),
         faint: v("faint"),
+        // Translucent-layer ink: white on the dark theme, navy on the
+        // light one. `bg-layer/5`, `border-layer/10` replace the old
+        // white-alpha layer classes so depth reads in both themes.
+        layer: v("layer"),
 
         cobalt,
         brass,
@@ -86,11 +90,11 @@ const config: Config = {
         "glow-emerald": "0 0 32px rgb(var(--c-green-500) / 0.18)",
         "glow-gold": "0 0 32px rgb(var(--c-brass-500) / 0.22)",
         "glow-magenta": "0 0 32px rgb(var(--c-plum-500) / 0.18)",
-        card: "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px rgb(0 0 0 / 0.35)",
-        "card-lg": "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 48px rgb(0 0 0 / 0.45)",
-        brut: "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px rgb(0 0 0 / 0.35)",
-        "brut-sm": "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 4px 12px rgb(0 0 0 / 0.3)",
-        "brut-lg": "0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 48px rgb(0 0 0 / 0.45)",
+        card: "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 8px 24px rgb(var(--c-shadow) / var(--shadow-a))",
+        "card-lg": "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 16px 48px rgb(var(--c-shadow) / var(--shadow-a-lg))",
+        brut: "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 8px 24px rgb(var(--c-shadow) / var(--shadow-a))",
+        "brut-sm": "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 4px 12px rgb(var(--c-shadow) / var(--shadow-a))",
+        "brut-lg": "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 16px 48px rgb(var(--c-shadow) / var(--shadow-a-lg))",
       },
       animation: {
         aurora: "aurora 18s ease-in-out infinite",

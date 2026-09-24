@@ -237,7 +237,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
               </span>
             </div>
 
-            <ul className="mt-4 divide-y divide-white/5">
+            <ul className="mt-4 divide-y divide-layer/5">
               {sections.map((s) => {
                 const p = progress[s.id];
                 const tone =
@@ -271,7 +271,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
               })}
             </ul>
 
-            <div className="mt-4 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
+            <div className="mt-4 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
               Auto-drafts always land in <em>in_progress</em> status. Review
               each section before sending to a color-team review.
             </div>

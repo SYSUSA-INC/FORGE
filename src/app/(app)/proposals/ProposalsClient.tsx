@@ -144,7 +144,7 @@ export function ProposalsClient({
         ]}
       />
 
-      <div className="mb-3 flex items-center gap-1 border-b border-white/10">
+      <div className="mb-3 flex items-center gap-1 border-b border-layer/10">
         <TabButton
           active={tab === "in_flight"}
           onClick={() => selectTab("in_flight")}
@@ -165,7 +165,7 @@ export function ProposalsClient({
           className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
             stageFilter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
-              : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+              : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
           }`}
         >
           All {inTab.length}
@@ -181,7 +181,7 @@ export function ProposalsClient({
               className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                  : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
               <span
@@ -252,7 +252,7 @@ function TabButton({
       {label}
       <span
         className={`ml-2 rounded px-1.5 py-0.5 text-[10px] ${
-          active ? "bg-teal/15 text-teal" : "bg-white/5 text-muted"
+          active ? "bg-teal/15 text-teal" : "bg-layer/5 text-muted"
         }`}
       >
         {count}
@@ -266,7 +266,7 @@ function ProposalRowItem({ p }: { p: ProposalRow }) {
   return (
     <Link
       href={`/proposals/${p.id}`}
-      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 transition-colors hover:border-white/20 md:grid-cols-[1fr_auto_auto_auto]"
+      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 transition-colors hover:border-layer/20 md:grid-cols-[1fr_auto_auto_auto]"
     >
       <div className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">

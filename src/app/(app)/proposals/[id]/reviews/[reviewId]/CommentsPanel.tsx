@@ -139,7 +139,7 @@ export function CommentsPanel({
       }
     >
       <form
-        className="mb-3 flex flex-col gap-2 rounded-md border border-dashed border-white/10 bg-white/[0.02] p-3"
+        className="mb-3 flex flex-col gap-2 rounded-md border border-dashed border-layer/10 bg-layer/[0.02] p-3"
         onSubmit={onSubmit}
       >
         <div className="flex flex-wrap items-end gap-2">
@@ -205,12 +205,12 @@ export function CommentsPanel({
                 key={c.id}
                 className={`rounded-md border p-2.5 ${
                   c.resolved
-                    ? "border-white/10 bg-white/[0.015] opacity-60"
-                    : "border-white/10 bg-white/[0.02]"
+                    ? "border-layer/10 bg-layer/[0.015] opacity-60"
+                    : "border-layer/10 bg-layer/[0.02]"
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                  <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                     {sec
                       ? `§${sec.ordering} · ${sec.title}`
                       : "General"}

@@ -174,7 +174,7 @@ function Stat({
   color?: string;
 }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <div className="font-mono text-[9px] uppercase tracking-widest text-subtle">
         {label}
       </div>

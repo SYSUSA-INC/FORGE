@@ -44,7 +44,7 @@ export function NewTemplateForm({ starters }: { starters: StarterPreview[] }) {
                 className={`flex cursor-pointer items-start gap-3 rounded-md border px-3 py-3 transition-colors ${
                   selected
                     ? "border-teal/50 bg-teal/5"
-                    : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                    : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
                 }`}
               >
                 <input
@@ -69,7 +69,7 @@ export function NewTemplateForm({ starters }: { starters: StarterPreview[] }) {
                       style={{ background: s.brandAccent }}
                       aria-hidden
                     />
-                    <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                    <span className="ml-auto rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                       {s.sectionCount} sections
                     </span>
                   </div>

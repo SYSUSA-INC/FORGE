@@ -42,7 +42,7 @@ export default function AppError({
   }, [error]);
 
   return (
-    <div className="mx-auto mt-10 max-w-xl rounded-lg border border-white/10 bg-white/[0.02] p-6">
+    <div className="mx-auto mt-10 max-w-xl rounded-lg border border-layer/10 bg-layer/[0.02] p-6">
       <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
         Something went wrong
       </div>

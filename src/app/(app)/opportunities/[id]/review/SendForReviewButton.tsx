@@ -111,7 +111,7 @@ function SendForReviewModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-white/10 bg-[#0c1424] p-5 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-layer/10 bg-[#0c1424] p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -128,7 +128,7 @@ function SendForReviewModal({
           </button>
         </div>
 
-        <div className="mb-4 inline-flex rounded-full border border-white/10 p-0.5 text-[11px]">
+        <div className="mb-4 inline-flex rounded-full border border-layer/10 p-0.5 text-[11px]">
           {(["team", "external"] as const).map((t) => (
             <button
               key={t}
@@ -190,7 +190,7 @@ function SendForReviewModal({
                 placeholder="Jane Doe"
               />
             </div>
-            <div className="mb-3 rounded border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[10px] text-muted">
+            <div className="mb-3 rounded border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[10px] text-muted">
               External reviewers get a magic link that works without a FORGE
               login. Link expires in 14 days.
             </div>

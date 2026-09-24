@@ -23,7 +23,7 @@ export function BarMeter({
           : color === "magenta"
             ? "bg-gradient-to-r from-magenta/80 to-magenta"
             : color === "bone"
-              ? "bg-white/15"
+              ? "bg-layer/15"
               : color === "ink"
                 ? "bg-text"
                 : "bg-gradient-to-r from-violet to-magenta";
@@ -36,7 +36,7 @@ export function BarMeter({
           <span>{right ?? `${Math.round(pct)}%`}</span>
         </div>
       )}
-      <div className="h-2 w-full overflow-hidden rounded-full border border-white/10 bg-white/[0.04]">
+      <div className="h-2 w-full overflow-hidden rounded-full border border-layer/10 bg-layer/[0.04]">
         <div className={`h-full ${bar}`} style={{ width: `${pct}%` }} />
       </div>
     </div>

@@ -319,7 +319,7 @@ function OutcomePanel({
                   className={`rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
                     selected
                       ? "border-teal/60 bg-teal/10 text-teal"
-                      : "border-white/10 bg-white/[0.03] text-muted hover:border-white/30 hover:text-text"
+                      : "border-layer/10 bg-layer/[0.03] text-muted hover:border-layer/30 hover:text-text"
                   }`}
                 >
                   {OUTCOME_REASON_LABELS[r]}
@@ -759,7 +759,7 @@ function SidebarPanel({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-1.5 last:border-b-0">
+    <div className="flex items-baseline justify-between gap-3 border-b border-layer/5 pb-1.5 last:border-b-0">
       <span className="text-[10px] uppercase tracking-[0.22em] text-subtle">
         {label}
       </span>
@@ -841,7 +841,7 @@ function DebriefRequestPanel({ proposalId }: { proposalId: string }) {
             </span>
             <span>Verify FAR cite against actual solicitation before sending</span>
           </div>
-          <pre className="max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.02] p-4 font-mono text-[11px] leading-relaxed text-foreground">
+          <pre className="max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-layer/10 bg-layer/[0.02] p-4 font-mono text-[11px] leading-relaxed text-foreground">
             {letter}
           </pre>
           <div className="mt-2 flex gap-2">

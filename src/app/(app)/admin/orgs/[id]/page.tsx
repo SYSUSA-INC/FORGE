@@ -404,7 +404,7 @@ export default async function TenantDetailPage({
               {topActors.map((a) => (
                 <li
                   key={a.actorEmail}
-                  className="flex items-center justify-between rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 font-mono text-[12px]"
+                  className="flex items-center justify-between rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2 font-mono text-[12px]"
                 >
                   <span className="truncate text-text">{a.actorEmail}</span>
                   <span className="tabular-nums text-muted">

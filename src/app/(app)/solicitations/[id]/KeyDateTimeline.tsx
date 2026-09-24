@@ -123,10 +123,10 @@ export function KeyDateTimeline({
       {/* Gantt strip */}
       <div className="relative mb-4 h-6">
         {/* Track */}
-        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
+        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-layer/10" />
         {/* Today marker */}
         <div
-          className="absolute top-0 h-full w-px bg-white/30"
+          className="absolute top-0 h-full w-px bg-layer/30"
           style={{ left: `${todayPct.toFixed(1)}%` }}
         />
         <span
@@ -168,7 +168,7 @@ export function KeyDateTimeline({
           return (
             <li
               key={`${kd.isoDate}-${kd.label}`}
-              className="flex items-center gap-2.5 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+              className="flex items-center gap-2.5 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               style={{ opacity: isPast ? 0.5 : 1 }}
             >
               {/* Type badge */}

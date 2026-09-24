@@ -135,7 +135,7 @@ export function TeamPanel({
             return (
               <li
                 key={role}
-                className="rounded-lg border border-white/10 bg-white/[0.02] p-2"
+                className="rounded-lg border border-layer/10 bg-layer/[0.02] p-2"
               >
                 <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200">
                   {SOLICITATION_ROLE_LABELS[role]}
@@ -144,7 +144,7 @@ export function TeamPanel({
                   {rows.map((a) => (
                     <li
                       key={`${a.userId}-${a.role}`}
-                      className="flex items-start justify-between gap-2 rounded border border-white/5 bg-white/[0.02] px-2 py-1.5"
+                      className="flex items-start justify-between gap-2 rounded border border-layer/5 bg-layer/[0.02] px-2 py-1.5"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-display text-[12px] font-semibold text-text">
@@ -185,7 +185,7 @@ export function TeamPanel({
         </ul>
       )}
 
-      <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.015] p-3">
+      <div className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
         <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           Add teammate
         </div>

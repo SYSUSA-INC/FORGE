@@ -335,14 +335,14 @@ export function GsaPasteClient() {
               // Allow re-adding the same file after removing it.
               e.target.value = "";
             }}
-            className="aur-input file:mr-3 file:rounded file:border-0 file:bg-white/10 file:px-3 file:py-1 file:text-[12px] file:text-text"
+            className="aur-input file:mr-3 file:rounded file:border-0 file:bg-layer/10 file:px-3 file:py-1 file:text-[12px] file:text-text"
           />
           {files.length > 0 ? (
             <ul className="flex flex-col gap-1">
               {files.map((f, i) => (
                 <li
                   key={`${f.name}_${f.size}_${i}`}
-                  className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px]"
+                  className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px]"
                 >
                   <div className="min-w-0 flex-1 truncate text-text">
                     {f.name}

@@ -13,7 +13,7 @@ export async function NotificationBell() {
     return (
       <Link
         href="/notifications"
-        className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-muted transition-colors hover:border-white/20 hover:text-text"
+        className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-layer/10 bg-layer/[0.03] text-muted transition-colors hover:border-layer/20 hover:text-text"
         aria-label="Notifications"
       >
         <BellIcon />

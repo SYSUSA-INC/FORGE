@@ -459,7 +459,7 @@ function EntityBanner({ org, className }: { org: OrgProfile; className?: string 
 
 function BannerTag({ k, v }: { k: string; v: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">
+    <div className="rounded-md border border-layer/10 bg-layer/[0.03] px-3 py-2">
       <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
         {k}
       </div>
@@ -756,7 +756,7 @@ function PastPerformancePanel({
           {rows.map((r) => (
             <li
               key={r.id}
-              className="rounded-lg border border-white/10 bg-white/[0.02] p-4"
+              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-4"
             >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <TextField
@@ -908,7 +908,7 @@ function ToggleField({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 ${className ?? ""}`}
+      className={`flex cursor-pointer items-start gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-3 py-2 ${className ?? ""}`}
     >
       <input
         type="checkbox"
@@ -936,7 +936,7 @@ function CheckboxField({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <input
         type="checkbox"
         className="accent-teal-400"

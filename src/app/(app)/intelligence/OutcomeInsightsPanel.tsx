@@ -192,7 +192,7 @@ export async function OutcomeInsightsPanel() {
             {recentLessons.map((l) => (
               <li
                 key={l.id}
-                className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
                   <span
@@ -242,7 +242,7 @@ export async function OutcomeInsightsPanel() {
               <li key={d.id}>
                 <Link
                   href={`/proposals/${d.proposalId}/outcome`}
-                  className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 hover:border-white/20"
+                  className="flex items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
                 >
                   <span className="truncate font-display text-[13px] text-text">
                     {d.proposalTitle}
@@ -341,7 +341,7 @@ function ReasonsPanel({
                 <span className="w-32 shrink-0 truncate font-mono text-[11px] text-text">
                   {label}
                 </span>
-                <div className="relative h-3 flex-1 overflow-hidden rounded-full bg-white/[0.04]">
+                <div className="relative h-3 flex-1 overflow-hidden rounded-full bg-layer/[0.04]">
                   <div
                     className="h-full rounded-full transition-all"
                     style={{

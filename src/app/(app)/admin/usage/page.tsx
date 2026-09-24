@@ -281,7 +281,7 @@ export default async function AdminUsagePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left font-mono text-[11px]">
                 <thead>
-                  <tr className="border-b border-white/10 text-muted">
+                  <tr className="border-b border-layer/10 text-muted">
                     <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
                       Tenant
                     </th>
@@ -315,7 +315,7 @@ export default async function AdminUsagePage() {
                     return (
                       <tr
                         key={r.organizationId}
-                        className="border-b border-white/[0.04] text-text/90 hover:bg-white/[0.03]"
+                        className="border-b border-layer/[0.04] text-text/90 hover:bg-layer/[0.03]"
                       >
                         <td className="px-2 py-1.5">
                           <Link
@@ -385,7 +385,7 @@ export default async function AdminUsagePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left font-mono text-[11px]">
                 <thead>
-                  <tr className="border-b border-white/10 text-muted">
+                  <tr className="border-b border-layer/10 text-muted">
                     <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
                       Feature
                     </th>
@@ -443,7 +443,7 @@ export default async function AdminUsagePage() {
                     return (
                       <tr
                         key={f.feature}
-                        className="border-b border-white/[0.04] text-text/90 hover:bg-white/[0.03]"
+                        className="border-b border-layer/[0.04] text-text/90 hover:bg-layer/[0.03]"
                       >
                         <td className="px-2 py-1.5">
                           {aiFeatureLabel(f.feature)}
@@ -530,7 +530,7 @@ export default async function AdminUsagePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left font-mono text-[11px]">
               <thead>
-                <tr className="border-b border-white/10 text-muted">
+                <tr className="border-b border-layer/10 text-muted">
                   <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
                     Class
                   </th>
@@ -546,7 +546,7 @@ export default async function AdminUsagePage() {
                 {featuresByClass.map((row) => (
                   <tr
                     key={row.cls}
-                    className="border-b border-white/[0.04] text-text/90"
+                    className="border-b border-layer/[0.04] text-text/90"
                   >
                     <td className="px-2 py-1.5 align-top">
                       {row.cls}

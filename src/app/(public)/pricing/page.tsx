@@ -173,7 +173,7 @@ export default async function PricingPage() {
                     (k) => (
                       <li
                         key={k}
-                        className="flex items-baseline justify-between border-b border-white/[0.04] pb-1.5 font-mono text-[11px]"
+                        className="flex items-baseline justify-between border-b border-layer/[0.04] pb-1.5 font-mono text-[11px]"
                       >
                         <span className="text-muted">{QUOTA_LABELS[k]}</span>
                         <span className="font-semibold text-text">

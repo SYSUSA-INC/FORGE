@@ -72,7 +72,7 @@ export default async function ArtifactDetailPage({
           eyebrow={`${formatChars(artifact.rawText?.length ?? 0)} indexed`}
         >
           {artifact.rawText && artifact.rawText.length > 0 ? (
-            <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.015] p-3 font-mono text-[11px] leading-relaxed text-muted">
+            <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap rounded-lg border border-layer/10 bg-layer/[0.015] p-3 font-mono text-[11px] leading-relaxed text-muted">
               {artifact.rawText.slice(0, 50_000)}
               {artifact.rawText.length > 50_000 ? "\n\n…(truncated)" : ""}
             </pre>

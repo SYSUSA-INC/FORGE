@@ -70,7 +70,7 @@ export default async function OpportunityActivityPage({
               return (
                 <li
                   key={a.id}
-                  className="relative grid grid-cols-[24px_1fr] items-start gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                  className="relative grid grid-cols-[24px_1fr] items-start gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
                 >
                   <span
                     className="mt-1.5 h-3 w-3 rounded-full"

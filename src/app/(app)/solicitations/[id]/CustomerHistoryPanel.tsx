@@ -155,7 +155,7 @@ export async function CustomerHistoryPanel({
             ) : (
               <ul className="space-y-2">
                 {h.evaluatorPriorities.map((e) => (
-                  <li key={e.solicitationId} className="rounded-md border border-white/10 bg-white/[0.02] px-2.5 py-1.5">
+                  <li key={e.solicitationId} className="rounded-md border border-layer/10 bg-layer/[0.02] px-2.5 py-1.5">
                     <Link
                       href={`/solicitations/${e.solicitationId}`}
                       className="font-display text-[12px] text-text hover:underline"
@@ -193,7 +193,7 @@ export async function CustomerHistoryPanel({
                           ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
                           : p.outcome === "lost"
                             ? "border-rose/40 bg-rose/10 text-rose"
-                            : "border-white/15 text-muted"
+                            : "border-layer/15 text-muted"
                       }`}
                     >
                       {p.outcome ?? STAGE_LABEL[p.stage] ?? p.stage}
@@ -207,7 +207,7 @@ export async function CustomerHistoryPanel({
       ) : null}
 
       {market ? (
-        <div className="mt-4 border-t border-white/10 pt-3">
+        <div className="mt-4 border-t border-layer/10 pt-3">
           <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
             Market view · USAspending · last {market.yearsBack} years
             {naicsCode ? ` · NAICS ${naicsCode}` : ""}
@@ -260,7 +260,7 @@ function Stat({
           ? "text-rose"
           : "text-text";
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted">{label}</div>
       <div className={`mt-0.5 truncate font-display text-[18px] font-semibold ${color}`}>{value}</div>
       {sub ? <div className="mt-0.5 truncate font-mono text-[10px] text-muted">{sub}</div> : null}

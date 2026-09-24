@@ -7,9 +7,16 @@
 ## 1. Direction
 
 FORGE is a capture and proposal platform for federal contractors. The
-interface is a dark, restrained corporate surface: the proposal text and
-the data are the hero, chrome stays quiet, and colour is spent on
-meaning, not decoration.
+interface is a restrained corporate surface: the proposal text and the
+data are the hero, chrome stays quiet, and colour is spent on meaning,
+not decoration.
+
+**Two themes, one set of names.** The default is **light** — off-white
+canvas, white cards, navy type, cobalt actions, a brass signature
+accent. The **dark** navy console look is kept behind the header toggle
+(☾ / ☀), stored per viewer in `localStorage` as `forge.theme` and
+applied as `data-theme="dark"` on `<html>` before first paint. Every
+component is written once; the variables do the work.
 
 | Family | Role | Where you see it |
 |---|---|---|
@@ -31,22 +38,33 @@ Type: `text` (near-white), `muted` (steel), `subtle` (dim steel), `faint`
 **One source for CSS, one mirror for JavaScript, tested against each
 other.**
 
-1. `src/app/globals.css` — `:root` declares every colour as an RGB
-   triplet: `--c-cobalt-500: 76 141 255;`. Families have stops 200–700
-   (plum 300–600); surfaces and type are single values.
+1. `src/app/globals.css` — `:root` (light) and `:root[data-theme="dark"]`
+   each declare every colour as an RGB triplet:
+   `--c-cobalt-500: 47 111 224;`. Families have stops 200–700 (plum
+   300–600); surfaces and type are single values. The two blocks declare
+   the same names (tested).
 2. `tailwind.config.ts` — every Tailwind colour is
    `rgb(var(--c-<name>) / <alpha-value>)`, so `bg-canvas/70`,
    `text-emerald-300`, `border-teal/40` all resolve to the variables
    above and alpha modifiers keep working.
-3. `src/lib/theme-colors.ts` — `THEME.*` hex constants for anything that
+3. `src/lib/theme-colors.ts` — `THEME.*` are **variable references**
+   (`rgb(var(--c-cobalt-500))`) for anything rendered in the page that
    has to be a JavaScript value: SVG chart fills, inline `style` status
-   maps (`src/lib/*-types.ts`), presence cursor colours, PDF template
-   defaults. `THEME_VAR_MAP` names the CSS variable each constant
-   mirrors and `tests/design/theme-tokens.test.ts` asserts they match.
+   maps (`src/lib/*-types.ts`), presence cursors. They follow the active
+   theme. `THEME_HEX.*` are literal hex (the dark values) for contexts
+   with no page variables: HTML emails, PDF template defaults, stored
+   data. `withAlpha()` tints either kind.
 
-Email templates (`src/lib/email.ts`, `src/lib/notification-email.ts`)
-carry literal hex because mail clients cannot read CSS variables; they
-use the same values.
+**Stops are roles, not lightness.** `200`/`300` are text-on-a-tint tones
+(dark on the light theme, light on the dark theme), `400` is a solid
+mid tone or gradient start, `500` (`DEFAULT`) is a readable solid on the
+canvas, `600`/`700` are deep. So `bg-emerald-500/15 text-emerald-300`
+reads correctly on both themes without a `dark:` variant anywhere.
+
+**`layer` is the ink for translucent layers** — white on dark, navy on
+light. Cards, borders and hover fills use `bg-layer/5`, `border-layer/10`
+(never `bg-white/5`: invisible on the light theme; the token test
+rejects it).
 
 ## 3. Names you can use in `className`
 
@@ -61,7 +79,7 @@ not have to change:
 | `red`, `red-200…700` | `rose`, `rose-NNN`, `blood` |
 | `indigo`, `indigo-200…700` | `violet`, `violet-NNN` |
 | `plum`, `plum-300…600` | `magenta` |
-| `canvas`, `paper`, `bone`, `concrete`, `text`, `muted`, `subtle`, `faint` | `ink` (= canvas) |
+| `canvas`, `paper`, `bone`, `concrete`, `text`, `muted`, `subtle`, `faint`, `layer` | `ink` (= canvas) |
 
 Every family has a `DEFAULT` (`text-emerald`) **and** numbered stops
 (`text-emerald-300`, `bg-emerald-500/15`). Before BL-UI-THEME the config
@@ -91,13 +109,14 @@ Utility classes in `globals.css`: `aur-card`, `aur-card-elevated`,
    red = blocked / lost / mandatory, brass = attention / partial /
    desired, cobalt = in progress / assigned, indigo = under analysis or
    review, plum = pink team, `muted` = not started / informational.
-5. **Adding a colour:** add the `--c-*` triplet(s) in `globals.css`, the
-   Tailwind entry in `tailwind.config.ts`, and, if JavaScript needs it,
-   the `THEME` constant plus its `THEME_VAR_MAP` entry. Run
-   `npx vitest run tests/design`.
-6. **Light theme later:** redefine the `--c-*` triplets under a
-   `[data-theme="light"]` selector; components need no change. Alpha
-   white layers (`bg-white/5`) would need a `--c-layer` variable first.
+5. **Adding a colour:** add the `--c-*` triplet(s) to **both** blocks in
+   `globals.css`, the Tailwind entry in `tailwind.config.ts`, and, if
+   JavaScript needs it, the role in `THEME_VAR_MAP` plus its `THEME_HEX`
+   value. Run `npx vitest run tests/design`.
+6. **Theme switching:** `ThemeToggle` (`src/components/shell/`) sets
+   `data-theme` and `localStorage["forge.theme"]`; the inline script in
+   `app/layout.tsx` re-applies it before paint. Never branch on the
+   theme in a component — put the difference in the variables.
 
 ## 5. Not in this pass
 

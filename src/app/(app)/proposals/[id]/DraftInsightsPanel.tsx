@@ -51,7 +51,7 @@ export async function DraftInsightsPanel({
     >
       <div className="flex flex-col gap-3">
         {/* Overall retention score */}
-        <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+        <div className="flex items-center justify-between rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
           <span className="font-body text-[12px] text-muted">
             Overall AI content retained
           </span>
@@ -74,7 +74,7 @@ export async function DraftInsightsPanel({
               {data.kindStats.map((s) => (
                 <div
                   key={s.sectionKind}
-                  className="flex items-center justify-between gap-2 rounded border border-white/10 bg-white/[0.02] px-2 py-1.5"
+                  className="flex items-center justify-between gap-2 rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
                 >
                   <span className="font-mono text-[10px] text-muted">
                     {KIND_LABELS[s.sectionKind] ?? s.sectionKind}
@@ -112,7 +112,7 @@ export async function DraftInsightsPanel({
 
         {/* BL-9 Slice 7 — track-changes decisions */}
         {data.editDecisions.total > 0 ? (
-          <div className="flex flex-col gap-1.5 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+          <div className="flex flex-col gap-1.5 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="font-body text-[12px] text-muted">
                 Track-changes decisions

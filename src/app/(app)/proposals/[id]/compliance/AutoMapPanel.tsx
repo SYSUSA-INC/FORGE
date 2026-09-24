@@ -191,10 +191,10 @@ export function AutoMapPanel({
               return (
                 <div
                   key={s.itemId}
-                  className={`rounded-md border bg-white/[0.02] p-3 transition-opacity ${
+                  className={`rounded-md border bg-layer/[0.02] p-3 transition-opacity ${
                     isExcluded
-                      ? "border-white/5 opacity-50"
-                      : "border-white/10"
+                      ? "border-layer/5 opacity-50"
+                      : "border-layer/10"
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -253,7 +253,7 @@ export function AutoMapPanel({
                             }))
                           }
                           disabled={isExcluded}
-                          className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-text"
+                          className="rounded border border-layer/10 bg-layer/[0.04] px-2 py-1 font-mono text-[11px] text-text"
                         >
                           {sections.map((sec) => (
                             <option key={sec.id} value={sec.id}>

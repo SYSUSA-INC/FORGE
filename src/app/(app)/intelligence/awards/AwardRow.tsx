@@ -41,7 +41,7 @@ export function AwardRow({
       className={`rounded-lg border p-3 transition-colors ${
         recompete
           ? "border-amber-400/60 bg-amber-400/5"
-          : "border-white/10 bg-white/[0.02] hover:border-white/20"
+          : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
       }`}
     >
       <div className="grid grid-cols-[1fr_auto] items-start gap-3">
@@ -56,7 +56,7 @@ export function AwardRow({
               </span>
             ) : null}
             {award.awardType ? (
-              <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 {award.awardType}
               </span>
             ) : null}
@@ -72,7 +72,7 @@ export function AwardRow({
                     ? "bg-amber-500/15 text-amber-200"
                     : chip.status === "active"
                       ? "bg-teal-500/15 text-teal-200"
-                      : "bg-white/5 text-muted"
+                      : "bg-layer/5 text-muted"
                 }`}
                 title={
                   chip.matchedBy === "name"

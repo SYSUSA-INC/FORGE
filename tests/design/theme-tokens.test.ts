@@ -1,9 +1,11 @@
 /**
- * BL-UI-THEME — the palette has two sources (CSS variables for Tailwind,
- * THEME constants for JavaScript). These tests keep them identical, make
- * sure every colour family is a real scale (the flat-string override that
- * deleted `emerald-300` & co. can't come back), and keep hex literals out
- * of the themed component paths.
+ * BL-UI-THEME — the palette has two themes (light default, dark under
+ * `data-theme="dark"`) and two consumers (Tailwind via CSS variables,
+ * JavaScript via THEME / THEME_HEX). These tests keep them coherent:
+ * both themes declare the same variables, every Tailwind colour points
+ * at a declared variable and is a real scale, THEME references only
+ * declared variables, THEME_HEX matches the dark block, and no hex or
+ * white-alpha literal creeps back into the themed component paths.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -14,6 +16,7 @@ import {
   CHART_SERIES,
   PRESENCE_PALETTE,
   THEME,
+  THEME_HEX,
   THEME_VAR_MAP,
   hexToRgbTriplet,
   withAlpha,
@@ -22,46 +25,65 @@ import {
 const ROOT = join(__dirname, "..", "..");
 const GLOBALS = readFileSync(join(ROOT, "src/app/globals.css"), "utf8");
 
-function cssVars(): Map<string, string> {
+/** `--c-*` triplets declared inside one selector block. */
+function blockVars(selector: string): Map<string, string> {
+  const start = GLOBALS.indexOf(`${selector} {`);
+  expect(start, `${selector} block missing`).toBeGreaterThanOrEqual(0);
+  const end = GLOBALS.indexOf("\n}", start);
+  const body = GLOBALS.slice(start, end);
   const out = new Map<string, string>();
-  for (const m of GLOBALS.matchAll(/--c-([a-z0-9-]+):\s*(\d{1,3}) (\d{1,3}) (\d{1,3});/g)) {
+  for (const m of body.matchAll(/--c-([a-z0-9-]+):\s*(\d{1,3}) (\d{1,3}) (\d{1,3});/g)) {
     out.set(m[1]!, `${m[2]} ${m[3]} ${m[4]}`);
   }
   return out;
 }
 
-describe("theme tokens — CSS ↔ JS parity", () => {
-  const vars = cssVars();
+const LIGHT = blockVars(":root");
+const DARK = blockVars(':root[data-theme="dark"]');
 
-  it("declares the palette as RGB triplets in globals.css", () => {
-    expect(vars.size).toBeGreaterThanOrEqual(40);
-    expect(vars.get("canvas")).toBe("11 18 32");
-    expect(vars.get("cobalt-500")).toBe("76 141 255");
-    expect(vars.get("brass-500")).toBe("211 168 76");
+describe("theme tokens — CSS", () => {
+  it("light and dark declare the same colour variables", () => {
+    expect(LIGHT.size).toBeGreaterThanOrEqual(40);
+    expect([...LIGHT.keys()].sort()).toEqual([...DARK.keys()].sort());
   });
 
-  it("every THEME constant equals the CSS variable it mirrors", () => {
-    for (const [key, hex] of Object.entries(THEME)) {
-      const varName = THEME_VAR_MAP[key as keyof typeof THEME];
-      expect(vars.has(varName), `--c-${varName} missing for THEME.${key}`).toBe(true);
-      expect(hexToRgbTriplet(hex), `THEME.${key}`).toBe(vars.get(varName));
+  it("the two themes actually differ where they should", () => {
+    expect(LIGHT.get("canvas")).not.toBe(DARK.get("canvas"));
+    expect(LIGHT.get("layer")).toBe("15 27 45");
+    expect(DARK.get("layer")).toBe("255 255 255");
+    expect(DARK.get("cobalt-500")).toBe("76 141 255");
+  });
+});
+
+describe("theme tokens — JavaScript palette", () => {
+  it("THEME values are variable references to declared variables", () => {
+    for (const [key, value] of Object.entries(THEME)) {
+      const m = /^rgb\(var\(--c-([a-z0-9-]+)\)\)$/.exec(value);
+      expect(m, `THEME.${key} = ${value}`).not.toBeNull();
+      expect(LIGHT.has(m![1]!), `--c-${m![1]} undeclared (THEME.${key})`).toBe(true);
+      expect(THEME_VAR_MAP[key as keyof typeof THEME_VAR_MAP]).toBe(m![1]);
     }
   });
 
-  it("hex helpers", () => {
-    expect(hexToRgbTriplet("#4C8DFF")).toBe("76 141 255");
-    expect(withAlpha("#4C8DFF", 0.15)).toBe("rgba(76, 141, 255, 0.15)");
-    expect(withAlpha("#4C8DFF", 2)).toBe("rgba(76, 141, 255, 1)");
-    expect(() => hexToRgbTriplet("#fff")).toThrow();
+  it("THEME_HEX mirrors the dark theme's variables", () => {
+    for (const [key, hex] of Object.entries(THEME_HEX)) {
+      const varName = THEME_VAR_MAP[key as keyof typeof THEME_VAR_MAP];
+      expect(hexToRgbTriplet(hex), `THEME_HEX.${key} vs --c-${varName}`).toBe(DARK.get(varName));
+    }
   });
 
-  it("chart and presence palettes are distinct hexes", () => {
+  it("withAlpha handles both value kinds", () => {
+    expect(withAlpha(THEME.cobalt, 0.15)).toBe("rgb(var(--c-cobalt-500) / 0.15)");
+    expect(withAlpha("#4C8DFF", 0.15)).toBe("rgba(76, 141, 255, 0.15)");
+    expect(withAlpha("#4C8DFF", 2)).toBe("rgba(76, 141, 255, 1)");
+    expect(() => withAlpha("#fff", 0.5)).toThrow();
+  });
+
+  it("chart and presence palettes are distinct", () => {
     expect(new Set(CHART_SERIES).size).toBe(CHART_SERIES.length);
     expect(PRESENCE_PALETTE.length).toBe(12);
     expect(new Set(PRESENCE_PALETTE).size).toBe(12);
-    for (const c of [...CHART_SERIES, ...PRESENCE_PALETTE]) {
-      expect(c).toMatch(/^#[0-9A-F]{6}$/i);
-    }
+    for (const c of PRESENCE_PALETTE) expect(c).toMatch(/^#[0-9A-F]{6}$/i);
   });
 });
 
@@ -70,7 +92,6 @@ describe("theme tokens — Tailwind config", () => {
     string,
     string | Record<string, string>
   >;
-  const vars = cssVars();
 
   it("every colour family is a scale with a DEFAULT and numbered stops", () => {
     const families = [
@@ -85,6 +106,7 @@ describe("theme tokens — Tailwind config", () => {
         expect(scale[stop], `${f}-${stop}`).toBeDefined();
       }
     }
+    expect(colors.layer).toBe("rgb(var(--c-layer) / <alpha-value>)");
   });
 
   it("every colour resolves to a declared --c-* variable with an alpha slot", () => {
@@ -94,19 +116,27 @@ describe("theme tokens — Tailwind config", () => {
       else values.push(...Object.values(entry));
     }
     expect(values.length).toBeGreaterThan(50);
-    for (const v of values) {
-      const m = /^rgb\(var\(--c-([a-z0-9-]+)\) \/ <alpha-value>\)$/.exec(v);
-      expect(m, `unexpected colour value ${v}`).not.toBeNull();
-      expect(vars.has(m![1]!), `--c-${m![1]} is not declared in globals.css`).toBe(true);
+    for (const val of values) {
+      const m = /^rgb\(var\(--c-([a-z0-9-]+)\) \/ <alpha-value>\)$/.exec(val);
+      expect(m, `unexpected colour value ${val}`).not.toBeNull();
+      expect(LIGHT.has(m![1]!), `--c-${m![1]} is not declared in globals.css`).toBe(true);
     }
   });
 });
 
-describe("theme tokens — no hex literals in themed paths", () => {
+describe("theme tokens — no literals in themed paths", () => {
   const HEX = /#[0-9a-fA-F]{6}\b/g;
+  // Palette numbers hand-written as rgba(...) are the other way colour
+  // drifts; black / white overlays (shadows, scrims) are fine.
+  const PALETTE_RGBA = /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,/g;
+  // `bg-white/5`-style layers are invisible on the light theme; the
+  // `layer` token replaces them.
+  const WHITE_ALPHA = /\b(bg|border|divide|text)-white\/\[?[0-9.]+\]?/g;
+
   const FILES = [
     "tailwind.config.ts",
     "src/app/globals.css",
+    "src/app/layout.tsx",
     "src/app/(auth)/layout.tsx",
     "src/lib/collab-user.ts",
     "src/lib/proposal-types.ts",
@@ -149,11 +179,7 @@ describe("theme tokens — no hex literals in themed paths", () => {
     return out;
   }
 
-  // Palette numbers hand-written as rgba(...) are the other way colour
-  // drifts; black / white overlays (shadows, hairlines) are fine.
-  const PALETTE_RGBA = /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,/g;
-
-  it("components, shell, status maps and retouched panels use tokens, not hex", () => {
+  it("components, shell, status maps and retouched panels use tokens, not literals", () => {
     const paths = [
       ...FILES.map((f) => join(ROOT, f)),
       ...DIRS.flatMap((d) => walk(join(ROOT, d))),
@@ -167,8 +193,15 @@ describe("theme tokens — no hex literals in themed paths", () => {
         const mono = (r === 0 && g === 0 && b === 0) || (r === 255 && g === 255 && b === 255);
         if (!mono) hits.push(m[0]);
       }
+      hits.push(...(src.match(WHITE_ALPHA) ?? []));
       if (hits.length > 0) offenders.push(`${p.replace(ROOT + "/", "")}: ${hits.join(", ")}`);
     }
     expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("no white-alpha layer utilities remain anywhere in the app", () => {
+    const paths = walk(join(ROOT, "src"));
+    const offenders = paths.filter((p) => WHITE_ALPHA.test(readFileSync(p, "utf8")));
+    expect(offenders.map((p) => p.replace(ROOT + "/", ""))).toEqual([]);
   });
 });

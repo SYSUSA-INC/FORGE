@@ -126,7 +126,7 @@ export function SearchClient({
               className={`rounded-md border px-2 py-1 font-mono text-[11px] tabular-nums transition-colors ${
                 naics === code
                   ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                  : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
               {code}
@@ -135,7 +135,7 @@ export function SearchClient({
           <button
             type="button"
             onClick={() => setNaics("")}
-            className="rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 font-mono text-[11px] text-muted hover:border-white/20"
+            className="rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1 font-mono text-[11px] text-muted hover:border-layer/20"
           >
             clear
           </button>
@@ -193,8 +193,8 @@ export function SearchClient({
                   key={e.ueiSAM}
                   className={`rounded-lg border p-3 ${
                     e.alreadyImported
-                      ? "border-white/10 bg-white/[0.015] opacity-70"
-                      : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                      ? "border-layer/10 bg-layer/[0.015] opacity-70"
+                      : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
                   }`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -215,7 +215,7 @@ export function SearchClient({
                           {e.sbaCertifications.map((s) => (
                             <span
                               key={s}
-                              className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+                              className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
                             >
                               {s}
                             </span>
@@ -225,7 +225,7 @@ export function SearchClient({
                     </div>
                     <div className="flex items-center gap-2">
                       {e.alreadyImported ? (
-                        <span className="rounded bg-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+                        <span className="rounded bg-layer/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted">
                           Already imported
                         </span>
                       ) : (

@@ -102,7 +102,7 @@ export function EnterpriseInvoiceForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="mt-4 flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3"
+      className="mt-4 flex flex-col gap-3 rounded-md border border-layer/10 bg-layer/[0.02] p-3"
     >
       <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
         Issue enterprise wire-invoice

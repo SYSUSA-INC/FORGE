@@ -41,7 +41,7 @@ export function TagManager({ tags }: { tags: Row[] }) {
           className="aur-input text-[11px]"
         />
       </div>
-      <ul className="divide-y divide-white/5 rounded-lg border border-white/10">
+      <ul className="divide-y divide-layer/5 rounded-lg border border-layer/10">
         {filtered.map((r) => (
           <TagRow key={r.tag} tag={r.tag} count={r.count} />
         ))}
@@ -122,7 +122,7 @@ function TagRow({ tag, count }: { tag: string; count: number }) {
             disabled={pending}
           />
         ) : (
-          <span className="rounded bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-text">
+          <span className="rounded bg-layer/[0.04] px-2 py-1 font-mono text-[11px] text-text">
             #{tag}
           </span>
         )}

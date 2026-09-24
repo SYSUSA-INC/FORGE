@@ -78,7 +78,7 @@ export function LossNarrativePanel({
             {result.narrative.insights.map((ins, i) => (
               <li
                 key={i}
-                className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <div className="font-display text-[13px] font-semibold text-text">
                   {i + 1}. {ins.title}
@@ -98,7 +98,7 @@ export function LossNarrativePanel({
                       <a
                         key={id}
                         href={`#pattern-${encodeURIComponent(id)}`}
-                        className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] text-muted hover:border-white/30 hover:text-text"
+                        className="rounded border border-layer/10 px-1.5 py-0.5 font-mono text-[9px] text-muted hover:border-layer/30 hover:text-text"
                       >
                         {id}
                       </a>
@@ -120,7 +120,7 @@ export function LossNarrativePanel({
               </ul>
             </div>
           ) : null}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-layer/10 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
             {result.stubbed ? <StubModeBanner variant="inline" /> : null}
             <span>
               <span className="text-muted">Provider:</span>{" "}

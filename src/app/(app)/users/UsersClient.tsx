@@ -150,7 +150,7 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
       </div>
 
       {summary.recent.length > 0 ? (
-        <div className="mt-4 border-t border-white/5 pt-4">
+        <div className="mt-4 border-t border-layer/5 pt-4">
           <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
             Recently joined
           </div>
@@ -350,7 +350,7 @@ function PendingPanel({
           {invites.map((i) => (
             <li
               key={i.id}
-              className="grid grid-cols-1 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-3 md:grid-cols-[1fr_auto_auto]"
+              className="grid grid-cols-1 items-center gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 md:grid-cols-[1fr_auto_auto]"
             >
               <div className="min-w-0">
                 <div className="truncate font-mono text-[12px] text-text">{i.email}</div>
@@ -446,7 +446,7 @@ function MembersPanel({
           return (
             <li
               key={m.userId}
-              className="grid grid-cols-1 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 md:grid-cols-[auto_1fr_auto_auto_auto_auto]"
+              className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 md:grid-cols-[auto_1fr_auto_auto_auto_auto]"
             >
               {m.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -471,7 +471,7 @@ function MembersPanel({
                 <div className="truncate text-[13px] font-semibold text-text">
                   {m.name ?? m.email}
                   {isSelf ? (
-                    <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                    <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                       You
                     </span>
                   ) : null}
@@ -497,7 +497,7 @@ function MembersPanel({
                 className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-widest ${
                   m.status === "active"
                     ? "border-emerald/30 bg-emerald/10 text-emerald"
-                    : "border-white/20 bg-white/[0.03] text-muted"
+                    : "border-layer/20 bg-layer/[0.03] text-muted"
                 }`}
               >
                 {m.status}

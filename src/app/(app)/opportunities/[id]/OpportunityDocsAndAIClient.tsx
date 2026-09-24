@@ -27,7 +27,7 @@ type SolicitationRow = {
 };
 
 const STATUS_TONE: Record<ReviewStatus, string> = {
-  none: "border-white/15 bg-white/5 text-muted",
+  none: "border-layer/15 bg-layer/5 text-muted",
   pending: "border-amber-400/40 bg-amber-400/10 text-amber-200",
   running: "border-cobalt-400/40 bg-cobalt-400/10 text-cobalt",
   complete: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
@@ -105,7 +105,7 @@ export function OpportunityDocsAndAIClient({
           return (
             <li
               key={s.id}
-              className="rounded-lg border border-white/10 bg-white/[0.02] p-3"
+              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="min-w-0">

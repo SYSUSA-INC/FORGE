@@ -243,7 +243,7 @@ function FilterRow({ active, env }: { active: Filter; env: string }) {
             className={`rounded-md border px-2 py-1 ${
               active === f.key
                 ? "border-violet/40 bg-violet/10 text-text"
-                : "border-white/10 bg-white/[0.02] text-muted hover:text-text"
+                : "border-layer/10 bg-layer/[0.02] text-muted hover:text-text"
             }`}
           >
             {f.label}
@@ -262,7 +262,7 @@ function FilterRow({ active, env }: { active: Filter; env: string }) {
             className={`rounded-md border px-2 py-1 ${
               env === e
                 ? "border-violet/40 bg-violet/10 text-text"
-                : "border-white/10 bg-white/[0.02] text-muted hover:text-text"
+                : "border-layer/10 bg-layer/[0.02] text-muted hover:text-text"
             }`}
           >
             {e || "All"}
@@ -275,7 +275,7 @@ function FilterRow({ active, env }: { active: Filter; env: string }) {
 
 function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
+    <span className="rounded bg-layer/[0.05] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
       {children}
     </span>
   );

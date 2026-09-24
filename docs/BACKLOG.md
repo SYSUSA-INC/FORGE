@@ -294,8 +294,25 @@ rendering bug found on the way.
   that every colour family is a scale, and that no hex literal returns
   to the themed paths.
 
-**Not in this pass:** PDF renderers' document palette; a light theme
-(the variables make it a selector-scoped override later).
+**Slice 2 — light corporate default + theme toggle** (PR #TBD). User
+feedback on #272: "same color scheme still" — the dark navy base read as
+unchanged. The default is now a **light** corporate theme (off-white
+canvas, white cards, navy type, cobalt actions, brass accent) and the
+dark palette moved under `:root[data-theme="dark"]`, chosen from a ☾/☀
+toggle in the app, sign-in and public headers (stored per viewer,
+applied before first paint). To make one set of components work on
+both: a `layer` token replaces the 800 `bg-white/…` / `border-white/…`
+translucent layers (white on dark, navy on light); numbered stops are
+roles (200/300 text-on-tint, 400 solid, 500 readable default, 600/700
+deep) so `text-emerald-300` stays legible on either theme; `THEME.*`
+became CSS-variable references (`THEME_HEX.*` keeps literal hex for
+emails, PDF defaults and stored data); card shadows and backdrop washes
+are per-theme variables. Token test extended (both blocks declare the
+same variables, THEME references declared variables, THEME_HEX matches
+the dark block, no white-alpha utility anywhere in `src`).
+
+**Not in this pass:** PDF renderers' document palette; the
+`proposal_template` DB column defaults (would need a migration).
 
 ---
 

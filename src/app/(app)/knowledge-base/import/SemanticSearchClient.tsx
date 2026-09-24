@@ -66,7 +66,7 @@ export function SemanticSearchClient({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.015] p-4">
+    <div className="rounded-xl border border-layer/10 bg-layer/[0.015] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           Semantic search
@@ -162,7 +162,7 @@ export function SemanticSearchClient({
 function SearchHitCard({ hit, query }: { hit: SearchHit; query: string }) {
   const sim = Math.max(0, Math.min(1, hit.similarity));
   return (
-    <li className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -171,7 +171,7 @@ function SearchHitCard({ hit, query }: { hit: SearchHit; query: string }) {
           >
             {hit.artifactTitle || hit.artifactFileName || "Untitled artifact"}
           </Link>
-          <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+          <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
             {hit.artifactKind.replace(/_/g, " ")}
           </span>
         </div>

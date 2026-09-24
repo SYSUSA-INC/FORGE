@@ -12,7 +12,7 @@ export function UserMenu({ user }: { user: UserLike | null }) {
     return (
       <Link
         href="/sign-in"
-        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-text transition-colors hover:border-white/20"
+        className="flex items-center gap-2 rounded-full border border-layer/10 bg-layer/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-text transition-colors hover:border-layer/20"
       >
         Sign in
       </Link>
@@ -29,7 +29,7 @@ export function UserMenu({ user }: { user: UserLike | null }) {
       .join("") || "·";
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1">
+    <div className="flex items-center gap-2 rounded-full border border-layer/10 bg-layer/5 px-2 py-1">
       {user.image ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -62,7 +62,7 @@ export function UserMenu({ user }: { user: UserLike | null }) {
       >
         <button
           type="submit"
-          className="ml-1 rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted transition-colors hover:border-white/20 hover:text-text"
+          className="ml-1 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted transition-colors hover:border-layer/20 hover:text-text"
         >
           Sign out
         </button>

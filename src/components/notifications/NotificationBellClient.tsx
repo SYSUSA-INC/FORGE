@@ -53,8 +53,8 @@ export function NotificationBellClient({
         aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
         className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
           open
-            ? "border-white/20 bg-white/10 text-text"
-            : "border-white/10 bg-white/[0.03] text-muted hover:border-white/20 hover:text-text"
+            ? "border-layer/20 bg-layer/10 text-text"
+            : "border-layer/10 bg-layer/[0.03] text-muted hover:border-layer/20 hover:text-text"
         }`}
       >
         <BellIcon />
@@ -66,8 +66,8 @@ export function NotificationBellClient({
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-lg border border-white/10 bg-canvas shadow-card">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
+        <div className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-lg border border-layer/10 bg-canvas shadow-card">
+          <div className="flex items-center justify-between border-b border-layer/10 px-4 py-2.5">
             <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
               Notifications
             </span>
@@ -87,7 +87,7 @@ export function NotificationBellClient({
                 return (
                   <li
                     key={n.id}
-                    className="border-b border-white/5 last:border-b-0"
+                    className="border-b border-layer/5 last:border-b-0"
                   >
                     <Link
                       href={n.linkPath || "/notifications"}
@@ -95,7 +95,7 @@ export function NotificationBellClient({
                         setOpen(false);
                         if (isUnread) markOne(n.id);
                       }}
-                      className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04] ${
+                      className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-layer/[0.04] ${
                         isUnread ? "" : "opacity-70"
                       }`}
                     >
@@ -138,7 +138,7 @@ export function NotificationBellClient({
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="block border-t border-white/10 px-4 py-2.5 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-teal hover:bg-white/[0.04]"
+            className="block border-t border-layer/10 px-4 py-2.5 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-teal hover:bg-layer/[0.04]"
           >
             View all{pending ? " · …" : ""}
           </Link>

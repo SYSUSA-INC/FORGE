@@ -115,14 +115,14 @@ export function OpportunitiesClient({
           type="button"
           onClick={() => setStageFilter("all")}
           aria-pressed={stageFilter === "all"}
-          className={`flex flex-col gap-2 rounded-lg border bg-white/[0.02] p-3 text-left transition-colors ${
+          className={`flex flex-col gap-2 rounded-lg border bg-layer/[0.02] p-3 text-left transition-colors ${
             stageFilter === "all"
-              ? "border-2 border-white/40 bg-white/[0.06]"
-              : "border-white/10 hover:border-white/30"
+              ? "border-2 border-layer/40 bg-layer/[0.06]"
+              : "border-layer/10 hover:border-layer/30"
           }`}
         >
           <div className="flex items-center justify-between">
-            <div className="rounded-sm border border-white/15 bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
+            <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
               All
             </div>
             <div className="font-display text-2xl font-semibold leading-none tabular-nums text-text">
@@ -211,7 +211,7 @@ function OppRow({ o }: { o: Opp }) {
     : null;
 
   return (
-    <div className="grid grid-cols-1 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 transition-colors hover:border-white/20 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+    <div className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 transition-colors hover:border-layer/20 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
       <Link href={`/opportunities/${o.id}`} className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">
           {o.title}

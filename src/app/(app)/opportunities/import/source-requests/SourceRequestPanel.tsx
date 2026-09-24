@@ -177,7 +177,7 @@ export function SourceRequestPanel({
             {own.map((r) => (
               <li
                 key={r.id}
-                className="flex items-start gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function SourceRequestPanel({
                     {r.description}
                   </div>
                   {r.platformNotes ? (
-                    <div className="mt-1 rounded border border-white/10 bg-white/[0.02] px-2 py-1 font-mono text-[10px] leading-relaxed text-text">
+                    <div className="mt-1 rounded border border-layer/10 bg-layer/[0.02] px-2 py-1 font-mono text-[10px] leading-relaxed text-text">
                       <span className="font-mono text-[9px] uppercase tracking-widest text-teal">
                         FORGE team:
                       </span>{" "}

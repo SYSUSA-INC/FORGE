@@ -67,7 +67,7 @@ export default async function CompanyDetailPage({
         ]}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-4 py-3">
         <span
           className="h-2 w-2 rounded-full"
           style={{ backgroundColor: relColor }}

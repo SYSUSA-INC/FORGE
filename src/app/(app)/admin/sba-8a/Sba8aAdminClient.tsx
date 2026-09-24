@@ -205,7 +205,7 @@ export function Sba8aAdminClient({
         dense
       >
         <table className="w-full text-left font-mono text-[11px]">
-          <thead className="bg-white/[0.02] text-muted">
+          <thead className="bg-layer/[0.02] text-muted">
             <tr>
               <th className="px-5 py-2">Cert</th>
               <th className="px-5 py-2 text-right">Total</th>
@@ -215,7 +215,7 @@ export function Sba8aAdminClient({
               <th className="px-5 py-2"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-layer/5">
             {stats.byCertType.map((row) => (
               <tr key={row.certType}>
                 <td className="px-5 py-2">
@@ -266,7 +266,7 @@ export function Sba8aAdminClient({
         {!cronSecretPresent ? (
           <div className="mb-3 rounded border border-rose/30 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose-200">
             <strong>CRON_SECRET not set.</strong> The cron route refuses
-            unauthenticated calls. Add <code className="rounded bg-white/5 px-1">CRON_SECRET</code>{" "}
+            unauthenticated calls. Add <code className="rounded bg-layer/5 px-1">CRON_SECRET</code>{" "}
             (any long random value) to Vercel env vars in Production
             scope and redeploy. Until then the monthly job won't run,
             but the manual "Trigger refresh" button below still works.
@@ -497,7 +497,7 @@ export function Sba8aAdminClient({
           </p>
         ) : (
           <table className="w-full text-left font-mono text-[11px]">
-            <thead className="bg-white/[0.02] text-muted">
+            <thead className="bg-layer/[0.02] text-muted">
               <tr>
                 <th className="px-5 py-2">Started</th>
                 <th className="px-5 py-2">Cert</th>
@@ -508,7 +508,7 @@ export function Sba8aAdminClient({
                 <th className="px-5 py-2">Error</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-layer/5">
               {runs.map((r) => (
                 <tr key={r.id}>
                   <td className="px-5 py-2 text-muted">

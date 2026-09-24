@@ -116,7 +116,7 @@ export function EvidenceDock({
             return (
               <li
                 key={e.id}
-                className="flex items-start gap-2 rounded-md border border-white/10 bg-white/[0.02] px-2 py-1.5"
+                className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
               >
                 <span
                   className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
@@ -172,7 +172,7 @@ export function EvidenceDock({
 
           {available ? (
             <>
-              <div className="mb-2 flex gap-1 rounded border border-white/10 p-0.5">
+              <div className="mb-2 flex gap-1 rounded border border-layer/10 p-0.5">
                 {(
                   [
                     "past_performance",
@@ -224,7 +224,7 @@ export function EvidenceDock({
                         return (
                           <li
                             key={pp.refId}
-                            className="rounded border border-white/10 bg-white/[0.02] px-2 py-1.5"
+                            className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
@@ -271,12 +271,12 @@ export function EvidenceDock({
                       {available.knowledgeEntries.map((k) => (
                         <li
                           key={k.id}
-                          className="rounded border border-white/10 bg-white/[0.02] px-2 py-1.5"
+                          className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="rounded bg-white/5 px-1 py-0.5 font-mono text-[9px] uppercase text-muted">
+                                <span className="rounded bg-layer/5 px-1 py-0.5 font-mono text-[9px] uppercase text-muted">
                                   {k.kind}
                                 </span>
                                 <span className="truncate font-mono text-[11px] text-text">
@@ -323,7 +323,7 @@ export function EvidenceDock({
                       <select
                         value={selectedSectionId ?? ""}
                         onChange={(e) => setSelectedSectionId(e.target.value)}
-                        className="mb-2 w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-text"
+                        className="mb-2 w-full rounded border border-layer/10 bg-layer/[0.04] px-2 py-1 font-mono text-[11px] text-text"
                       >
                         {available.sections.map((s) => (
                           <option key={s.id} value={s.id}>
@@ -349,7 +349,7 @@ export function EvidenceDock({
                             {section.contentSnippets.map((p, i) => (
                               <li
                                 key={i}
-                                className="rounded border border-white/10 bg-white/[0.02] px-2 py-1.5"
+                                className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="line-clamp-3 flex-1 font-body text-[11px] text-foreground">

@@ -245,7 +245,7 @@ function AddSectionRow({ proposalId }: { proposalId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-dashed border-white/10 bg-white/[0.02] p-3 md:flex-row md:items-end">
+    <div className="flex flex-col gap-2 rounded-md border border-dashed border-layer/10 bg-layer/[0.02] p-3 md:flex-row md:items-end">
       <div className="flex-1">
         <label className="aur-label">Add section</label>
         <input
@@ -504,7 +504,7 @@ function SectionRow({
   const words = wordCount;
 
   return (
-    <li className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.02]">
+    <li className="overflow-hidden rounded-lg border border-layer/10 bg-layer/[0.02]">
       <button
         type="button"
         onClick={onToggle}
@@ -512,7 +512,7 @@ function SectionRow({
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+            <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
               {section.ordering}
             </span>
             {/* BL-FB-SCAN-CONTINUOUS — health dot per section */}
@@ -560,7 +560,7 @@ function SectionRow({
       </button>
 
       {open ? (
-        <div className="border-t border-white/10 bg-canvas/40 p-3">
+        <div className="border-t border-layer/10 bg-canvas/40 p-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className="aur-label">Section title</label>

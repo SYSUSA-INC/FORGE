@@ -162,7 +162,7 @@ export function AmendmentsPanel({
             return (
               <li
                 key={a.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="font-mono text-[12px] text-text">

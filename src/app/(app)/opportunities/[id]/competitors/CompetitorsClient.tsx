@@ -34,7 +34,7 @@ export function CompetitorsClient({
         suggestedIncumbent={incumbentFromOverview}
       />
       {competitors.length === 0 ? (
-        <div className="rounded-md border border-dashed border-white/10 px-3 py-3 font-mono text-[11px] text-muted">
+        <div className="rounded-md border border-dashed border-layer/10 px-3 py-3 font-mono text-[11px] text-muted">
           No competitors added yet.
         </div>
       ) : (
@@ -96,7 +96,7 @@ function AddForm({
 
   return (
     <form
-      className="grid grid-cols-1 gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 md:grid-cols-2"
+      className="grid grid-cols-1 gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 md:grid-cols-2"
       onSubmit={onSubmit}
     >
       <div>
@@ -110,7 +110,7 @@ function AddForm({
         />
       </div>
       <div className="flex items-end">
-        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
           <input
             type="checkbox"
             className="accent-teal-400"
@@ -223,7 +223,7 @@ function CompetitorCard({
 
   if (!editing) {
     return (
-      <li className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="font-display text-[14px] font-semibold text-text">
             {competitor.name}
@@ -273,7 +273,7 @@ function CompetitorCard({
   }
 
   return (
-    <li className="rounded-lg border border-teal-400/40 bg-white/[0.02] p-3">
+    <li className="rounded-lg border border-teal-400/40 bg-layer/[0.02] p-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label className="aur-label">Name</label>
@@ -284,7 +284,7 @@ function CompetitorCard({
           />
         </div>
         <div className="flex items-end">
-          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
             <input
               type="checkbox"
               className="accent-teal-400"

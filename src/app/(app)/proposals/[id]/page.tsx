@@ -135,7 +135,7 @@ export default async function ProposalOverviewPage({
             {sections.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <span className="truncate font-mono text-[12px] text-text">
                   {s.title}

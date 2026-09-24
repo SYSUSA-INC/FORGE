@@ -60,13 +60,13 @@ export async function ImpersonationBanner() {
         <span className="rounded bg-black/30 px-1.5 py-0.5">
           {target?.name ?? "unknown tenant"}
         </span>
-        <span className="hidden md:inline text-white/80">
+        <span className="hidden md:inline text-layer/80">
           · reason:{" "}
           <span className="italic">
             {truncate(session.reason, 90)}
           </span>
         </span>
-        <span className="hidden lg:inline text-white/70">
+        <span className="hidden lg:inline text-layer/70">
           · expires in {minutesRemaining}m
         </span>
       </div>

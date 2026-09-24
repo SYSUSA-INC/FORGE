@@ -217,9 +217,9 @@ export function AuditLogClient({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-md border border-white/10 bg-white/[0.02]">
+      <div className="overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.02]">
         <table className="w-full min-w-[800px] text-left">
-          <thead className="border-b border-white/10 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
             <tr>
               <th className="px-3 py-2 font-normal">Time</th>
               <th className="px-3 py-2 font-normal">Actor</th>
@@ -244,7 +244,7 @@ export function AuditLogClient({
                 return (
                   <tr
                     key={r.id}
-                    className="border-b border-white/5 align-top last:border-0"
+                    className="border-b border-layer/5 align-top last:border-0"
                   >
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-muted">
                       {new Date(r.createdAt).toLocaleString()}
@@ -282,7 +282,7 @@ export function AuditLogClient({
                         {expanded ? "Hide" : "Detail"}
                       </button>
                       {expanded ? (
-                        <div className="mt-2 rounded border border-white/10 bg-canvas px-3 py-2 text-left">
+                        <div className="mt-2 rounded border border-layer/10 bg-canvas px-3 py-2 text-left">
                           <div className="grid grid-cols-1 gap-2 font-mono text-[11px] md:grid-cols-2">
                             <Row label="resource id" value={r.resourceId} />
                             <Row label="ip" value={r.ip} />

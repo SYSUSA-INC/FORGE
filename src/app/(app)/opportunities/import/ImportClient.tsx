@@ -125,7 +125,7 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
   return (
     <div className="flex flex-col gap-4">
       <Panel title="Search SAM.gov" eyebrow="Active solicitations">
-        <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.015] p-3">
+        <div className="mb-3 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-text">
               <input
@@ -155,7 +155,7 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
                     className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
                       active
                         ? "border-teal-400 bg-teal-400/15 text-teal"
-                        : "border-white/15 bg-white/[0.02] text-muted hover:border-white/30 hover:text-text"
+                        : "border-layer/15 bg-layer/[0.02] text-muted hover:border-layer/30 hover:text-text"
                     }`}
                   >
                     {v.label}
@@ -316,10 +316,10 @@ function OpportunityRow({
     <li
       className={`rounded-lg border p-3 transition-colors ${
         o.alreadyImported
-          ? "border-white/10 bg-white/[0.015] opacity-60"
+          ? "border-layer/10 bg-layer/[0.015] opacity-60"
           : checked
             ? "border-teal-400 bg-teal-400/5"
-            : "border-white/10 bg-white/[0.02] hover:border-white/20"
+            : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
       }`}
     >
       <label className="grid cursor-pointer grid-cols-[auto_1fr_auto] items-start gap-3">
@@ -336,7 +336,7 @@ function OpportunityRow({
               {o.title}
             </span>
             {o.alreadyImported ? (
-              <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 Already imported
               </span>
             ) : null}
@@ -357,7 +357,7 @@ function OpportunityRow({
               </span>
             ) : null}
             {o.type ? (
-              <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 {o.type}
               </span>
             ) : null}
@@ -381,7 +381,7 @@ function OpportunityRow({
             </div>
           ) : null}
           {o.recompete ? (
-            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] px-2.5 py-1.5 font-body text-[12px] text-muted">
+            <div className="mt-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2.5 py-1.5 font-body text-[12px] text-muted">
               Bid before as{" "}
               <Link
                 href={`/proposals/${o.recompete.proposalId}/outcome`}

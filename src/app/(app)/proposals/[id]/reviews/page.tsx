@@ -101,7 +101,7 @@ export default async function ProposalReviewsPage({
                 return (
                   <li
                     key={r.id}
-                    className="rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                    className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -171,7 +171,7 @@ export default async function ProposalReviewsPage({
                                 className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
                                   a.submittedAt
                                     ? "bg-emerald/10 text-emerald"
-                                    : "bg-white/5 text-muted"
+                                    : "bg-layer/5 text-muted"
                                 }`}
                               >
                                 {(a.name ?? a.email) || "?"}

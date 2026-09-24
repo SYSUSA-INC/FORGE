@@ -40,11 +40,11 @@ export default async function AwardsIntelPage({
         >
           <p className="font-mono text-[12px] text-muted">
             This feature is in preview and is gated behind the{" "}
-            <code className="rounded bg-white/5 px-1.5 py-0.5">
+            <code className="rounded bg-layer/5 px-1.5 py-0.5">
               AWARDS_INTEL_ENABLED
             </code>{" "}
             environment variable. Set it to{" "}
-            <code className="rounded bg-white/5 px-1.5 py-0.5">1</code> on the
+            <code className="rounded bg-layer/5 px-1.5 py-0.5">1</code> on the
             deployment to enable. Source data: USAspending.gov public API (no
             credentials required).
           </p>
