@@ -124,7 +124,17 @@ type Props = {
   sectionId: string;
   hasContent: boolean;
   onAccept: (bodyDoc: TipTapDoc, plain: string, words: number) => void;
+  /**
+   * BL-AIP-2 — the section text as it stands in the editor. Improve,
+   * Tighten and Chat send it so the AI works on what the writer sees,
+   * not the last saved copy. A getter (not a value) so keystrokes do not
+   * re-render this panel.
+   */
+  getCurrentText?: () => string;
 };
+
+/** The routes cap the live body at 60k characters. */
+const LIVE_BODY_MAX_CHARS = 60_000;
 
 const MODES: { key: SectionDraftMode; label: string; description: string }[] = [
   {
@@ -145,7 +155,7 @@ const MODES: { key: SectionDraftMode; label: string; description: string }[] = [
   },
 ];
 
-export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
+export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentText }: Props) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
 
@@ -245,7 +255,12 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
       const res = await fetch("/api/ai/draft", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sectionId, mode: forMode, cite }),
+        body: JSON.stringify({
+          sectionId,
+          mode: forMode,
+          cite,
+          currentBodyPlain: getCurrentText?.().slice(0, LIVE_BODY_MAX_CHARS),
+        }),
         signal: ac.signal,
       });
       const isSse = (res.headers.get("content-type") ?? "").includes(
@@ -375,7 +390,11 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept }: Props) {
         method: "POST",
         headers: { "content-type": "application/json" },
         // History is read server-side from the persisted thread.
-        body: JSON.stringify({ sectionId, message: msg }),
+        body: JSON.stringify({
+          sectionId,
+          message: msg,
+          currentBodyPlain: getCurrentText?.().slice(0, LIVE_BODY_MAX_CHARS),
+        }),
         signal: ac.signal,
       });
       const isSse = (res.headers.get("content-type") ?? "").includes(

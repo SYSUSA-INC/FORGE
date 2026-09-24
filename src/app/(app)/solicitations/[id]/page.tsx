@@ -220,6 +220,7 @@ export default async function SolicitationDetail({
             <SolicitationActions
               id={s.id}
               parseStatus={s.parseStatus}
+              parseUpdatedAt={s.updatedAt ? new Date(s.updatedAt).toISOString() : null}
               opportunityId={s.opportunityId}
               hasStorage={!!s.storagePath}
             />
@@ -329,9 +330,10 @@ export default async function SolicitationDetail({
             {s.parseError}
           </pre>
           <p className="mt-3 font-body text-[12px] leading-relaxed text-muted">
-            If this is a scanned-image PDF, FORGE doesn't yet OCR — re-upload
-            a text-layer version. Otherwise click <strong>Re-parse</strong>{" "}
-            once the cause is fixed.
+            Scanned-image PDFs and images go through vision OCR
+            automatically; if that also failed, re-upload a text-layer
+            version. Otherwise click <strong>Re-parse</strong> once the cause
+            is fixed.
           </p>
         </Panel>
       ) : null}

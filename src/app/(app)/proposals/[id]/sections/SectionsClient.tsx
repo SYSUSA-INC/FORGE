@@ -340,15 +340,22 @@ function SectionRow({
   // BL-9 Slice 4 — comments config (activates only when collab is on).
   const comments = buildCommentsConfig(currentUser);
   const router = useRouter();
+  // BL-AIP-2 — a restore is an explicit request to discard local edits;
+  // the server-sync effect below honours it even while dirty.
+  const restorePendingRef = useRef(false);
   // BL-9 Slice 5b — snapshots config. The restore path mutates the
   // section's body_doc server-side, so a successful restore triggers
-  // a router.refresh() to re-fetch fresh server data into the editor.
+  // a router.refresh(); the refreshed props are adopted into the editor
+  // by the server-sync effect (BL-AIP-2).
   const snapshots = buildSnapshotsConfig({
     proposalId,
     sectionId: section.id,
     currentUser,
     authorUserId: section.authorUserId,
-    onRestored: () => router.refresh(),
+    onRestored: () => {
+      restorePendingRef.current = true;
+      router.refresh();
+    },
   });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -385,6 +392,60 @@ function SectionRow({
     section.authorUserId ?? "",
   );
 
+  // BL-AIP-2 — the editor reads `doc` once at mount. Every replacement
+  // from outside it (AI accept, Brain insert, snapshot restore) bumps
+  // `docVersion` so RichSectionEditor pushes the new document into
+  // TipTap; until now those actions changed page state while the
+  // visible text stayed, and the next Save threw the AI text away.
+  const [docVersion, setDocVersion] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const bodyDocRef = useRef<TipTapDoc>(initialDoc);
+  bodyDocRef.current = bodyDoc;
+  const plainRef = useRef(plainContent);
+  plainRef.current = plainContent;
+
+  function replaceDoc(doc: TipTapDoc, plain: string, count: number) {
+    setBodyDoc(doc);
+    setPlainContent(plain);
+    setWordCount(count);
+    setDirty(true);
+    setDocVersion((v) => v + 1);
+  }
+
+  // Server data changed underneath us (snapshot restore, or a refresh
+  // while there are no unsaved edits): adopt it. Never while dirty —
+  // that would throw away typing — unless a restore was requested.
+  useEffect(() => {
+    const serverDoc: TipTapDoc = section.bodyDoc?.content?.length
+      ? section.bodyDoc
+      : fromPlainText(section.content);
+    if (JSON.stringify(serverDoc) === JSON.stringify(bodyDocRef.current)) {
+      restorePendingRef.current = false;
+      return;
+    }
+    if (dirty && !restorePendingRef.current) return;
+    restorePendingRef.current = false;
+    setBodyDoc(serverDoc);
+    setPlainContent(section.content);
+    setWordCount(section.wordCount);
+    setDirty(false);
+    setDocVersion((v) => v + 1);
+    // `dirty` is read but deliberately not a dependency: typing must not
+    // re-run the adoption check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section.bodyDoc, section.content, section.wordCount]);
+
+  // Unsaved-changes guard.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
   function save() {
     setError(null);
     setNotice(null);
@@ -399,6 +460,7 @@ function SectionRow({
         authorUserId: authorUserId || null,
       });
       if (!res.ok) return setError(res.error);
+      setDirty(false);
       setNotice("Saved.");
       router.refresh();
 
@@ -556,11 +618,8 @@ function SectionRow({
             <AiAssistantPanel
               sectionId={section.id}
               hasContent={plainContent.trim().length > 0}
-              onAccept={(doc, plain, count) => {
-                setBodyDoc(doc);
-                setPlainContent(plain);
-                setWordCount(count);
-              }}
+              getCurrentText={() => plainRef.current}
+              onAccept={(doc, plain, count) => replaceDoc(doc, plain, count)}
             />
             <BrainSuggestPanel
               sectionId={section.id}
@@ -569,23 +628,31 @@ function SectionRow({
                   ? plainContent.replace(/\s+$/, "") + "\n\n" + text
                   : text;
                 const doc = fromPlainText(next);
-                setBodyDoc(doc);
-                setPlainContent(next);
-                setWordCount(next.split(/\s+/).filter(Boolean).length);
+                replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
               }}
             />
             <div className="flex items-center justify-between">
               <label className="aur-label mb-0">Content</label>
               <span className="font-mono text-[10px] text-muted">
                 {words} words
+                {dirty ? (
+                  <span
+                    className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-200"
+                    title="Changes in this section have not been saved"
+                  >
+                    unsaved
+                  </span>
+                ) : null}
               </span>
             </div>
             <RichSectionEditor
               doc={bodyDoc}
+              docVersion={docVersion}
               onChange={(doc, plain, count) => {
                 setBodyDoc(doc);
                 setPlainContent(plain);
                 setWordCount(count);
+                setDirty(true);
               }}
               placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
               collab={collab}

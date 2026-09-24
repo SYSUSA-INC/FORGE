@@ -133,6 +133,13 @@ type Props = {
    * the Comments extension. Threads live on the shared Y.Doc.
    */
   comments?: CommentsConfig;
+  /**
+   * BL-AIP-2 — bump when the parent replaces `doc` from outside the
+   * editor (AI accept, Brain insert, snapshot restore). TipTap reads
+   * `content` once at mount and ignores later prop changes; a new
+   * version pushes the new document in.
+   */
+  docVersion?: number;
 };
 
 function collabEnabled(): boolean {
@@ -148,6 +155,7 @@ export function RichSectionEditor({
   trackChanges,
   comments,
   snapshots,
+  docVersion,
 }: Props) {
   const useCollab = !!collab && collabEnabled();
   // Local toggle for track-changes sidebar visibility (independent of
@@ -334,6 +342,19 @@ export function RichSectionEditor({
   useEffect(() => {
     if (editor) editor.setEditable(!disabled);
   }, [editor, disabled]);
+
+  // BL-AIP-2 — apply externally replaced content. Guarded by version so
+  // the editor's own onUpdate → parent setState → new `doc` prop cycle
+  // never re-applies what the editor already holds (which would reset
+  // the cursor on every keystroke). emitUpdate keeps the parent's plain
+  // text and word count in step with what was applied.
+  const appliedVersionRef = useRef<number | undefined>(docVersion);
+  useEffect(() => {
+    if (!editor || docVersion === undefined) return;
+    if (appliedVersionRef.current === docVersion) return;
+    appliedVersionRef.current = docVersion;
+    editor.commands.setContent(doc, { emitUpdate: true });
+  }, [editor, docVersion, doc]);
 
   const setLink = useCallback(() => {
     if (!editor) return;

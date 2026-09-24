@@ -218,6 +218,14 @@ async function runSingleProposalScan(
     cacheSystem: true,
   });
   if (res.stubbed) {
+    // BL-AIP-2 — clear the dirty flag before bailing, otherwise the same
+    // proposals are picked up again every run (oldest first, five per
+    // run) and block everything behind them until a provider is set.
+    await db
+      .update(proposals)
+      .set({ scanDirtySince: null })
+      .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)))
+      .catch(() => undefined);
     throw new Error("AI provider is in stub mode — background scan skipped.");
   }
   if (!res.data) {

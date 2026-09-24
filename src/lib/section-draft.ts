@@ -77,6 +77,12 @@ export async function prepareSectionDraft(input: {
   mode: SectionDraftMode;
   /** BL-FB-GEN-CITE — retrieve Brain sources and require inline citations. */
   cite?: boolean;
+  /**
+   * BL-AIP-2 — the section as it stands in the editor. When present it
+   * replaces the saved body, so Improve / Tighten operate on unsaved
+   * typing instead of the last Save.
+   */
+  currentBodyPlain?: string;
 }): Promise<PreparedSectionDraft> {
   const { organizationId } = input;
 
@@ -172,6 +178,10 @@ export async function prepareSectionDraft(input: {
     patternIntel = undefined;
   }
 
+  // BL-AIP-2 — prefer the editor's live text over the saved body.
+  const liveBody =
+    typeof input.currentBodyPlain === "string" ? input.currentBodyPlain.trim() : undefined;
+
   const snapshot: SectionDraftSnapshot = {
     organizationName: orgRow?.name ?? "your organization",
     proposal: {
@@ -187,8 +197,11 @@ export async function prepareSectionDraft(input: {
       title: row.section.title,
       kind: row.section.kind,
       pageLimit: row.section.pageLimit,
-      currentBodyPlain: (row.section.content ?? "").slice(0, 4000),
-      currentWordCount: row.section.wordCount,
+      currentBodyPlain: (liveBody ?? row.section.content ?? "").slice(0, 4000),
+      currentWordCount:
+        liveBody !== undefined
+          ? liveBody.split(/\s+/g).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+          : row.section.wordCount,
     },
     pastPerformance,
     patternIntel,

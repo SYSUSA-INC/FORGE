@@ -183,6 +183,14 @@ export async function runProposalScanAction(
     stubbed = res.stubbed;
     if (res.stubbed) {
       await refundQuota(organizationId, "aiRequestsPerMonth");
+      // BL-AIP-2 — nothing will scan until a provider is configured, so
+      // clear the dirty flag. Leaving it set made the overview show
+      // "Background scan running" forever and re-fire on every page load.
+      await db
+        .update(proposals)
+        .set({ scanDirtySince: null })
+        .where(and(eq(proposals.organizationId, organizationId), eq(proposals.id, proposalId)))
+        .catch(() => undefined);
       return {
         ok: false,
         error:

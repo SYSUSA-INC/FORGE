@@ -493,8 +493,11 @@ export function buildSectionDraftPrompt(
   void _omitThemes;
   void _omitSources;
 
+  // BL-AIP-2 — `draft_alt` is a first draft too; it used to fall through
+  // to the "tightened body" instruction, contaminating variant B of
+  // every A/B comparison.
   const outputInstruction =
-    mode === "draft"
+    mode === "draft" || mode === "draft_alt"
       ? `Produce the section body. Output ONLY the body text — no title, no preamble, no commentary about your process.`
       : mode === "improve"
         ? `Return the improved body. Output ONLY the body text — no diff, no commentary about what you changed.`
