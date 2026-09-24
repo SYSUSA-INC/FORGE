@@ -30,7 +30,7 @@ Open http://localhost:3000
 
 ## Aesthetic
 
-Brutalist: stark paper/ink palette, hazard-yellow accents, 2px hard borders,
+"Boardroom Navy" (BL-UI-THEME, see `docs/DESIGN_SYSTEM.md`): deep navy surfaces, cobalt primary, brass signature accent, muted outcome colours; every colour is a CSS variable in `src/app/globals.css`. Earlier brutalist notes below are historical: stark paper/ink palette, hazard-yellow accents, 2px hard borders,
 offset box shadows, uppercase display type (Space Grotesk), monospace metadata
 (JetBrains Mono), grid-paper backgrounds, and diagonal hazard stripes on edges
 and caution zones.

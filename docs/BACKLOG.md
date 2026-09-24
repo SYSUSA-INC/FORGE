@@ -256,6 +256,49 @@ controls. Details and evidence in the assessment report.
 
 ---
 
+### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)
+
+User request (2026-09-24): "pretty up the UI with some nice corporate
+color theme." Replaces the neon aurora palette (teal / emerald / violet /
+pink glows) with a restrained corporate theme and fixes a long-standing
+rendering bug found on the way.
+
+**Delivered:**
+- **Palette on CSS variables.** `src/app/globals.css` declares every
+  colour as an RGB triplet (`--c-cobalt-500: 76 141 255`); Tailwind
+  resolves all tokens through `rgb(var(--c-x) / <alpha-value>)`. Deep
+  navy surfaces, **cobalt** primary (actions, focus, links), **brass**
+  signature accent (brand mark, AI, attention, the hairline on the top
+  chrome), muted green / red outcomes, indigo / plum for review stages.
+  Legacy names (`teal`, `gold`, `emerald`, `rose`, `violet`, `magenta`,
+  `sky`, `amber`) alias into the new families so no component had to
+  change.
+- **~340 dead colour classes fixed.** The old config set `teal`,
+  `emerald`, `rose`, `violet`, `sky` to flat strings, which deleted the
+  numbered stops (`text-emerald-300`, `bg-rose-500/15`, `text-teal-300`
+  …) from the generated CSS; status pills, "AI suggests" chips and delta
+  badges rendered unstyled. Every family is now a scale with a DEFAULT.
+- **JavaScript colours from one module.** `src/lib/theme-colors.ts`
+  (`THEME`, `CHART_SERIES`, `PRESENCE_PALETTE`, `withAlpha`) replaces
+  ~120 hex literals in the status maps (`*-types.ts`), charts (Funnel,
+  Radar, Sparkline, PieChart), key-date timeline, scan and diff panels,
+  track-changes sidebar, presence cursors and starter-template brand
+  defaults; the email shells use the same values.
+- **Chrome.** Brand tile is a cobalt→brass gradient (`aur-brand-mark`),
+  active nav carries a cobalt→brass rail, the app and auth headers get a
+  brass hairline (`aur-topline`), the backdrop is one cool wash and one
+  warm wash over a fine engineering grid.
+- **Guardrails.** `docs/DESIGN_SYSTEM.md` (rules, names, how to add a
+  colour); `tests/design/theme-tokens.test.ts` asserts CSS ↔ JS parity,
+  that every colour family is a scale, and that no hex literal returns
+  to the themed paths.
+
+**Not in this pass:** PDF renderers' document palette; a light theme
+(the variables make it a selector-scoped override later).
+
+---
+
 ### BL-PACKAGES — Subscription packages + AI token caps
 **Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slices 1–4: PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ⏳ remaining: à la carte add-on system
 

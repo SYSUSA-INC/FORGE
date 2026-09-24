@@ -29,7 +29,7 @@ export default async function SignInPage({
         <div
           className="h-[2px] w-full"
           style={{
-            background: "linear-gradient(90deg, #2DD4BF, #34D399 55%, #EC4899)",
+            background: "var(--g-brand-bar)",
           }}
         />
         <div className="px-8 py-10">
@@ -38,7 +38,7 @@ export default async function SignInPage({
               className="grid h-9 w-9 place-items-center rounded-lg font-display text-sm font-bold text-white shadow-glow"
               style={{
                 background:
-                  "linear-gradient(135deg, #2DD4BF, #34D399 55%, #EC4899 100%)",
+                  "var(--g-brand)",
               }}
             >
               F

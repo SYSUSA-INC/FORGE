@@ -25,6 +25,7 @@ import {
 } from "./actions";
 import { WinnerAnalysisPanel } from "./WinnerAnalysisPanel";
 import { ProtestViabilityPanel } from "./ProtestViabilityPanel";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 type OutcomeForm = {
   outcomeType: ProposalOutcomeType;
@@ -230,7 +231,7 @@ function OutcomePanel({
                   style={{
                     color: selected
                       ? OUTCOME_TYPE_COLORS[t]
-                      : "rgba(155, 201, 217, 0.8)",
+                      : withAlpha(THEME.muted, 0.8),
                     backgroundColor: selected
                       ? `${OUTCOME_TYPE_COLORS[t]}1A`
                       : "rgba(255, 255, 255, 0.04)",

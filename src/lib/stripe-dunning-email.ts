@@ -160,7 +160,7 @@ function buildHtml(args: {
   const cta = args.hostedInvoiceUrl
     ? `<p style="margin: 20px 0;">
          <a href="${args.hostedInvoiceUrl}"
-            style="display:inline-block;background:#2DD4BF;color:#0b1220;padding:10px 18px;border-radius:8px;font-weight:600;text-decoration:none;">
+            style="display:inline-block;background:#4C8DFF;color:#0b1220;padding:10px 18px;border-radius:8px;font-weight:600;text-decoration:none;">
            Update payment method →
          </a>
        </p>`

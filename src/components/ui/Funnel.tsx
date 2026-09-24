@@ -1,3 +1,5 @@
+import { THEME } from "@/lib/theme-colors";
+
 export type FunnelStage = {
   key: string;
   label: string;
@@ -6,17 +8,20 @@ export type FunnelStage = {
   valueHigh?: number;
 };
 
+// BL-UI-THEME — cool-to-warm progression through the pipeline: cobalt
+// while the pursuit is being qualified, brass while it is being written
+// and reviewed, green when it is won.
 const STAGE_GRADIENTS = [
-  ["#A5F3FC", "#67E8F9"],
-  ["#67E8F9", "#22D3EE"],
-  ["#5EEAD4", "#2DD4BF"],
-  ["#34D399", "#10B981"],
-  ["#A78BFA", "#8B5CF6"],
-  ["#F472B6", "#EC4899"],
-  ["#EC4899", "#BE185D"],
-  ["#F472B6", "#A21CAF"],
-  // Stage 9: Won — emerald + teal celebratory gradient
-  ["#6EE7B7", "#2DD4BF"],
+  [THEME.cobaltLight, THEME.cobalt],
+  [THEME.cobalt, THEME.cobaltDeep],
+  [THEME.cobaltDeep, THEME.indigo],
+  [THEME.indigo, THEME.plum],
+  [THEME.brassLight, THEME.brass],
+  [THEME.brass, THEME.brassDeep],
+  [THEME.plum, THEME.plumDeep],
+  [THEME.plumDeep, THEME.indigo],
+  // Stage 9: Won
+  [THEME.greenLight, THEME.green],
 ];
 
 export function Funnel({
@@ -100,7 +105,7 @@ export function Funnel({
                 fontFamily="var(--font-mono)"
                 fontSize={12}
                 fontWeight={700}
-                fill="#ffffff"
+                fill={THEME.text}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 style={{ textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}

@@ -8,6 +8,7 @@ import {
   semanticSearchAction,
   type SearchHit,
 } from "./embed-actions";
+import { THEME } from "@/lib/theme-colors";
 
 export function SemanticSearchClient({
   initialStatus,
@@ -197,11 +198,11 @@ function SearchHitCard({ hit, query }: { hit: SearchHit; query: string }) {
 }
 
 function simColor(s: number): string {
-  if (s >= 0.85) return "#10B981"; // emerald
-  if (s >= 0.7) return "#34D399"; // light emerald
-  if (s >= 0.55) return "#2DD4BF"; // teal
-  if (s >= 0.4) return "#A78BFA"; // violet
-  return "#94A3B8"; // muted
+  if (s >= 0.85) return THEME.green;
+  if (s >= 0.7) return THEME.greenLight;
+  if (s >= 0.55) return THEME.cobalt;
+  if (s >= 0.4) return THEME.indigo;
+  return THEME.muted;
 }
 
 function highlight(text: string, query: string): string {

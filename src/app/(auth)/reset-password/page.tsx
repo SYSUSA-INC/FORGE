@@ -16,7 +16,7 @@ export default function ResetPasswordPage({
         <div
           className="h-[2px] w-full"
           style={{
-            background: "linear-gradient(90deg, #2DD4BF, #34D399 55%, #EC4899)",
+            background: "var(--g-brand-bar)",
           }}
         />
         <div className="px-8 py-10">

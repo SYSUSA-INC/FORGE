@@ -1,4 +1,5 @@
 import type { NotificationKind } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   review_assigned: "Review assigned",
@@ -19,10 +20,10 @@ export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
 };
 
 export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
-  review_assigned: "#A78BFA",
-  review_section_assigned: "#2DD4BF",
-  review_comment_mentioned: "#EC4899",
-  review_completed: "#10B981",
-  opportunity_review_completed: "#2DD4BF",
-  solicitation_role_assigned: "#F59E0B",
+  review_assigned: THEME.indigo,
+  review_section_assigned: THEME.cobalt,
+  review_comment_mentioned: THEME.plum,
+  review_completed: THEME.green,
+  opportunity_review_completed: THEME.cobalt,
+  solicitation_role_assigned: THEME.brass,
 };

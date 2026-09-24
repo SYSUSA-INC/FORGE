@@ -1,4 +1,5 @@
 import type { OpportunityStage } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const STAGES: {
   key: OpportunityStage;
@@ -12,70 +13,70 @@ export const STAGES: {
     label: "Identified",
     shortLabel: "S1",
     phase: "capture",
-    color: "#A5F3FC",
+    color: THEME.cobaltLight,
   },
   {
     key: "sources_sought",
     label: "Sources Sought / RFI",
     shortLabel: "S2",
     phase: "capture",
-    color: "#67E8F9",
+    color: THEME.cobaltLight,
   },
   {
     key: "qualification",
     label: "Qualification",
     shortLabel: "S3",
     phase: "capture",
-    color: "#2DD4BF",
+    color: THEME.cobalt,
   },
   {
     key: "capture",
     label: "Capture",
     shortLabel: "S4",
     phase: "capture",
-    color: "#34D399",
+    color: THEME.green,
   },
   {
     key: "pre_proposal",
     label: "Pre-Proposal",
     shortLabel: "S5",
     phase: "proposal",
-    color: "#8B5CF6",
+    color: THEME.indigo,
   },
   {
     key: "writing",
     label: "Writing",
     shortLabel: "S6",
     phase: "proposal",
-    color: "#EC4899",
+    color: THEME.plum,
   },
   {
     key: "submitted",
     label: "Submitted",
     shortLabel: "S7",
     phase: "proposal",
-    color: "#BE185D",
+    color: THEME.plumDeep,
   },
   {
     key: "won",
     label: "Won",
     shortLabel: "W",
     phase: "closed",
-    color: "#10B981",
+    color: THEME.green,
   },
   {
     key: "lost",
     label: "Lost",
     shortLabel: "L",
     phase: "closed",
-    color: "#F43F5E",
+    color: THEME.red,
   },
   {
     key: "no_bid",
     label: "No Bid",
     shortLabel: "NB",
     phase: "closed",
-    color: "#64748B",
+    color: THEME.subtle,
   },
 ];
 

@@ -2,6 +2,7 @@ import type {
   OpportunityActivityKind,
   OpportunityEvaluation,
 } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 export const EVALUATION_DIMENSIONS: {
   key: keyof Omit<OpportunityEvaluation, "opportunityId" | "rationale" | "updatedAt">;
@@ -53,14 +54,14 @@ export const ACTIVITY_KIND_LABELS: Record<OpportunityActivityKind, string> = {
 };
 
 export const ACTIVITY_KIND_COLORS: Record<OpportunityActivityKind, string> = {
-  note: "#94A3B8",
-  meeting: "#60A5FA",
-  action: "#34D399",
-  stage_change: "#8B5CF6",
-  gate_decision: "#F59E0B",
-  evaluation_update: "#2DD4BF",
-  competitor_update: "#EC4899",
-  owner_change: "#A78BFA",
+  note: THEME.muted,
+  meeting: THEME.cobalt,
+  action: THEME.green,
+  stage_change: THEME.indigo,
+  gate_decision: THEME.brass,
+  evaluation_update: THEME.cobalt,
+  competitor_update: THEME.plum,
+  owner_change: THEME.indigo,
 };
 
 export const MANUAL_ACTIVITY_KINDS: OpportunityActivityKind[] = [

@@ -38,8 +38,8 @@ export default async function VerifyEmailPage({
           style={{
             background:
               state === "success"
-                ? "linear-gradient(90deg, #34D399, #2DD4BF)"
-                : "linear-gradient(90deg, #F43F5E, #EC4899)",
+                ? "var(--g-success)"
+                : "var(--g-danger)",
           }}
         />
         <div className="px-8 py-10">

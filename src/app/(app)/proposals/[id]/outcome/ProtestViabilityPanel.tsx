@@ -9,6 +9,7 @@ import {
   type ProtestCheckRow,
 } from "./protest-actions";
 import type { ProtestGround, ProtestRiskTier } from "@/db/schema";
+import { THEME } from "@/lib/theme-colors";
 
 const TIER_LABEL: Record<ProtestRiskTier, string> = {
   none: "None",
@@ -18,16 +19,16 @@ const TIER_LABEL: Record<ProtestRiskTier, string> = {
 };
 
 const TIER_COLOR: Record<ProtestRiskTier, string> = {
-  none: "#9BC9D9",
-  weak: "#F59E0B",
-  colorable: "#F97316",
-  strong: "#EF4444",
+  none: THEME.muted,
+  weak: THEME.brass,
+  colorable: THEME.brassDeep,
+  strong: THEME.red,
 };
 
 const STRENGTH_COLOR: Record<ProtestGround["strength"], string> = {
-  weak: "#F59E0B",
-  colorable: "#F97316",
-  strong: "#EF4444",
+  weak: THEME.brass,
+  colorable: THEME.brassDeep,
+  strong: THEME.red,
 };
 
 /**

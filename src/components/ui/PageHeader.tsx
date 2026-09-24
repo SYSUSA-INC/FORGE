@@ -25,10 +25,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: "linear-gradient(90deg, #2DD4BF, #34D399 55%, #EC4899)" }}
-            />
+            <span className="aur-brand-dot h-1.5 w-1.5 rounded-full" />
             {eyebrow}
           </div>
           <h1 className="mt-3 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-text md:text-5xl">
@@ -115,11 +112,11 @@ function MetaTile({
     return (
       <Link
         href={href}
-        className={`aur-card group block px-4 py-3 transition-colors hover:border-teal-400/40 hover:bg-white/[0.04] ${glow}`}
+        className={`aur-card group block px-4 py-3 transition-colors hover:border-cobalt-400/40 hover:bg-white/[0.04] ${glow}`}
         title={`View ${label.toLowerCase()}`}
       >
         {body}
-        <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-muted/60 transition-colors group-hover:text-teal-300">
+        <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-muted/60 transition-colors group-hover:text-cobalt-300">
           View →
         </div>
       </Link>

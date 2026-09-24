@@ -1,3 +1,5 @@
+import { THEME, withAlpha } from "@/lib/theme-colors";
+
 export type PieSlice = {
   key: string;
   label: string;
@@ -59,7 +61,7 @@ export function PieChart({
           key={slice.key}
           d={d}
           fill={slice.color}
-          stroke="rgba(4,24,39,0.9)"
+          stroke={withAlpha(THEME.canvas, 0.9)}
           strokeWidth={2}
         />
       ))}
@@ -69,7 +71,7 @@ export function PieChart({
         textAnchor="middle"
         fontFamily="var(--font-mono)"
         fontSize={10}
-        fill="#9BC9D9"
+        fill={THEME.muted}
         style={{ textTransform: "uppercase", letterSpacing: "0.2em" }}
       >
         Total
@@ -81,7 +83,7 @@ export function PieChart({
         fontFamily="var(--font-display)"
         fontSize={22}
         fontWeight={600}
-        fill="#E8FAFF"
+        fill={THEME.text}
       >
         {total.toLocaleString()}
       </text>

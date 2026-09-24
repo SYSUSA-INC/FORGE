@@ -12,7 +12,7 @@ export default async function PublicReviewPage({
 
   if (!res.ok) {
     return (
-      <main className="min-h-screen bg-[#0b1220] text-text">
+      <main className="min-h-screen bg-canvas text-text">
         <div className="mx-auto max-w-2xl p-8">
           <Brand />
           <div className="mt-8 rounded-xl border border-rose-500/30 bg-rose-500/5 p-6">
@@ -33,7 +33,7 @@ export default async function PublicReviewPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#0b1220] text-text">
+    <main className="min-h-screen bg-canvas text-text">
       <div className="mx-auto max-w-2xl p-8">
         <Brand />
         <ReviewClient
@@ -51,7 +51,7 @@ function Brand() {
       <div
         className="grid h-10 w-10 place-items-center rounded-lg font-display text-lg font-bold text-white"
         style={{
-          background: "linear-gradient(135deg, #2DD4BF, #EC4899)",
+          background: "var(--g-brand)",
         }}
       >
         F

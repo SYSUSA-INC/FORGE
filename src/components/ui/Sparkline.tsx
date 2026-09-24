@@ -1,8 +1,10 @@
+import { THEME } from "@/lib/theme-colors";
+
 export function Sparkline({
   data,
   width = 220,
   height = 60,
-  stroke = "#5EEAD4",
+  stroke = THEME.cobaltLight,
   gradientId = "sparkline-fill",
   area = true,
 }: {
@@ -38,8 +40,8 @@ export function Sparkline({
     >
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#2DD4BF" stopOpacity="0" />
+          <stop offset="0%" stopColor={THEME.cobalt} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={THEME.cobalt} stopOpacity="0" />
         </linearGradient>
       </defs>
       {area ? <path d={areaPath} fill={`url(#${gradientId})`} /> : null}
@@ -60,8 +62,8 @@ export function Sparkline({
 
 export function BarSpark({
   data,
-  color = "bg-teal",
-  active = "bg-magenta",
+  color = "bg-cobalt",
+  active = "bg-brass",
   peak,
   height = 56,
 }: {

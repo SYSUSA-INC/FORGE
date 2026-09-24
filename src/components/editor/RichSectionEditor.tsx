@@ -29,6 +29,7 @@ export type { ChangeDecisionEvent } from "./extensions/TrackChanges";
 import { CommentAnchor, Comments } from "./extensions/Comments";
 import { CommentsSidebar } from "./CommentsSidebar";
 import { SnapshotsSidebar } from "./SnapshotsSidebar";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 /**
  * BL-9 Slice 2 — when a `collab` config is supplied AND
@@ -702,8 +703,8 @@ function TrackToggleBtn({
             label="Edit"
             active={mode === "edit"}
             activeStyle={{
-              background: "rgba(74, 222, 128, 0.15)",
-              color: "#4ADE80",
+              background: withAlpha(THEME.green, 0.15),
+              color: THEME.green,
             }}
             onClick={() => editor.commands.setEditorMode("edit")}
             title="Edit mode — your changes apply directly"
@@ -712,8 +713,8 @@ function TrackToggleBtn({
             label="Suggest"
             active={mode === "suggest"}
             activeStyle={{
-              background: "rgba(251, 191, 36, 0.15)",
-              color: "#FBBF24",
+              background: withAlpha(THEME.brass, 0.15),
+              color: THEME.brass,
             }}
             onClick={() => editor.commands.setEditorMode("suggest")}
             title="Suggest mode — changes are recorded for the owner to accept"
@@ -722,8 +723,8 @@ function TrackToggleBtn({
             label="View"
             active={mode === "view"}
             activeStyle={{
-              background: "rgba(148, 163, 184, 0.15)",
-              color: "#94A3B8",
+              background: withAlpha(THEME.muted, 0.15),
+              color: THEME.muted,
             }}
             onClick={() => editor.commands.setEditorMode("view")}
             title="View mode — read-only for everyone"
@@ -734,8 +735,8 @@ function TrackToggleBtn({
           className="inline-flex h-7 items-center gap-1 rounded border border-white/10 px-2 font-mono text-[10px]"
           style={
             mode === "view"
-              ? { color: "#94A3B8" }
-              : { background: "rgba(251, 191, 36, 0.10)", color: "#FBBF24" }
+              ? { color: THEME.muted }
+              : { background: withAlpha(THEME.brass, 0.10), color: THEME.brass }
           }
           title={
             mode === "view"

@@ -4,6 +4,7 @@ import { useEffect, useReducer, useState } from "react";
 import type { Editor } from "@tiptap/core";
 import type * as Y from "yjs";
 import { getCommentThreads, type CommentThread } from "./extensions/Comments";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 /**
  * BL-9 Slice 4 — sidebar panel for browsing comment threads.
@@ -147,9 +148,9 @@ function ThreadCard({
             <span
               className="ml-1 rounded px-1 py-0.5 font-mono text-[9px] uppercase tracking-wider"
               style={{
-                background: "rgba(251, 191, 36, 0.10)",
-                border: "1px solid rgba(251, 191, 36, 0.30)",
-                color: "#FBBF24",
+                background: withAlpha(THEME.brass, 0.10),
+                border: `1px solid ${withAlpha(THEME.brass, 0.30)}`,
+                color: THEME.brass,
               }}
               title="The text this thread was attached to has been deleted."
             >
@@ -187,7 +188,7 @@ function ThreadCard({
       {thread.quoted && (
         <blockquote
           className="border-l-2 border-yellow-400/40 pl-2 font-mono text-[10px] italic"
-          style={{ color: "#D6CFA9" }}
+          style={{ color: THEME.brassLight }}
         >
           &ldquo;{thread.quoted}&rdquo;
         </blockquote>

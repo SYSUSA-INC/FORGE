@@ -9,6 +9,7 @@ import {
   reparseSolicitationDocumentAction,
   type SolicitationDocumentRow,
 } from "./document-actions";
+import { THEME } from "@/lib/theme-colors";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   rfp: "RFP",
@@ -21,10 +22,10 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 const PARSE_STATUS_COLORS: Record<string, string> = {
-  uploaded: "#9BC9D9",
-  parsing: "#A78BFA",
-  parsed: "#10B981",
-  failed: "#EF4444",
+  uploaded: THEME.muted,
+  parsing: THEME.indigo,
+  parsed: THEME.green,
+  failed: THEME.red,
 };
 
 function formatBytes(bytes: number): string {
@@ -177,7 +178,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
       ) : (
         <ul className="flex flex-col gap-1.5">
           {docs.map((doc) => {
-            const statusColor = PARSE_STATUS_COLORS[doc.parseStatus] ?? "#9BC9D9";
+            const statusColor = PARSE_STATUS_COLORS[doc.parseStatus] ?? THEME.muted;
             return (
               <li
                 key={doc.id}
@@ -187,7 +188,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
                 <span
                   className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                   style={{
-                    color: "#9BC9D9",
+                    color: THEME.muted,
                     backgroundColor: "#9BC9D91A",
                     border: "1px solid #9BC9D940",
                   }}

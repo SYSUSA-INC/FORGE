@@ -31,6 +31,7 @@ import {
 } from "../../actions";
 import { recordChangeDecisionsAction } from "./change-decision-actions";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
+import { THEME } from "@/lib/theme-colors";
 
 type Section = {
   id: string;
@@ -710,12 +711,12 @@ function ScanDot({
   // about a freshly-started proposal).
   const color =
     severity === "high"
-      ? "#f87171"
+      ? THEME.red
       : severity === "medium"
-        ? "#fbbf24"
+        ? THEME.brass
         : severity === "low"
-          ? "#94a3b8"
-          : "#34d399";
+          ? THEME.muted
+          : THEME.green;
   const label =
     severity === "high"
       ? "Critical issue"
@@ -748,10 +749,10 @@ function ThemeBadge({
   if (total === 0) return null;
   const color =
     reinforced === total
-      ? "#34d399"
+      ? THEME.green
       : reinforced > 0
-        ? "#fbbf24"
-        : "#f87171";
+        ? THEME.brass
+        : THEME.red;
   const title =
     reinforced === total
       ? `All ${total} win theme${total === 1 ? "" : "s"} reinforced`

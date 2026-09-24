@@ -126,7 +126,7 @@ export default async function PricingPage() {
                   className="absolute inset-x-0 top-0 h-[2px]"
                   style={{
                     background:
-                      "linear-gradient(90deg, #2DD4BF, #34D399 55%, #EC4899)",
+                      "var(--g-brand-bar)",
                   }}
                 />
                 <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">

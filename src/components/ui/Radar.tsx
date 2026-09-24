@@ -1,3 +1,5 @@
+import { THEME } from "@/lib/theme-colors";
+
 export type RadarDatum = { label: string; value: number };
 
 export function Radar({
@@ -32,13 +34,13 @@ export function Radar({
     <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" aria-hidden>
       <defs>
         <linearGradient id="radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#2DD4BF" stopOpacity="0.45" />
-          <stop offset="55%" stopColor="#34D399" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#EC4899" stopOpacity="0.22" />
+          <stop offset="0%" stopColor={THEME.cobalt} stopOpacity="0.45" />
+          <stop offset="55%" stopColor={THEME.cobaltDeep} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={THEME.brass} stopOpacity="0.22" />
         </linearGradient>
         <linearGradient id="radar-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#5EEAD4" />
-          <stop offset="100%" stopColor="#EC4899" />
+          <stop offset="0%" stopColor={THEME.cobaltLight} />
+          <stop offset="100%" stopColor={THEME.brass} />
         </linearGradient>
       </defs>
 
@@ -83,7 +85,7 @@ export function Radar({
       {data.map((d, i) => {
         const [x, y] = axisPoint(i, Math.max(0, Math.min(1, d.value / max)));
         return (
-          <circle key={d.label + "-dot"} cx={x} cy={y} r={3} fill="#E8FAFF" />
+          <circle key={d.label + "-dot"} cx={x} cy={y} r={3} fill={THEME.text} />
         );
       })}
 
@@ -100,7 +102,7 @@ export function Radar({
             fontWeight={600}
             textAnchor={anchor}
             dominantBaseline="middle"
-            fill="#9BC9D9"
+            fill={THEME.muted}
             style={{ textTransform: "uppercase", letterSpacing: "0.14em" }}
           >
             {d.label}

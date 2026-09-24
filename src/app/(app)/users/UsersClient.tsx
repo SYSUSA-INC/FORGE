@@ -461,7 +461,7 @@ function MembersPanel({
                   className="grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white"
                   style={{
                     background:
-                      "linear-gradient(135deg, #2DD4BF 0%, #EC4899 100%)",
+                      "var(--g-brand)",
                   }}
                 >
                   {initials}

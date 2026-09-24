@@ -7,6 +7,7 @@ import {
 import { getSessionUser } from "@/lib/auth-helpers";
 import { getActiveImpersonationSession } from "@/lib/impersonation";
 import { EndImpersonationButton } from "./EndImpersonationButton";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 /**
  * BL-15 Phase B-3b — top-of-app banner shown while an impersonation
@@ -47,8 +48,8 @@ export async function ImpersonationBanner() {
       className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 text-text md:px-6"
       style={{
         background:
-          "linear-gradient(90deg, rgba(220, 38, 38, 0.45), rgba(220, 38, 38, 0.65), rgba(220, 38, 38, 0.45))",
-        borderColor: "rgba(248, 113, 113, 0.55)",
+          `linear-gradient(90deg, ${withAlpha(THEME.redDeep, 0.45)}, ${withAlpha(THEME.redDeep, 0.65)}, ${withAlpha(THEME.redDeep, 0.45)})`,
+        borderColor: withAlpha(THEME.red, 0.55),
       }}
     >
       <div className="flex min-w-0 items-center gap-2 font-mono text-[11px]">

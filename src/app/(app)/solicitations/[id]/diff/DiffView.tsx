@@ -7,30 +7,31 @@ import type {
   RequirementDiff,
   ScalarFieldDiff,
 } from "@/lib/solicitation-amendment-diff";
+import { THEME, withAlpha } from "@/lib/theme-colors";
 
 const STATUS_TONE: Record<RequirementDiff["status"], { color: string; bg: string; border: string; label: string }> = {
   added: {
-    color: "#10b981",
-    bg: "rgba(16, 185, 129, 0.08)",
-    border: "rgba(16, 185, 129, 0.30)",
+    color: THEME.green,
+    bg: withAlpha(THEME.green, 0.08),
+    border: withAlpha(THEME.green, 0.30),
     label: "ADDED",
   },
   removed: {
-    color: "#f87171",
-    bg: "rgba(248, 113, 113, 0.08)",
-    border: "rgba(248, 113, 113, 0.30)",
+    color: THEME.red,
+    bg: withAlpha(THEME.red, 0.08),
+    border: withAlpha(THEME.red, 0.30),
     label: "REMOVED",
   },
   modified: {
-    color: "#fbbf24",
-    bg: "rgba(251, 191, 36, 0.08)",
-    border: "rgba(251, 191, 36, 0.30)",
+    color: THEME.brass,
+    bg: withAlpha(THEME.brass, 0.08),
+    border: withAlpha(THEME.brass, 0.30),
     label: "MODIFIED",
   },
   unchanged: {
-    color: "#94a3b8",
-    bg: "rgba(148, 163, 184, 0.06)",
-    border: "rgba(148, 163, 184, 0.20)",
+    color: THEME.muted,
+    bg: withAlpha(THEME.muted, 0.06),
+    border: withAlpha(THEME.muted, 0.20),
     label: "UNCHANGED",
   },
 };
@@ -183,12 +184,12 @@ function SummaryCell({
 }) {
   const color =
     tone === "emerald"
-      ? "#34d399"
+      ? THEME.green
       : tone === "rose"
-        ? "#f87171"
+        ? THEME.red
         : tone === "amber"
-          ? "#fbbf24"
-          : "#94a3b8";
+          ? THEME.brass
+          : THEME.muted;
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
       <div className="font-mono text-[10px] uppercase tracking-widest text-subtle">
@@ -230,9 +231,9 @@ function FieldRow({ field }: { field: ScalarFieldDiff }) {
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
             style={{
-              color: "#fbbf24",
-              background: "rgba(251, 191, 36, 0.08)",
-              border: "1px solid rgba(251, 191, 36, 0.30)",
+              color: THEME.brass,
+              background: withAlpha(THEME.brass, 0.08),
+              border: `1px solid ${withAlpha(THEME.brass, 0.30)}`,
             }}
           >
             CHANGED
