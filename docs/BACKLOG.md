@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #TBD); BL-AIP-4 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -215,7 +215,7 @@ defect in the assessment plus its neighbours:
   when a solicitation has been "parsing" for more than five minutes;
   stale copy about OCR, storage and "synchronous" parsing corrected.
 
-**BL-AIP-3 — notification engine truth** ✅ (PR #TBD)
+**BL-AIP-3 — notification engine truth** ✅ (PR #271)
 
 - **The email channel sends.** `notification-email.ts` (pure, tested)
   builds the per-notification and digest emails; the dispatcher inserts
