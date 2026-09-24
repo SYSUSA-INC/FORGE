@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #TBD); BL-AIP-2 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -137,7 +137,7 @@ drafter's prompt and the outcome loop are real; the surfaces around them
 leak signals, several hand-offs are broken, and almost nothing runs
 without a click. Remediation ships in priority order below.
 
-**BL-AIP-1 — capture-loop breaks and hygiene** ✅ (PR #TBD). Every item
+**BL-AIP-1 — capture-loop breaks and hygiene** ✅ (PR #269). Every item
 was confirmed in code before it was fixed:
 - **SAM.gov import silently dropped selections.** The action took notice
   ids and re-ran an unfiltered 30-day / 200-row search to find them; a
