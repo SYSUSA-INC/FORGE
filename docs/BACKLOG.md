@@ -257,7 +257,7 @@ controls. Details and evidence in the assessment report.
 ---
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)
 
 User request (2026-09-24): "pretty up the UI with some nice corporate
 color theme." Replaces the neon aurora palette (teal / emerald / violet /
