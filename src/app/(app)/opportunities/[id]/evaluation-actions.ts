@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { STAGE_LABELS } from "@/lib/opportunity-types";
+import { applyOpportunityStage } from "@/lib/opportunity-stage";
 
 async function ownsOpportunity(
   opportunityId: string,
@@ -117,40 +117,16 @@ export async function setStageWithLogAction(
     return { ok: false, error: "Opportunity not found." };
   }
 
-  const [current] = await db
-    .select({ stage: opportunities.stage })
-    .from(opportunities)
-    .where(eq(opportunities.id, opportunityId))
-    .limit(1);
-  const fromLabel = current ? STAGE_LABELS[current.stage] : "";
-  const toLabel = STAGE_LABELS[newStage];
-
-  await db
-    .update(opportunities)
-    .set({ stage: newStage, updatedAt: new Date() })
-    .where(and(eq(opportunities.organizationId, organizationId), eq(opportunities.id, opportunityId)));
-
-  const isGate = newStage === "no_bid" || newStage === "lost";
-  await db.insert(opportunityActivities).values({
-    opportunityId,
-    userId: actor.id,
-    kind: isGate ? "gate_decision" : "stage_change",
-    title: `${fromLabel} → ${toLabel}`,
-    body: reasoning.trim(),
-    metadata: { from: current?.stage ?? null, to: newStage },
-  });
-
-  await recordAudit({
+  // BL-AIP-1 — one write path for stage changes: activity row, audit,
+  // and the BL-13 rules event. Until now the gate decision skipped the
+  // rules engine, so "notify me when we no-bid" rules never fired.
+  await applyOpportunityStage({
     organizationId,
+    opportunityId,
+    stage: newStage,
     actor: { userId: actor.id, email: actor.email },
-    action: isGate ? "opportunity.gate_decision" : "opportunity.advance_stage",
-    resourceType: "opportunity",
-    resourceId: opportunityId,
-    metadata: {
-      fromStage: current?.stage ?? null,
-      toStage: newStage,
-      hasReasoning: reasoning.trim().length > 0,
-    },
+    reasoning,
+    source: "gate_decision",
   });
 
   revalidatePath(`/opportunities/${opportunityId}`);
@@ -363,10 +339,7 @@ export async function removeCompetitorAction(
   return { ok: true };
 }
 
-export async function listActivities(opportunityId: string) {
-  return db
-    .select()
-    .from(opportunityActivities)
-    .where(eq(opportunityActivities.opportunityId, opportunityId))
-    .orderBy(desc(opportunityActivities.createdAt));
-}
+// `listActivities` used to be exported from this "use server" file with
+// no auth gate and no tenant scope — a callable endpoint that returned
+// any opportunity's timeline by id. Nothing called it; removed in
+// BL-AIP-1. The activity page reads through its own scoped query.

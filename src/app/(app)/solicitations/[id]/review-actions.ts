@@ -1,10 +1,9 @@
 "use server";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
-  knowledgeEntries,
   solicitationCapabilityMatrices,
   solicitationQuestionSets,
   solicitationReviews,
@@ -16,6 +15,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { selectKnowledgeForMatrix } from "@/lib/matrix-knowledge";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   aiRunCapabilityMatrix,
@@ -442,18 +442,23 @@ export async function runCapabilityMatrixAction(
     };
   }
 
-  // Pull the org's knowledge corpus to score against.
-  const knowledge = await db
-    .select({
-      id: knowledgeEntries.id,
-      kind: knowledgeEntries.kind,
-      title: knowledgeEntries.title,
-      body: knowledgeEntries.body,
-      tags: knowledgeEntries.tags,
-    })
-    .from(knowledgeEntries)
-    .where(eq(knowledgeEntries.organizationId, organizationId))
-    .orderBy(asc(knowledgeEntries.title));
+  // BL-AIP-1 — score against the knowledge the Brain ranks as relevant to
+  // this solicitation. The prompt shows at most 60 entries; until now the
+  // first 60 BY TITLE were sent, so for a larger Brain the matrix scored
+  // against an arbitrary alphabetical slice.
+  const knowledge = await selectKnowledgeForMatrix({
+    organizationId,
+    query: [
+      `Solicitation: ${doc.title}`,
+      doc.agency ? `Agency: ${doc.agency}` : "",
+      doc.setAside ? `Set-aside: ${doc.setAside}` : "",
+      ...reviewResult.requirements
+        .slice(0, 40)
+        .map((r) => String((r as { text?: unknown }).text ?? "").slice(0, 200)),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  });
 
   const result = await aiRunCapabilityMatrix({
     organizationId,
@@ -461,13 +466,7 @@ export async function runCapabilityMatrixAction(
     agency: doc.agency,
     setAside: doc.setAside,
     requirements: reviewResult.requirements,
-    knowledgeEntries: knowledge.map((k) => ({
-      id: k.id,
-      kind: k.kind,
-      title: k.title,
-      body: k.body,
-      tags: k.tags,
-    })),
+    knowledgeEntries: knowledge.entries,
   });
   if (!result.ok) return { ok: false, error: result.error };
 

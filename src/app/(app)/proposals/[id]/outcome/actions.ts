@@ -16,6 +16,8 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
+import { applyOpportunityStage } from "@/lib/opportunity-stage";
+import { stageForOutcome } from "@/lib/opportunity-stage-map";
 import { OUTCOME_REASONS } from "@/lib/proposal-outcome-types";
 import { log } from "@/lib/log";
 
@@ -45,7 +47,11 @@ const DEBRIEF_FORMATS: ProposalDebriefFormat[] = [
 
 async function ownsProposal(id: string, organizationId: string) {
   const [row] = await db
-    .select({ id: proposals.id, stage: proposals.stage })
+    .select({
+      id: proposals.id,
+      stage: proposals.stage,
+      opportunityId: proposals.opportunityId,
+    })
     .from(proposals)
     .where(
       and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)),
@@ -136,6 +142,26 @@ export async function saveOutcomeAction(
           updatedAt: new Date(),
         })
         .where(and(eq(proposals.organizationId, organizationId), eq(proposals.id, proposalId)));
+    }
+
+    // BL-AIP-1 — keep the opportunity in step with the outcome. Until
+    // now a won / lost / no-bid proposal left its opportunity open, so
+    // the PWin prior, loss intelligence, the recompete radar and the
+    // pipeline win rate never saw decisions recorded here, and the
+    // opportunity_won / _lost / _no_bid rules never fired. Best-effort.
+    if (owned.opportunityId) {
+      try {
+        await applyOpportunityStage({
+          organizationId,
+          opportunityId: owned.opportunityId,
+          stage: stageForOutcome(outcomeType),
+          actor: { userId: user.id, email: user.email },
+          reasoning: `Proposal outcome recorded: ${outcomeType}`,
+          source: "proposal_outcome",
+        });
+      } catch (err) {
+        log.warn("[saveOutcomeAction]", "opportunity stage sync failed", { error: err });
+      }
     }
 
     // Phase 14a: propagate the outcome to the harvested artifact and

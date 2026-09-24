@@ -126,6 +126,65 @@ diffs `pg_indexes` against both sources in CI.
   `tests/ai/schema-drift.test.ts`.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
+### BL-AIP — AI-platform assessment remediation (2026-09-24)
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #TBD); BL-AIP-2 next
+
+Five read-only audits (capture & intelligence, solicitations, proposal
+development & editor, Brain & AI engine, navigation & admin) of every
+route and action, asking of each: is the AI real, is there a learning
+loop, is it scaffolding. Verdict in one line: the gateway, PWin, the
+drafter's prompt and the outcome loop are real; the surfaces around them
+leak signals, several hand-offs are broken, and almost nothing runs
+without a click. Remediation ships in priority order below.
+
+**BL-AIP-1 — capture-loop breaks and hygiene** ✅ (PR #TBD). Every item
+was confirmed in code before it was fixed:
+- **SAM.gov import silently dropped selections.** The action took notice
+  ids and re-ran an unfiltered 30-day / 200-row search to find them; a
+  notice picked from a NAICS or keyword search, or a wider window, was
+  reported as "skipped". It now takes the rows the user ticked, sanitised
+  server-side (`src/lib/sam-import-row.ts`, tested), and audits the batch
+  (`opportunity.import`).
+- **Gate decisions never fired notification rules; outcomes never moved
+  the opportunity.** `setStageWithLogAction` wrote the stage + activity +
+  audit but not the BL-13 event, and `setOpportunityStageAction` (which
+  did) was unused; `saveOutcomeAction` moved the proposal's stage but left
+  the opportunity open, so PWin's prior, loss intelligence, the recompete
+  radar and the pipeline win rate saw only proposal-side decisions. One
+  write path now: `src/lib/opportunity-stage.ts` (`applyOpportunityStage`:
+  stage + activity + audit + `opportunity_won/_lost/_no_bid/_advanced`),
+  with the outcome → stage table in `opportunity-stage-map.ts` (tested).
+  The unused action is deleted.
+- **`listActivities` was exported from a `"use server"` file with no auth
+  gate and no tenant scope** — a callable endpoint returning any
+  opportunity's timeline. Nothing used it; removed.
+- **Capability matrix scored against an alphabetical slice of the Brain.**
+  The prompt shows 60 entries; the action sent them ordered by title.
+  `src/lib/matrix-knowledge.ts` now leads with `searchBrain` (cosine +
+  won/lost boost) results for the solicitation and its requirements and
+  fills alphabetically; small corpora behave exactly as before; stubbed
+  embeddings fall back to the old order.
+- **GSA email-paste attachments were never parsed** (stored `uploaded`
+  forever; the opportunity's Documents & AI review never enabled). The
+  parse routine moved from the solicitations `"use server"` file into
+  `src/lib/solicitation-parse.ts` so both paths run it.
+- Hygiene: developer copy ("Magic-link button, 72-hour TTL token") removed
+  from the customer-facing review email; "BL-23b" ticket code removed
+  from the opportunity panel eyebrow.
+
+**Queued slices (from the assessment, in order):** BL-AIP-2 editor
+hand-off + solicitations review panel state (accepted AI text never
+appears in the editor; review results never render after the AI call);
+BL-AIP-3 notification engine truth (email channel, 7 un-emitted triggers,
+`ackedAt`, test-send scope); BL-AIP-4 outcome provenance + Brain indexing
+cron; BL-AIP-5 requirements-first pipeline (full-text extraction, seed
+compliance items, per-section requirements to the drafter, hard gate);
+BL-AIP-6 AI edits as tracked changes by "FORGE AI" + research-while-you-
+write rail; BL-AIP-7 proactive scout / stored graded briefs / AI Engine
+controls. Details and evidence in the assessment report.
+
+---
+
 ### BL-PACKAGES — Subscription packages + AI token caps
 **Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slices 1–4: PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ⏳ remaining: à la carte add-on system
 
