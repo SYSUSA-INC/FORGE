@@ -24,12 +24,16 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   opportunity_lost: "Opportunity lost",
   proposal_created: "Proposal created",
   proposal_advanced: "Proposal advanced a stage",
-  proposal_section_overdue: "Proposal section overdue",
+  proposal_section_assigned: "Proposal section assigned",
+  // BL-AIP-3 — these three kinds have no emitter yet. The label says
+  // so in the rule editor so an admin doesn't build a rule that can
+  // never fire and assume the engine is broken.
+  proposal_section_overdue: "Proposal section overdue (not yet active)",
   review_request_pending: "Color-team review pending",
   review_completed: "Color-team review completed",
   review_assignment_added: "Color-team reviewer added late",
-  compliance_overdue: "Compliance item overdue",
-  audit_anomaly: "Audit anomaly detected",
+  compliance_overdue: "Compliance item overdue (not yet active)",
+  audit_anomaly: "Audit anomaly detected (not yet active)",
   membership_invited: "Team member invited",
   membership_disabled: "Team member disabled",
   comment_mentioned: "Review comment mention",

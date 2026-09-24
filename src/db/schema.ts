@@ -1320,6 +1320,7 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "comment_mentioned",
     "opportunity_reviewed",
     "solicitation_role_assigned",
+    "proposal_section_assigned",
   ],
 );
 

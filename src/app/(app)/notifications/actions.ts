@@ -1,16 +1,51 @@
 "use server";
 
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
+  notificationDeliveries,
   notifications,
   users,
   type NotificationKind,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { ackCutoff } from "@/lib/notification-ack";
 import { log } from "@/lib/log";
+
+/**
+ * BL-AIP-3 — reading the inbox acknowledges this recipient's in-app
+ * deliveries sent up to `cutoff` (or all sent deliveries when null).
+ * `acked_at` drives the SLA cron; it was never written before, so every
+ * rule with an SLA breached and escalated regardless of what the user
+ * had read. Best-effort: never fails the mark-read.
+ */
+async function ackDeliveries(input: {
+  organizationId: string;
+  userId: string;
+  cutoff: Date | null;
+}): Promise<void> {
+  try {
+    await db
+      .update(notificationDeliveries)
+      .set({ ackedAt: new Date() })
+      .where(
+        and(
+          eq(notificationDeliveries.organizationId, input.organizationId),
+          eq(notificationDeliveries.recipientUserId, input.userId),
+          eq(notificationDeliveries.channel, "in_app"),
+          isNull(notificationDeliveries.ackedAt),
+          isNotNull(notificationDeliveries.sentAt),
+          input.cutoff
+            ? lte(notificationDeliveries.sentAt, input.cutoff)
+            : undefined,
+        ),
+      );
+  } catch (err) {
+    log.warn("[notifications]", "delivery ack failed", { error: err });
+  }
+}
 
 export type NotificationRow = {
   id: string;
@@ -114,7 +149,7 @@ export async function markNotificationsReadAction(
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   try {
-    await db
+    const marked = await db
       .update(notifications)
       .set({ readAt: new Date() })
       .where(
@@ -124,7 +159,15 @@ export async function markNotificationsReadAction(
           inArray(notifications.id, ids),
           isNull(notifications.readAt),
         ),
-      );
+      )
+      .returning({ createdAt: notifications.createdAt });
+    if (marked.length > 0) {
+      await ackDeliveries({
+        organizationId,
+        userId: user.id,
+        cutoff: ackCutoff(marked.map((m) => m.createdAt)),
+      });
+    }
     await recordAudit({
       organizationId,
       actor: { userId: user.id, email: user.email },
@@ -162,6 +205,7 @@ export async function markAllNotificationsReadAction(): Promise<
         ),
       )
       .returning({ id: notifications.id });
+    await ackDeliveries({ organizationId, userId: user.id, cutoff: null });
     await recordAudit({
       organizationId,
       actor: { userId: user.id, email: user.email },
