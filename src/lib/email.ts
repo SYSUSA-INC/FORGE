@@ -417,7 +417,7 @@ export async function sendOpportunityReviewRequestEmail(opts: {
           <li style="margin:0;">
             <div style="margin:4px 0 8px 0;">${button}</div>
             <div style="font-size:12px;color:#64748b;line-height:1.5;">
-              Magic-link button, 72-hour TTL token. The link is good for 72 hours.
+              This link is personal to you and expires in 72 hours.
             </div>
           </li>
         </ul>
@@ -445,6 +445,6 @@ export async function sendOpportunityReviewRequestEmail(opts: {
       `${opts.senderName} from ${opts.organizationName} would like your quick read on "${opts.opportunityTitle}" (${opts.agency}, due ${opts.dueDate}).` +
       (opts.note ? `\n\nNote: ${opts.note}` : "") +
       `\n\nPlease open the link below to recommend Bid / No-bid / More info:\n${url}` +
-      `\n\nMagic-link button, 72-hour TTL token. The link is good for 72 hours.`,
+      `\n\nThis link is personal to you and expires in 72 hours.`,
   });
 }

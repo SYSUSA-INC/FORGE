@@ -59,7 +59,7 @@ export async function OpportunityDocsAndAIPanel({
 
   if (linkedSolicitations.length === 0) {
     return (
-      <Panel title="Documents & AI review" eyebrow="BL-23b">
+      <Panel title="Documents & AI review" eyebrow="Linked solicitations">
         <p className="font-body text-[13px] leading-relaxed text-muted">
           No solicitations are linked to this opportunity yet. Upload a
           solicitation document and link it here to enable AI document
@@ -170,7 +170,7 @@ export async function OpportunityDocsAndAIPanel({
   return (
     <Panel
       title="Documents & AI review"
-      eyebrow="BL-23b"
+      eyebrow="Linked solicitations"
       actions={
         rows.length > 1 ? (
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted">

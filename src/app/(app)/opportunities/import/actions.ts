@@ -4,10 +4,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { opportunities, organizations } from "@/db/schema";
+import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
+import { sanitizeSamImportRows, type SamImportRow } from "@/lib/sam-import-row";
 import {
   GSA_VEHICLES,
   searchSamGovOpportunities,
@@ -155,8 +157,19 @@ function mapStageFromType(type: string): "identified" | "sources_sought" {
   return "identified";
 }
 
+/**
+ * Import the SAM.gov rows the user ticked.
+ *
+ * BL-AIP-1 — takes the rows themselves, not notice ids. The previous
+ * version re-ran an UNFILTERED 30-day / 200-row search to find the ids
+ * again, so anything picked from a NAICS or keyword search, or a wider
+ * date window, was silently counted as "skipped". The client already
+ * holds the exact rows it displayed; the server sanitises them
+ * (sam-import-row.ts), drops notice ids this org already has, inserts,
+ * and audits the batch.
+ */
 export async function importSamGovOpportunitiesAction(
-  noticeIds: string[],
+  selected: SamImportRow[],
 ): Promise<
   | { ok: true; imported: number; skipped: number }
   | { ok: false; error: string }
@@ -164,9 +177,11 @@ export async function importSamGovOpportunitiesAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  if (noticeIds.length === 0) {
+  const rowsIn = sanitizeSamImportRows(selected);
+  if (rowsIn.length === 0) {
     return { ok: false, error: "Pick at least one opportunity to import." };
   }
+  const noticeIds = rowsIn.map((r) => r.noticeId);
 
   const existing = await db
     .select({ noticeId: opportunities.noticeId })
@@ -179,14 +194,7 @@ export async function importSamGovOpportunitiesAction(
     );
   const existingSet = new Set(existing.map((r) => r.noticeId));
 
-  const fresh = await searchSamGovOpportunities({ activeOnly: false, limit: 200 });
-  if (!fresh.ok) return { ok: false, error: fresh.error };
-  const index = new Map(fresh.opportunities.map((o) => [o.noticeId, o]));
-
-  const toImport = noticeIds
-    .filter((id) => !existingSet.has(id))
-    .map((id) => index.get(id))
-    .filter((o): o is SamOpportunity => !!o);
+  const toImport = rowsIn.filter((o) => !existingSet.has(o.noticeId));
 
   if (toImport.length === 0) {
     return { ok: true, imported: 0, skipped: noticeIds.length };
@@ -211,6 +219,20 @@ export async function importSamGovOpportunitiesAction(
   }));
 
   await db.insert(opportunities).values(rows);
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.import",
+    resourceType: "opportunity",
+    resourceId: "samgov",
+    metadata: {
+      source: "samgov",
+      imported: rows.length,
+      skipped: noticeIds.length - rows.length,
+      noticeIds: rows.slice(0, 50).map((r) => r.noticeId),
+    },
+  });
 
   revalidatePath("/opportunities");
   revalidatePath("/");

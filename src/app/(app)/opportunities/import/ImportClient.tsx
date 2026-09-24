@@ -97,9 +97,11 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
     setError(null);
     setNotice(null);
     startImporting(async () => {
-      const res = await importSamGovOpportunitiesAction(
-        Array.from(selected),
-      );
+      // BL-AIP-1 — send the rows the user ticked, exactly as displayed.
+      // The server used to re-search SAM.gov for the ids and lose any
+      // result outside its default window.
+      const picked = (results ?? []).filter((o) => selected.has(o.noticeId));
+      const res = await importSamGovOpportunitiesAction(picked);
       if (!res.ok) {
         setError(res.error);
         return;
