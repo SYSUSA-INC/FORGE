@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  requireAuth,
+  requireCurrentOrg,
+  requireOrgAdmin,
+} from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import {
@@ -29,7 +33,11 @@ export default async function AuditLogPage({
   };
 }) {
   await requireAuth();
-  await requireCurrentOrg();
+  // BL-AIP-3 — the tenant audit log is an admin surface (it was
+  // readable by every member while the nav hid it behind an admin-only
+  // group). Gate the page and its actions the same way.
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
 
   const filter: AuditFilter = {
     query: readSearchParam(searchParams.q),

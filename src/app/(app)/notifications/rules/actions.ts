@@ -28,7 +28,9 @@ import {
 // Two return shapes used across the actions. Kept non-generic to
 // avoid the `Record<string, never>` default-intersection trap where
 // `{ ok: true }` fails to satisfy the empty index signature.
-export type MutationResult = { ok: true } | { ok: false; error: string };
+export type MutationResult =
+  | { ok: true; notice?: string }
+  | { ok: false; error: string };
 export type CreateResult =
   | { ok: true; id: string }
   | { ok: false; error: string };
@@ -404,9 +406,13 @@ export async function testSendNotificationRuleAction(
     const { dispatchTriggerEvent } = await import(
       "@/lib/notification-dispatcher"
     );
-    await dispatchTriggerEvent({
+    // BL-AIP-3 — only THIS rule. It used to fan out to every active rule
+    // of the same kind in the tenant, and reported success even when the
+    // recipient strategy resolved nobody from the synthetic payload.
+    const result = await dispatchTriggerEvent({
       organizationId,
       kind: rule.triggerEventKind,
+      onlyRuleId: rule.id,
       // Tag the payload so downstream filtering / debugging can tell
       // test deliveries from real ones. The match_filter on the rule
       // would normally fire on real payload keys; for a test we want
@@ -434,10 +440,30 @@ export async function testSendNotificationRuleAction(
       metadata: {
         name: rule.name,
         triggerEventKind: rule.triggerEventKind,
+        recipients: result.recipients,
+        deliveries: result.deliveries,
+        emailsSent: result.emailsSent,
+        emailErrors: result.emailErrors,
       },
     });
 
-    return { ok: true };
+    if (result.recipients === 0) {
+      return {
+        ok: true,
+        notice:
+          "Test send reached nobody: the rule's recipient strategy resolved no users from the synthetic payload (formula and payload-mention strategies need a real event, and a match filter may not match). Nothing was delivered.",
+      };
+    }
+    const emailNote =
+      result.emailErrors > 0
+        ? ` ${result.emailErrors} email${result.emailErrors === 1 ? "" : "s"} could not be sent — see the delivery error on the rule.`
+        : result.emailsSent > 0
+          ? ` ${result.emailsSent} email${result.emailsSent === 1 ? "" : "s"} sent.`
+          : "";
+    return {
+      ok: true,
+      notice: `Test send delivered to ${result.recipients} recipient${result.recipients === 1 ? "" : "s"} (${result.deliveries} deliver${result.deliveries === 1 ? "y" : "ies"}).${emailNote}`,
+    };
   } catch (err) {
     log.error("[testSendNotificationRuleAction]", "error", { error: err });
     return {

@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   notifications,
   notificationDeliveries,
   notificationRules,
+  users,
   type NotificationChannel,
   type NotificationTriggerEventKind,
 } from "@/db/schema";
@@ -32,12 +33,19 @@ import { resolveRecipients } from "@/lib/notification-recipient-resolver";
  *   - batched_*    → delivery row created with sent_at = null; the
  *                    Phase D cron materializes batches and sets sent_at
  *
- * Channel semantics (Phase C scope):
+ * Channel semantics:
  *   - in_app  → creates notification_delivery + notification rows
- *   - email   → creates notification_delivery row; sending logic
- *                lands in Phase D when the email integration is wired
+ *   - email   → BL-AIP-3: for immediate rules the email is sent here
+ *               (src/lib/email.ts via Resend) and the delivery row
+ *               records sent_at on success or `error` on failure; with no
+ *               RESEND_API_KEY the row is marked with that error rather
+ *               than pretending it was sent. Batched email is sent as a
+ *               digest by the Phase D cron.
  *   - slack/teams → creates a delivery row with error="not implemented"
  *                   so the audit trail captures the gap
+ *
+ * Returns counts so callers that need to know (test send, crons) can
+ * report honestly instead of assuming something went out.
  */
 export type DispatchInput = {
   organizationId: string;
@@ -61,14 +69,48 @@ export type DispatchInput = {
   commentId?: string;
   /** The user who triggered the event, if attributable. */
   actorUserId?: string;
+  /**
+   * BL-AIP-3 — restrict the dispatch to one rule. Test send uses it so a
+   * test exercises the rule being edited, not every active rule of that
+   * kind in the tenant.
+   */
+  onlyRuleId?: string;
 };
 
-export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> {
+export type DispatchResult = {
+  /** Rules that matched the filter and resolved at least one recipient. */
+  rulesMatched: number;
+  /** Recipient × rule pairs (a user reached by two rules counts twice). */
+  recipients: number;
+  /** Delivery rows written. */
+  deliveries: number;
+  emailsSent: number;
+  emailErrors: number;
+};
+
+const EMPTY_RESULT: DispatchResult = {
+  rulesMatched: 0,
+  recipients: 0,
+  deliveries: 0,
+  emailsSent: 0,
+  emailErrors: 0,
+};
+
+export async function dispatchTriggerEvent(input: DispatchInput): Promise<DispatchResult> {
   const { organizationId, kind, payload } = input;
+  const result: DispatchResult = { ...EMPTY_RESULT };
   try {
+    const conditions = [
+      eq(notificationRules.organizationId, organizationId),
+      eq(notificationRules.triggerEventKind, kind),
+      eq(notificationRules.active, true),
+    ];
+    if (input.onlyRuleId) conditions.push(eq(notificationRules.id, input.onlyRuleId));
+
     const rules = await db
       .select({
         id: notificationRules.id,
+        name: notificationRules.name,
         matchFilter: notificationRules.matchFilter,
         recipientStrategy: notificationRules.recipientStrategy,
         recipientConfig: notificationRules.recipientConfig,
@@ -76,15 +118,9 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
         frequency: notificationRules.frequency,
       })
       .from(notificationRules)
-      .where(
-        and(
-          eq(notificationRules.organizationId, organizationId),
-          eq(notificationRules.triggerEventKind, kind),
-          eq(notificationRules.active, true),
-        ),
-      );
+      .where(and(...conditions));
 
-    if (rules.length === 0) return;
+    if (rules.length === 0) return result;
 
     for (const rule of rules) {
       if (!matchFilterApplies(rule.matchFilter, payload)) continue;
@@ -97,11 +133,14 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
       });
 
       if (recipientIds.length === 0) continue;
+      result.rulesMatched += 1;
+      result.recipients += recipientIds.length;
 
       const isImmediate = rule.frequency === "immediate";
       const sentAt = isImmediate ? new Date() : null;
 
-      // Build the delivery rows. One per (recipient × channel).
+      // Build the delivery rows. One per (recipient × channel). Immediate
+      // email rows start unsent; sendEmailDeliveries stamps them.
       const deliveryRows: Array<{
         organizationId: string;
         ruleId: string;
@@ -123,7 +162,7 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
             triggerPayload: payload,
             recipientUserId: userId,
             channel,
-            sentAt: supported ? sentAt : null,
+            sentAt: supported && channel !== "email" ? sentAt : null,
             error: supported ? "" : "channel not yet implemented",
           });
         }
@@ -131,8 +170,13 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
 
       if (deliveryRows.length === 0) continue;
 
+      let inserted: { id: string; recipientUserId: string | null; channel: NotificationChannel }[];
       try {
-        await db.insert(notificationDeliveries).values(deliveryRows);
+        inserted = await db.insert(notificationDeliveries).values(deliveryRows).returning({
+          id: notificationDeliveries.id,
+          recipientUserId: notificationDeliveries.recipientUserId,
+          channel: notificationDeliveries.channel,
+        });
       } catch (err) {
         log.error("[dispatchTriggerEvent]", "delivery insert failed", {
           error: err,
@@ -141,13 +185,32 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
         });
         continue;
       }
+      result.deliveries += inserted.length;
+
+      // BL-AIP-3 — immediate email goes out now. Batched email waits for
+      // the digest cron, which sends one email per recipient per cadence.
+      if (isImmediate && rule.channels.includes("email")) {
+        const emailRows = inserted.filter(
+          (r): r is { id: string; recipientUserId: string; channel: NotificationChannel } =>
+            r.channel === "email" && !!r.recipientUserId,
+        );
+        const sent = await sendEmailDeliveries({
+          organizationId,
+          rows: emailRows,
+          subject: input.subject,
+          body: input.body,
+          linkPath: input.linkPath,
+          ruleName: rule.name,
+        });
+        result.emailsSent += sent.sent;
+        result.emailErrors += sent.failed;
+      }
 
       // For immediate + in_app, also append a row to the legacy
       // `notification` table so it shows up in the user's inbox.
       // Batched in-app rows materialize via the Phase D cron.
       if (!isImmediate) continue;
       if (!rule.channels.includes("in_app")) continue;
-      if (recipientIds.length === 0) continue;
 
       const inboxRows = recipientIds.map((userId) => ({
         organizationId,
@@ -183,6 +246,94 @@ export async function dispatchTriggerEvent(input: DispatchInput): Promise<void> 
       kind,
     });
   }
+  return result;
+}
+
+export const EMAIL_NOT_CONFIGURED_ERROR = "email not configured (RESEND_API_KEY)";
+
+/**
+ * Send one email per delivery row and stamp each row: `sent_at` on
+ * success, `sent_at` + `error` on failure (an attempt was made; nothing
+ * retries it, and leaving sent_at null would make the SLA cron ignore it
+ * forever). Without a provider key every row gets the "not configured"
+ * error so the rule's history shows the truth.
+ */
+async function sendEmailDeliveries(input: {
+  organizationId: string;
+  rows: { id: string; recipientUserId: string }[];
+  subject: string;
+  body?: string;
+  linkPath?: string;
+  ruleName: string;
+}): Promise<{ sent: number; failed: number }> {
+  const { organizationId } = input;
+  if (input.rows.length === 0) return { sent: 0, failed: 0 };
+  const ids = input.rows.map((r) => r.id);
+
+  // Lazy import keeps Resend out of every action's import graph.
+  const { emailConfigured, sendRuleNotificationEmail } = await import("@/lib/email");
+  if (!emailConfigured()) {
+    await db
+      .update(notificationDeliveries)
+      .set({ sentAt: new Date(), error: EMAIL_NOT_CONFIGURED_ERROR })
+      .where(
+        and(
+          eq(notificationDeliveries.organizationId, organizationId),
+          inArray(notificationDeliveries.id, ids),
+        ),
+      )
+      .catch(() => undefined);
+    return { sent: 0, failed: ids.length };
+  }
+
+  // Recipient ids were resolved within this tenant; `user` has no org
+  // column, so the lookup is by id.
+  const userRows = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(inArray(users.id, input.rows.map((r) => r.recipientUserId)));
+  const emailById = new Map(userRows.map((u) => [u.id, u.email]));
+
+  let sent = 0;
+  let failed = 0;
+  for (const row of input.rows) {
+    const to = emailById.get(row.recipientUserId);
+    try {
+      if (!to) throw new Error("recipient has no email address");
+      await sendRuleNotificationEmail({
+        to,
+        subject: input.subject,
+        body: input.body,
+        linkPath: input.linkPath,
+        ruleName: input.ruleName,
+      });
+      await db
+        .update(notificationDeliveries)
+        .set({ sentAt: new Date(), error: "" })
+        .where(
+          and(
+            eq(notificationDeliveries.organizationId, organizationId),
+            eq(notificationDeliveries.id, row.id),
+          ),
+        );
+      sent += 1;
+    } catch (err) {
+      failed += 1;
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn("[dispatchTriggerEvent]", "email send failed", { deliveryId: row.id, error: message });
+      await db
+        .update(notificationDeliveries)
+        .set({ sentAt: new Date(), error: message.slice(0, 500) })
+        .where(
+          and(
+            eq(notificationDeliveries.organizationId, organizationId),
+            eq(notificationDeliveries.id, row.id),
+          ),
+        )
+        .catch(() => undefined);
+    }
+  }
+  return { sent, failed };
 }
 
 /**
@@ -240,6 +391,9 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
     case "proposal_advanced":
     case "proposal_section_overdue":
       return "review_assigned" as const;
+    case "proposal_section_assigned":
+      // BL-AIP-3 — the inbox already has a kind for exactly this.
+      return "review_section_assigned" as const;
     case "compliance_overdue":
       return "review_assigned" as const;
     case "audit_anomaly":

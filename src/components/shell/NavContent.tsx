@@ -53,18 +53,21 @@ const NAV: NavGroup[] = [
     id: "ops",
     label: "Operations Management",
     icon: "⚙",
-    admin: true,
+    // BL-AIP-3 — the group itself is visible to every member (the
+    // inbox and read-only settings pages are member pages); admin-only
+    // pages are gated per child so a non-admin never sees a link that
+    // 403s on click.
     needsWorkspace: true,
     children: [
       { href: "/settings", label: "Settings" },
       { href: "/settings/billing", label: "Billing", admin: true },
-      { href: "/users", label: "Users & Roles" },
+      { href: "/users", label: "Users & Roles", admin: true },
       { href: "/settings/integrations", label: "Integrations" },
       { href: "/settings/ai-engine", label: "AI Engine" },
-      { href: "/settings/templates", label: "Templates" },
+      { href: "/settings/templates", label: "Templates", admin: true },
       { href: "/notifications", label: "Notifications" },
       { href: "/notifications/rules", label: "Notification rules", admin: true },
-      { href: "/audit-log", label: "Audit Log" },
+      { href: "/audit-log", label: "Audit Log", admin: true },
     ],
   },
   {

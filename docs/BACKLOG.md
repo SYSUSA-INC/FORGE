@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -215,9 +215,39 @@ defect in the assessment plus its neighbours:
   when a solicitation has been "parsing" for more than five minutes;
   stale copy about OCR, storage and "synchronous" parsing corrected.
 
+**BL-AIP-3 — notification engine truth** ✅ (PR #271)
+
+- **The email channel sends.** `notification-email.ts` (pure, tested)
+  builds the per-notification and digest emails; the dispatcher inserts
+  email deliveries unsent, sends through Resend, then stamps `sent_at`
+  or records the error (including a visible "email not configured"
+  error when `RESEND_API_KEY` is absent). The materialization cron sends
+  one digest email per recipient for batched email rules. Before this
+  the channel marked every email delivery "sent" and sent nothing.
+- **`acked_at` is written.** Marking inbox rows read (or Mark all read)
+  acknowledges the recipient's in-app deliveries sent up to that point
+  (`ackCutoff`, tested), so the SLA cron stops breaching and escalating
+  notifications the recipient had already read.
+- **Test send is scoped and honest.** It fires only the rule being
+  tested (`onlyRuleId`) and the notice reports resolved recipients,
+  deliveries and emails sent / failed; zero recipients says so.
+- **Five trigger kinds now have emitters:** `proposal_advanced`
+  (stage change), `membership_invited`, `membership_disabled`,
+  `opportunity_due_soon` (daily cron at T-7 / T-3 / T-1, deduped per
+  opportunity and horizon, `opportunity-due-soon.ts` tested) and the
+  new `proposal_section_assigned` (migrations 0079 + 0080 seed a
+  default in-app + email rule per tenant; fires when a section's author
+  changes to someone else). The three still without an emitter carry a
+  "(not yet active)" label in the rule editor, whose default trigger is
+  now one that fires.
+- **Hygiene from the audit:** admin "view audit log" links use the
+  `tenant` param the page reads (`orgId` was ignored); the Operations
+  nav group is visible to all members with admin-only children gated
+  individually; the tenant audit log page and actions require org
+  admin (they were readable by every member).
+
 **Queued slices (from the assessment, in order):**
-BL-AIP-3 notification engine truth (email channel, 7 un-emitted triggers,
-`ackedAt`, test-send scope); BL-AIP-4 outcome provenance + Brain indexing
+BL-AIP-4 outcome provenance + Brain indexing
 cron; BL-AIP-5 requirements-first pipeline (full-text extraction, seed
 compliance items, per-section requirements to the drafter, hard gate);
 BL-AIP-6 AI edits as tracked changes by "FORGE AI" + research-while-you-

@@ -417,6 +417,30 @@ export async function advanceProposalStageAction(
       resourceId: id,
       metadata: { fromStage: before?.stage ?? "unknown", toStage: nextStage },
     });
+
+    // BL-AIP-3 — `proposal_advanced` was a selectable trigger kind that
+    // nothing ever emitted. Fire it here so rules on it actually work.
+    // Best-effort: a dispatcher failure must not undo the stage change.
+    try {
+      await dispatchTriggerEvent({
+        organizationId,
+        kind: "proposal_advanced",
+        payload: {
+          proposalId: id,
+          stage: nextStage,
+          fromStage: before?.stage ?? null,
+        },
+        subject: `Proposal advanced to ${nextStage}`,
+        linkPath: `/proposals/${id}`,
+        proposalId: id,
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      log.warn("[advanceProposalStage]", "proposal_advanced dispatch failed", {
+        error: err,
+      });
+    }
+
     revalidatePath(`/proposals/${id}`);
     revalidatePath("/proposals");
     revalidatePath("/");
@@ -492,12 +516,26 @@ export async function saveSectionAction(input: {
     let snapshotBody: TipTapDoc | null = null;
     let snapshotStage: ProposalSectionStatus | null = null;
     let snapshotWordCount = 0;
-    if (input.status !== undefined) {
-      const [prior] = await db
+    // BL-AIP-3 — the same prior read also tells us whether the author
+    // is changing hands, so the assignment notification fires only on
+    // a real hand-off (not on every save that echoes the same author).
+    let prior:
+      | {
+          status: ProposalSectionStatus;
+          bodyDoc: TipTapDoc;
+          wordCount: number;
+          authorUserId: string | null;
+          title: string;
+        }
+      | undefined;
+    if (input.status !== undefined || input.authorUserId !== undefined) {
+      [prior] = await db
         .select({
           status: proposalSections.status,
           bodyDoc: proposalSections.bodyDoc,
           wordCount: proposalSections.wordCount,
+          authorUserId: proposalSections.authorUserId,
+          title: proposalSections.title,
         })
         .from(proposalSections)
         .where(
@@ -507,7 +545,11 @@ export async function saveSectionAction(input: {
           ),
         )
         .limit(1);
-      if (prior && prior.status !== input.status) {
+      if (
+        input.status !== undefined &&
+        prior &&
+        prior.status !== input.status
+      ) {
         snapshotBody = prior.bodyDoc;
         snapshotStage = prior.status;
         snapshotWordCount = prior.wordCount;
@@ -540,6 +582,43 @@ export async function saveSectionAction(input: {
           eq(proposalSections.proposalId, input.proposalId),
         ),
       );
+
+    // BL-AIP-3 — notify the newly-assigned author. Only when the author
+    // actually changed to someone else (assigning yourself is silent).
+    // Best-effort — never blocks the save.
+    const newAuthor =
+      input.authorUserId !== undefined ? input.authorUserId || null : null;
+    if (
+      newAuthor &&
+      newAuthor !== (prior?.authorUserId ?? null) &&
+      newAuthor !== actor.id
+    ) {
+      const sectionTitle =
+        (input.title !== undefined ? input.title.trim() : prior?.title) ||
+        "Untitled section";
+      try {
+        await dispatchTriggerEvent({
+          organizationId,
+          kind: "proposal_section_assigned",
+          payload: {
+            proposalId: input.proposalId,
+            sectionId: input.sectionId,
+            sectionTitle,
+            mentionedUserIds: [newAuthor],
+            assignedByUserId: actor.id,
+          },
+          subject: `You were assigned "${sectionTitle}"`,
+          body: `${actor.name ?? actor.email ?? "A teammate"} assigned you the "${sectionTitle}" section. Open the section editor to start drafting.`,
+          linkPath: `/proposals/${input.proposalId}/sections`,
+          proposalId: input.proposalId,
+          actorUserId: actor.id,
+        });
+      } catch (err) {
+        log.warn("[saveSectionAction]", "section-assigned dispatch failed", {
+          error: err,
+        });
+      }
+    }
 
     if (snapshotBody && snapshotStage && input.status) {
       // Best-effort: a failure here MUST NOT block the save itself.

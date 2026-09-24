@@ -3,7 +3,11 @@
 import { and, asc, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, memberships, users } from "@/db/schema";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import {
+  requireAuth,
+  requireCurrentOrg,
+  requireOrgAdmin,
+} from "@/lib/auth-helpers";
 import { safeQuery } from "@/lib/schema-resilience";
 import {
   ensureFeature,
@@ -55,6 +59,8 @@ export async function listAuditEventsAction(
 ): Promise<AuditQueryResult> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  // BL-AIP-3 — tenant audit log is an admin surface (matches nav).
+  await requireOrgAdmin(organizationId);
 
   const conditions = [eq(auditLogs.organizationId, organizationId)];
 
@@ -177,6 +183,7 @@ export async function listAuditActorsAction(): Promise<
 > {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
 
   const rows = await db
     .select({
@@ -210,6 +217,7 @@ export async function exportAuditLogCsvAction(
 ): Promise<{ ok: true; csv: string; rowCount: number } | { ok: false; error: string }> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
 
   // BL-16 Phase B-2 — gate bulk CSV export on `bulkExport`. Tenants
   // can still read individual audit-log rows in the table view; only

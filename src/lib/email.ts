@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { log } from "@/lib/log";
+import { buildDigestEmail, buildRuleNotificationEmail } from "@/lib/notification-email";
 
 const apiKey = process.env.RESEND_API_KEY;
 const from = process.env.EMAIL_FROM ?? "Forge <noreply@sysgov.com>";
@@ -446,5 +447,47 @@ export async function sendOpportunityReviewRequestEmail(opts: {
       (opts.note ? `\n\nNote: ${opts.note}` : "") +
       `\n\nPlease open the link below to recommend Bid / No-bid / More info:\n${url}` +
       `\n\nThis link is personal to you and expires in 72 hours.`,
+  });
+}
+
+/** BL-AIP-3 — whether a provider key is present; callers record the truth when not. */
+export function emailConfigured(): boolean {
+  return !!apiKey;
+}
+
+/**
+ * BL-AIP-3 — one notification from the rules engine (immediate
+ * frequency, email channel). Throws on provider failure so the
+ * dispatcher can record the error on the delivery row.
+ */
+export async function sendRuleNotificationEmail(opts: {
+  to: string;
+  subject: string;
+  body?: string;
+  linkPath?: string;
+  ruleName: string;
+}): Promise<void> {
+  const built = buildRuleNotificationEmail({ ...opts, appUrl: baseUrl() });
+  await sendEmail({
+    to: opts.to,
+    subject: built.subject,
+    html: emailShell(built.subject, built.html),
+    text: built.text,
+  });
+}
+
+/** BL-AIP-3 — a daily / weekly digest for a batched-frequency rule. */
+export async function sendDigestEmail(opts: {
+  to: string;
+  ruleName: string;
+  count: number;
+  cadence: "daily" | "weekly";
+}): Promise<void> {
+  const built = buildDigestEmail({ ...opts, appUrl: baseUrl() });
+  await sendEmail({
+    to: opts.to,
+    subject: built.subject,
+    html: emailShell(built.subject, built.html),
+    text: built.text,
   });
 }

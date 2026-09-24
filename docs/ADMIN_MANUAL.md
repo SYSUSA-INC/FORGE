@@ -359,7 +359,9 @@ Click **+ New rule** (or any existing row) to open the editor.
 
 **Identity** — name and description. The description shows in the rule list; a sentence about *why* the rule exists is much more useful than the name alone.
 
-**Trigger event kind** — picks one event from a fixed list. The list expands as more product features add new triggers. Today: opportunity stage changes (advanced / won / lost / no-bid / due soon), proposal lifecycle (created / advanced / section overdue), color-team reviews (pending / completed), comment mentions, opportunity bid/no-bid reviews submitted, solicitation role assignments, compliance overdue, audit anomalies, membership invited / disabled.
+**Trigger event kind** — picks one event from a fixed list. The list expands as more product features add new triggers. Today: opportunity stage changes (advanced / won / lost / no-bid / due soon), proposal lifecycle (created / advanced / section assigned), color-team reviews (pending / completed / reviewer added late), comment mentions, opportunity bid/no-bid reviews submitted, solicitation role assignments, membership invited / disabled. Three kinds are listed with a "(not yet active)" suffix — proposal section overdue, compliance overdue and audit anomaly — because no product feature emits them yet; a rule on one of those is saved but never fires until the emitter ships.
+
+"Opportunity due soon" fires from the daily 08:00 UTC cron at T-7, T-3 and T-1 before an open opportunity's response due date (won / lost / no-bid opportunities are skipped). Its payload carries `opportunityId`, `daysUntil`, `dueDate`, `stage` and `agency`, so `{"daysUntil": 1}` narrows a rule to the final reminder.
 
 **Match filter** — a JSON object. Empty (`{}`) matches every event of the kind. Non-empty matches only events whose payload contains every key/value in the filter. Use this to narrow by stage, color, etc. — for example, `{"color": "red"}` on a `review_completed` rule fires only for Red Team reviews.
 
@@ -370,7 +372,9 @@ Click **+ New rule** (or any existing row) to open the editor.
 - **By relationship to the record** (formula): the proposal manager, opportunity owner, capture lead, pricing lead, section author, or **color-team review assignees** (resolved from the triggering event's `reviewId`).
 - **Users mentioned in the event payload**: events like @-mentions in review comments and role assignments tag the relevant users in their payload. This strategy fans out to whoever the event tagged — no static list to maintain.
 
-**Delivery** — channels and frequency. Channels: in-app (always available), email (always available), Slack and Teams (coming soon — selectable as a placeholder but not yet delivered). Frequency: Immediate (delivery row created at trigger time), Daily digest, or Weekly digest (collapsed into a single inbox row per recipient per cadence by the materialization cron).
+**Delivery** — channels and frequency. Channels: in-app (always available), email (sent through Resend when `RESEND_API_KEY` is configured on the deployment — otherwise the delivery is recorded with the error "email not configured" so the gap is visible instead of silent), Slack and Teams (coming soon — selectable as a placeholder but not yet delivered). Frequency: Immediate (delivery row created at trigger time; email sent right away), Daily digest, or Weekly digest (collapsed into a single inbox row per recipient per cadence by the materialization cron, which also sends one digest email per recipient for email-channel rules).
+
+Reading the inbox acknowledges deliveries: marking a notification read (or "Mark all read") stamps the matching in-app deliveries as acknowledged, which is what the SLA cron checks before marking a breach and escalating.
 
 **SLA & escalation** — optional. Set SLA hours (0 = no SLA, max 30 days). If a recipient hasn't acknowledged their delivery within the window, the SLA-breach cron marks the row breached. If an **escalation strategy** is set (same four shapes as the primary recipient), it then fires a fresh delivery to the fallback recipients.
 
@@ -378,7 +382,7 @@ Click **+ New rule** (or any existing row) to open the editor.
 
 ### 5.2 Default rules every tenant gets
 
-On migration, FORGE seeds six default rules per tenant so the rules engine matches the legacy hardcoded behavior. They're named `Default: <human label>` and noted as auto-seeded in their description. If you already had a rule for one of these trigger kinds, the seed skipped that kind — your custom rule wins.
+On migration, FORGE seeds seven default rules per tenant so the rules engine matches the legacy hardcoded behavior. They're named `Default: <human label>` and noted as auto-seeded in their description. If you already had a rule for one of these trigger kinds, the seed skipped that kind — your custom rule wins.
 
 | Default rule | Recipients | Channels |
 |---|---|---|
@@ -388,14 +392,15 @@ On migration, FORGE seeds six default rules per tenant so the rules engine match
 | Review comment mention | The @-mentioned user(s) | In-app + Email |
 | Opportunity bid/no-bid review submitted | Opportunity owner | In-app |
 | Solicitation role assigned | The newly-assigned user | In-app |
+| Proposal section assigned | The newly-assigned section author | In-app + Email |
 
 Edit or delete defaults the same way you'd edit a custom rule. Disabling a default doesn't break the legacy hardcoded notification (it still fires in parallel until that legacy path is retired in a future release — duplicate inbox rows are the accepted cost during the parity window).
 
 ### 5.3 Test send
 
-On any active rule's edit page, click **Test send** to dispatch a sample event for that rule's trigger kind. The recipients receive an in-app (and email, if the rule's channels include email) notification prefixed with `[Test send]`, with a body identifying you as the sender and noting the event is synthetic.
+On any active rule's edit page, click **Test send** to dispatch a sample event for that rule's trigger kind. Only the rule you are testing fires (other active rules on the same trigger kind are left alone). The recipients receive an in-app (and email, if the rule's channels include email) notification prefixed with `[Test send]`, with a body identifying you as the sender and noting the event is synthetic. The success notice reports how many recipients resolved, how many deliveries were written and how many emails were sent or failed, so a test that reached nobody says so instead of "dispatched".
 
-Test sends use an empty payload (other than `testSend: true`), so any rule with a non-empty match filter that requires specific payload keys won't match against a test. Exercise filter logic by triggering a real event. The button is disabled when the rule is Inactive; activate first.
+Test sends use an empty payload (other than `testSend: true`), so any rule with a non-empty match filter that requires specific payload keys won't match against a test, and a rule whose recipients come from the event ("Users mentioned in the event payload", or a formula that needs a proposal or review) resolves zero recipients on a test. Exercise those by triggering a real event. The button is disabled when the rule is Inactive; activate first.
 
 Every test send writes a `notification_rule.test_send` row to your audit log so the use can be tracked.
 

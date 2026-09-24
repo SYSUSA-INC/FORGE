@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { sendInviteEmail } from "@/lib/email";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { issueToken } from "@/lib/tokens";
 import {
   enforceSeatsQuota,
@@ -200,6 +201,24 @@ export async function inviteUserAction(input: {
     },
   });
 
+  // BL-AIP-3 — `membership_invited` was a selectable trigger kind that
+  // nothing emitted. Best-effort: the invite already succeeded.
+  try {
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: "membership_invited",
+      payload: { invitedEmail: email, role: input.role, inviteId },
+      subject: `Team member invited: ${email}`,
+      body: `${user.name ?? user.email ?? "An admin"} invited ${email} as ${input.role}.`,
+      linkPath: "/users",
+      actorUserId: user.id,
+    });
+  } catch (err) {
+    log.warn("[inviteUserAction]", "membership_invited dispatch failed", {
+      error: err,
+    });
+  }
+
   revalidatePath("/users");
   return { ok: true };
 }
@@ -353,6 +372,26 @@ export async function setMemberStatusAction(
     resourceId: memberUserId,
     metadata: { status },
   });
+
+  // BL-AIP-3 — `membership_disabled` was a selectable trigger kind that
+  // nothing emitted. Best-effort: the status change already succeeded.
+  if (status === "disabled") {
+    try {
+      await dispatchTriggerEvent({
+        organizationId,
+        kind: "membership_disabled",
+        payload: { userId: memberUserId },
+        subject: "Team member disabled",
+        body: `${actor.name ?? actor.email ?? "An admin"} disabled a team member's access.`,
+        linkPath: "/users",
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      log.warn("[setMemberStatusAction]", "membership_disabled dispatch failed", {
+        error: err,
+      });
+    }
+  }
 
   revalidatePath("/users");
   return { ok: true };

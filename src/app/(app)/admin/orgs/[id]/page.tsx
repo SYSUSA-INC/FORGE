@@ -416,7 +416,7 @@ export default async function TenantDetailPage({
           )}
           <div className="mt-3 font-mono text-[10px] text-muted/80">
             <Link
-              href={`/platform/audit-log?orgId=${org.id}`}
+              href={`/platform/audit-log?tenant=${org.id}`}
               className="underline-offset-2 hover:underline"
             >
               View full audit log for this tenant →

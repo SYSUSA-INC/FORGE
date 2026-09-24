@@ -65,7 +65,7 @@ type FormState = {
 const DEFAULT_FORM: FormState = {
   name: "",
   description: "",
-  triggerEventKind: "opportunity_due_soon",
+  triggerEventKind: "proposal_created",
   matchFilterText: "{}",
   recipientStrategy: "role_based",
   specificUserIds: [],
@@ -288,7 +288,10 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
         setError(res.error);
         return;
       }
-      setNotice("Test send dispatched — check the configured recipients.");
+      setNotice(
+        ("notice" in res && res.notice) ||
+          "Test send dispatched — check the configured recipients.",
+      );
     });
   }
 

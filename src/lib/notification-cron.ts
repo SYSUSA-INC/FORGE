@@ -6,6 +6,7 @@ import {
   notifications,
   notificationDeliveries,
   notificationRules,
+  users,
 } from "@/db/schema";
 import { log } from "@/lib/log";
 
@@ -32,6 +33,9 @@ export type BatchesResult = {
   rulesScanned: number;
   inboxRowsCreated: number;
   deliveriesMarkedSent: number;
+  /** BL-AIP-3 — digest emails actually sent / failed this run. */
+  digestEmailsSent: number;
+  digestEmailErrors: number;
 };
 
 const BATCHED_FREQUENCIES = ["batched_daily", "batched_weekly"] as const;
@@ -43,6 +47,8 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
   let inboxRowsCreated = 0;
   let deliveriesMarkedSent = 0;
   let rulesScanned = 0;
+  let digestEmailsSent = 0;
+  let digestEmailErrors = 0;
 
   for (const frequency of BATCHED_FREQUENCIES) {
     if (frequency === "batched_weekly" && !isWeeklyDay) continue;
@@ -141,8 +147,7 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
         }
 
         // Materialize one inbox row per (recipient, in_app) group.
-        // Other channels (email) only get the sent_at marker — the
-        // actual email sending lands when the email integration is wired.
+        // Email groups get one digest email each (BL-AIP-3, below).
         const inboxRows = Array.from(groups.values())
           .filter((g) => g.channel === "in_app")
           .map((g) => ({
@@ -163,6 +168,59 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
         if (inboxRows.length > 0) {
           await db.insert(notifications).values(inboxRows);
           inboxRowsCreated += inboxRows.length;
+        }
+
+        // BL-AIP-3 — one digest email per (recipient, email) group. These
+        // rows used to be marked sent with nothing ever sent.
+        const emailGroups = Array.from(groups.values()).filter((g) => g.channel === "email");
+        if (emailGroups.length > 0) {
+          const { emailConfigured, sendDigestEmail } = await import("@/lib/email");
+          if (!emailConfigured()) {
+            const ids = emailGroups.flatMap((g) => g.deliveryIds);
+            await db
+              .update(notificationDeliveries)
+              .set({ error: "email not configured (RESEND_API_KEY)" })
+              .where(
+                and(
+                  eq(notificationDeliveries.organizationId, organizationId),
+                  inArray(notificationDeliveries.id, ids),
+                ),
+              )
+              .catch(() => undefined);
+            digestEmailErrors += emailGroups.length;
+          } else {
+            const userRows = await db
+              .select({ id: users.id, email: users.email })
+              .from(users)
+              .where(inArray(users.id, emailGroups.map((g) => g.recipientUserId)));
+            const emailById = new Map(userRows.map((u) => [u.id, u.email]));
+            for (const g of emailGroups) {
+              const to = emailById.get(g.recipientUserId);
+              try {
+                if (!to) throw new Error("recipient has no email address");
+                await sendDigestEmail({
+                  to,
+                  ruleName: rule.name,
+                  count: g.deliveryIds.length,
+                  cadence: frequency === "batched_daily" ? "daily" : "weekly",
+                });
+                digestEmailsSent += 1;
+              } catch (err) {
+                digestEmailErrors += 1;
+                const message = err instanceof Error ? err.message : String(err);
+                await db
+                  .update(notificationDeliveries)
+                  .set({ error: message.slice(0, 500) })
+                  .where(
+                    and(
+                      eq(notificationDeliveries.organizationId, organizationId),
+                      inArray(notificationDeliveries.id, g.deliveryIds),
+                    ),
+                  )
+                  .catch(() => undefined);
+              }
+            }
+          }
         }
 
         // Mark every pending delivery for THIS rule as sent. Filter by
@@ -195,7 +253,13 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
     }
   }
 
-  return { rulesScanned, inboxRowsCreated, deliveriesMarkedSent };
+  return {
+    rulesScanned,
+    inboxRowsCreated,
+    deliveriesMarkedSent,
+    digestEmailsSent,
+    digestEmailErrors,
+  };
 }
 
 /**
