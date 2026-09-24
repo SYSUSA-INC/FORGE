@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #TBD); BL-AIP-3 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -172,7 +172,7 @@ was confirmed in code before it was fixed:
   from the customer-facing review email; "BL-23b" ticket code removed
   from the opportunity panel eyebrow.
 
-**BL-AIP-2 — the hand-offs** ✅ (PR #TBD). The single highest-impact
+**BL-AIP-2 — the hand-offs** ✅ (PR #270). The single highest-impact
 defect in the assessment plus its neighbours:
 - **Accepted AI text now reaches the editor.** TipTap reads `content`
   once at mount and ignores later prop changes, so "Replace section with
