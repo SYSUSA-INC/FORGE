@@ -33,6 +33,7 @@ import {
   validateDoc,
 } from "@/lib/tiptap-doc";
 import { getDefaultTemplate } from "@/lib/template-defaults";
+import { runInBackground } from "@/lib/background";
 import { log } from "@/lib/log";
 
 async function ownsProposal(id: string, organizationId: string) {
@@ -454,9 +455,9 @@ export async function advanceProposalStageAction(
       const { harvestProposalToCorpusAction } = await import(
         "./[id]/harvest-actions"
       );
-      void harvestProposalToCorpusAction(id).catch((err) => {
-        log.warn("[advanceProposalStage]", "harvest failed", { error: err });
-      });
+      runInBackground("[advanceProposalStage] harvest", () =>
+        harvestProposalToCorpusAction(id),
+      );
     }
 
     return { ok: true, harvestStarted };

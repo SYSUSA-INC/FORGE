@@ -2,7 +2,7 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { KnowledgeKind } from "@/db/schema";
+import type { KnowledgeKind, KnowledgeOutcomeLabel } from "@/db/schema";
 import {
   archiveKnowledgeEntryAction,
   deleteKnowledgeEntryAction,
@@ -15,6 +15,14 @@ const KINDS: KnowledgeKind[] = [
   "past_performance",
   "personnel",
   "boilerplate",
+];
+
+const OUTCOMES: { value: KnowledgeOutcomeLabel; label: string }[] = [
+  { value: "none", label: "Unknown / not from a pursuit" },
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
+  { value: "no_bid", label: "No-bid" },
+  { value: "withdrawn", label: "Withdrawn" },
 ];
 
 const FACTOR_LABELS: Record<string, string> = {
@@ -39,6 +47,8 @@ export function EditEntryClient({
     archived: boolean;
     qualityScore: number | null;
     qualityScoreFactors: Record<string, number>;
+    /** BL-AIP-4 — outcome provenance, editable. */
+    outcomeLabel?: KnowledgeOutcomeLabel;
   };
 }) {
   const router = useRouter();
@@ -47,6 +57,9 @@ export function EditEntryClient({
   const [notice, setNotice] = useState<string | null>(null);
 
   const [kind, setKind] = useState<KnowledgeKind>(initial.kind);
+  const [outcomeLabel, setOutcomeLabel] = useState<KnowledgeOutcomeLabel>(
+    initial.outcomeLabel ?? "none",
+  );
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
   const [tagsRaw, setTagsRaw] = useState(initial.tags.join(", "));
@@ -65,6 +78,7 @@ export function EditEntryClient({
         title,
         body,
         tags,
+        outcomeLabel,
       });
       if (!res.ok) return setError(res.error);
       setNotice("Saved.");
@@ -113,6 +127,27 @@ export function EditEntryClient({
             </option>
           ))}
         </select>
+      </div>
+      <div>
+        <label className="aur-label" htmlFor="kb-outcome">
+          Outcome
+        </label>
+        <select
+          id="kb-outcome"
+          className="aur-input"
+          value={outcomeLabel}
+          onChange={(e) => setOutcomeLabel(e.target.value as KnowledgeOutcomeLabel)}
+        >
+          {OUTCOMES.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <div className="mt-1 font-mono text-[10px] text-muted">
+          Where this came from. Won content is boosted when the Brain drafts;
+          lost content is slightly demoted.
+        </div>
       </div>
       <div>
         <label className="aur-label" htmlFor="kb-title">

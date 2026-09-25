@@ -6,6 +6,11 @@
  * Respects per-org feature gates and quota so the cron never burns slots
  * for orgs that have opted out or exhausted their monthly allowance.
  *
+ * BL-AIP-4 — failures back off exponentially (5 min doubling to 6 h) and
+ * a proposal is dropped from the queue after SCAN_MAX_ATTEMPTS, so one
+ * proposal whose scan keeps failing no longer blocks the five-per-run
+ * batch forever and burns a request slot every tick.
+ *
  * Called from /api/cron/proposal-scan. Not a server action (no "use server"
  * — this is an internal server-only lib function). Cross-org queries here
  * are intentional: the cron is an admin-level background worker, not a
@@ -13,7 +18,7 @@
  */
 import "server-only";
 
-import { and, asc, eq, isNotNull, lt } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   opportunities,
@@ -24,6 +29,7 @@ import {
 } from "@/db/schema";
 import { completeStructuredForTenant } from "@/lib/ai";
 import { proposalScanSchema } from "@/lib/ai-prompts";
+import { nextScanAttempt } from "@/lib/proposal-scan-backoff";
 import {
   buildScanUserPrompt,
   SCAN_MAX_TOKENS,
@@ -46,36 +52,51 @@ export type CronScanSummary = {
   scanned: number;
   skipped: number;
   errors: number;
+  /** BL-AIP-4 — failures that were re-queued with a backoff. */
+  retriesScheduled: number;
+  /** BL-AIP-4 — proposals dropped after SCAN_MAX_ATTEMPTS failures. */
+  abandoned: number;
 };
 
+/** Thrown when the AI provider is in stub mode: not a failure, skip. */
+class StubSkipError extends Error {}
+
 /**
- * Find proposals dirty for ≥ 5 minutes and run a health scan for each,
- * up to `maxBatch` per invocation. Processes oldest-dirty-first so no
- * proposal is perpetually skipped when the batch cap is hit.
+ * Find proposals dirty for ≥ 5 minutes whose backoff (if any) has
+ * elapsed and run a health scan for each, up to `maxBatch` per
+ * invocation. Oldest-dirty-first so no proposal is perpetually skipped
+ * when the batch cap is hit.
  */
 export async function runStaleProposalScans(
   maxBatch = 5,
 ): Promise<CronScanSummary> {
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const now = new Date();
+  const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
   const staleRows = await db
     .select({
       id: proposals.id,
       organizationId: proposals.organizationId,
+      scanAttempts: proposals.scanAttempts,
     })
     .from(proposals)
     .where(
       and(
         isNotNull(proposals.scanDirtySince),
         lt(proposals.scanDirtySince, fiveMinutesAgo),
+        or(isNull(proposals.scanNextAttemptAt), lte(proposals.scanNextAttemptAt, now)),
       ),
     )
     .orderBy(asc(proposals.scanDirtySince))
     .limit(maxBatch);
 
-  let scanned = 0;
-  let skipped = 0;
-  let errors = 0;
+  const summary: CronScanSummary = {
+    scanned: 0,
+    skipped: 0,
+    errors: 0,
+    retriesScheduled: 0,
+    abandoned: 0,
+  };
 
   for (const row of staleRows) {
     // Feature + quota gates — skip silently, don't refund (nothing was charged yet).
@@ -96,32 +117,71 @@ export async function runStaleProposalScans(
     }
 
     if (gated) {
-      skipped++;
+      summary.skipped++;
       continue;
     }
 
     try {
       await runSingleProposalScan(row.id, row.organizationId);
-      scanned++;
+      summary.scanned++;
     } catch (err) {
-      log.error("[proposal-scan-cron]", "scan failed", {
-        proposalId: row.id,
-        error: err,
-      });
       // Refund the quota slot — the user got no value from this scan.
       await refundQuota(row.organizationId, "aiRequestsPerMonth").catch(
         () => {},
       );
-      errors++;
+      if (err instanceof StubSkipError) {
+        summary.skipped++;
+        continue;
+      }
+      summary.errors++;
+      log.error("[proposal-scan-cron]", "scan failed", {
+        proposalId: row.id,
+        error: err,
+      });
+
+      // BL-AIP-4 — schedule the retry, or give up.
+      const attempts = (row.scanAttempts ?? 0) + 1;
+      const next = nextScanAttempt(attempts, new Date());
+      try {
+        if (next.giveUp) {
+          await db
+            .update(proposals)
+            .set({ scanDirtySince: null, scanAttempts: 0, scanNextAttemptAt: null })
+            .where(and(eq(proposals.id, row.id), eq(proposals.organizationId, row.organizationId)));
+          summary.abandoned++;
+          log.error("[proposal-scan-cron]", "giving up after repeated failures", {
+            proposalId: row.id,
+            attempts,
+          });
+        } else {
+          await db
+            .update(proposals)
+            .set({ scanAttempts: attempts, scanNextAttemptAt: next.nextAttemptAt })
+            .where(and(eq(proposals.id, row.id), eq(proposals.organizationId, row.organizationId)));
+          summary.retriesScheduled++;
+        }
+      } catch (bookkeepingErr) {
+        log.error("[proposal-scan-cron]", "retry bookkeeping failed", {
+          proposalId: row.id,
+          error: bookkeepingErr,
+        });
+      }
     }
   }
 
-  return { scanned, skipped, errors };
+  return summary;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: run one proposal scan (no auth gate — caller verifies org access).
 // ─────────────────────────────────────────────────────────────────────────────
+
+async function clearScanState(proposalId: string, organizationId: string): Promise<void> {
+  await db
+    .update(proposals)
+    .set({ scanDirtySince: null, scanAttempts: 0, scanNextAttemptAt: null })
+    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)));
+}
 
 async function runSingleProposalScan(
   proposalId: string,
@@ -221,12 +281,8 @@ async function runSingleProposalScan(
     // BL-AIP-2 — clear the dirty flag before bailing, otherwise the same
     // proposals are picked up again every run (oldest first, five per
     // run) and block everything behind them until a provider is set.
-    await db
-      .update(proposals)
-      .set({ scanDirtySince: null })
-      .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)))
-      .catch(() => undefined);
-    throw new Error("AI provider is in stub mode — background scan skipped.");
+    await clearScanState(proposalId, organizationId).catch(() => undefined);
+    throw new StubSkipError("AI provider is in stub mode — background scan skipped.");
   }
   if (!res.data) {
     throw new Error(
@@ -292,9 +348,6 @@ async function runSingleProposalScan(
     });
   }
 
-  // Clear the dirty flag.
-  await db
-    .update(proposals)
-    .set({ scanDirtySince: null })
-    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)));
+  // Clear the dirty flag and any retry state.
+  await clearScanState(proposalId, organizationId);
 }

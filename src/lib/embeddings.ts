@@ -11,7 +11,13 @@
  * Pinned to 1536 dims so we don't have to re-create the pgvector
  * column to swap providers. If we ever add Voyage / Cohere, we'd
  * either pad/truncate to 1536 or run a separate column.
+ *
+ * BL-AIP-4 — callers pass an `EmbedContext` so every call is recorded
+ * in ai_call_log (provider, model, token estimate, latency, stub flag)
+ * under the `embedding` / `embedding_query` features. Embeddings were
+ * the one AI spend the ledger never saw.
  */
+import "server-only";
 
 import { KNOWLEDGE_EMBEDDING_DIM } from "@/db/schema";
 
@@ -28,6 +34,12 @@ export type EmbeddingProviderStatus = {
   name: EmbeddingProviderName;
   configured: boolean;
   reason: string;
+};
+
+/** Who is paying for the call, for the ai_call_log ledger. */
+export type EmbedContext = {
+  organizationId: string;
+  feature?: "embedding" | "embedding_query";
 };
 
 export function getEmbeddingProviderStatus(): {
@@ -61,6 +73,11 @@ export function getEmbeddingProviderStatus(): {
   return { active, all };
 }
 
+/** True when a real (non-stub) embedding provider is active. */
+export function liveEmbeddingProviderConfigured(): boolean {
+  return getEmbeddingProviderStatus().active.name !== "stub";
+}
+
 function statusFor(name: EmbeddingProviderName): EmbeddingProviderStatus {
   if (name === "openai") {
     const key = process.env.OPENAI_API_KEY;
@@ -80,14 +97,83 @@ function statusFor(name: EmbeddingProviderName): EmbeddingProviderStatus {
  * 8000 chars are truncated client-side — text-embedding-3-small caps
  * at 8191 tokens per item.
  */
-export async function embedBatch(texts: string[]): Promise<EmbeddingResult> {
+export async function embedBatch(
+  texts: string[],
+  ctx?: EmbedContext,
+): Promise<EmbeddingResult> {
   const cleaned = texts.map((t) => t.slice(0, 8000));
   const { active } = getEmbeddingProviderStatus();
+  const startedAt = Date.now();
 
-  if (active.name === "openai") {
-    return embedOpenAI(cleaned);
+  try {
+    const result =
+      active.name === "openai" ? await embedOpenAI(cleaned) : embedStub(cleaned);
+    if (ctx) {
+      void recordEmbeddingCall({
+        ctx,
+        texts: cleaned,
+        latencyMs: Date.now() - startedAt,
+        status: "ok",
+        provider: result.provider,
+        model: result.model,
+        stubbed: result.stubbed,
+      });
+    }
+    return result;
+  } catch (err) {
+    if (ctx) {
+      void recordEmbeddingCall({
+        ctx,
+        texts: cleaned,
+        latencyMs: Date.now() - startedAt,
+        status: "error",
+        provider: active.name,
+        model: active.name === "openai" ? OPENAI_MODEL : "stub-embedding-1536",
+        stubbed: active.name === "stub",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    throw err;
   }
-  return embedStub(cleaned);
+}
+
+/**
+ * Best-effort ledger write. Lazy import keeps the telemetry module (and
+ * its DB handle) out of callers that only need the provider status.
+ */
+async function recordEmbeddingCall(input: {
+  ctx: EmbedContext;
+  texts: string[];
+  latencyMs: number;
+  status: "ok" | "error";
+  provider: string;
+  model: string;
+  stubbed: boolean;
+  error?: string;
+}): Promise<void> {
+  try {
+    const [{ recordAiCall }, { approxTokenCount }] = await Promise.all([
+      import("@/lib/ai-telemetry"),
+      import("@/lib/text-chunk"),
+    ]);
+    const inputTokens = input.texts.reduce((n, t) => n + approxTokenCount(t), 0);
+    await recordAiCall({
+      organizationId: input.ctx.organizationId,
+      feature: input.ctx.feature ?? "embedding",
+      variant: `${input.texts.length}`,
+      provider: input.provider,
+      model: input.model,
+      status: input.status,
+      error: input.error ?? null,
+      inputTokens,
+      outputTokens: 0,
+      outputChars: 0,
+      latencyMs: input.latencyMs,
+      stubbed: input.stubbed,
+    });
+  } catch {
+    // Telemetry must never affect the embedding call.
+  }
 }
 
 const OPENAI_MODEL =

@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -246,9 +246,43 @@ defect in the assessment plus its neighbours:
   individually; the tenant audit log page and actions require org
   admin (they were readable by every member).
 
+**BL-AIP-4 — outcome provenance and Brain indexing** ✅ (PR #275)
+
+- **Outcomes reach the Brain.** Harvest reads `proposal_outcome`, so a
+  won proposal lands labelled `won` instead of `none` (the old order
+  propagated the label before the artifact existed). Promoted candidates
+  inherit the source artifact's outcome and are quality-scored on
+  creation; the embed failure that `{ ok: false }` used to hide is now
+  logged. Outcome selectors on corpus upload, on each artifact row and
+  in the entry editor let a new tenant label historical proposals.
+- **`/api/cron/brain-index`** (every six hours, `brain-index-cron.ts`):
+  reconciles outcome labels from `proposal_outcome`, embeds artifacts
+  that have text but no chunks, re-embeds stub / unknown vectors once a
+  live provider is configured (entries now record `embedding_provider`
+  / `embedding_model`, migration 0081), embeds curated entries with no
+  vector, and auto-extracts candidates from never-mined artifacts
+  (feature- and quota-gated per tenant, skipped in stub mode) with
+  de-duplication against earlier candidates and curated entries
+  (`knowledge-dedup.ts`, tested). Embedding calls are now metered in
+  `ai_call_log` under `embedding` / `embedding_query`.
+- **Indexes:** the IVFFlat vector indexes built on empty tables are
+  rebuilt as HNSW (migration 0082, mirrored in `schema.ts`).
+- **Ranking:** `rankBoost` (`brain-rank.ts`, tested) adds artifact kind,
+  recency and quality score to the outcome and curated boosts.
+- **Scan cron:** failures back off exponentially (5 min → 6 h) and a
+  proposal is dropped after five failures (`proposal-scan-backoff.ts`,
+  tested; `proposal.scan_attempts` / `scan_next_attempt_at`, migration
+  0081); stub mode counts as a skip, not a failure.
+- **Durable background work:** `runInBackground` (`background.ts`,
+  tested) hands fire-and-forget parses, harvests, remerges and scans to
+  Vercel's `waitUntil` so the instance is not frozen mid-flight; the
+  nine `void …` sites use it.
+
 **Queued slices (from the assessment, in order):**
-BL-AIP-4 outcome provenance + Brain indexing
-cron; BL-AIP-5 requirements-first pipeline (full-text extraction, seed
+BL-AIP-4b Brain follow-ups (hybrid tsvector search, harvest moved to a
+lib with a cron fallback for un-harvested won proposals, R2 storage for
+artifacts, a background-job table with stuck-row recovery);
+BL-AIP-5 requirements-first pipeline (full-text extraction, seed
 compliance items, per-section requirements to the drafter, hard gate);
 BL-AIP-6 AI edits as tracked changes by "FORGE AI" + research-while-you-
 write rail; BL-AIP-7 proactive scout / stored graded briefs / AI Engine

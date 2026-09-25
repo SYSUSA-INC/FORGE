@@ -53,6 +53,8 @@ export function CorpusUploader() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [defaultKind, setDefaultKind] = useState<string>("auto");
   const [defaultTags, setDefaultTags] = useState<string>("");
+  // BL-AIP-4 — outcome provenance for historical proposals / debriefs.
+  const [defaultOutcome, setDefaultOutcome] = useState<string>("none");
   const [dragOver, setDragOver] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -105,6 +107,9 @@ export function CorpusUploader() {
           fd.append("kind", defaultKind);
         }
         if (defaultTags.trim()) fd.append("tags", defaultTags.trim());
+        if (defaultOutcome && defaultOutcome !== "none") {
+          fd.append("outcome", defaultOutcome);
+        }
 
         let res: ArtifactUploadResult;
         try {
@@ -141,7 +146,7 @@ export function CorpusUploader() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
         <div>
           <label className="aur-label">Default kind</label>
           <select
@@ -167,6 +172,24 @@ export function CorpusUploader() {
             value={defaultTags}
             onChange={(e) => setDefaultTags(e.target.value)}
           />
+        </div>
+        <div>
+          <label className="aur-label">Outcome</label>
+          <select
+            className="aur-input"
+            value={defaultOutcome}
+            onChange={(e) => setDefaultOutcome(e.target.value)}
+            title="For past proposals and debriefs: how the pursuit ended. The Brain favours won content when it drafts."
+          >
+            <option value="none">Unknown / not a proposal</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
+            <option value="no_bid">No-bid</option>
+            <option value="withdrawn">Withdrawn</option>
+          </select>
+          <div className="mt-1 font-mono text-[10px] text-muted">
+            Won content is boosted in Brain retrieval.
+          </div>
         </div>
       </div>
 

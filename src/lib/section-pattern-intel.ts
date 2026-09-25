@@ -101,7 +101,7 @@ async function retrieveCorpusByOutcome(
   if (query.trim().length < 6) return [];
   let queryVec: number[];
   try {
-    const r = await embedBatch([query]);
+    const r = await embedBatch([query], { organizationId, feature: "embedding_query" });
     if (r.stubbed) return []; // no signal in stub vectors
     queryVec = r.vectors[0]!;
   } catch (err) {

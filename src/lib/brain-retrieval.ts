@@ -12,8 +12,13 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { knowledgeEntries } from "@/db/schema";
+import { rankBoost } from "@/lib/brain-rank";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
 import { log } from "@/lib/log";
+
+// BL-AIP-4 — the boosts live in src/lib/brain-rank.ts (pure, tested);
+// re-exported so existing importers keep working.
+export { outcomeBoost } from "@/lib/brain-rank";
 
 export type BrainOutcomeLabel = "none" | "won" | "lost" | "no_bid" | "withdrawn";
 export type BrainEntryKind = "capability" | "past_performance" | "personnel" | "boilerplate";
@@ -38,23 +43,10 @@ export type BrainSearchResult =
   | { ok: false; error: string };
 
 /**
- * Phase 14a — outcome-aware retrieval bonus. Won content rises, lost
- * content is slightly demoted; no_bid / withdrawn / none stay neutral.
- */
-export function outcomeBoost(label: string | null | undefined): number {
-  switch (label) {
-    case "won":
-      return 0.1;
-    case "lost":
-      return -0.05;
-    default:
-      return 0;
-  }
-}
-
-/**
  * Search corpus chunks and curated entries for `query`, merge and rank.
- * Curated entries get a +0.05 tie-break because they are reviewer-approved.
+ * Cosine similarity plus `rankBoost`: won +0.10 / lost −0.05, artifact
+ * kind, recency, quality score and a +0.05 curated tie-break because
+ * entries are reviewer-approved.
  */
 export async function searchBrain(input: {
   organizationId: string;
@@ -77,7 +69,7 @@ export async function searchBrain(input: {
   let provider = "stub";
   let stubbed = true;
   try {
-    const r = await embedBatch([composed]);
+    const r = await embedBatch([composed], { organizationId, feature: "embedding_query" });
     queryVec = r.vectors[0]!;
     provider = r.provider;
     stubbed = r.stubbed;
@@ -95,6 +87,7 @@ export async function searchBrain(input: {
     artifact_title: string;
     artifact_kind: string;
     artifact_outcome: string;
+    artifact_updated_at: string | Date | null;
     content: string;
     similarity: number | string;
   };
@@ -104,8 +97,11 @@ export async function searchBrain(input: {
     title: string;
     body: string;
     outcome_label: string;
+    quality_score: number | string | null;
+    updated_at: string | Date | null;
     similarity: number | string;
   };
+  const now = new Date();
 
   let corpusRows: CorpusRow[] = [];
   let entryRows: EntryRow[] = [];
@@ -119,6 +115,7 @@ export async function searchBrain(input: {
         a.title           AS artifact_title,
         a.kind            AS artifact_kind,
         a.outcome_label   AS artifact_outcome,
+        a.updated_at      AS artifact_updated_at,
         1 - (c.embedding <=> ${literal}::vector) AS similarity
       FROM knowledge_artifact_chunk c
       INNER JOIN knowledge_artifact a ON a.id = c.artifact_id
@@ -142,6 +139,8 @@ export async function searchBrain(input: {
         title,
         body,
         outcome_label,
+        quality_score,
+        updated_at,
         1 - (embedding <=> ${literal}::vector) AS similarity
       FROM knowledge_entry
       WHERE organization_id = ${organizationId}
@@ -169,6 +168,8 @@ export async function searchBrain(input: {
           title: knowledgeEntries.title,
           body: knowledgeEntries.body,
           outcomeLabel: knowledgeEntries.outcomeLabel,
+          qualityScore: knowledgeEntries.qualityScore,
+          updatedAt: knowledgeEntries.updatedAt,
         })
         .from(knowledgeEntries)
         .where(eq(knowledgeEntries.organizationId, organizationId))
@@ -190,6 +191,8 @@ export async function searchBrain(input: {
             title: e.title,
             body: e.body,
             outcome_label: e.outcomeLabel,
+            quality_score: e.qualityScore,
+            updated_at: e.updatedAt,
             similarity: scoreOverlap((e.title + " " + e.body).toLowerCase(), tokens),
           }))
           .filter((e) => Number(e.similarity) > 0)
@@ -211,7 +214,16 @@ export async function searchBrain(input: {
       outcomeLabel: (r.artifact_outcome ?? "none") as BrainOutcomeLabel,
       title: r.artifact_title || "(untitled artifact)",
       content: r.content,
-      similarity: Number(r.similarity) + outcomeBoost(r.artifact_outcome),
+      similarity:
+        Number(r.similarity) +
+        rankBoost(
+          {
+            outcomeLabel: r.artifact_outcome,
+            kind: r.artifact_kind,
+            updatedAt: r.artifact_updated_at,
+          },
+          now,
+        ),
     })),
     ...entryRows.map<BrainHit>((r) => ({
       source: "entry",
@@ -220,7 +232,18 @@ export async function searchBrain(input: {
       outcomeLabel: (r.outcome_label ?? "none") as BrainOutcomeLabel,
       title: r.title,
       content: r.body,
-      similarity: Number(r.similarity) + 0.05 + outcomeBoost(r.outcome_label),
+      similarity:
+        Number(r.similarity) +
+        rankBoost(
+          {
+            outcomeLabel: r.outcome_label,
+            kind: r.kind,
+            updatedAt: r.updated_at,
+            qualityScore: r.quality_score == null ? null : Number(r.quality_score),
+            curated: true,
+          },
+          now,
+        ),
     })),
   ]
     .sort((a, b) => b.similarity - a.similarity)

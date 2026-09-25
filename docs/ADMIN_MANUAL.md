@@ -630,3 +630,21 @@ Vercel → `forge` → **Logs** tab. Filter by path (e.g., `/api/register`) to f
 - **Rotate the DB password:** Vercel Storage → Rotate Secrets → copy new value into local `.env.local`.
 
 Vercel → `forge` → **Logs** tab. Filter by path (e.g., `/api/register`) to find server-side errors. Red entries have stack traces.
+
+---
+
+## 8. Background jobs
+
+Everything below runs from Vercel Cron (`vercel.json`) and is protected by `Authorization: Bearer ${CRON_SECRET}`. A missing `CRON_SECRET` makes every handler refuse to run rather than run open. Each handler returns a JSON summary you can read in the Vercel function logs.
+
+| Path | Schedule (UTC) | What it does |
+|---|---|---|
+| `/api/cron/proposal-scan` | every 5 min | Health-scans proposals edited ≥ 5 min ago, five per run, oldest first. Failures back off (5 min doubling to 6 h) and a proposal is dropped after five failures so one broken proposal can't block the queue; stub mode counts as a skip. |
+| `/api/cron/notification-sla` | every 15 min | Marks unacknowledged deliveries past their rule's SLA as breached and fires the escalation. |
+| `/api/cron/notification-batches` | 04:00 daily | Materializes daily / weekly digests (inbox rows + one digest email per recipient). |
+| `/api/cron/solicitation-key-dates` | 08:00 daily | Key-date reminders (T-7 / T-3 / T-1) and the `opportunity_due_soon` trigger. |
+| `/api/cron/prune-audit-logs` | 03:30 daily | Prunes audit rows past each tenant's retention window. |
+| `/api/cron/refresh-certifications` | 03:00, 1st of month | Refreshes SBA certification data. |
+| `/api/cron/brain-index` | every 6 h (at :30) | **The Brain's indexer.** Reconciles outcome labels from recorded proposal outcomes onto harvested artifacts and their entries; embeds artifacts that have text but no chunks; re-embeds stub / unknown vectors once a live embedding provider (`OPENAI_API_KEY`) is configured; embeds curated entries with no vector; auto-extracts knowledge candidates from artifacts nobody has mined yet. Extraction is gated per tenant by the `aiAutoDraft` feature flag and the monthly AI request quota (a failed run refunds the slot), skipped entirely while the AI provider is in stub mode, and de-duplicated against earlier candidates and curated entries so the review queue doesn't fill with repeats. Budgets per run: 10 artifact embeds, 200 entry embeds, 3 extractions; the rest waits for the next tick. |
+
+Embedding calls (indexing and retrieval queries) are recorded in the AI usage ledger under the `embedding` and `embedding_query` features, so **Platform admin → Usage** shows them alongside completions.

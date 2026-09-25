@@ -517,6 +517,11 @@ export const proposals = pgTable("proposal", {
   // first dirtying edit so callers can decide whether a re-scan is
   // worth firing (debounce window).
   scanDirtySince: timestamp("scan_dirty_since"),
+  // BL-AIP-4 — background-scan retry policy (drizzle/0081). Failures
+  // back off exponentially; after SCAN_MAX_ATTEMPTS the dirty flag is
+  // dropped so one broken proposal cannot block the queue.
+  scanAttempts: integer("scan_attempts").notNull().default(0),
+  scanNextAttemptAt: timestamp("scan_next_attempt_at"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -2174,6 +2179,10 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   // column to swap.
   embedding: vector1536("embedding"),
   embeddedAt: timestamp("embedded_at"),
+  // BL-AIP-4 — which provider / model produced the vector (drizzle/0081)
+  // so the brain-index cron can re-embed stub or stale vectors.
+  embeddingProvider: text("embedding_provider").notNull().default(""),
+  embeddingModel: text("embedding_model").notNull().default(""),
   archivedAt: timestamp("archived_at"),
   createdByUserId: text("created_by_user_id").references(() => users.id, {
     onDelete: "set null",
@@ -2184,11 +2193,12 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   organizationIdIdx: index("knowledge_entry_organization_id_idx").on(t.organizationId),
   // drizzle/0026 (BL-TENANT-DRIFT mirror).
   outcomeLabelIdx: index("knowledge_entry_outcome_label_idx").on(t.outcomeLabel),
-  // drizzle/0023 — IVFFlat cosine index for Brain Suggest; org-blind by
-  // nature, which is why every `<=>` query must filter organization_id.
-  embeddingCosineIdx: index("knowledge_entry_embedding_cosine_idx")
-    .using("ivfflat", t.embedding.op("vector_cosine_ops"))
-    .with({ lists: 50 }),
+  // drizzle/0023 created an IVFFlat cosine index; drizzle/0082 (BL-AIP-4)
+  // dropped it and built this HNSW one. Org-blind by nature, which is
+  // why every `<=>` query must filter organization_id.
+  embeddingHnswIdx: index("knowledge_entry_embedding_hnsw_idx")
+    .using("hnsw", t.embedding.op("vector_cosine_ops"))
+    .with({ m: 16, ef_construction: 64 }),
 }));
 
 export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
@@ -2467,11 +2477,12 @@ export const knowledgeArtifactChunks = pgTable("knowledge_artifact_chunk", {
   // drizzle/0022 (BL-TENANT-DRIFT mirror).
   artifactIdx: index("knowledge_artifact_chunk_artifact_id_idx").on(t.artifactId),
   organizationIdIdx: index("knowledge_artifact_chunk_organization_id_idx").on(t.organizationId),
-  // IVFFlat cosine index for semantic search; org-blind by nature, which is
-  // why every `<=>` query must filter organization_id (check-isolation D).
-  embeddingCosineIdx: index("knowledge_artifact_chunk_embedding_cosine_idx")
-    .using("ivfflat", t.embedding.op("vector_cosine_ops"))
-    .with({ lists: 100 }),
+  // Cosine index for semantic search — IVFFlat in drizzle/0022, dropped and
+  // rebuilt as HNSW in drizzle/0082 (BL-AIP-4). Org-blind by nature, which
+  // is why every `<=>` query must filter organization_id (check-isolation D).
+  embeddingHnswIdx: index("knowledge_artifact_chunk_embedding_hnsw_idx")
+    .using("hnsw", t.embedding.op("vector_cosine_ops"))
+    .with({ m: 16, ef_construction: 64 }),
 }));
 
 export type KnowledgeArtifactChunk =

@@ -21,6 +21,7 @@ import {
   SCAN_TEMPERATURE,
 } from "@/lib/proposal-scan-input";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { runInBackground } from "@/lib/background";
 import {
   enforceQuota,
   ensureFeature,
@@ -399,11 +400,9 @@ export async function triggerProposalScanIfStaleAction(
   // `runProposalScanAction` handles its own rate-limit + quota refund
   // path, so we don't need defensive logic here beyond catching to
   // keep the unhandled rejection clean.
-  void runProposalScanAction(proposalId).catch((err) => {
-    log.warn("[triggerProposalScanIfStaleAction]", "background scan failed", {
-      error: err,
-    });
-  });
+  runInBackground("[triggerProposalScanIfStaleAction] background scan", () =>
+    runProposalScanAction(proposalId),
+  );
 
   return { triggered: true };
 }

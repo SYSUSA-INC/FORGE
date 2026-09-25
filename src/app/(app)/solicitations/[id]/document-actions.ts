@@ -20,6 +20,7 @@ import {
 } from "@/lib/solicitation-extract";
 import { detectFormat } from "@/lib/text-extract";
 import type { AIDocumentMedia } from "@/lib/ai";
+import { runInBackground } from "@/lib/background";
 import { log } from "@/lib/log";
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -197,15 +198,15 @@ export async function addSolicitationDocumentAction(
     return { ok: false, error: "Upload saved metadata but file storage failed." };
   }
 
-  void parseSolicitationDocumentFromBytes(
-    row.id,
-    solicitationId,
-    organizationId,
-    bytes,
-    file.name,
-    resolvedContentType,
-  ).catch((err) =>
-    log.error("[addSolicitationDocumentAction]", "inline parse failed", { error: err }),
+  runInBackground("[addSolicitationDocumentAction] inline parse", () =>
+    parseSolicitationDocumentFromBytes(
+      row.id,
+      solicitationId,
+      organizationId,
+      bytes,
+      file.name,
+      resolvedContentType,
+    ),
   );
 
   await recordAudit({
@@ -257,11 +258,8 @@ export async function deleteSolicitationDocumentAction(
     );
 
   // Remerge after deletion so the parent requirements stay accurate.
-  void mergeDocumentRequirementsHelper(
-    row.solicitationId,
-    organizationId,
-  ).catch((err) =>
-    log.warn("[deleteSolicitationDocumentAction]", "remerge failed", { error: err }),
+  runInBackground("[deleteSolicitationDocumentAction] remerge", () =>
+    mergeDocumentRequirementsHelper(row.solicitationId, organizationId),
   );
 
   await recordAudit({
@@ -316,15 +314,15 @@ export async function reparseSolicitationDocumentAction(
     };
   }
 
-  void parseSolicitationDocumentFromBytes(
-    row.id,
-    row.solicitationId,
-    organizationId,
-    obj.bytes,
-    row.fileName,
-    row.contentType,
-  ).catch((err) =>
-    log.error("[reparseSolicitationDocumentAction]", "parse failed", { error: err }),
+  runInBackground("[reparseSolicitationDocumentAction] parse", () =>
+    parseSolicitationDocumentFromBytes(
+      row.id,
+      row.solicitationId,
+      organizationId,
+      obj.bytes,
+      row.fileName,
+      row.contentType,
+    ),
   );
   return { ok: true };
 }

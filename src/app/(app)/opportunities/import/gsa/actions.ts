@@ -16,6 +16,7 @@ import type { GsaExtractionResult } from "@/lib/ai-prompts";
 import { getStorageProvider } from "@/lib/storage";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
 import { detectFormat } from "@/lib/text-extract";
+import { runInBackground } from "@/lib/background";
 import { log } from "@/lib/log";
 
 export type GsaParseResult =
@@ -270,11 +271,8 @@ export async function createOpportunityFromGsaAction(
       // BL-AIP-1 — extract the attachment the same way an upload is.
       // These rows used to stay at parseStatus "uploaded" forever, so
       // the opportunity's Documents & AI review never became available.
-      void parseSolicitationFromBytes(row.id, organizationId, bytes).catch((err) =>
-        log.error("[createOpportunityFromGsaAction]", "attachment parse failed", {
-          error: err,
-          solicitationId: row.id,
-        }),
+      runInBackground("[createOpportunityFromGsaAction] attachment parse", () =>
+        parseSolicitationFromBytes(row.id, organizationId, bytes),
       );
     } catch (err) {
       log.error("[createOpportunityFromGsaAction]", "attachment", {

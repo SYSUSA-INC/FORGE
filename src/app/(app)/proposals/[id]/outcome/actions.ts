@@ -19,6 +19,7 @@ import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
 import { applyOpportunityStage } from "@/lib/opportunity-stage";
 import { stageForOutcome } from "@/lib/opportunity-stage-map";
 import { OUTCOME_REASONS } from "@/lib/proposal-outcome-types";
+import { runInBackground } from "@/lib/background";
 import { log } from "@/lib/log";
 
 const OUTCOME_TYPES: ProposalOutcomeType[] = [
@@ -185,9 +186,11 @@ export async function saveOutcomeAction(
         const { harvestProposalToCorpusAction } = await import(
           "../harvest-actions"
         );
-        void harvestProposalToCorpusAction(proposalId).catch((err) => {
-          log.warn("[saveOutcomeAction]", "win-harvest failed", { error: err });
-        });
+        // BL-AIP-4 — durable, and the harvest now reads the outcome row
+        // written above so the artifact lands labelled `won`.
+        runInBackground("[saveOutcomeAction] win-harvest", () =>
+          harvestProposalToCorpusAction(proposalId),
+        );
       }
     } catch (err) {
       log.warn("[saveOutcomeAction]", "propagateOutcomeToCorpus failed", { error: err });

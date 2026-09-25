@@ -47,6 +47,7 @@ export default async function KnowledgeEntryPage({
             qualityScore: row.qualityScore,
             qualityScoreFactors:
               (row.qualityScoreFactors as Record<string, number>) ?? {},
+            outcomeLabel: row.outcomeLabel,
           }}
         />
       </Panel>

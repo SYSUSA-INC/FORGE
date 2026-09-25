@@ -103,16 +103,23 @@ export async function getKnowledgeEntryAction(id: string) {
   return row ?? null;
 }
 
+const OUTCOME_LABELS: KnowledgeOutcomeLabel[] = ["none", "won", "lost", "no_bid", "withdrawn"];
+
 export async function createKnowledgeEntryAction(input: {
   kind: KnowledgeKind;
   title: string;
   body?: string;
   tags?: string[];
+  /** BL-AIP-4 — provenance for manually authored entries. */
+  outcomeLabel?: KnowledgeOutcomeLabel;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!KINDS.includes(input.kind)) {
     return { ok: false, error: "Invalid kind." };
+  }
+  if (input.outcomeLabel !== undefined && !OUTCOME_LABELS.includes(input.outcomeLabel)) {
+    return { ok: false, error: "Invalid outcome." };
   }
   if (!input.title.trim()) {
     return { ok: false, error: "Title is required." };
@@ -138,6 +145,7 @@ export async function createKnowledgeEntryAction(input: {
         title: finalTitle,
         body: finalBody,
         tags: finalTags,
+        outcomeLabel: input.outcomeLabel ?? "none",
         createdByUserId: user.id,
         qualityScore: quality.score,
         qualityScoreFactors: quality.factors,
@@ -177,6 +185,7 @@ export async function updateKnowledgeEntryAction(
     title?: string;
     body?: string;
     tags?: string[];
+    outcomeLabel?: KnowledgeOutcomeLabel;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireAuth();
@@ -213,6 +222,11 @@ export async function updateKnowledgeEntryAction(
     if (input.title !== undefined) update.title = input.title.trim();
     if (input.body !== undefined) update.body = input.body.trim();
     if (input.tags !== undefined) update.tags = dedupTags(input.tags);
+    if (input.outcomeLabel !== undefined) {
+      if (!OUTCOME_LABELS.includes(input.outcomeLabel))
+        return { ok: false, error: "Invalid outcome." };
+      update.outcomeLabel = input.outcomeLabel;
+    }
 
     // BL-10 Phase D-2 — re-score on every save against the merged
     // post-update shape so the score reflects the change even when

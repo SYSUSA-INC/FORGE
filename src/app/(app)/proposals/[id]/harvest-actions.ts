@@ -6,8 +6,10 @@ import { db } from "@/db";
 import {
   knowledgeArtifacts,
   opportunities,
+  proposalOutcomes,
   proposalSections,
   proposals,
+  type KnowledgeOutcomeLabel,
   type TipTapDoc,
   type TipTapNode,
 } from "@/db/schema";
@@ -66,6 +68,24 @@ export async function harvestProposalToCorpusAction(
     )
     .limit(1);
   if (!propRow) return { ok: false, error: "Proposal not found." };
+
+  // BL-AIP-4 — a proposal that already has an outcome (won proposals are
+  // harvested from saveOutcomeAction) lands labelled, instead of `none`
+  // that propagateOutcomeToCorpus had already tried to overwrite before
+  // the artifact existed.
+  const [outcomeRow] = await db
+    .select({ outcomeType: proposalOutcomes.outcomeType })
+    .from(proposalOutcomes)
+    .where(
+      and(
+        eq(proposalOutcomes.proposalId, proposalId),
+        eq(proposalOutcomes.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  const outcomeLabel: KnowledgeOutcomeLabel | null = outcomeRow
+    ? (outcomeRow.outcomeType as KnowledgeOutcomeLabel)
+    : null;
 
   const sections = await db
     .select()
@@ -135,6 +155,7 @@ export async function harvestProposalToCorpusAction(
         statusError: "",
         indexedAt: new Date(),
         updatedAt: new Date(),
+        ...(outcomeLabel ? { outcomeLabel } : {}),
         metadata: {
           ...(typeof existing.metadata === "object" && existing.metadata
             ? existing.metadata
@@ -167,6 +188,7 @@ export async function harvestProposalToCorpusAction(
           rawText: composed.slice(0, RAW_TEXT_CAP),
           status: "indexed",
           indexedAt: new Date(),
+          outcomeLabel: outcomeLabel ?? "none",
           uploadedByUserId: user.id,
           metadata: {
             proposalId,

@@ -480,6 +480,10 @@ Two surfaces live here:
 
 Go to **Knowledge base → Import corpus**. Drag files onto the dropzone or click to pick. Up to 50 MB per file. Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD, images. Each file becomes a **knowledge artifact** with a kind tag (proposal, rfp, contract, etc.), file metadata, and indexed plain text.
 
+**Outcome.** For past proposals and debriefs, pick how the pursuit ended (won / lost / no-bid / withdrawn) in the **Outcome** field before uploading, or change it later from the dropdown on the artifact row. The Brain favours content from won pursuits when it drafts and slightly demotes lost ones, so labelling your history is the fastest way to make its suggestions sound like your winners. Knowledge entries promoted from a labelled artifact inherit the label; you can also set it in the entry editor.
+
+You don't have to press anything for the Brain to learn from an upload: a background indexer runs every few hours, embeds anything new, and mines candidate knowledge entries into the review queue on **Knowledge base → Import → artifact**. Uploads still index immediately on their own; the background pass catches whatever was missed.
+
 **AI-assisted kind classification (auto-detect)**: leave the default "Auto-detect" kind selected. After text extraction completes, the Brain reads the document and classifies it into one of the 15 kinds. High-confidence classifications (≥ 60%) overwrite the heuristic kind directly. Lower-confidence suggestions appear as a violet **AI suggests: <kind>** pill on the row, with an **Accept** button and a tooltip showing the AI's reasoning. Click Accept to apply, or leave it alone if you disagree.
 
 **Backfill old uploads**: if you have artifacts uploaded before AI classification existed (they sit at `kind="other"`), the **AI classification backfill** panel appears with a Reclassify button. Each click processes up to 50 candidates. Run it until the panel disappears.
