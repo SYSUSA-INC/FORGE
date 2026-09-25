@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 in PR (PR #TBD); BL-AIP-4b / 5b / 7 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 in PR (PR #278); BL-AIP-4b / 5b / 7 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,7 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-6 — AI as a collaborator in the editor** 🔄 (PR #TBD)
+**BL-AIP-6 — AI as a collaborator in the editor** 🔄 (PR #278)
 
 - **AI edits are tracked changes.** `applyAsTrackedChanges`
   (`src/lib/tracked-diff.ts`, tested: accept-all yields the rewrite,
