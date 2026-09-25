@@ -6,14 +6,20 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { Role, MembershipStatus } from "@/db/schema";
 import type { MembersSummary } from "@/lib/settings-status";
+import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
+import type { InviteResult } from "@/lib/invite-types";
+import { superadminInviteUserAction } from "@/app/(app)/admin/orgs/[id]/users/actions";
 import {
   changeMemberRoleAction,
+  createInviteLinkAction,
   inviteUserAction,
   removeMemberAction,
   resendInviteAction,
   revokeInviteAction,
   setMemberStatusAction,
 } from "./actions";
+
+export type TenantOption = { id: string; name: string; itarRestricted: boolean };
 
 export type Member = {
   userId: string;
@@ -86,12 +92,19 @@ export function UsersClient({
   members,
   pendingInvites,
   itarRestricted,
+  isSuperadmin = false,
+  currentOrganizationId,
+  tenants = [],
 }: {
   currentUserId: string;
   summary: MembersSummary;
   members: Member[];
   pendingInvites: PendingInvite[];
   itarRestricted: boolean;
+  /** BL-AUTH-INVITE — platform admins choose the tenant explicitly. */
+  isSuperadmin?: boolean;
+  currentOrganizationId?: string;
+  tenants?: TenantOption[];
 }) {
   return (
     <>
@@ -109,6 +122,9 @@ export function UsersClient({
         <InvitePanel
           className="xl:col-span-1"
           itarRestricted={itarRestricted}
+          isSuperadmin={isSuperadmin}
+          currentOrganizationId={currentOrganizationId}
+          tenants={tenants}
         />
         <PendingPanel
           className="xl:col-span-2"
@@ -182,38 +198,53 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
 function InvitePanel({
   className,
   itarRestricted,
+  isSuperadmin,
+  currentOrganizationId,
+  tenants,
 }: {
   className?: string;
   itarRestricted: boolean;
+  isSuperadmin: boolean;
+  currentOrganizationId?: string;
+  tenants: TenantOption[];
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("viewer");
   const [title, setTitle] = useState("");
+  // BL-AUTH-INVITE — a platform superadmin is not a member of the tenants
+  // they support, so the tenant is a mandatory explicit choice for them.
+  // Tenant admins invite into their own tenant only (no selector).
+  const [tenantId, setTenantId] = useState<string>(currentOrganizationId ?? "");
   // BL-ITAR-TAG — when the tenant is ITAR-restricted the admin must
   // attest the invitee is a US person. We send the value either way
   // for forensic completeness; the server enforces the requirement.
   const [attestUsPerson, setAttestUsPerson] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [result, setResult] = useState<{ email: string; res: Extract<InviteResult, { ok: true }> } | null>(null);
+
+  const selectedTenant = tenants.find((t) => t.id === tenantId);
+  const needsAttestation = isSuperadmin ? !!selectedTenant?.itarRestricted : itarRestricted;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
+    setResult(null);
+    if (isSuperadmin && !tenantId) {
+      setError("Pick the tenant this person should join.");
+      return;
+    }
     startTransition(async () => {
-      const res = await inviteUserAction({
-        email,
-        role,
-        title,
-        attestUsPerson,
-      });
+      const input = { email, role, title, attestUsPerson };
+      const res = isSuperadmin
+        ? await superadminInviteUserAction(tenantId, input)
+        : await inviteUserAction(input);
       if (!res.ok) {
         setError(res.error);
         return;
       }
-      setSuccess(`Invitation sent to ${email}.`);
+      setResult({ email, res });
       setEmail("");
       setTitle("");
       setRole("viewer");
@@ -225,10 +256,37 @@ function InvitePanel({
   return (
     <Panel
       title="Invite a user"
-      eyebrow="Add team member"
+      eyebrow={isSuperadmin ? "Platform admin · pick the tenant" : "Add team member"}
       className={className}
     >
       <form className="flex flex-col gap-3" onSubmit={onSubmit}>
+        {isSuperadmin ? (
+          <div>
+            <label className="aur-label">Tenant (required)</label>
+            <select
+              className="aur-input"
+              value={tenantId}
+              onChange={(e) => {
+                setTenantId(e.target.value);
+                setAttestUsPerson(false);
+              }}
+              required
+            >
+              <option value="">— choose a tenant —</option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.itarRestricted ? " (ITAR-restricted)" : ""}
+                  {t.id === currentOrganizationId ? " · current" : ""}
+                </option>
+              ))}
+            </select>
+            <div className="mt-1 font-mono text-[10px] text-muted">
+              You are a platform admin: the invitee joins the tenant you pick
+              here, not the one you are browsing.
+            </div>
+          </div>
+        ) : null}
         <div>
           <label className="aur-label">Email</label>
           <input
@@ -265,7 +323,7 @@ function InvitePanel({
           />
         </div>
         {/* BL-ITAR-TAG — admin attestation required for ITAR-restricted orgs */}
-        {itarRestricted && (
+        {needsAttestation && (
           <label className="flex items-start gap-2 rounded-md border border-rose/30 bg-rose/[0.04] px-3 py-2 font-mono text-[11px] text-text">
             <input
               type="checkbox"
@@ -286,14 +344,17 @@ function InvitePanel({
             {error}
           </div>
         ) : null}
-        {success ? (
-          <div className="rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">
-            {success}
-          </div>
+        {result ? (
+          <InviteLinkNotice
+            url={result.res.inviteUrl}
+            emailSent={result.res.emailSent}
+            warning={result.res.warning}
+            sentTo={result.email}
+          />
         ) : null}
         <button
           type="submit"
-          disabled={pending || !email}
+          disabled={pending || !email || (isSuperadmin && !tenantId)}
           className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
         >
           {pending ? "Sending…" : "Send invitation"}
@@ -313,9 +374,13 @@ function PendingPanel({
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // BL-AUTH-INVITE — the last link produced for an invite (resend or
+  // copy), shown under its row so the admin can hand it over manually.
+  const [link, setLink] = useState<{ id: string; email: string; res: Extract<InviteResult, { ok: true }> } | null>(null);
 
   async function onRevoke(id: string) {
     setError(null);
+    setLink(null);
     setPendingId(id);
     const res = await revokeInviteAction(id);
     setPendingId(null);
@@ -323,13 +388,27 @@ function PendingPanel({
     else router.refresh();
   }
 
-  async function onResend(id: string) {
+  async function onResend(id: string, email: string) {
     setError(null);
+    setLink(null);
     setPendingId(id);
     const res = await resendInviteAction(id);
     setPendingId(null);
     if (!res.ok) setError(res.error);
-    else router.refresh();
+    else {
+      setLink({ id, email, res });
+      router.refresh();
+    }
+  }
+
+  async function onCopyLink(id: string, email: string) {
+    setError(null);
+    setLink(null);
+    setPendingId(id);
+    const res = await createInviteLinkAction(id);
+    setPendingId(null);
+    if (!res.ok) setError(res.error);
+    else setLink({ id, email, res });
   }
 
   return (
@@ -350,30 +429,51 @@ function PendingPanel({
           {invites.map((i) => (
             <li
               key={i.id}
-              className="grid grid-cols-1 items-center gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 md:grid-cols-[1fr_auto_auto]"
+              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
             >
-              <div className="min-w-0">
-                <div className="truncate font-mono text-[12px] text-text">{i.email}</div>
-                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-                  {roleLabel(i.role)} · invited {new Date(i.invitedAt).toLocaleDateString()}
+              <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto]">
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-[12px] text-text">{i.email}</div>
+                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                    {roleLabel(i.role)} · invited {new Date(i.invitedAt).toLocaleDateString()}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  className="aur-btn aur-btn-ghost text-[11px]"
+                  onClick={() => onCopyLink(i.id, i.email)}
+                  disabled={pendingId === i.id}
+                  title="Get a fresh invite link to send by chat or ticket"
+                >
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  className="aur-btn aur-btn-ghost text-[11px]"
+                  onClick={() => onResend(i.id, i.email)}
+                  disabled={pendingId === i.id}
+                >
+                  {pendingId === i.id ? "…" : "Resend"}
+                </button>
+                <button
+                  type="button"
+                  className="aur-btn aur-btn-danger text-[11px]"
+                  onClick={() => onRevoke(i.id)}
+                  disabled={pendingId === i.id}
+                >
+                  Revoke
+                </button>
               </div>
-              <button
-                type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
-                onClick={() => onResend(i.id)}
-                disabled={pendingId === i.id}
-              >
-                {pendingId === i.id ? "…" : "Resend"}
-              </button>
-              <button
-                type="button"
-                className="aur-btn aur-btn-danger text-[11px]"
-                onClick={() => onRevoke(i.id)}
-                disabled={pendingId === i.id}
-              >
-                Revoke
-              </button>
+              {link && link.id === i.id ? (
+                <div className="mt-2">
+                  <InviteLinkNotice
+                    url={link.res.inviteUrl}
+                    emailSent={link.res.emailSent}
+                    warning={link.res.warning}
+                    sentTo={link.email}
+                  />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

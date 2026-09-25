@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { log } from "@/lib/log";
+import { appBaseUrl, inviteUrl, passwordResetUrl, verifyEmailUrl } from "@/lib/app-url";
 import { buildDigestEmail, buildRuleNotificationEmail } from "@/lib/notification-email";
 
 const apiKey = process.env.RESEND_API_KEY;
@@ -44,14 +45,10 @@ export async function sendEmail(opts: {
   });
 }
 
-function baseUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL ?? process.env.AUTH_URL;
-  if (explicit) return explicit.replace(/\/+$/, "");
-  if (process.env.VERCEL_ENV === "production") return "https://www.sysgov.com";
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel}`;
-  return "https://www.sysgov.com";
-}
+// BL-AUTH-INVITE — the origin and the invite / reset links are built in
+// src/lib/app-url.ts so the "copy link" an admin sees is byte-identical
+// to what the email carries.
+const baseUrl = appBaseUrl;
 
 function emailShell(title: string, body: string): string {
   return `<!doctype html>
@@ -97,7 +94,7 @@ function emailShell(title: string, body: string): string {
 }
 
 export async function sendVerificationEmail(to: string, token: string): Promise<void> {
-  const url = `${baseUrl()}/verify-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
+  const url = verifyEmailUrl(to, token);
   const body = `
     <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#EEF2F8;">Verify your email</h1>
     <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:#A3B1C6;">
@@ -124,7 +121,7 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
 }
 
 export async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
-  const url = `${baseUrl()}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
+  const url = passwordResetUrl(to, token);
   const body = `
     <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#EEF2F8;">Reset your password</h1>
     <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:#A3B1C6;">
@@ -158,9 +155,7 @@ export async function sendInviteEmail(opts: {
   inviterName: string;
   role: string;
 }): Promise<void> {
-  const url = `${baseUrl()}/sign-up?invite=${encodeURIComponent(
-    opts.token,
-  )}&id=${encodeURIComponent(opts.inviteId)}`;
+  const url = inviteUrl(opts.inviteId, opts.token);
   const body = `
     <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#EEF2F8;">You&#39;re invited to Forge</h1>
     <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:#A3B1C6;">

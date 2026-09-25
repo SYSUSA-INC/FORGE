@@ -10,6 +10,7 @@ import { authConfig } from "@/auth.config";
 import { verifyPassword } from "@/lib/passwords";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { selfServiceRegistrationAllowed } from "@/lib/signup-mode";
+import { attachPendingInvitesByEmail } from "@/lib/invite-accept";
 import { log } from "@/lib/log";
 
 async function enrichFromDb(userId: string): Promise<{
@@ -138,6 +139,26 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     async createUser({ user }) {
       if (!user.id) return;
 
+      // BL-AUTH-INVITE — an invitee who signs in with Google / Microsoft
+      // instead of the emailed link: the provider proved the address, the
+      // allow-list row is the authorisation. Attach the membership and
+      // keep the account; the invite_only guard below is for strangers.
+      try {
+        const attached = await attachPendingInvitesByEmail({
+          userId: user.id,
+          email: user.email,
+        });
+        if (attached.attached > 0 || attached.alreadyMember > 0) {
+          log.info("[events.createUser]", "accepted pending invite via OAuth", {
+            userId: user.id,
+            organizations: attached.organizationIds.length,
+          });
+          return;
+        }
+      } catch (err) {
+        log.error("[events.createUser]", "invite attach failed", { error: err });
+      }
+
       // Security gate: the OAuth providers' "auto-create on first sign-in"
       // is itself a public signup vector. Without this check, anyone with a
       // Google/Microsoft account can hit /sign-in and silently get an org
@@ -172,6 +193,14 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       // affected because provisionOrgForUser is a no-op when they already
       // have a membership.
       if (!user?.id) return;
+      // BL-AUTH-INVITE — an existing account (password or OAuth) that was
+      // later invited to a tenant picks the membership up on its next
+      // sign-in, without needing the emailed link.
+      try {
+        await attachPendingInvitesByEmail({ userId: user.id, email: user.email });
+      } catch (err) {
+        log.error("[events.signIn]", "invite attach failed", { error: err });
+      }
       if (!selfServiceRegistrationAllowed()) return;
       try {
         await provisionOrgForUser(user.id, user.name);

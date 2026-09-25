@@ -3,11 +3,25 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { allowlist, memberships, type Role } from "@/db/schema";
+import {
+  allowlist,
+  memberships,
+  organizations,
+  users,
+  type Role,
+} from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
+import { inviteUrl } from "@/lib/app-url";
 import { requireSuperadmin } from "@/lib/auth-helpers";
-import { sendInviteEmail } from "@/lib/email";
+import { deliverInvite } from "@/lib/invite-send";
+import type { InviteResult } from "@/lib/invite-types";
+import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
+import {
+  enforceSeatsQuota,
+  QuotaExceededError,
+} from "@/lib/subscription-gates";
 import { issueToken } from "@/lib/tokens";
+import { validateEmail } from "@/lib/validators";
 import { log } from "@/lib/log";
 
 /**
@@ -18,6 +32,13 @@ import { log } from "@/lib/log";
  * `requireSuperadmin()`. Used when a tenant gets stuck (e.g., the
  * primary admin left without promoting a replacement, a member is
  * locked out, an invite needs to be re-sent, etc.).
+ *
+ * BL-AUTH-INVITE adds `superadminInviteUserAction`: a platform admin is
+ * not a member of the tenants they support, so the tenant-scoped invite
+ * action (which reads the org from the session) cannot serve them. The
+ * tenant is an explicit, mandatory parameter here; tenant admins keep
+ * the session-scoped action and can only ever invite into their own
+ * tenant.
  *
  * Audit posture: every action writes a row into the TARGET tenant's
  * audit log so the tenant's own admins can later see what was done
@@ -43,6 +64,175 @@ const ASSIGNABLE_ROLES: Role[] = [
 
 function isAssignableRole(v: unknown): v is Role {
   return typeof v === "string" && (ASSIGNABLE_ROLES as string[]).includes(v);
+}
+
+export async function superadminInviteUserAction(
+  organizationId: string,
+  input: {
+    email: string;
+    role: string;
+    title?: string | null;
+    attestUsPerson?: boolean;
+  },
+): Promise<InviteResult> {
+  const actor = await requireSuperadmin();
+
+  if (!organizationId) return { ok: false, error: "Pick the tenant to invite into." };
+  const email = input.email.trim().toLowerCase();
+  const emailError = validateEmail(email);
+  if (!email || emailError) {
+    return { ok: false, error: emailError ?? "Enter an email address." };
+  }
+  if (!isAssignableRole(input.role)) {
+    return { ok: false, error: "Pick a valid role." };
+  }
+
+  const [org] = await db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      disabledAt: organizations.disabledAt,
+      itarRestricted: organizations.itarRestricted,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!org) return { ok: false, error: "Tenant not found." };
+  if (org.disabledAt) return { ok: false, error: "That tenant is disabled. Enable it before inviting." };
+
+  if (org.itarRestricted && !input.attestUsPerson) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "user.invite_denied",
+      resourceType: "user",
+      metadata: {
+        invitedEmail: email,
+        reason: "itar_us_person_attestation_required",
+        viaSuperadmin: true,
+      },
+    });
+    return {
+      ok: false,
+      error:
+        "This tenant is ITAR-restricted. Confirm the invitee is a US person before inviting.",
+    };
+  }
+  const attestUsPerson = !!input.attestUsPerson;
+  const attestUsPersonAt = attestUsPerson ? new Date() : null;
+
+  try {
+    await enforceSeatsQuota(organizationId);
+  } catch (err) {
+    if (err instanceof QuotaExceededError) return { ok: false, error: err.message };
+    throw err;
+  }
+
+  const [existingMember] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.organizationId, organizationId), eq(users.email, email)))
+    .limit(1);
+  if (existingMember) {
+    return { ok: false, error: "That email already belongs to a member of this tenant." };
+  }
+
+  const [existingPending] = await db
+    .select({ id: allowlist.id })
+    .from(allowlist)
+    .where(
+      and(
+        eq(allowlist.organizationId, organizationId),
+        eq(allowlist.email, email),
+        eq(allowlist.revoked, false),
+      ),
+    )
+    .limit(1);
+
+  let inviteId: string;
+  if (existingPending) {
+    await db
+      .update(allowlist)
+      .set({
+        role: input.role,
+        title: input.title?.trim() || null,
+        invitedByUserId: actor.id,
+        invitedAt: new Date(),
+        consumedAt: null,
+        revoked: false,
+        usPersonAttested: attestUsPerson,
+        usPersonAttestedAt: attestUsPersonAt,
+      })
+      .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, existingPending.id)));
+    inviteId = existingPending.id;
+  } else {
+    const [row] = await db
+      .insert(allowlist)
+      .values({
+        email,
+        organizationId,
+        role: input.role,
+        title: input.title?.trim() || null,
+        invitedByUserId: actor.id,
+        usPersonAttested: attestUsPerson,
+        usPersonAttestedAt: attestUsPersonAt,
+      })
+      .returning({ id: allowlist.id });
+    if (!row) return { ok: false, error: "Could not create invitation." };
+    inviteId = row.id;
+  }
+
+  const token = await issueToken("invite", inviteId);
+  const delivery = await deliverInvite({
+    to: email,
+    inviteId,
+    token,
+    organizationName: org.name,
+    inviterName: actor.name ?? actor.email ?? "Platform admin",
+    role: input.role,
+    tag: "[superadminInviteUserAction]",
+  });
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.invite",
+    resourceType: "user",
+    resourceId: inviteId,
+    metadata: {
+      invitedEmail: email,
+      role: input.role,
+      itarRestricted: !!org.itarRestricted,
+      usPersonAttested: attestUsPerson,
+      emailSent: delivery.emailSent,
+      viaSuperadmin: true,
+    },
+  });
+
+  try {
+    await dispatchTriggerEvent({
+      organizationId,
+      kind: "membership_invited",
+      payload: { invitedEmail: email, role: input.role, inviteId, viaSuperadmin: true },
+      subject: `Team member invited: ${email}`,
+      body: `${actor.name ?? actor.email ?? "Platform support"} invited ${email} as ${input.role}.`,
+      linkPath: "/users",
+      actorUserId: actor.id,
+    });
+  } catch (err) {
+    log.warn("[superadminInviteUserAction]", "membership_invited dispatch failed", { error: err });
+  }
+
+  revalidatePath(`/admin/orgs/${organizationId}/users`);
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    inviteId,
+    inviteUrl: delivery.inviteUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
 }
 
 export async function superadminChangeMemberRoleAction(
@@ -188,22 +378,28 @@ export async function superadminRevokeInviteAction(
   return { ok: true };
 }
 
-export async function superadminResendInviteAction(
+type PendingInvite = {
+  id: string;
+  email: string;
+  role: Role;
+  organizationName: string;
+};
+
+async function loadPendingInvite(
   organizationId: string,
   inviteId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const actor = await requireSuperadmin();
-
+): Promise<{ ok: false; error: string } | { ok: true; invite: PendingInvite }> {
   const [invite] = await db
     .select({
       id: allowlist.id,
       email: allowlist.email,
       role: allowlist.role,
-      organizationId: allowlist.organizationId,
       consumedAt: allowlist.consumedAt,
       revoked: allowlist.revoked,
+      organizationName: organizations.name,
     })
     .from(allowlist)
+    .innerJoin(organizations, eq(organizations.id, allowlist.organizationId))
     .where(
       and(
         eq(allowlist.id, inviteId),
@@ -212,33 +408,44 @@ export async function superadminResendInviteAction(
     )
     .limit(1);
   if (!invite) return { ok: false, error: "Invite not found." };
-  if (invite.consumedAt)
-    return { ok: false, error: "Invite already consumed." };
-  if (invite.revoked)
-    return { ok: false, error: "Invite was revoked. Create a new one instead." };
+  if (invite.consumedAt) return { ok: false, error: "Invite already consumed." };
+  if (invite.revoked) return { ok: false, error: "Invite was revoked. Create a new one instead." };
+  return {
+    ok: true,
+    invite: {
+      id: invite.id,
+      email: invite.email,
+      role: invite.role,
+      organizationName: invite.organizationName,
+    },
+  };
+}
+
+export async function superadminResendInviteAction(
+  organizationId: string,
+  inviteId: string,
+): Promise<InviteResult> {
+  const actor = await requireSuperadmin();
+
+  const loaded = await loadPendingInvite(organizationId, inviteId);
+  if (!loaded.ok) return { ok: false, error: loaded.error };
+  const invite = loaded.invite;
 
   const token = await issueToken("invite", invite.id);
+  const delivery = await deliverInvite({
+    to: invite.email,
+    inviteId: invite.id,
+    token,
+    organizationName: invite.organizationName,
+    inviterName: actor.name ?? actor.email ?? "Platform admin",
+    role: invite.role,
+    tag: "[superadminResendInviteAction]",
+  });
 
-  try {
-    await sendInviteEmail({
-      to: invite.email,
-      inviteId: invite.id,
-      token,
-      organizationName: "your organization", // Email helper renders org name from context; minimal fallback
-      inviterName: actor.name ?? actor.email ?? "Platform admin",
-      role: invite.role,
-    });
-  } catch (err) {
-    log.error("[superadminResendInviteAction]", "sendInviteEmail failed", {
-      error: err,
-      inviteId,
-      organizationId,
-    });
-    return {
-      ok: false,
-      error: "Failed to send invite email. Check email service status.",
-    };
-  }
+  await db
+    .update(allowlist)
+    .set({ invitedAt: new Date() })
+    .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, invite.id)));
 
   await recordAudit({
     organizationId,
@@ -246,8 +453,40 @@ export async function superadminResendInviteAction(
     action: "user.invite_resend",
     resourceType: "invite",
     resourceId: inviteId,
-    metadata: { viaSuperadmin: true },
+    metadata: { viaSuperadmin: true, emailSent: delivery.emailSent },
   });
 
-  return { ok: true };
+  revalidatePath(`/admin/orgs/${organizationId}/users`);
+  return {
+    ok: true,
+    inviteId: invite.id,
+    inviteUrl: delivery.inviteUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
+}
+
+/** BL-AUTH-INVITE — a fresh link to hand over by other means; no email. */
+export async function superadminCreateInviteLinkAction(
+  organizationId: string,
+  inviteId: string,
+): Promise<InviteResult> {
+  const actor = await requireSuperadmin();
+
+  const loaded = await loadPendingInvite(organizationId, inviteId);
+  if (!loaded.ok) return { ok: false, error: loaded.error };
+  const invite = loaded.invite;
+
+  const token = await issueToken("invite", invite.id);
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.invite_link",
+    resourceType: "invite",
+    resourceId: invite.id,
+    metadata: { invitedEmail: invite.email, viaSuperadmin: true },
+  });
+
+  return { ok: true, inviteId: invite.id, inviteUrl: inviteUrl(invite.id, token), emailSent: false };
 }

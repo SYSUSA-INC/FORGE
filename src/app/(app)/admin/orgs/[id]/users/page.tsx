@@ -44,6 +44,7 @@ export default async function TenantUsersPage({
       slug: organizations.slug,
       disabledAt: organizations.disabledAt,
       primaryAdminUserId: organizations.primaryAdminUserId,
+      itarRestricted: organizations.itarRestricted,
     })
     .from(organizations)
     .where(eq(organizations.id, params.id))
@@ -164,6 +165,8 @@ export default async function TenantUsersPage({
 
       <TenantUsersClient
         organizationId={org.id}
+        organizationName={org.name}
+        itarRestricted={org.itarRestricted}
         members={memberRows.map((m) => ({
           userId: m.userId,
           name: m.name,

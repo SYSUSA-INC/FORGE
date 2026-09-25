@@ -65,7 +65,7 @@ If your organization uses SSO, use **Continue with Google** or **Continue with M
 
 ### 1.4 Forgot your password
 
-Click **Forgot password?** below the sign-in form. Enter your email — you'll get a reset link (valid for 1 hour). If no email arrives, contact your administrator; see the Admin manual's "Force password reset" for what they can do.
+Click **Forgot password?** below the sign-in form. Enter your email — you'll get a reset link (valid for 1 hour). This works for every account, including one you created with **Continue with Google / Microsoft** (it simply sets a password on it) and one where you were invited but never finished creating a password. If no email arrives, contact your administrator: they can issue the reset link from the admin portal and send it to you directly.
 
 ### 1.5 Accepting an invitation
 
@@ -75,6 +75,8 @@ https://www.sysgov.com/sign-up?invite=...&id=...
 ```
 
 Clicking it lands you on a sign-up page pre-filled with your email (you can't change it). Enter your name + password and click **Accept and create account**. You'll be signed in immediately and placed in your teammate's organization with the role they assigned you.
+
+If your organization uses SSO, you can instead go to the sign-in page and use **Continue with Google / Microsoft** with the invited email address: the invitation is matched to that address and accepted automatically. Your admin may also hand you the invite link directly (for example in chat) — it is the same link the email carries.
 
 ---
 
