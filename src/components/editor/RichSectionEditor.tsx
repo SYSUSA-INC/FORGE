@@ -141,6 +141,12 @@ type Props = {
    * version pushes the new document in.
    */
   docVersion?: number;
+  /**
+   * BL-AIP-6 — bump to open the track-changes review panel (after the
+   * AI has applied a rewrite as tracked changes, the owner should see
+   * the list without hunting for the toggle).
+   */
+  reviewSignal?: number;
 };
 
 function collabEnabled(): boolean {
@@ -157,11 +163,19 @@ export function RichSectionEditor({
   comments,
   snapshots,
   docVersion,
+  reviewSignal,
 }: Props) {
   const useCollab = !!collab && collabEnabled();
   // Local toggle for track-changes sidebar visibility (independent of
   // tracking mode which lives in the extension storage / Y.Map).
   const [tcSidebarOpen, setTcSidebarOpen] = useState(false);
+  // BL-AIP-6 — the host asks for the panel after applying AI changes.
+  const appliedSignalRef = useRef<number | undefined>(reviewSignal);
+  useEffect(() => {
+    if (reviewSignal === undefined || appliedSignalRef.current === reviewSignal) return;
+    appliedSignalRef.current = reviewSignal;
+    if (reviewSignal > 0) setTcSidebarOpen(true);
+  }, [reviewSignal]);
   // BL-9 Slice 4 — local toggle for comments sidebar. Comments only
   // activate when collab + comments config are both supplied.
   const useComments = !!comments && useCollab;

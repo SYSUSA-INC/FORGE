@@ -186,6 +186,7 @@ export async function prepareSectionDraft(input: {
     patternIntel = await gatherPatternIntelForSection({
       sectionId: input.sectionId,
       organizationId,
+      proposalId: row.proposal.id,
       sectionTitle: row.section.title,
       sectionKind: row.section.kind,
       agency: row.agency ?? "",

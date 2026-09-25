@@ -34,6 +34,7 @@ import {
   type ProposalSectionKind,
 } from "@/db/schema";
 import { gatherEditFeedbackForSection } from "@/lib/edit-feedback";
+import { gatherWritingSignals } from "@/lib/writing-signals";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
 import { getSectionSignals } from "@/lib/section-signals";
 import type {
@@ -48,6 +49,8 @@ const EXCERPT_CAP = 700;
 export async function gatherPatternIntelForSection(input: {
   sectionId: string;
   organizationId: string;
+  /** BL-AIP-6 — reviewer comments are looked up per proposal + section. */
+  proposalId?: string;
   sectionTitle: string;
   sectionKind: ProposalSectionKind;
   agency: string;
@@ -71,7 +74,7 @@ export async function gatherPatternIntelForSection(input: {
 
   // Run the queries in parallel. None of them block draft generation —
   // failures degrade silently to empty arrays / null.
-  const [winningPatterns, lostPatterns, complianceGaps, sectionSignal, editFeedback] =
+  const [winningPatterns, lostPatterns, complianceGaps, sectionSignal, editFeedback, writingSignals] =
     await Promise.all([
       retrieveCorpusByOutcome(input.organizationId, composed, "won", TOP_WIN),
       retrieveCorpusByOutcome(input.organizationId, composed, "lost", TOP_LOSS),
@@ -81,6 +84,20 @@ export async function gatherPatternIntelForSection(input: {
         organizationId: input.organizationId,
         sectionKind: input.sectionKind,
       }),
+      // BL-AIP-6 — draft acceptance, reviewer comments, debrief
+      // weaknesses and winner gaps. Best-effort like the rest.
+      input.proposalId
+        ? gatherWritingSignals({
+            organizationId: input.organizationId,
+            proposalId: input.proposalId,
+            sectionId: input.sectionId,
+            sectionKind: input.sectionKind,
+            agency: input.agency,
+          }).catch((err: unknown) => {
+            log.warn("[14d]", "writing signals failed", { error: err });
+            return null;
+          })
+        : Promise.resolve(null),
     ]);
 
   return {
@@ -89,6 +106,7 @@ export async function gatherPatternIntelForSection(input: {
     complianceGaps,
     sectionSignal,
     editFeedback,
+    writingSignals,
   };
 }
 

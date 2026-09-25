@@ -17,8 +17,10 @@ import {
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { runInBackground } from "@/lib/background";
 import { extractMentionUserIds } from "@/lib/mentions";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
+import { runReviewPreflight } from "@/lib/review-preflight";
 import { log } from "@/lib/log";
 
 const COLOR_LABELS: Record<ReviewColor, string> = {
@@ -156,6 +158,21 @@ export async function startReviewAction(input: {
       reviewId: review.id,
       actorUserId: actor.id,
     });
+
+    // BL-AIP-6 — AI colour-team pre-review: each section is read against
+    // its mapped requirements and the win themes, and the findings land
+    // as FORGE AI review comments before the human reviewers open it.
+    // Feature- and quota-gated inside; never blocks the start.
+    const reviewId = review.id;
+    runInBackground("[startReviewAction] AI pre-review", () =>
+      runReviewPreflight({
+        organizationId,
+        proposalId: input.proposalId,
+        reviewId,
+        color: input.color,
+        actor: { id: actor.id, email: actor.email },
+      }),
+    );
 
     revalidatePath(`/proposals/${input.proposalId}/reviews`);
     revalidatePath(`/proposals/${input.proposalId}`);

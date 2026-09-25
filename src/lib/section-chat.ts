@@ -24,6 +24,7 @@ import {
 import type { AIMessage } from "@/lib/ai";
 import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
+import { gatherWritingSignals, renderWritingSignals } from "@/lib/writing-signals";
 
 /** BL-AIP-5 — how many general requirements the chat sees (mapped rows always go in full). */
 const CHAT_GENERAL_REQUIREMENTS = 40;
@@ -150,6 +151,22 @@ export async function prepareSectionChat(input: {
           .join("\n")}`
       : "";
 
+  // BL-AIP-6 — what the team has learned: reviewer comments on this
+  // section, debrief weaknesses, winner gaps, AI-draft acceptance.
+  let signalsBlock = "";
+  try {
+    const signals = await gatherWritingSignals({
+      organizationId,
+      proposalId: row.proposal.id,
+      sectionId: input.sectionId,
+      sectionKind: row.section.kind,
+      agency: row.agency ?? "",
+    });
+    signalsBlock = renderWritingSignals(signals);
+  } catch {
+    // best effort
+  }
+
   const contextBlock = [
     `Organization: ${orgRow?.name ?? "unknown"}`,
     `Proposal: ${row.proposal.title}`,
@@ -162,6 +179,7 @@ export async function prepareSectionChat(input: {
       `Opportunity description: ${row.opportunityDescription.slice(0, 800)}`,
     themesBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
+    signalsBlock && `\nWhat the team has learned (resolve reviewer comments in the text; answer past weaknesses with evidence; never cite them):\n${signalsBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
     (liveBody || row.section.content?.trim()) &&
       `\nCurrent draft (${

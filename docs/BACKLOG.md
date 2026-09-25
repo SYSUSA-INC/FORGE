@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 in PR (PR #277); BL-AIP-5b next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 in PR (PR #TBD); BL-AIP-4b / 5b / 7 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,46 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-5 — requirements-first pipeline** 🔄 (PR #277)
+**BL-AIP-6 — AI as a collaborator in the editor** 🔄 (PR #TBD)
+
+- **AI edits are tracked changes.** `applyAsTrackedChanges`
+  (`src/lib/tracked-diff.ts`, tested: accept-all yields the rewrite,
+  reject-all restores the original, untouched tables / lists / marks
+  survive byte-for-byte) aligns the AI's paragraphs to the document's
+  blocks, diffs changed blocks word by word and writes the same
+  TcInsert / TcDelete marks a human leaves in Suggest mode, authored
+  "FORGE AI". Improve / Tighten / Draft-over-content, chat "Apply" and
+  Brain "Insert" all go through it (`appendAsTrackedInsertion` for the
+  latter); "Replace section" remains a secondary button. The owner's
+  accept / reject lands in `section_change_decision` with the AI author,
+  so the Draft Insights and edit-feedback loops now measure AI text.
+  The editor opens its Track changes panel when AI changes arrive.
+- **Research while you write.** `ResearchRail` under the editor: 2.5 s
+  after a pause, `researchForSectionAction` (rate-limited, one embedding
+  call, `research-rail.ts`) returns Brain passages for the paragraph the
+  writer is in (won boost), mapped matrix rows the draft does not cover
+  yet and win themes it does not reinforce (lexical coverage,
+  `research-signals.ts`, tested), and the last health scan's
+  contradictions involving the section. Passages insert as a tracked
+  suggestion by FORGE AI.
+- **The drafter and chat read what the team learned.**
+  `writing-signals.ts`: AI-draft acceptance from `section_draft_signal`,
+  open reviewer comments on the section, agency debrief weaknesses and
+  winner-analysis gaps (same agency first) — into `patternIntel.
+  writingSignals` for the drafter (with prompt rules: resolve comments
+  in the text, answer criticisms with evidence, never cite them) and a
+  prose block for the chat.
+- **AI colour-team pre-review.** `runReviewPreflight`
+  (`review-preflight.ts`, feature `review_preflight`) runs in the
+  background when a review starts: each drafted section (up to 8) is
+  read against its mapped requirements and the win themes for that
+  colour and up to three findings plus a verdict land as review
+  comments authored FORGE AI (`user_id` null, labelled in the review),
+  which the drafter then sees as open comments until resolved. Gated
+  by `aiAutoDraft` + request quota, skipped in stub mode, audited as
+  `proposal.review.preflight`.
+
+**BL-AIP-5 — requirements-first pipeline** ✅ (PR #277)
 
 - **Intake reads the whole document.** `extractRequirementsFullText`
   (`solicitation-extract.ts`) sweeps the full `rawText` in ~60k-character
@@ -328,10 +367,11 @@ lib with a cron fallback for un-harvested won proposals, R2 storage for
 artifacts, a background-job table with stuck-row recovery);
 BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
 dates, proposed themes) and the golden eval set from won proposals
-keyed by `promptVersion`; BL-AIP-6 AI edits as tracked changes by
-"FORGE AI" + research-while-you-write rail; BL-AIP-7 proactive scout /
-stored graded briefs / AI Engine controls. Details and evidence in the
-assessment report.
+keyed by `promptVersion`; BL-AIP-6b paragraph-anchored rail (cursor
+position from the editor instead of the last edited paragraph) and
+"resolve" on AI review comments from the editor; BL-AIP-7 proactive
+scout / stored graded briefs / AI Engine controls. Details and evidence
+in the assessment report.
 
 ---
 
