@@ -343,7 +343,7 @@ expiry reminders; SSO domain auto-join.
 ---
 
 ### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
-**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #TBD)
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #276)
 
 User request (2026-09-25): "by DEFAULT people CAN ONLY join the tenant
 based on their email domain … no admin should be able to add anyone
