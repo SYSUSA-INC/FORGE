@@ -32,7 +32,8 @@ describe("BL-AIP-5 — seedComplianceItemsFromRequirements", () => {
         { kind: "shall", ref: "L.5.2.1", text: "The offeror shall describe its staffing approach for all task areas." },
         { kind: "shall", ref: "M-1", text: "Proposals will be evaluated on technical approach and past performance." },
         { kind: "should", ref: "PWS 3.2", text: "The contractor should provide monthly status reports to the COR." },
-        // Near-duplicate of the PWS clause: skipped.
+        // Near-duplicate of the PWS clause: the loader de-duplicates it
+        // before the seed ever sees it (same rule as the companion merge).
         { kind: "shall", ref: "C.3.2", text: "Contractor shall provide monthly status reports to the COR" },
       ],
     });
@@ -51,8 +52,8 @@ describe("BL-AIP-5 — seedComplianceItemsFromRequirements", () => {
     expect(first).toEqual({
       ok: true,
       inserted: 3,
-      skippedDuplicates: 1,
-      available: 4,
+      skippedDuplicates: 0,
+      available: 3,
       solicitationCount: 1,
     });
 
@@ -80,7 +81,7 @@ describe("BL-AIP-5 — seedComplianceItemsFromRequirements", () => {
       proposalId: fx.orgA.proposalId,
       actor: { id: fx.orgA.userId },
     });
-    expect(again).toMatchObject({ ok: true, inserted: 0, skippedDuplicates: 4 });
+    expect(again).toMatchObject({ ok: true, inserted: 0, skippedDuplicates: 3 });
     const count = await db
       .select({ id: complianceItems.id })
       .from(complianceItems)
@@ -113,7 +114,9 @@ describe("BL-AIP-5 — seedComplianceItemsFromRequirements", () => {
       organizationId: fx.orgA.organizationId,
       opportunityId: fx.orgA.opportunityId,
     });
-    expect(legit.requirements).toHaveLength(4);
+    // Four stored, three distinct: the near-duplicate PWS / C.3.2 pair collapses on load.
+    expect(legit.requirements).toHaveLength(3);
+    expect(legit.requirements.map((r) => r.ref)).toEqual(["L.5.2.1", "M-1", "PWS 3.2"]);
     expect(legit.sectionLSummary).toBe("Thirty pages, three volumes.");
   });
 });
