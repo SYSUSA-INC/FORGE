@@ -342,6 +342,59 @@ expiry reminders; SSO domain auto-join.
 
 ---
 
+### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #TBD)
+
+User request (2026-09-25): "by DEFAULT people CAN ONLY join the tenant
+based on their email domain … no admin should be able to add anyone
+from any other domain unless that domain access has been approved by
+the platform admin. This is also to prevent multiple companies trying
+to use the platform to save costs" (context: enablenow.com people were
+added to the sysusa.com tenant by its own admins).
+
+**Rule delivered:**
+- Every organization carries `email_domains` (owned) and
+  `approved_external_domains` (platform-approved) —
+  `drizzle/0083_domain_scoped_membership.sql`, backfilled from active
+  admins' addresses excluding public mailbox providers; a new org owns
+  its first admin's domain. Public providers (gmail.com…) can never be
+  tenant domains.
+- A tenant-admin invite whose address is on neither list is
+  **cross-domain**: the allowlist row is created with `cross_domain`
+  and no `platform_approved_at`, no token is issued, nothing is emailed
+  to the invitee, the platform admins are emailed, and the UI shows
+  **Awaiting platform approval** (Copy link / Resend refused; Revoke
+  allowed). A tenant with no domains on file allows nobody by default.
+- Only a **platform superadmin** approves: **Cross-domain approvals**
+  queue on `/admin` and on each tenant's Users page — **Approve** (stamps
+  the invite, issues the link, sends the email), **Approve + allow
+  domain** (also adds the domain to the tenant's approved list), **Deny**
+  (revokes). A superadmin's own invite from another domain is stamped at
+  creation. Tenant admins cannot edit either list; superadmins edit them
+  on the tenant detail page (**Email domains** panel, with the current
+  members from other domains listed for a decision).
+- Enforced at every entry: `/api/register` refuses an unapproved invite
+  before spending the token and refuses self-service sign-up for a
+  domain an existing tenant owns; `/sign-up` renders an "awaiting
+  approval" state; `attachPendingInvitesByEmail` (OAuth / sign-in) skips
+  unapproved cross-domain invites; NextAuth open-mode provisioning never
+  founds a shadow workspace for a domain a tenant already owns.
+- Audit: `user.invite_held_cross_domain`,
+  `user.invite_cross_domain_approve`, `user.invite_cross_domain_deny`,
+  `tenant.approved_domain_add`, `tenant.email_domains_change`; `user.invite`
+  carries `crossDomain` / `platformApproved`.
+- Tests: `tests/ai/email-domain.test.ts` (pure rules) and a runtime case
+  in `tests/isolation/invite-accept.test.ts` (held invite not attached
+  until stamped). Docs: ADMIN_MANUAL §2.2 / §2.3 / §3.2 / §3.4,
+  USER_MANUAL §1.5.
+
+**Not in this pass:** retroactive removal of existing other-domain
+members (listed, never auto-removed); notifying the requesting tenant
+admin by email on approve / deny (they see the status on `/users`);
+subdomain matching (`mail.acme.com` is a separate domain).
+
+---
+
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)
 

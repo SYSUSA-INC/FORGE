@@ -4,10 +4,13 @@ import { type FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
 import { Panel } from "@/components/ui/Panel";
+import { isPublicEmailDomain, type TenantDomains } from "@/lib/email-domain";
 import type { InviteResult } from "@/lib/invite-types";
 import {
+  superadminApproveCrossDomainInviteAction,
   superadminChangeMemberRoleAction,
   superadminCreateInviteLinkAction,
+  superadminDenyCrossDomainInviteAction,
   superadminInviteUserAction,
   superadminRemoveMemberAction,
   superadminResendInviteAction,
@@ -27,14 +30,19 @@ type Member = {
   verified: boolean;
   userGloballyDisabled: boolean;
   isPrimaryAdmin: boolean;
+  /** BL-AUTH-DOMAIN — domain neither owned by nor approved for the tenant. */
+  externalDomain?: boolean;
 };
 
 type Invite = {
   id: string;
   email: string;
+  domain?: string | null;
   role: string;
   title: string | null;
   invitedAt: string;
+  /** BL-AUTH-DOMAIN — held until a platform admin approves it. */
+  awaitingApproval?: boolean;
 };
 
 const ROLES: { value: string; label: string }[] = [
@@ -51,6 +59,7 @@ export function TenantUsersClient({
   organizationId,
   organizationName,
   itarRestricted = false,
+  tenantDomains,
   members,
   pendingInvites,
   activeAdminCount,
@@ -58,6 +67,7 @@ export function TenantUsersClient({
   organizationId: string;
   organizationName?: string;
   itarRestricted?: boolean;
+  tenantDomains?: TenantDomains;
   members: Member[];
   pendingInvites: Invite[];
   activeAdminCount: number;
@@ -159,6 +169,28 @@ export function TenantUsersClient({
     );
   }
 
+  // BL-AUTH-DOMAIN — approving sends the invitation; the link shows below.
+  function approveInvite(inviteId: string, email: string, domain: string | null | undefined, allowDomain: boolean) {
+    if (
+      allowDomain &&
+      !window.confirm(
+        `Approve ${email} AND allow every future invite from ${domain} into ${organizationName ?? "this tenant"} without approval?`,
+      )
+    ) {
+      return;
+    }
+    runInvite(inviteId, email, () =>
+      superadminApproveCrossDomainInviteAction(organizationId, inviteId, { allowDomain }),
+    );
+  }
+
+  function denyInvite(inviteId: string, email: string) {
+    if (!window.confirm(`Deny ${email}? The invitation is revoked.`)) return;
+    run(`Deny invite to ${email}`, () =>
+      superadminDenyCrossDomainInviteAction(organizationId, inviteId),
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {error ? (
@@ -176,6 +208,7 @@ export function TenantUsersClient({
         organizationId={organizationId}
         organizationName={organizationName ?? "this tenant"}
         itarRestricted={itarRestricted}
+        tenantDomains={tenantDomains}
       />
 
       <Panel
@@ -233,6 +266,9 @@ export function TenantUsersClient({
                       ) : (
                         <Tag tone="muted">unverified</Tag>
                       )}
+                      {m.externalDomain ? (
+                        <Tag tone="gold">external domain</Tag>
+                      ) : null}
                     </div>
                   </div>
 
@@ -340,40 +376,83 @@ export function TenantUsersClient({
                   <div>
                     <div className="font-display text-[13px] text-text">
                       {i.email}
+                      {i.awaitingApproval ? (
+                        <span className="ml-2 align-middle">
+                          <Tag tone="gold">awaiting your approval</Tag>
+                        </span>
+                      ) : null}
                     </div>
                     <div className="font-mono text-[10px] text-muted">
                       Role: {i.role}
                       {i.title ? ` · ${i.title}` : ""} · invited{" "}
                       {formatDate(i.invitedAt)}
+                      {i.awaitingApproval
+                        ? " · cross-domain: the invitee has not been contacted"
+                        : ""}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => copyInviteLink(i.id, i.email)}
-                      className="aur-btn aur-btn-ghost text-[11px]"
-                      title="Get a fresh invite link to send by chat or ticket"
-                    >
-                      Copy link
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => resendInvite(i.id, i.email)}
-                      className="aur-btn aur-btn-ghost text-[11px]"
-                    >
-                      Resend
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => revokeInvite(i.id, i.email)}
-                      className="aur-btn aur-btn-danger text-[11px]"
-                    >
-                      Revoke
-                    </button>
-                  </div>
+                  {i.awaitingApproval ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => approveInvite(i.id, i.email, i.domain, false)}
+                        className="aur-btn aur-btn-primary text-[11px]"
+                        title="Approve this one person; the invitation is sent now"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending || !i.domain || isPublicEmailDomain(i.domain)}
+                        onClick={() => approveInvite(i.id, i.email, i.domain, true)}
+                        className="aur-btn aur-btn-ghost text-[11px]"
+                        title={
+                          i.domain && !isPublicEmailDomain(i.domain)
+                            ? `Approve and add ${i.domain} to this tenant's approved external domains`
+                            : "Public mailbox providers cannot be approved as a domain"
+                        }
+                      >
+                        Approve + allow domain
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => denyInvite(i.id, i.email)}
+                        className="aur-btn aur-btn-danger text-[11px]"
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => copyInviteLink(i.id, i.email)}
+                        className="aur-btn aur-btn-ghost text-[11px]"
+                        title="Get a fresh invite link to send by chat or ticket"
+                      >
+                        Copy link
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => resendInvite(i.id, i.email)}
+                        className="aur-btn aur-btn-ghost text-[11px]"
+                      >
+                        Resend
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => revokeInvite(i.id, i.email)}
+                        className="aur-btn aur-btn-danger text-[11px]"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {inviteLink && inviteLink.id === i.id ? (
                   <div className="mt-2">
@@ -421,14 +500,16 @@ function Tag({
   tone,
 }: {
   children: React.ReactNode;
-  tone: "emerald" | "rose" | "muted";
+  tone: "emerald" | "rose" | "muted" | "gold";
 }) {
   const toneClass =
     tone === "emerald"
       ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
       : tone === "rose"
         ? "border-rose/40 bg-rose/10 text-rose"
-        : "border-layer/10 bg-layer/5 text-muted";
+        : tone === "gold"
+          ? "border-gold/40 bg-gold/10 text-gold"
+          : "border-layer/10 bg-layer/5 text-muted";
   return (
     <span
       className={`rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${toneClass}`}
@@ -451,10 +532,12 @@ function TenantInvitePanel({
   organizationId,
   organizationName,
   itarRestricted,
+  tenantDomains,
 }: {
   organizationId: string;
   organizationName: string;
   itarRestricted: boolean;
+  tenantDomains?: TenantDomains;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -494,6 +577,17 @@ function TenantInvitePanel({
 
   return (
     <Panel title={`Invite a user to ${organizationName}`} eyebrow="Platform admin · this tenant">
+      {tenantDomains ? (
+        <p className="mb-3 font-mono text-[10px] leading-relaxed text-muted">
+          Tenant domains:{" "}
+          {tenantDomains.emailDomains.length > 0 ? tenantDomains.emailDomains.join(", ") : "none on file"}
+          {tenantDomains.approvedExternalDomains.length > 0
+            ? ` · approved external: ${tenantDomains.approvedExternalDomains.join(", ")}`
+            : ""}
+          . As a platform admin your invite from any other domain counts as approved
+          and goes out at once; it is audited as a cross-domain invite.
+        </p>
+      ) : null}
       <form className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr_auto]" onSubmit={onSubmit}>
         <div>
           <label className="aur-label">Email</label>

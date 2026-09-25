@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { parseDomainList } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 
 /**
@@ -300,6 +301,90 @@ export async function listOrgAdminsAction(
     .orderBy(asc(users.name), asc(users.email));
 
   return rows;
+}
+
+/**
+ * BL-AUTH-DOMAIN — set the email domains a tenant owns and the external
+ * domains a platform admin has approved for it.
+ *
+ * Superadmin-only: tenant admins must not be able to widen their own
+ * tenant's domain list, or the rule ("no one from another domain
+ * without platform approval") would be theirs to switch off. Public
+ * mailbox providers are refused in both lists. Existing memberships are
+ * never touched; the lists only govern who can be invited without a
+ * per-invite approval.
+ */
+export async function setTenantDomainsAction(input: {
+  organizationId: string;
+  emailDomains: string;
+  approvedExternalDomains: string;
+}): Promise<
+  | { ok: true; emailDomains: string[]; approvedExternalDomains: string[] }
+  | { ok: false; error: string }
+> {
+  const actor = await requireSuperadmin();
+  if (!input.organizationId) return { ok: false, error: "Organization not found." };
+
+  const owned = parseDomainList(input.emailDomains ?? "");
+  const external = parseDomainList(input.approvedExternalDomains ?? "");
+  const problems: string[] = [];
+  const invalid = [...owned.invalid, ...external.invalid];
+  const publicProviders = [...owned.publicProviders, ...external.publicProviders];
+  if (invalid.length > 0) problems.push(`Not a valid domain: ${invalid.join(", ")}.`);
+  if (publicProviders.length > 0) {
+    problems.push(
+      `Public mailbox providers cannot be tenant domains: ${publicProviders.join(", ")}. Approve those people one invite at a time instead.`,
+    );
+  }
+  const overlap = external.domains.filter((d) => owned.domains.includes(d));
+  if (overlap.length > 0) {
+    problems.push(`Already an owned domain, no need to approve it: ${overlap.join(", ")}.`);
+  }
+  if (problems.length > 0) return { ok: false, error: problems.join(" ") };
+
+  const [prior] = await db
+    .select({
+      emailDomains: organizations.emailDomains,
+      approvedExternalDomains: organizations.approvedExternalDomains,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId))
+    .limit(1);
+  if (!prior) return { ok: false, error: "Organization not found." };
+
+  try {
+    await db
+      .update(organizations)
+      .set({
+        emailDomains: owned.domains,
+        approvedExternalDomains: external.domains,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, input.organizationId));
+    await recordAudit({
+      organizationId: input.organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "tenant.email_domains_change",
+      resourceType: "organization",
+      resourceId: input.organizationId,
+      metadata: {
+        viaSuperadmin: true,
+        priorEmailDomains: prior.emailDomains,
+        emailDomains: owned.domains,
+        priorApprovedExternalDomains: prior.approvedExternalDomains,
+        approvedExternalDomains: external.domains,
+      },
+    });
+    revalidatePath(`/admin/orgs/${input.organizationId}`);
+    revalidatePath("/users");
+    return { ok: true, emailDomains: owned.domains, approvedExternalDomains: external.domains };
+  } catch (err) {
+    log.error("[setTenantDomainsAction]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not update the domains.",
+    };
+  }
 }
 
 /**

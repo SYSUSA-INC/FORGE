@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import type { Role, MembershipStatus } from "@/db/schema";
 import type { MembersSummary } from "@/lib/settings-status";
 import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
+import { domainOf, isCrossDomainInvite, type TenantDomains } from "@/lib/email-domain";
 import type { InviteResult } from "@/lib/invite-types";
 import { superadminInviteUserAction } from "@/app/(app)/admin/orgs/[id]/users/actions";
 import {
@@ -31,6 +32,8 @@ export type Member = {
   title: string | null;
   joinedAt: string;
   verified: boolean;
+  /** BL-AUTH-DOMAIN — email domain neither owned by nor approved for this tenant. */
+  externalDomain?: boolean;
 };
 
 export type PendingInvite = {
@@ -39,7 +42,11 @@ export type PendingInvite = {
   role: Role;
   title: string | null;
   invitedAt: string;
+  /** BL-AUTH-DOMAIN — held until a platform admin approves it; no link exists. */
+  awaitingApproval?: boolean;
 };
+
+const NO_DOMAINS: TenantDomains = { emailDomains: [], approvedExternalDomains: [] };
 
 const ROLES: { value: Role; label: string; description: string }[] = [
   {
@@ -95,6 +102,7 @@ export function UsersClient({
   isSuperadmin = false,
   currentOrganizationId,
   tenants = [],
+  tenantDomains = NO_DOMAINS,
 }: {
   currentUserId: string;
   summary: MembersSummary;
@@ -105,6 +113,8 @@ export function UsersClient({
   isSuperadmin?: boolean;
   currentOrganizationId?: string;
   tenants?: TenantOption[];
+  /** BL-AUTH-DOMAIN — the current tenant's owned + approved domains. */
+  tenantDomains?: TenantDomains;
 }) {
   return (
     <>
@@ -125,6 +135,7 @@ export function UsersClient({
           isSuperadmin={isSuperadmin}
           currentOrganizationId={currentOrganizationId}
           tenants={tenants}
+          tenantDomains={tenantDomains}
         />
         <PendingPanel
           className="xl:col-span-2"
@@ -201,12 +212,14 @@ function InvitePanel({
   isSuperadmin,
   currentOrganizationId,
   tenants,
+  tenantDomains,
 }: {
   className?: string;
   itarRestricted: boolean;
   isSuperadmin: boolean;
   currentOrganizationId?: string;
   tenants: TenantOption[];
+  tenantDomains: TenantDomains;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -226,6 +239,12 @@ function InvitePanel({
 
   const selectedTenant = tenants.find((t) => t.id === tenantId);
   const needsAttestation = isSuperadmin ? !!selectedTenant?.itarRestricted : itarRestricted;
+  // BL-AUTH-DOMAIN — a tenant admin sees, before sending, whether this
+  // address will be held for platform approval. (A superadmin's invite
+  // into any tenant is approved by them at creation, so no hint.)
+  const typedDomain = domainOf(email);
+  const willNeedApproval =
+    !isSuperadmin && !!typedDomain && isCrossDomainInvite(email, tenantDomains);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -298,6 +317,33 @@ function InvitePanel({
             required
             placeholder="name@company.com"
           />
+          {!isSuperadmin ? (
+            <div className="mt-1 font-mono text-[10px] leading-relaxed text-muted">
+              {tenantDomains.emailDomains.length > 0 ? (
+                <>
+                  Workspace domains: {tenantDomains.emailDomains.join(", ")}
+                  {tenantDomains.approvedExternalDomains.length > 0
+                    ? ` · approved external: ${tenantDomains.approvedExternalDomains.join(", ")}`
+                    : ""}
+                  . People from other domains can be invited, but the invitation is
+                  held until a platform admin approves it.
+                </>
+              ) : (
+                <>
+                  No email domains are on file for this workspace, so every
+                  invitation is held until a platform admin approves it. Ask the
+                  platform admin to set your domains.
+                </>
+              )}
+            </div>
+          ) : null}
+          {willNeedApproval ? (
+            <div className="mt-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 font-mono text-[11px] text-gold">
+              {typedDomain} is outside this workspace&apos;s domains. Sending will
+              request platform-admin approval; the person is not emailed until it
+              is granted.
+            </div>
+          ) : null}
         </div>
         <div>
           <label className="aur-label">Role</label>
@@ -357,7 +403,7 @@ function InvitePanel({
           disabled={pending || !email || (isSuperadmin && !tenantId)}
           className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
         >
-          {pending ? "Sending…" : "Send invitation"}
+          {pending ? "Sending…" : willNeedApproval ? "Request approval" : "Send invitation"}
         </button>
       </form>
     </Panel>
@@ -433,28 +479,46 @@ function PendingPanel({
             >
               <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto]">
                 <div className="min-w-0">
-                  <div className="truncate font-mono text-[12px] text-text">{i.email}</div>
+                  <div className="truncate font-mono text-[12px] text-text">
+                    {i.email}
+                    {i.awaitingApproval ? (
+                      <span
+                        className="ml-2 rounded border border-gold/40 bg-gold/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-gold"
+                        title="The invitee is from another email domain. A platform admin must approve this before any link exists."
+                      >
+                        Awaiting platform approval
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
                     {roleLabel(i.role)} · invited {new Date(i.invitedAt).toLocaleDateString()}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="aur-btn aur-btn-ghost text-[11px]"
-                  onClick={() => onCopyLink(i.id, i.email)}
-                  disabled={pendingId === i.id}
-                  title="Get a fresh invite link to send by chat or ticket"
-                >
-                  Copy link
-                </button>
-                <button
-                  type="button"
-                  className="aur-btn aur-btn-ghost text-[11px]"
-                  onClick={() => onResend(i.id, i.email)}
-                  disabled={pendingId === i.id}
-                >
-                  {pendingId === i.id ? "…" : "Resend"}
-                </button>
+                {i.awaitingApproval ? (
+                  <span className="font-mono text-[10px] text-muted md:col-span-2">
+                    No link until approved · not yet emailed
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="aur-btn aur-btn-ghost text-[11px]"
+                      onClick={() => onCopyLink(i.id, i.email)}
+                      disabled={pendingId === i.id}
+                      title="Get a fresh invite link to send by chat or ticket"
+                    >
+                      Copy link
+                    </button>
+                    <button
+                      type="button"
+                      className="aur-btn aur-btn-ghost text-[11px]"
+                      onClick={() => onResend(i.id, i.email)}
+                      disabled={pendingId === i.id}
+                    >
+                      {pendingId === i.id ? "…" : "Resend"}
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   className="aur-btn aur-btn-danger text-[11px]"
@@ -573,6 +637,14 @@ function MembersPanel({
                   {isSelf ? (
                     <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                       You
+                    </span>
+                  ) : null}
+                  {m.externalDomain ? (
+                    <span
+                      className="ml-2 rounded border border-gold/40 bg-gold/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-gold"
+                      title="This member's email domain is neither owned by nor approved for this workspace. Only a platform admin can change the workspace's domains."
+                    >
+                      External domain
                     </span>
                   ) : null}
                 </div>

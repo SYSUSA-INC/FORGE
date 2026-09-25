@@ -451,6 +451,47 @@ export function emailConfigured(): boolean {
 }
 
 /**
+ * BL-AUTH-DOMAIN — ask the platform admins to approve a cross-domain
+ * invitation. Only superadmins receive this; tenant admins cannot
+ * approve it.
+ */
+export async function sendCrossDomainApprovalEmail(opts: {
+  to: string;
+  inviteeEmail: string;
+  targetOrganizationName: string;
+  homeOrganizationName: string | null;
+  requestedBy: string;
+}): Promise<void> {
+  const url = `${baseUrl()}/admin`;
+  const home = opts.homeOrganizationName
+    ? `their email domain belongs to <strong style="color:#EEF2F8;">${escapeHtml(opts.homeOrganizationName)}</strong>`
+    : "their email domain is not owned by any tenant on Forge";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:#EEF2F8;">Approval needed: cross-domain invitation</h1>
+    <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:#A3B1C6;">
+      ${escapeHtml(opts.requestedBy)} invited <strong style="color:#EEF2F8;">${escapeHtml(opts.inviteeEmail)}</strong>
+      to join <strong style="color:#EEF2F8;">${escapeHtml(opts.targetOrganizationName)}</strong>, but ${home}.
+      By default people may only join the tenant that owns their email domain, so this invitation is on hold
+      until a platform admin approves it. The invitee has not been contacted.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#4C8DFF;color:#0b1220;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Review the request</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#6B7A93;">
+      Platform admin &rarr; Organizations &rarr; Cross-domain approvals. Approving sends the invitation;
+      &ldquo;Approve and allow domain&rdquo; also lets that domain into the tenant without further approvals.
+      Denying revokes the invitation.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `Approval needed: ${opts.inviteeEmail} → ${opts.targetOrganizationName}`,
+    html: emailShell("Approval needed", body),
+    text: `${opts.requestedBy} invited ${opts.inviteeEmail} to join ${opts.targetOrganizationName}. The invitee's email domain is ${opts.homeOrganizationName ? `owned by ${opts.homeOrganizationName}` : "not owned by any tenant"}, so the invitation is on hold until a platform admin approves it. Review: ${url}`,
+  });
+}
+
+/**
  * BL-AIP-3 — one notification from the rules engine (immediate
  * frequency, email channel). Throws on provider failure so the
  * dispatcher can record the error on the delivery row.

@@ -7,6 +7,10 @@ import { useState } from "react";
  * reset link: whether the email went out, and the link itself with a
  * copy button so they can hand it over by chat, ticket or phone when
  * email delivery is not configured or the message did not arrive.
+ *
+ * BL-AUTH-DOMAIN — with `url` null the invite is on hold for platform
+ * approval: there is no link to copy yet, so the notice says who has to
+ * act instead.
  */
 export function InviteLinkNotice({
   url,
@@ -15,7 +19,7 @@ export function InviteLinkNotice({
   sentTo,
   kind = "invite",
 }: {
-  url: string;
+  url: string | null;
   emailSent: boolean;
   warning?: string;
   sentTo: string;
@@ -24,6 +28,7 @@ export function InviteLinkNotice({
   const [copied, setCopied] = useState(false);
 
   async function copy() {
+    if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -35,6 +40,21 @@ export function InviteLinkNotice({
   }
 
   const noun = kind === "reset" ? "Reset link" : "Invitation";
+
+  if (!url) {
+    return (
+      <div className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 font-mono text-[11px]">
+        <div className="text-gold">
+          {noun} for {sentTo} is on hold until a platform admin approves it.
+        </div>
+        <div className="mt-1 text-[10px] text-muted">
+          {warning ??
+            "The invitee has not been emailed. Once approved, they receive the invitation and it appears here with a link."}
+        </div>
+      </div>
+    );
+  }
+
   const tone = emailSent
     ? "border-emerald/40 bg-emerald/10"
     : "border-gold/40 bg-gold/10";

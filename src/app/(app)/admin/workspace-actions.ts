@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { memberships, organizations } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 
@@ -51,9 +52,15 @@ export async function createWorkspaceForSelfAction(input: {
 
   const name = (input.name ?? "").trim().slice(0, 128) || defaultOrgName(actor.name);
 
+  // BL-AUTH-DOMAIN — the workspace owns its creator's domain (never a
+  // public mailbox provider) so colleagues can be invited without a
+  // per-invite approval.
+  const ownDomain = domainOf(actor.email);
+  const emailDomains = ownDomain && !isPublicEmailDomain(ownDomain) ? [ownDomain] : [];
+
   const [org] = await db
     .insert(organizations)
-    .values({ name, slug: defaultOrgSlug(actor.name) })
+    .values({ name, slug: defaultOrgSlug(actor.name), emailDomains })
     .returning({ id: organizations.id });
   if (!org) return { ok: false, error: "Could not create the workspace." };
 

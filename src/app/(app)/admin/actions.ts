@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { domainOf, inviteAwaitsApproval, isPublicEmailDomain } from "@/lib/email-domain";
 import { deliverInvite, deliverPasswordReset } from "@/lib/invite-send";
 import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
 import { issueToken } from "@/lib/tokens";
@@ -39,11 +40,19 @@ export async function createOrganizationAction(input: {
     return { ok: false, error: emailError ?? "Enter an admin email." };
   }
 
+  // BL-AUTH-DOMAIN — the new tenant owns its first admin's domain, so
+  // their colleagues can be invited without platform approval. A public
+  // mailbox provider is never a tenant domain; the admin invite is then
+  // cross-domain and carries the superadmin's approval stamp.
+  const adminDomain = domainOf(adminEmail);
+  const ownsDomain = !!adminDomain && !isPublicEmailDomain(adminDomain);
+
   const [org] = await db
     .insert(organizations)
     .values({
       name: orgName,
       slug: defaultOrgSlug(orgName),
+      emailDomains: ownsDomain ? [adminDomain] : [],
     })
     .returning({ id: organizations.id });
   if (!org) return { ok: false, error: "Could not create organization." };
@@ -56,6 +65,9 @@ export async function createOrganizationAction(input: {
       role: "admin" as Role,
       title: input.adminTitle?.trim() || null,
       invitedByUserId: actor.id,
+      crossDomain: !ownsDomain,
+      platformApprovedAt: ownsDomain ? null : new Date(),
+      platformApprovedByUserId: ownsDomain ? null : actor.id,
     })
     .returning({ id: allowlist.id });
   if (!invite) {
@@ -87,6 +99,7 @@ export async function createOrganizationAction(input: {
     metadata: {
       name: orgName,
       primaryAdminEmail: adminEmail,
+      emailDomains: ownsDomain ? [adminDomain] : [],
       superadmin: true,
       emailSent: delivery.emailSent,
     },
@@ -240,6 +253,13 @@ export async function resendOrgAdminInviteAction(
     .limit(1);
   if (!inv) return { ok: false, error: "Invite not found." };
   if (inv.consumedAt) return { ok: false, error: "Invite already accepted." };
+  if (inviteAwaitsApproval(inv)) {
+    return {
+      ok: false,
+      error:
+        "This invitation is waiting for platform approval. Approve it under Cross-domain approvals instead of resending.",
+    };
+  }
 
   const [org] = await db
     .select({ name: organizations.name })

@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { isPublicEmailDomain } from "@/lib/email-domain";
 import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
 import {
+  superadminApproveCrossDomainInviteAction,
   superadminCreateInviteLinkAction,
+  superadminDenyCrossDomainInviteAction,
   superadminInviteUserAction,
 } from "./orgs/[id]/users/actions";
 import {
@@ -63,6 +66,22 @@ type Stats = {
   activeOrgs: number;
   activeUsers: number;
   pendingAdminInvites: number;
+  pendingApprovals: number;
+};
+
+/** BL-AUTH-DOMAIN — one cross-domain invite waiting for the platform stamp. */
+export type ApprovalRow = {
+  inviteId: string;
+  email: string;
+  domain: string | null;
+  role: string;
+  title: string | null;
+  invitedAt: string;
+  invitedByEmail: string | null;
+  organizationId: string;
+  organizationName: string;
+  homeOrganizationId: string | null;
+  homeOrganizationName: string | null;
 };
 
 type Tab = "overview" | "organizations" | "users";
@@ -71,11 +90,13 @@ export function AdminClient({
   currentUserId,
   orgs,
   users,
+  approvals = [],
   stats,
 }: {
   currentUserId: string;
   orgs: OrgRow[];
   users: UserRow[];
+  approvals?: ApprovalRow[];
   stats: Stats;
 }) {
   const [tab, setTab] = useState<Tab>("organizations");
@@ -153,6 +174,11 @@ export function AdminClient({
             value: String(stats.pendingAdminInvites),
             accent: stats.pendingAdminInvites > 0 ? "gold" : undefined,
           },
+          {
+            label: "Cross-domain approvals",
+            value: String(stats.pendingApprovals),
+            accent: stats.pendingApprovals > 0 ? "gold" : undefined,
+          },
         ]}
       />
 
@@ -174,7 +200,7 @@ export function AdminClient({
 
       {tab === "overview" && <OverviewTab stats={stats} />}
       {tab === "organizations" && (
-        <OrganizationsTab orgs={orgs} currentUserId={currentUserId} />
+        <OrganizationsTab orgs={orgs} approvals={approvals} currentUserId={currentUserId} />
       )}
       {tab === "users" && <UsersTab users={users} currentUserId={currentUserId} />}
     </>
@@ -209,9 +235,11 @@ function StatTile({ label, value }: { label: string; value: number | string }) {
 
 function OrganizationsTab({
   orgs,
+  approvals,
   currentUserId,
 }: {
   orgs: OrgRow[];
+  approvals: ApprovalRow[];
   currentUserId: string;
 }) {
   const [filter, setFilter] = useState("");
@@ -229,6 +257,9 @@ function OrganizationsTab({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="xl:col-span-3">
+        <CrossDomainApprovalsPanel approvals={approvals} />
+      </div>
       <div className="flex flex-col gap-4 xl:col-span-1">
         <InviteUserPanel orgs={orgs} />
         <CreateOrgPanel />
@@ -264,6 +295,169 @@ function OrganizationsTab({
         </Panel>
       </div>
     </div>
+  );
+}
+
+/**
+ * BL-AUTH-DOMAIN — the platform admin's approval queue. By default a
+ * person may only join the tenant that owns their email domain; a tenant
+ * admin who invites someone from another domain only creates a request.
+ * Nothing reaches the invitee until a platform admin approves it here.
+ * "Approve and allow domain" also adds the domain to the tenant's
+ * approved external domains so later invites from it go straight out.
+ */
+function CrossDomainApprovalsPanel({ approvals }: { approvals: ApprovalRow[] }) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<{
+    inviteId: string;
+    email: string;
+    tenantName: string;
+    res: Extract<InviteResult, { ok: true }>;
+  } | null>(null);
+
+  async function approve(a: ApprovalRow, allowDomain: boolean) {
+    if (
+      allowDomain &&
+      !window.confirm(
+        `Approve ${a.email} AND allow every future invite from ${a.domain} into ${a.organizationName} without approval?`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setDone(null);
+    setBusyId(a.inviteId);
+    const res = await superadminApproveCrossDomainInviteAction(a.organizationId, a.inviteId, {
+      allowDomain,
+    });
+    setBusyId(null);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setDone({ inviteId: a.inviteId, email: a.email, tenantName: a.organizationName, res });
+    router.refresh();
+  }
+
+  async function deny(a: ApprovalRow) {
+    if (!window.confirm(`Deny ${a.email} joining ${a.organizationName}? The invitation is revoked.`)) {
+      return;
+    }
+    setError(null);
+    setDone(null);
+    setBusyId(a.inviteId);
+    const res = await superadminDenyCrossDomainInviteAction(a.organizationId, a.inviteId);
+    setBusyId(null);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <Panel
+      title="Cross-domain approvals"
+      eyebrow={
+        approvals.length === 0
+          ? "Nothing waiting"
+          : `${approvals.length} request${approvals.length === 1 ? "" : "s"} waiting for you`
+      }
+    >
+      <p className="mb-3 font-body text-[12px] leading-relaxed text-muted">
+        By default people may only join the tenant that owns their email domain.
+        These invitations were requested by tenant admins for people from other
+        domains; the invitee has not been contacted. Approving sends the
+        invitation. Denying revokes it.
+      </p>
+      {error ? (
+        <div className="mb-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+          {error}
+        </div>
+      ) : null}
+      {done ? (
+        <div className="mb-3">
+          <InviteLinkNotice
+            url={done.res.inviteUrl}
+            emailSent={done.res.emailSent}
+            warning={done.res.warning}
+            sentTo={`${done.email} (${done.tenantName})`}
+          />
+        </div>
+      ) : null}
+      {approvals.length === 0 ? (
+        <div className="font-mono text-[11px] text-muted">
+          No cross-domain invitations are waiting. Tenant domains are set on each
+          tenant&apos;s detail page.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {approvals.map((a) => {
+            const canAllowDomain = !!a.domain && !isPublicEmailDomain(a.domain);
+            return (
+              <li
+                key={a.inviteId}
+                className="rounded-lg border border-gold/30 bg-gold/5 p-3"
+              >
+                <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto]">
+                  <div className="min-w-0">
+                    <div className="truncate font-mono text-[12px] text-text">
+                      {a.email} <span className="text-muted">→</span>{" "}
+                      <Link
+                        href={`/admin/orgs/${a.organizationId}`}
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {a.organizationName}
+                      </Link>{" "}
+                      <span className="text-muted">as {a.role}</span>
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-muted">
+                      {a.homeOrganizationName
+                        ? `${a.domain} belongs to ${a.homeOrganizationName}`
+                        : `${a.domain ?? "domain"} is not owned by any tenant`}
+                      {" · "}requested by {a.invitedByEmail ?? "a tenant admin"} on{" "}
+                      {new Date(a.invitedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-primary text-[11px]"
+                    disabled={busyId === a.inviteId}
+                    onClick={() => approve(a, false)}
+                    title="Approve this one person; the invitation is sent now"
+                  >
+                    {busyId === a.inviteId ? "…" : "Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-ghost text-[11px]"
+                    disabled={busyId === a.inviteId || !canAllowDomain}
+                    onClick={() => approve(a, true)}
+                    title={
+                      canAllowDomain
+                        ? `Approve and add ${a.domain} to the tenant's approved external domains`
+                        : "Public mailbox providers cannot be approved as a domain"
+                    }
+                  >
+                    Approve + allow domain
+                  </button>
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-danger text-[11px]"
+                    disabled={busyId === a.inviteId}
+                    onClick={() => deny(a)}
+                  >
+                    Deny
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
   );
 }
 

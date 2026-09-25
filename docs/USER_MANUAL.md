@@ -78,6 +78,8 @@ Clicking it lands you on a sign-up page pre-filled with your email (you can't ch
 
 If your organization uses SSO, you can instead go to the sign-in page and use **Continue with Google / Microsoft** with the invited email address: the invitation is matched to that address and accepted automatically. Your admin may also hand you the invite link directly (for example in chat) — it is the same link the email carries.
 
+By default you can only join the organization that owns your email domain. If you were invited to an organization from a different domain, the invitation is held until a platform administrator approves it: you will not receive the email until then, and a link that lands on **Invitation awaiting approval** means exactly that. Once approved, the invitation arrives as described above.
+
 ---
 
 ## 2. The app layout

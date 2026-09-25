@@ -12,9 +12,12 @@ import {
   opportunities,
   organizations,
   proposals,
+  users,
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
+import { tenantAllowsEmail } from "@/lib/email-domain";
+import { listPendingApprovals } from "@/lib/invite-approval";
 import { getCurrentTier } from "@/lib/subscription-gates";
 import { listActiveTiersAction, listOrgAdminsAction } from "./actions";
 import { TierAssignmentForm } from "./TierAssignmentForm";
@@ -23,6 +26,7 @@ import { EnterpriseInvoiceForm } from "./EnterpriseInvoiceForm";
 import { StartImpersonationForm } from "./StartImpersonationForm";
 import { IsolationCheckPanel } from "./IsolationCheckPanel";
 import { ItarRestrictedToggle } from "./ItarRestrictedToggle";
+import { TenantDomainsEditor } from "./TenantDomainsEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +64,32 @@ export default async function TenantDetailPage({
       disabledAt: organizations.disabledAt,
       primaryAdminUserId: organizations.primaryAdminUserId,
       itarRestricted: organizations.itarRestricted,
+      emailDomains: organizations.emailDomains,
+      approvedExternalDomains: organizations.approvedExternalDomains,
     })
     .from(organizations)
     .where(eq(organizations.id, params.id))
     .limit(1);
 
   if (!org) notFound();
+
+  // BL-AUTH-DOMAIN — members whose domain the tenant neither owns nor
+  // has approved (joined before the rule, or approved one invite at a
+  // time). Shown so the platform admin can decide whether to allow the
+  // domain or remove the membership. Nothing is changed automatically.
+  const tenantDomains = {
+    emailDomains: org.emailDomains,
+    approvedExternalDomains: org.approvedExternalDomains,
+  };
+  const [memberEmails, pendingApprovals] = await Promise.all([
+    db
+      .select({ email: users.email, role: memberships.role, status: memberships.status })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(eq(memberships.organizationId, org.id)),
+    listPendingApprovals({ organizationId: org.id }),
+  ]);
+  const externalMembers = memberEmails.filter((m) => !tenantAllowsEmail(m.email, tenantDomains));
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -435,6 +459,61 @@ export default async function TenantDetailPage({
             organizationId={org.id}
             initialValue={org.itarRestricted}
           />
+        </Panel>
+
+        {/* BL-AUTH-DOMAIN — who may join this tenant by plain invitation */}
+        <Panel
+          title="Email domains"
+          eyebrow={
+            org.emailDomains.length === 0
+              ? "No domains — every invite needs approval"
+              : `${org.emailDomains.length} owned · ${org.approvedExternalDomains.length} approved external`
+          }
+          className="lg:col-span-2"
+        >
+          <TenantDomainsEditor
+            organizationId={org.id}
+            initialEmailDomains={org.emailDomains}
+            initialApprovedExternalDomains={org.approvedExternalDomains}
+          />
+          <div className="mt-4 border-t border-layer/10 pt-3">
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              Members from other domains ({externalMembers.length})
+            </div>
+            {externalMembers.length === 0 ? (
+              <div className="font-mono text-[11px] text-muted">
+                Every member&apos;s email domain is owned by or approved for this tenant.
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {externalMembers.map((m) => (
+                  <li
+                    key={m.email}
+                    className="flex items-center justify-between gap-2 rounded-md border border-gold/30 bg-gold/5 px-3 py-1.5 font-mono text-[11px]"
+                  >
+                    <span className="truncate text-text">{m.email}</span>
+                    <span className="text-muted">
+                      {m.role} · {m.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-2 font-mono text-[10px] text-muted">
+              Existing memberships are never removed automatically. Allow the
+              domain above, or remove the person on the{" "}
+              <Link
+                href={`/admin/orgs/${org.id}/users`}
+                className="underline-offset-2 hover:underline"
+              >
+                tenant users page
+              </Link>
+              .
+              {pendingApprovals.length > 0
+                ? ` ${pendingApprovals.length} cross-domain invitation${pendingApprovals.length === 1 ? "" : "s"} for this tenant awaiting your approval on the portal.`
+                : ""}
+            </div>
+          </div>
         </Panel>
       </div>
     </>

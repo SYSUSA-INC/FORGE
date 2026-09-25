@@ -2,6 +2,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { listPendingApprovals } from "@/lib/invite-approval";
 import { AdminClient } from "./AdminClient";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,10 @@ export default async function AdminPage() {
         eq(allowlist.role, "admin"),
       ),
     );
+
+  // BL-AUTH-DOMAIN — the platform admin's approval queue: cross-domain
+  // invites every tenant admin has requested and nobody has approved.
+  const approvals = await listPendingApprovals({});
 
   const userRows = await db
     .select({
@@ -125,12 +130,14 @@ export default async function AdminPage() {
       currentUserId={actor.id}
       orgs={orgs}
       users={usersWithOrgs}
+      approvals={approvals}
       stats={{
         orgCount: orgs.length,
         userCount: usersWithOrgs.length,
         activeOrgs: orgs.filter((o) => !o.disabled).length,
         activeUsers: usersWithOrgs.filter((u) => !u.disabled).length,
         pendingAdminInvites: pendingAdminInvites.length,
+        pendingApprovals: approvals.length,
       }}
     />
   );
