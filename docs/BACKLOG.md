@@ -257,7 +257,7 @@ controls. Details and evidence in the assessment report.
 ---
 
 ### BL-AUTH-INVITE — Platform-admin tenant invites + invite / password-reset truth
-**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #274)
 
 User report (2026-09-25): a platform superadmin needs to invite users
 with a mandatory tenant choice (tenant admins invite only into their own
