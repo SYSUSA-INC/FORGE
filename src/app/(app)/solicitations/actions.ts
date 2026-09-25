@@ -13,6 +13,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { parseSolicitationFromBytes, stripExt } from "@/lib/solicitation-parse";
 import { detectFormat } from "@/lib/text-extract";
+import { runInBackground } from "@/lib/background";
 import { log } from "@/lib/log";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB cap for v1.
@@ -143,8 +144,10 @@ export async function uploadSolicitationAction(
   // Kick off parsing in the same request so the user gets a populated
   // record on the redirect. Failures are recorded on the row and shown
   // on the detail page; the upload itself still succeeds.
-  void parseSolicitationFromBytes(row.id, organizationId, bytes).catch((err) =>
-    log.error("[uploadSolicitationAction]", "inline parse failed", { error: err }),
+  // BL-AIP-4 — durable: on Vercel the instance stays alive until the
+  // parse settles instead of being frozen with the response.
+  runInBackground("[uploadSolicitationAction] inline parse", () =>
+    parseSolicitationFromBytes(row.id, organizationId, bytes),
   );
 
   await recordAudit({
@@ -226,8 +229,8 @@ export async function reparseSolicitationAction(
         "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)",
     };
 
-  void parseSolicitationFromBytes(id, organizationId, obj.bytes).catch((err) =>
-    log.error("[reparseSolicitationAction]", "parse failed", { error: err }),
+  runInBackground("[reparseSolicitationAction] parse", () =>
+    parseSolicitationFromBytes(id, organizationId, obj.bytes),
   );
   return { ok: true };
 }

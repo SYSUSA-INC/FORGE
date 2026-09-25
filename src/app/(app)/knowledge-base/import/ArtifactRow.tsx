@@ -6,13 +6,36 @@ import {
   acceptKindSuggestionAction,
   archiveKnowledgeArtifactAction,
   deleteKnowledgeArtifactAction,
+  setArtifactOutcomeAction,
   type ListedArtifact,
 } from "./actions";
+
+const OUTCOME_OPTIONS: { value: ListedArtifact["outcomeLabel"]; label: string }[] = [
+  { value: "none", label: "Outcome: unknown" },
+  { value: "won", label: "Outcome: won" },
+  { value: "lost", label: "Outcome: lost" },
+  { value: "no_bid", label: "Outcome: no-bid" },
+  { value: "withdrawn", label: "Outcome: withdrawn" },
+];
 
 export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [acceptError, setAcceptError] = useState<string | null>(null);
+
+  // BL-AIP-4 — label historical proposals won / lost so the Brain can
+  // learn from them; this is the only way a new tenant seeds outcomes.
+  function setOutcome(value: string) {
+    setAcceptError(null);
+    startTransition(async () => {
+      const res = await setArtifactOutcomeAction(artifact.id, value);
+      if (!res.ok) {
+        setAcceptError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   function acceptSuggestion() {
     setAcceptError(null);
@@ -129,6 +152,20 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
         ) : null}
       </div>
       <div className="flex shrink-0 gap-1">
+        <select
+          className="aur-input w-auto text-[10px]"
+          value={artifact.outcomeLabel}
+          onChange={(e) => setOutcome(e.target.value)}
+          disabled={pending}
+          aria-label="Outcome"
+          title="How the pursuit this document belongs to ended. Won content is boosted in Brain retrieval."
+        >
+          {OUTCOME_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         <a
           href={`/knowledge-base/import/${artifact.id}`}
           className="aur-btn aur-btn-primary text-[10px]"

@@ -13,11 +13,9 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
-import {
-  KNOWLEDGE_EXTRACT_PROMPT_VERSION,
-  aiExtractKnowledgeFromArtifact,
-} from "@/lib/knowledge-extract";
 import { embedKnowledgeEntry } from "@/lib/knowledge-entry-embed";
+import { runKnowledgeExtraction } from "@/lib/knowledge-extraction";
+import { scoreKnowledgeEntry } from "@/lib/knowledge-quality";
 import { log } from "@/lib/log";
 
 export type StartExtractionResult =
@@ -41,110 +39,40 @@ export async function startKnowledgeExtractionAction(
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const [artifact] = await db
-    .select()
-    .from(knowledgeArtifacts)
-    .where(
-      and(
-        eq(knowledgeArtifacts.id, artifactId),
-        eq(knowledgeArtifacts.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-  if (!artifact) return { ok: false, error: "Artifact not found." };
-  if (!artifact.rawText || artifact.rawText.trim().length === 0) {
-    return {
-      ok: false,
-      error:
-        "Artifact has no extracted text yet. Wait for indexing to finish, or re-upload if it failed.",
-    };
-  }
-
-  // Insert the run row first so progress is visible even if the AI
-  // call takes a while.
-  const [run] = await db
-    .insert(knowledgeExtractionRuns)
-    .values({
-      organizationId,
-      artifactId: artifact.id,
-      status: "running",
-      promptVersion: KNOWLEDGE_EXTRACT_PROMPT_VERSION,
-      startedAt: new Date(),
-      startedByUserId: user.id,
-    })
-    .returning({ id: knowledgeExtractionRuns.id });
-  if (!run) return { ok: false, error: "Could not create extraction run." };
-
-  const aiRes = await aiExtractKnowledgeFromArtifact({
+  // BL-AIP-4 — the run itself (with candidate de-duplication) lives in
+  // src/lib/knowledge-extraction.ts so the brain-index cron shares it.
+  const res = await runKnowledgeExtraction({
     organizationId,
-    artifactKind: artifact.kind,
-    artifactTitle: artifact.title || artifact.fileName,
-    artifactTags: artifact.tags ?? [],
-    rawText: artifact.rawText,
+    artifactId,
+    startedByUserId: user.id,
   });
-
-  if (!aiRes.ok) {
-    await db
-      .update(knowledgeExtractionRuns)
-      .set({
-        status: "failed",
-        errorMessage: aiRes.error,
-        finishedAt: new Date(),
-      })
-      .where(and(eq(knowledgeExtractionRuns.organizationId, organizationId), eq(knowledgeExtractionRuns.id, run.id)));
-    return { ok: false, error: aiRes.error };
-  }
-
-  // Materialize candidates. Sequential per Neon-pgbouncer rule.
-  for (const c of aiRes.candidates) {
-    await db.insert(knowledgeExtractionCandidates).values({
-      organizationId,
-      runId: run.id,
-      artifactId: artifact.id,
-      kind: c.kind as KnowledgeKind,
-      title: c.title,
-      body: c.body,
-      tags: c.tags,
-      metadata: c.metadata ?? {},
-      sourceExcerpt: c.sourceExcerpt,
-    });
-  }
-
-  await db
-    .update(knowledgeExtractionRuns)
-    .set({
-      status: "completed",
-      candidateCount: aiRes.candidates.length,
-      provider: aiRes.provider,
-      model: aiRes.model,
-      finishedAt: new Date(),
-    })
-    .where(and(eq(knowledgeExtractionRuns.organizationId, organizationId), eq(knowledgeExtractionRuns.id, run.id)));
+  if (!res.ok) return { ok: false, error: res.error };
 
   await recordAudit({
     organizationId,
     actor: { userId: user.id, email: user.email },
     action: "knowledge_extraction.run",
     resourceType: "knowledge_extraction_run",
-    resourceId: run.id,
+    resourceId: res.runId,
     metadata: {
-      artifactId: artifact.id,
-      candidateCount: aiRes.candidates.length,
-      provider: aiRes.provider,
-      model: aiRes.model,
-      stubbed: aiRes.stubbed,
+      artifactId,
+      candidateCount: res.candidateCount,
+      skippedDuplicates: res.skippedDuplicates,
+      provider: res.provider,
+      model: res.model,
+      stubbed: res.stubbed,
     },
   });
 
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
-  revalidatePath(`/knowledge-base/import/${artifact.id}`);
+  revalidatePath(`/knowledge-base/import/${artifactId}`);
 
   return {
     ok: true,
-    runId: run.id,
-    candidateCount: aiRes.candidates.length,
-    stubbed: aiRes.stubbed,
+    runId: res.runId,
+    candidateCount: res.candidateCount,
+    stubbed: res.stubbed,
   };
 }
 
@@ -295,6 +223,35 @@ export async function approveCandidateAction(
     };
   }
 
+  // BL-AIP-4 — the promoted entry inherits the source artifact's outcome
+  // (won / lost …) so retrieval's outcome boost applies from day one, and
+  // is quality-scored on creation like a manually authored entry.
+  const [sourceArtifact] = await db
+    .select({ outcomeLabel: knowledgeArtifacts.outcomeLabel })
+    .from(knowledgeArtifacts)
+    .where(
+      and(
+        eq(knowledgeArtifacts.id, c.artifactId),
+        eq(knowledgeArtifacts.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  const metadata = {
+    ...(typeof c.metadata === "object" && c.metadata
+      ? (c.metadata as Record<string, string | number | boolean>)
+      : {}),
+    sourceArtifactId: c.artifactId,
+    sourceCandidateId: c.id,
+    sourceRunId: c.runId,
+  };
+  const quality = scoreKnowledgeEntry({
+    kind: c.kind,
+    title: finalTitle,
+    body: finalBody,
+    tags: finalTags,
+    metadata,
+  });
+
   const [entry] = await db
     .insert(knowledgeEntries)
     .values({
@@ -303,14 +260,11 @@ export async function approveCandidateAction(
       title: finalTitle,
       body: finalBody,
       tags: finalTags,
-      metadata: {
-        ...(typeof c.metadata === "object" && c.metadata
-          ? (c.metadata as Record<string, string | number | boolean>)
-          : {}),
-        sourceArtifactId: c.artifactId,
-        sourceCandidateId: c.id,
-        sourceRunId: c.runId,
-      },
+      metadata,
+      outcomeLabel: sourceArtifact?.outcomeLabel ?? "none",
+      qualityScore: quality.score,
+      qualityScoreFactors: quality.factors,
+      qualityScoredAt: new Date(),
       createdByUserId: user.id,
     })
     .returning({ id: knowledgeEntries.id });
@@ -334,9 +288,20 @@ export async function approveCandidateAction(
   // Embed the new entry so Brain Suggest can rank it via real cosine
   // similarity. Best-effort: failures don't block the approval — the
   // backfill action can fix it later.
-  await embedKnowledgeEntry(organizationId, entry.id, finalTitle, finalBody).catch((err) => {
-    log.warn("[approveCandidateAction]", "embed failed (non-fatal)", { error: err });
-  });
+  // The helper returns { ok: false } rather than throwing, so the old
+  // `.catch` never saw a failure; check the result explicitly.
+  const embedded = await embedKnowledgeEntry(
+    organizationId,
+    entry.id,
+    finalTitle,
+    finalBody,
+  ).catch((err) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }));
+  if (!embedded.ok) {
+    log.warn("[approveCandidateAction]", "embed failed (non-fatal)", {
+      entryId: entry.id,
+      error: embedded.error,
+    });
+  }
 
   await recordAudit({
     organizationId,

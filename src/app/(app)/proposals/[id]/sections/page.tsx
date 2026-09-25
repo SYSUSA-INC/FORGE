@@ -11,6 +11,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { listProposalTeamCandidates } from "../../actions";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
+import { runInBackground } from "@/lib/background";
 import { AutoDraftButton } from "./ai/AutoDraftButton";
 import { SectionsClient } from "./SectionsClient";
 
@@ -95,7 +96,9 @@ export default async function ProposalSectionsPage({
       total: c.reinforced.length + c.missing.length,
     });
   }
-  void triggerProposalScanIfStaleAction(params.id);
+  runInBackground("[sections page] scan trigger", () =>
+    triggerProposalScanIfStaleAction(params.id),
+  );
 
   return (
     <Panel

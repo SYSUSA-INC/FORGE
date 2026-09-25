@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/solicitation-key-dates",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/brain-index",
+      "schedule": "30 */6 * * *"
     }
   ]
 }

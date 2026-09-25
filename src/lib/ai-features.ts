@@ -30,6 +30,9 @@ export const AI_FEATURES = {
   knowledge_classify: "Knowledge classification",
   knowledge_extract: "Knowledge extraction",
   loss_intelligence: "Loss intelligence narrative",
+  // BL-AIP-4 — embedding calls were never metered before.
+  embedding: "Embeddings (indexing)",
+  embedding_query: "Embeddings (query)",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

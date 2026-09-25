@@ -3,35 +3,24 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import {
-  knowledgeArtifactChunks,
-  knowledgeArtifacts,
-} from "@/db/schema";
+import { knowledgeArtifacts } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import {
   embedBatch,
   getEmbeddingProviderStatus,
   vectorToPgLiteral,
 } from "@/lib/embeddings";
-import { approxTokenCount, chunkText } from "@/lib/text-chunk";
+import { embedArtifact } from "@/lib/knowledge-artifact-embed";
+import type { EmbedArtifactResult } from "@/lib/knowledge-artifact-embed";
 import { log } from "@/lib/log";
 
-const EMBED_BATCH = 32;
-
-export type EmbedArtifactResult =
-  | {
-      ok: true;
-      chunks: number;
-      provider: string;
-      model: string;
-      stubbed: boolean;
-    }
-  | { ok: false; error: string };
+export type { EmbedArtifactResult };
 
 /**
  * Chunk an artifact's raw_text, embed each chunk, and persist them
- * into knowledge_artifact_chunk. Idempotent: deletes existing chunks
- * for the artifact first so re-runs replace, not duplicate.
+ * into knowledge_artifact_chunk. Idempotent: existing chunks for the
+ * artifact are replaced. BL-AIP-4 — the implementation lives in
+ * src/lib/knowledge-artifact-embed.ts so the brain-index cron shares it.
  */
 export async function embedArtifactAction(
   artifactId: string,
@@ -39,116 +28,12 @@ export async function embedArtifactAction(
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const [artifact] = await db
-    .select()
-    .from(knowledgeArtifacts)
-    .where(
-      and(
-        eq(knowledgeArtifacts.id, artifactId),
-        eq(knowledgeArtifacts.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-  if (!artifact) return { ok: false, error: "Artifact not found." };
-  if (!artifact.rawText || artifact.rawText.trim().length === 0) {
-    return {
-      ok: false,
-      error:
-        "Artifact has no extracted text yet. Wait for indexing to finish, or re-upload if it failed.",
-    };
+  const result = await embedArtifact({ organizationId, artifactId });
+  if (result.ok) {
+    revalidatePath(`/knowledge-base/import/${artifactId}`);
+    revalidatePath("/knowledge-base/import");
   }
-
-  const chunks = chunkText(artifact.rawText);
-  if (chunks.length === 0) {
-    return { ok: false, error: "Could not split the artifact into chunks." };
-  }
-
-  // Replace existing chunks for this artifact.
-  await db
-    .delete(knowledgeArtifactChunks)
-    .where(and(eq(knowledgeArtifactChunks.organizationId, organizationId), eq(knowledgeArtifactChunks.artifactId, artifactId)));
-
-  // Batch embed — OpenAI accepts arrays; stub does too.
-  let provider = "stub";
-  let model = "stub";
-  let stubbed = true;
-
-  // The whole insert loop is wrapped so any mid-batch failure (network
-  // hiccup on a single insert, embedding provider returning fewer
-  // vectors than chunks, etc.) results in a clean slate rather than a
-  // half-embedded artifact. On error we delete every chunk for the
-  // artifact (including the ones we just inserted) and propagate the
-  // error to the caller. The caller (harvest, manual re-embed) treats
-  // the failure as best-effort and the user can re-run.
-  try {
-    for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
-      const slice = chunks.slice(i, i + EMBED_BATCH);
-      const texts = slice.map((c) => c.content);
-      const result = await embedBatch(texts);
-      provider = result.provider;
-      model = result.model;
-      stubbed = result.stubbed;
-
-      if (result.vectors.length !== slice.length) {
-        throw new Error(
-          `Embedding provider returned ${result.vectors.length} vectors for ${slice.length} chunks.`,
-        );
-      }
-
-      // Insert sequentially with raw cast to vector. Done one-at-a-time
-      // because pgvector text-cast on bulk inserts is awkward through
-      // Drizzle's parameter binding; chunk counts are small (<200).
-      for (let j = 0; j < slice.length; j++) {
-        const c = slice[j]!;
-        const vec = result.vectors[j]!;
-        const literal = vectorToPgLiteral(vec);
-        await db.execute(sql`
-          INSERT INTO knowledge_artifact_chunk
-            (organization_id, artifact_id, chunk_index, content,
-             embedding, token_count, char_start, char_end,
-             embedding_provider, embedding_model, embedded_at)
-          VALUES
-            (${organizationId}, ${artifactId}, ${c.index}, ${c.content},
-             ${literal}::vector, ${approxTokenCount(c.content)},
-             ${c.charStart}, ${c.charEnd},
-             ${result.provider}, ${result.model}, now())
-        `);
-      }
-    }
-  } catch (err) {
-    // Roll back any partial inserts so the artifact has either ALL
-    // chunks or NONE — never a partial set. The delete is best-effort:
-    // if it fails too, we at least logged the original failure.
-    await db
-      .delete(knowledgeArtifactChunks)
-      .where(and(eq(knowledgeArtifactChunks.organizationId, organizationId), eq(knowledgeArtifactChunks.artifactId, artifactId)))
-      .catch((cleanupErr) => {
-        log.error(
-          "[embedArtifactAction]",
-          "partial chunks could not be rolled back",
-          { error: cleanupErr },
-        );
-      });
-    log.error("[embedArtifactAction]", "chunk insert failed", { error: err });
-    return {
-      ok: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Embedding failed mid-batch; please retry.",
-    };
-  }
-
-  revalidatePath(`/knowledge-base/import/${artifactId}`);
-  revalidatePath("/knowledge-base/import");
-
-  return {
-    ok: true,
-    chunks: chunks.length,
-    provider,
-    model,
-    stubbed,
-  };
+  return result;
 }
 
 export type SearchHit = {
@@ -193,7 +78,7 @@ export async function semanticSearchAction(
   let provider = "stub";
   let stubbed = true;
   try {
-    const r = await embedBatch([trimmed]);
+    const r = await embedBatch([trimmed], { organizationId, feature: "embedding_query" });
     queryEmbedding = r.vectors[0]!;
     provider = r.provider;
     stubbed = r.stubbed;
@@ -352,10 +237,11 @@ export async function reembedMissingArtifactsAction(): Promise<
       skipped += 1;
       continue;
     }
-    const r = await embedArtifactAction(row.id);
+    const r = await embedArtifact({ organizationId, artifactId: row.id });
     if (r.ok) embedded += 1;
     else skipped += 1;
   }
 
+  revalidatePath("/knowledge-base/import");
   return { ok: true, embedded, skipped };
 }

@@ -6,6 +6,7 @@ import { db } from "@/db";
 import {
   knowledgeArtifacts,
   type KnowledgeArtifactKind,
+  type KnowledgeOutcomeLabel,
 } from "@/db/schema";
 import {
   requireAuth,
@@ -107,6 +108,12 @@ export async function uploadKnowledgeArtifactAction(
   const rawKind = (formData.get("kind") as string | null)?.trim() || "";
   const rawTags = (formData.get("tags") as string | null) || "";
   const rawTitle = (formData.get("title") as string | null) || "";
+  // BL-AIP-4 — a historical proposal (or debrief) can be labelled won /
+  // lost at upload so retrieval's outcome boost has data on day one.
+  const rawOutcome = (formData.get("outcome") as string | null)?.trim() || "";
+  const outcomeLabel: KnowledgeOutcomeLabel = isOutcomeLabel(rawOutcome)
+    ? rawOutcome
+    : "none";
 
   const kind = isValidKind(rawKind)
     ? (rawKind as KnowledgeArtifactKind)
@@ -135,6 +142,7 @@ export async function uploadKnowledgeArtifactAction(
       fileSize: file.size,
       contentType,
       status: "uploaded",
+      outcomeLabel,
       uploadedByUserId: user.id,
     })
     .returning({ id: knowledgeArtifacts.id });
@@ -201,6 +209,7 @@ export async function uploadKnowledgeArtifactAction(
       fileName: file.name,
       fileSize: file.size,
       format,
+      outcomeLabel,
     },
   });
 
@@ -351,6 +360,8 @@ export type ListedArtifact = {
   aiSuggestedKind: KnowledgeArtifactKind | null;
   aiClassificationConfidence: number | null;
   aiClassificationReasoning: string;
+  // BL-AIP-4 — won / lost / … provenance, editable from the row.
+  outcomeLabel: KnowledgeOutcomeLabel;
 };
 
 export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> {
@@ -373,6 +384,7 @@ export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> 
       aiSuggestedKind: knowledgeArtifacts.aiSuggestedKind,
       aiClassificationConfidence: knowledgeArtifacts.aiClassificationConfidence,
       aiClassificationReasoning: knowledgeArtifacts.aiClassificationReasoning,
+      outcomeLabel: knowledgeArtifacts.outcomeLabel,
     })
     .from(knowledgeArtifacts)
     .where(eq(knowledgeArtifacts.organizationId, organizationId))
@@ -394,7 +406,65 @@ export async function listKnowledgeArtifactsAction(): Promise<ListedArtifact[]> 
     aiSuggestedKind: r.aiSuggestedKind,
     aiClassificationConfidence: r.aiClassificationConfidence,
     aiClassificationReasoning: r.aiClassificationReasoning,
+    outcomeLabel: r.outcomeLabel,
   }));
+}
+
+/**
+ * BL-AIP-4 — label an artifact's outcome by hand. The only way a new
+ * tenant can tell the Brain which of their uploaded past proposals won,
+ * which is what the retrieval boost and the win-pattern intelligence
+ * learn from.
+ */
+export async function setArtifactOutcomeAction(
+  artifactId: string,
+  outcome: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+
+  if (!isOutcomeLabel(outcome)) {
+    return { ok: false, error: "Invalid outcome." };
+  }
+
+  try {
+    const result = await db
+      .update(knowledgeArtifacts)
+      .set({ outcomeLabel: outcome, updatedAt: new Date() })
+      .where(
+        and(
+          eq(knowledgeArtifacts.id, artifactId),
+          eq(knowledgeArtifacts.organizationId, organizationId),
+        ),
+      )
+      .returning({ id: knowledgeArtifacts.id });
+    if (result.length === 0) {
+      return { ok: false, error: "Artifact not found." };
+    }
+
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "knowledge_artifact.set_outcome",
+      resourceType: "knowledge_artifact",
+      resourceId: artifactId,
+      metadata: { outcome },
+    });
+    revalidatePath("/knowledge-base/import");
+    return { ok: true };
+  } catch (err) {
+    log.error("[setArtifactOutcomeAction]", "update failed", { error: err, artifactId });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Update failed.",
+    };
+  }
+}
+
+const OUTCOME_LABELS: KnowledgeOutcomeLabel[] = ["none", "won", "lost", "no_bid", "withdrawn"];
+
+function isOutcomeLabel(s: string): s is KnowledgeOutcomeLabel {
+  return (OUTCOME_LABELS as string[]).includes(s);
 }
 
 /**
