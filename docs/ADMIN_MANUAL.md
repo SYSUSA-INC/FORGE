@@ -94,15 +94,20 @@ On `/users`, use the **Invite a user** panel:
   - **Viewer** — read-only
 - **Title** (optional) — their organizational title
 
-Click **Send invitation**. The recipient gets an email with an invite link. Clicking it takes them to a pre-filled sign-up page where they set a password and land straight in your organization.
+Click **Send invitation**. The recipient gets an email with an invite link. Clicking it takes them to a pre-filled sign-up page where they set a password and land straight in your organization. An invitee who prefers **Continue with Google / Microsoft** can use that instead: the invite is matched on their email and accepted automatically at first sign-in.
+
+The panel then shows the **invite link itself** with a **Copy link** button and says whether the email was actually sent. If the deployment has no email provider configured (`RESEND_API_KEY` unset) or the send fails, the invitation still exists and the notice tells you so in amber: copy the link and send it to the person yourself (chat, ticket, phone). Before this, the UI reported "sent" in that situation and the invitee never received anything — which looks, from their side, like "I was never given a password."
 
 Invites expire after **7 days**.
+
+> **Platform admins (superadmins):** you are not a member of the tenants you support, so the invite panel shows a mandatory **Tenant** selector for you — on `/users`, on **Platform admin → Organizations → Invite a user to a tenant**, and on each tenant's **Users** page. Tenant admins never see the selector; they can only invite into their own tenant.
 
 ### 2.3 Manage pending invitations
 
 The **Pending invitations** panel lists invites not yet accepted. For each:
 
-- **Resend** — issues a fresh token and re-sends the email (old link stops working)
+- **Copy link** — issues a fresh link without sending an email (old link stops working); share it by any channel
+- **Resend** — issues a fresh token and re-sends the email (old link stops working); shows the link too
 - **Revoke** — cancels the invite; the link returns "Invitation not found"
 
 ### 2.4 Manage members
@@ -176,7 +181,9 @@ Left: **Onboard a new organization** panel.
 - **Initial admin email**
 - **Admin title** (optional)
 
-Click **Create organization**. This creates the organization row and sends an invitation to the initial admin. When they accept, they land inside the new org with admin role.
+Click **Create organization**. This creates the organization row and sends an invitation to the initial admin. When they accept, they land inside the new org with admin role. The invite link is shown with a **Copy link** button, and the notice says whether the email went out.
+
+Above it, **Invite a user to a tenant** invites anyone into any existing tenant. The **Tenant** field is required: pick the organization, then email, role and optional title. If the tenant is ITAR-restricted, tick the US-person attestation or the invite is refused. The invite is written to that tenant's audit log with `viaSuperadmin: true`, and the resulting link is shown for manual delivery.
 
 Right: **All organizations** — searchable list with member count, created date, disabled status, and pending admin invite if any.
 
@@ -192,7 +199,7 @@ Per-row actions:
 
 Every user on the platform with their org memberships + role in each org. Search by name, email, or org name. Per-row actions:
 
-- **Reset password** — sends a password-reset email to the user. They click the link and choose a new password. Use this any time someone reports a stuck sign-in; it's safer than ad-hoc password resets in chat.
+- **Reset password** — issues a password-reset link (valid 1 hour) and emails it to the user; the link is also shown to you with **Copy link** in case the email cannot be sent. Works for every account, including people who signed up through Google / Microsoft and never had a password, and people whose invite acceptance never finished: setting a password through the link also marks their email verified, so they can sign in with email + password afterwards. Use this any time someone reports a stuck sign-in.
 - **Make / Revoke superadmin** — toggles `user.is_superadmin`. Requires confirmation when granting. You can't revoke your own superadmin (so a single superadmin can't accidentally lock the platform out of its highest privilege).
 - **Disable / Enable** — toggles `user.disabled_at`. Disabled users cannot sign in via **any** provider (Credentials, Google, Microsoft). You can't disable yourself.
 

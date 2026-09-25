@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { type FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
 import { Panel } from "@/components/ui/Panel";
+import type { InviteResult } from "@/lib/invite-types";
 import {
   superadminChangeMemberRoleAction,
+  superadminCreateInviteLinkAction,
+  superadminInviteUserAction,
   superadminRemoveMemberAction,
   superadminResendInviteAction,
   superadminRevokeInviteAction,
@@ -45,11 +49,15 @@ const ROLES: { value: string; label: string }[] = [
 
 export function TenantUsersClient({
   organizationId,
+  organizationName,
+  itarRestricted = false,
   members,
   pendingInvites,
   activeAdminCount,
 }: {
   organizationId: string;
+  organizationName?: string;
+  itarRestricted?: boolean;
   members: Member[];
   pendingInvites: Invite[];
   activeAdminCount: number;
@@ -58,6 +66,31 @@ export function TenantUsersClient({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // BL-AUTH-INVITE — link produced by Resend / Copy link on an invite row.
+  const [inviteLink, setInviteLink] = useState<{
+    id: string;
+    email: string;
+    res: Extract<InviteResult, { ok: true }>;
+  } | null>(null);
+
+  function runInvite(
+    id: string,
+    email: string,
+    fn: () => Promise<InviteResult>,
+  ): void {
+    setError(null);
+    setNotice(null);
+    setInviteLink(null);
+    startTransition(async () => {
+      const res = await fn();
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setInviteLink({ id, email, res });
+      router.refresh();
+    });
+  }
 
   function run(
     label: string,
@@ -102,8 +135,14 @@ export function TenantUsersClient({
   }
 
   function resendInvite(inviteId: string, email: string) {
-    run(`Resend invite to ${email}`, () =>
+    runInvite(inviteId, email, () =>
       superadminResendInviteAction(organizationId, inviteId),
+    );
+  }
+
+  function copyInviteLink(inviteId: string, email: string) {
+    runInvite(inviteId, email, () =>
+      superadminCreateInviteLinkAction(organizationId, inviteId),
     );
   }
 
@@ -132,6 +171,12 @@ export function TenantUsersClient({
           {notice}
         </div>
       ) : null}
+
+      <TenantInvitePanel
+        organizationId={organizationId}
+        organizationName={organizationName ?? "this tenant"}
+        itarRestricted={itarRestricted}
+      />
 
       <Panel
         title="Members"
@@ -306,6 +351,15 @@ export function TenantUsersClient({
                     <button
                       type="button"
                       disabled={pending}
+                      onClick={() => copyInviteLink(i.id, i.email)}
+                      className="aur-btn aur-btn-ghost text-[11px]"
+                      title="Get a fresh invite link to send by chat or ticket"
+                    >
+                      Copy link
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending}
                       onClick={() => resendInvite(i.id, i.email)}
                       className="aur-btn aur-btn-ghost text-[11px]"
                     >
@@ -321,6 +375,16 @@ export function TenantUsersClient({
                     </button>
                   </div>
                 </div>
+                {inviteLink && inviteLink.id === i.id ? (
+                  <div className="mt-2">
+                    <InviteLinkNotice
+                      url={inviteLink.res.inviteUrl}
+                      emailSent={inviteLink.res.emailSent}
+                      warning={inviteLink.res.warning}
+                      sentTo={inviteLink.email}
+                    />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -376,4 +440,132 @@ function Tag({
 
 function formatDate(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
+}
+
+/**
+ * BL-AUTH-INVITE — invite straight into this tenant as platform support.
+ * The tenant is fixed by the page; the action takes it explicitly and
+ * audits the invite into the tenant's log with viaSuperadmin.
+ */
+function TenantInvitePanel({
+  organizationId,
+  organizationName,
+  itarRestricted,
+}: {
+  organizationId: string;
+  organizationName: string;
+  itarRestricted: boolean;
+}) {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("viewer");
+  const [title, setTitle] = useState("");
+  const [attestUsPerson, setAttestUsPerson] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    email: string;
+    res: Extract<InviteResult, { ok: true }>;
+  } | null>(null);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setResult(null);
+    startTransition(async () => {
+      const res = await superadminInviteUserAction(organizationId, {
+        email,
+        role,
+        title,
+        attestUsPerson,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setResult({ email, res });
+      setEmail("");
+      setTitle("");
+      setRole("viewer");
+      setAttestUsPerson(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <Panel title={`Invite a user to ${organizationName}`} eyebrow="Platform admin · this tenant">
+      <form className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr_auto]" onSubmit={onSubmit}>
+        <div>
+          <label className="aur-label">Email</label>
+          <input
+            className="aur-input"
+            type="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="name@company.com"
+          />
+        </div>
+        <div>
+          <label className="aur-label">Role</label>
+          <select className="aur-input" value={role} onChange={(e) => setRole(e.target.value)}>
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="aur-label">Title (optional)</label>
+          <input
+            className="aur-input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Capture Manager"
+          />
+        </div>
+        <div className="flex items-end">
+          <button
+            type="submit"
+            disabled={pending || !email}
+            className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          >
+            {pending ? "Sending…" : "Send invitation"}
+          </button>
+        </div>
+        {itarRestricted ? (
+          <label className="flex items-start gap-2 rounded-md border border-rose/30 bg-rose/[0.04] px-3 py-2 font-mono text-[11px] text-text md:col-span-4">
+            <input
+              type="checkbox"
+              checked={attestUsPerson}
+              onChange={(e) => setAttestUsPerson(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong className="text-rose">ITAR-restricted tenant.</strong> I confirm this
+              invitee is a US person and that this attestation is recorded with my user id
+              and timestamp.
+            </span>
+          </label>
+        ) : null}
+        {error ? (
+          <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose md:col-span-4">
+            {error}
+          </div>
+        ) : null}
+        {result ? (
+          <div className="md:col-span-4">
+            <InviteLinkNotice
+              url={result.res.inviteUrl}
+              emailSent={result.res.emailSent}
+              warning={result.res.warning}
+              sentTo={result.email}
+            />
+          </div>
+        ) : null}
+      </form>
+    </Panel>
+  );
 }

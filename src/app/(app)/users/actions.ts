@@ -16,7 +16,9 @@ import {
   requireOrgAdmin,
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
-import { sendInviteEmail } from "@/lib/email";
+import { inviteUrl } from "@/lib/app-url";
+import { deliverInvite } from "@/lib/invite-send";
+import type { InviteResult } from "@/lib/invite-types";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { issueToken } from "@/lib/tokens";
 import {
@@ -51,7 +53,7 @@ export async function inviteUserAction(input: {
    * invite + membership rows for forensic completeness).
    */
   attestUsPerson?: boolean;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<InviteResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
@@ -173,19 +175,17 @@ export async function inviteUserAction(input: {
     .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  try {
-    await sendInviteEmail({
-      to: email,
-      inviteId,
-      token,
-      organizationName: org?.name ?? "your workspace",
-      inviterName: user.name ?? user.email ?? "A team member",
-      role: input.role,
-    });
-  } catch (err) {
-    log.error("[inviteUserAction]", "sendInviteEmail failed", { error: err });
-    return { ok: false, error: "Could not send invite email. Try again." };
-  }
+  // BL-AUTH-INVITE — the invite exists whether or not the email goes out;
+  // the admin always gets the link and an honest emailSent flag.
+  const delivery = await deliverInvite({
+    to: email,
+    inviteId,
+    token,
+    organizationName: org?.name ?? "your workspace",
+    inviterName: user.name ?? user.email ?? "A team member",
+    role: input.role,
+    tag: "[inviteUserAction]",
+  });
 
   await recordAudit({
     organizationId,
@@ -198,6 +198,7 @@ export async function inviteUserAction(input: {
       role: input.role,
       itarRestricted: !!orgRow?.itarRestricted,
       usPersonAttested: attestUsPerson,
+      emailSent: delivery.emailSent,
     },
   });
 
@@ -220,7 +221,53 @@ export async function inviteUserAction(input: {
   }
 
   revalidatePath("/users");
-  return { ok: true };
+  return {
+    ok: true,
+    inviteId,
+    inviteUrl: delivery.inviteUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
+}
+
+/**
+ * BL-AUTH-INVITE — a fresh invite link for an admin to share by hand
+ * (chat, a ticket, a phone call). Issues a new token, which retires the
+ * one in the last email — same as Resend, without the email.
+ */
+export async function createInviteLinkAction(
+  inviteId: string,
+): Promise<InviteResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const [inv] = await db
+    .select({ id: allowlist.id, email: allowlist.email, consumedAt: allowlist.consumedAt })
+    .from(allowlist)
+    .where(
+      and(
+        eq(allowlist.id, inviteId),
+        eq(allowlist.organizationId, organizationId),
+        eq(allowlist.revoked, false),
+      ),
+    )
+    .limit(1);
+  if (!inv) return { ok: false, error: "Invite not found." };
+  if (inv.consumedAt) return { ok: false, error: "Invite already accepted." };
+
+  const token = await issueToken("invite", inv.id);
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "user.invite_link",
+    resourceType: "user",
+    resourceId: inv.id,
+    metadata: { invitedEmail: inv.email },
+  });
+
+  return { ok: true, inviteId: inv.id, inviteUrl: inviteUrl(inv.id, token), emailSent: false };
 }
 
 export async function revokeInviteAction(
@@ -254,7 +301,7 @@ export async function revokeInviteAction(
 
 export async function resendInviteAction(
   inviteId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<InviteResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
@@ -281,27 +328,38 @@ export async function resendInviteAction(
     .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  try {
-    await sendInviteEmail({
-      to: inv.email,
-      inviteId: inv.id,
-      token,
-      organizationName: org?.name ?? "your workspace",
-      inviterName: user.name ?? user.email ?? "A team member",
-      role: inv.role,
-    });
-  } catch (err) {
-    log.error("[resendInviteAction]", "sendInviteEmail failed", { error: err });
-    return { ok: false, error: "Could not send invite email. Try again." };
-  }
+  const delivery = await deliverInvite({
+    to: inv.email,
+    inviteId: inv.id,
+    token,
+    organizationName: org?.name ?? "your workspace",
+    inviterName: user.name ?? user.email ?? "A team member",
+    role: inv.role,
+    tag: "[resendInviteAction]",
+  });
 
   await db
     .update(allowlist)
     .set({ invitedAt: new Date() })
     .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, inv.id)));
 
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "user.resend_invite",
+    resourceType: "user",
+    resourceId: inv.id,
+    metadata: { invitedEmail: inv.email, emailSent: delivery.emailSent },
+  });
+
   revalidatePath("/users");
-  return { ok: true };
+  return {
+    ok: true,
+    inviteId: inv.id,
+    inviteUrl: delivery.inviteUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
 }
 
 export async function changeMemberRoleAction(

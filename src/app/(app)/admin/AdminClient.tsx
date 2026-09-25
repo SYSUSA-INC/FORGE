@@ -3,8 +3,14 @@
 import { FormEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
+import {
+  superadminCreateInviteLinkAction,
+  superadminInviteUserAction,
+} from "./orgs/[id]/users/actions";
 import {
   createOrganizationAction,
   deleteOrganizationAction,
@@ -14,6 +20,16 @@ import {
   setUserDisabledAction,
   setUserSuperadminAction,
 } from "./actions";
+
+const INVITE_ROLES: { value: string; label: string }[] = [
+  { value: "admin", label: "Admin" },
+  { value: "capture", label: "Capture lead" },
+  { value: "proposal", label: "Proposal manager" },
+  { value: "author", label: "Author" },
+  { value: "reviewer", label: "Reviewer" },
+  { value: "pricing", label: "Pricing" },
+  { value: "viewer", label: "Viewer" },
+];
 
 type OrgRow = {
   id: string;
@@ -213,7 +229,10 @@ function OrganizationsTab({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <CreateOrgPanel className="xl:col-span-1" />
+      <div className="flex flex-col gap-4 xl:col-span-1">
+        <InviteUserPanel orgs={orgs} />
+        <CreateOrgPanel />
+      </div>
       <div className="xl:col-span-2">
         <Panel
           title="All organizations"
@@ -248,6 +267,147 @@ function OrganizationsTab({
   );
 }
 
+/**
+ * BL-AUTH-INVITE — platform admins invite into any tenant from here. The
+ * tenant is a mandatory choice: a superadmin is not a member of the
+ * tenants they support, so the session cannot supply it. Tenant admins
+ * never see this panel; their /users page invites into their own tenant.
+ */
+function InviteUserPanel({ orgs }: { orgs: OrgRow[] }) {
+  const router = useRouter();
+  const [tenantId, setTenantId] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("viewer");
+  const [title, setTitle] = useState("");
+  const [attestUsPerson, setAttestUsPerson] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    email: string;
+    tenantName: string;
+    res: Extract<InviteResult, { ok: true }>;
+  } | null>(null);
+
+  const activeOrgs = orgs.filter((o) => !o.disabled);
+  const tenantName = activeOrgs.find((o) => o.id === tenantId)?.name ?? "";
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setResult(null);
+    if (!tenantId) {
+      setError("Pick the tenant this person should join.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await superadminInviteUserAction(tenantId, {
+        email,
+        role,
+        title,
+        attestUsPerson,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setResult({ email, tenantName, res });
+      setEmail("");
+      setTitle("");
+      setRole("viewer");
+      setAttestUsPerson(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <Panel title="Invite a user to a tenant" eyebrow="Platform admin · tenant is required">
+      <form className="flex flex-col gap-3" onSubmit={onSubmit}>
+        <div>
+          <label className="aur-label">Tenant (required)</label>
+          <select
+            className="aur-input"
+            value={tenantId}
+            onChange={(e) => setTenantId(e.target.value)}
+            required
+          >
+            <option value="">— choose a tenant —</option>
+            {activeOrgs.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name} · {o.memberCount} {o.memberCount === 1 ? "member" : "members"}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="aur-label">Email</label>
+          <input
+            className="aur-input"
+            type="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="name@company.com"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="aur-label">Role</label>
+            <select className="aur-input" value={role} onChange={(e) => setRole(e.target.value)}>
+              {INVITE_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="aur-label">Title (optional)</label>
+            <input
+              className="aur-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Capture Manager"
+            />
+          </div>
+        </div>
+        <label className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
+          <input
+            type="checkbox"
+            checked={attestUsPerson}
+            onChange={(e) => setAttestUsPerson(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            I confirm this invitee is a US person. Required when the tenant is
+            ITAR-restricted; recorded with your user id and timestamp.
+          </span>
+        </label>
+        {error ? (
+          <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
+            {error}
+          </div>
+        ) : null}
+        {result ? (
+          <InviteLinkNotice
+            url={result.res.inviteUrl}
+            emailSent={result.res.emailSent}
+            warning={result.res.warning}
+            sentTo={`${result.email} (${result.tenantName})`}
+          />
+        ) : null}
+        <button
+          type="submit"
+          disabled={pending || !email || !tenantId}
+          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+        >
+          {pending ? "Sending…" : "Send invitation"}
+        </button>
+      </form>
+    </Panel>
+  );
+}
+
 function CreateOrgPanel({ className }: { className?: string }) {
   const router = useRouter();
   const [orgName, setOrgName] = useState("");
@@ -255,7 +415,10 @@ function CreateOrgPanel({ className }: { className?: string }) {
   const [adminTitle, setAdminTitle] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{
+    email: string;
+    res: Extract<InviteResult, { ok: true }>;
+  } | null>(null);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -271,9 +434,7 @@ function CreateOrgPanel({ className }: { className?: string }) {
         setError(res.error);
         return;
       }
-      setSuccess(
-        `Created "${orgName}" and sent admin invite to ${adminEmail}.`,
-      );
+      setSuccess({ email: adminEmail, res });
       setOrgName("");
       setAdminEmail("");
       setAdminTitle("");
@@ -325,9 +486,12 @@ function CreateOrgPanel({ className }: { className?: string }) {
           </div>
         ) : null}
         {success ? (
-          <div className="rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">
-            {success}
-          </div>
+          <InviteLinkNotice
+            url={success.res.inviteUrl}
+            emailSent={success.res.emailSent}
+            warning={success.res.warning}
+            sentTo={success.email}
+          />
         ) : null}
         <button
           type="submit"
@@ -351,6 +515,10 @@ function OrgRowItem({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<{
+    email: string;
+    res: Extract<InviteResult, { ok: true }>;
+  } | null>(null);
 
   async function toggleDisabled() {
     setBusy(true);
@@ -361,13 +529,27 @@ function OrgRowItem({
     else router.refresh();
   }
 
-  async function resendAdminInvite(id: string) {
+  async function resendAdminInvite(id: string, email: string) {
     setBusy(true);
     setErr(null);
+    setInviteLink(null);
     const res = await resendOrgAdminInviteAction(id);
     setBusy(false);
     if (!res.ok) setErr(res.error);
-    else router.refresh();
+    else {
+      setInviteLink({ email, res });
+      router.refresh();
+    }
+  }
+
+  async function copyAdminInviteLink(id: string, email: string) {
+    setBusy(true);
+    setErr(null);
+    setInviteLink(null);
+    const res = await superadminCreateInviteLinkAction(org.id, id);
+    setBusy(false);
+    if (!res.ok) setErr(res.error);
+    else setInviteLink({ email, res });
   }
 
   async function deleteOrg() {
@@ -445,17 +627,38 @@ function OrgRowItem({
                   {i.email} · invited{" "}
                   {new Date(i.invitedAt).toLocaleDateString()}
                 </span>
-                <button
-                  type="button"
-                  className="aur-btn aur-btn-ghost text-[10px]"
-                  disabled={busy}
-                  onClick={() => resendAdminInvite(i.id)}
-                >
-                  Resend
-                </button>
+                <span className="flex gap-1">
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-ghost text-[10px]"
+                    disabled={busy}
+                    onClick={() => copyAdminInviteLink(i.id, i.email)}
+                    title="Get a fresh invite link to send by chat or ticket"
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-ghost text-[10px]"
+                    disabled={busy}
+                    onClick={() => resendAdminInvite(i.id, i.email)}
+                  >
+                    Resend
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
+          {inviteLink ? (
+            <div className="mt-2">
+              <InviteLinkNotice
+                url={inviteLink.res.inviteUrl}
+                emailSent={inviteLink.res.emailSent}
+                warning={inviteLink.res.warning}
+                sentTo={inviteLink.email}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -527,6 +730,7 @@ function UserRowItem({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [reset, setReset] = useState<Extract<ResetLinkResult, { ok: true }> | null>(null);
 
   const isSelf = u.id === currentUserId;
 
@@ -562,10 +766,11 @@ function UserRowItem({
     setBusy(true);
     setErr(null);
     setNote(null);
+    setReset(null);
     const res = await forcePasswordResetAction(u.id);
     setBusy(false);
     if (!res.ok) setErr(res.error);
-    else setNote(`Reset link emailed to ${u.email}.`);
+    else setReset(res);
   }
 
   return (
@@ -637,6 +842,17 @@ function UserRowItem({
       {note ? (
         <div className="mt-2 rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">
           {note}
+        </div>
+      ) : null}
+      {reset ? (
+        <div className="mt-2">
+          <InviteLinkNotice
+            kind="reset"
+            url={reset.resetUrl}
+            emailSent={reset.emailSent}
+            warning={reset.warning}
+            sentTo={u.email}
+          />
         </div>
       ) : null}
     </li>

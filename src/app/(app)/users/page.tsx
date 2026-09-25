@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
@@ -12,7 +12,7 @@ export default async function UsersPage() {
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
-  const [memberRows, inviteRows, summary, orgRow] = await Promise.all([
+  const [memberRows, inviteRows, summary, orgRow, tenantRows] = await Promise.all([
     db
       .select({
         userId: users.id,
@@ -54,6 +54,20 @@ export default async function UsersPage() {
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .limit(1),
+    // BL-AUTH-INVITE — a platform superadmin picks the tenant explicitly
+    // (mandatory) instead of inheriting it from the session. Tenant
+    // admins never see this list.
+    actor.isSuperadmin
+      ? db
+          .select({
+            id: organizations.id,
+            name: organizations.name,
+            itarRestricted: organizations.itarRestricted,
+          })
+          .from(organizations)
+          .where(isNull(organizations.disabledAt))
+          .orderBy(asc(organizations.name))
+      : Promise.resolve([] as { id: string; name: string; itarRestricted: boolean }[]),
   ]);
 
   const pending = inviteRows.filter((i) => !i.consumedAt);
@@ -81,6 +95,9 @@ export default async function UsersPage() {
         invitedAt: i.invitedAt.toISOString(),
       }))}
       itarRestricted={orgRow[0]?.itarRestricted ?? false}
+      isSuperadmin={actor.isSuperadmin}
+      currentOrganizationId={organizationId}
+      tenants={tenantRows}
     />
   );
 }

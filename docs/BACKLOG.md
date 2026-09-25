@@ -256,6 +256,58 @@ controls. Details and evidence in the assessment report.
 
 ---
 
+### BL-AUTH-INVITE — Platform-admin tenant invites + invite / password-reset truth
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #TBD)
+
+User report (2026-09-25): a platform superadmin needs to invite users
+with a mandatory tenant choice (tenant admins invite only into their own
+tenant), and invited users "have no knowledge of their password as there
+was none assigned and cannot reset it."
+
+**Root causes found in code:**
+- `sendEmail` silently skips when `RESEND_API_KEY` is unset, so every
+  invite, resend and reset reported success while nothing was sent — the
+  invitee never received the one link that lets them set a password.
+- `/api/forgot-password` refused any account without a password hash or
+  a verified email (OAuth accounts, unfinished invites) and returned the
+  neutral "sent" message anyway.
+- `/api/reset-password` never marked the email verified, and the
+  credentials provider requires it, so a reset could succeed and sign-in
+  still fail.
+- An invitee who chose "Continue with Google / Microsoft" under
+  `SIGNUP_MODE=invite_only` had the freshly created user deleted by the
+  OAuth guard.
+- No superadmin invite path: `inviteUserAction` reads the tenant from the
+  session, which a platform admin (not a member) cannot supply.
+
+**Delivered:**
+- **Honest delivery.** `src/lib/invite-send.ts` wraps invite and reset
+  sends; every admin action returns the exact link plus `emailSent` and
+  a warning when it did not go out. `InviteLinkNotice` shows the link
+  with **Copy link** on `/users`, the tenant users page and the platform
+  portal (create org, resend admin invite, reset password). New
+  **Copy link** actions issue a fresh link without email.
+- **Reset works for everyone.** Forgot-password issues a link for any
+  live account; reset-password sets the password *and* marks the email
+  verified (the emailed link proves ownership).
+- **OAuth accepts invites.** `attachPendingInvitesByEmail`
+  (`src/lib/invite-accept.ts`, runtime-tested) runs in the NextAuth
+  `createUser` and `signIn` events: a pending invite for the verified
+  email creates the membership, consumes the invite and keeps the account.
+- **Superadmin invites with a mandatory tenant.**
+  `superadminInviteUserAction(organizationId, …)` (ITAR attestation,
+  seat quota, `viaSuperadmin` audit, `membership_invited` trigger) behind
+  a tenant selector on `/users` for superadmins, an **Invite a user to a
+  tenant** panel on the platform portal, and an invite panel on each
+  tenant's Users page. Tenant admins keep the session-scoped action.
+- Links are built once in `src/lib/app-url.ts` (tested) so the email and
+  the copied link are identical.
+
+**Not in this pass:** a per-tenant "default role" for invites; invite
+expiry reminders; SSO domain auto-join.
+
+---
+
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)
 

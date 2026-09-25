@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
@@ -42,9 +42,16 @@ export async function POST(req: Request) {
 
   const passwordHash = await hashPassword(password);
 
+  // BL-AUTH-INVITE — following the emailed link proves the address, so
+  // an account that never finished verification becomes sign-in-able
+  // here (the credentials provider requires emailVerified).
   const updated = await db
     .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({
+      passwordHash,
+      emailVerified: sql`COALESCE(${users.emailVerified}, now())`,
+      updatedAt: new Date(),
+    })
     .where(eq(users.email, email))
     .returning({ id: users.id });
 

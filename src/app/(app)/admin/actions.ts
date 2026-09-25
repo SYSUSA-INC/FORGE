@@ -12,17 +12,18 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
-import { sendInviteEmail, sendPasswordResetEmail } from "@/lib/email";
+import { deliverInvite, deliverPasswordReset } from "@/lib/invite-send";
+import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
 import { issueToken } from "@/lib/tokens";
 import { defaultOrgSlug } from "@/lib/org-defaults";
 import { validateEmail } from "@/lib/validators";
-import { log } from "@/lib/log";
+
 
 export async function createOrganizationAction(input: {
   orgName: string;
   adminEmail: string;
   adminTitle?: string | null;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<InviteResult> {
   const actor = await requireAuth();
   await requireSuperadmin();
 
@@ -67,23 +68,15 @@ export async function createOrganizationAction(input: {
 
   const token = await issueToken("invite", invite.id);
 
-  try {
-    await sendInviteEmail({
-      to: adminEmail,
-      inviteId: invite.id,
-      token,
-      organizationName: orgName,
-      inviterName: actor.name ?? actor.email ?? "Platform admin",
-      role: "admin",
-    });
-  } catch (err) {
-    log.error("[createOrganizationAction]", "sendInviteEmail failed", { error: err });
-    return {
-      ok: false,
-      error:
-        "Organization created, but the invite email could not be sent. Resend from the org panel.",
-    };
-  }
+  const delivery = await deliverInvite({
+    to: adminEmail,
+    inviteId: invite.id,
+    token,
+    organizationName: orgName,
+    inviterName: actor.name ?? actor.email ?? "Platform admin",
+    role: "admin",
+    tag: "[createOrganizationAction]",
+  });
 
   await recordAudit({
     organizationId: org.id,
@@ -91,11 +84,22 @@ export async function createOrganizationAction(input: {
     action: "org.create",
     resourceType: "organization",
     resourceId: org.id,
-    metadata: { name: orgName, primaryAdminEmail: adminEmail, superadmin: true },
+    metadata: {
+      name: orgName,
+      primaryAdminEmail: adminEmail,
+      superadmin: true,
+      emailSent: delivery.emailSent,
+    },
   });
 
   revalidatePath("/admin");
-  return { ok: true };
+  return {
+    ok: true,
+    inviteId: invite.id,
+    inviteUrl: delivery.inviteUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
 }
 
 export async function setOrgDisabledAction(
@@ -182,7 +186,7 @@ export async function setUserDisabledAction(
 
 export async function forcePasswordResetAction(
   userId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<ResetLinkResult> {
   const actor = await requireSuperadmin();
 
   const [user] = await db
@@ -194,12 +198,14 @@ export async function forcePasswordResetAction(
 
   const token = await issueToken("reset-password", user.email);
 
-  try {
-    await sendPasswordResetEmail(user.email, token);
-  } catch (err) {
-    log.error("[forcePasswordResetAction]", "send failed", { error: err });
-    return { ok: false, error: "Could not send reset email." };
-  }
+  // BL-AUTH-INVITE — when email is not configured (or fails) the
+  // superadmin gets the link to pass on; before this the action reported
+  // "sent" and the person stayed locked out.
+  const delivery = await deliverPasswordReset({
+    to: user.email,
+    token,
+    tag: "[forcePasswordResetAction]",
+  });
 
   const auditOrgId = await resolveAuditOrgForUser(actor.organizationId, userId);
   if (auditOrgId) {
@@ -209,16 +215,21 @@ export async function forcePasswordResetAction(
       action: "user.force_password_reset",
       resourceType: "user",
       resourceId: userId,
-      metadata: { targetEmail: user.email, superadmin: true },
+      metadata: { targetEmail: user.email, superadmin: true, emailSent: delivery.emailSent },
     });
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    resetUrl: delivery.resetUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
 }
 
 export async function resendOrgAdminInviteAction(
   inviteId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<InviteResult> {
   const actor = await requireAuth();
   await requireSuperadmin();
 
@@ -238,19 +249,15 @@ export async function resendOrgAdminInviteAction(
 
   const token = await issueToken("invite", inv.id);
 
-  try {
-    await sendInviteEmail({
-      to: inv.email,
-      inviteId: inv.id,
-      token,
-      organizationName: org?.name ?? "a workspace",
-      inviterName: actor.name ?? actor.email ?? "Platform admin",
-      role: inv.role,
-    });
-  } catch (err) {
-    log.error("[resendOrgAdminInviteAction]", "send failed", { error: err });
-    return { ok: false, error: "Could not resend invite." };
-  }
+  const delivery = await deliverInvite({
+    to: inv.email,
+    inviteId: inv.id,
+    token,
+    organizationName: org?.name ?? "a workspace",
+    inviterName: actor.name ?? actor.email ?? "Platform admin",
+    role: inv.role,
+    tag: "[resendOrgAdminInviteAction]",
+  });
 
   await db
     .update(allowlist)
@@ -263,11 +270,17 @@ export async function resendOrgAdminInviteAction(
     action: "user.resend_invite",
     resourceType: "allowlist",
     resourceId: inv.id,
-    metadata: { email: inv.email, role: inv.role, superadmin: true },
+    metadata: { email: inv.email, role: inv.role, superadmin: true, emailSent: delivery.emailSent },
   });
 
   revalidatePath("/admin");
-  return { ok: true };
+  return {
+    ok: true,
+    inviteId: inv.id,
+    inviteUrl: delivery.inviteUrl,
+    emailSent: delivery.emailSent,
+    warning: delivery.warning,
+  };
 }
 
 export async function deleteOrganizationAction(
