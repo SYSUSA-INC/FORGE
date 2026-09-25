@@ -12,7 +12,8 @@ import {
   SECTION_STATUS_COLORS,
   SECTION_STATUS_LABELS,
 } from "@/lib/proposal-types";
-import { fromPlainText } from "@/lib/tiptap-doc";
+import { countWords as countDocWords, fromPlainText, projectToPlain } from "@/lib/tiptap-doc";
+import { appendAsTrackedInsertion, applyAsTrackedChanges } from "@/lib/tracked-diff";
 import { pickColorForUser } from "@/lib/collab-user";
 import {
   RichSectionEditor,
@@ -24,6 +25,7 @@ import {
 } from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
+import { ResearchRail } from "./ai/ResearchRail";
 import {
   addCustomSectionAction,
   removeSectionAction,
@@ -413,6 +415,31 @@ function SectionRow({
     setDocVersion((v) => v + 1);
   }
 
+  // BL-AIP-6 — AI text lands as tracked changes authored "FORGE AI" on
+  // top of the current document: unchanged blocks (tables, lists, marks)
+  // survive, the owner accepts or rejects each change in the editor,
+  // and every decision is recorded against the AI author.
+  const [reviewSignal, setReviewSignal] = useState(0);
+  function applyTracked(text: string) {
+    const res = applyAsTrackedChanges({ doc: bodyDocRef.current, proposedText: text });
+    if (res.changes === 0) {
+      setNotice("The AI text matches the section — nothing to change.");
+      return;
+    }
+    replaceDoc(res.doc, projectToPlain(res.doc), countDocWords(res.doc));
+    setReviewSignal((v) => v + 1);
+    setNotice(
+      `FORGE AI suggested ${res.changes} change${res.changes === 1 ? "" : "s"} (+${res.insertedWords} / −${res.deletedWords} words). Accept or reject them in Track changes, then save.`,
+    );
+  }
+  function insertTracked(text: string) {
+    const res = appendAsTrackedInsertion({ doc: bodyDocRef.current, text });
+    if (res.changes === 0) return;
+    replaceDoc(res.doc, projectToPlain(res.doc), countDocWords(res.doc));
+    setReviewSignal((v) => v + 1);
+    setNotice("Inserted as a tracked suggestion by FORGE AI. Accept it in Track changes, then save.");
+  }
+
   // Server data changed underneath us (snapshot restore, or a refresh
   // while there are no unsaved edits): adopt it. Never while dirty —
   // that would throw away typing — unless a restore was requested.
@@ -621,13 +648,19 @@ function SectionRow({
               hasContent={plainContent.trim().length > 0}
               getCurrentText={() => plainRef.current}
               onAccept={(doc, plain, count) => replaceDoc(doc, plain, count)}
+              onApplyTracked={applyTracked}
             />
             <BrainSuggestPanel
               sectionId={section.id}
               onInsert={(text) => {
-                const next = plainContent
-                  ? plainContent.replace(/\s+$/, "") + "\n\n" + text
-                  : text;
+                // BL-AIP-6 — appended as a tracked insertion; the rest of
+                // the document (tables, lists, pending suggestions) is
+                // left exactly as it is instead of rebuilt from plain text.
+                if (plainRef.current.trim()) {
+                  insertTracked(text);
+                  return;
+                }
+                const next = text.trim();
                 const doc = fromPlainText(next);
                 replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
               }}
@@ -649,6 +682,7 @@ function SectionRow({
             <RichSectionEditor
               doc={bodyDoc}
               docVersion={docVersion}
+              reviewSignal={reviewSignal}
               onChange={(doc, plain, count) => {
                 setBodyDoc(doc);
                 setPlainContent(plain);
@@ -662,6 +696,12 @@ function SectionRow({
               snapshots={snapshots}
             />
             <input type="hidden" value={plainContent} readOnly />
+            {/* BL-AIP-6 — research while you write */}
+            <ResearchRail
+              sectionId={section.id}
+              text={plainContent}
+              onInsertTracked={insertTracked}
+            />
           </div>
 
           {error ? (
