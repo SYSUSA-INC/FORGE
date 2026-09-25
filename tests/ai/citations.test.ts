@@ -8,10 +8,14 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  citedClaims,
+  demoteClaims,
+  dropInvalidMarkers,
   extractCitationStats,
   NEEDS_CITATION_MARKER,
   sourceMarker,
 } from "@/lib/citations";
+import { isTruncatedStop } from "@/lib/ai-stop";
 import {
   buildSectionDraftPrompt,
   type SectionDraftSnapshot,
@@ -66,6 +70,66 @@ describe("BL-FB-GEN-CITE — marker parsing", () => {
       citationCount: 1,
       needsCitation: 1,
     });
+  });
+});
+
+describe("BL-AIP-5 — verifier helpers", () => {
+  it("drops markers that name no listed source and collapses runs", () => {
+    const r = dropInvalidMarkers("Uptime 99.9% [S2]. Staff of 40 [S7][S9]. Contract X [S1].", 3);
+    expect(r.dropped).toBe(2);
+    expect(r.text).toBe("Uptime 99.9% [S2]. Staff of 40 [NEEDS CITATION]. Contract X [S1].");
+  });
+
+  it("finds the sentences that cite something", () => {
+    const claims = citedClaims("We ran 14 towers [S2]. Plain sentence. Uptime 99.98% [S2][S3].\nNew line [S1].");
+    expect(claims.map((c) => c.sourceIndexes)).toEqual([[2], [2, 3], [1]]);
+    expect(claims[1]!.claim).toBe("Uptime 99.98% [S2][S3].");
+    expect(claims.map((c) => c.id)).toEqual([1, 2, 3]);
+  });
+
+  it("demotes unsupported claims to a single NEEDS CITATION flag", () => {
+    const text = "We ran 14 towers [S2]. Uptime 99.98% [S2][S3].";
+    const claims = citedClaims(text);
+    const out = demoteClaims(text, [claims[1]!]);
+    expect(out).toBe("We ran 14 towers [S2]. Uptime 99.98%. [NEEDS CITATION]");
+    expect(extractCitationStats(out)).toEqual({ citedSources: [2], citationCount: 1, needsCitation: 1 });
+  });
+
+  it("knows the providers' truncation stop reasons", () => {
+    expect(isTruncatedStop("max_tokens")).toBe(true);
+    expect(isTruncatedStop("length")).toBe(true);
+    expect(isTruncatedStop("end_turn")).toBe(false);
+    expect(isTruncatedStop("stop")).toBe(false);
+    expect(isTruncatedStop(undefined)).toBe(false);
+  });
+});
+
+describe("BL-AIP-5 — draft prompt requirements", () => {
+  it("lists mapped requirements verbatim before the general list and reports the count", () => {
+    const { messages } = buildSectionDraftPrompt("draft", {
+      ...baseSnapshot,
+      solicitation: {
+        sectionLSummary: "Thirty pages.",
+        sectionMSummary: "",
+        totalRequirements: 90,
+        requirements: Array.from({ length: 70 }, (_, i) => ({
+          kind: "shall",
+          ref: `C.${i + 1}`,
+          text: `General requirement number ${i + 1} ${"x".repeat(650)}`,
+        })),
+        mappedRequirements: [
+          { number: "L.5.2.1", category: "section_l", text: "The offeror shall describe its staffing approach for all task areas, including surge." },
+        ],
+      },
+    });
+    const user = messages[0]!.content as string;
+    expect(user).toContain("Requirements mapped to THIS section");
+    expect(user).toContain("1. [L.5.2.1] (section_l) The offeror shall describe its staffing approach for all task areas, including surge.");
+    expect(user).toContain("All extracted requirements (60 of 90 shown");
+    expect(user).toContain("60. [C.60]");
+    expect(user).not.toContain("[C.61]");
+    // Mapped block comes before the general list.
+    expect(user.indexOf("Requirements mapped to THIS section")).toBeLessThan(user.indexOf("All extracted requirements"));
   });
 });
 

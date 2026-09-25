@@ -13,11 +13,14 @@ import {
   refundQuota,
 } from "@/lib/subscription-gates";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
+import { isTruncatedStop } from "@/lib/ai-stop";
 import {
   extractCitationStats,
   type CitationStats,
+  type CitationVerification,
   type DraftSource,
 } from "@/lib/citations";
+import { verifyDraftCitations } from "@/lib/citation-verify";
 import {
   captureDraftSignal,
   isDraftMode,
@@ -44,6 +47,10 @@ export type SectionDraftResult =
       sources?: DraftSource[];
       citations?: CitationStats;
       sourcesStubbed?: boolean;
+      /** BL-AIP-5 — the provider stopped at its output ceiling; the draft is cut short. */
+      truncated?: boolean;
+      /** BL-AIP-5 — what the verifier pass did (citation mode only). */
+      verification?: CitationVerification;
     }
   | { ok: false; error: string };
 
@@ -60,11 +67,15 @@ export async function generateSectionDraftAction(input: {
   /** BL-11 A/B: caller-supplied UUID linking the two competing variants. */
   abPairId?: string;
   abVariant?: "a" | "b";
-  /** BL-FB-GEN-CITE — require inline citations against Brain sources. */
+  /**
+   * BL-FB-GEN-CITE — require inline citations against Brain sources.
+   * BL-AIP-5 — on by default; pass `false` to opt out.
+   */
   cite?: boolean;
 }): Promise<SectionDraftResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  const cite = input.cite ?? true;
 
   // BL-16 Phase B-2 — gate AI section generation on `aiAutoDraft`.
   // BL-16 Phase B-3b — also bump the AI-request counter for this month.
@@ -87,7 +98,7 @@ export async function generateSectionDraftAction(input: {
     organizationId,
     sectionId: input.sectionId,
     mode: input.mode,
-    cite: input.cite,
+    cite,
   });
   if (!prepared.ok) {
     // Nothing was generated — give the request slot back.
@@ -99,7 +110,7 @@ export async function generateSectionDraftAction(input: {
     const ai = await completeForTenant({
       organizationId,
       feature: "section_draft",
-      variant: input.cite ? `${input.mode}+cite` : input.mode,
+      variant: cite ? `${input.mode}+cite` : input.mode,
       system: prepared.prompt.system,
       messages: prepared.prompt.messages,
       maxTokens: prepared.maxTokens,
@@ -107,12 +118,26 @@ export async function generateSectionDraftAction(input: {
       cacheSystem: true,
     });
 
-    const text = (ai.text ?? "").trim();
+    let text = (ai.text ?? "").trim();
     if (!text) {
       // BL-16 Phase B-3d — AI returned nothing usable, refund the request slot.
       await refundQuota(organizationId, "aiRequestsPerMonth");
       return { ok: false, error: "AI returned an empty response." };
     }
+
+    // BL-AIP-5 — verifier pass: invented markers become [NEEDS CITATION]
+    // and every cited sentence is checked against its source excerpt.
+    let verification: CitationVerification | undefined;
+    if (cite && prepared.sources.length > 0 && !ai.stubbed) {
+      const verified = await verifyDraftCitations({
+        organizationId,
+        text,
+        sources: prepared.sources,
+      });
+      text = verified.text;
+      verification = verified.verification;
+    }
+    const truncated = isTruncatedStop(ai.stopReason);
 
     const signalId = await captureDraftSignal({
       organizationId,
@@ -139,11 +164,13 @@ export async function generateSectionDraftAction(input: {
       outputTokens: ai.outputTokens,
       generatedAt: new Date().toISOString(),
       signalId,
-      ...(input.cite
+      truncated,
+      ...(cite
         ? {
             sources: prepared.sources,
             citations: extractCitationStats(text),
             sourcesStubbed: prepared.sourcesStubbed,
+            verification,
           }
         : {}),
     };

@@ -169,7 +169,8 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
     hasContent ? "improve" : "draft",
   );
   // BL-FB-GEN-CITE — citation mode + the legend streamed before the body.
-  const [cite, setCite] = useState(false);
+  // BL-AIP-5 — on by default; the author opts out per draft.
+  const [cite, setCite] = useState(true);
   const [sources, setSources] = useState<DraftSource[]>([]);
   const [sourcesStubbed, setSourcesStubbed] = useState(false);
   // One in-flight stream per panel; a new request or Discard aborts it.
@@ -602,9 +603,10 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                   Cite sources
                 </span>
                 <span className="font-body text-[11px] leading-relaxed text-muted">
-                  Ground the draft in your Brain. Supported claims get [S#]
-                  markers you can verify; anything unsupported is flagged
-                  [NEEDS CITATION] instead of invented.
+                  On by default. Ground the draft in your Brain: supported claims
+                  get [S#] markers, a verifier pass checks each one against its
+                  source, and anything unsupported is flagged [NEEDS CITATION]
+                  instead of invented. Open markers block the export.
                 </span>
               </span>
             </label>
@@ -675,6 +677,26 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
               {MODES.find((m) => m.key === result.mode)?.label} preview ·{" "}
               {result.text.split(/\s+/).filter(Boolean).length} words
             </div>
+            {result.truncated ? (
+              <div className="mb-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 font-mono text-[11px] text-gold">
+                The model hit its output limit before finishing, so this draft is
+                cut short. Accept it as a start, then use Tighten, or split the
+                section.
+              </div>
+            ) : null}
+            {result.verification ? (
+              <div className="mb-2 font-mono text-[10px] text-muted">
+                Citation check: {result.verification.checked} cited sentence
+                {result.verification.checked === 1 ? "" : "s"} reviewed
+                {result.verification.unsupported > 0
+                  ? ` · ${result.verification.unsupported} not supported by the cited source → flagged [NEEDS CITATION]`
+                  : ""}
+                {result.verification.invalidMarkers > 0
+                  ? ` · ${result.verification.invalidMarkers} marker${result.verification.invalidMarkers === 1 ? "" : "s"} named no listed source → flagged`
+                  : ""}
+                {result.verification.skipped ? ` · check skipped (${result.verification.skipped})` : ""}
+              </div>
+            ) : null}
             <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-layer/10 bg-canvas px-3 py-2 font-body text-[13px] leading-relaxed text-text">
               {result.text}
             </div>

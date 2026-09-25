@@ -25,6 +25,8 @@ type ComplianceGate = {
   partialCount: number;
   notAddressedCount: number;
   notApplicableCount: number;
+  needsCitationCount: number;
+  needsCitationSections: string[];
   summary: string;
 };
 
@@ -62,7 +64,11 @@ export function ExportPanel({
   const [recentDocx, setRecentDocx] = useState<DocxSuccess | null>(null);
   const [recentDocxPdf, setRecentDocxPdf] = useState<DocxPdfSuccess | null>(null);
   const [recentCrosswalk, setRecentCrosswalk] = useState<SuccessResult | null>(null);
-  const [forceExport, setForceExport] = useState(false);
+  // BL-AIP-5 — the gate is hard. An override needs a written reason and
+  // is only honoured server-side for an org admin or the proposal
+  // manager; it is written to the audit log.
+  const [overrideReason, setOverrideReason] = useState("");
+  const override = overrideReason.trim().length >= 10 ? { reason: overrideReason.trim() } : undefined;
 
   function clearAll() {
     setError(null);
@@ -79,9 +85,7 @@ export function ExportPanel({
       // button hits the docx-to-pdf path so the user gets the same
       // header/footer/cover/TOC fidelity in their PDF.
       if (exportCapability.hasDocxTemplate) {
-        const res = await renderProposalDocxAsPdfAction(proposalId, {
-          forceExport,
-        });
+        const res = await renderProposalDocxAsPdfAction(proposalId, { override });
         if (!res.ok) {
           setError(res.error);
           return;
@@ -90,7 +94,7 @@ export function ExportPanel({
         router.refresh();
         return;
       }
-      const res = await renderProposalPdfAction(proposalId, { forceExport });
+      const res = await renderProposalPdfAction(proposalId, { override });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -103,7 +107,7 @@ export function ExportPanel({
   function generateDocx() {
     clearAll();
     startTransition(async () => {
-      const res = await renderProposalDocxAction(proposalId, { forceExport });
+      const res = await renderProposalDocxAction(proposalId, { override });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -126,10 +130,9 @@ export function ExportPanel({
     });
   }
 
-  // Disable the proposal export buttons when the gate blocks AND the
-  // user hasn't checked Force export.
-  const exportDisabled =
-    pending || (complianceGate.blocked && !forceExport);
+  // Disable the proposal export buttons when the gate blocks and no
+  // override reason has been written.
+  const exportDisabled = pending || (complianceGate.blocked && !override);
 
   const stubMode = pdfStatus.name === "stub" || storageStatus.name === "memory";
 
@@ -170,7 +173,7 @@ export function ExportPanel({
         ) : null}
 
         {/* BL-FB-CM-GATE — compliance status before the user clicks generate */}
-        {complianceGate.hasMatrix ? (
+        {complianceGate.hasMatrix || complianceGate.needsCitationCount > 0 ? (
           <div
             className={`rounded-md border px-3 py-2 font-mono text-[11px] ${
               complianceGate.blocked
@@ -196,16 +199,24 @@ export function ExportPanel({
                 Open matrix →
               </Link>
             </div>
+            {complianceGate.needsCitationCount > 0 ? (
+              <div className="mt-1 text-[10px] opacity-90">
+                Resolve the [NEEDS CITATION] markers in:{" "}
+                {complianceGate.needsCitationSections.join(", ")}.
+              </div>
+            ) : null}
             {complianceGate.blocked ? (
-              <label className="mt-2 flex cursor-pointer items-center gap-2 text-[10px]">
+              <div className="mt-2 flex flex-col gap-1 text-[10px]">
+                <label className="uppercase tracking-wider">
+                  Override reason (org admin or proposal manager only; audited)
+                </label>
                 <input
-                  type="checkbox"
-                  checked={forceExport}
-                  onChange={(e) => setForceExport(e.target.checked)}
-                  className="accent-rose"
+                  className="aur-input text-[11px]"
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="Why this proposal ships with open gaps (at least 10 characters)"
                 />
-                Force export anyway (acknowledges the matrix has gaps)
-              </label>
+              </div>
             ) : null}
           </div>
         ) : null}

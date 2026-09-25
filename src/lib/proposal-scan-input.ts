@@ -26,6 +26,9 @@ import { projectToPlain } from "@/lib/tiptap-doc";
 
 export const SCAN_MAX_TOKENS = 2000;
 export const SCAN_TEMPERATURE = 0.2;
+/** BL-AIP-5 — requirement list budget for the scan prompt. */
+export const SCAN_MAX_REQUIREMENTS = 60;
+export const SCAN_REQUIREMENT_CHARS = 300;
 
 export const SCAN_SYSTEM = `You are a proposal quality analyst inside FORGE reviewing an in-progress federal proposal. Your job is an honest health check: flag what's missing, thin, or off-target so the team knows exactly what to fix before submission.
 
@@ -269,15 +272,18 @@ export function buildScanUserPrompt(input: ScanPromptInput): {
 } {
   const scan = buildScanSectionBlocks(input.sections, input.budget);
 
+  // BL-AIP-5 — the scan used to see 20 clauses at 200 characters; it now
+  // sees up to SCAN_MAX_REQUIREMENTS at SCAN_REQUIREMENT_CHARS and is told
+  // how many exist, so "compliance at risk" is judged against the list.
+  const shownReqs = input.requirements.slice(0, SCAN_MAX_REQUIREMENTS);
   const requirementsBlock =
     input.requirements.length > 0
       ? `\nEvaluation criteria (Section M): ${input.sectionMSummary.slice(0, 400)}\n` +
-        `Requirements (top ${Math.min(input.requirements.length, 20)}):\n` +
-        input.requirements
-          .slice(0, 20)
+        `Requirements (${shownReqs.length}${input.requirements.length > shownReqs.length ? ` of ${input.requirements.length} shown` : ""}):\n` +
+        shownReqs
           .map(
             (r, i) =>
-              `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, 200)}`,
+              `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, SCAN_REQUIREMENT_CHARS)}`,
           )
           .join("\n")
       : "";

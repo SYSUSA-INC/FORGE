@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { completeForTenant } from "@/lib/ai";
+import { isTruncatedStop } from "@/lib/ai-stop";
 import type { DraftStreamEvent } from "@/lib/ai-stream-types";
 import { requireApiTenant } from "@/lib/api-tenant";
-import { extractCitationStats } from "@/lib/citations";
+import { extractCitationStats, type CitationVerification } from "@/lib/citations";
+import { verifyDraftCitations } from "@/lib/citation-verify";
 import { log } from "@/lib/log";
 import {
   captureDraftSignal,
@@ -38,8 +40,8 @@ export const maxDuration = 120;
 const bodySchema = z.object({
   sectionId: z.string().uuid(),
   mode: z.enum(DRAFT_MODES as [string, ...string[]]),
-  /** BL-FB-GEN-CITE — require inline citations against Brain sources. */
-  cite: z.boolean().optional().default(false),
+  /** BL-FB-GEN-CITE — require inline citations against Brain sources. BL-AIP-5: on by default. */
+  cite: z.boolean().optional().default(true),
   /**
    * BL-AIP-2 — the section text as it stands in the editor, so Improve /
    * Tighten work on what the writer sees rather than the last saved copy.
@@ -123,12 +125,28 @@ export async function POST(req: NextRequest) {
           onDelta: (text) => send({ type: "delta", text }),
         });
 
-        const text = (ai.text ?? "").trim();
+        let text = (ai.text ?? "").trim();
         if (!text) {
           await refundQuota(organizationId, "aiRequestsPerMonth");
           send({ type: "error", error: "AI returned an empty response." });
           return;
         }
+
+        // BL-AIP-5 — verifier pass after the stream: the `done` payload
+        // carries the checked text (invented markers dropped, unsupported
+        // sentences flagged), which the panel renders in place of the
+        // streamed preview.
+        let verification: CitationVerification | undefined;
+        if (body.cite && prepared.sources.length > 0 && !ai.stubbed) {
+          const verified = await verifyDraftCitations({
+            organizationId,
+            text,
+            sources: prepared.sources,
+          });
+          text = verified.text;
+          verification = verified.verification;
+        }
+        const truncated = isTruncatedStop(ai.stopReason);
 
         const signalId = await captureDraftSignal({
           organizationId,
@@ -154,11 +172,13 @@ export async function POST(req: NextRequest) {
             outputTokens: ai.outputTokens,
             generatedAt: new Date().toISOString(),
             signalId,
+            truncated,
             ...(body.cite
               ? {
                   sources: prepared.sources,
                   citations: extractCitationStats(text),
                   sourcesStubbed: prepared.sourcesStubbed,
+                  verification,
                 }
               : {}),
           },

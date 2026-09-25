@@ -431,6 +431,14 @@ Section L/M traceability matrix. Every shall-statement from the RFP gets a row:
 
 **Rollup panel** shows weighted completion (`complete = 1.0, partial = 0.5, N/A excluded`). **Bulk paste** mode parses one shall statement per line and auto-extracts leading numbers like `L.3.1` or `M-1`.
 
+**The matrix starts full (BL-AIP-5).** When you create a proposal on an opportunity whose solicitation has been parsed, every requirement the intake pipeline extracted becomes a row automatically, categorised from its reference (`L.…` → Section L, `M-…` → Section M, `C.…` / `PWS` / `SOW` → Section C, `FAR …` → FAR clause), and the rows are mapped to your seeded sections in the background where the AI is confident. Intake itself now reads the **whole** document in windows rather than the first 80,000 characters and a "top 25" sample, and merges the clauses from companion PWS / SOW / attachment uploads, so a requirement on page 140 reaches the matrix. For proposals created before this, or when a solicitation was parsed later, click **Seed from solicitation** (it skips rows that already exist) and then **Auto-map**. Deleting a companion document removes its clauses on the next merge; re-parsing the main RFP keeps them.
+
+**Requirements follow you into the editor.** The rows mapped to a section are handed to the AI drafter and the section chat verbatim as that section's contract ("address every one; reference its number inline"), ahead of the general requirement list, and the health scan judges compliance against the full list rather than a 20-clause sample.
+
+**Citations are on by default.** In the AI assistant, **Cite sources** is checked unless you turn it off, including Auto-draft. Supported claims carry `[S#]` markers; a verifier pass then checks every cited sentence against its source excerpt, turns any marker that names no listed source into `[NEEDS CITATION]`, and does the same to sentences the source does not support. A draft that hit the model's output limit is labelled as cut short so you tighten it rather than ship half a section.
+
+**The export gate is real.** Generate PDF / Word / Word→PDF refuses while any row is *Not addressed* or *Partial*, or while any section still contains `[NEEDS CITATION]` (the Export panel names the sections). There is no "force export" checkbox any more: an **org admin or the proposal manager** can override by writing a reason of at least ten characters, and the override is recorded in the audit log with the counts it waved through.
+
 Each compliance item has its own **owner** field — the person responsible for making sure the proposal addresses that requirement. Status changes are stamped with the editor's user id and updated_at, so you can see at a glance which rows have moved and who moved them. Use this view in pre-submission checks: filter by status = Not addressed, look at owner, walk down the list. Nothing falls through the cracks.
 
 ---

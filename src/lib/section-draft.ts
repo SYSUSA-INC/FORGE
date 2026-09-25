@@ -13,16 +13,18 @@
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  complianceItems,
   opportunities,
   organizations,
   proposalSections,
   proposals,
-  solicitations,
   type ProposalSectionKind,
 } from "@/db/schema";
+import { DRAFT_GENERAL_REQUIREMENTS } from "@/lib/ai-prompts";
+import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import {
   buildSectionDraftPrompt,
   type SectionDraftMode,
@@ -124,34 +126,51 @@ export async function prepareSectionDraft(input: {
       description: (p.description ?? "").slice(0, 400),
     }));
 
-  // Load solicitation requirements (best-effort). Gives the AI concrete
-  // Section L/M language to write against instead of generic prose.
+  // BL-AIP-5 — requirements-first. The compliance-matrix rows mapped to
+  // THIS section go to the drafter verbatim (they are its contract), and
+  // the general list comes from every solicitation on the opportunity
+  // rather than whichever row `.limit(1)` returned, capped at 60 with an
+  // honest total. Best-effort: a load failure degrades to no block.
   let solicitationContext: SectionDraftSnapshot["solicitation"] | undefined;
   try {
-    const [solRow] = await db
-      .select({
-        sectionLSummary: solicitations.sectionLSummary,
-        sectionMSummary: solicitations.sectionMSummary,
-        extractedRequirements: solicitations.extractedRequirements,
-      })
-      .from(solicitations)
-      .where(
-        and(
-          eq(solicitations.opportunityId, row.proposal.opportunityId),
-          eq(solicitations.organizationId, organizationId),
-        ),
-      )
-      .limit(1);
+    const [loaded, mappedRows] = await Promise.all([
+      loadOpportunityRequirements({
+        organizationId,
+        opportunityId: row.proposal.opportunityId,
+      }),
+      db
+        .select({
+          number: complianceItems.number,
+          requirementText: complianceItems.requirementText,
+          category: complianceItems.category,
+        })
+        .from(complianceItems)
+        .where(
+          and(
+            eq(complianceItems.proposalSectionId, input.sectionId),
+            eq(complianceItems.proposalId, row.proposal.id),
+          ),
+        )
+        .orderBy(asc(complianceItems.ordering))
+        .limit(DRAFT_GENERAL_REQUIREMENTS),
+    ]);
+    const mappedRequirements = mappedRows.map((m) => ({
+      number: m.number,
+      text: m.requirementText,
+      category: m.category,
+    }));
     if (
-      solRow &&
-      (solRow.sectionLSummary ||
-        solRow.sectionMSummary ||
-        (solRow.extractedRequirements ?? []).length > 0)
+      loaded.sectionLSummary ||
+      loaded.sectionMSummary ||
+      loaded.requirements.length > 0 ||
+      mappedRequirements.length > 0
     ) {
       solicitationContext = {
-        sectionLSummary: solRow.sectionLSummary,
-        sectionMSummary: solRow.sectionMSummary,
-        requirements: (solRow.extractedRequirements ?? []).slice(0, 25),
+        sectionLSummary: loaded.sectionLSummary,
+        sectionMSummary: loaded.sectionMSummary,
+        requirements: loaded.requirements.slice(0, DRAFT_GENERAL_REQUIREMENTS),
+        totalRequirements: loaded.requirements.length,
+        mappedRequirements,
       };
     }
   } catch (err) {

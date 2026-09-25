@@ -14,12 +14,66 @@ import {
   proposals,
   users,
 } from "@/db/schema";
-import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { recordRead } from "@/lib/audit-log";
+import { requireAuth, requireCurrentOrg, type SessionUser } from "@/lib/auth-helpers";
+import { recordAudit, recordRead } from "@/lib/audit-log";
 import {
   complianceGateBlockMessage,
   getComplianceGateStatus,
 } from "@/lib/compliance-gate";
+
+/**
+ * BL-AIP-5 — the compliance gate is hard. It blocks on open matrix rows
+ * and on "[NEEDS CITATION]" markers left in section bodies. The only way
+ * past it is a written reason from an org admin, the proposal manager or
+ * a platform admin, and that override is written to the audit log.
+ * Returns the refusal message, or null when the export may proceed.
+ */
+export type ExportGateOptions = { override?: { reason: string } };
+
+async function enforceExportGate(
+  proposalId: string,
+  organizationId: string,
+  user: SessionUser,
+  options: ExportGateOptions | undefined,
+  format: string,
+): Promise<string | null> {
+  const gate = await getComplianceGateStatus(proposalId, organizationId);
+  if (!gate.blocked) return null;
+
+  const reason = options?.override?.reason?.trim() ?? "";
+  if (reason.length < 10) return complianceGateBlockMessage(gate);
+
+  const [prop] = await db
+    .select({ managerId: proposals.proposalManagerUserId })
+    .from(proposals)
+    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  const allowed =
+    user.isSuperadmin || user.role === "admin" || (prop?.managerId != null && prop.managerId === user.id);
+  if (!allowed) {
+    return (
+      "Only an org admin or this proposal's manager can override the compliance gate. " +
+      complianceGateBlockMessage(gate)
+    );
+  }
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "proposal.export.gate_override",
+    resourceType: "proposal",
+    resourceId: proposalId,
+    metadata: {
+      format,
+      reason: reason.slice(0, 1000),
+      notAddressed: gate.notAddressedCount,
+      partial: gate.partialCount,
+      needsCitation: gate.needsCitationCount,
+      needsCitationSections: gate.needsCitationSections,
+    },
+  });
+  return null;
+}
 import { getPdfProvider, getPdfProviderStatus } from "@/lib/pdf";
 import {
   getStorageProvider,
@@ -49,20 +103,16 @@ export type PdfRenderResult =
 
 export async function renderProposalPdfAction(
   proposalId: string,
-  options?: { forceExport?: boolean },
+  options?: ExportGateOptions,
 ): Promise<PdfRenderResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  // BL-FB-CM-GATE — refuse the export when the compliance matrix
-  // has unaddressed / partial requirements unless the caller passes
-  // forceExport: true. Gate is inactive when no matrix is recorded.
-  if (!options?.forceExport) {
-    const gate = await getComplianceGateStatus(proposalId, organizationId);
-    if (gate.blocked) {
-      return { ok: false, error: complianceGateBlockMessage(gate) };
-    }
-  }
+  // BL-FB-CM-GATE / BL-AIP-5 — refuse the export while the matrix has
+  // open rows or a section still says [NEEDS CITATION]; an audited
+  // override from an admin or the proposal manager is the only bypass.
+  const gateError = await enforceExportGate(proposalId, organizationId, user, options, "pdf");
+  if (gateError) return { ok: false, error: gateError };
 
   // 1. Load proposal + its opportunity + template + sections + org.
   const [propRow] = await db
@@ -312,18 +362,14 @@ export type DocxRenderActionResult =
  */
 export async function renderProposalDocxAction(
   proposalId: string,
-  options?: { forceExport?: boolean },
+  options?: ExportGateOptions,
 ): Promise<DocxRenderActionResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  // BL-FB-CM-GATE — same gate as the PDF path.
-  if (!options?.forceExport) {
-    const gate = await getComplianceGateStatus(proposalId, organizationId);
-    if (gate.blocked) {
-      return { ok: false, error: complianceGateBlockMessage(gate) };
-    }
-  }
+  // BL-FB-CM-GATE / BL-AIP-5 — same gate as the PDF path.
+  const gateError = await enforceExportGate(proposalId, organizationId, user, options, "docx");
+  if (gateError) return { ok: false, error: gateError };
 
   // Pull proposal + opportunity inline; we need the opportunity for
   // agency / NAICS / set-aside variables.
@@ -503,18 +549,14 @@ export type DocxAsPdfResult =
  */
 export async function renderProposalDocxAsPdfAction(
   proposalId: string,
-  options?: { forceExport?: boolean },
+  options?: ExportGateOptions,
 ): Promise<DocxAsPdfResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  // BL-FB-CM-GATE — same gate as the PDF path.
-  if (!options?.forceExport) {
-    const gate = await getComplianceGateStatus(proposalId, organizationId);
-    if (gate.blocked) {
-      return { ok: false, error: complianceGateBlockMessage(gate) };
-    }
-  }
+  // BL-FB-CM-GATE / BL-AIP-5 — same gate as the PDF path.
+  const gateError = await enforceExportGate(proposalId, organizationId, user, options, "docx_pdf");
+  if (gateError) return { ok: false, error: gateError };
 
   // Reuse the same loaders as the docx render. Inline duplication
   // would be cleaner if extracted, but keeping symmetry with the

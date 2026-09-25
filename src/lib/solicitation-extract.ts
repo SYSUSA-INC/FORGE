@@ -9,8 +9,10 @@
  * route straight to vision OCR via the AI gateway.
  */
 import {
+  buildRequirementsChunkPrompt,
   buildSolicitationExtractPrompt,
   buildSolicitationVisionPrompt,
+  requirementsChunkSchema,
   solicitationExtractionSchema,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
@@ -19,6 +21,13 @@ import {
   getAIProviderStatus,
   type AIDocumentMedia,
 } from "@/lib/ai";
+import { isTruncatedStop } from "@/lib/ai-stop";
+import {
+  chunkText,
+  mergeRequirementLists,
+  normalizeRequirementList,
+  type RequirementLike,
+} from "@/lib/requirements-text";
 import {
   detectFormat,
   extractTextFromDocx,
@@ -74,9 +83,128 @@ export async function extractTextFromAny(
   }
 }
 
+/** Ceiling on requirements kept from one document after the sweep. */
+export const MAX_REQUIREMENTS_PER_DOCUMENT = 400;
+const REQUIREMENTS_PER_CHUNK = 150;
+const CHUNK_MAX_TOKENS = 4000;
+/** Below this a failed window is not split again. */
+const MIN_SPLIT_CHARS = 8_000;
+
+export type FullTextRequirementsResult = {
+  requirements: RequirementLike[];
+  chunks: number;
+  failedChunks: number;
+  /** Windows that hit the output ceiling and were split and re-read. */
+  splitChunks: number;
+  stubbed: boolean;
+};
+
+/**
+ * BL-AIP-5 — read the WHOLE document for requirements, one window at a
+ * time, and merge the windows' lists without duplicates. A window whose
+ * answer hit the output ceiling (`stopReason`) or failed to validate is
+ * split in two and re-read once; a window that still fails is counted
+ * and skipped rather than failing the document.
+ */
+export async function extractRequirementsFullText(
+  organizationId: string,
+  rawText: string,
+  options?: { documentLabel?: string },
+): Promise<FullTextRequirementsResult> {
+  const chunks = chunkText(rawText);
+  const label = options?.documentLabel ?? "solicitation";
+  const lists: RequirementLike[][] = [];
+  let failedChunks = 0;
+  let splitChunks = 0;
+  let stubbed = false;
+
+  const readWindow = async (
+    text: string,
+    index: number,
+    count: number,
+    depth: number,
+  ): Promise<RequirementLike[] | null> => {
+    const prompt = buildRequirementsChunkPrompt({
+      chunkText: text,
+      chunkIndex: index,
+      chunkCount: count,
+      documentLabel: label,
+    });
+    const res = await completeStructuredForTenant({
+      organizationId,
+      feature: "solicitation_extract",
+      variant: depth === 0 ? "requirements_chunk" : "requirements_chunk_split",
+      schema: requirementsChunkSchema,
+      toolName: "record_requirements",
+      toolDescription: "Record every requirement found in this window of the document.",
+      system: prompt.system,
+      messages: prompt.messages,
+      maxTokens: CHUNK_MAX_TOKENS,
+      temperature: 0,
+      cacheSystem: true,
+    });
+    if (res.stubbed) {
+      stubbed = true;
+      return [];
+    }
+    const truncated = isTruncatedStop(res.stopReason);
+    if (res.data && !truncated) {
+      return normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK });
+    }
+    // Too much for one answer, or unparseable: halve the window and try
+    // each half once. Keep whatever validated from the long answer as a
+    // floor so a split that also fails still yields something.
+    if (depth === 0 && text.length >= MIN_SPLIT_CHARS) {
+      splitChunks += 1;
+      const mid = Math.floor(text.length / 2);
+      const cut = text.lastIndexOf("\n", mid);
+      const at = cut > text.length * 0.3 ? cut : mid;
+      const [a, b] = await Promise.all([
+        readWindow(text.slice(0, at), index, count, 1),
+        readWindow(text.slice(at), index, count, 1),
+      ]);
+      const parts = [a ?? [], b ?? []];
+      const merged = mergeRequirementLists(parts);
+      if (merged.length > 0 || (a && b)) return merged;
+    }
+    if (res.data) {
+      // Truncated but parseable: partial list is better than none.
+      return normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK });
+    }
+    log.warn("[extractRequirementsFullText]", "window failed", {
+      index,
+      depth,
+      parseError: res.parseError,
+      stopReason: res.stopReason,
+    });
+    return null;
+  };
+
+  for (const chunk of chunks) {
+    if (stubbed) break;
+    try {
+      const list = await readWindow(chunk.text, chunk.index, chunks.length, 0);
+      if (list === null) failedChunks += 1;
+      else lists.push(list);
+    } catch (err) {
+      failedChunks += 1;
+      log.warn("[extractRequirementsFullText]", "window threw", { error: err, index: chunk.index });
+    }
+  }
+
+  return {
+    requirements: mergeRequirementLists(lists).slice(0, MAX_REQUIREMENTS_PER_DOCUMENT),
+    chunks: chunks.length,
+    failedChunks,
+    splitChunks,
+    stubbed,
+  };
+}
+
 export async function aiExtractSolicitation(
   organizationId: string,
   rawText: string,
+  options?: { documentLabel?: string },
 ): Promise<{ ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean } | { ok: false; error: string }> {
   if (!rawText.trim()) return { ok: false, error: "No text extracted from the file." };
   try {
@@ -132,12 +260,38 @@ export async function aiExtractSolicitation(
       };
     }
 
+    const data = normalizeExtraction(ai.data);
+
+    // BL-AIP-5 — the front-matter pass above sees the first 80k
+    // characters and returns a ranked sample. The sweep reads every
+    // window of the document; its list replaces the sample whenever it
+    // found at least as much, so a PWS on page 140 reaches the matrix.
+    try {
+      const sweep = await extractRequirementsFullText(organizationId, rawText, {
+        documentLabel: options?.documentLabel ?? data.title,
+      });
+      if (!sweep.stubbed && sweep.requirements.length >= data.requirements.length) {
+        data.requirements = sweep.requirements;
+      }
+      log.info("[aiExtractSolicitation]", "requirement sweep", {
+        chunks: sweep.chunks,
+        failedChunks: sweep.failedChunks,
+        splitChunks: sweep.splitChunks,
+        fromSweep: sweep.requirements.length,
+        kept: data.requirements.length,
+      });
+    } catch (err) {
+      log.warn("[aiExtractSolicitation]", "requirement sweep failed; keeping front-matter list", {
+        error: err,
+      });
+    }
+
     return {
       ok: true,
       provider: ai.provider,
       model: ai.model,
       stubbed: false,
-      data: normalizeExtraction(ai.data),
+      data,
     };
   } catch (err) {
     log.error("[aiExtractSolicitation]", "error", { error: err });
@@ -328,7 +482,7 @@ function normalizeExtraction(
           ref: typeof r.ref === "string" ? r.ref.slice(0, 64) : "",
         }))
         .filter((r) => r.text.trim().length > 0)
-        .slice(0, 50)
+        .slice(0, MAX_REQUIREMENTS_PER_DOCUMENT)
     : [];
   const allowedKeyDateTypes = [
     "qa_cutoff",

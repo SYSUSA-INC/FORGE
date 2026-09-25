@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 in PR (PR #277); BL-AIP-5b next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,15 +278,60 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
+**BL-AIP-5 — requirements-first pipeline** 🔄 (PR #277)
+
+- **Intake reads the whole document.** `extractRequirementsFullText`
+  (`solicitation-extract.ts`) sweeps the full `rawText` in ~60k-character
+  windows (`requirements-text.ts`: `chunkText`, tested) with a prompt
+  that asks for every obligation, merges the windows' lists by Jaccard
+  de-duplication, and replaces the front-matter pass's ranked sample
+  whenever it found at least as much. A window whose answer hit the
+  output ceiling (`stopReason`, read for the first time via
+  `ai-stop.ts`) or failed to validate is split in two and re-read once.
+  Cap 400 requirements per document (was 50 / "25 most important").
+- **Companion documents survive.** The merge moved to
+  `solicitation-requirements.ts`: the parent's re-parse now re-merges
+  companion clauses instead of wiping them, and a deleted document's
+  clauses are dropped (they used to persist for good).
+- **One loader for every consumer.** `loadOpportunityRequirements`
+  unions every parsed solicitation on the opportunity; the drafter,
+  section chat, on-demand scan and scan cron all read it instead of
+  `.limit(1)` with no ordering.
+- **The matrix starts full.** `seedComplianceItemsFromRequirements`
+  (`compliance-seed.ts`, runtime-tested for isolation and idempotence)
+  runs on proposal creation and behind **Seed from solicitation**;
+  categories come from the reference (`categoryFromRef`, tested).
+  Auto-map moved to `compliance-automap.ts` and runs in the background
+  after seeding, applying high-confidence mappings (audited as
+  `proposal.compliance.automap.auto_apply`); the action keeps its gates.
+- **Per-section requirements to the drafter verbatim.** Mapped matrix
+  rows go first as the section's contract ("address every one"), then
+  60 general requirements at 600 characters with an honest total (was
+  25 at 300); chat gets the same; the scan sees 60 at 300 (was 20 at
+  200).
+- **Citations on by default, verified.** `cite` defaults to true in
+  the panel, the action, the streaming route and Auto-draft (the one
+  path that never cited). `citation-verify.ts` drops markers that name
+  no listed source and asks the model, per cited sentence, whether the
+  excerpt supports it; unsupported sentences become `[NEEDS CITATION]`
+  (`citations.ts` helpers tested). A draft cut at `max_tokens` is
+  flagged `truncated` and the panel says so.
+- **Hard export gate.** `getComplianceGateStatus` also counts
+  `[NEEDS CITATION]` markers per section; PDF / DOCX / DOCX→PDF refuse
+  on open rows or markers. `forceExport` is gone: an org admin, the
+  proposal manager or a platform admin may pass `override.reason`
+  (≥ 10 chars), recorded as `proposal.export.gate_override`.
+
 **Queued slices (from the assessment, in order):**
 BL-AIP-4b Brain follow-ups (hybrid tsvector search, harvest moved to a
 lib with a cron fallback for un-harvested won proposals, R2 storage for
 artifacts, a background-job table with stuck-row recovery);
-BL-AIP-5 requirements-first pipeline (full-text extraction, seed
-compliance items, per-section requirements to the drafter, hard gate);
-BL-AIP-6 AI edits as tracked changes by "FORGE AI" + research-while-you-
-write rail; BL-AIP-7 proactive scout / stored graded briefs / AI Engine
-controls. Details and evidence in the assessment report.
+BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
+dates, proposed themes) and the golden eval set from won proposals
+keyed by `promptVersion`; BL-AIP-6 AI edits as tracked changes by
+"FORGE AI" + research-while-you-write rail; BL-AIP-7 proactive scout /
+stored graded briefs / AI Engine controls. Details and evidence in the
+assessment report.
 
 ---
 

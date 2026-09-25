@@ -9,20 +9,24 @@
  */
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  complianceItems,
   opportunities,
   organizations,
   proposalSections,
   proposals,
   sectionChatMessages,
-  solicitations,
   users,
   type SectionChatRole,
 } from "@/db/schema";
 import type { AIMessage } from "@/lib/ai";
 import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
+import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
+
+/** BL-AIP-5 — how many general requirements the chat sees (mapped rows always go in full). */
+const CHAT_GENERAL_REQUIREMENTS = 40;
 
 export const CHAT_SYSTEM = `You are an expert federal proposal writer embedded inside FORGE. You are helping the proposal author work on a specific section of their in-progress government proposal. You have context about the opportunity, the organization, and the solicitation requirements.
 
@@ -93,36 +97,45 @@ export async function prepareSectionChat(input: {
     .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  // Load solicitation context (best-effort).
+  // BL-AIP-5 — solicitation context (best-effort): the matrix rows mapped
+  // to this section verbatim, then the merged requirement list across
+  // every solicitation on the opportunity (it used to be 15 clauses at
+  // 200 characters from whichever row came back first).
   let solBlock = "";
   try {
-    const [sol] = await db
-      .select({
-        sectionLSummary: solicitations.sectionLSummary,
-        sectionMSummary: solicitations.sectionMSummary,
-        extractedRequirements: solicitations.extractedRequirements,
-      })
-      .from(solicitations)
-      .where(
-        and(
-          eq(solicitations.opportunityId, row.opportunityId),
-          eq(solicitations.organizationId, organizationId),
-        ),
-      )
-      .limit(1);
-    if (sol) {
-      const reqs = (sol.extractedRequirements ?? [])
-        .slice(0, 15)
-        .map((r, i) => `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, 200)}`)
-        .join("\n");
-      solBlock = [
-        sol.sectionLSummary && `Section L: ${sol.sectionLSummary.slice(0, 500)}`,
-        sol.sectionMSummary && `Section M: ${sol.sectionMSummary.slice(0, 500)}`,
-        reqs && `Requirements:\n${reqs}`,
-      ]
-        .filter(Boolean)
-        .join("\n\n");
-    }
+    const [loaded, mapped] = await Promise.all([
+      loadOpportunityRequirements({ organizationId, opportunityId: row.opportunityId }),
+      db
+        .select({
+          number: complianceItems.number,
+          requirementText: complianceItems.requirementText,
+        })
+        .from(complianceItems)
+        .where(
+          and(
+            eq(complianceItems.proposalSectionId, input.sectionId),
+            eq(complianceItems.proposalId, row.proposal.id),
+          ),
+        )
+        .orderBy(asc(complianceItems.ordering))
+        .limit(CHAT_GENERAL_REQUIREMENTS),
+    ]);
+    const mappedBlock = mapped
+      .map((m, i) => `${i + 1}. [${m.number || "?"}] ${m.requirementText}`)
+      .join("\n");
+    const shown = loaded.requirements.slice(0, CHAT_GENERAL_REQUIREMENTS);
+    const reqs = shown
+      .map((r, i) => `${i + 1}. [${r.ref || "?"}] ${r.kind}: ${r.text.slice(0, 400)}`)
+      .join("\n");
+    solBlock = [
+      mappedBlock && `Requirements mapped to this section (address every one):\n${mappedBlock}`,
+      loaded.sectionLSummary && `Section L: ${loaded.sectionLSummary.slice(0, 500)}`,
+      loaded.sectionMSummary && `Section M: ${loaded.sectionMSummary.slice(0, 500)}`,
+      reqs &&
+        `All extracted requirements (${shown.length}${loaded.requirements.length > shown.length ? ` of ${loaded.requirements.length}` : ""}):\n${reqs}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   } catch {
     // best effort
   }

@@ -42,6 +42,62 @@ export function sourceMarker(index: number): string {
 }
 
 /**
+ * BL-AIP-5 — a marker that names no listed source is an invention. Turn
+ * it into [NEEDS CITATION] so the author sees a gap instead of a
+ * confident-looking reference to nothing.
+ */
+export function dropInvalidMarkers(
+  text: string,
+  sourceCount: number,
+): { text: string; dropped: number } {
+  let dropped = 0;
+  const out = text.replace(SOURCE_MARKER_RE, (m, n: string) => {
+    const idx = Number(n);
+    if (idx >= 1 && idx <= sourceCount) return m;
+    dropped += 1;
+    return NEEDS_CITATION_MARKER;
+  });
+  // Several inventions in a row collapse to one flag.
+  return {
+    text: out.replace(/(\[NEEDS CITATION\])(\s*\[NEEDS CITATION\])+/g, "$1"),
+    dropped,
+  };
+}
+
+export type CitedClaim = {
+  id: number;
+  /** The sentence as it appears in the text, markers included. */
+  claim: string;
+  sourceIndexes: number[];
+};
+
+/** Sentences carrying at least one source marker, in order of appearance. */
+export function citedClaims(text: string): CitedClaim[] {
+  const sentences = text.split(/(?<=[.!?])\s+|\n+/);
+  const out: CitedClaim[] = [];
+  for (const s of sentences) {
+    const idxs = new Set<number>();
+    for (const m of s.matchAll(SOURCE_MARKER_RE)) idxs.add(Number(m[1]));
+    if (idxs.size === 0) continue;
+    out.push({ id: out.length + 1, claim: s.trim(), sourceIndexes: [...idxs].sort((a, b) => a - b) });
+  }
+  return out;
+}
+
+/**
+ * Replace the markers of the given claims with a single [NEEDS CITATION]
+ * so an unsupported sentence is flagged rather than falsely sourced.
+ */
+export function demoteClaims(text: string, claims: CitedClaim[]): string {
+  let out = text;
+  for (const c of claims) {
+    const flagged = `${c.claim.replace(/\s*\[S\d{1,2}\]/g, "")} ${NEEDS_CITATION_MARKER}`;
+    out = out.split(c.claim).join(flagged);
+  }
+  return out;
+}
+
+/**
  * A source the drafter may cite. `index` is 1-based and stable for the
  * life of one draft. `href` points at the Brain record for the legend.
  */
@@ -57,3 +113,16 @@ export type DraftSource = {
 /** Cap on sources sent to the model; keeps the prompt bounded. */
 export const MAX_DRAFT_SOURCES = 10;
 export const SOURCE_EXCERPT_CHARS = 600;
+
+/** BL-AIP-5 — what the verifier pass did to a cited draft (pure shape; the pass itself is server-only). */
+export type CitationVerification = {
+  /** Sentences the verifier looked at. */
+  checked: number;
+  /** Sentences demoted to [NEEDS CITATION]. */
+  unsupported: number;
+  /** Markers that named no listed source (replaced before the model ran). */
+  invalidMarkers: number;
+  stubbed: boolean;
+  /** Present when the model pass did not run or did not validate. */
+  skipped?: string;
+};

@@ -7,10 +7,10 @@ import {
   proposalScanResults,
   proposalSections,
   proposals,
-  solicitations,
   type SectionThemeCoverage,
   type ProposalScanContradiction,
 } from "@/db/schema";
+import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { completeStructuredForTenant } from "@/lib/ai";
 import { proposalScanSchema } from "@/lib/ai-prompts";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
@@ -121,27 +121,17 @@ export async function runProposalScanAction(
     .where(eq(proposalSections.proposalId, proposalId))
     .orderBy(asc(proposalSections.ordering));
 
-  // Load solicitation requirements (best-effort).
+  // BL-AIP-5 — every requirement across the opportunity's solicitations
+  // (best-effort), not whichever row `.limit(1)` returned.
   let solRequirements: { kind: string; text: string; ref: string }[] = [];
   let sectionMSummary = "";
   try {
-    const [sol] = await db
-      .select({
-        extractedRequirements: solicitations.extractedRequirements,
-        sectionMSummary: solicitations.sectionMSummary,
-      })
-      .from(solicitations)
-      .where(
-        and(
-          eq(solicitations.opportunityId, propRow.opportunityId),
-          eq(solicitations.organizationId, organizationId),
-        ),
-      )
-      .limit(1);
-    if (sol) {
-      solRequirements = sol.extractedRequirements ?? [];
-      sectionMSummary = sol.sectionMSummary ?? "";
-    }
+    const loaded = await loadOpportunityRequirements({
+      organizationId,
+      opportunityId: propRow.opportunityId,
+    });
+    solRequirements = loaded.requirements;
+    sectionMSummary = loaded.sectionMSummary;
   } catch {
     // best effort
   }

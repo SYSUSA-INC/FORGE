@@ -19,9 +19,13 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { autoMapAndApply } from "@/lib/compliance-automap";
+import { seedComplianceItemsFromRequirements } from "@/lib/compliance-seed";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import {
   enforceQuota,
+  ensureFeature,
+  FeatureGateError,
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
@@ -212,6 +216,45 @@ export async function createProposalAction(input: {
       })),
     );
 
+    // BL-AIP-5 — requirements-first: the matrix starts as the
+    // solicitation's extracted requirements, and the rows are mapped to
+    // the seeded sections in the background (high-confidence only,
+    // feature- and quota-gated, audited as an automatic apply). Nothing
+    // here can fail the proposal.
+    let seededItems = 0;
+    try {
+      const seeded = await seedComplianceItemsFromRequirements({
+        organizationId,
+        proposalId: row.id,
+        actor: { id: actor.id, email: actor.email },
+      });
+      if (seeded.ok) seededItems = seeded.inserted;
+      if (seeded.ok && seeded.inserted > 0) {
+        const proposalId = row.id;
+        runInBackground("[createProposalAction] compliance auto-map", async () => {
+          try {
+            await ensureFeature(organizationId, "complianceMatrix");
+            await enforceQuota(organizationId, "aiRequestsPerMonth");
+          } catch (err) {
+            if (err instanceof FeatureGateError || err instanceof QuotaExceededError) return;
+            throw err;
+          }
+          const mapped = await autoMapAndApply({
+            organizationId,
+            proposalId,
+            actor: { id: actor.id, email: actor.email },
+            minConfidence: "high",
+          });
+          if (!mapped.ok) {
+            await refundQuota(organizationId, "aiRequestsPerMonth");
+            log.warn("[createProposalAction]", "auto-map skipped", { error: mapped.error });
+          }
+        });
+      }
+    } catch (err) {
+      log.warn("[createProposalAction]", "compliance seed failed", { error: err });
+    }
+
     await recordAudit({
       organizationId,
       actor: { userId: actor.id, email: actor.email },
@@ -222,6 +265,7 @@ export async function createProposalAction(input: {
         title: input.title,
         opportunityId: input.opportunityId,
         sectionCount: seedSections.length,
+        seededComplianceItems: seededItems,
       },
     });
 

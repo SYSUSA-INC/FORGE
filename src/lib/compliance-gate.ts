@@ -2,25 +2,28 @@
  * BL-FB-CM-GATE — pre-submission compliance gate.
  *
  * Computes whether a proposal is cleared for export against its
- * compliance matrix. The gate is meant to live between the user
- * clicking "Export PDF / DOCX" and the actual render call.
+ * compliance matrix and the text of its sections. The gate sits between
+ * the user clicking "Export PDF / DOCX" and the actual render call.
  *
- * Behaviour:
+ * BL-AIP-5 made it a real gate:
  *   - blocked = true     when one or more compliance items are
  *                        `not_addressed` or `partial` (anything that
- *                        isn't `complete` / `not_applicable`).
- *   - allowOverride       always true today — the gate is advisory
- *                        until tier-level "hard block" is wired in
- *                        BL-FB-CM-GATE-CONFIG. Render actions accept
- *                        `forceExport: true` to bypass.
- *   - hasMatrix          false → no items recorded at all. Gate
- *                        treats this as not-blocked so this PR doesn't
- *                        break existing workflows for tenants who
- *                        haven't built their matrix yet.
+ *                        isn't `complete` / `not_applicable`), OR any
+ *                        section still carries a "[NEEDS CITATION]"
+ *                        marker left by citation mode.
+ *   - Override           no longer a checkbox. The render actions accept
+ *                        `override: { reason }` from an org admin or the
+ *                        proposal manager only, and audit it
+ *                        (`proposal.export.gate_override`).
+ *   - hasMatrix          false → no items recorded. Open markers still
+ *                        block; an empty matrix on its own does not, so
+ *                        tenants who never built one keep exporting.
  */
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { complianceItems, proposals } from "@/db/schema";
+import { complianceItems, proposalSections, proposals, type TipTapDoc } from "@/db/schema";
+import { NEEDS_CITATION_MARKER } from "@/lib/citations";
+import { projectToPlain } from "@/lib/tiptap-doc";
 
 export type ComplianceGateStatus = {
   blocked: boolean;
@@ -30,9 +33,27 @@ export type ComplianceGateStatus = {
   partialCount: number;
   notAddressedCount: number;
   notApplicableCount: number;
-  /** Pretty summary for in-line UI ("12 of 15 complete · 1 not addressed"). */
+  /** BL-AIP-5 — "[NEEDS CITATION]" markers still in section bodies. */
+  needsCitationCount: number;
+  /** Titles of the sections carrying markers. */
+  needsCitationSections: string[];
+  /** Pretty summary for in-line UI ("12 of 15 complete · 1 not addressed · 2 citations open"). */
   summary: string;
 };
+
+const EMPTY: Omit<ComplianceGateStatus, "summary"> = {
+  blocked: false,
+  hasMatrix: false,
+  totalItems: 0,
+  completeCount: 0,
+  partialCount: 0,
+  notAddressedCount: 0,
+  notApplicableCount: 0,
+  needsCitationCount: 0,
+  needsCitationSections: [],
+};
+
+const NEEDS_CITATION_RE = /\[NEEDS CITATION\]/gi;
 
 export async function getComplianceGateStatus(
   proposalId: string,
@@ -51,16 +72,7 @@ export async function getComplianceGateStatus(
     )
     .limit(1);
   if (!own) {
-    return {
-      blocked: false,
-      hasMatrix: false,
-      totalItems: 0,
-      completeCount: 0,
-      partialCount: 0,
-      notAddressedCount: 0,
-      notApplicableCount: 0,
-      summary: "Proposal not found.",
-    };
+    return { ...EMPTY, summary: "Proposal not found." };
   }
 
   const rows = await db
@@ -68,17 +80,24 @@ export async function getComplianceGateStatus(
     .from(complianceItems)
     .where(eq(complianceItems.proposalId, proposalId));
 
-  if (rows.length === 0) {
-    return {
-      blocked: false,
-      hasMatrix: false,
-      totalItems: 0,
-      completeCount: 0,
-      partialCount: 0,
-      notAddressedCount: 0,
-      notApplicableCount: 0,
-      summary: "No compliance matrix recorded — gate is inactive.",
-    };
+  // BL-AIP-5 — a draft that still says "[NEEDS CITATION]" is not done.
+  const sections = await db
+    .select({
+      title: proposalSections.title,
+      bodyDoc: proposalSections.bodyDoc,
+      content: proposalSections.content,
+    })
+    .from(proposalSections)
+    .where(eq(proposalSections.proposalId, proposalId));
+  let needsCitationCount = 0;
+  const needsCitationSections: string[] = [];
+  for (const s of sections) {
+    const plain = projectToPlain(s.bodyDoc as TipTapDoc | null) || s.content || "";
+    const n = plain.match(NEEDS_CITATION_RE)?.length ?? 0;
+    if (n > 0) {
+      needsCitationCount += n;
+      needsCitationSections.push(s.title);
+    }
   }
 
   let complete = 0;
@@ -92,21 +111,34 @@ export async function getComplianceGateStatus(
     else notAddressed += 1;
   }
 
-  const blocked = notAddressed > 0 || partial > 0;
+  const hasMatrix = rows.length > 0;
+  const blocked = notAddressed > 0 || partial > 0 || needsCitationCount > 0;
 
-  const parts: string[] = [`${complete} of ${rows.length} complete`];
-  if (partial > 0) parts.push(`${partial} partial`);
-  if (notAddressed > 0) parts.push(`${notAddressed} not addressed`);
-  if (notApplicable > 0) parts.push(`${notApplicable} N/A`);
+  const parts: string[] = [];
+  if (hasMatrix) {
+    parts.push(`${complete} of ${rows.length} complete`);
+    if (partial > 0) parts.push(`${partial} partial`);
+    if (notAddressed > 0) parts.push(`${notAddressed} not addressed`);
+    if (notApplicable > 0) parts.push(`${notApplicable} N/A`);
+  } else {
+    parts.push("No compliance matrix recorded");
+  }
+  if (needsCitationCount > 0) {
+    parts.push(
+      `${needsCitationCount} ${NEEDS_CITATION_MARKER} marker${needsCitationCount === 1 ? "" : "s"} open in ${needsCitationSections.length} section${needsCitationSections.length === 1 ? "" : "s"}`,
+    );
+  }
 
   return {
     blocked,
-    hasMatrix: true,
+    hasMatrix,
     totalItems: rows.length,
     completeCount: complete,
     partialCount: partial,
     notAddressedCount: notAddressed,
     notApplicableCount: notApplicable,
+    needsCitationCount,
+    needsCitationSections,
     summary: parts.join(" · "),
   };
 }
@@ -122,12 +154,16 @@ export function complianceGateBlockMessage(
     );
   }
   if (status.partialCount > 0) {
+    bits.push(`${status.partialCount} marked partial`);
+  }
+  if (status.needsCitationCount > 0) {
     bits.push(
-      `${status.partialCount} marked partial`,
+      `${status.needsCitationCount} ${NEEDS_CITATION_MARKER} marker${status.needsCitationCount === 1 ? "" : "s"} in ${status.needsCitationSections.join(", ")}`,
     );
   }
   return (
     `Compliance gate blocked the export: ${bits.join(", ")}. ` +
-    `Close the gaps on /proposals/[id]/compliance, or pass forceExport=true to override.`
+    `Close the gaps on the compliance matrix and resolve the citation markers in the editor. ` +
+    `An org admin or the proposal manager can override with a written reason; the override is recorded in the audit log.`
   );
 }
