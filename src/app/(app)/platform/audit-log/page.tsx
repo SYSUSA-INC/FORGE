@@ -87,7 +87,7 @@ export default async function PlatformAuditLogPage({
               {tenants.slice(0, 20).map((t) => (
                 <li
                   key={t.id}
-                  className="flex items-baseline justify-between gap-2 border-b border-white/5 pb-1 last:border-0"
+                  className="flex items-baseline justify-between gap-2 border-b border-layer/5 pb-1 last:border-0"
                 >
                   <Link
                     href={`/platform/audit-log?tenant=${encodeURIComponent(t.id)}`}

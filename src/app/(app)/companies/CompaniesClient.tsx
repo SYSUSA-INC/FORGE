@@ -105,7 +105,7 @@ export function CompaniesClient({
           className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
             relFilter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
-              : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+              : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
           }`}
         >
           All {companies.length}
@@ -121,7 +121,7 @@ export function CompaniesClient({
               className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                  : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
               <span
@@ -183,7 +183,7 @@ function CompanyRowItem({
   return (
     <Link
       href={`/companies/${c.id}`}
-      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3 transition-colors hover:border-white/20 md:grid-cols-[1fr_auto_auto_auto]"
+      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 transition-colors hover:border-layer/20 md:grid-cols-[1fr_auto_auto_auto]"
     >
       <div className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">
@@ -199,7 +199,7 @@ function CompanyRowItem({
             {c.sbaCertifications.slice(0, 4).map((s) => (
               <span
                 key={s}
-                className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+                className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
               >
                 {s}
               </span>

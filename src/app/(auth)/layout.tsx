@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/shell/ThemeToggle";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
         </Link>
+        <ThemeToggle />
       </header>
       <main className="relative z-10 px-4 pb-12">{children}</main>
     </div>

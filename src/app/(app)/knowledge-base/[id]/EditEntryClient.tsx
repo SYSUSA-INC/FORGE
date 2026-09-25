@@ -219,7 +219,7 @@ function QualityScorePanel({
 }) {
   if (score === null) {
     return (
-      <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
+      <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
         Quality score will compute on the next save.
       </div>
     );

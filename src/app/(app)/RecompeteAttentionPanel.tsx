@@ -40,7 +40,7 @@ export async function RecompeteAttentionPanel({ organizationId }: { organization
               <li key={`${it.kind}-${it.id}`}>
                 <Link
                   href={it.kind === "opportunity" ? `/opportunities/${it.id}` : `/solicitations/${it.id}`}
-                  className="block rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 hover:border-white/20"
+                  className="block rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span

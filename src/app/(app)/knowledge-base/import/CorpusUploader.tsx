@@ -181,7 +181,7 @@ export function CorpusUploader() {
         className={`grid cursor-pointer place-items-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
           dragOver
             ? "border-teal-400 bg-teal-400/5"
-            : "border-white/15 bg-white/[0.015] hover:border-white/30"
+            : "border-layer/15 bg-layer/[0.015] hover:border-layer/30"
         }`}
       >
         <div className="font-display text-2xl font-semibold text-text">
@@ -211,8 +211,8 @@ export function CorpusUploader() {
       </div>
 
       {queue.length > 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.015]">
-          <div className="flex items-center justify-between border-b border-white/10 p-3">
+        <div className="rounded-xl border border-layer/10 bg-layer/[0.015]">
+          <div className="flex items-center justify-between border-b border-layer/10 p-3">
             <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
               Queue · {queuedCount} pending · {uploadingCount} uploading ·{" "}
               {doneCount} done · {failedCount} failed
@@ -236,7 +236,7 @@ export function CorpusUploader() {
               </button>
             </div>
           </div>
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-layer/5">
             {queue.map((q) => (
               <li
                 key={q.id}
@@ -270,7 +270,7 @@ function StatusPill({
         ? "bg-amber-500/15 text-amber-200"
         : status === "failed"
           ? "bg-rose-500/15 text-rose-300"
-          : "bg-white/5 text-muted";
+          : "bg-layer/5 text-muted";
   return (
     <span
       className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-widest ${tone}`}

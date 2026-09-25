@@ -466,7 +466,7 @@ export function AwardsSearchClient({
         </div>
 
         {saveSearchOpen ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-layer/10 bg-layer/[0.02] px-3 py-2">
             <input
               className="aur-input min-w-[200px] flex-1"
               placeholder="Name this search"

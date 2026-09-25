@@ -116,7 +116,7 @@ export default async function SolicitationsListPage() {
                 <li key={r.id}>
                   <Link
                     href={`/solicitations/${r.id}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:border-white/20"
+                    className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2.5 hover:border-layer/20"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">

@@ -155,8 +155,8 @@ export function MentionTextarea({
         onKeyDown={handleKeyDown}
       />
       {open && filtered.length > 0 ? (
-        <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md border border-white/10 bg-canvas shadow-card">
-          <div className="border-b border-white/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+        <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md border border-layer/10 bg-canvas shadow-card">
+          <div className="border-b border-layer/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
             Tag a teammate
           </div>
           <ul className="max-h-64 overflow-y-auto">
@@ -171,8 +171,8 @@ export function MentionTextarea({
                   onMouseEnter={() => setHighlight(i)}
                   className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left ${
                     i === highlight
-                      ? "bg-white/[0.06] text-text"
-                      : "text-muted hover:bg-white/[0.03] hover:text-text"
+                      ? "bg-layer/[0.06] text-text"
+                      : "text-muted hover:bg-layer/[0.03] hover:text-text"
                   }`}
                 >
                   <span className="truncate font-display text-[13px]">

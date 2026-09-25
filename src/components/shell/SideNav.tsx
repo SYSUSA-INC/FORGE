@@ -55,7 +55,7 @@ export function SideNav({
 
   return (
     <aside
-      className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-white/10 bg-canvas/70 backdrop-blur-xl transition-[width] duration-200 lg:flex ${
+      className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-layer/10 bg-canvas/70 backdrop-blur-xl transition-[width] duration-200 lg:flex ${
         collapsed ? "w-[60px]" : "w-60"
       }`}
     >

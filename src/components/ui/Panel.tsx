@@ -44,7 +44,7 @@ export function Panel({
       ) : null}
 
       {(title || eyebrow || actions) && (
-        <header className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-3">
+        <header className="flex items-center justify-between gap-4 border-b border-layer/10 px-5 py-3">
           <div className="min-w-0">
             {eyebrow ? (
               <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">

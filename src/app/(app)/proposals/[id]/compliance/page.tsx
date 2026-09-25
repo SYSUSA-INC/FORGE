@@ -141,7 +141,7 @@ export default async function ProposalCompliancePage({
             color="#F43F5E"
           />
         </div>
-        <div className="mt-4 rounded-full bg-white/5">
+        <div className="mt-4 rounded-full bg-layer/5">
           <div
             className="h-2 rounded-full transition-all"
             style={{

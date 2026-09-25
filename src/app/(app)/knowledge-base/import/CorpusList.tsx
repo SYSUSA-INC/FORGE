@@ -148,7 +148,7 @@ export function CorpusList({ artifacts }: { artifacts: ListedArtifact[] }) {
       ) : null}
 
       {mode === "none" || !grouped ? (
-        <ul className="divide-y divide-white/5 rounded-lg border border-white/10">
+        <ul className="divide-y divide-layer/5 rounded-lg border border-layer/10">
           {artifacts.map((a) => (
             <DraggableRow key={a.id} artifact={a} />
           ))}
@@ -192,7 +192,7 @@ function GroupToggle({
       className={`rounded px-2 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
         active
           ? "bg-teal-400/15 text-teal-300"
-          : "bg-white/5 text-muted hover:text-text"
+          : "bg-layer/5 text-muted hover:text-text"
       }`}
     >
       {label}
@@ -276,7 +276,7 @@ function KindGroup({
       className={`rounded-lg border transition-colors ${
         hoverDrop
           ? "border-teal-400/60 bg-teal-400/[0.05]"
-          : "border-white/10"
+          : "border-layer/10"
       }`}
       onDragOver={(e) => {
         e.preventDefault();
@@ -298,7 +298,7 @@ function KindGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between border-b border-white/10 px-3 py-2 text-left"
+        className="flex w-full items-center justify-between border-b border-layer/10 px-3 py-2 text-left"
       >
         <span className="flex items-center gap-2">
           <span className="font-mono text-[10px] text-muted">
@@ -329,7 +329,7 @@ function KindGroup({
             ) : null}
           </div>
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-layer/5">
             {rows.map((a) => (
               <DraggableRow key={a.id} artifact={a} />
             ))}
@@ -357,7 +357,7 @@ function TagSubBucket({
       className={`rounded border transition-colors ${
         hoverDrop
           ? "border-amber-400/60 bg-amber-400/[0.05]"
-          : "border-white/[0.06]"
+          : "border-layer/[0.06]"
       }`}
       onDragOver={(e) => {
         e.preventDefault();
@@ -394,7 +394,7 @@ function TagSubBucket({
         </span>
       </button>
       {open ? (
-        <ul className="divide-y divide-white/5 border-t border-white/[0.05]">
+        <ul className="divide-y divide-layer/5 border-t border-layer/[0.05]">
           {rows.map((a) => (
             <DraggableRow key={a.id} artifact={a} />
           ))}
@@ -407,7 +407,7 @@ function TagSubBucket({
 function UntaggedSubBucket({ rows }: { rows: ListedArtifact[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded border border-white/[0.06]">
+    <div className="rounded border border-layer/[0.06]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -426,7 +426,7 @@ function UntaggedSubBucket({ rows }: { rows: ListedArtifact[] }) {
         </span>
       </button>
       {open ? (
-        <ul className="divide-y divide-white/5 border-t border-white/[0.05]">
+        <ul className="divide-y divide-layer/5 border-t border-layer/[0.05]">
           {rows.map((a) => (
             <DraggableRow key={a.id} artifact={a} />
           ))}
@@ -451,7 +451,7 @@ function EmptyKindTargets({
   const missing = ALL_KINDS.filter((k) => !existing.has(k));
   if (missing.length === 0) return null;
   return (
-    <div className="rounded-lg border border-dashed border-white/10 p-2">
+    <div className="rounded-lg border border-dashed border-layer/10 p-2">
       <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
         Empty kinds — drop here to reclassify
       </div>
@@ -495,7 +495,7 @@ function EmptyKindPill({
       className={`rounded px-2 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
         hover
           ? "bg-teal-400/20 text-teal-200 border border-teal-400/60"
-          : "bg-white/[0.04] text-muted border border-white/10"
+          : "bg-layer/[0.04] text-muted border border-layer/10"
       }`}
     >
       {formatKind(kind)}

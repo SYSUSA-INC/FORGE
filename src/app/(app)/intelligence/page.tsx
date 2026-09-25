@@ -43,12 +43,12 @@ export default async function IntelligencePage() {
       {bdEnabled ? (
         <section className="mb-8">
           <Panel title="BD intelligence" eyebrow="Capture intel — external data" dense>
-            <ul className="grid grid-cols-1 gap-px bg-white/5 md:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-px bg-layer/5 md:grid-cols-2">
               {BD_LINKS.map((l) => (
                 <li key={l.href} className="bg-bg/95">
                   <Link
                     href={l.href}
-                    className="flex flex-col gap-1 px-5 py-3 transition-colors hover:bg-white/[0.03]"
+                    className="flex flex-col gap-1 px-5 py-3 transition-colors hover:bg-layer/[0.03]"
                   >
                     <span className="font-display text-[13px] text-text">
                       {l.title}

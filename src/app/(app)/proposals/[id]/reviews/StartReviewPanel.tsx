@@ -108,7 +108,7 @@ export function StartReviewPanel({
                 const isSelected = selected.has(r.id);
                 return (
                   <li key={r.id}>
-                    <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5">
+                    <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5">
                       <label className="flex cursor-pointer items-center gap-2">
                         <input
                           type="checkbox"
@@ -119,7 +119,7 @@ export function StartReviewPanel({
                         <span className="min-w-0 truncate font-mono text-[12px] text-text">
                           {r.name ?? r.email}
                         </span>
-                        <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                        <span className="ml-auto rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                           {r.role}
                         </span>
                       </label>

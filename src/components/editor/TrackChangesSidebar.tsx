@@ -69,7 +69,7 @@ export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) 
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
       {/* Header row */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ function ChangeRow({
   const timeAgo = formatTimeAgo(change.ts);
 
   return (
-    <li className="flex flex-col gap-1 rounded border border-white/[0.06] bg-white/[0.03] px-2.5 py-2">
+    <li className="flex flex-col gap-1 rounded border border-layer/[0.06] bg-layer/[0.03] px-2.5 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span

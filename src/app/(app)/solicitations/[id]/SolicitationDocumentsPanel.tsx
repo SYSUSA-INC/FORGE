@@ -153,7 +153,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
               ref={fileRef}
               type="file"
               accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif"
-              className="aur-input font-mono text-[11px] file:mr-2 file:rounded file:border-0 file:bg-white/10 file:px-2 file:py-0.5 file:font-mono file:text-[11px] file:text-text"
+              className="aur-input font-mono text-[11px] file:mr-2 file:rounded file:border-0 file:bg-layer/10 file:px-2 file:py-0.5 file:font-mono file:text-[11px] file:text-text"
             />
           </div>
           <button
@@ -182,7 +182,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
             return (
               <li
                 key={doc.id}
-                className="flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="flex items-center gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 {/* Type badge */}
                 <span

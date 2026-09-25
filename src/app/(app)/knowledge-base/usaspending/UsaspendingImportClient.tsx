@@ -243,10 +243,10 @@ function AwardRow({
     <li
       className={`rounded-lg border p-3 transition-colors ${
         award.alreadyImported
-          ? "border-white/10 bg-white/[0.015] opacity-60"
+          ? "border-layer/10 bg-layer/[0.015] opacity-60"
           : picked
             ? "border-teal-400 bg-teal-400/5"
-            : "border-white/10 bg-white/[0.02] hover:border-white/20"
+            : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
       }`}
     >
       <label className="grid cursor-pointer grid-cols-[auto_1fr_auto] items-start gap-3">
@@ -263,12 +263,12 @@ function AwardRow({
               {award.awardId}
             </span>
             {award.alreadyImported ? (
-              <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 Already imported
               </span>
             ) : null}
             {award.awardType ? (
-              <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                 {award.awardType}
               </span>
             ) : null}

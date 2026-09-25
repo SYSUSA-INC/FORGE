@@ -242,7 +242,7 @@ export default async function TenantActivityPage({
                 return (
                   <li
                     key={r.id}
-                    className="grid grid-cols-[120px_1fr_1fr_140px] gap-3 border-b border-white/5 px-2 py-1.5 last:border-0"
+                    className="grid grid-cols-[120px_1fr_1fr_140px] gap-3 border-b border-layer/5 px-2 py-1.5 last:border-0"
                   >
                     <span className="tabular-nums text-muted">
                       {formatTimestamp(new Date(r.createdAt))}
@@ -342,7 +342,7 @@ function HealthRow({
         ? "text-emerald-300"
         : "text-text";
   return (
-    <div className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-muted">{label}</span>
         <span className={`tabular-nums font-semibold ${toneClass}`}>

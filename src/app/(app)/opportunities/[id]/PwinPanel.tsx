@@ -6,7 +6,7 @@ import { ApplyPwinButton } from "./ApplyPwinButton";
 const CONFIDENCE_STYLE: Record<string, { label: string; cls: string }> = {
   high: { label: "High confidence", cls: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" },
   medium: { label: "Medium confidence", cls: "border-amber-400/40 bg-amber-400/10 text-amber-200" },
-  low: { label: "Low confidence", cls: "border-white/15 bg-white/[0.04] text-muted" },
+  low: { label: "Low confidence", cls: "border-layer/15 bg-layer/[0.04] text-muted" },
 };
 
 /**
@@ -104,7 +104,7 @@ export async function PwinPanel({
                       {f.logOdds.toFixed(2)}
                     </span>
                   </div>
-                  <div className="mt-0.5 h-1 w-full overflow-hidden rounded bg-white/[0.06]">
+                  <div className="mt-0.5 h-1 w-full overflow-hidden rounded bg-layer/[0.06]">
                     <div
                       className={`h-full ${positive ? "bg-emerald-400/70" : "bg-rose/70"}`}
                       style={{ width: `${pct}%` }}

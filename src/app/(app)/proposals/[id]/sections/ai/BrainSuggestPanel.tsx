@@ -122,7 +122,7 @@ function HitRow({
   const sim = Math.max(0, Math.min(1, hit.similarity));
 
   return (
-    <li className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <SourceTag hit={hit} />
@@ -187,7 +187,7 @@ function SourceTag({ hit }: { hit: BrainHit }) {
     );
   }
   return (
-    <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+    <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
       {hit.artifactKind?.replace(/_/g, " ") ?? "artifact"}
     </span>
   );

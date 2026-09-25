@@ -141,7 +141,7 @@ export function ComplianceClient({
           className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
             catFilter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
-              : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+              : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
           }`}
         >
           All {items.length}
@@ -157,7 +157,7 @@ export function ComplianceClient({
               className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                  : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
               <span
@@ -188,13 +188,13 @@ export function ComplianceClient({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <div className="flex gap-1 rounded-md border border-white/10 bg-white/[0.02] p-0.5">
+        <div className="flex gap-1 rounded-md border border-layer/10 bg-layer/[0.02] p-0.5">
           <button
             type="button"
             onClick={() => setViewMode("list")}
             className={`rounded px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
               viewMode === "list"
-                ? "bg-white/10 text-text"
+                ? "bg-layer/10 text-text"
                 : "text-muted hover:text-text"
             }`}
           >
@@ -205,7 +205,7 @@ export function ComplianceClient({
             onClick={() => setViewMode("heatmap")}
             className={`rounded px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
               viewMode === "heatmap"
-                ? "bg-white/10 text-text"
+                ? "bg-layer/10 text-text"
                 : "text-muted hover:text-text"
             }`}
           >
@@ -699,7 +699,7 @@ function ItemRowCard({
     const catColor = categoryColors[item.category];
     const stColor = statusColors[item.status];
     return (
-      <li className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[auto_1fr_auto]">
           <div className="flex flex-col gap-1 md:w-32">
             <span
@@ -784,7 +784,7 @@ function ItemRowCard({
                 <button
                   key={s.key}
                   type="button"
-                  className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted transition-colors hover:border-white/30 hover:text-text"
+                  className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted transition-colors hover:border-layer/30 hover:text-text"
                   disabled={pending || s.key === item.status}
                   onClick={() => quickStatus(s.key)}
                   style={
@@ -807,7 +807,7 @@ function ItemRowCard({
                   <button
                     key={s.key}
                     type="button"
-                    className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest text-muted transition-colors hover:border-white/30 hover:text-text"
+                    className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest text-muted transition-colors hover:border-layer/30 hover:text-text"
                     disabled={pending || s.key === ownerStatus}
                     onClick={() => quickOwnerStatus(s.key)}
                     style={
@@ -862,7 +862,7 @@ function ItemRowCard({
   }
 
   return (
-    <li className="rounded-lg border border-teal-400/40 bg-white/[0.02] p-3">
+    <li className="rounded-lg border border-teal-400/40 bg-layer/[0.02] p-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label className="aur-label">Category</label>
@@ -1036,14 +1036,14 @@ function ComplianceHeatmap({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-6 text-center font-mono text-[11px] text-muted">
+      <div className="rounded-lg border border-layer/10 bg-layer/[0.02] px-4 py-6 text-center font-mono text-[11px] text-muted">
         No items match the current filters.
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-white/10 bg-white/[0.02]">
+    <div className="overflow-x-auto rounded-lg border border-layer/10 bg-layer/[0.02]">
       <table className="w-full border-collapse text-[11px]">
         <thead>
           <tr>
@@ -1073,7 +1073,7 @@ function ComplianceHeatmap({
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} className="border-t border-white/[0.04] hover:bg-white/[0.02]">
+            <tr key={item.id} className="border-t border-layer/[0.04] hover:bg-layer/[0.02]">
               <td className="sticky left-0 z-10 bg-[#0d1117] px-3 py-2 font-body text-[12px] text-text">
                 <div className="flex items-center gap-1.5">
                   {item.number ? (
@@ -1094,7 +1094,7 @@ function ComplianceHeatmap({
                       key={s.id}
                       className="px-2 py-2 text-center"
                     >
-                      <div className="mx-auto h-5 w-5 rounded bg-white/[0.03]" />
+                      <div className="mx-auto h-5 w-5 rounded bg-layer/[0.03]" />
                     </td>
                   );
                 }
@@ -1120,7 +1120,7 @@ function ComplianceHeatmap({
                       title={statusLabels[item.status]}
                     />
                   ) : (
-                    <div className="mx-auto h-5 w-5 rounded bg-white/[0.03]" />
+                    <div className="mx-auto h-5 w-5 rounded bg-layer/[0.03]" />
                   )}
                 </td>
               ) : null}
@@ -1128,7 +1128,7 @@ function ComplianceHeatmap({
           ))}
         </tbody>
       </table>
-      <div className="flex flex-wrap items-center gap-4 border-t border-white/[0.06] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-4 border-t border-layer/[0.06] px-3 py-2">
         {(["not_addressed", "partial", "complete", "not_applicable"] as ComplianceStatus[]).map(
           (s) => (
             <div key={s} className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
@@ -1242,7 +1242,7 @@ function PreflightBar({
 const CONFIDENCE_TONES = {
   high: "bg-emerald-400/10 text-emerald-300 border-emerald-400/30",
   medium: "bg-amber-400/10 text-amber-200 border-amber-400/30",
-  low: "bg-white/5 text-muted border-white/10",
+  low: "bg-layer/5 text-muted border-layer/10",
 } as const;
 
 function AIAssessmentRow({

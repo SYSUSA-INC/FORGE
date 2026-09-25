@@ -158,7 +158,7 @@ export function TenantUsersClient({
                   className={`rounded-lg border p-3 ${
                     m.status === "disabled" || m.userGloballyDisabled
                       ? "border-rose/30 bg-rose/[0.04]"
-                      : "border-white/10 bg-white/[0.02]"
+                      : "border-layer/10 bg-layer/[0.02]"
                   }`}
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -289,7 +289,7 @@ export function TenantUsersClient({
             {pendingInvites.map((i) => (
               <li
                 key={i.id}
-                className="rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div>
@@ -364,7 +364,7 @@ function Tag({
       ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
       : tone === "rose"
         ? "border-rose/40 bg-rose/10 text-rose"
-        : "border-white/10 bg-white/5 text-muted";
+        : "border-layer/10 bg-layer/5 text-muted";
   return (
     <span
       className={`rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${toneClass}`}

@@ -21,9 +21,9 @@ export function StageStrip({
         const bg = active
           ? "bg-gradient-to-br from-violet via-magenta to-gold text-white"
           : completed
-            ? "bg-white/10 text-text"
-            : "bg-white/[0.03] text-muted";
-        const border = active ? "border-gold/50" : "border-white/10";
+            ? "bg-layer/10 text-text"
+            : "bg-layer/[0.03] text-muted";
+        const border = active ? "border-gold/50" : "border-layer/10";
 
         return (
           <div key={s.key} className="relative flex flex-1 items-center">

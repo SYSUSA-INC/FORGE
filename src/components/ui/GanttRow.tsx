@@ -12,8 +12,8 @@ export function GanttRow({
   marker?: number;
 }) {
   return (
-    <div className="relative h-6 w-full overflow-hidden rounded-md border border-white/10 bg-white/[0.03]">
-      <div className="pointer-events-none absolute inset-0 grid grid-cols-4 divide-x divide-white/5">
+    <div className="relative h-6 w-full overflow-hidden rounded-md border border-layer/10 bg-layer/[0.03]">
+      <div className="pointer-events-none absolute inset-0 grid grid-cols-4 divide-x divide-layer/5">
         <span />
         <span />
         <span />

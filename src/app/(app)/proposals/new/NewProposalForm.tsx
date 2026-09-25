@@ -109,7 +109,7 @@ export function NewProposalForm({
           ) : null}
         </label>
         {templates.length === 0 ? (
-          <div className="rounded-md border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
+          <div className="rounded-md border border-dashed border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
             New proposal will use the built-in 6-section default. An admin
             can create org templates in Settings → Templates.
           </div>

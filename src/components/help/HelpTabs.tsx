@@ -7,7 +7,7 @@ export function HelpTabs({ canSeeAdmin }: { canSeeAdmin: boolean }) {
   const pathname = usePathname() ?? "";
 
   return (
-    <div className="mb-8 flex items-center gap-2 border-b border-white/10">
+    <div className="mb-8 flex items-center gap-2 border-b border-layer/10">
       <Tab href="/help/user" label="User guide" active={pathname.startsWith("/help/user") || pathname === "/help"} />
       {canSeeAdmin && (
         <Tab href="/help/admin" label="Admin guide" active={pathname.startsWith("/help/admin")} />

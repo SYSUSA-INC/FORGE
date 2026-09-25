@@ -90,7 +90,7 @@ export default async function TiersPage() {
             {tierRows.map((t) => (
               <li
                 key={t.id}
-                className="rounded-lg border border-white/10 bg-white/[0.02] p-4"
+                className="rounded-lg border border-layer/10 bg-layer/[0.02] p-4"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div className="flex items-baseline gap-3">
@@ -119,7 +119,7 @@ export default async function TiersPage() {
                 ) : null}
 
                 <dl className="mt-3 grid grid-cols-1 gap-2 font-mono text-[11px] md:grid-cols-2">
-                  <div className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+                  <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
                       Features
                     </div>
@@ -127,7 +127,7 @@ export default async function TiersPage() {
                       {summarizeFlags(t.featureFlags as TierFeatureFlags)}
                     </div>
                   </div>
-                  <div className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+                  <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
                       Quotas
                     </div>

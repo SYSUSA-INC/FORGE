@@ -109,9 +109,9 @@ export default async function NotificationRulesPage() {
         </Panel>
       ) : (
         <Panel title="Rules" eyebrow={`${activeCount} active of ${total}`}>
-          <div className="overflow-x-auto rounded-md border border-white/10 bg-white/[0.02]">
+          <div className="overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.02]">
             <table className="w-full min-w-[800px] text-left">
-              <thead className="border-b border-white/10 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
                 <tr>
                   <th className="px-3 py-2 font-normal">Name</th>
                   <th className="px-3 py-2 font-normal">Trigger</th>
@@ -126,7 +126,7 @@ export default async function NotificationRulesPage() {
                 {rows.map((r) => (
                   <tr
                     key={r.id}
-                    className="border-b border-white/5 last:border-0"
+                    className="border-b border-layer/5 last:border-0"
                   >
                     <td className="px-3 py-2 font-display text-[12px] text-text">
                       <Link
@@ -165,7 +165,7 @@ export default async function NotificationRulesPage() {
                         className={`rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                           r.active
                             ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
-                            : "border-white/10 bg-white/5 text-muted"
+                            : "border-layer/10 bg-layer/5 text-muted"
                         }`}
                       >
                         {r.active ? "Active" : "Inactive"}

@@ -327,7 +327,7 @@ export function RichSectionEditor({
     editorProps: {
       attributes: {
         class:
-          "tiptap-prose min-h-[280px] w-full rounded-md border border-white/10 bg-white/[0.03] px-4 py-3 font-body text-[14px] leading-relaxed text-text outline-none focus:border-teal/60 focus:bg-white/[0.05]",
+          "tiptap-prose min-h-[280px] w-full rounded-md border border-layer/10 bg-layer/[0.03] px-4 py-3 font-body text-[14px] leading-relaxed text-text outline-none focus:border-teal/60 focus:bg-layer/[0.05]",
       },
     },
     onUpdate: ({ editor: e }) => {
@@ -394,7 +394,7 @@ export function RichSectionEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] p-1">
+      <div className="flex flex-wrap items-center gap-1 rounded-md border border-layer/10 bg-layer/[0.03] p-1">
         <ToolbarBtn
           label="B"
           title="Bold"
@@ -557,8 +557,8 @@ export function RichSectionEditor({
               title="Open / close snapshots panel"
               className={`inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors ${
                 snapshotsOpen
-                  ? "bg-white/10 text-text"
-                  : "text-muted hover:bg-white/[0.06] hover:text-text"
+                  ? "bg-layer/10 text-text"
+                  : "text-muted hover:bg-layer/[0.06] hover:text-text"
               }`}
             >
               snap ▾
@@ -697,7 +697,7 @@ function TrackToggleBtn({
         <div
           role="group"
           aria-label="Editor mode"
-          className="inline-flex h-7 items-center overflow-hidden rounded border border-white/10"
+          className="inline-flex h-7 items-center overflow-hidden rounded border border-layer/10"
         >
           <ModePill
             label="Edit"
@@ -732,7 +732,7 @@ function TrackToggleBtn({
         </div>
       ) : (
         <span
-          className="inline-flex h-7 items-center gap-1 rounded border border-white/10 px-2 font-mono text-[10px]"
+          className="inline-flex h-7 items-center gap-1 rounded border border-layer/10 px-2 font-mono text-[10px]"
           style={
             mode === "view"
               ? { color: THEME.muted }
@@ -754,8 +754,8 @@ function TrackToggleBtn({
         title="Open / close track-changes review panel"
         className={`inline-flex h-7 items-center justify-center rounded px-1 font-mono text-[10px] transition-colors ${
           sidebarOpen
-            ? "bg-white/10 text-text"
-            : "text-muted hover:bg-white/[0.06] hover:text-text"
+            ? "bg-layer/10 text-text"
+            : "text-muted hover:bg-layer/[0.06] hover:text-text"
         }`}
       >
         ▾
@@ -783,7 +783,7 @@ function ModePill({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className="inline-flex h-7 items-center justify-center px-2 font-mono text-[10px] transition-colors hover:bg-white/[0.06]"
+      className="inline-flex h-7 items-center justify-center px-2 font-mono text-[10px] transition-colors hover:bg-layer/[0.06]"
       style={active ? activeStyle : undefined}
     >
       {label}
@@ -836,7 +836,7 @@ function CommentsToggleBtn({
         }
         className={`inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-[10px] transition-colors ${
           hasSelection
-            ? "text-muted hover:bg-white/[0.06] hover:text-text"
+            ? "text-muted hover:bg-layer/[0.06] hover:text-text"
             : "text-subtle opacity-50 cursor-not-allowed"
         }`}
       >
@@ -849,8 +849,8 @@ function CommentsToggleBtn({
         title="Open / close comments panel"
         className={`inline-flex h-7 items-center justify-center rounded px-1 font-mono text-[10px] transition-colors ${
           sidebarOpen
-            ? "bg-white/10 text-text"
-            : "text-muted hover:bg-white/[0.06] hover:text-text"
+            ? "bg-layer/10 text-text"
+            : "text-muted hover:bg-layer/[0.06] hover:text-text"
         }`}
       >
         ▾
@@ -890,7 +890,7 @@ function ToolbarBtn({
       className={`inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 font-mono text-[11px] transition-colors disabled:opacity-40 ${
         isActive
           ? "bg-teal/15 text-teal"
-          : "text-muted hover:bg-white/[0.06] hover:text-text"
+          : "text-muted hover:bg-layer/[0.06] hover:text-text"
       }`}
       style={{
         fontWeight: bold ? 700 : undefined,
@@ -908,5 +908,5 @@ function ToolbarBtn({
 }
 
 function ToolbarDivider() {
-  return <span aria-hidden className="mx-1 inline-block h-5 w-px bg-white/10" />;
+  return <span aria-hidden className="mx-1 inline-block h-5 w-px bg-layer/10" />;
 }

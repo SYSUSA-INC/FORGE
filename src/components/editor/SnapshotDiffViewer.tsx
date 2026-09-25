@@ -108,7 +108,7 @@ export function SnapshotDiffViewer({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-white/10 bg-canvas p-4 shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-layer/10 bg-canvas p-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -151,7 +151,7 @@ export function SnapshotDiffViewer({
                 <span className="text-muted">No textual changes.</span>
               )}
             </div>
-            <div className="overflow-y-auto rounded border border-white/10 bg-white/[0.02] p-3 font-mono text-[12px] leading-relaxed">
+            <div className="overflow-y-auto rounded border border-layer/10 bg-layer/[0.02] p-3 font-mono text-[12px] leading-relaxed">
               {changes.length === 0 ? (
                 <p className="text-muted">Documents are identical.</p>
               ) : (

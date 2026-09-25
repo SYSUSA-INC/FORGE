@@ -35,7 +35,7 @@ export function EndImpersonationButton() {
       type="button"
       onClick={end}
       disabled={pending}
-      className="rounded border border-white/30 bg-white/15 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white hover:bg-white/25 disabled:opacity-60 transition-colors"
+      className="rounded border border-layer/30 bg-layer/15 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white hover:bg-layer/25 disabled:opacity-60 transition-colors"
     >
       {pending ? "Ending…" : "End impersonation"}
     </button>

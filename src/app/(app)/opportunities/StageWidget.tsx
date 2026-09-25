@@ -44,10 +44,10 @@ export function StageWidget({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`group flex flex-col gap-2 rounded-lg border bg-white/[0.02] p-3 text-left transition-colors ${
+      className={`group flex flex-col gap-2 rounded-lg border bg-layer/[0.02] p-3 text-left transition-colors ${
         active
           ? "border-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
-          : "border-white/10 hover:border-white/30"
+          : "border-layer/10 hover:border-layer/30"
       }`}
       style={
         active

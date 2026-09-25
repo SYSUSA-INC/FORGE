@@ -336,14 +336,14 @@ export function ExportPanel({
         {exportCapability.hasDocxTemplate &&
         docxToPdfProvider === "stub" &&
         !recentDocxPdf ? (
-          <div className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[10px] text-muted">
+          <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[10px] text-muted">
             DOCX→PDF conversion is in stub mode. Set{" "}
             <code className="text-text">CLOUDCONVERT_API_KEY</code> on Vercel to
             get real PDFs from your Word template.
           </div>
         ) : null}
 
-        <div className="border-t border-white/10 pt-3">
+        <div className="border-t border-layer/10 pt-3">
           <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
             Recent renders
           </div>
@@ -356,7 +356,7 @@ export function ExportPanel({
               {initialRenders.map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.02] px-2 py-1.5 font-mono text-[10px] text-muted"
+                  className="flex items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1.5 font-mono text-[10px] text-muted"
                 >
                   <div className="min-w-0 flex-1 truncate">
                     <span className="text-text">

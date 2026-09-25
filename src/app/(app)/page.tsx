@@ -114,14 +114,14 @@ export default async function DashboardPage() {
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px]">
+              <span className="rounded-md border border-layer/10 bg-layer/[0.04] px-2 py-1 font-mono text-[11px]">
                 Stage:{" "}
                 <span className="text-text">
                   {OPP_STAGE_LABELS[snap.nextDue.stage]}
                 </span>
               </span>
               {snap.nextDue.pWin > 0 ? (
-                <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px]">
+                <span className="rounded-md border border-layer/10 bg-layer/[0.04] px-2 py-1 font-mono text-[11px]">
                   PWin: <span className="text-text">{snap.nextDue.pWin}%</span>
                 </span>
               ) : null}
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
               {Object.entries(propByStage).map(([stage, count]) => (
                 <li
                   key={stage}
-                  className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5"
+                  className="flex items-center justify-between rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5"
                 >
                   <span className="font-mono text-[11px] uppercase tracking-widest text-muted">
                     {stage}
@@ -204,7 +204,7 @@ export default async function DashboardPage() {
                 <li key={p.id}>
                   <Link
                     href={`/proposals/${p.id}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 hover:border-white/20"
+                    className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
                   >
                     <span className="min-w-0 truncate font-display text-[14px] text-text">
                       {p.title}
@@ -230,7 +230,7 @@ export default async function DashboardPage() {
           <div className="flex flex-col gap-2">
             <Link
               href="/opportunities"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -244,7 +244,7 @@ export default async function DashboardPage() {
             </Link>
             <Link
               href="/opportunities/import"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -258,7 +258,7 @@ export default async function DashboardPage() {
             </Link>
             <Link
               href="/intelligence"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -272,7 +272,7 @@ export default async function DashboardPage() {
             </Link>
             <Link
               href="/notifications"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-white/20"
+              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">

@@ -3,7 +3,7 @@ export function DotMeter({
   max = 100,
   steps = 20,
   filled = "bg-violet",
-  empty = "bg-white/10",
+  empty = "bg-layer/10",
   highlight,
   className = "",
 }: {
@@ -18,7 +18,7 @@ export function DotMeter({
   const on = Math.round((Math.max(0, Math.min(max, value)) / max) * steps);
   const cells = Array.from({ length: steps });
   return (
-    <div className={`flex gap-[2px] rounded-md border border-white/10 bg-white/[0.04] p-[3px] ${className}`}>
+    <div className={`flex gap-[2px] rounded-md border border-layer/10 bg-layer/[0.04] p-[3px] ${className}`}>
       {cells.map((_, i) => (
         <span
           key={i}

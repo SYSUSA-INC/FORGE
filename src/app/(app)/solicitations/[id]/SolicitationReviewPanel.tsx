@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<SolicitationReviewStatus | "none", string> = {
 };
 
 const STATUS_TONE: Record<SolicitationReviewStatus | "none", string> = {
-  none: "border-white/15 bg-white/5 text-muted",
+  none: "border-layer/15 bg-layer/5 text-muted",
   pending: "border-amber-400/40 bg-amber-400/10 text-amber-200",
   running: "border-cobalt-400/40 bg-cobalt-400/10 text-cobalt",
   complete: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
@@ -37,7 +37,7 @@ const CELL_TONE: Record<CapabilityMatrixCell["status"], string> = {
   strong: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
   partial: "border-amber-400/40 bg-amber-400/10 text-amber-200",
   gap: "border-rose/40 bg-rose/10 text-rose",
-  not_addressed: "border-white/15 bg-white/[0.04] text-muted",
+  not_addressed: "border-layer/15 bg-layer/[0.04] text-muted",
 };
 
 const CELL_LABEL: Record<CapabilityMatrixCell["status"], string> = {
@@ -354,12 +354,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02]">
+    <div className="rounded-lg border border-layer/10 bg-layer/[0.02]">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-layer/[0.03]"
       >
         <div className="min-w-0 flex-1">
           <div className="font-display text-[13px] font-semibold text-text">
@@ -371,13 +371,13 @@ function Section({
         </div>
         <span
           aria-hidden
-          className="grid h-5 w-5 place-items-center rounded-md border border-white/10 bg-white/[0.03] font-mono text-[12px] text-muted"
+          className="grid h-5 w-5 place-items-center rounded-md border border-layer/10 bg-layer/[0.03] font-mono text-[12px] text-muted"
         >
           {open ? "−" : "+"}
         </span>
       </button>
       {open ? (
-        <div className="border-t border-white/10 px-3 py-3">{children}</div>
+        <div className="border-t border-layer/10 px-3 py-3">{children}</div>
       ) : null}
     </div>
   );
@@ -433,7 +433,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
             {result.evaluationFactors.map((f, i) => (
               <li
                 key={i}
-                className="flex items-start justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 font-mono text-[11px]"
+                className="flex items-start justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5 font-mono text-[11px]"
               >
                 <span className="min-w-0 flex-1 truncate text-text">
                   {f.name}
@@ -461,7 +461,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
             {result.requirements.map((r) => (
               <li
                 key={r.id}
-                className="flex items-start gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <span
                   className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
@@ -469,7 +469,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
                       ? "border border-rose/40 bg-rose/10 text-rose"
                       : r.kind === "should"
                         ? "border border-amber-400/40 bg-amber-400/10 text-amber-200"
-                        : "border border-white/15 bg-white/5 text-muted"
+                        : "border border-layer/15 bg-layer/5 text-muted"
                   }`}
                 >
                   {r.kind}
@@ -510,7 +510,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
         result.placeOfPerformance ||
         result.setAside ||
         result.mandatoryCertifications.length > 0) && (
-        <div className="grid grid-cols-1 gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px] md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] md:grid-cols-2">
           {result.periodOfPerformance ? (
             <Row label="PoP" value={result.periodOfPerformance} />
           ) : null}
@@ -583,7 +583,7 @@ function MatrixView({
           return (
             <li
               key={cell.requirementId}
-              className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+              className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
             >
               <div className="flex items-start gap-3">
                 <span
@@ -685,7 +685,7 @@ function QuestionList({ questions }: { questions: SolicitationQuestion[] }) {
             {list.map((q) => (
               <li
                 key={q.id}
-                className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <div className="font-body text-[13px] leading-relaxed text-text">
                   {q.text}

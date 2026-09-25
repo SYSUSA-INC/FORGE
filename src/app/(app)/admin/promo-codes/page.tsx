@@ -74,7 +74,7 @@ export default async function PromoCodesPage() {
               return (
                 <li
                   key={r.id}
-                  className="rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                  className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <Link
@@ -152,7 +152,7 @@ export default async function PromoCodesPage() {
 
 function RowField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-2">
+    <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
       <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
         {label}
       </div>

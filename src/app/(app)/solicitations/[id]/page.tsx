@@ -250,7 +250,7 @@ export default async function SolicitationDetail({
         ]}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 font-mono text-[11px]">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px]">
         <span
           className="rounded px-1.5 py-0.5 uppercase tracking-widest"
           style={{
@@ -385,7 +385,7 @@ export default async function SolicitationDetail({
                   return (
                     <li
                       key={i}
-                      className="flex items-start gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                      className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
                     >
                       <span
                         className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
@@ -478,7 +478,7 @@ export default async function SolicitationDetail({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-1.5 last:border-b-0">
+    <div className="flex items-baseline justify-between gap-3 border-b border-layer/5 pb-1.5 last:border-b-0">
       <dt className="text-[10px] uppercase tracking-[0.22em] text-subtle">
         {label}
       </dt>

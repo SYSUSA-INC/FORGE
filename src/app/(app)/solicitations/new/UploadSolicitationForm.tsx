@@ -71,7 +71,7 @@ export function UploadSolicitationForm() {
           className={`relative grid place-items-center cursor-pointer rounded-lg border-2 border-dashed p-12 text-center transition-colors ${
             dragOver
               ? "border-teal/70 bg-teal/[0.06]"
-              : "border-white/15 bg-white/[0.02] hover:border-white/30"
+              : "border-layer/15 bg-layer/[0.02] hover:border-layer/30"
           }`}
         >
           <div className="font-display text-2xl font-semibold text-text">

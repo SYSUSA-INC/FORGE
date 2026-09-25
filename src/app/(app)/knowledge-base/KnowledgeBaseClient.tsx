@@ -38,7 +38,7 @@ const OUTCOME_TONES: Record<OutcomeLabel, string> = {
   none: "",
   won: "bg-emerald-400/15 text-emerald-300 border-emerald-400/40",
   lost: "bg-rose/15 text-rose border-rose/40",
-  no_bid: "bg-white/5 text-muted border-white/10",
+  no_bid: "bg-layer/5 text-muted border-layer/10",
   withdrawn: "bg-amber-400/10 text-amber-200 border-amber-400/30",
 };
 
@@ -112,7 +112,7 @@ export function KnowledgeBaseClient({
             placeholder='Title or body — e.g. "NAVSEA C5ISR", "AWS GovCloud"…'
           />
         </form>
-        <div className="flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-white/[0.02] p-1">
+        <div className="flex flex-wrap items-center gap-1 rounded-md border border-layer/10 bg-layer/[0.02] p-1">
           {kinds.map((k) => {
             const active = k.key === activeKind;
             return (
@@ -122,7 +122,7 @@ export function KnowledgeBaseClient({
                 onClick={() => applyFilter({ kind: k.key })}
                 className={`rounded px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-colors ${
                   active
-                    ? "bg-white/10 text-text"
+                    ? "bg-layer/10 text-text"
                     : "text-muted hover:text-text"
                 }`}
               >
@@ -132,7 +132,7 @@ export function KnowledgeBaseClient({
           })}
         </div>
         <div
-          className="flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-white/[0.02] p-1"
+          className="flex flex-wrap items-center gap-1 rounded-md border border-layer/10 bg-layer/[0.02] p-1"
           title="Phase 14a — filter by the outcome of the proposal each entry came from."
         >
           {OUTCOMES.map((o) => {
@@ -144,7 +144,7 @@ export function KnowledgeBaseClient({
                 onClick={() => applyFilter({ outcome: o.key })}
                 className={`rounded px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-colors ${
                   active
-                    ? "bg-white/10 text-text"
+                    ? "bg-layer/10 text-text"
                     : "text-muted hover:text-text"
                 }`}
               >
@@ -214,14 +214,14 @@ export function KnowledgeBaseClient({
                       {e.tags.slice(0, 6).map((t) => (
                         <span
                           key={t}
-                          className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+                          className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
                         >
                           #{t}
                         </span>
                       ))}
                     </div>
                   ) : null}
-                  <div className="border-t border-white/10 pt-2 font-mono text-[10px] text-subtle">
+                  <div className="border-t border-layer/10 pt-2 font-mono text-[10px] text-subtle">
                     Used {e.reuseCount} time{e.reuseCount === 1 ? "" : "s"}
                   </div>
                 </li>

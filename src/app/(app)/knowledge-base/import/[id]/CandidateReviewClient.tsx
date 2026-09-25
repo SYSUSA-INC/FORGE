@@ -311,7 +311,7 @@ function FilterChip({
       className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
         active
           ? "border-teal-400 bg-teal-400/15 text-teal"
-          : "border-white/15 bg-white/[0.02] text-muted hover:border-white/30 hover:text-text"
+          : "border-layer/15 bg-layer/[0.02] text-muted hover:border-layer/30 hover:text-text"
       }`}
     >
       {label}
@@ -348,7 +348,7 @@ function CandidateCard({
           ? "border-emerald-400/30 bg-emerald-400/5"
           : isRejected
             ? "border-rose-400/20 bg-rose-400/5 opacity-60"
-            : "border-white/10 bg-white/[0.02]"
+            : "border-layer/10 bg-layer/[0.02]"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -473,7 +473,7 @@ function CandidateCard({
               {candidate.tags.map((t) => (
                 <span
                   key={t}
-                  className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] text-muted"
+                  className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] text-muted"
                 >
                   {t}
                 </span>
@@ -484,7 +484,7 @@ function CandidateCard({
       )}
 
       {candidate.sourceExcerpt ? (
-        <details className="mt-3 rounded-lg border border-white/10 bg-white/[0.015] px-3 py-2">
+        <details className="mt-3 rounded-lg border border-layer/10 bg-layer/[0.015] px-3 py-2">
           <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
             Evidence (source excerpt)
           </summary>

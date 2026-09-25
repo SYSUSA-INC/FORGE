@@ -54,7 +54,7 @@ export function SavedSearchesClient({ rows }: { rows: SavedSearchRow[] }) {
           {error}
         </div>
       ) : null}
-      <div className="mb-3 flex flex-wrap gap-1 border-b border-white/10">
+      <div className="mb-3 flex flex-wrap gap-1 border-b border-layer/10">
         {(["all", "mine", "shared"] as const).map((f) => (
           <button
             type="button"
@@ -90,7 +90,7 @@ export function SavedSearchesClient({ rows }: { rows: SavedSearchRow[] }) {
             and use "Save this search" to add one.
           </p>
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-layer/5">
             {visible.map((r) => (
               <SavedSearchRowView
                 key={r.id}
@@ -128,7 +128,7 @@ function SavedSearchRowView({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
               {row.kind}
             </span>
             <span className="truncate font-display text-[13px] text-text">

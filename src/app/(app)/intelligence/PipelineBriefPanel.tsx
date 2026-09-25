@@ -106,7 +106,7 @@ function BriefMeta({ brief }: { brief: PipelineBriefResult }) {
   });
 
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 pt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-layer/10 pt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
       {brief.stubbed ? <StubModeBanner variant="inline" /> : null}
       {meta.map((m) => (
         <span key={m.label}>

@@ -296,7 +296,7 @@ export function EditTemplateClient({
             {seed.map((s, i) => (
               <li
                 key={i}
-                className="flex flex-wrap items-end gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                className="flex flex-wrap items-end gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
                   §{s.ordering}
@@ -352,7 +352,7 @@ export function EditTemplateClient({
                     type="button"
                     disabled={pending}
                     onClick={() => moveSeedItem(i, -1)}
-                    className="rounded px-2 py-1 hover:bg-white/[0.05] hover:text-text disabled:opacity-30"
+                    className="rounded px-2 py-1 hover:bg-layer/[0.05] hover:text-text disabled:opacity-30"
                   >
                     ↑
                   </button>
@@ -360,7 +360,7 @@ export function EditTemplateClient({
                     type="button"
                     disabled={pending}
                     onClick={() => moveSeedItem(i, 1)}
-                    className="rounded px-2 py-1 hover:bg-white/[0.05] hover:text-text disabled:opacity-30"
+                    className="rounded px-2 py-1 hover:bg-layer/[0.05] hover:text-text disabled:opacity-30"
                   >
                     ↓
                   </button>
@@ -392,7 +392,7 @@ export function EditTemplateClient({
           title="Template source"
           eyebrow={kind === "docx" ? "Word template" : "Legacy HTML / CSS"}
           actions={
-            <div className="inline-flex rounded-full border border-white/10 p-0.5 text-[10px]">
+            <div className="inline-flex rounded-full border border-layer/10 p-0.5 text-[10px]">
               {(["docx", "html"] as const).map((k) => (
                 <button
                   key={k}
@@ -501,7 +501,7 @@ export function EditTemplateClient({
                 <input
                   id="t-brand-primary"
                   type="color"
-                  className="h-9 w-12 cursor-pointer rounded border border-white/10 bg-transparent"
+                  className="h-9 w-12 cursor-pointer rounded border border-layer/10 bg-transparent"
                   value={brandPrimary}
                   onChange={(e) => setBrandPrimary(e.target.value)}
                 />
@@ -521,7 +521,7 @@ export function EditTemplateClient({
                 <input
                   id="t-brand-accent"
                   type="color"
-                  className="h-9 w-12 cursor-pointer rounded border border-white/10 bg-transparent"
+                  className="h-9 w-12 cursor-pointer rounded border border-layer/10 bg-transparent"
                   value={brandAccent}
                   onChange={(e) => setBrandAccent(e.target.value)}
                 />
@@ -689,7 +689,7 @@ function DocxPanel({
         className={`grid cursor-pointer place-items-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
           dragOver
             ? "border-teal-400 bg-teal-400/5"
-            : "border-white/15 bg-white/[0.015] hover:border-white/30"
+            : "border-layer/15 bg-layer/[0.015] hover:border-layer/30"
         }`}
       >
         {docxFileName ? (
@@ -771,7 +771,7 @@ function DocxPanel({
       ) : null}
 
       {variablesDetected.length > 0 ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.015] p-4">
+        <div className="rounded-lg border border-layer/10 bg-layer/[0.015] p-4">
           <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
             Detected placeholders
           </div>
@@ -836,7 +836,7 @@ function DocxPanel({
         </div>
       ) : null}
 
-      <details className="rounded-lg border border-white/10 bg-white/[0.015] p-3">
+      <details className="rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
         <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           Available placeholders ({KNOWN_TEMPLATE_VARIABLES.length}) — drop
           these into your Word template using <code>&#123;variableName&#125;</code>
@@ -845,7 +845,7 @@ function DocxPanel({
           {KNOWN_TEMPLATE_VARIABLES.map((v) => (
             <li
               key={v.key}
-              className="flex items-center justify-between gap-2 rounded border border-white/5 bg-white/[0.01] px-2 py-1 font-mono text-[10px]"
+              className="flex items-center justify-between gap-2 rounded border border-layer/5 bg-layer/[0.01] px-2 py-1 font-mono text-[10px]"
             >
               <code className="text-text">&#123;{v.key}&#125;</code>
               <span className="text-muted">{v.description}</span>
@@ -867,7 +867,7 @@ function DocxPanel({
         </p>
       </details>
 
-      <div className="rounded-md border border-white/10 bg-white/[0.015] px-3 py-2 font-mono text-[10px] text-muted">
+      <div className="rounded-md border border-layer/10 bg-layer/[0.015] px-3 py-2 font-mono text-[10px] text-muted">
         Note: rendering will run on download in Phase 12b. For now, the
         upload + variable detection ensures the template is well-formed.
       </div>

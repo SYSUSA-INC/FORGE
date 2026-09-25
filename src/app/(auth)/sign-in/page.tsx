@@ -75,11 +75,11 @@ export default async function SignInPage({
           <SignInForm callbackUrl={safeCallback} />
 
           <div className="relative my-6 flex items-center">
-            <span className="h-px flex-1 bg-white/10" />
+            <span className="h-px flex-1 bg-layer/10" />
             <span className="px-3 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
               or
             </span>
-            <span className="h-px flex-1 bg-white/10" />
+            <span className="h-px flex-1 bg-layer/10" />
           </div>
 
           <SsoButtons callbackUrl={safeCallback} mode="sign-in" />

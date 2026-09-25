@@ -99,7 +99,7 @@ export function ErrorRowActions({
       </div>
 
       {!editingNotes && notes ? (
-        <p className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
+        <p className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
           {notes}
         </p>
       ) : null}

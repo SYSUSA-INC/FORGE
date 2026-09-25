@@ -54,7 +54,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
         ? "bg-rose-500/15 text-rose-300"
         : artifact.status === "extracting_text"
           ? "bg-amber-500/15 text-amber-200"
-          : "bg-white/5 text-muted";
+          : "bg-layer/5 text-muted";
 
   return (
     <li className="grid grid-cols-[1fr_auto] items-start gap-3 px-3 py-3">
@@ -63,7 +63,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
           <span className="truncate font-display text-[14px] font-semibold text-text">
             {artifact.title || artifact.fileName || "Untitled"}
           </span>
-          <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+          <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
             {formatKind(artifact.kind)}
           </span>
           <span
@@ -72,7 +72,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
             {artifact.status.replace(/_/g, " ")}
           </span>
           {artifact.archivedAt ? (
-            <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
               archived
             </span>
           ) : null}
@@ -87,7 +87,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
             {artifact.tags.map((t) => (
               <span
                 key={t}
-                className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] text-muted"
+                className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] text-muted"
               >
                 {t}
               </span>

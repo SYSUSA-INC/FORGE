@@ -15,7 +15,7 @@ export function HeatGrid({
 
   const cellStyle = (v: number) => {
     const r = v / max;
-    if (v === 0) return "bg-white/[0.03] text-subtle";
+    if (v === 0) return "bg-layer/[0.03] text-subtle";
     if (r < 0.25) return "bg-violet/15 text-text";
     if (r < 0.5) return "bg-violet/30 text-white";
     if (r < 0.75) return "bg-gradient-to-br from-violet/50 to-magenta/40 text-white";
@@ -31,7 +31,7 @@ export function HeatGrid({
         </div>
       )}
       <div
-        className="grid gap-1 overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] p-1"
+        className="grid gap-1 overflow-hidden rounded-lg border border-layer/10 bg-layer/[0.02] p-1"
         style={{
           gridTemplateColumns: `72px repeat(${cols.length}, minmax(0, 1fr))`,
         }}

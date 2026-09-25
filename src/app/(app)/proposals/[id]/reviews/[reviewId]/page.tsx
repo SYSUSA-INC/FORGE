@@ -103,7 +103,7 @@ export default async function ReviewDetailPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/proposals/${params.id}/reviews`}

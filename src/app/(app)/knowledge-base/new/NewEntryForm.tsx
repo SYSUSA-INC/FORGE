@@ -70,7 +70,7 @@ export function NewEntryForm() {
                 className={`flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2 transition-colors ${
                   active
                     ? "border-teal/50 bg-teal/[0.06]"
-                    : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                    : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
                 }`}
               >
                 <input

@@ -169,7 +169,7 @@ export function ProposalScanPanel({
                 {scan.sectionIssues.map((issue) => (
                   <li
                     key={issue.sectionId}
-                    className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                    className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-[12px] text-text">
@@ -179,8 +179,8 @@ export function ProposalScanPanel({
                         className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                         style={{
                           color: SEVERITY_COLOR[issue.severity] ?? THEME.muted,
-                          background: `${SEVERITY_COLOR[issue.severity] ?? THEME.muted}1a`,
-                          border: `1px solid ${SEVERITY_COLOR[issue.severity] ?? THEME.muted}40`,
+                          background: withAlpha(SEVERITY_COLOR[issue.severity] ?? THEME.muted, 0.1),
+                          border: `1px solid ${withAlpha(SEVERITY_COLOR[issue.severity] ?? THEME.muted, 0.25)}`,
                         }}
                       >
                         {issue.severity}
@@ -209,7 +209,7 @@ export function ProposalScanPanel({
                 {scan.sectionThemeCoverage.map((c) => (
                   <li
                     key={c.sectionId}
-                    className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                    className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
                   >
                     <div className="mb-1.5 font-mono text-[11px] text-text">
                       {c.sectionTitle}
@@ -258,7 +258,7 @@ export function ProposalScanPanel({
                 {scan.contradictions.map((c, i) => (
                   <li
                     key={i}
-                    className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+                    className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-mono text-[11px] text-text">
@@ -270,8 +270,8 @@ export function ProposalScanPanel({
                         className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
                         style={{
                           color: SEVERITY_COLOR[c.severity] ?? THEME.muted,
-                          background: `${SEVERITY_COLOR[c.severity] ?? THEME.muted}1a`,
-                          border: `1px solid ${SEVERITY_COLOR[c.severity] ?? THEME.muted}40`,
+                          background: withAlpha(SEVERITY_COLOR[c.severity] ?? THEME.muted, 0.1),
+                          border: `1px solid ${withAlpha(SEVERITY_COLOR[c.severity] ?? THEME.muted, 0.25)}`,
                         }}
                       >
                         {c.severity}

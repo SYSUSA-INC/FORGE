@@ -63,7 +63,7 @@ export function PipelineFilters({
               className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
-                  : "border-white/10 bg-white/[0.02] text-muted hover:border-white/20"
+                  : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
               {w.label}
@@ -72,7 +72,7 @@ export function PipelineFilters({
         })}
       </div>
 
-      <div className="ml-auto flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.02] p-1">
+      <div className="ml-auto flex items-center gap-1 rounded-md border border-layer/10 bg-layer/[0.02] p-1">
         {MODES.map((m) => {
           const active = currentMode === m.key;
           return (
@@ -83,7 +83,7 @@ export function PipelineFilters({
               title={m.help}
               className={`rounded px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
                 active
-                  ? "bg-white/10 text-text"
+                  ? "bg-layer/10 text-text"
                   : "text-muted hover:text-text"
               }`}
             >

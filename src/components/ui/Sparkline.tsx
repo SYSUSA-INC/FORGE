@@ -76,7 +76,7 @@ export function BarSpark({
   const max = Math.max(...data, 1);
   return (
     <div
-      className="flex items-end gap-[3px] rounded-md border border-white/10 bg-white/[0.03] p-2"
+      className="flex items-end gap-[3px] rounded-md border border-layer/10 bg-layer/[0.03] p-2"
       style={{ height }}
     >
       {data.map((v, i) => (

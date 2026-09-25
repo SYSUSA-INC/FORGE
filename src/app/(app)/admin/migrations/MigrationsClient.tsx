@@ -126,8 +126,8 @@ export function MigrationsClient({
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-white/10 bg-white/[0.02]">
-        <div className="border-b border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+      <div className="rounded-lg border border-layer/10 bg-layer/[0.02]">
+        <div className="border-b border-layer/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
           Migrations
         </div>
         <ul className="flex flex-col">
@@ -144,7 +144,7 @@ export function MigrationsClient({
               return (
                 <li
                   key={file}
-                  className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 font-mono text-[11px] last:border-0"
+                  className="flex items-center justify-between border-b border-layer/5 px-3 py-1.5 font-mono text-[11px] last:border-0"
                 >
                   <span className="text-text">{file}</span>
                   <span

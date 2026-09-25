@@ -55,7 +55,7 @@ export function CommentsSidebar({ editor, ydoc, visible, currentUserId }: Props)
   const resolvedCount = threads.filter((t) => t.resolved).length;
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
           Comments {threads.length > 0 ? `· ${threads.length}` : ""}
@@ -64,7 +64,7 @@ export function CommentsSidebar({ editor, ydoc, visible, currentUserId }: Props)
           <button
             type="button"
             onClick={() => setShowResolved((v) => !v)}
-            className="rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted hover:bg-white/10 transition-colors"
+            className="rounded border border-layer/10 bg-layer/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted hover:bg-layer/10 transition-colors"
           >
             {showResolved
               ? `Hide ${resolvedCount} resolved`
@@ -125,8 +125,8 @@ function ThreadCard({
     <li
       className={`flex flex-col gap-1.5 rounded border px-2.5 py-2 ${
         thread.resolved
-          ? "border-white/[0.06] bg-white/[0.02] opacity-70"
-          : "border-white/[0.08] bg-white/[0.04]"
+          ? "border-layer/[0.06] bg-layer/[0.02] opacity-70"
+          : "border-layer/[0.08] bg-layer/[0.04]"
       }`}
     >
       {/* Header: opener + status + orphan flag */}
@@ -164,7 +164,7 @@ function ThreadCard({
               type="button"
               onClick={focusInDoc}
               title="Find this comment's text in the editor"
-              className="rounded px-1.5 py-0.5 font-mono text-[9px] text-muted hover:bg-white/[0.08] hover:text-text transition-colors"
+              className="rounded px-1.5 py-0.5 font-mono text-[9px] text-muted hover:bg-layer/[0.08] hover:text-text transition-colors"
             >
               jump
             </button>
@@ -175,7 +175,7 @@ function ThreadCard({
             title={thread.resolved ? "Re-open this thread" : "Mark resolved"}
             className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors ${
               thread.resolved
-                ? "border-white/15 bg-white/[0.04] text-muted hover:bg-white/10"
+                ? "border-layer/15 bg-layer/[0.04] text-muted hover:bg-layer/10"
                 : "border-emerald/30 bg-emerald/10 text-emerald hover:bg-emerald/20"
             }`}
           >
@@ -199,7 +199,7 @@ function ThreadCard({
         {thread.messages.map((m) => (
           <div
             key={m.id}
-            className="rounded bg-white/[0.03] px-2 py-1.5 font-mono text-[11px] leading-relaxed text-text"
+            className="rounded bg-layer/[0.03] px-2 py-1.5 font-mono text-[11px] leading-relaxed text-text"
           >
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted">

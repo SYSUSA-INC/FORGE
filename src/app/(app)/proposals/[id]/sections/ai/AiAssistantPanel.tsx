@@ -43,7 +43,7 @@ function SourceLegend({
   const stats = extractCitationStats(text);
   const cited = new Set(stats.citedSources);
   return (
-    <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+    <div className="mt-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
         <span>
           Sources · {cited.size}/{sources.length} cited
@@ -71,7 +71,7 @@ function SourceLegend({
                 className={`shrink-0 rounded px-1 font-mono text-[10px] ${
                   used
                     ? "border border-teal/40 bg-teal/10 text-teal"
-                    : "border border-white/10 text-muted"
+                    : "border border-layer/10 text-muted"
                 }`}
               >
                 S{s.index}
@@ -471,7 +471,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-teal">
             ✨ AI assist
           </span>
-          <div className="flex gap-1 rounded border border-white/10 p-0.5">
+          <div className="flex gap-1 rounded border border-layer/10 p-0.5">
             {(["generate", "chat"] as ActiveTab[]).map((tab) => (
               <button
                 key={tab}
@@ -525,7 +525,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                     className={`flex flex-col gap-2 rounded-md border p-3 ${
                       isRecommended
                         ? "border-teal/40 bg-teal/[0.04]"
-                        : "border-white/10 bg-white/[0.02]"
+                        : "border-layer/10 bg-layer/[0.02]"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -537,7 +537,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                         <span className="font-mono text-[9px] text-teal">★ rec.</span>
                       ) : null}
                     </div>
-                    <div className="max-h-[220px] overflow-y-auto whitespace-pre-wrap rounded border border-white/10 bg-canvas px-2 py-1.5 font-body text-[12px] leading-relaxed text-text">
+                    <div className="max-h-[220px] overflow-y-auto whitespace-pre-wrap rounded border border-layer/10 bg-canvas px-2 py-1.5 font-body text-[12px] leading-relaxed text-text">
                       {variant.text}
                     </div>
                     <button
@@ -575,7 +575,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                     className={`flex flex-col items-start gap-1 rounded-md border px-3 py-2 text-left transition-colors disabled:opacity-50 ${
                       pending && mode === m.key
                         ? "border-teal/60 bg-teal/10"
-                        : "border-white/10 bg-white/[0.02] hover:border-white/20"
+                        : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
                     }`}
                   >
                     <span className="font-display text-[13px] font-semibold text-text">
@@ -589,7 +589,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
               })}
             </div>
             {/* Cite sources — BL-FB-GEN-CITE */}
-            <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2">
+            <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
               <input
                 type="checkbox"
                 checked={cite}
@@ -675,7 +675,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
               {MODES.find((m) => m.key === result.mode)?.label} preview ·{" "}
               {result.text.split(/\s+/).filter(Boolean).length} words
             </div>
-            <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-white/10 bg-canvas px-3 py-2 font-body text-[13px] leading-relaxed text-text">
+            <div className="max-h-[420px] overflow-y-auto whitespace-pre-wrap rounded-md border border-layer/10 bg-canvas px-3 py-2 font-body text-[13px] leading-relaxed text-text">
               {result.text}
             </div>
             {result.sources && result.sources.length > 0 ? (
@@ -744,7 +744,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
 
           {/* Message history */}
           {chatHistory.length > 0 ? (
-            <div className="flex max-h-[340px] flex-col gap-2 overflow-y-auto rounded-md border border-white/10 bg-canvas p-2">
+            <div className="flex max-h-[340px] flex-col gap-2 overflow-y-auto rounded-md border border-layer/10 bg-canvas p-2">
               {chatHistory.map((msg, i) => (
                 <div
                   key={i}
@@ -761,7 +761,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                     className={`max-w-[90%] rounded-md px-3 py-2 font-body text-[12px] leading-relaxed ${
                       msg.role === "user"
                         ? "bg-teal/10 text-text"
-                        : "border border-white/10 bg-white/[0.03] text-foreground"
+                        : "border border-layer/10 bg-layer/[0.03] text-foreground"
                     }`}
                   >
                     <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -806,7 +806,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
               }}
               placeholder="Ask about this section… (Enter to send, Shift+Enter for newline)"
               rows={2}
-              className="flex-1 resize-none rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-muted/50 focus:border-teal/40 focus:outline-none"
+              className="flex-1 resize-none rounded-md border border-layer/10 bg-layer/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-muted/50 focus:border-teal/40 focus:outline-none"
             />
             <button
               type="button"

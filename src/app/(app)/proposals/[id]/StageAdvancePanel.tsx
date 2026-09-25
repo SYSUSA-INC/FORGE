@@ -112,7 +112,7 @@ export function StageAdvancePanel({
             </button>
           </div>
         ) : (
-          <div className="rounded-md border border-dashed border-white/10 p-3 font-mono text-[11px] text-muted">
+          <div className="rounded-md border border-dashed border-layer/10 p-3 font-mono text-[11px] text-muted">
             Proposal is at a terminal stage. Pick a closed state below if the
             outcome has been decided.
           </div>

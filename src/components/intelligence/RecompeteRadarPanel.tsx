@@ -65,7 +65,7 @@ function MatchCard({ m }: { m: RecompeteMatch }) {
   const lessons = p.lessonsLearned.trim();
 
   return (
-    <li className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+    <li className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
@@ -91,7 +91,7 @@ function MatchCard({ m }: { m: RecompeteMatch }) {
         {m.signals.map((s) => (
           <span
             key={`${s.kind}-${s.label}`}
-            className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+            className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
           >
             {s.label}
           </span>

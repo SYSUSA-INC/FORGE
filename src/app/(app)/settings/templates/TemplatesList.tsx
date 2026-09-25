@@ -111,7 +111,7 @@ export function TemplatesList({ templates }: { templates: TemplateRow[] }) {
                   <span>{t.sectionCount} sections</span>
                 </div>
 
-                <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/10 pt-3 font-mono text-[10px] text-muted">
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-layer/10 pt-3 font-mono text-[10px] text-muted">
                   <span>
                     Updated{" "}
                     {new Date(t.updatedAt).toISOString().slice(0, 10)}
@@ -158,7 +158,7 @@ export function TemplatesList({ templates }: { templates: TemplateRow[] }) {
             {archived.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-muted"
+                className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 text-muted"
               >
                 <div className="min-w-0 flex-1">
                   <span className="font-display text-[13px]">{t.name}</span>

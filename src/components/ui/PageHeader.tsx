@@ -112,7 +112,7 @@ function MetaTile({
     return (
       <Link
         href={href}
-        className={`aur-card group block px-4 py-3 transition-colors hover:border-cobalt-400/40 hover:bg-white/[0.04] ${glow}`}
+        className={`aur-card group block px-4 py-3 transition-colors hover:border-cobalt-400/40 hover:bg-layer/[0.04] ${glow}`}
         title={`View ${label.toLowerCase()}`}
       >
         {body}

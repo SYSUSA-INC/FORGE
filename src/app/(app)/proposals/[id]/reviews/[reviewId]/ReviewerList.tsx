@@ -79,7 +79,7 @@ export function ReviewerList({
             return (
               <li
                 key={a.userId}
-                className="rounded-md border border-white/10 bg-white/[0.02] p-2"
+                className="rounded-md border border-layer/10 bg-layer/[0.02] p-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0 truncate font-mono text-[12px] text-text">
@@ -98,7 +98,7 @@ export function ReviewerList({
                         {VERDICT_LABELS[a.verdict as "pass" | "conditional" | "fail"]}
                       </span>
                     ) : (
-                      <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                      <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                         Pending
                       </span>
                     )}

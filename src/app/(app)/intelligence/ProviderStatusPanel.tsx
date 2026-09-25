@@ -55,7 +55,7 @@ export function ProviderStatusPanel({
           {all.map((p) => (
             <li
               key={p.name}
-              className="flex items-start gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2"
+              className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
             >
               <span
                 className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${

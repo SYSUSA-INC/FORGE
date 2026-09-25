@@ -259,7 +259,7 @@ export function FirmsSearchClient({
             />
           </Field>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-layer/10 px-5 py-3">
           <p className="font-mono text-[11px] text-muted">
             Newly graduated firms are <em>especially</em> valuable capture
             targets — they're now competing in full-and-open for the first
@@ -284,7 +284,7 @@ export function FirmsSearchClient({
           </div>
         </div>
         {saveSearchOpen ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-white/10 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-layer/10 px-5 py-3">
             <input
               className="aur-input min-w-[200px] flex-1"
               placeholder="Name this search"
@@ -358,7 +358,7 @@ export function FirmsSearchClient({
               .
             </p>
           ) : (
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-layer/5">
               {results.map((r) => (
                 <FirmRowView
                   key={r.uei}

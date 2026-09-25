@@ -18,7 +18,7 @@ export function ProposalTabs({ id }: { id: string }) {
     TABS.find((t) => pathname?.endsWith(`/${t.key}`))?.key ?? "overview";
 
   return (
-    <nav className="mb-4 flex flex-wrap gap-1 border-b border-white/10">
+    <nav className="mb-4 flex flex-wrap gap-1 border-b border-layer/10">
       {TABS.map((t) => {
         const href = t.key === "overview" ? basePath : `${basePath}/${t.key}`;
         const active = current === t.key;
