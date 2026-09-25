@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #TBD); BL-AIP-5 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -246,7 +246,7 @@ defect in the assessment plus its neighbours:
   individually; the tenant audit log page and actions require org
   admin (they were readable by every member).
 
-**BL-AIP-4 — outcome provenance and Brain indexing** ✅ (PR #TBD)
+**BL-AIP-4 — outcome provenance and Brain indexing** ✅ (PR #275)
 
 - **Outcomes reach the Brain.** Harvest reads `proposal_outcome`, so a
   won proposal lands labelled `won` instead of `none` (the old order
