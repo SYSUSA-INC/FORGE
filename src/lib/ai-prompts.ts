@@ -53,7 +53,7 @@ Rules:
 - Type must be one of: rfp, rfi, rfq, sources_sought, other.
 - Requirement kind must be one of: shall, should, may.
 - Each requirement.ref should be a section reference if available (e.g., "L.5.2.1", "M-1", "C.3"); otherwise empty string.
-- Limit requirements to the 25 most important shall/should/may statements you can find. Prefer Section L (instructions) and Section M (evaluation criteria) over Section C boilerplate.
+- requirements: the shall/should/may statements you find in this text, most important first, up to 50. Prefer Section L (instructions) and Section M (evaluation criteria) over Section C boilerplate. A separate full-text pass captures every clause of a text document; this list is what scanned documents rely on, so be thorough.
 - Section L summary: 2–4 sentences describing what offerors must submit, page caps, and format requirements you found.
 - Section M summary: 2–4 sentences describing evaluation factors and weights you found.
 - If the document is clearly not a federal solicitation, set title to "" and return mostly empty fields.
@@ -122,6 +122,112 @@ export function buildSolicitationVisionPrompt(): {
     messages: [{ role: "user", content: userPrompt }],
   };
 }
+
+// ────────────────────────────────────────────────────────────────────
+// BL-AIP-5 — full-text requirement sweep, one window at a time
+// ────────────────────────────────────────────────────────────────────
+
+export type RequirementsChunkResult = {
+  requirements: { kind: "shall" | "should" | "may"; text: string; ref: string }[];
+};
+
+const REQUIREMENTS_CHUNK_SYSTEM = `You are a federal solicitation analyst inside FORGE. You read ONE window of a longer solicitation (RFP / RFQ / PWS / SOW / attachment) and list EVERY requirement it places on the offeror or the contractor. Nothing is "too minor": page limits, fonts, submission mechanics, key-personnel rules, certifications, reporting cadence, transition duties, security controls, evaluation factors — all of it. Downstream, each entry becomes a row in the proposal's compliance matrix, so a clause you skip is a clause the team never checks.
+
+Rules:
+- One entry per distinct obligation. Quote the clause closely (light trimming of boilerplate is fine); do not paraphrase into vagueness and do not merge separate obligations.
+- kind: "shall" for mandatory (shall / must / will / required), "should" for desired, "may" for optional.
+- ref: the source reference as written (e.g. "L.5.2.1", "M-3", "C.3.4", "PWS 2.1.4", "FAR 52.204-21"); "" when the window shows none. Section letters from earlier in the document may not be visible in this window — never guess one.
+- Skip pure narrative, definitions, and government-side statements that oblige nobody.
+- The window may start or end mid-sentence; ignore fragments you cannot read whole.
+- Return only the tool call / JSON object. No commentary.`;
+
+export function buildRequirementsChunkPrompt(input: {
+  chunkText: string;
+  chunkIndex: number;
+  chunkCount: number;
+  documentLabel: string;
+}): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Document: ${input.documentLabel || "(untitled)"}`,
+    `Window ${input.chunkIndex + 1} of ${input.chunkCount}.`,
+    ``,
+    `Text:`,
+    "```",
+    input.chunkText,
+    "```",
+    ``,
+    `List every requirement in this window.`,
+  ].join("\n");
+  return {
+    system: REQUIREMENTS_CHUNK_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+export const requirementsChunkSchema = z.object({
+  requirements: z.array(
+    z.object({
+      kind: z.enum(["shall", "should", "may"]),
+      text: z.string(),
+      ref: z.string(),
+    }),
+  ),
+});
+
+// ────────────────────────────────────────────────────────────────────
+// BL-AIP-5 — citation verifier: does the cited source say that?
+// ────────────────────────────────────────────────────────────────────
+
+export type CitationVerifyClaim = {
+  id: number;
+  claim: string;
+  sources: { index: number; excerpt: string }[];
+};
+
+export type CitationVerifyVerdict = {
+  id: number;
+  supported: boolean;
+  reason: string;
+};
+
+const CITATION_VERIFY_SYSTEM = `You are a fact-checker inside FORGE. A proposal draft cites numbered sources with "[Sn]" markers. For each claim you are given the sentence and the excerpt(s) of the source(s) it cites. Decide whether the excerpt actually supports the concrete facts in the sentence (names, numbers, dates, certifications, outcomes).
+
+Rules:
+- supported = true only when the cited excerpt states or directly implies every concrete fact the sentence asserts. Paraphrase is fine; extra facts not in the excerpt are not.
+- A sentence with no concrete fact (pure framing or intent) is supported = true.
+- reason: one short sentence. Plain prose.
+- Judge strictly against the excerpt given; you have no other knowledge of these sources.
+- Return one verdict per claim id, no extras.`;
+
+export function buildCitationVerifyPrompt(input: {
+  claims: CitationVerifyClaim[];
+}): { system: string; messages: AIMessage[] } {
+  const blocks = input.claims.map((c) => {
+    const src = c.sources
+      .map((s) => `  [S${s.index}] ${s.excerpt.replace(/\s+/g, " ").slice(0, 700)}`)
+      .join("\n");
+    return `Claim ${c.id}: ${c.claim.replace(/\s+/g, " ").slice(0, 600)}\nCited:\n${src || "  (no listed source)"}`;
+  });
+  return {
+    system: CITATION_VERIFY_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: [`${input.claims.length} claims to verify.`, ``, ...blocks, ``, `Return a verdict for every claim id.`].join("\n\n"),
+      },
+    ],
+  };
+}
+
+export const citationVerifySchema = z.object({
+  verdicts: z.array(
+    z.object({
+      id: z.number(),
+      supported: z.boolean(),
+      reason: z.string(),
+    }),
+  ),
+});
 
 export type EbuyExtractionResult = {
   title: string;
@@ -361,6 +467,13 @@ export type SectionDraftSnapshot = {
     sectionLSummary: string;
     sectionMSummary: string;
     requirements: { kind: string; text: string; ref: string }[];
+    /**
+     * BL-AIP-5 — compliance-matrix rows mapped to THIS section, passed
+     * verbatim. Every one must be addressed in the draft.
+     */
+    mappedRequirements?: { number: string; text: string; category: string }[];
+    /** BL-AIP-5 — how many requirements the solicitation carries in total (the list above may be a prefix). */
+    totalRequirements?: number;
   };
   /**
    * BL-FB-GEN-THEMES — proposal-level win themes the drafter is
@@ -417,29 +530,51 @@ const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
     "BL-11 A/B variant: produce an alternative first draft that leads with the organization's single strongest differentiator or win theme. Challenge conventional section structure if it better serves the reader — front-load the most compelling claim, then support it. Aim for the same word/page targets as the standard draft mode but choose a distinctly different structural approach.",
 };
 
+/** BL-AIP-5 — how much of the general requirement list the drafter sees. */
+export const DRAFT_GENERAL_REQUIREMENTS = 60;
+export const DRAFT_REQUIREMENT_CHARS = 600;
+
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
   snapshot: SectionDraftSnapshot,
 ): { system: string; messages: AIMessage[] } {
   // Build a solicitation block when requirements are available so the
   // draft addresses real Section L/M language rather than generic prose.
+  // BL-AIP-5 — requirements mapped to this section come first and
+  // verbatim: they are the section's contract. The general list follows
+  // as context (60 entries, no 300-character cut) with an honest count.
+  const mapped = snapshot.solicitation?.mappedRequirements ?? [];
+  const generalReqs = snapshot.solicitation?.requirements ?? [];
+  const generalShown = generalReqs.slice(0, DRAFT_GENERAL_REQUIREMENTS);
+  const generalTotal = snapshot.solicitation?.totalRequirements ?? generalReqs.length;
   const solicitationBlock = snapshot.solicitation
     ? [
-        `Solicitation requirements (write to these — use [ref] inline for traceability):`,
+        mapped.length > 0
+          ? [
+              `Requirements mapped to THIS section — every one MUST be addressed in the draft; reference its number inline in [BRACKETS] (e.g. "[L.5.2.1]") so the reviewer can trace it:`,
+              ...mapped.map(
+                (r, i) => `${i + 1}. [${r.number || "?"}] (${r.category}) ${r.text}`,
+              ),
+              ``,
+            ].join("\n")
+          : "",
+        `Solicitation context (write to these — use [ref] inline for traceability):`,
         snapshot.solicitation.sectionLSummary
           ? `Section L summary: ${snapshot.solicitation.sectionLSummary.slice(0, 800)}`
           : "",
         snapshot.solicitation.sectionMSummary
           ? `Section M summary: ${snapshot.solicitation.sectionMSummary.slice(0, 800)}`
           : "",
-        snapshot.solicitation.requirements.length > 0
-          ? snapshot.solicitation.requirements
-              .slice(0, 25)
-              .map(
+        generalShown.length > 0
+          ? [
+              generalTotal > generalShown.length
+                ? `All extracted requirements (${generalShown.length} of ${generalTotal} shown; the mapped list above is authoritative for this section):`
+                : `All extracted requirements (${generalShown.length}):`,
+              ...generalShown.map(
                 (r, i) =>
-                  `${i + 1}. [${r.ref || "?"}] ${r.kind.toUpperCase()}: ${r.text.slice(0, 300)}`,
-              )
-              .join("\n")
+                  `${i + 1}. [${r.ref || "?"}] ${r.kind.toUpperCase()}: ${r.text.slice(0, DRAFT_REQUIREMENT_CHARS)}`,
+              ),
+            ].join("\n")
           : "",
       ]
         .filter(Boolean)

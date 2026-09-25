@@ -5,7 +5,7 @@
  */
 import type { TipTapDoc } from "@/db/schema";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
-import type { CitationStats, DraftSource } from "@/lib/citations";
+import type { CitationStats, CitationVerification, DraftSource } from "@/lib/citations";
 
 export type { DraftSource } from "@/lib/citations";
 
@@ -28,6 +28,10 @@ export type DraftDonePayload = {
   citations?: CitationStats;
   /** True when sources came from the stub embedder and are not meaningful. */
   sourcesStubbed?: boolean;
+  /** BL-AIP-5 — the provider stopped at its output ceiling; the draft is cut short. */
+  truncated?: boolean;
+  /** BL-AIP-5 — what the verifier pass did (citation mode only). */
+  verification?: CitationVerification;
 };
 
 export type DraftStreamEvent =

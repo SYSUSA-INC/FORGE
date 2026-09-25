@@ -177,9 +177,12 @@ export async function autoDraftSingleSectionAction(input: {
     };
   }
 
+  // BL-AIP-5 — auto-draft used to be the one path that never cited;
+  // every unsupported claim now lands as [NEEDS CITATION] for the author.
   const draft = await generateSectionDraftAction({
     sectionId: input.sectionId,
     mode: "draft",
+    cite: true,
   });
   if (!draft.ok) {
     return {

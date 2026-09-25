@@ -15,6 +15,7 @@ import {
   deleteComplianceItemAction,
   dismissComplianceAIAssessmentAction,
   runCompliancePreflightAction,
+  seedComplianceFromSolicitationAction,
   updateComplianceItemAction,
   type EvidenceRow as EvidenceRowType,
 } from "./actions";
@@ -126,6 +127,7 @@ export function ComplianceClient({
         proposalId={proposalId}
         items={items}
       />
+      <SeedFromSolicitation proposalId={proposalId} itemCount={items.length} />
       <BulkImport proposalId={proposalId} categories={categories} />
       <AddItem
         proposalId={proposalId}
@@ -475,6 +477,63 @@ function AddItem({
         </div>
       </form>
     </Panel>
+  );
+}
+
+/**
+ * BL-AIP-5 — the matrix used to be filled only by hand. New proposals
+ * are seeded from the solicitation automatically; this button does the
+ * same for older ones (and after a later parse). Idempotent.
+ */
+function SeedFromSolicitation({
+  proposalId,
+  itemCount,
+}: {
+  proposalId: string;
+  itemCount: number;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  function seed() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await seedComplianceFromSolicitationAction(proposalId);
+      if (!res.ok) return setError(res.error);
+      if (res.available === 0) {
+        setNotice(
+          res.solicitationCount === 0
+            ? "No parsed solicitation is linked to this proposal's opportunity yet. Upload and parse the RFP under Solicitations first."
+            : "The linked solicitation has no extracted requirements. Re-parse it to run the full-text sweep.",
+        );
+        return;
+      }
+      setNotice(
+        `Added ${res.inserted} requirement${res.inserted === 1 ? "" : "s"} from ${res.solicitationCount} solicitation${res.solicitationCount === 1 ? "" : "s"}` +
+          (res.skippedDuplicates > 0 ? ` (${res.skippedDuplicates} already in the matrix)` : "") +
+          (res.inserted > 0 ? ". Run Auto-map to place them." : "."),
+      );
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        className="aur-btn aur-btn-ghost py-2 text-[12px]"
+        onClick={seed}
+        disabled={pending}
+        title="Create one row per requirement extracted from the linked solicitation (skips rows already here)"
+      >
+        {pending ? "Seeding…" : itemCount === 0 ? "Seed from solicitation" : "Pull new requirements from solicitation"}
+      </button>
+      {error ? <span className="font-mono text-[11px] text-rose">{error}</span> : null}
+      {notice ? <span className="font-mono text-[11px] text-emerald">{notice}</span> : null}
+    </div>
   );
 }
 

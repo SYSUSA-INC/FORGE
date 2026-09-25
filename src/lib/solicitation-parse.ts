@@ -31,6 +31,7 @@ import {
   aiExtractSolicitationFromPdf,
   extractTextFromAny,
 } from "@/lib/solicitation-extract";
+import { mergeSolicitationRequirements } from "@/lib/solicitation-requirements";
 import { detectFormat } from "@/lib/text-extract";
 
 // Below this many extracted characters we treat the PDF as effectively
@@ -207,7 +208,9 @@ export async function parseSolicitationFromBytes(
     return;
   }
 
-  const aiRes = await aiExtractSolicitation(organizationId, rawText);
+  const aiRes = await aiExtractSolicitation(organizationId, rawText, {
+    documentLabel: fileName,
+  });
   if (!aiRes.ok) {
     await db
       .update(solicitations)
@@ -253,6 +256,13 @@ export async function parseSolicitationFromBytes(
         eq(solicitations.id, solicitationId),
       ),
     );
+  // BL-AIP-5 — a re-parse used to overwrite the list and lose every
+  // companion document's clauses; roll them back in.
+  try {
+    await mergeSolicitationRequirements(solicitationId, organizationId);
+  } catch (err) {
+    log.warn("[parseSolicitationFromBytes]", "companion merge failed", { error: err });
+  }
   revalidatePath(`/solicitations/${solicitationId}`);
 }
 

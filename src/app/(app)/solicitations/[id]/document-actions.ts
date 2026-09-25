@@ -9,6 +9,7 @@ import {
   type SolicitationDocumentType,
   type SolicitationRequirement,
 } from "@/db/schema";
+import { mergeSolicitationRequirements } from "@/lib/solicitation-requirements";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
@@ -456,107 +457,15 @@ async function applyExtraction(
 // Merge requirements from all companion documents into the parent row
 // ────────────────────────────────────────────────────────────────────────────
 
+// BL-AIP-5 — the merge lives in src/lib/solicitation-requirements.ts so
+// the parent's own re-parse can call it too (it used to wipe every
+// companion document's clauses), and deleting a document now drops that
+// document's clauses instead of leaving them in the list for good.
 async function mergeDocumentRequirementsHelper(
   solicitationId: string,
   organizationId: string,
 ): Promise<void> {
-  const [parentRow] = await db
-    .select({
-      id: solicitations.id,
-      extractedRequirements: solicitations.extractedRequirements,
-    })
-    .from(solicitations)
-    .where(
-      and(
-        eq(solicitations.id, solicitationId),
-        eq(solicitations.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-  if (!parentRow) return;
-
-  const docRows = await db
-    .select({
-      id: solicitationDocuments.id,
-      extractedRequirements: solicitationDocuments.extractedRequirements,
-      parseStatus: solicitationDocuments.parseStatus,
-    })
-    .from(solicitationDocuments)
-    .where(
-      and(
-        eq(solicitationDocuments.solicitationId, solicitationId),
-        eq(solicitationDocuments.organizationId, organizationId),
-      ),
-    );
-
-  // Start with the parent's own requirements (no sourceDocId).
-  const parentReqs = (parentRow.extractedRequirements ?? []) as SolicitationRequirement[];
-  const baseReqs: SolicitationRequirement[] = parentReqs.map((r) => ({
-    kind: r.kind,
-    text: r.text,
-    ref: r.ref,
-    // Preserve existing sourceDocId if present; strip if it was tagged by a
-    // now-deleted doc (we don't know which doc was deleted here, so keep existing).
-    ...(r.sourceDocId ? { sourceDocId: r.sourceDocId } : {}),
-  }));
-
-  // Collect companion-document requirements, tagging each with sourceDocId.
-  const companionReqs: SolicitationRequirement[] = [];
-  for (const doc of docRows) {
-    if (doc.parseStatus !== "parsed") continue;
-    const docReqs = (doc.extractedRequirements ?? []) as SolicitationRequirement[];
-    for (const r of docReqs) {
-      companionReqs.push({
-        kind: r.kind,
-        text: r.text,
-        ref: r.ref,
-        sourceDocId: doc.id,
-      });
-    }
-  }
-
-  // Deduplicate companion requirements against the base set using Jaccard similarity.
-  const merged = dedupeRequirements(baseReqs, companionReqs);
-
-  await db
-    .update(solicitations)
-    .set({ extractedRequirements: merged, updatedAt: new Date() })
-    .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
-}
-
-const JACCARD_THRESHOLD = 0.6;
-
-function tokenize(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/\W+/)
-      .filter((t) => t.length > 2),
-  );
-}
-
-function jaccard(a: string, b: string): number {
-  const setA = tokenize(a);
-  const setB = tokenize(b);
-  if (setA.size === 0 && setB.size === 0) return 1;
-  let intersection = 0;
-  for (const t of setA) if (setB.has(t)) intersection++;
-  const union = new Set([...setA, ...setB]).size;
-  return union === 0 ? 0 : intersection / union;
-}
-
-function dedupeRequirements(
-  base: SolicitationRequirement[],
-  incoming: SolicitationRequirement[],
-): SolicitationRequirement[] {
-  const result = [...base];
-  for (const candidate of incoming) {
-    const isDup = result.some(
-      (existing) => jaccard(existing.text, candidate.text) >= JACCARD_THRESHOLD,
-    );
-    if (!isDup) result.push(candidate);
-  }
-  return result;
+  await mergeSolicitationRequirements(solicitationId, organizationId);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
