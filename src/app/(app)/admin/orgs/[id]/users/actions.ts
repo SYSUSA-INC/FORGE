@@ -13,6 +13,12 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { inviteUrl } from "@/lib/app-url";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { domainOf, inviteAwaitsApproval, isCrossDomainInvite } from "@/lib/email-domain";
+import {
+  approveCrossDomainInvite,
+  denyCrossDomainInvite,
+  findHomeOrganization,
+} from "@/lib/invite-approval";
 import { deliverInvite } from "@/lib/invite-send";
 import type { InviteResult } from "@/lib/invite-types";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
@@ -93,12 +99,23 @@ export async function superadminInviteUserAction(
       name: organizations.name,
       disabledAt: organizations.disabledAt,
       itarRestricted: organizations.itarRestricted,
+      emailDomains: organizations.emailDomains,
+      approvedExternalDomains: organizations.approvedExternalDomains,
     })
     .from(organizations)
     .where(eq(organizations.id, organizationId))
     .limit(1);
   if (!org) return { ok: false, error: "Tenant not found." };
   if (org.disabledAt) return { ok: false, error: "That tenant is disabled. Enable it before inviting." };
+
+  // BL-AUTH-DOMAIN — a platform admin IS the approver, so a cross-domain
+  // invite issued here is stamped approved at creation (and audited as
+  // such) instead of being held.
+  const crossDomain = isCrossDomainInvite(email, org);
+  const homeOrganization = crossDomain ? await findHomeOrganization(domainOf(email)) : null;
+  const approvalStamp = crossDomain
+    ? { platformApprovedAt: new Date(), platformApprovedByUserId: actor.id }
+    : { platformApprovedAt: null, platformApprovedByUserId: null };
 
   if (org.itarRestricted && !input.attestUsPerson) {
     await recordAudit({
@@ -163,6 +180,9 @@ export async function superadminInviteUserAction(
         revoked: false,
         usPersonAttested: attestUsPerson,
         usPersonAttestedAt: attestUsPersonAt,
+        crossDomain,
+        homeOrganizationId: homeOrganization?.id ?? null,
+        ...approvalStamp,
       })
       .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, existingPending.id)));
     inviteId = existingPending.id;
@@ -177,6 +197,9 @@ export async function superadminInviteUserAction(
         invitedByUserId: actor.id,
         usPersonAttested: attestUsPerson,
         usPersonAttestedAt: attestUsPersonAt,
+        crossDomain,
+        homeOrganizationId: homeOrganization?.id ?? null,
+        ...approvalStamp,
       })
       .returning({ id: allowlist.id });
     if (!row) return { ok: false, error: "Could not create invitation." };
@@ -205,6 +228,9 @@ export async function superadminInviteUserAction(
       role: input.role,
       itarRestricted: !!org.itarRestricted,
       usPersonAttested: attestUsPerson,
+      crossDomain,
+      platformApproved: crossDomain ? true : undefined,
+      homeOrganizationId: homeOrganization?.id ?? null,
       emailSent: delivery.emailSent,
       viaSuperadmin: true,
     },
@@ -396,6 +422,8 @@ async function loadPendingInvite(
       role: allowlist.role,
       consumedAt: allowlist.consumedAt,
       revoked: allowlist.revoked,
+      crossDomain: allowlist.crossDomain,
+      platformApprovedAt: allowlist.platformApprovedAt,
       organizationName: organizations.name,
     })
     .from(allowlist)
@@ -410,6 +438,14 @@ async function loadPendingInvite(
   if (!invite) return { ok: false, error: "Invite not found." };
   if (invite.consumedAt) return { ok: false, error: "Invite already consumed." };
   if (invite.revoked) return { ok: false, error: "Invite was revoked. Create a new one instead." };
+  // BL-AUTH-DOMAIN — a held invite has no link; approve it first.
+  if (inviteAwaitsApproval(invite)) {
+    return {
+      ok: false,
+      error:
+        "This cross-domain invitation is waiting for platform approval. Approve it (which sends the invitation) instead of resending.",
+    };
+  }
   return {
     ok: true,
     invite: {
@@ -464,6 +500,65 @@ export async function superadminResendInviteAction(
     emailSent: delivery.emailSent,
     warning: delivery.warning,
   };
+}
+
+/**
+ * BL-AUTH-DOMAIN — approve a cross-domain invitation. Only a platform
+ * superadmin can do this; the tenant's own admins cannot. Approving
+ * issues the link and emails the invitee. With `allowDomain` the
+ * invitee's domain is also added to the tenant's approved external
+ * domains, so later invites from it need no approval.
+ */
+export async function superadminApproveCrossDomainInviteAction(
+  organizationId: string,
+  inviteId: string,
+  options?: { allowDomain?: boolean },
+): Promise<InviteResult> {
+  const actor = await requireSuperadmin();
+  if (!organizationId || !inviteId) return { ok: false, error: "Invite not found." };
+
+  const res = await approveCrossDomainInvite({
+    inviteId,
+    organizationId,
+    actor: { id: actor.id, email: actor.email, name: actor.name },
+    allowDomain: !!options?.allowDomain,
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/orgs/${organizationId}`);
+  revalidatePath(`/admin/orgs/${organizationId}/users`);
+  revalidatePath("/users");
+  return {
+    ok: true,
+    inviteId: res.inviteId,
+    inviteUrl: res.delivery.inviteUrl,
+    emailSent: res.delivery.emailSent,
+    warning: res.domainAllowed
+      ? `${res.domainAllowed} is now an approved domain for this tenant.${res.delivery.warning ? ` ${res.delivery.warning}` : ""}`
+      : res.delivery.warning,
+  };
+}
+
+/** BL-AUTH-DOMAIN — deny (revoke) a cross-domain invitation. Audited. */
+export async function superadminDenyCrossDomainInviteAction(
+  organizationId: string,
+  inviteId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  if (!organizationId || !inviteId) return { ok: false, error: "Invite not found." };
+
+  const res = await denyCrossDomainInvite({
+    inviteId,
+    organizationId,
+    actor: { id: actor.id, email: actor.email },
+  });
+  if (!res.ok) return res;
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/orgs/${organizationId}/users`);
+  revalidatePath("/users");
+  return { ok: true };
 }
 
 /** BL-AUTH-INVITE — a fresh link to hand over by other means; no email. */

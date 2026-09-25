@@ -102,6 +102,10 @@ Invites expire after **7 days**.
 
 > **Platform admins (superadmins):** you are not a member of the tenants you support, so the invite panel shows a mandatory **Tenant** selector for you — on `/users`, on **Platform admin → Organizations → Invite a user to a tenant**, and on each tenant's **Users** page. Tenant admins never see the selector; they can only invite into their own tenant.
 
+**Email domains (BL-AUTH-DOMAIN).** By default a person may only join the tenant that owns their email domain. Every organization carries a list of **owned domains** (backfilled from its admins' addresses, e.g. `sysusa.com`) and a list of **approved external domains** that a platform admin has allowed for it. The invite panel shows both lists under the email field. Inviting someone whose address is on either list works as described above. Inviting anyone else — another company's domain, or a public mailbox such as gmail.com — creates the invitation **on hold**: the button reads **Request approval**, nothing is emailed to the person, no link exists, and the request goes to the platform admins. The **Pending invitations** panel shows it with an **Awaiting platform approval** badge until a platform admin approves it (the invitation is then sent) or denies it (the invitation is revoked). A tenant admin cannot approve it, and cannot edit the domain lists: this is what stops one company sharing another's tenant, and stops anyone being added to a tenant their employer does not run without the platform noticing. If your workspace shows *no domains on file*, every invitation is held — ask the platform admin to set your domains on the tenant detail page.
+
+Members who joined before this rule (or were approved one at a time) from another domain are marked **External domain** in the Members panel; nothing happens to them automatically.
+
 ### 2.3 Manage pending invitations
 
 The **Pending invitations** panel lists invites not yet accepted. For each:
@@ -109,6 +113,8 @@ The **Pending invitations** panel lists invites not yet accepted. For each:
 - **Copy link** — issues a fresh link without sending an email (old link stops working); share it by any channel
 - **Resend** — issues a fresh token and re-sends the email (old link stops working); shows the link too
 - **Revoke** — cancels the invite; the link returns "Invitation not found"
+
+An invite marked **Awaiting platform approval** has neither Copy link nor Resend: no link can exist until a platform admin approves it. Revoke still works if you change your mind.
 
 ### 2.4 Manage members
 
@@ -183,7 +189,15 @@ Left: **Onboard a new organization** panel.
 
 Click **Create organization**. This creates the organization row and sends an invitation to the initial admin. When they accept, they land inside the new org with admin role. The invite link is shown with a **Copy link** button, and the notice says whether the email went out.
 
-Above it, **Invite a user to a tenant** invites anyone into any existing tenant. The **Tenant** field is required: pick the organization, then email, role and optional title. If the tenant is ITAR-restricted, tick the US-person attestation or the invite is refused. The invite is written to that tenant's audit log with `viaSuperadmin: true`, and the resulting link is shown for manual delivery.
+Above it, **Invite a user to a tenant** invites anyone into any existing tenant. The **Tenant** field is required: pick the organization, then email, role and optional title. If the tenant is ITAR-restricted, tick the US-person attestation or the invite is refused. The invite is written to that tenant's audit log with `viaSuperadmin: true`, and the resulting link is shown for manual delivery. A platform admin *is* the approver for cross-domain access, so an invite you issue for someone from another domain is stamped approved at creation and goes out at once (audited with `crossDomain: true, platformApproved: true`).
+
+At the top of the tab, **Cross-domain approvals** is your queue (BL-AUTH-DOMAIN). Each row is an invitation a tenant admin requested for someone whose email domain that tenant neither owns nor has approved — for example an `enablenow.com` address into the `sysusa.com` tenant. The row shows who was invited, into which tenant, as what role, who asked, and whether the invitee's domain belongs to another tenant on the platform. The invitee has not been contacted. Three actions:
+
+- **Approve** — lets this one person in: the invitation is sent and its link is shown to you.
+- **Approve + allow domain** — the same, and the domain is added to that tenant's **approved external domains**, so future invites from it need no approval (use for a teaming partner; unavailable for public mailbox providers).
+- **Deny** — revokes the invitation; the tenant admin sees it disappear from their pending list.
+
+Every decision is written to the tenant's audit log (`user.invite_cross_domain_approve` / `user.invite_cross_domain_deny`, plus `tenant.approved_domain_add` when a domain is allowed). The platform admins are also emailed when a request is created, when email delivery is configured. The header tile **Cross-domain approvals** counts what is waiting; the same requests appear on the tenant's **Users** page with the same buttons.
 
 Right: **All organizations** — searchable list with member count, created date, disabled status, and pending admin invite if any.
 
@@ -231,6 +245,7 @@ What it shows:
 - **Subscription tier panel**: current tier name + status + effective quotas + override status. Dropdown to **change tier** (see §6.5).
 - **Storage & config**: knowledge artifact count + total bytes used (formatted B / KB / MB / GB / TB), notification rule count.
 - **Most active operators (last 30d)**: top five actors by audit-row count, with a deep link into `/platform/audit-log?orgId=<id>` for the full trail.
+- **Email domains** (BL-AUTH-DOMAIN): the tenant's **owned domains** and **approved external domains**, editable only here (one per line; public mailbox providers are refused). Below the editor, **Members from other domains** lists every current member whose address is on neither list, so you can decide to allow the domain or remove the person on the tenant users page — nothing is removed automatically. This is where you set a tenant's domains when its invite panel says *no domains on file*, and where you record that a partner company is allowed in.
 
 Loading this page is itself a sensitive cross-tenant read, so every visit writes a `tenant.view_summary` row into the *target* tenant's audit log. The tenant's own org-admin can see in `/audit-log` when platform support looked at their workspace.
 

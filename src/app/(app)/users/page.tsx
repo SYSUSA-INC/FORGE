@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import { inviteAwaitsApproval, tenantAllowsEmail } from "@/lib/email-domain";
 import { getMembersSummary } from "@/lib/settings-status";
 import { UsersClient } from "./UsersClient";
 
@@ -39,6 +40,8 @@ export default async function UsersPage() {
         consumedAt: allowlist.consumedAt,
         revoked: allowlist.revoked,
         invitedByUserId: allowlist.invitedByUserId,
+        crossDomain: allowlist.crossDomain,
+        platformApprovedAt: allowlist.platformApprovedAt,
       })
       .from(allowlist)
       .where(
@@ -50,7 +53,11 @@ export default async function UsersPage() {
       .orderBy(desc(allowlist.invitedAt)),
     getMembersSummary(organizationId),
     db
-      .select({ itarRestricted: organizations.itarRestricted })
+      .select({
+        itarRestricted: organizations.itarRestricted,
+        emailDomains: organizations.emailDomains,
+        approvedExternalDomains: organizations.approvedExternalDomains,
+      })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .limit(1),
@@ -72,6 +79,14 @@ export default async function UsersPage() {
 
   const pending = inviteRows.filter((i) => !i.consumedAt);
 
+  // BL-AUTH-DOMAIN — the tenant's domain lists drive the invite panel's
+  // hint and the "external domain" badge on members who joined before
+  // the rule (or were approved by a platform admin).
+  const tenantDomains = {
+    emailDomains: orgRow[0]?.emailDomains ?? [],
+    approvedExternalDomains: orgRow[0]?.approvedExternalDomains ?? [],
+  };
+
   return (
     <UsersClient
       currentUserId={actor.id}
@@ -86,6 +101,7 @@ export default async function UsersPage() {
         title: m.title,
         joinedAt: m.joinedAt.toISOString(),
         verified: !!m.emailVerified,
+        externalDomain: !tenantAllowsEmail(m.email, tenantDomains),
       }))}
       pendingInvites={pending.map((i) => ({
         id: i.id,
@@ -93,8 +109,10 @@ export default async function UsersPage() {
         role: i.role,
         title: i.title,
         invitedAt: i.invitedAt.toISOString(),
+        awaitingApproval: inviteAwaitsApproval(i),
       }))}
       itarRestricted={orgRow[0]?.itarRestricted ?? false}
+      tenantDomains={tenantDomains}
       isSuperadmin={actor.isSuperadmin}
       currentOrganizationId={organizationId}
       tenants={tenantRows}

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { recordRead } from "@/lib/audit-log";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { domainOf, inviteAwaitsApproval, tenantAllowsEmail } from "@/lib/email-domain";
 import { TenantUsersClient } from "./TenantUsersClient";
 
 export const dynamic = "force-dynamic";
@@ -45,12 +46,19 @@ export default async function TenantUsersPage({
       disabledAt: organizations.disabledAt,
       primaryAdminUserId: organizations.primaryAdminUserId,
       itarRestricted: organizations.itarRestricted,
+      emailDomains: organizations.emailDomains,
+      approvedExternalDomains: organizations.approvedExternalDomains,
     })
     .from(organizations)
     .where(eq(organizations.id, params.id))
     .limit(1);
 
   if (!org) notFound();
+
+  const tenantDomains = {
+    emailDomains: org.emailDomains,
+    approvedExternalDomains: org.approvedExternalDomains,
+  };
 
   const [memberRows, inviteRows] = await Promise.all([
     db
@@ -79,6 +87,8 @@ export default async function TenantUsersPage({
         invitedAt: allowlist.invitedAt,
         consumedAt: allowlist.consumedAt,
         revoked: allowlist.revoked,
+        crossDomain: allowlist.crossDomain,
+        platformApprovedAt: allowlist.platformApprovedAt,
       })
       .from(allowlist)
       .where(
@@ -91,6 +101,7 @@ export default async function TenantUsersPage({
   ]);
 
   const pendingInvites = inviteRows.filter((i) => !i.consumedAt);
+  const awaitingApprovalCount = pendingInvites.filter((i) => inviteAwaitsApproval(i)).length;
 
   const activeAdminCount = memberRows.filter(
     (m) => m.role === "admin" && m.status === "active",
@@ -143,6 +154,11 @@ export default async function TenantUsersPage({
             value: String(pendingInvites.length),
             accent: pendingInvites.length > 0 ? "violet" : undefined,
           },
+          {
+            label: "Awaiting your approval",
+            value: String(awaitingApprovalCount),
+            accent: awaitingApprovalCount > 0 ? "gold" : undefined,
+          },
         ]}
       />
 
@@ -167,6 +183,7 @@ export default async function TenantUsersPage({
         organizationId={org.id}
         organizationName={org.name}
         itarRestricted={org.itarRestricted}
+        tenantDomains={tenantDomains}
         members={memberRows.map((m) => ({
           userId: m.userId,
           name: m.name,
@@ -179,13 +196,16 @@ export default async function TenantUsersPage({
           verified: !!m.emailVerified,
           userGloballyDisabled: !!m.userDisabledAt,
           isPrimaryAdmin: m.userId === org.primaryAdminUserId,
+          externalDomain: !tenantAllowsEmail(m.email, tenantDomains),
         }))}
         pendingInvites={pendingInvites.map((i) => ({
           id: i.id,
           email: i.email,
+          domain: domainOf(i.email),
           role: i.role,
           title: i.title,
           invitedAt: i.invitedAt.toISOString(),
+          awaitingApproval: inviteAwaitsApproval(i),
         }))}
         activeAdminCount={activeAdminCount}
       />

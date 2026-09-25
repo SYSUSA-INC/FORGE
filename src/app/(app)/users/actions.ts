@@ -17,6 +17,13 @@ import {
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { inviteUrl } from "@/lib/app-url";
+import {
+  crossDomainReason,
+  domainOf,
+  inviteAwaitsApproval,
+  isCrossDomainInvite,
+} from "@/lib/email-domain";
+import { findHomeOrganization, notifyPlatformAdmins } from "@/lib/invite-approval";
 import { deliverInvite } from "@/lib/invite-send";
 import type { InviteResult } from "@/lib/invite-types";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
@@ -41,6 +48,11 @@ const ASSIGNABLE_ROLES: Role[] = [
 function isAssignableRole(v: unknown): v is Role {
   return typeof v === "string" && (ASSIGNABLE_ROLES as string[]).includes(v);
 }
+
+// BL-AUTH-DOMAIN — no link may exist for an invite the platform admin
+// has not approved; Copy link and Resend are refused until then.
+const AWAITING_APPROVAL_ERROR =
+  "This invitation is waiting for platform-admin approval (the invitee is from another email domain). No link can be issued until it is approved.";
 
 export async function inviteUserAction(input: {
   email: string;
@@ -71,11 +83,17 @@ export async function inviteUserAction(input: {
   // admin MUST attest that the invitee is a US person. Without the
   // attestation we refuse + audit the denial.
   const [orgRow] = await db
-    .select({ itarRestricted: organizations.itarRestricted })
+    .select({
+      name: organizations.name,
+      itarRestricted: organizations.itarRestricted,
+      emailDomains: organizations.emailDomains,
+      approvedExternalDomains: organizations.approvedExternalDomains,
+    })
     .from(organizations)
     .where(eq(organizations.id, organizationId))
     .limit(1);
-  if (orgRow?.itarRestricted && !input.attestUsPerson) {
+  if (!orgRow) return { ok: false, error: "Workspace not found." };
+  if (orgRow.itarRestricted && !input.attestUsPerson) {
     await recordAudit({
       organizationId,
       actor: { userId: user.id, email: user.email },
@@ -122,8 +140,15 @@ export async function inviteUserAction(input: {
     return { ok: false, error: "That email already belongs to a member." };
   }
 
+  // BL-AUTH-DOMAIN — by default a person may only join the tenant that
+  // owns their email domain. A tenant admin cannot add anyone from
+  // another domain on their own: the invite is created on hold, nothing
+  // reaches the invitee, and a platform admin has to approve it.
+  const crossDomain = isCrossDomainInvite(email, orgRow);
+  const homeOrganization = crossDomain ? await findHomeOrganization(domainOf(email)) : null;
+
   const [existingPending] = await db
-    .select({ id: allowlist.id })
+    .select({ id: allowlist.id, platformApprovedAt: allowlist.platformApprovedAt })
     .from(allowlist)
     .where(
       and(
@@ -135,6 +160,9 @@ export async function inviteUserAction(input: {
     .limit(1);
 
   let inviteId: string;
+  // A re-invite keeps an approval the platform admin already granted for
+  // this person into this tenant; a same-domain invite needs none.
+  const platformApprovedAt = crossDomain ? (existingPending?.platformApprovedAt ?? null) : null;
   if (existingPending) {
     await db
       .update(allowlist)
@@ -147,6 +175,9 @@ export async function inviteUserAction(input: {
         revoked: false,
         usPersonAttested: attestUsPerson,
         usPersonAttestedAt: attestUsPersonAt,
+        crossDomain,
+        homeOrganizationId: homeOrganization?.id ?? null,
+        ...(crossDomain ? {} : { platformApprovedAt: null, platformApprovedByUserId: null }),
       })
       .where(and(eq(allowlist.organizationId, organizationId), eq(allowlist.id, existingPending.id)));
     inviteId = existingPending.id;
@@ -161,19 +192,50 @@ export async function inviteUserAction(input: {
         invitedByUserId: user.id,
         usPersonAttested: attestUsPerson,
         usPersonAttestedAt: attestUsPersonAt,
+        crossDomain,
+        homeOrganizationId: homeOrganization?.id ?? null,
       })
       .returning({ id: allowlist.id });
     if (!row) return { ok: false, error: "Could not create invitation." };
     inviteId = row.id;
   }
 
-  const token = await issueToken("invite", inviteId);
+  if (inviteAwaitsApproval({ crossDomain, platformApprovedAt })) {
+    const reason = crossDomainReason(email, orgRow);
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "user.invite_held_cross_domain",
+      resourceType: "user",
+      resourceId: inviteId,
+      metadata: {
+        invitedEmail: email,
+        role: input.role,
+        domain: domainOf(email),
+        homeOrganizationId: homeOrganization?.id ?? null,
+        tenantDomains: orgRow.emailDomains,
+      },
+    });
+    const notice = await notifyPlatformAdmins({
+      inviteId,
+      organizationId,
+      inviteeEmail: email,
+      targetOrganizationName: orgRow.name,
+      homeOrganization,
+      requestedBy: user.name ?? user.email ?? "A tenant admin",
+    });
+    revalidatePath("/users");
+    return {
+      ok: true,
+      inviteId,
+      inviteUrl: null,
+      emailSent: false,
+      pendingApproval: true,
+      warning: notice.warning ? `${reason} ${notice.warning}` : reason,
+    };
+  }
 
-  const [org] = await db
-    .select({ name: organizations.name })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
+  const token = await issueToken("invite", inviteId);
 
   // BL-AUTH-INVITE — the invite exists whether or not the email goes out;
   // the admin always gets the link and an honest emailSent flag.
@@ -181,7 +243,7 @@ export async function inviteUserAction(input: {
     to: email,
     inviteId,
     token,
-    organizationName: org?.name ?? "your workspace",
+    organizationName: orgRow.name,
     inviterName: user.name ?? user.email ?? "A team member",
     role: input.role,
     tag: "[inviteUserAction]",
@@ -196,8 +258,10 @@ export async function inviteUserAction(input: {
     metadata: {
       invitedEmail: email,
       role: input.role,
-      itarRestricted: !!orgRow?.itarRestricted,
+      itarRestricted: !!orgRow.itarRestricted,
       usPersonAttested: attestUsPerson,
+      crossDomain,
+      platformApproved: crossDomain ? !!platformApprovedAt : undefined,
       emailSent: delivery.emailSent,
     },
   });
@@ -243,7 +307,13 @@ export async function createInviteLinkAction(
   await requireOrgAdmin(organizationId);
 
   const [inv] = await db
-    .select({ id: allowlist.id, email: allowlist.email, consumedAt: allowlist.consumedAt })
+    .select({
+      id: allowlist.id,
+      email: allowlist.email,
+      consumedAt: allowlist.consumedAt,
+      crossDomain: allowlist.crossDomain,
+      platformApprovedAt: allowlist.platformApprovedAt,
+    })
     .from(allowlist)
     .where(
       and(
@@ -255,6 +325,7 @@ export async function createInviteLinkAction(
     .limit(1);
   if (!inv) return { ok: false, error: "Invite not found." };
   if (inv.consumedAt) return { ok: false, error: "Invite already accepted." };
+  if (inviteAwaitsApproval(inv)) return { ok: false, error: AWAITING_APPROVAL_ERROR };
 
   const token = await issueToken("invite", inv.id);
 
@@ -319,6 +390,7 @@ export async function resendInviteAction(
     .limit(1);
   if (!inv) return { ok: false, error: "Invite not found." };
   if (inv.consumedAt) return { ok: false, error: "Invite already accepted." };
+  if (inviteAwaitsApproval(inv)) return { ok: false, error: AWAITING_APPROVAL_ERROR };
 
   const token = await issueToken("invite", inv.id);
 

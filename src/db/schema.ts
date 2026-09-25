@@ -226,9 +226,30 @@ export const organizations = pgTable("organization", {
   // lifts.
   itarRestricted: boolean("itar_restricted").notNull().default(false),
 
+  // BL-AUTH-DOMAIN — the email domains this tenant owns (drizzle/0083).
+  // By default a person may only join the tenant that owns their
+  // domain; an invite from any other domain is held until a platform
+  // superadmin approves it. Backfilled from active admins' emails;
+  // edited by a platform superadmin on the tenant detail page. Never a
+  // public mailbox provider.
+  emailDomains: text("email_domains")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+  // BL-AUTH-DOMAIN — external domains a platform superadmin has approved
+  // for this tenant (e.g. a teaming partner). Invites from these domains
+  // need no per-invite approval. Only a superadmin edits this list.
+  approvedExternalDomains: text("approved_external_domains")
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::text[]`),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  // drizzle/0083 — `email_domains @> ARRAY[domain]` lookups.
+  emailDomainsGinIdx: index("organization_email_domains_gin_idx").using("gin", t.emailDomains),
+}));
 
 export const memberships = pgTable(
   "membership",
@@ -278,9 +299,21 @@ export const allowlist = pgTable("allowlist", {
   // don't need to join through this (eventually expired) row.
   usPersonAttested: boolean("us_person_attested").notNull().default(false),
   usPersonAttestedAt: timestamp("us_person_attested_at"),
+  // BL-AUTH-DOMAIN (drizzle/0083) — set when the invitee's email domain
+  // is neither owned by nor approved for the target tenant. Such an
+  // invite has no usable link until a platform superadmin stamps
+  // `platform_approved_at` (a superadmin issuing the invite stamps it at
+  // once). `home_organization_id` records which tenant owns the
+  // invitee's domain, if any, for the approver's context only.
+  crossDomain: boolean("cross_domain").notNull().default(false),
+  homeOrganizationId: uuid("home_organization_id"),
+  platformApprovedAt: timestamp("platform_approved_at"),
+  platformApprovedByUserId: text("platform_approved_by_user_id"),
 }, (t) => ({
   // BL-TENANT-AUDIT 2026-09 — leading org index (drizzle/0077).
   organizationIdIdx: index("allowlist_organization_id_idx").on(t.organizationId),
+  // drizzle/0083 — "which of my people were invited elsewhere".
+  homeOrganizationIdIdx: index("allowlist_home_organization_id_idx").on(t.homeOrganizationId),
 }));
 
 export type User = typeof users.$inferSelect;

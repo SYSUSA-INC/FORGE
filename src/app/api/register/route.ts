@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
 import { sendVerificationEmail } from "@/lib/email";
+import { domainOf, inviteAwaitsApproval, isPublicEmailDomain } from "@/lib/email-domain";
+import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { consumeToken, issueToken } from "@/lib/tokens";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
@@ -31,11 +33,16 @@ async function provisionUserAndOrg(opts: {
   if (!user) throw new Error("User insert returned empty");
 
   try {
+    // BL-AUTH-DOMAIN — a self-provisioned workspace owns its founder's
+    // domain (never a public provider), so the next person from that
+    // company is routed to this tenant instead of founding another.
+    const ownDomain = domainOf(opts.email);
     const [org] = await db
       .insert(organizations)
       .values({
         name: defaultOrgName(opts.name),
         slug: defaultOrgSlug(opts.name),
+        emailDomains: ownDomain && !isPublicEmailDomain(ownDomain) ? [ownDomain] : [],
       })
       .returning({ id: organizations.id });
     if (!org) throw new Error("Organization insert returned empty");
@@ -81,6 +88,18 @@ async function acceptInvite(opts: {
   if (!inv) return { ok: false, error: "Invitation not found or revoked.", status: 404 };
   if (inv.consumedAt) {
     return { ok: false, error: "Invitation already used.", status: 409 };
+  }
+  // BL-AUTH-DOMAIN — a cross-domain invite is unusable until a platform
+  // admin approves it, whatever link the caller holds (a token from
+  // before the tenant's domains changed must not get anyone in).
+  // Checked before the token is spent so nothing is burned.
+  if (inviteAwaitsApproval(inv)) {
+    return {
+      ok: false,
+      error:
+        "This invitation is waiting for platform-admin approval because your email domain is not part of that organization. You will get an email once it is approved.",
+      status: 403,
+    };
   }
 
   const ok = await consumeToken("invite", inv.id, opts.rawToken);
@@ -279,6 +298,21 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: "Enter a valid email address." },
         { status: 400 },
+      );
+    }
+
+    // BL-AUTH-DOMAIN — by default a person may only join the tenant that
+    // owns their email domain. When one already does, self-service must
+    // not found a second workspace for the same company: they get in by
+    // invitation from that tenant's admin.
+    const homeOrganization = await findHomeOrganizationForEmail(email);
+    if (homeOrganization) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Your organization (${homeOrganization.name}) is already on FORGE. Ask its admin to invite you instead of creating a new workspace.`,
+        },
+        { status: 403 },
       );
     }
 

@@ -15,10 +15,14 @@
  * Cross-tenant by nature (an email can hold invites to several tenants);
  * every write carries the invite's own organization_id. Server-only lib,
  * called from the NextAuth events, never from a client.
+ *
+ * BL-AUTH-DOMAIN — a cross-domain invite the platform admin has not yet
+ * approved is skipped: the provider proving the address does not make
+ * the tenant allowed to have it.
  */
 import "server-only";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, users } from "@/db/schema";
 import { log } from "@/lib/log";
@@ -54,6 +58,7 @@ export async function attachPendingInvitesByEmail(input: {
         eq(allowlist.email, email),
         eq(allowlist.revoked, false),
         isNull(allowlist.consumedAt),
+        or(eq(allowlist.crossDomain, false), sql`${allowlist.platformApprovedAt} IS NOT NULL`),
       ),
     );
 

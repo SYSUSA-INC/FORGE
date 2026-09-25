@@ -11,6 +11,8 @@ import { verifyPassword } from "@/lib/passwords";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { selfServiceRegistrationAllowed } from "@/lib/signup-mode";
 import { attachPendingInvitesByEmail } from "@/lib/invite-accept";
+import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
+import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 
 async function enrichFromDb(userId: string): Promise<{
@@ -52,7 +54,11 @@ async function enrichFromDb(userId: string): Promise<{
   };
 }
 
-async function provisionOrgForUser(userId: string, name: string | null | undefined) {
+async function provisionOrgForUser(
+  userId: string,
+  name: string | null | undefined,
+  email: string | null | undefined,
+) {
   const [existing] = await db
     .select({ userId: memberships.userId })
     .from(memberships)
@@ -60,11 +66,26 @@ async function provisionOrgForUser(userId: string, name: string | null | undefin
     .limit(1);
   if (existing) return;
 
+  // BL-AUTH-DOMAIN — by default a person may only join the tenant that
+  // owns their email domain. When one does, no shadow workspace is
+  // founded for them: they need an invitation from that tenant's admin
+  // (which the sign-in event above will pick up once it exists).
+  const home = email ? await findHomeOrganizationForEmail(email) : null;
+  if (home) {
+    log.warn("[provisionOrgForUser]", "skipped: email domain belongs to an existing tenant", {
+      userId,
+      organizationId: home.id,
+    });
+    return;
+  }
+  const ownDomain = domainOf(email);
+
   const [org] = await db
     .insert(organizations)
     .values({
       name: defaultOrgName(name ?? ""),
       slug: defaultOrgSlug(name ?? ""),
+      emailDomains: ownDomain && !isPublicEmailDomain(ownDomain) ? [ownDomain] : [],
     })
     .returning({ id: organizations.id });
   if (!org) return;
@@ -180,7 +201,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
 
       try {
-        await provisionOrgForUser(user.id, user.name);
+        await provisionOrgForUser(user.id, user.name, user.email);
       } catch (err) {
         log.error("[events.createUser]", "org provisioning failed", { error: err });
       }
@@ -203,7 +224,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
       if (!selfServiceRegistrationAllowed()) return;
       try {
-        await provisionOrgForUser(user.id, user.name);
+        await provisionOrgForUser(user.id, user.name, user.email);
       } catch (err) {
         log.error("[events.signIn]", "org provisioning failed", { error: err });
       }

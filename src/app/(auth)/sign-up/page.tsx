@@ -9,6 +9,7 @@ import {
   anySignupAllowed,
   selfServiceRegistrationAllowed,
 } from "@/lib/signup-mode";
+import { inviteAwaitsApproval } from "@/lib/email-domain";
 import { peekToken } from "@/lib/tokens";
 import { SignUpForm } from "./SignUpForm";
 
@@ -33,6 +34,8 @@ export default async function SignUpPage({
     organizationName: string;
     expired?: boolean;
     consumed?: boolean;
+    /** BL-AUTH-DOMAIN — held for platform approval; no details shown. */
+    awaitingApproval?: boolean;
   } | null = null;
 
   if (inviteToken && inviteId) {
@@ -43,6 +46,8 @@ export default async function SignUpPage({
         role: allowlist.role,
         consumedAt: allowlist.consumedAt,
         revoked: allowlist.revoked,
+        crossDomain: allowlist.crossDomain,
+        platformApprovedAt: allowlist.platformApprovedAt,
         orgName: organizations.name,
       })
       .from(allowlist)
@@ -58,6 +63,10 @@ export default async function SignUpPage({
     if (row && !row.revoked) {
       if (row.consumedAt) {
         invite = { id: row.id, email: "", role: "", organizationName: "", consumed: true };
+      } else if (inviteAwaitsApproval(row)) {
+        // No token is ever issued for a held invite, but an old link from
+        // before the tenant's domains changed could still carry one.
+        invite = { id: row.id, email: "", role: "", organizationName: "", awaitingApproval: true };
       } else if (await peekToken("invite", row.id, inviteToken)) {
         invite = {
           id: row.id,
@@ -123,6 +132,24 @@ export default async function SignUpPage({
               </h1>
               <p className="mt-2 text-sm text-muted">
                 This invite link is invalid or has been revoked. Ask your admin to resend it.
+              </p>
+              <Link
+                href="/sign-in"
+                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+              >
+                Go to sign in
+              </Link>
+            </>
+          ) : invite?.awaitingApproval ? (
+            <>
+              <h1 className="mt-8 font-display text-2xl font-semibold tracking-tight text-text">
+                Invitation awaiting approval
+              </h1>
+              <p className="mt-2 text-sm text-muted">
+                Your email domain is not part of the organization that invited
+                you, so a platform administrator has to approve the invitation
+                first. You will receive an email with a working link once that
+                happens.
               </p>
               <Link
                 href="/sign-in"

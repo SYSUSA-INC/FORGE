@@ -88,6 +88,44 @@ describe("BL-AUTH-INVITE — attachPendingInvitesByEmail", () => {
     expect(again).toEqual({ attached: 0, alreadyMember: 0, organizationIds: [] });
   });
 
+  it("BL-AUTH-DOMAIN — skips a cross-domain invite until a platform admin approves it", async () => {
+    const email = `held-${Date.now().toString(36)}@other-company.test`;
+    const [inv] = await db
+      .insert(allowlist)
+      .values({
+        email,
+        organizationId: fx.orgA.organizationId,
+        role: "viewer",
+        invitedByUserId: fx.orgA.userId,
+        crossDomain: true,
+      })
+      .returning({ id: allowlist.id });
+    const userId = await newUser(email);
+
+    // Held: the provider proving the address does not let the tenant have it.
+    const held = await attachPendingInvitesByEmail({ userId, email });
+    expect(held).toEqual({ attached: 0, alreadyMember: 0, organizationIds: [] });
+    const before = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, fx.orgA.organizationId)));
+    expect(before).toEqual([]);
+    const [stillOpen] = await db
+      .select({ consumedAt: allowlist.consumedAt })
+      .from(allowlist)
+      .where(and(eq(allowlist.id, inv!.id), eq(allowlist.organizationId, fx.orgA.organizationId)));
+    expect(stillOpen?.consumedAt).toBeNull();
+
+    // Approved by the platform: the next sign-in picks it up.
+    await db
+      .update(allowlist)
+      .set({ platformApprovedAt: new Date(), platformApprovedByUserId: fx.orgB.userId })
+      .where(and(eq(allowlist.id, inv!.id), eq(allowlist.organizationId, fx.orgA.organizationId)));
+    const approved = await attachPendingInvitesByEmail({ userId, email });
+    expect(approved.attached).toBe(1);
+    expect(approved.organizationIds).toEqual([fx.orgA.organizationId]);
+  });
+
   it("ignores revoked and consumed invites and unknown addresses", async () => {
     const email = `revoked-${Date.now().toString(36)}@bl-auth.test`;
     await db.insert(allowlist).values({
