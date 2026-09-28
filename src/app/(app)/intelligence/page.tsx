@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getAIProviderStatus } from "@/lib/ai";
+import { latestBrief, toStoredBrief } from "@/lib/briefs";
+import { safeQuery } from "@/lib/schema-resilience";
 import { PipelineBriefPanel } from "./PipelineBriefPanel";
 import { ProviderStatusPanel } from "./ProviderStatusPanel";
 import { OutcomeInsightsPanel } from "./OutcomeInsightsPanel";
@@ -37,6 +39,12 @@ export default async function IntelligencePage() {
   const { organizationId } = await requireCurrentOrg();
   const providerStatus = getAIProviderStatus();
   const bdEnabled = process.env.AWARDS_INTEL_ENABLED === "1";
+  // BL-AIP-7a — the last stored pipeline brief.
+  const pipelineBrief = await safeQuery(
+    () => latestBrief({ organizationId, kind: "pipeline" }),
+    null,
+    { tag: "intelligence.pipelineBrief" },
+  );
 
   return (
     <>
@@ -65,7 +73,7 @@ export default async function IntelligencePage() {
       ) : null}
 
       <section className="mb-8 grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-        <PipelineBriefPanel />
+        <PipelineBriefPanel initial={pipelineBrief ? toStoredBrief(pipelineBrief) : null} />
         <ProviderStatusPanel
           active={providerStatus.active}
           all={providerStatus.all}

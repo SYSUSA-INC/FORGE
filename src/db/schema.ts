@@ -3658,3 +3658,60 @@ export const aiEvalRuns = pgTable(
 
 export type AiEvalRun = typeof aiEvalRuns.$inferSelect;
 export type NewAiEvalRun = typeof aiEvalRuns.$inferInsert;
+
+/**
+ * BL-AIP-7a — stored, grounded, graded briefs. One row per generated
+ * pursuit or pipeline brief: the snapshot it was written from, the
+ * model's structured take, the reader's feedback and, once the
+ * opportunity closes, the outcome and grade. `signals` holds key
+ * signals (pursuit) or risks (pipeline); `nextActions` holds next
+ * actions (pursuit) or priorities (pipeline). Migration 0088.
+ */
+export const aiBriefKindEnum = pgEnum("ai_brief_kind", ["pursuit", "pipeline"]);
+
+export const aiBriefs = pgTable(
+  "ai_brief",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: aiBriefKindEnum("kind").notNull(),
+    opportunityId: uuid("opportunity_id").references(() => opportunities.id, {
+      onDelete: "cascade",
+    }),
+    promptVersion: text("prompt_version").notNull().default(""),
+    model: text("model").notNull().default(""),
+    stubbed: boolean("stubbed").notNull().default(false),
+    snapshotKey: text("snapshot_key").notNull().default(""),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+    text: text("text").notNull().default(""),
+    /** pursue | watch | no_bid (pursuit briefs only). */
+    recommendation: text("recommendation"),
+    /** 0..1 */
+    confidence: real("confidence"),
+    signals: jsonb("signals").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    nextActions: jsonb("next_actions").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** useful | not_useful */
+    feedback: text("feedback"),
+    feedbackUserId: text("feedback_user_id").references(() => users.id, { onDelete: "set null" }),
+    feedbackAt: timestamp("feedback_at", { withTimezone: true }),
+    /** won | lost | no_bid, set when the opportunity closes. */
+    outcome: text("outcome"),
+    /** correct | wrong | inconclusive */
+    grade: text("grade"),
+    gradedAt: timestamp("graded_at", { withTimezone: true }),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("ai_brief_org_created_idx").on(t.organizationId, t.createdAt),
+    opportunityIdx: index("ai_brief_opportunity_idx").on(t.opportunityId, t.createdAt),
+  }),
+);
+
+export type AiBrief = typeof aiBriefs.$inferSelect;
+export type NewAiBrief = typeof aiBriefs.$inferInsert;
+export type AiBriefKind = (typeof aiBriefKindEnum.enumValues)[number];

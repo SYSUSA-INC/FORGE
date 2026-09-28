@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { opportunities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { getBriefTrack, latestBrief, toStoredBrief } from "@/lib/briefs";
+import { safeQuery } from "@/lib/schema-resilience";
 import { Panel } from "@/components/ui/Panel";
 import { OpportunityForm } from "../OpportunityForm";
 import { listOpportunityOwners } from "../actions";
@@ -39,6 +41,22 @@ export default async function OpportunityOverviewPage({
   if (!opp) notFound();
 
   const owners = await listOpportunityOwners();
+
+  // BL-AIP-7a — the last stored pursuit brief and how past calls held up.
+  const [briefRow, briefTrack] = await Promise.all([
+    safeQuery(
+      () => latestBrief({ organizationId, kind: "pursuit", opportunityId: opp.id }),
+      null,
+      { tag: "opportunity.brief" },
+    ),
+    safeQuery(() => getBriefTrack({ organizationId }), {
+      n: 0,
+      correct: 0,
+      wrong: 0,
+      inconclusive: 0,
+      accuracy: null,
+    }, { tag: "opportunity.briefTrack" }),
+  ]);
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
@@ -78,7 +96,11 @@ export default async function OpportunityOverviewPage({
           target={{ kind: "opportunity", id: opp.id }}
         />
         <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
-        <OpportunityBriefPanel opportunityId={opp.id} />
+        <OpportunityBriefPanel
+          opportunityId={opp.id}
+          initial={briefRow ? toStoredBrief(briefRow) : null}
+          track={briefTrack}
+        />
         <OpportunityDocsAndAIPanel opportunityId={opp.id} />
       </div>
     </div>
