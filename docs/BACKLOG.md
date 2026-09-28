@@ -549,7 +549,7 @@ in the assessment report.
 ---
 
 ### BL-NAV-WORKSPACES — Role-scoped workspaces: work / company admin / platform admin
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #285)
 
 User request (2026-09-28): strip the platform-admin surface out of the
 tenant portal into its own page with only platform-admin menu items,
