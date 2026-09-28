@@ -68,6 +68,64 @@ export const WORKSPACES: Record<Workspace, WorkspaceMeta> = {
   },
 };
 
+/**
+ * BL-NAV-PORTAL — how each workspace is offered as a portal at sign-in.
+ * The roles behind the offer are read from the authenticated session,
+ * never from the typed email, so the picker reveals nothing about an
+ * account before its password is verified.
+ */
+export type PortalChoice = {
+  workspace: Workspace;
+  title: string;
+  description: string;
+  home: string;
+};
+
+export const PORTALS: Record<Workspace, { title: string; description: string }> = {
+  platform: {
+    title: "Super Admin Portal",
+    description:
+      "Platform administration across every tenant: organizations, platform users, subscription tiers, AI usage, background jobs and the cross-tenant audit log.",
+  },
+  company: {
+    title: "Company Admin Portal",
+    description:
+      "Administer your organization only: people and roles, profile and domains, billing, templates, integrations, notification rules and the audit log.",
+  },
+  work: {
+    title: "Proposal Tool",
+    description:
+      "Everyday capture and proposal work: opportunities, solicitations, proposals, intelligence and the FORGE Brain.",
+  },
+};
+
+/** The picker page; sign-in lands here when the account holds several portals. */
+export const PORTAL_PICKER_PATH = "/portal";
+
+/** Sign-in offers the portals highest hat first. */
+const PORTAL_ORDER: Workspace[] = ["platform", "company", "work"];
+
+/** The portals this account may enter, in the order the picker shows them. */
+export function portalChoices(v: NavVisibility): PortalChoice[] {
+  const available = availableWorkspaces(v);
+  return PORTAL_ORDER.filter((w) => available.includes(w)).map((w) => ({
+    workspace: w,
+    ...PORTALS[w],
+    home: WORKSPACES[w].home,
+  }));
+}
+
+/**
+ * Where sign-in lands: the picker when the account holds more than one
+ * portal, that portal's home when it holds exactly one, and the work
+ * home — which onboards an account with no tenant yet — otherwise.
+ */
+export function portalLanding(v: NavVisibility): string {
+  const choices = portalChoices(v);
+  if (choices.length > 1) return PORTAL_PICKER_PATH;
+  return choices[0]?.home ?? WORKSPACES.work.home;
+}
+
 /** Everyday proposal operations — what every member works in. */
 const WORK_NAV: WorkspaceNavGroup[] = [
   { id: "command", label: "Command Center", icon: "▦", href: "/", needsWorkspace: true },

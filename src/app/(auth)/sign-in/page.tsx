@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SsoButtons } from "@/components/auth/SsoButtons";
-import { safeRedirectTarget } from "@/lib/safe-redirect";
+import { PORTAL_PICKER_PATH } from "@/lib/nav-workspaces";
+import { safeRedirectTarget, sameOriginPath } from "@/lib/safe-redirect";
 import { SignInForm } from "./SignInForm";
 
 export default async function SignInPage({
@@ -10,10 +12,20 @@ export default async function SignInPage({
 }: {
   searchParams: { error?: string; callbackUrl?: string; verified?: string };
 }) {
-  // Validate callbackUrl — only allow same-origin relative paths.
-  // Anything off-origin / protocol-relative / pointing at an API
-  // route falls back to "/". Prevents phishing redirects.
-  const safeCallback = safeRedirectTarget(searchParams.callbackUrl);
+  // Validate callbackUrl — only allow same-origin paths. The auth
+  // middleware hands us an absolute URL on our own origin (the page a
+  // signed-out visitor opened), which is reduced to its path first;
+  // anything off-origin / protocol-relative / pointing at an API route
+  // falls back to the portal picker (BL-NAV-PORTAL), which sends the
+  // account to its one portal or offers the several it holds.
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : null;
+  const safeCallback = safeRedirectTarget(
+    sameOriginPath(searchParams.callbackUrl, origin),
+    PORTAL_PICKER_PATH,
+  );
 
   const session = await auth();
   if (session?.user) {

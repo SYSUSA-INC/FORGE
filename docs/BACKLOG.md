@@ -548,8 +548,39 @@ in the assessment report.
 
 ---
 
+### BL-NAV-PORTAL — Portal choice at sign-in: Super Admin / Company Admin / Proposal Tool
+**Priority:** P1  ·  **Effort:** XS  ·  **Status:** 🔄 in PR
+
+User request (2026-09-28): based on the account signing in, offer the
+choice of the Super Admin Portal, the Company Admin Portal, or the
+Proposal Tool as a regular user.
+
+Delivered:
+- `/portal` (BL-NAV-PORTAL, no app shell): after sign-in the account's
+  portals are read from its verified session — **Super Admin Portal**
+  (superadmin), **Company Admin Portal** (org admin with a tenant),
+  **Proposal Tool** (any member with a tenant). One portal opens
+  directly; several are offered as cards, highest hat first; none falls
+  through to the work home, which onboards the account. Bookmarkable;
+  a signed-out visit returns here after sign-in.
+- Sign-in (password and SSO) lands on `/portal` unless a `callbackUrl`
+  names a page. `portalChoices` / `portalLanding` in
+  `src/lib/nav-workspaces.ts` (tested).
+- The auth middleware sends a signed-out visitor to sign-in with an
+  absolute `callbackUrl` on our own origin, which the safe-redirect rule
+  rejected, so nobody ever returned to the page they had opened.
+  `sameOriginPath` reduces it to its path + query (other origins still
+  refused; tested), so a bookmark to `/admin` or `/users` lands there
+  after sign-in.
+- Roles are checked after authentication, never from the typed email
+  alone, so the picker reveals nothing about an account before its
+  password is verified.
+- USER_MANUAL §2.1 and ADMIN_MANUAL §2.1 / §3.2.
+
+---
+
 ### BL-NAV-WORKSPACES — Role-scoped workspaces: work / company admin / platform admin
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #285)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #285)
 
 User request (2026-09-28): strip the platform-admin surface out of the
 tenant portal into its own page with only platform-admin menu items,

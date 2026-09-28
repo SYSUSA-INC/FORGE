@@ -99,6 +99,8 @@ The top-right avatar is your **user menu**. Click it to see your name/email and 
 
 The sidebar shows one **workspace** at a time, scoped to the hat you are wearing (BL-NAV-WORKSPACES). People who wear more than one see a **Switch to** row under the FORGE mark; everyone else sees only their own.
 
+Sign-in decides where you start (BL-NAV-PORTAL). An account with one role goes straight to its portal. An account with several is asked first — **Super Admin Portal**, **Company Admin Portal** or the **Proposal Tool** — on the `/portal` page, which you can also open at any time. Opening a page while signed out brings you back to that page after sign-in.
+
 | Workspace | Who | What it contains |
 |---|---|---|
 | **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, New Opportunity, Solicitations, In-flight Proposals, New Proposals); Platform Intelligence (Company Search, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge); Inbox; My organization (Settings, Integrations, AI Engine — read-only for non-admins); Help |

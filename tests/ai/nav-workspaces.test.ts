@@ -8,6 +8,9 @@ import {
   availableWorkspaces,
   defaultWorkspace,
   NAV_BY_WORKSPACE,
+  PORTAL_PICKER_PATH,
+  portalChoices,
+  portalLanding,
   resolveWorkspace,
   WORKSPACES,
   workspaceForPath,
@@ -56,6 +59,36 @@ describe("availableWorkspaces / defaultWorkspace / resolveWorkspace", () => {
     expect(resolveWorkspace("/admin/tiers", orgAdmin)).toBe("work");
     expect(resolveWorkspace("/admin/tiers", superWithTenant)).toBe("platform");
     expect(resolveWorkspace("/", superNoTenant)).toBe("platform");
+  });
+});
+
+describe("BL-NAV-PORTAL — portal choice at sign-in", () => {
+  it("offers the account's portals, highest hat first", () => {
+    expect(portalChoices(member).map((c) => c.title)).toEqual(["Proposal Tool"]);
+    expect(portalChoices(orgAdmin).map((c) => c.title)).toEqual([
+      "Company Admin Portal",
+      "Proposal Tool",
+    ]);
+    expect(portalChoices(superWithTenant).map((c) => c.title)).toEqual([
+      "Super Admin Portal",
+      "Company Admin Portal",
+      "Proposal Tool",
+    ]);
+    expect(portalChoices(superNoTenant).map((c) => c.home)).toEqual(["/admin"]);
+    expect(portalChoices(nobody)).toEqual([]);
+    // Each choice lands on its workspace's home.
+    for (const c of portalChoices(superWithTenant)) {
+      expect(c.home).toBe(WORKSPACES[c.workspace].home);
+    }
+  });
+
+  it("lands single-portal accounts directly and multi-portal accounts on the picker", () => {
+    expect(portalLanding(member)).toBe("/");
+    expect(portalLanding(superNoTenant)).toBe("/admin");
+    expect(portalLanding(orgAdmin)).toBe(PORTAL_PICKER_PATH);
+    expect(portalLanding(superWithTenant)).toBe(PORTAL_PICKER_PATH);
+    // No tenant and no platform role: the work home onboards the account.
+    expect(portalLanding(nobody)).toBe("/");
   });
 });
 

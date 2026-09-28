@@ -26,8 +26,10 @@ export function SignInForm({ callbackUrl }: { callbackUrl?: string }) {
         return;
       }
       // Server validates the callbackUrl too, but defense-in-depth: never
-      // hand window.location an attacker-controlled string.
-      window.location.href = safeRedirectTarget(callbackUrl);
+      // hand window.location an attacker-controlled string. Without a
+      // target, the portal picker decides where this account lands
+      // (BL-NAV-PORTAL).
+      window.location.href = safeRedirectTarget(callbackUrl, "/portal");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Try again.");
       setLoading(false);
