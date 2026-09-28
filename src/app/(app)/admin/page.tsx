@@ -7,8 +7,17 @@ import { AdminClient } from "./AdminClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams?: { tab?: string };
+}) {
   const actor = await requireSuperadmin();
+  // BL-NAV-WORKSPACES — the platform-admin sidebar deep-links the tabs.
+  const initialTab =
+    searchParams?.tab === "users" || searchParams?.tab === "overview"
+      ? searchParams.tab
+      : "organizations";
 
   const orgRows = await db
     .select({
@@ -127,6 +136,7 @@ export default async function AdminPage() {
 
   return (
     <AdminClient
+      initialTab={initialTab}
       currentUserId={actor.id}
       orgs={orgs}
       users={usersWithOrgs}

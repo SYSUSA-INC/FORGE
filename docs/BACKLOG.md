@@ -548,6 +548,39 @@ in the assessment report.
 
 ---
 
+### BL-NAV-WORKSPACES — Role-scoped workspaces: work / company admin / platform admin
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+
+User request (2026-09-28): strip the platform-admin surface out of the
+tenant portal into its own page with only platform-admin menu items,
+and give the company admin a separate page with only the items that
+role needs.
+
+Delivered:
+- `src/lib/nav-workspaces.ts` (pure, tested): three navigation trees —
+  **work** (Command Center, Opportunities, Platform Intelligence, Inbox,
+  My organization, Help), **company** (People, Organization,
+  Governance, Admin guide) and **platform** (Tenants & users,
+  Commercial, Operations, Admin guide) — `availableWorkspaces` (work
+  and company need a tenant; company needs the admin role; platform
+  needs superadmin), `workspaceForPath` (platform for `/admin*` and
+  `/platform*`, company for the admin pages, work otherwise) and
+  `resolveWorkspace` (the URL's workspace when the person may use it,
+  else their default — a superadmin without a tenant lands in Platform
+  admin).
+- `NavContent`: renders the active workspace's tree only, with a
+  **Switch to** row (pills, or one-letter markers in the collapsed
+  rail) for people who hold more than one hat and the brand subtitle
+  naming the workspace. Existing group / child gating unchanged.
+- `/admin?tab=users` and `?tab=overview` deep-link the SuperAdmin
+  portal's tabs so the platform sidebar can list them.
+- USER_MANUAL §2.1 and ADMIN_MANUAL §2.1 / §3.2.
+- Not changed: page-level gates (`requireOrgAdmin`, `requireSuperadmin`)
+  remain the security boundary; the sidebar only decides what is
+  offered.
+
+---
+
 ### BL-TIER-ASSIGN — Platform admin cannot assign a first tier
 **Priority:** P0  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #282)
 

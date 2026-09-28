@@ -4,32 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { visibleNavChildren, visibleNavGroups } from "@/lib/nav-visibility";
-
-type NavItem = {
-  href: string;
-  label: string;
-  /** Visible only to org admins (or superadmins). */
-  admin?: boolean;
-};
-
-type NavGroup = {
-  id: string;
-  label: string;
-  icon: string;
-  /** When set, the group has no expand affordance — it IS a link itself. */
-  href?: string;
-  /** Group visible only to org admins (or superadmins). */
-  admin?: boolean;
-  /** Group visible only to superadmins. */
-  superadmin?: boolean;
-  /**
-   * Every page in the group calls `requireCurrentOrg()`. Hidden when the
-   * session has no active workspace, because each link would redirect to
-   * /onboarding and the menu would read as two dozen broken links.
-   */
-  needsWorkspace?: boolean;
-  children?: NavItem[];
-};
+import {
+  availableWorkspaces,
+  NAV_BY_WORKSPACE,
+  resolveWorkspace,
+  WORKSPACES,
+  type Workspace,
+  type WorkspaceNavGroup,
+  type WorkspaceNavItem,
+} from "@/lib/nav-workspaces";
 
 type NavUser = {
   name: string | null;
@@ -37,97 +20,9 @@ type NavUser = {
   image: string | null;
 };
 
-// Six top-level entries per the platform spec.
-//
-// Operations Management consolidates the per-tenant admin surface.
-// Each sub-page is its own URL (BL-14 route split landed).
-const NAV: NavGroup[] = [
-  {
-    id: "command",
-    label: "Command Center",
-    icon: "▦",
-    href: "/",
-    needsWorkspace: true,
-  },
-  {
-    id: "ops",
-    label: "Operations Management",
-    icon: "⚙",
-    // BL-AIP-3 — the group itself is visible to every member (the
-    // inbox and read-only settings pages are member pages); admin-only
-    // pages are gated per child so a non-admin never sees a link that
-    // 403s on click.
-    needsWorkspace: true,
-    children: [
-      { href: "/settings", label: "Settings" },
-      { href: "/settings/billing", label: "Billing", admin: true },
-      { href: "/users", label: "Users & Roles", admin: true },
-      { href: "/settings/integrations", label: "Integrations" },
-      { href: "/settings/ai-engine", label: "AI Engine" },
-      { href: "/settings/templates", label: "Templates", admin: true },
-      { href: "/notifications", label: "Notifications" },
-      { href: "/notifications/rules", label: "Notification rules", admin: true },
-      { href: "/audit-log", label: "Audit Log", admin: true },
-    ],
-  },
-  {
-    id: "opps",
-    label: "Opportunities",
-    icon: "✸",
-    needsWorkspace: true,
-    children: [
-      { href: "/opportunities", label: "Dashboard" },
-      { href: "/pipeline", label: "Pipeline" },
-      { href: "/opportunities/new", label: "New Opportunity" },
-      { href: "/solicitations", label: "Solicitations" },
-      { href: "/proposals", label: "In-flight Proposals" },
-      { href: "/proposals/new", label: "New Proposals" },
-    ],
-  },
-  {
-    id: "intel",
-    label: "Platform Intelligence",
-    icon: "◈",
-    needsWorkspace: true,
-    children: [
-      { href: "/companies", label: "Company Search" },
-      { href: "/intelligence", label: "FORGE Brain" },
-      { href: "/intelligence/losses", label: "Loss intelligence" },
-      { href: "/intelligence/awards", label: "Awards & recompetes" },
-      { href: "/intelligence/firms", label: "8(a) firms" },
-      { href: "/intelligence/watchlist", label: "Watchlist" },
-      { href: "/intelligence/saved-searches", label: "Saved searches" },
-      { href: "/knowledge-base", label: "Knowledge" },
-    ],
-  },
-  {
-    id: "help",
-    label: "Help",
-    icon: "?",
-    children: [
-      { href: "/help/user", label: "User guide" },
-      { href: "/help/admin", label: "Admin guide", admin: true },
-      { href: "/help/faq", label: "FAQ" },
-    ],
-  },
-  {
-    id: "platform",
-    label: "Platform Administration",
-    icon: "✱",
-    superadmin: true,
-    children: [
-      { href: "/admin", label: "Tenants" },
-      { href: "/admin/tiers", label: "Subscription tiers" },
-      { href: "/admin/usage", label: "AI usage & costs" },
-      { href: "/admin/promo-codes", label: "Promo codes" },
-      { href: "/admin/errors", label: "Production errors" },
-      { href: "/admin/migrations", label: "Database migrations" },
-      { href: "/admin/sba-8a", label: "SBA 8(a) registry" },
-      { href: "/admin/source-requests", label: "Source requests" },
-      { href: "/platform/audit-log", label: "Audit Log" },
-    ],
-  },
-];
+// BL-NAV-WORKSPACES — the trees live in src/lib/nav-workspaces.ts: one
+// per hat (workspace / company admin / platform admin). The active one
+// follows the URL; the switcher under the brand moves between them.
 
 const COLLAPSED_GROUPS_KEY = "forge.nav.collapsed.v2";
 const NAV_RAIL_COLLAPSED_KEY = "forge.nav.rail.v1";
@@ -185,6 +80,14 @@ function hrefMatches(pathname: string | null, href: string): boolean {
   return pathname === cleanHref || pathname.startsWith(cleanHref + "/");
 }
 
+/** Query-tab links (e.g. /admin?tab=users) only match on the client with that tab. */
+function itemMatches(pathname: string | null, search: string, href: string): boolean {
+  const [path, query] = href.split("?");
+  if (!hrefMatches(pathname, path!)) return false;
+  if (!query) return true;
+  return search === `?${query}`;
+}
+
 function initialsFor(name: string | null, email: string): string {
   const seed = name?.trim() || email;
   return (
@@ -220,6 +123,7 @@ export function NavContent({
     () => new Set(),
   );
   const [railCollapsed, setRailCollapsedState] = useState(false);
+  const [search, setSearch] = useState("");
 
   // Hydrate from localStorage after mount. SSR + first client render
   // produce identical markup (avoids hydration mismatch warnings).
@@ -227,6 +131,13 @@ export function NavContent({
     setCollapsedGroups(readCollapsedGroups());
     setRailCollapsedState(readRailCollapsed());
   }, []);
+
+  // The query string decides which /admin tab link is active; read it
+  // after mount so server and first client render agree.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setSearch(window.location.search);
+  }, [pathname]);
 
   // Notify the parent shell when the rail collapses so it can resize
   // its sticky aside (60px ↔ 256px). The parent listens via a custom
@@ -259,9 +170,12 @@ export function NavContent({
   }
 
   const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace };
-  const visibleGroups = visibleNavGroups(NAV, visibility);
+  const workspace = resolveWorkspace(pathname, visibility);
+  const workspaces = availableWorkspaces(visibility);
+  const meta = WORKSPACES[workspace];
+  const visibleGroups = visibleNavGroups(NAV_BY_WORKSPACE[workspace], visibility);
 
-  function visibleChildren(group: NavGroup): NavItem[] {
+  function visibleChildren(group: WorkspaceNavGroup): WorkspaceNavItem[] {
     return visibleNavChildren(group.children, visibility);
   }
 
@@ -277,8 +191,22 @@ export function NavContent({
           </div>
         </div>
 
+        {workspaces.length > 1 ? (
+          <div className="flex flex-col items-center gap-1 border-b border-layer/10 py-2">
+            {workspaces.map((w) => (
+              <WorkspaceSwitchLink
+                key={w}
+                target={w}
+                active={w === workspace}
+                compact
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        ) : null}
+
         <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-3">
-          {!hasWorkspace ? (
+          {!hasWorkspace && workspace === "work" ? (
             <Link
               href="/onboarding"
               onClick={onNavigate}
@@ -297,7 +225,7 @@ export function NavContent({
             const children = visibleChildren(g);
             const groupActive = g.href
               ? hrefMatches(pathname, g.href)
-              : children.some((c) => hrefMatches(pathname, c.href));
+              : children.some((c) => itemMatches(pathname, search, c.href));
 
             // Standalone link (e.g. Command Center) — direct navigation.
             if (g.href && children.length === 0) {
@@ -379,7 +307,7 @@ export function NavContent({
             FORGE
           </div>
           <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
-            Proposal Ops
+            {meta.subtitle}
           </div>
         </div>
         {!hideRailToggle && (
@@ -395,8 +323,27 @@ export function NavContent({
         )}
       </div>
 
+      {workspaces.length > 1 ? (
+        <div className="border-b border-layer/10 px-3 py-2">
+          <div className="mb-1 px-1 font-mono text-[9px] uppercase tracking-[0.25em] text-subtle">
+            Switch to
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {workspaces.map((w) => (
+              <WorkspaceSwitchLink
+                key={w}
+                target={w}
+                active={w === workspace}
+                compact={false}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <nav className="mt-3 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-4">
-        {!hasWorkspace ? (
+        {!hasWorkspace && workspace === "work" ? (
           <Link
             href="/onboarding"
             onClick={onNavigate}
@@ -419,7 +366,7 @@ export function NavContent({
           const children = visibleChildren(g);
           const groupActive = g.href
             ? hrefMatches(pathname, g.href)
-            : children.some((c) => hrefMatches(pathname, c.href));
+            : children.some((c) => itemMatches(pathname, search, c.href));
           const isCollapsedGroup = collapsedGroups.has(g.id);
           // Force the group open if the active page lives inside it.
           const showChildren =
@@ -496,7 +443,7 @@ export function NavContent({
                   className="ml-[1.4rem] mt-0.5 flex flex-col border-l border-layer/[0.08] pl-0"
                 >
                   {children.map((c) => {
-                    const active = hrefMatches(pathname, c.href);
+                    const active = itemMatches(pathname, search, c.href);
                     return (
                       <li
                         key={c.href}
@@ -527,6 +474,53 @@ export function NavContent({
         {user ? <UserAvatar user={user} compact={false} /> : null}
       </div>
     </>
+  );
+}
+
+/** One entry of the workspace switcher — a pill (expanded) or a letter (rail). */
+function WorkspaceSwitchLink({
+  target,
+  active,
+  compact,
+  onNavigate,
+}: {
+  target: Workspace;
+  active: boolean;
+  compact: boolean;
+  onNavigate?: () => void;
+}) {
+  const m = WORKSPACES[target];
+  if (compact) {
+    return (
+      <Link
+        href={m.home}
+        onClick={onNavigate}
+        title={m.label}
+        aria-label={`Switch to ${m.label}`}
+        aria-current={active ? "true" : undefined}
+        className={`flex h-7 w-7 items-center justify-center rounded-md font-mono text-[10px] font-bold transition-colors ${
+          active
+            ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
+            : "text-muted hover:bg-layer/[0.05] hover:text-text"
+        }`}
+      >
+        {m.initial}
+      </Link>
+    );
+  }
+  return (
+    <Link
+      href={m.home}
+      onClick={onNavigate}
+      aria-current={active ? "true" : undefined}
+      className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors ${
+        active
+          ? "border-cobalt/40 bg-cobalt/10 text-text"
+          : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20 hover:text-text"
+      }`}
+    >
+      {m.label}
+    </Link>
   );
 }
 

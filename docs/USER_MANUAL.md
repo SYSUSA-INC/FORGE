@@ -95,9 +95,21 @@ After signing in you'll see the main **app shell**:
 
 The top-right avatar is your **user menu**. Click it to see your name/email and sign out.
 
-### 2.1 Sidebar navigation
+### 2.1 Sidebar navigation — three workspaces
 
-The sidebar groups every workspace into seven top-level sections. Each group is collapsible — click the group header (or its chevron) to fold its children. Group visibility depends on your role: Operations Management only shows for org admins; Platform Administration only shows for superadmins.
+The sidebar shows one **workspace** at a time, scoped to the hat you are wearing (BL-NAV-WORKSPACES). People who wear more than one see a **Switch to** row under the FORGE mark; everyone else sees only their own.
+
+| Workspace | Who | What it contains |
+|---|---|---|
+| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, New Opportunity, Solicitations, In-flight Proposals, New Proposals); Platform Intelligence (Company Search, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge); Inbox; My organization (Settings, Integrations, AI Engine — read-only for non-admins); Help |
+| **Company admin** | org admins | People (Users & roles); Organization (Profile & domains, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit log); Admin guide |
+| **Platform admin** | platform superadmins | Tenants & users (Organizations, Platform users, Overview, Source requests); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit log); Admin guide |
+
+The active workspace follows the page you are on: a platform-admin URL opens the platform workspace, a company-admin URL the company console, everything else the workspace — so links inside a workspace keep you there and a bookmark opens the right one. A superadmin with no tenant membership lands in Platform admin, which has no tenant pages at all; to work inside a tenant they use **Assume identity** on the tenant's page.
+
+The older single-tree description below is kept for reference; the group-visibility rules are unchanged (admin-only children still hide from members).
+
+Each group is collapsible — click the group header (or its chevron) to fold its children. Group visibility depends on your role: Operations Management only shows for org admins; Platform Administration only shows for superadmins.
 
 | Group | Children | Who sees it |
 |---|---|---|
