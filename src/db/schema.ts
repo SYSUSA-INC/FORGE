@@ -3604,3 +3604,57 @@ export type BackgroundJob = typeof backgroundJobs.$inferSelect;
 export type NewBackgroundJob = typeof backgroundJobs.$inferInsert;
 export type BackgroundJobKind = (typeof backgroundJobKindEnum.enumValues)[number];
 export type BackgroundJobStatus = (typeof backgroundJobStatusEnum.enumValues)[number];
+
+/**
+ * BL-AIP-5b — golden eval runs. The drafter re-drafts sections of WON
+ * proposals from the solicitation context alone and each draft is
+ * scored against the text that won (`src/lib/golden-score.ts`). Rows
+ * are keyed by the drafter's prompt version and model so a prompt
+ * change is comparable to the previous one. Migration 0086.
+ */
+export type AiEvalCaseResult = {
+  proposalId: string;
+  sectionId: string;
+  sectionTitle: string;
+  sectionKind: string;
+  agency: string;
+  goldenWords: number;
+  draftWords: number;
+  score: number;
+  termCoverage: number;
+  lengthFit: number;
+  specificity: number;
+  placeholderRate: number;
+  themeCoverage: number | null;
+  error?: string;
+};
+
+export const aiEvalRuns = pgTable(
+  "ai_eval_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull().default("section_draft"),
+    promptVersion: text("prompt_version").notNull().default(""),
+    model: text("model").notNull().default(""),
+    caseCount: integer("case_count").notNull().default(0),
+    meanScore: real("mean_score").notNull().default(0),
+    results: jsonb("results")
+      .$type<AiEvalCaseResult[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    stubbed: boolean("stubbed").notNull().default(false),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("ai_eval_run_org_created_idx").on(t.organizationId, t.createdAt),
+  }),
+);
+
+export type AiEvalRun = typeof aiEvalRuns.$inferSelect;
+export type NewAiEvalRun = typeof aiEvalRuns.$inferInsert;
