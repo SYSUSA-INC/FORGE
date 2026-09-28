@@ -214,7 +214,11 @@ Add rows with customer, contract name, value, period start/end, description. Use
 
 Tag-based editor for terms that describe your core competencies. (Future phases will use these for opportunity matching.)
 
-### 4.12 Save / Reset
+### 4.12 AI Engine — draft quality vs. won proposals (admins)
+
+**Settings → AI Engine** lists the configured providers and, below them, the **golden eval** (BL-AIP-5b): every section of a proposal you marked **won** with at least 150 words is a benchmark case. **Run eval (3 cases)** asks the AI drafter to write those sections again from the solicitation context alone (the saved text is withheld) and scores each draft against the text that won — shared vocabulary (45%), length fit (20%), specificity of numbers and names (20%) and placeholder-free prose (15%), plus win-theme coverage when the proposal has themes. Each run is one row keyed by the drafter's prompt version and the model, so after a prompt change you can see whether the drafter moved closer to what wins for you. Three AI requests per run; org admins only. Treat the score as an upper bound: the Brain may already hold the winning text, so the drafter can be helped by fragments of the answer.
+
+### 4.13 Save / Reset
 
 Changes only persist when you click **Save changes** at the top-right. **Reset** reverts unsaved changes. The Save button is disabled if any field has validation errors.
 

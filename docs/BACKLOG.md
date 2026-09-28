@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i (Section L bootstrap) in PR (PR #281); BL-AIP-5b part ii (golden eval) / BL-AIP-7 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii (golden eval) in PR; BL-AIP-7 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,32 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-5b (part i) — proposal bootstrap from Section L** 🔄 (PR #281)
+**BL-AIP-5b (part ii) — the golden eval set** 🔄 (in PR)
+
+- **Cases.** `listGoldenCases` (`src/lib/golden-eval.ts`) = sections
+  (≥ 150 words) of proposals with a won outcome, newest first, per
+  organization.
+- **Runs.** `runGoldenEval` re-drafts up to five cases with the saved
+  body withheld (`prepareSectionDraft` with `currentBodyPlain: ""`),
+  tagged `section_draft` / `golden_eval` / `SECTION_DRAFT_PROMPT_VERSION`,
+  scores each against the winning text with `golden-score.ts` (pure,
+  tested): term coverage 45 %, length fit 20 %, specificity 20 %,
+  placeholder-free 15 %, theme coverage reported; stores one
+  `ai_eval_run` row (migration 0087, mirrored in `schema.ts`) keyed by
+  prompt version + model with per-case results; audited `ai.eval.run`.
+- **Where.** **Settings → AI Engine → Draft quality vs. won proposals**
+  (`GoldenEvalPanel`): run history with per-case breakdown and **Run
+  eval (3 cases)** for org admins (`runGoldenEvalAction`: three quota
+  slots reserved up front, refunded for cases that never reached the
+  model).
+- Documented limit: the Brain may hold the harvested winning text, so
+  scores are an upper bound; every prompt version faces the same
+  corpus, which keeps runs comparable.
+- Runtime-tested (`tests/isolation/golden-eval.test.ts`): only won
+  proposals' long sections are cases, per organization; run history is
+  per organization.
+
+**BL-AIP-5b (part i) — proposal bootstrap from Section L** ✅ (PR #281)
 
 - **The outline comes from the instructions.** `planProposalFromSolicitation`
   (`src/lib/proposal-bootstrap.ts`, feature `proposal_bootstrap`, strong
@@ -472,10 +497,7 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-5b part ii — the golden eval set keyed by `promptVersion`
-(`ai_eval_run`, `golden-score.ts`, `runGoldenEval`, Settings → AI
-Engine panel; the code is written and split out of part i for the size
-guard); BL-AIP-6b paragraph-anchored rail (cursor
+BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and
 "resolve" on AI review comments from the editor; BL-AIP-7 proactive
 scout / stored graded briefs / AI Engine controls. Details and evidence
