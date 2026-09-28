@@ -453,7 +453,7 @@ When the platform was first seeded, five tiers were created with placeholder pri
 | **Platinum** | $999 | All 6 features | All quotas **unlimited** (0 = unlimited semantics) |
 | **Custom** | $0 | All 6 features | Unlimited (negotiated per-tenant via overrides) |
 
-**Backfill behavior**: when the tier model first shipped, every existing organization was assigned the **Platinum** tier so runtime behavior didn't change. New organizations created today still default to Platinum at the application layer — superadmins move them to the correct tier as part of onboarding.
+**Backfill behavior**: when the tier model first shipped, every existing organization was assigned the **Platinum** tier so runtime behavior didn't change. New organizations are put on Platinum (or, if Platinum is retired, the first active tier) the moment they are created — by platform-admin onboarding, self-service registration, workspace creation or first sign-in (BL-TIER-ASSIGN; before it, no creation path wrote the subscription row, so every tenant created after the backfill showed "No tier" and was denied every gated feature). Superadmins move them to the correct tier as part of onboarding.
 
 ### 6.2 What each feature flag gates
 
@@ -518,6 +518,8 @@ On `/admin/orgs/<id>` (the per-tenant detail page), the **Subscription tier** pa
 4. The change applies immediately. Feature access and quotas update on the next gated action call.
 
 Every change writes a `tenant.tier_change` audit row into the **target tenant's** audit log with `fromTier` and `toTier` metadata, so the tenant's own org admin sees the change in their `/audit-log`.
+
+**A tenant that shows "No tier"** (created before BL-TIER-ASSIGN, or whose row was removed) gets the same dropdown labelled **Assign tier**: pick the tier and confirm; the subscription row is created with status `active` and the audit row carries `fromTier: null` and `firstAssignment: true`. The dropdown is present whenever at least one active tier exists. The **Issue enterprise wire-invoice** form below it is a different path — Stripe billing for sales-led deals — and needs Stripe Price ids on the tiers; its "No tiers have Stripe Prices configured" note does not affect manual assignment.
 
 ### 6.6 Per-tenant overrides (custom_overrides)
 

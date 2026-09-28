@@ -9,6 +9,7 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
+import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 
 export type CreateWorkspaceForSelfResult =
   | { ok: true; organizationId: string; created: boolean }
@@ -71,6 +72,8 @@ export async function createWorkspaceForSelfAction(input: {
       role: "admin",
       status: "active",
     });
+    // BL-TIER-ASSIGN — default tier on creation (best-effort).
+    await ensureTenantSubscription({ organizationId: org.id });
   } catch (err) {
     log.error("[createWorkspaceForSelfAction]", "membership insert failed", { error: err });
     await db

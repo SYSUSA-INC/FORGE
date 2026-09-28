@@ -14,6 +14,7 @@ import { attachPendingInvitesByEmail } from "@/lib/invite-accept";
 import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
+import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 
 async function enrichFromDb(userId: string): Promise<{
   isSuperadmin: boolean;
@@ -97,6 +98,8 @@ async function provisionOrgForUser(
       role: "admin",
       status: "active",
     });
+    // BL-TIER-ASSIGN — default tier on creation (best-effort).
+    await ensureTenantSubscription({ organizationId: org.id });
   } catch (err) {
     log.error("[provisionOrgForUser]", "membership insert failed", { error: err });
     await db

@@ -17,6 +17,7 @@ import { deliverInvite, deliverPasswordReset } from "@/lib/invite-send";
 import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
 import { issueToken } from "@/lib/tokens";
 import { defaultOrgSlug } from "@/lib/org-defaults";
+import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 import { validateEmail } from "@/lib/validators";
 
 
@@ -56,6 +57,10 @@ export async function createOrganizationAction(input: {
     })
     .returning({ id: organizations.id });
   if (!org) return { ok: false, error: "Could not create organization." };
+
+  // BL-TIER-ASSIGN — new tenants land on the default tier; the manual
+  // promised this and no path did it.
+  const subscription = await ensureTenantSubscription({ organizationId: org.id });
 
   const [invite] = await db
     .insert(allowlist)
@@ -102,6 +107,7 @@ export async function createOrganizationAction(input: {
       emailDomains: ownsDomain ? [adminDomain] : [],
       superadmin: true,
       emailSent: delivery.emailSent,
+      tier: subscription.tier?.slug ?? null,
     },
   });
 
