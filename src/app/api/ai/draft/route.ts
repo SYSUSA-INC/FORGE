@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { completeForTenant } from "@/lib/ai";
+import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { isTruncatedStop } from "@/lib/ai-stop";
 import type { DraftStreamEvent } from "@/lib/ai-stream-types";
 import { requireApiTenant } from "@/lib/api-tenant";
@@ -117,6 +118,7 @@ export async function POST(req: NextRequest) {
           organizationId,
           feature: "section_draft",
           variant: body.cite ? `${mode}+cite` : mode,
+          promptVersion: SECTION_DRAFT_PROMPT_VERSION,
           system: prepared.prompt.system,
           messages: prepared.prompt.messages,
           maxTokens: prepared.maxTokens,

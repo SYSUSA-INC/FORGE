@@ -217,6 +217,8 @@ export async function prepareSectionDraft(input: {
       title: row.section.title,
       kind: row.section.kind,
       pageLimit: row.section.pageLimit,
+      // BL-AIP-5b — Section L's brief for this section, when bootstrapped.
+      ...(row.section.instructions ? { instructions: row.section.instructions } : {}),
       currentBodyPlain: (liveBody ?? row.section.content ?? "").slice(0, 4000),
       currentWordCount:
         liveBody !== undefined

@@ -4,7 +4,10 @@ import { db } from "@/db";
 import { proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
+import { opportunityHasSectionL } from "@/lib/proposal-bootstrap";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
+import { safeQuery } from "@/lib/schema-resilience";
+import { BootstrapPanel } from "./BootstrapPanel";
 import { BrainMinePanel } from "./BrainMinePanel";
 import { getBrainMineStatusAction } from "./brain-actions";
 import { DraftInsightsPanel } from "./DraftInsightsPanel";
@@ -72,6 +75,7 @@ export default async function ProposalOverviewPage({
     brainMineStatus,
     storedScan,
     scanTrigger,
+    hasSectionL,
   ] = await Promise.all([
     listRecentRendersAction(params.id, 5),
     getProviderStatusAction(),
@@ -85,6 +89,12 @@ export default async function ProposalOverviewPage({
     // Fire-and-forget at the server-action layer; we just surface
     // whether a scan was launched so the panel can show a notice.
     triggerProposalScanIfStaleAction(params.id),
+    // BL-AIP-5b — whether the outline can be built from Section L.
+    safeQuery(
+      () => opportunityHasSectionL({ organizationId, opportunityId: p.opportunityId }),
+      false,
+      { tag: "proposal.hasSectionL" },
+    ),
   ]);
 
   return (
@@ -103,6 +113,7 @@ export default async function ProposalOverviewPage({
             team={team}
           />
         </Panel>
+        <BootstrapPanel proposalId={p.id} record={p.bootstrap ?? null} hasSectionL={hasSectionL} />
         <WinThemesPanel
           proposalId={p.id}
           initial={(p.winThemes ?? []) as { title: string; statement: string }[]}

@@ -514,6 +514,35 @@ export const proposalSectionStatusEnum = pgEnum("proposal_section_status", [
   "approved",
 ]);
 
+/**
+ * BL-AIP-5b — the outline the AI built from the solicitation's Section L
+ * and what of it was applied to the proposal (migration 0086).
+ */
+export type ProposalBootstrapRecord = {
+  promptVersion: string;
+  generatedAt: string;
+  stubbed: boolean;
+  sections: {
+    title: string;
+    kind: ProposalSectionKind;
+    pageLimit: number | null;
+    instructions: string;
+    sourceRef: string;
+  }[];
+  dueDate: string | null;
+  proposedThemes: { title: string; statement: string; rationale: string }[];
+  notes: string;
+  applied: {
+    mode: "create" | "rebuild";
+    sectionsInserted: number;
+    sectionsUpdated: number;
+    sectionsRemoved: number;
+    sectionsKept: number;
+    themesSeeded: boolean;
+    dueDateSet: boolean;
+  };
+};
+
 export const proposals = pgTable("proposal", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -545,6 +574,8 @@ export const proposals = pgTable("proposal", {
     .$type<{ title: string; statement: string }[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
+  // BL-AIP-5b — outline built from Section L (null until bootstrapped).
+  bootstrap: jsonb("bootstrap").$type<ProposalBootstrapRecord>(),
   // BL-FB-SCAN-CONTINUOUS — marker for "content changed since the
   // last health scan". NULL = fresh; set to the timestamp of the
   // first dirtying edit so callers can decide whether a re-scan is
@@ -862,6 +893,9 @@ export const proposalSections = pgTable("proposal_section", {
   status: proposalSectionStatusEnum("status").notNull().default("not_started"),
   wordCount: integer("word_count").notNull().default(0),
   pageLimit: integer("page_limit"),
+  // BL-AIP-5b — what Section L says this section must contain; the
+  // drafter reads it as the section's brief (migration 0086).
+  instructions: text("instructions").notNull().default(""),
   authorUserId: text("author_user_id").references(() => users.id, {
     onDelete: "set null",
   }),

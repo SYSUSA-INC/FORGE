@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c in PR (PR #280); BL-AIP-5b / 7 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i (Section L bootstrap) in PR; BL-AIP-5b part ii (golden eval) / BL-AIP-7 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,51 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-4c — background jobs with stuck-row recovery** 🔄 (PR #280)
+**BL-AIP-5b (part i) — proposal bootstrap from Section L** 🔄 (in PR)
+
+- **The outline comes from the instructions.** `planProposalFromSolicitation`
+  (`src/lib/proposal-bootstrap.ts`, feature `proposal_bootstrap`, strong
+  class, `PROPOSAL_BOOTSTRAP_PROMPT_VERSION`) reads the Section L
+  summary, the instructions-to-offerors stretch of the document
+  (`sectionLWindow`, last marker with text behind it, so a table of
+  contents does not win), Section M, the submission / format
+  requirements first (`outlineRequirements`) and key dates, and returns
+  the sections the instructions ask for in their order with page caps,
+  a brief each (`proposal_section.instructions`, migration 0086), the
+  stated due date and 1–3 proposed themes grounded in Section M.
+  `normalizeBootstrapPlan` (pure, tested) de-duplicates titles, infers
+  kinds, bounds page limits and dates.
+- **Applied without losing work.** `applyProposalBootstrap` +
+  `planSectionsForRebuild` (pure, tested): written sections are never
+  removed, empty sections the instructions do not ask for are dropped,
+  matching titles take the plan's cap and brief, new ones are inserted
+  in the instructed order, written leftovers are ordered after. Themes
+  are seeded only when the proposal has none; the opportunity's due
+  date only when blank. The plan and what was applied land in
+  `proposal.bootstrap` (audited `proposal.bootstrap`).
+- **Where.** New-proposal form: **Build the outline from the
+  solicitation's Section L** (offered when the opportunity has a parsed
+  solicitation with instructions, on by default; runs before the
+  compliance auto-map so rows map to the final sections; a failure
+  keeps the template and reports why). Proposal overview: **Outline
+  from Section L** panel with **Build / Rebuild outline**
+  (`bootstrapProposalAction`, gated + metered like a draft). The drafter
+  receives `section.instructions` as the section's brief, ahead of
+  conventions and pattern guidance.
+- **Prompt versions are real.** `SECTION_DRAFT_PROMPT_VERSION` is
+  passed on every section-draft call (draft action, streaming route,
+  citation verifier) — `ai_call_log.prompt_version` was never populated
+  before. Part ii (next PR) adds the golden eval set that keys on it:
+  sections of won proposals re-drafted with the saved body withheld and
+  scored deterministically against the winning text, one `ai_eval_run`
+  row per run keyed by prompt version + model, run from **Settings →
+  AI Engine**.
+- Runtime-tested (`tests/isolation/proposal-bootstrap.test.ts`): create
+  replaces the seed and keeps the written section; rebuild refreshes
+  matches and never overwrites the team's themes or a set due date;
+  tenant B cannot apply a plan to A's proposal.
+
+**BL-AIP-4c — background jobs with stuck-row recovery** ✅ (PR #280)
 
 - **Every parse and harvest is a row.** `background_job` (migration
   0085, mirrored in `schema.ts`): org-scoped, `kind` (solicitation
@@ -428,9 +472,10 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
-dates, proposed themes) and the golden eval set from won proposals
-keyed by `promptVersion`; BL-AIP-6b paragraph-anchored rail (cursor
+BL-AIP-5b part ii — the golden eval set keyed by `promptVersion`
+(`ai_eval_run`, `golden-score.ts`, `runGoldenEval`, Settings → AI
+Engine panel; the code is written and split out of part i for the size
+guard); BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and
 "resolve" on AI review comments from the editor; BL-AIP-7 proactive
 scout / stored graded briefs / AI Engine controls. Details and evidence

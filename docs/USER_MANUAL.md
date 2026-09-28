@@ -372,6 +372,8 @@ Pick an **Opportunity** (dropdown of your org's opportunities), optionally overr
 - Price Volume
 - Compliance Matrix
 
+**Outline from Section L (BL-AIP-5b).** When the opportunity has a parsed solicitation with instructions to offerors, the form offers **Build the outline from the solicitation's Section L** (on by default). The AI reads Section L, Section M, the extracted requirements and key dates and replaces the template's list with the sections the instructions actually ask for — in their order, with each section's page cap and a short brief of what it must contain — sets the opportunity's due date when it was blank, and proposes one to three win themes grounded in the evaluation factors (only when the proposal has none). It costs one AI request; if it fails, the template is used and the overview says why. The brief travels with the section: the AI drafter treats it as that section's contract.
+
 ### 6.3 Proposal detail — tabs
 
 ![Proposal detail header](docs/images/proposal-detail-header.png)
@@ -384,6 +386,8 @@ Edit title, roles, notes. Right-side **Workflow** panel shows:
 - Close-out buttons (Submitted, Awarded, Lost, No Bid, Archived)
 
 Quick section rollup below shows which sections are Not started / In progress / Draft complete / In review / Approved.
+
+**Outline from Section L** panel shows what the AI read in the instructions — each section with its page cap, source clause and brief, the due date, the proposed themes and any formatting notes — and offers **Build outline** / **Rebuild outline** for proposals created before this or after a solicitation was re-parsed. A rebuild never deletes a section that has text: it refreshes the page cap and brief of matching sections, adds missing ones, removes only empty ones the instructions do not ask for, and orders the rest after the instructed sections.
 
 #### Sections
 
