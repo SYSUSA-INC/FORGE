@@ -298,6 +298,8 @@ Every opportunity has four tabs.
 
 Same form as New opportunity, but with every field editable. Save persists.
 
+**AI pursuit brief (BL-AIP-7a).** The panel on the right gives a **Pursue / Watch / Consider no-bid** call with a confidence, a 5–8 sentence brief, the signals that drove the call and next actions. It is grounded in what FORGE already knows: the calibrated PWin and its factors (and how well that model has predicted your past outcomes), past bids that look like this one with what the team wrote down afterwards, your record at this agency and who beat you there, the patterns you have lost on, and matching passages from your own corpus. Briefs are kept — the last one shows when you open the page — and a new one is only written when something that matters has changed (or you click **Regenerate**). Answer **Was this useful?** to record feedback. When the pursuit closes (gate decision or proposal outcome), every brief that made a call on it is graded against the result; the panel's eyebrow shows the running track ("3 right, 1 wrong · 75%"). A "Watch" call is a hedge and is never counted right or wrong.
+
 #### Evaluation
 
 A qualification scorecard with 5 weighted dimensions (0–100 sliders):
@@ -335,6 +337,10 @@ Each entry shows the author's avatar, name, kind, body, and timestamp. You can d
 ![Activity timeline](docs/images/opportunity-activity.png)
 
 ---
+
+### 5.5 Pipeline brief (FORGE Brain page)
+
+**Intelligence → Pipeline brief** writes a 4–7 sentence take on your whole portfolio — what to chase, what to abandon, what is at risk this week — with **Priorities this week** and **Risks** listed underneath. Since BL-AIP-7a it is grounded in the PWin model's track record and your loss intelligence (the patterns and competitors you keep losing to), it is stored (the last one shows on load; a new one is written when the pipeline changes or you click **Regenerate**), and you can mark it useful or not.
 
 ## 6. Proposals
 

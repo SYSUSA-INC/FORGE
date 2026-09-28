@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii (golden eval) in PR (PR #283); BL-AIP-7 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a (stored, grounded, graded briefs) in PR; BL-AIP-7b / 7c / 7d next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,42 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-5b (part ii) — the golden eval set** 🔄 (PR #283)
+**BL-AIP-7a — stored, grounded, graded briefs** 🔄 (in PR)
+
+- **Grounded.** The pursuit brief's snapshot now carries the calibrated
+  PWin with its factors and track record (`computePwin`), recompete
+  matches with lessons and debrief weaknesses
+  (`getRecompeteForOpportunity`), the organization's record at the
+  agency and who beat it there (`getCustomerIntelligence`), its loss
+  patterns (`getLossIntelligence`) and matching Brain passages
+  (`searchBrain`); the pipeline snapshot carries the model track and
+  loss intelligence. The prompts tell the model what each block is and
+  to prefer the model PWin over the hand-set one, with the reason.
+- **Structured.** Both briefs answer through a forced tool
+  (`pursuitBriefSchema`: prose + `recommendation` pursue / watch /
+  no_bid + `confidence` + key signals + next actions;
+  `pipelineBriefSchema`: prose + priorities + risks), tagged
+  `BRIEF_PROMPT_VERSION`.
+- **Stored.** Every generation is an `ai_brief` row (migration 0088,
+  mirrored in `schema.ts`): snapshot, snapshot key, text, take, model,
+  prompt version, requester. A recent row with an unchanged snapshot key
+  is reused instead of a new call (`briefIsFresh`, 24 h) — the
+  in-process five-minute cache is gone. The last brief shows on the
+  opportunity overview and on `/intelligence` without regenerating.
+- **Fed back and graded.** Readers mark a brief useful / not useful
+  (`ai_brief.feedback`, audited). When an opportunity closes
+  (`applyOpportunityStage`, gate decision or proposal outcome), every
+  ungraded pursuit brief on it is graded against the outcome
+  (`gradeRecommendation`, pure, tested: pursue ↔ won, no_bid ↔
+  lost / no_bid, watch = inconclusive); the panel eyebrow shows the
+  track (right / wrong / hedged and accuracy).
+- Runtime-tested (`tests/isolation/briefs.test.ts`): a closed pursuit
+  grades its ungraded calls once and only its own tenant's; latest
+  brief, track and feedback are per organization.
+- Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
+  `ai_brief.feedback`.
+
+**BL-AIP-5b (part ii) — the golden eval set** ✅ (PR #283)
 
 - **Cases.** `listGoldenCases` (`src/lib/golden-eval.ts`) = sections
   (≥ 150 words) of proposals with a won outcome, newest first, per
@@ -497,7 +532,15 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-6b paragraph-anchored rail (cursor
+BL-AIP-7b nightly scout (re-run saved searches + org NAICS, score with
+recompete / PWin prior / customer intel, structured `opportunity_triage`
+stored as briefs, learn from import vs dismiss; watchlisted expiring
+awards → draft opportunities) and nightly PWin snapshots / "PWin
+movers"; BL-AIP-7c a real AI Engine control panel (per-feature model
+class within tier → `customOverrides.aiModels`, monthly budget vs
+`aiTokensPerMonth`, burn-down from `ai_call_log`, all features);
+BL-AIP-7d ⌘K palette with Brain answers and AI-assisted onboarding from
+UEI; BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and
 "resolve" on AI review comments from the editor; BL-AIP-7 proactive
 scout / stored graded briefs / AI Engine controls. Details and evidence

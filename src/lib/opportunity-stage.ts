@@ -135,5 +135,21 @@ export async function applyOpportunityStage(
     log.warn("[opportunity-stage]", "rules dispatch failed", { error: err });
   }
 
+  // BL-AIP-7a — a closed pursuit grades every stored pursuit brief that
+  // made a call on it. Best-effort; loaded lazily so this write path
+  // stays light.
+  if (isGate) {
+    try {
+      const { gradeBriefsForOpportunity } = await import("@/lib/briefs");
+      await gradeBriefsForOpportunity({
+        organizationId,
+        opportunityId,
+        outcome: stage as "won" | "lost" | "no_bid",
+      });
+    } catch (err) {
+      log.warn("[opportunity-stage]", "brief grading failed", { error: err });
+    }
+  }
+
   return { changed: true, from: current.stage, to: stage };
 }

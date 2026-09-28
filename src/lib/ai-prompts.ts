@@ -797,6 +797,14 @@ export type PipelineSnapshot = {
     byStage: Record<string, number>;
     inActiveReview: number;
   };
+  /** BL-AIP-7a — what the platform already knows, so the brief is grounded. */
+  modelTrack?: { n: number; brier: number | null };
+  lossIntel?: {
+    decided: number;
+    winRate: number | null;
+    patterns: { title: string; severity: string; detail: string }[];
+    topCompetitors: { name: string; count: number }[];
+  } | null;
 };
 
 const PIPELINE_BRIEF_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform. You write concise, candid daily briefs for capture and proposal leaders.
@@ -808,7 +816,9 @@ Style rules:
 - Note risks frankly: late-stage opportunities with no proposal, proposals stuck in a single stage, missing PWin.
 - Do NOT invent numbers. Only use figures present in the snapshot.
 - Do NOT use governance/risk/compliance jargon. Speak in capture language: pursuit, capture, color team, Section M, gate.
-- If the snapshot is empty (no opportunities), explain there's nothing to brief on yet and suggest seeding pursuits via /opportunities/import.`;
+- If the snapshot is empty (no opportunities), explain there's nothing to brief on yet and suggest seeding pursuits via /opportunities/import.
+- When \`lossIntel\` is present, its patterns are what this organization actually lost on; when a live pursuit shows the same shape, say so. \`modelTrack\` is how well the PWin model has predicted this organization's outcomes (Brier: lower is better); trust the PWin figures accordingly.
+- Answer through the record_pipeline_brief tool: \`brief\` (the prose), \`priorities\` (up to five pursuits or actions to chase this week, each one line naming the pursuit) and \`risks\` (up to five, each one line naming the pursuit). Never repeat the prose in the lists.`;
 
 export type OpportunitySnapshot = {
   organizationName: string;
@@ -853,6 +863,36 @@ export type OpportunitySnapshot = {
     body: string;
     daysAgo: number;
   }[];
+  /**
+   * BL-AIP-7a — the intelligence the platform already computes, so the
+   * brief is grounded in it rather than in the hand-set PWin alone.
+   */
+  modelPwin?: {
+    pwin: number;
+    confidence: string;
+    factors: { label: string; detail: string; direction: "up" | "down" }[];
+    track: { n: number; brier: number | null };
+  } | null;
+  recompete?: {
+    title: string;
+    outcome: "won" | "lost";
+    decidedAt: string | null;
+    awardedTo: string;
+    confidence: string;
+    lessonsLearned: string;
+    weaknesses: string;
+  }[];
+  customer?: {
+    agency: string;
+    pursuits: number;
+    won: number;
+    lost: number;
+    winRate: number | null;
+    winners: { name: string; count: number }[];
+    evaluatorPriorities: string[];
+  } | null;
+  lossPatterns?: { title: string; severity: string; detail: string }[];
+  brainHits?: { title: string; excerpt: string; outcomeLabel: string | null }[];
 };
 
 const OPPORTUNITY_BRIEF_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform. You write concise, candid pursuit briefs for capture and proposal leaders thinking about a single opportunity.
@@ -865,7 +905,12 @@ Style rules:
 - Note the most recent activity if it's within 7 days; mention if the deal has been quiet for >14 days.
 - Do NOT invent numbers, dates, or competitor names that aren't in the snapshot.
 - Do NOT use governance/risk/compliance jargon. Speak in capture language: pursuit, capture, gate, Section M, set-aside, NAICS.
-- If the snapshot is sparse (no evaluation, no competitors, no activity), say so honestly and suggest the next concrete step (e.g., "run a qualification scorecard", "log a call with the customer", "identify the incumbent").`;
+- If the snapshot is sparse (no evaluation, no competitors, no activity), say so honestly and suggest the next concrete step (e.g., "run a qualification scorecard", "log a call with the customer", "identify the incumbent").
+
+BL-AIP-7a — grounding:
+- \`modelPwin\` is the platform's calibrated estimate with the factors that moved it and how well the model has predicted this organization's past outcomes (Brier: lower is better). Prefer it to the hand-set \`opportunity.pwin\` when they differ, and say why.
+- \`recompete\` lists past bids that look like this one, with how they ended and what the team wrote down afterwards. \`customer\` is this organization's record at the agency and who beat it there. \`lossPatterns\` are shapes this organization has lost on before. \`brainHits\` are passages from the organization's own corpus that match this pursuit. Use them; never invent what they do not say.
+- Answer through the record_pursuit_brief tool: \`brief\` (the prose, 5–8 sentences), \`recommendation\` — exactly one of pursue, watch or no_bid — \`confidence\` (0 to 1, how sure you are of that call), \`keySignals\` (up to five one-line facts from the snapshot that drove the call) and \`nextActions\` (up to four concrete steps). Never repeat the prose in the lists.`;
 
 export function buildOpportunityBriefPrompt(
   snapshot: OpportunitySnapshot,
@@ -879,6 +924,7 @@ export function buildOpportunityBriefPrompt(
     "```",
     ``,
     `Brief should help the leader decide whether to keep pushing on this pursuit, change the approach, or walk.`,
+    `Record it with the record_pursuit_brief tool.`,
   ].join("\n");
 
   return {
@@ -886,6 +932,23 @@ export function buildOpportunityBriefPrompt(
     messages: [{ role: "user", content: userPrompt }],
   };
 }
+
+/** BL-AIP-7a — bump when either brief prompt or its grounding changes. */
+export const BRIEF_PROMPT_VERSION = "2026-09-28.1";
+
+export const pursuitBriefSchema = z.object({
+  brief: z.string(),
+  recommendation: z.enum(["pursue", "watch", "no_bid"]),
+  confidence: z.number(),
+  keySignals: z.array(z.string()),
+  nextActions: z.array(z.string()),
+});
+
+export const pipelineBriefSchema = z.object({
+  brief: z.string(),
+  priorities: z.array(z.string()),
+  risks: z.array(z.string()),
+});
 
 export function buildPipelineBriefPrompt(
   snapshot: PipelineSnapshot,
@@ -899,6 +962,7 @@ export function buildPipelineBriefPrompt(
     "```",
     ``,
     `Brief should help the reader decide what to chase, what to abandon, and what's at risk this week.`,
+    `Record it with the record_pipeline_brief tool.`,
   ].join("\n");
 
   return {
