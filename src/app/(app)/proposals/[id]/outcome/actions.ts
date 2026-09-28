@@ -19,7 +19,7 @@ import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
 import { applyOpportunityStage } from "@/lib/opportunity-stage";
 import { stageForOutcome } from "@/lib/opportunity-stage-map";
 import { OUTCOME_REASONS } from "@/lib/proposal-outcome-types";
-import { runInBackground } from "@/lib/background";
+import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
 const OUTCOME_TYPES: ProposalOutcomeType[] = [
@@ -183,14 +183,15 @@ export async function saveOutcomeAction(
       // never get mined unless we kick off a harvest here. Fire-and-
       // forget so the outcome save isn't blocked by AI extraction.
       if (outcomeType === "won" && propagated.artifactsTagged === 0) {
-        const { harvestProposalToCorpusAction } = await import(
-          "../harvest-actions"
-        );
-        // BL-AIP-4 — durable, and the harvest now reads the outcome row
-        // written above so the artifact lands labelled `won`.
-        runInBackground("[saveOutcomeAction] win-harvest", () =>
-          harvestProposalToCorpusAction(proposalId),
-        );
+        // BL-AIP-4c — a background_job row (retried by the cron if this
+        // instance dies); the harvest reads the outcome row written
+        // above so the artifact lands labelled `won`.
+        await runDurable("[saveOutcomeAction] win-harvest", {
+          organizationId,
+          kind: "proposal_harvest",
+          resourceId: proposalId,
+          requestedByUserId: user.id,
+        });
       }
     } catch (err) {
       log.warn("[saveOutcomeAction]", "propagateOutcomeToCorpus failed", { error: err });

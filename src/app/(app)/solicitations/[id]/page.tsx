@@ -11,6 +11,8 @@ import {
   users,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { latestJobForResource } from "@/lib/jobs";
+import { describeJobStatus } from "@/lib/jobs-policy";
 import { safeQuery } from "@/lib/schema-resilience";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -77,6 +79,24 @@ export default async function SolicitationDetail({
   const s = row.s;
   const statusColor = STATUS_COLOR[s.parseStatus] ?? THEME.muted;
   const assignments = await listSolicitationAssignmentsAction(s.id);
+
+  // BL-AIP-4c — the parse is a durable job; say where it stands while
+  // it is not finished (queued for retry, running, stuck, failed).
+  const parseJob =
+    s.parseStatus === "parsed"
+      ? null
+      : await safeQuery(
+          () =>
+            latestJobForResource({
+              organizationId,
+              kind: "solicitation_parse",
+              resourceId: s.id,
+            }),
+          null,
+          { tag: "solicitation.parseJob" },
+        );
+  const parseJobNote =
+    parseJob && parseJob.status !== "done" ? describeJobStatus(parseJob) : "";
 
   // BL-FB-SOL-AMEND-DIFF — load amendment context. If this solicitation
   // is itself an amendment, fetch the parent's display info; otherwise
@@ -230,7 +250,9 @@ export default async function SolicitationDetail({
         meta={[
           {
             label: "Parse",
-            value: STATUS_LABEL[s.parseStatus] ?? s.parseStatus,
+            value:
+              (STATUS_LABEL[s.parseStatus] ?? s.parseStatus) +
+              (parseJobNote ? ` · ${parseJobNote}` : ""),
           },
           {
             label: "Type",

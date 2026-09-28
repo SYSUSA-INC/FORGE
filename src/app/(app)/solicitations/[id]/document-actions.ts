@@ -7,25 +7,19 @@ import {
   solicitationDocuments,
   solicitations,
   type SolicitationDocumentType,
-  type SolicitationRequirement,
 } from "@/db/schema";
 import { mergeSolicitationRequirements } from "@/lib/solicitation-requirements";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
-import {
-  aiExtractSolicitation,
-  aiExtractSolicitationFromImage,
-  aiExtractSolicitationFromPdf,
-  extractTextFromAny,
-} from "@/lib/solicitation-extract";
 import { detectFormat } from "@/lib/text-extract";
-import type { AIDocumentMedia } from "@/lib/ai";
 import { runInBackground } from "@/lib/background";
+import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
+// BL-AIP-4c — the parse pipeline itself lives in
+// src/lib/solicitation-document-parse.ts so the jobs cron can re-run it.
 const MAX_BYTES = 25 * 1024 * 1024;
-const TEXT_LAYER_MIN_CHARS = 200;
 
 export type SolicitationDocumentRow = {
   id: string;
@@ -199,15 +193,18 @@ export async function addSolicitationDocumentAction(
     return { ok: false, error: "Upload saved metadata but file storage failed." };
   }
 
-  runInBackground("[addSolicitationDocumentAction] inline parse", () =>
-    parseSolicitationDocumentFromBytes(
-      row.id,
-      solicitationId,
+  // BL-AIP-4c — a background_job row: runs now from the bytes in hand;
+  // the jobs cron re-runs it from storage if this instance dies.
+  await runDurable(
+    "[addSolicitationDocumentAction] inline parse",
+    {
       organizationId,
-      bytes,
-      file.name,
-      resolvedContentType,
-    ),
+      kind: "solicitation_document_parse",
+      resourceId: row.id,
+      payload: { solicitationId },
+      requestedByUserId: user.id,
+    },
+    { bytes },
   );
 
   await recordAudit({
@@ -283,7 +280,7 @@ export async function deleteSolicitationDocumentAction(
 export async function reparseSolicitationDocumentAction(
   documentId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const [row] = await db
@@ -315,142 +312,18 @@ export async function reparseSolicitationDocumentAction(
     };
   }
 
-  runInBackground("[reparseSolicitationDocumentAction] parse", () =>
-    parseSolicitationDocumentFromBytes(
-      row.id,
-      row.solicitationId,
+  await runDurable(
+    "[reparseSolicitationDocumentAction] parse",
+    {
       organizationId,
-      obj.bytes,
-      row.fileName,
-      row.contentType,
-    ),
+      kind: "solicitation_document_parse",
+      resourceId: row.id,
+      payload: { solicitationId: row.solicitationId },
+      requestedByUserId: user.id,
+    },
+    { bytes: obj.bytes },
   );
   return { ok: true };
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Parse pipeline (internal)
-// ────────────────────────────────────────────────────────────────────────────
-
-async function parseSolicitationDocumentFromBytes(
-  documentId: string,
-  solicitationId: string,
-  organizationId: string,
-  bytes: Uint8Array,
-  fileName: string,
-  contentType: string,
-): Promise<void> {
-  await db
-    .update(solicitationDocuments)
-    .set({ parseStatus: "parsing", parseError: "", updatedAt: new Date() })
-    .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
-
-  const fail = async (msg: string, rawText = "") => {
-    await db
-      .update(solicitationDocuments)
-      .set({
-        parseStatus: "failed",
-        parseError: msg,
-        rawText: rawText.slice(0, 500_000),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
-    revalidatePath(`/solicitations/${solicitationId}`);
-  };
-
-  let rawText = "";
-  let format: ReturnType<typeof detectFormat> = null;
-  try {
-    const res = await extractTextFromAny(bytes, contentType, fileName);
-    rawText = res.text;
-    format = res.format;
-  } catch {
-    format = detectFormat(contentType, fileName);
-  }
-
-  if (format === "image") {
-    const mediaType = (contentType || "image/png") as AIDocumentMedia;
-    const visionRes = await aiExtractSolicitationFromImage(
-      organizationId,
-      bytes,
-      fileName,
-      mediaType,
-    );
-    if (!visionRes.ok) { await fail(visionRes.error); return; }
-    await applyExtraction(documentId, solicitationId, organizationId, {
-      rawText: "",
-      sectionLSummary: visionRes.data.sectionLSummary + "\n\n[Extracted via vision OCR.]",
-      sectionMSummary: visionRes.data.sectionMSummary,
-      requirements: visionRes.data.requirements,
-    });
-    return;
-  }
-
-  if (format === "pdf" && rawText.trim().length < TEXT_LAYER_MIN_CHARS) {
-    const visionRes = await aiExtractSolicitationFromPdf(organizationId, bytes, fileName);
-    if (!visionRes.ok) { await fail(visionRes.error, rawText); return; }
-    await applyExtraction(documentId, solicitationId, organizationId, {
-      rawText: "",
-      sectionLSummary:
-        visionRes.data.sectionLSummary +
-        "\n\n[Extracted via vision OCR — text layer was unreadable.]",
-      sectionMSummary: visionRes.data.sectionMSummary,
-      requirements: visionRes.data.requirements,
-    });
-    return;
-  }
-
-  if (format !== "pdf" && rawText.trim().length < TEXT_LAYER_MIN_CHARS) {
-    await fail(
-      `${format?.toUpperCase() ?? "Document"} has no extractable text. Confirm the file isn't password-protected.`,
-    );
-    return;
-  }
-
-  const aiRes = await aiExtractSolicitation(organizationId, rawText);
-  if (!aiRes.ok) { await fail(aiRes.error, rawText); return; }
-
-  await applyExtraction(documentId, solicitationId, organizationId, {
-    rawText: rawText.slice(0, 500_000),
-    sectionLSummary: aiRes.data.sectionLSummary,
-    sectionMSummary: aiRes.data.sectionMSummary,
-    requirements: aiRes.data.requirements,
-  });
-}
-
-async function applyExtraction(
-  documentId: string,
-  solicitationId: string,
-  organizationId: string,
-  data: {
-    rawText: string;
-    sectionLSummary: string;
-    sectionMSummary: string;
-    requirements: { kind: string; text: string; ref: string }[];
-  },
-): Promise<void> {
-  const reqs: SolicitationRequirement[] = data.requirements.map((r) => ({
-    kind: r.kind as SolicitationRequirement["kind"],
-    text: r.text,
-    ref: r.ref,
-  }));
-
-  await db
-    .update(solicitationDocuments)
-    .set({
-      parseStatus: "parsed",
-      parseError: "",
-      rawText: data.rawText,
-      sectionLSummary: data.sectionLSummary,
-      sectionMSummary: data.sectionMSummary,
-      extractedRequirements: reqs,
-      updatedAt: new Date(),
-    })
-    .where(eq(solicitationDocuments.id, documentId));
-
-  // Roll merged requirements back up to the parent solicitation.
-  await mergeDocumentRequirementsHelper(solicitationId, organizationId);
-  revalidatePath(`/solicitations/${solicitationId}`);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
