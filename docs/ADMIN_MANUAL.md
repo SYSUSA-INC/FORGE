@@ -73,7 +73,7 @@ Practical guidance for assignments:
 
 ### 2.1 Access
 
-Sign in. The left sidebar shows an **Administration** group with a **Users** link (only visible to org admins and superadmins).
+Sign in. Under the FORGE mark the sidebar shows **Switch to: Workspace · Company admin** (BL-NAV-WORKSPACES). **Company admin** is the org admin's own console and carries only admin pages: People (Users & roles), Organization (Profile & domains, Billing, Templates, Integrations, AI Engine), Governance (Notification rules, Audit log) and the Admin guide. Members never see it. Everyday proposal work stays in **Workspace**; opening any admin page switches the sidebar to the console automatically.
 
 ![Users page](docs/images/users-page.png)
 
@@ -170,7 +170,7 @@ Sign out and sign in again to refresh your session JWT. The sidebar will now sho
 
 ### 3.2 The SuperAdmin portal
 
-Go to **Platform admin** in the sidebar. Three tabs.
+Switch to **Platform admin** under the FORGE mark (BL-NAV-WORKSPACES). It is a workspace of its own with nothing but platform pages: Tenants & users (Organizations, Platform users, Overview, Source requests), Commercial (Subscription tiers, AI usage & costs, Promo codes) and Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, the cross-tenant Audit log). A superadmin who is not a member of any tenant lands here after sign-in; to work inside a tenant, open it under Organizations and use **Assume identity**. The Organizations page has three tabs.
 
 ![SuperAdmin portal](docs/images/admin-portal.png)
 

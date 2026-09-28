@@ -92,14 +92,17 @@ export function AdminClient({
   users,
   approvals = [],
   stats,
+  initialTab = "organizations",
 }: {
   currentUserId: string;
   orgs: OrgRow[];
   users: UserRow[];
   approvals?: ApprovalRow[];
   stats: Stats;
+  /** BL-NAV-WORKSPACES — `/admin?tab=users` opens the Platform users tab. */
+  initialTab?: Tab;
 }) {
-  const [tab, setTab] = useState<Tab>("organizations");
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },

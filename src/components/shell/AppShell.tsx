@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Suspense } from "react";
+import { HeaderSettingsLink, HeaderWorkspace } from "@/components/shell/HeaderWorkspace";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
@@ -64,18 +64,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <span className="sm:hidden">FORGE</span>
           </div>
 
-          <div className="ml-4 hidden min-w-0 flex-1 items-center md:flex">
-            <label className="relative flex w-full max-w-md items-center">
-              <span className="pointer-events-none absolute left-3 text-muted">⌕</span>
-              <input
-                placeholder="Search solicitations, proposals, people…"
-                className="aur-input pl-8 font-body text-sm"
-              />
-              <kbd className="absolute right-2 hidden rounded-md border border-layer/10 bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] text-muted md:inline">
-                ⌘K
-              </kbd>
-            </label>
-          </div>
+          {/* BL-NAV-WORKSPACES — search box in everyday work; a console badge otherwise. */}
+          <HeaderWorkspace
+            isOrgAdmin={isOrgAdmin}
+            isSuperadmin={isSuperadmin}
+            hasWorkspace={hasWorkspace}
+          />
 
           <div className="ml-auto flex items-center gap-2 md:gap-3">
             <SessionClock />
@@ -85,11 +79,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 <NotificationBell />
               </Suspense>
             ) : null}
-            {hasWorkspace ? (
-              <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
-                Settings
-              </Link>
-            ) : null}
+            <HeaderSettingsLink
+              isOrgAdmin={isOrgAdmin}
+              isSuperadmin={isSuperadmin}
+              hasWorkspace={hasWorkspace}
+            />
             <UserMenu user={user} />
           </div>
         </header>
