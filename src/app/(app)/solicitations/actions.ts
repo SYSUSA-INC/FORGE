@@ -11,9 +11,9 @@ import {
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
-import { parseSolicitationFromBytes, stripExt } from "@/lib/solicitation-parse";
+import { stripExt } from "@/lib/solicitation-parse";
 import { detectFormat } from "@/lib/text-extract";
-import { runInBackground } from "@/lib/background";
+import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB cap for v1.
@@ -144,10 +144,17 @@ export async function uploadSolicitationAction(
   // Kick off parsing in the same request so the user gets a populated
   // record on the redirect. Failures are recorded on the row and shown
   // on the detail page; the upload itself still succeeds.
-  // BL-AIP-4 — durable: on Vercel the instance stays alive until the
-  // parse settles instead of being frozen with the response.
-  runInBackground("[uploadSolicitationAction] inline parse", () =>
-    parseSolicitationFromBytes(row.id, organizationId, bytes),
+  // BL-AIP-4c — a background_job row: runs now from the bytes in hand;
+  // the jobs cron re-runs it from storage if this instance dies.
+  await runDurable(
+    "[uploadSolicitationAction] inline parse",
+    {
+      organizationId,
+      kind: "solicitation_parse",
+      resourceId: row.id,
+      requestedByUserId: user.id,
+    },
+    { bytes },
   );
 
   await recordAudit({
@@ -200,7 +207,7 @@ function guessContentTypeFromFormat(
 export async function reparseSolicitationAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const [row] = await db
@@ -229,8 +236,10 @@ export async function reparseSolicitationAction(
         "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)",
     };
 
-  runInBackground("[reparseSolicitationAction] parse", () =>
-    parseSolicitationFromBytes(id, organizationId, obj.bytes),
+  await runDurable(
+    "[reparseSolicitationAction] parse",
+    { organizationId, kind: "solicitation_parse", resourceId: id, requestedByUserId: user.id },
+    { bytes: obj.bytes },
   );
   return { ok: true };
 }

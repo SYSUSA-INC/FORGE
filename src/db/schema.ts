@@ -3503,3 +3503,70 @@ export const isolationCheckResults = pgTable(
 
 export type IsolationCheckResult = typeof isolationCheckResults.$inferSelect;
 export type NewIsolationCheckResult = typeof isolationCheckResults.$inferInsert;
+
+/**
+ * BL-AIP-4c — durable background jobs.
+ *
+ * One row per solicitation parse, companion-document parse or proposal
+ * harvest. The request enqueues the row and starts it at once
+ * (`runDurable` in `src/lib/jobs.ts`); the jobs cron re-runs rows whose
+ * instance died mid-run from the stored file bytes, backs off between
+ * attempts and marks a row failed after `maxAttempts`. `resourceId` is
+ * the row the job acts on; `payload` carries anything else the handler
+ * needs. Migration 0085.
+ */
+export const backgroundJobKindEnum = pgEnum("background_job_kind", [
+  "solicitation_parse",
+  "solicitation_document_parse",
+  "proposal_harvest",
+]);
+
+export const backgroundJobStatusEnum = pgEnum("background_job_status", [
+  "queued",
+  "running",
+  "done",
+  "failed",
+]);
+
+export const backgroundJobs = pgTable(
+  "background_job",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: backgroundJobKindEnum("kind").notNull(),
+    /** The solicitation / document / proposal the job acts on. */
+    resourceId: uuid("resource_id").notNull(),
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    status: backgroundJobStatusEnum("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    error: text("error").notNull().default(""),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("background_job_org_created_idx").on(t.organizationId, t.createdAt),
+    resourceIdx: index("background_job_resource_idx").on(t.kind, t.resourceId),
+    openIdx: index("background_job_open_idx")
+      .on(t.status, t.nextAttemptAt)
+      .where(sql`${t.status} IN ('queued', 'running')`),
+  }),
+);
+
+export type BackgroundJob = typeof backgroundJobs.$inferSelect;
+export type NewBackgroundJob = typeof backgroundJobs.$inferInsert;
+export type BackgroundJobKind = (typeof backgroundJobKindEnum.enumValues)[number];
+export type BackgroundJobStatus = (typeof backgroundJobStatusEnum.enumValues)[number];

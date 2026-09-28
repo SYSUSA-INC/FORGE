@@ -38,6 +38,7 @@ import {
 } from "@/lib/tiptap-doc";
 import { getDefaultTemplate } from "@/lib/template-defaults";
 import { runInBackground } from "@/lib/background";
+import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
 async function ownsProposal(id: string, organizationId: string) {
@@ -493,15 +494,17 @@ export async function advanceProposalStageAction(
     // Phase 10f: harvest into the corpus on transition to submitted.
     // Best-effort, fire-and-forget — failures don't block the stage
     // change. Users can re-run via the "Harvest now" button.
+    // BL-AIP-4c — a background_job row, retried by the cron if this
+    // instance dies mid-harvest.
     let harvestStarted = false;
     if (nextStage === "submitted" && wasNotSubmitted) {
       harvestStarted = true;
-      const { harvestProposalToCorpusAction } = await import(
-        "./[id]/harvest-actions"
-      );
-      runInBackground("[advanceProposalStage] harvest", () =>
-        harvestProposalToCorpusAction(id),
-      );
+      await runDurable("[advanceProposalStage] harvest", {
+        organizationId,
+        kind: "proposal_harvest",
+        resourceId: id,
+        requestedByUserId: actor.id,
+      });
     }
 
     return { ok: true, harvestStarted };

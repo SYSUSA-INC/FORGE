@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b in PR (PR #279); BL-AIP-4c / 5b / 7 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c in PR; BL-AIP-5b / 7 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,47 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-4b — Brain follow-ups** 🔄 (PR #279)
+**BL-AIP-4c — background jobs with stuck-row recovery** 🔄 (in PR)
+
+- **Every parse and harvest is a row.** `background_job` (migration
+  0085, mirrored in `schema.ts`): org-scoped, `kind` (solicitation
+  parse, companion-document parse, proposal harvest), `resource_id`,
+  `payload`, `status` queued / running / done / failed, `attempts` /
+  `max_attempts` (3), `next_attempt_at`, `started_at` / `finished_at`,
+  `error`, `requested_by_user_id`. `runDurable` (`src/lib/jobs.ts`)
+  replaces `runInBackground` at the upload, Re-parse, GSA-attachment,
+  companion-document add / re-parse, stage-advance and won-outcome
+  call sites: it inserts the row (or reuses an open one for the same
+  resource, so a double click never runs a parse twice) and starts it
+  at once from the bytes in hand — the user waits for nothing extra.
+  Claims are conditional updates (`status = 'queued'`), so two
+  instances can never run the same row.
+- **The cron finishes what died.** `/api/cron/jobs` every five minutes
+  (`runJobsCron`): rows still `running` past fifteen minutes are
+  presumed dead and re-queued, or failed once their attempts are spent;
+  due rows run oldest-first from the stored file bytes, three per tick
+  inside a time budget. Handler errors back off 1 → 5 → 15 minutes
+  (`jobs-policy.ts`, tested); a `JobPermanentError` (bytes gone, row
+  deleted, the parser itself reported a failure) fails the row at once
+  and — for the bytes-gone case — marks the solicitation / document
+  `failed` with the reason, so "Parsing" no longer sticks forever.
+  The companion-document parse pipeline moved to
+  `src/lib/solicitation-document-parse.ts` so the cron can call it.
+- **Visible.** `/admin/jobs` (superadmin, cross-tenant): state, attempts,
+  last error, filters, and **Run due jobs now** (one tick on demand,
+  audited `admin.jobs.run_now`) for previews and draining. The
+  solicitation page shows the job state next to the parse status
+  (`describeJobStatus`).
+- Runtime-tested (`tests/isolation/background-jobs.test.ts`): bytes
+  gone → permanent failure recorded on the row; open-job reuse; stuck
+  recovery + abandonment + same-tick run; harvest with nothing to
+  harvest; tenant B cannot claim or see A's jobs.
+- Not moved: the compliance auto-map, review pre-flight and scan
+  triggers keep `runInBackground` — scans already have their own
+  durable queue (`scan_dirty_since` + backoff + the scan cron), and the
+  other two are cheap, idempotent re-computations.
+
+**BL-AIP-4b — Brain follow-ups** ✅ (PR #279)
 
 - **Cloudflare R2 is real.** `R2Storage` (`src/lib/storage.ts`) puts and
   gets objects through R2's S3 API with SigV4 signed by hand
@@ -388,9 +428,7 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-4c a background-job table with stuck-row recovery (durable
-records for parses, harvests and scans; a cron that re-runs rows whose
-instance died, from the stored file bytes); BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
+BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
 dates, proposed themes) and the golden eval set from won proposals
 keyed by `promptVersion`; BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and

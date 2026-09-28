@@ -157,6 +157,13 @@ export function AdminClient({
               Errors →
             </Link>
             <Link
+              href="/admin/jobs"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Durable background jobs — parses and harvests, with stuck-row recovery"
+            >
+              Jobs →
+            </Link>
+            <Link
               href="/platform/audit-log"
               className="aur-btn aur-btn-ghost text-[11px]"
               title="Cross-tenant audit log — every recorded action across every org"
