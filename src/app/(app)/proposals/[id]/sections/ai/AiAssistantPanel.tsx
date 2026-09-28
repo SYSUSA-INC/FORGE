@@ -131,6 +131,13 @@ type Props = {
    * re-render this panel.
    */
   getCurrentText?: () => string;
+  /**
+   * BL-AIP-6 — apply the AI text as tracked changes authored "FORGE AI"
+   * on top of the current document, so the owner accepts or rejects
+   * paragraph by paragraph and formatting outside the edits survives.
+   * The default action whenever the section already has content.
+   */
+  onApplyTracked?: (text: string) => void;
 };
 
 /** The routes cap the live body at 60k characters. */
@@ -155,7 +162,7 @@ const MODES: { key: SectionDraftMode; label: string; description: string }[] = [
   },
 ];
 
-export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentText }: Props) {
+export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentText, onApplyTracked }: Props) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
 
@@ -317,6 +324,16 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
     setResult(null);
   }
 
+  // BL-AIP-6 — tracked apply is the default when there is text to
+  // compare against; a first draft into an empty section still replaces.
+  const canApplyTracked = hasContent && !!onApplyTracked;
+  function applyTracked() {
+    if (!result || !onApplyTracked) return;
+    onApplyTracked(result.text);
+    setOpen(false);
+    setResult(null);
+  }
+
   function generateAB() {
     setAbError(null);
     setAbResult(null);
@@ -444,6 +461,12 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
   }
 
   function applyChatSuggestion(text: string) {
+    // BL-AIP-6 — into an existing draft, chat language lands as tracked
+    // changes the owner reviews rather than replacing the section.
+    if (canApplyTracked && onApplyTracked) {
+      onApplyTracked(text);
+      return;
+    }
     const words = text
       .split(/\s+/g)
       .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
@@ -738,12 +761,23 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                 >
                   Discard
                 </button>
+                {canApplyTracked ? (
+                  <button
+                    type="button"
+                    onClick={applyTracked}
+                    className="aur-btn aur-btn-primary text-[11px]"
+                    title="Show the AI's edits as tracked changes by FORGE AI; accept or reject each one in the editor"
+                  >
+                    Apply as tracked changes
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={accept}
-                  className="aur-btn aur-btn-primary text-[11px]"
+                  className={`aur-btn ${canApplyTracked ? "aur-btn-ghost" : "aur-btn-primary"} text-[11px]`}
+                  title={canApplyTracked ? "Discard the current text and use this draft as is" : undefined}
                 >
-                  Replace section with this
+                  {canApplyTracked ? "Replace section" : "Replace section with this"}
                 </button>
               </div>
             </div>
@@ -792,8 +826,9 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                         type="button"
                         onClick={() => applyChatSuggestion(msg.content)}
                         className="mt-1.5 font-mono text-[9px] uppercase tracking-wider text-teal hover:text-teal/80"
+                        title={canApplyTracked ? "Apply as tracked changes by FORGE AI" : "Replace the section with this text"}
                       >
-                        Apply to section ↑
+                        {canApplyTracked ? "Apply as tracked changes ↑" : "Apply to section ↑"}
                       </button>
                     ) : null}
                   </div>

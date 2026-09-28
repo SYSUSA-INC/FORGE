@@ -395,6 +395,12 @@ Click any section to expand and edit:
 
 Add custom sections with **+ Add** at the top (specify kind — Technical / Management / etc.). Remove sections from inside the editor.
 
+**AI edits arrive as tracked changes (BL-AIP-6).** When a section already has text, the AI assistant's **Improve**, **Tighten** and **Draft** results, the chat's **Apply**, and the Brain's **Insert** no longer replace the section. They land as tracked changes authored **FORGE AI** — the same green insertions and red strikethroughs a teammate leaves in Suggest mode — and the Track changes panel opens so you accept or reject each change. Tables, lists, links and formatting outside the edited words are untouched, and pending suggestions from teammates are settled to their original text first so there is one consistent set to review. Every accept or reject is recorded against the AI author, which is how the Draft Insights panel and the drafter itself learn what this team keeps. **Replace section** is still there as the secondary button when you really do want the whole thing swapped.
+
+**Research while you write.** Under the editor, the **Research while you write** rail refreshes a couple of seconds after you pause: Brain passages for the paragraph you are in (winning proposals first), requirements mapped to this section that the draft does not cover yet (with the missing terms named), win themes it does not reinforce, and any contradiction the last health scan raised between this section and another. **Insert as suggestion** drops a passage in as a tracked FORGE AI insertion. The rail uses one embedding lookup per refresh and no drafting calls, and is rate-limited per user.
+
+**The drafter and the chat read what the team has learned.** Open reviewer comments on the section, weaknesses the agency cited in past debriefs, gaps found against past winners (same agency first) and how much of past AI drafts this team kept now reach the AI, with instructions to resolve comments in the text and answer criticisms with evidence rather than mention them.
+
 #### Reviews
 
 Run formal color-team reviews. **Start review** panel:
@@ -409,6 +415,8 @@ When you click Start, the review is in progress and reviewers get access. Clicki
 - **Close review** (final verdict + summary) or **Cancel review** — only the proposal manager (or an admin) can close or cancel; the action is stamped with their name and a timestamp
 
 ![Reviews tab](docs/images/proposal-reviews.png)
+
+**FORGE AI reviews first.** When you start a review, the AI reads each drafted section (up to eight) against its mapped requirements and the win themes for that colour — pink for structure and compliance shape, red as the evaluator scoring against Section M, gold for polish and consistency — and leaves up to three findings and a verdict per section as comments authored **FORGE AI**. Human reviewers open the review to findings rather than a blank thread; resolve a comment once it is addressed, because open ones are fed to the section's drafter and chat. This needs AI drafting enabled on your tier and counts one AI request per review.
 
 Verdicts roll up: any **Fail** → Fail; any **Conditional** → Conditional; else **Pass**. Once a review is closed, the per-reviewer verdicts and the comment thread become read-only history. Open it any time later to see who voted what, what comments were raised, and which were resolved before close.
 

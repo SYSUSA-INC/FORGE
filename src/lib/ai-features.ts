@@ -33,6 +33,8 @@ export const AI_FEATURES = {
   // BL-AIP-4 — embedding calls were never metered before.
   embedding: "Embeddings (indexing)",
   embedding_query: "Embeddings (query)",
+  // BL-AIP-6 — AI colour-team pre-review when a review starts.
+  review_preflight: "Colour-team pre-review",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

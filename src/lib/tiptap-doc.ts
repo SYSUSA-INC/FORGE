@@ -31,6 +31,35 @@ function hasMark(node: TipTapNode, type: string): boolean {
   return (node.marks ?? []).some((m) => m.type === type);
 }
 
+/** Copy without the `marks` key (not `marks: undefined`), so structural equality holds. */
+function withoutMarks(node: TipTapNode): TipTapNode {
+  const { marks: _dropped, ...rest } = node;
+  void _dropped;
+  return rest;
+}
+
+function marksKey(node: TipTapNode): string {
+  return JSON.stringify(node.marks ?? []);
+}
+
+/**
+ * Join neighbouring text nodes that carry identical marks, as ProseMirror
+ * does on load, so a resolved document has the same shape as one that
+ * was never marked up.
+ */
+function mergeAdjacentText(nodes: TipTapNode[]): TipTapNode[] {
+  const out: TipTapNode[] = [];
+  for (const n of nodes) {
+    const prev = out[out.length - 1];
+    if (prev && prev.type === "text" && n.type === "text" && marksKey(prev) === marksKey(n)) {
+      out[out.length - 1] = { ...prev, text: (prev.text ?? "") + (n.text ?? "") };
+    } else {
+      out.push(n);
+    }
+  }
+  return out;
+}
+
 /**
  * BL-AIP-2 — does the document carry unresolved tracked changes?
  * Exports and AI input show the "final" view (see below); callers use
@@ -62,10 +91,12 @@ export function resolveTrackedChanges(doc: TipTapDoc): TipTapDoc {
       if (hasMark(node, TC_DELETE)) return null;
       if (!hasMark(node, TC_INSERT)) return node;
       const marks = (node.marks ?? []).filter((m) => m.type !== TC_INSERT);
-      return marks.length ? { ...node, marks } : { ...node, marks: undefined };
+      return marks.length ? { ...node, marks } : withoutMarks(node);
     }
     if (!node.content) return node;
-    const content = node.content.map(resolveNode).filter((n): n is TipTapNode => n !== null);
+    const content = mergeAdjacentText(
+      node.content.map(resolveNode).filter((n): n is TipTapNode => n !== null),
+    );
     if (content.length === 0 && node.content.length > 0) return null;
     return { ...node, content };
   };
@@ -92,6 +123,42 @@ export function projectToPlain(doc: TipTapDoc | null | undefined): string {
     .filter((s) => s.length > 0)
     .join("\n\n")
     .trim();
+}
+
+/**
+ * BL-AIP-6 — the "original" view of a document with tracked changes:
+ * pending insertions are dropped, pending deletions are kept (mark
+ * removed). The inverse of resolveTrackedChanges; what reject-all yields.
+ */
+export function rejectTrackedChanges(doc: TipTapDoc): TipTapDoc {
+  if (!hasPendingTrackedChanges(doc)) return doc;
+  const rejectNode = (node: TipTapNode): TipTapNode | null => {
+    if (node.type === "text") {
+      if (hasMark(node, TC_INSERT)) return null;
+      if (!hasMark(node, TC_DELETE)) return node;
+      const marks = (node.marks ?? []).filter((m) => m.type !== TC_DELETE);
+      return marks.length ? { ...node, marks } : withoutMarks(node);
+    }
+    if (!node.content) return node;
+    const content = mergeAdjacentText(
+      node.content.map(rejectNode).filter((n): n is TipTapNode => n !== null),
+    );
+    if (content.length === 0 && node.content.length > 0) return null;
+    return { ...node, content };
+  };
+  return {
+    type: "doc",
+    content: (doc.content ?? [])
+      .map(rejectNode)
+      .filter((n): n is TipTapNode => n !== null),
+  };
+}
+
+/** Plain text of one block, tracked changes resolved to their final view. */
+export function blockPlainText(node: TipTapNode): string {
+  const resolved = resolveTrackedChanges({ type: "doc", content: [node] });
+  const only = resolved.content?.[0];
+  return only ? blockToText(only) : "";
 }
 
 function blockToText(node: TipTapNode): string {

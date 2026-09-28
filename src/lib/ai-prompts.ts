@@ -229,6 +229,81 @@ export const citationVerifySchema = z.object({
   ),
 });
 
+// ────────────────────────────────────────────────────────────────────
+// BL-AIP-6 — AI colour-team pre-review, one section per call
+// ────────────────────────────────────────────────────────────────────
+
+export type ReviewPreflightVerdict = {
+  verdict: "pass" | "conditional" | "fail";
+  summary: string;
+  comments: { text: string; severity: "high" | "medium" | "low" }[];
+};
+
+const REVIEW_PREFLIGHT_SYSTEM = `You are a colour-team reviewer inside FORGE — a federal proposal operations platform. A human review is starting; you read one section first and leave the comments an experienced reviewer would, so the human reviewers start from findings rather than a blank page.
+
+Colour teams: pink = early structure and compliance shape; red = evaluator's eyes, scoring against Section M; gold = executive polish, themes and consistency; white_gloves = final proofread and format.
+
+Output ONLY the tool call / JSON object:
+{
+  "verdict": "pass" | "conditional" | "fail",
+  "summary": "<2 sentences on the section's readiness for THIS colour>",
+  "comments": [ { "text": "<one concrete, actionable comment tied to a specific passage or gap>", "severity": "high" | "medium" | "low" } ]
+}
+
+Rules:
+- At most 3 comments; the most consequential first. Quote or point at the passage. No compliments.
+- Judge against the mapped requirements and win themes provided. A requirement with no answer in the text is a high-severity comment.
+- pass: an evaluator could score this as is; conditional: fixable gaps; fail: missing, off-target or non-compliant.
+- Plain prose. No markdown.`;
+
+export function buildReviewPreflightPrompt(input: {
+  color: string;
+  sectionTitle: string;
+  sectionKind: string;
+  pageLimit: number | null;
+  wordCount: number;
+  body: string;
+  requirements: { number: string; text: string }[];
+  winThemes: { title: string; statement: string }[];
+}): { system: string; messages: AIMessage[] } {
+  const reqs = input.requirements
+    .slice(0, 15)
+    .map((r, i) => `${i + 1}. [${r.number || "?"}] ${r.text.slice(0, 400)}`)
+    .join("\n");
+  const themes = input.winThemes
+    .slice(0, 3)
+    .map((t, i) => `${i + 1}. ${t.title}: ${t.statement}`)
+    .join("\n");
+  const userPrompt = [
+    `Colour team: ${input.color}.`,
+    `Section: "${input.sectionTitle}" (kind: ${input.sectionKind}${input.pageLimit ? `, page cap ${input.pageLimit}` : ""}, ${input.wordCount} words).`,
+    reqs ? `\nRequirements mapped to this section:\n${reqs}` : "\nNo requirements are mapped to this section.",
+    themes ? `\nWin themes:\n${themes}` : "",
+    `\nSection text:`,
+    "```",
+    input.body.slice(0, 12_000),
+    "```",
+    `\nReturn the verdict and up to 3 comments.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    system: REVIEW_PREFLIGHT_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+export const reviewPreflightSchema = z.object({
+  verdict: z.enum(["pass", "conditional", "fail"]),
+  summary: z.string(),
+  comments: z.array(
+    z.object({
+      text: z.string(),
+      severity: z.enum(["high", "medium", "low"]),
+    }),
+  ),
+});
+
 export type EbuyExtractionResult = {
   title: string;
   rfqNumber: string;
@@ -431,6 +506,20 @@ export type SectionDraftPatternIntel = {
    * (src/lib/edit-feedback.ts). Null until enough decisions exist.
    */
   editFeedback?: EditFeedbackSummary | null;
+  /**
+   * BL-AIP-6 — the loops that never reached the drafter: AI-draft
+   * acceptance, open reviewer comments on this section, agency debrief
+   * weaknesses and winner-analysis gaps (src/lib/writing-signals.ts).
+   */
+  writingSignals?: WritingSignalsSnapshot | null;
+};
+
+/** BL-AIP-6 — shape of the writing signals; defined here so client code can import the type. */
+export type WritingSignalsSnapshot = {
+  draftAcceptance: { drafts: number; meanAcceptedFraction: number; widened: boolean } | null;
+  reviewComments: { color: string; body: string; reviewer: string | null }[];
+  debriefWeaknesses: { agency: string; weaknesses: string; improvements: string }[];
+  winnerGaps: { competitor: string; agency: string; gaps: string; recommendations: string }[];
 };
 
 export type SectionDraftSnapshot = {
@@ -517,7 +606,12 @@ BL-9 Slice 7 — edit feedback:
 - \`preferredPhrases\` are contributions the owner kept: match their register, level of specificity and kind of claim. Do NOT copy them verbatim — they belong to other sections and other facts.
 - \`rejectedPhrases\` are insertions the owner struck: do not reproduce their style, hedging or claims.
 - \`removedPhrases\` are passages the owner agreed to cut: they show the padding and repetition this team does not tolerate — do not produce it.
-- A low \`insertAcceptRate\` means a strict owner: write tighter and make every sentence earn its place. Treat the whole block as taste, not facts: it never overrides the snapshot's proposal facts or the compliance gaps.`;
+- A low \`insertAcceptRate\` means a strict owner: write tighter and make every sentence earn its place. Treat the whole block as taste, not facts: it never overrides the snapshot's proposal facts or the compliance gaps.
+
+BL-AIP-6 — writing signals:
+- \`patternIntel.writingSignals.reviewComments\` are open colour-team comments on THIS section. Resolve each one in the text where it applies; do not acknowledge them in prose.
+- \`debriefWeaknesses\` are what the agency criticised in past debriefs and \`winnerGaps\` are what past winners had that we lacked. Where the section touches the same ground, write the concrete evidence that answers the criticism; never mention the debrief or the competitor.
+- \`draftAcceptance\` says how much of past AI drafts this team kept. A low figure means their owners rewrite heavily: be specific, avoid generic capability claims, and leave [BRACKETS] where only the team can supply the fact.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:

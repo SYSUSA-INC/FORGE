@@ -171,7 +171,8 @@ export default async function ReviewDetailPage({
               body: c.body,
               resolved: c.resolved,
               createdAt: c.createdAt.toISOString(),
-              authorName: c.authorName,
+              // BL-AIP-6 — pre-review comments carry no user; label them.
+              authorName: c.authorName ?? (c.userId ? null : "FORGE AI"),
               authorEmail: c.authorEmail,
             }))}
           />

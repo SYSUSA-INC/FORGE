@@ -56,9 +56,11 @@ describe("tracked changes — final view", () => {
     const resolved = resolveTrackedChanges(doc);
     expect(resolved.content).toHaveLength(2);
     const first = resolved.content[0]!;
-    expect(first.content!.map((n) => n.text)).toEqual(["We deliver ", "measurable ", "outcomes", "."]);
-    expect(first.content![1]!.marks).toBeUndefined();
-    expect(first.content![2]!.marks).toEqual([{ type: "bold" }]);
+    // BL-AIP-6 — neighbouring runs with identical marks are joined, as
+    // ProseMirror would on load, so the resolved shape matches a clean doc.
+    expect(first.content!.map((n) => n.text)).toEqual(["We deliver measurable ", "outcomes", "."]);
+    expect(first.content![0]!.marks).toBeUndefined();
+    expect(first.content![1]!.marks).toEqual([{ type: "bold" }]);
     expect(hasPendingTrackedChanges(resolved)).toBe(false);
     // The input is not mutated.
     expect(doc.content).toHaveLength(3);
