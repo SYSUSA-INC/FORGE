@@ -71,3 +71,35 @@ describe("rankBoost", () => {
     expect(max).toBeLessThan(0.3);
   });
 });
+
+describe("BL-AIP-4b — hybrid fusion", () => {
+  it("reciprocal rank fusion rewards ids both signals rank", async () => {
+    const { reciprocalRankFusion, fusedToUnit, RRF_K } = await import("@/lib/brain-rank");
+    const fused = reciprocalRankFusion([
+      ["a", "b", "c"],
+      ["c", "a", "d"],
+    ]);
+    // a: 1/61 + 1/62 ; c: 1/63 + 1/61 ; b: 1/62 ; d: 1/63
+    expect(fused.get("a")!.score).toBeCloseTo(1 / 61 + 1 / 62, 10);
+    expect(fused.get("c")!.score).toBeCloseTo(1 / 63 + 1 / 61, 10);
+    expect(fused.get("a")!.lists).toEqual([0, 1]);
+    expect(fused.get("b")!.lists).toEqual([0]);
+    const order = [...fused.entries()].sort((x, y) => y[1].score - x[1].score).map(([id]) => id);
+    expect(order).toEqual(["a", "c", "b", "d"]);
+    expect(fusedToUnit(2 / (RRF_K + 1), 2)).toBe(1);
+    expect(fusedToUnit(1 / (RRF_K + 1), 2)).toBeCloseTo(0.5, 10);
+  });
+
+  it("builds an OR query from the most distinctive terms", async () => {
+    const { lexicalQueryFromText } = await import("@/lib/brain-rank");
+    const q = lexicalQueryFromText(
+      "Section: Technical Approach (technical)\nAgency: FAA\nNAICS 541512\nOur FedRAMP Moderate platform migrates the tower workloads; FedRAMP evidence is attached.",
+      4,
+    );
+    expect(q.split(" OR ")).toHaveLength(4);
+    expect(q).toContain("fedramp");
+    expect(q).not.toContain("section");
+    expect(q).not.toContain("541512");
+    expect(lexicalQueryFromText("the and for")).toBe("");
+  });
+});

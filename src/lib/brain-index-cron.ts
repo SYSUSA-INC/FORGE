@@ -7,6 +7,9 @@
  * a harvest never reached the harvested artifact. This cron closes those
  * loops on a schedule (vercel.json: every six hours):
  *
+ *   0. Harvest submitted / won proposals that have no harvest artifact
+ *      (BL-AIP-4b) — the fire-and-forget harvest used to be the only
+ *      path, and it died with the instance.
  *   1. Reconcile outcomes — harvested artifacts whose proposal has an
  *      outcome that differs from the artifact's label.
  *   2. Embed artifacts that have text but no chunks.
@@ -31,6 +34,7 @@ import { embedArtifact } from "@/lib/knowledge-artifact-embed";
 import { embedKnowledgeEntries, type EntryEmbedRow } from "@/lib/knowledge-entry-embed";
 import { runKnowledgeExtraction } from "@/lib/knowledge-extraction";
 import { propagateOutcomeToCorpus } from "@/lib/knowledge-outcome";
+import { harvestProposal } from "@/lib/proposal-harvest";
 import {
   enforceQuota,
   ensureFeature,
@@ -42,6 +46,8 @@ import { log } from "@/lib/log";
 import type { ProposalOutcomeType } from "@/db/schema";
 
 export type BrainIndexSummary = {
+  /** BL-AIP-4b — submitted / won proposals harvested because none existed. */
+  proposalsHarvested: number;
   outcomesReconciled: number;
   artifactsEmbedded: number;
   artifactsReembedded: number;
@@ -57,6 +63,7 @@ export type BrainIndexSummary = {
 };
 
 export type BrainIndexOptions = {
+  maxHarvests?: number;
   maxEmbeds?: number;
   maxEntryEmbeds?: number;
   maxExtractions?: number;
@@ -67,12 +74,14 @@ function rowsOf<T>(result: unknown): T[] {
 }
 
 export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<BrainIndexSummary> {
+  const maxHarvests = opts.maxHarvests ?? 3;
   const maxEmbeds = opts.maxEmbeds ?? 10;
   const maxEntryEmbeds = opts.maxEntryEmbeds ?? 200;
   const maxExtractions = opts.maxExtractions ?? 3;
   const live = liveEmbeddingProviderConfigured();
 
   const summary: BrainIndexSummary = {
+    proposalsHarvested: 0,
     outcomesReconciled: 0,
     artifactsEmbedded: 0,
     artifactsReembedded: 0,
@@ -85,6 +94,52 @@ export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<Brain
     liveEmbeddings: live,
     errors: 0,
   };
+
+  // 0. Un-harvested submitted / won proposals (BL-AIP-4b).
+  try {
+    const unharvested = rowsOf<{ organization_id: string; proposal_id: string }>(
+      await db.execute(sql`
+        SELECT p.organization_id, p.id AS proposal_id
+        FROM proposal p
+        LEFT JOIN proposal_outcome po
+          ON po.proposal_id = p.id AND po.organization_id = p.organization_id
+        WHERE (p.stage IN ('submitted', 'awarded') OR po.outcome_type = 'won')
+          AND EXISTS (
+            SELECT 1 FROM proposal_section s
+            WHERE s.proposal_id = p.id AND s.word_count > 0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM knowledge_artifact a
+            WHERE a.organization_id = p.organization_id
+              AND a.source = 'mined_from_proposal'
+              AND a.metadata ->> 'proposalId' = p.id::text
+          )
+        ORDER BY p.updated_at DESC
+        LIMIT ${maxHarvests}
+      `),
+    );
+    for (const row of unharvested) {
+      try {
+        const r = await harvestProposal({
+          organizationId: row.organization_id,
+          proposalId: row.proposal_id,
+          actor: { userId: null },
+          skipStubExtraction: true,
+        });
+        if (r.ok) summary.proposalsHarvested += 1;
+        else {
+          summary.errors += 1;
+          log.warn("[brain-index]", "harvest declined", { proposalId: row.proposal_id, error: r.error });
+        }
+      } catch (err) {
+        summary.errors += 1;
+        log.error("[brain-index]", "harvest failed", { error: err, proposalId: row.proposal_id });
+      }
+    }
+  } catch (err) {
+    summary.errors += 1;
+    log.error("[brain-index]", "un-harvested scan failed", { error: err });
+  }
 
   // 1. Outcome reconciliation.
   try {

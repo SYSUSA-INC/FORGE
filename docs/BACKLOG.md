@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 in PR (PR #278); BL-AIP-4b / 5b / 7 next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b in PR (PR #TBD); BL-AIP-4c / 5b / 7 next
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,33 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-6 — AI as a collaborator in the editor** 🔄 (PR #278)
+**BL-AIP-4b — Brain follow-ups** 🔄 (PR #TBD)
+
+- **Cloudflare R2 is real.** `R2Storage` (`src/lib/storage.ts`) puts and
+  gets objects through R2's S3 API with SigV4 signed by hand
+  (`src/lib/aws-sigv4.ts`, tested against the AWS documentation vector)
+  — no SDK. With `R2_ACCOUNT_ID` / `R2_BUCKET` / `R2_ACCESS_KEY_ID` /
+  `R2_SECRET_ACCESS_KEY` set, solicitation files, companion documents,
+  corpus uploads and renders survive redeploys; without them the memory
+  provider still runs everything end-to-end.
+- **Hybrid Brain search.** `searchBrain` runs a Postgres full-text query
+  (`websearch_to_tsquery` over the query's most distinctive terms,
+  `lexicalQueryFromText`) beside the vector query and fuses the two
+  rankings with reciprocal rank fusion (`brain-rank.ts`, tested), then
+  layers the existing boosts. GIN expression indexes in migration 0084
+  (mirrored in `schema.ts`). Exact terms — contract numbers,
+  certifications, acronyms — now surface even when the embedding misses
+  them, and stub-embedding tenants get ranked results instead of noise;
+  hits carry `matchedBy`.
+- **Harvest as a library with a cron fallback.** The proposal harvest
+  moved to `src/lib/proposal-harvest.ts` (action delegates; uses the
+  embed / extraction libs directly). `runBrainIndex` gains phase 0:
+  submitted / awarded / won proposals with drafted sections and no
+  harvest artifact are harvested (3 per run, stub extraction skipped,
+  audited with `viaCron`), so a harvest that died with the instance no
+  longer keeps a win out of the Brain.
+
+**BL-AIP-6 — AI as a collaborator in the editor** ✅ (PR #278)
 
 - **AI edits are tracked changes.** `applyAsTrackedChanges`
   (`src/lib/tracked-diff.ts`, tested: accept-all yields the rewrite,
@@ -362,10 +388,9 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-4b Brain follow-ups (hybrid tsvector search, harvest moved to a
-lib with a cron fallback for un-harvested won proposals, R2 storage for
-artifacts, a background-job table with stuck-row recovery);
-BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
+BL-AIP-4c a background-job table with stuck-row recovery (durable
+records for parses, harvests and scans; a cron that re-runs rows whose
+instance died, from the stored file bytes); BL-AIP-5b proposal bootstrap from Section L (sections, page limits, due
 dates, proposed themes) and the golden eval set from won proposals
 keyed by `promptVersion`; BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and
