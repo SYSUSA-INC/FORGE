@@ -93,9 +93,14 @@ describe("BL-TIER-ASSIGN — tenant subscription", () => {
       .select({ action: auditLogs.action, metadata: auditLogs.metadata })
       .from(auditLogs)
       .where(eq(auditLogs.organizationId, fx.orgA.organizationId));
+    // Row order is not guaranteed without ORDER BY: compare the multiset.
     const tierAudits = audits.filter((a) => a.action === "tenant.tier_change");
     expect(tierAudits).toHaveLength(2);
-    expect((tierAudits[0]!.metadata as { firstAssignment?: boolean }).firstAssignment).toBe(true);
+    expect(
+      tierAudits
+        .map((a) => (a.metadata as { firstAssignment?: boolean }).firstAssignment)
+        .sort((a, b) => Number(b) - Number(a)),
+    ).toEqual([true, false]);
 
     // B never had a row and still has none.
     expect(await rowOf(fx.orgB.organizationId)).toBeNull();
