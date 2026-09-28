@@ -2232,6 +2232,11 @@ export const knowledgeEntries = pgTable("knowledge_entry", {
   embeddingHnswIdx: index("knowledge_entry_embedding_hnsw_idx")
     .using("hnsw", t.embedding.op("vector_cosine_ops"))
     .with({ m: 16, ef_construction: 64 }),
+  // BL-AIP-4b (drizzle/0084) — full-text half of hybrid Brain search.
+  textTsvIdx: index("knowledge_entry_text_tsv_idx").using(
+    "gin",
+    sql`to_tsvector('english', ${t.title} || ' ' || ${t.body})`,
+  ),
 }));
 
 export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
@@ -2516,6 +2521,11 @@ export const knowledgeArtifactChunks = pgTable("knowledge_artifact_chunk", {
   embeddingHnswIdx: index("knowledge_artifact_chunk_embedding_hnsw_idx")
     .using("hnsw", t.embedding.op("vector_cosine_ops"))
     .with({ m: 16, ef_construction: 64 }),
+  // BL-AIP-4b (drizzle/0084) — full-text half of hybrid Brain search.
+  contentTsvIdx: index("knowledge_artifact_chunk_content_tsv_idx").using(
+    "gin",
+    sql`to_tsvector('english', ${t.content})`,
+  ),
 }));
 
 export type KnowledgeArtifactChunk =

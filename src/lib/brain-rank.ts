@@ -78,3 +78,67 @@ export function rankBoost(input: RankInput, now: Date = new Date()): number {
     (input.curated ? CURATED_BOOST : 0)
   );
 }
+
+// ────────────────────────────────────────────────────────────────────
+// BL-AIP-4b — hybrid search: vector ranking + full-text ranking fused
+// ────────────────────────────────────────────────────────────────────
+
+/** Standard RRF constant: rank 1 scores 1/61, rank 10 scores 1/70. */
+export const RRF_K = 60;
+
+/**
+ * Reciprocal rank fusion. Each list is ordered best-first; an id's fused
+ * score is the sum over the lists it appears in of 1 / (k + rank). Ids
+ * that both signals like rise above ids only one signal likes, without
+ * needing the two scores to be on the same scale.
+ */
+export function reciprocalRankFusion(
+  lists: string[][],
+  k: number = RRF_K,
+): Map<string, { score: number; lists: number[] }> {
+  const out = new Map<string, { score: number; lists: number[] }>();
+  lists.forEach((list, listIndex) => {
+    list.forEach((id, i) => {
+      const cur = out.get(id) ?? { score: 0, lists: [] };
+      cur.score += 1 / (k + i + 1);
+      cur.lists.push(listIndex);
+      out.set(id, cur);
+    });
+  });
+  return out;
+}
+
+/**
+ * Scale a fused score to the 0..1 band the UI shows as a percentage:
+ * the best possible score (rank 1 in every list) maps to 1.
+ */
+export function fusedToUnit(score: number, listCount: number, k: number = RRF_K): number {
+  const best = listCount / (k + 1);
+  return best > 0 ? Math.min(1, score / best) : 0;
+}
+
+const LEXICAL_STOPWORDS = new Set([
+  "the", "and", "for", "with", "this", "that", "are", "was", "were", "from",
+  "into", "they", "their", "have", "has", "had", "but", "not", "you", "your",
+  "our", "any", "all", "each", "such", "shall", "will", "may", "include",
+  "including", "section", "agency", "naics", "proposal", "rfp", "kind",
+  "opportunity", "current", "draft", "title", "set", "aside",
+]);
+
+/**
+ * Turn free text into a `websearch_to_tsquery` string that ORs its most
+ * distinctive terms, so a paragraph-sized query still matches documents
+ * that share a few key terms instead of demanding every word.
+ */
+export function lexicalQueryFromText(text: string, maxTerms = 12): string {
+  const counts = new Map<string, number>();
+  for (const raw of text.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []) {
+    if (LEXICAL_STOPWORDS.has(raw)) continue;
+    counts.set(raw, (counts.get(raw) ?? 0) + 1);
+  }
+  const terms = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .slice(0, maxTerms)
+    .map(([t]) => t);
+  return terms.join(" OR ");
+}

@@ -5,9 +5,11 @@
  * URL or our own download path.
  *
  * R2 is the production provider (DP-4 locked: Cloudflare R2 — cheap
- * egress, S3-compatible API). When R2 vars aren't set we fall back to
- * an in-memory cache so dev / preview never break — this means PDFs
- * are temporary across redeploys but always work end-to-end.
+ * egress, S3-compatible API; implemented in BL-AIP-4b with hand-rolled
+ * SigV4). When R2 vars aren't set we fall back to an in-memory cache so
+ * dev / preview never break — this means PDFs, solicitation files and
+ * corpus uploads are temporary across redeploys but always work
+ * end-to-end.
  *
  * For simplicity in the v1 stub path, we use our own download API
  * (`/api/proposals/[id]/pdf/[renderId]`) for both providers — that
@@ -15,6 +17,8 @@
  * Switching to R2 with public-bucket access in a follow-up is a small
  * change to the route handler.
  */
+
+import { EMPTY_PAYLOAD_SHA256, sha256Hex, signRequest, uriEncodePath } from "@/lib/aws-sigv4";
 
 export type StoredObject = {
   storagePath: string;
@@ -71,8 +75,18 @@ class MemoryStorage implements StorageProvider {
   }
 }
 
+/**
+ * BL-AIP-4b — Cloudflare R2 through its S3-compatible API, signed with
+ * SigV4 by hand (src/lib/aws-sigv4.ts) so no SDK is needed for PUT and
+ * GET. Keys are stored as given; the object's content type rides on the
+ * object metadata so `get` can return it. A missing object is `null`;
+ * every other failure throws with the HTTP status so the caller's
+ * existing error paths report it.
+ */
 class R2Storage implements StorageProvider {
   readonly name = "r2" as const;
+  private static readonly TIMEOUT_MS = 30_000;
+
   constructor(
     private accountId: string,
     private bucket: string,
@@ -80,28 +94,81 @@ class R2Storage implements StorageProvider {
     private secretAccessKey: string,
   ) {}
 
-  /**
-   * R2 is S3-compatible. We don't pull in @aws-sdk/client-s3 here to
-   * keep this PR's dependency footprint small; we sign requests with
-   * AWS SigV4 by hand using Web Crypto. Implementation deliberately
-   * left as a follow-up — when a customer needs persistent multi-day
-   * PDFs across redeploys, we install @aws-sdk/client-s3 and replace
-   * this class. Until then, falling back to MemoryStorage is the
-   * correct behavior.
-   */
-  async put(): Promise<StoredObject> {
-    void this.accountId;
-    void this.bucket;
-    void this.accessKeyId;
-    void this.secretAccessKey;
-    throw new Error(
-      "R2Storage is not yet implemented. Either install @aws-sdk/client-s3 " +
-        "and finish R2Storage in src/lib/storage.ts, or unset R2_BUCKET to " +
-        "fall back to MemoryStorage.",
-    );
+  private get host(): string {
+    return `${this.accountId}.r2.cloudflarestorage.com`;
   }
-  async get(): Promise<null> {
-    return null;
+
+  private path(key: string): string {
+    return uriEncodePath(`/${this.bucket}/${key.replace(/^\/+/, "")}`);
+  }
+
+  private async send(
+    method: "GET" | "PUT",
+    key: string,
+    body: Uint8Array | null,
+    extraHeaders: Record<string, string>,
+  ): Promise<Response> {
+    const path = this.path(key);
+    const payloadHash = body ? sha256Hex(body) : EMPTY_PAYLOAD_SHA256;
+    const signed = signRequest({
+      method,
+      host: this.host,
+      path,
+      headers: extraHeaders,
+      payloadHash,
+      region: "auto",
+      service: "s3",
+      accessKeyId: this.accessKeyId,
+      secretAccessKey: this.secretAccessKey,
+      now: new Date(),
+    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), R2Storage.TIMEOUT_MS);
+    try {
+      return await fetch(`https://${this.host}${path}`, {
+        method,
+        headers: signed.headers,
+        body: body ? Buffer.from(body) : undefined,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async put(opts: {
+    key: string;
+    bytes: Uint8Array;
+    contentType: string;
+  }): Promise<StoredObject> {
+    const res = await this.send("PUT", opts.key, opts.bytes, {
+      "content-type": opts.contentType || "application/octet-stream",
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      throw new Error(`R2 put failed (${res.status}) for ${opts.key}: ${detail}`);
+    }
+    return {
+      storagePath: opts.key,
+      byteSize: opts.bytes.byteLength,
+      contentType: opts.contentType,
+    };
+  }
+
+  async get(
+    key: string,
+  ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+    const res = await this.send("GET", key, null, {});
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      throw new Error(`R2 get failed (${res.status}) for ${key}: ${detail}`);
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return {
+      bytes,
+      contentType: res.headers.get("content-type") || "application/octet-stream",
+    };
   }
 }
 
@@ -122,7 +189,7 @@ function statusFor(name: StorageProviderName): StorageProviderStatus {
       if (missing.length) {
         return { name, configured: false, reason: `Missing: ${missing.join(", ")}` };
       }
-      return { name, configured: true, reason: "All R2 vars present (impl WIP)" };
+      return { name, configured: true, reason: "Cloudflare R2 (S3 API, SigV4)" };
     }
     case "memory":
       return {

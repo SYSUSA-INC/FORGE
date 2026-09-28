@@ -12,7 +12,12 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { knowledgeEntries } from "@/db/schema";
-import { rankBoost } from "@/lib/brain-rank";
+import {
+  fusedToUnit,
+  lexicalQueryFromText,
+  rankBoost,
+  reciprocalRankFusion,
+} from "@/lib/brain-rank";
 import { embedBatch, vectorToPgLiteral } from "@/lib/embeddings";
 import { log } from "@/lib/log";
 
@@ -35,7 +40,10 @@ export type BrainHit = {
   outcomeLabel?: BrainOutcomeLabel;
   title: string;
   content: string;
+  /** 0..1: cosine similarity when the vector signal matched, else the fused rank scaled. */
   similarity: number;
+  /** BL-AIP-4b — which signals found this hit. */
+  matchedBy?: ("vector" | "lexical")[];
 };
 
 export type BrainSearchResult =
@@ -44,9 +52,15 @@ export type BrainSearchResult =
 
 /**
  * Search corpus chunks and curated entries for `query`, merge and rank.
- * Cosine similarity plus `rankBoost`: won +0.10 / lost −0.05, artifact
- * kind, recency, quality score and a +0.05 curated tie-break because
- * entries are reviewer-approved.
+ *
+ * BL-AIP-4b — hybrid: a vector query (cosine) and a Postgres full-text
+ * query (`websearch_to_tsquery` over the most distinctive terms, backed
+ * by the GIN indexes in drizzle/0084) run side by side and their
+ * rankings are fused with reciprocal rank fusion, so an exact contract
+ * number or certification name surfaces even when the embedding misses
+ * it, and stub-embedding tenants get real results instead of noise.
+ * `rankBoost` (won +0.10 / lost −0.05, kind, recency, quality, curated
+ * tie-break) is layered on top of the fused score.
  */
 export async function searchBrain(input: {
   organizationId: string;
@@ -157,9 +171,10 @@ export async function searchBrain(input: {
     });
   }
 
-  if (entryRows.length === 0) {
-    // Fallback: token overlap on un-embedded entries (fresh deploys
-    // before the embedding backfill has run).
+  if (entryRows.length === 0 && !lexicalQueryFromText(composed)) {
+    // Fallback: token overlap on un-embedded entries when there is no
+    // usable full-text query either (fresh deploys before the embedding
+    // backfill has run and a query made only of stopwords).
     try {
       const all = await db
         .select({
@@ -204,47 +219,137 @@ export async function searchBrain(input: {
     }
   }
 
+  // BL-AIP-4b — full-text half. Stub vectors are noise, so in stub mode
+  // the lexical ranking is the only ranking.
+  const lexical = lexicalQueryFromText(composed);
+  let corpusLex: CorpusRow[] = [];
+  let entryLex: EntryRow[] = [];
+  if (lexical) {
+    try {
+      const r3 = await db.execute(sql`
+        SELECT
+          c.id              AS chunk_id,
+          c.content         AS content,
+          a.id              AS artifact_id,
+          a.title           AS artifact_title,
+          a.kind            AS artifact_kind,
+          a.outcome_label   AS artifact_outcome,
+          a.updated_at      AS artifact_updated_at,
+          ts_rank_cd(to_tsvector('english', c.content), websearch_to_tsquery('english', ${lexical})) AS similarity
+        FROM knowledge_artifact_chunk c
+        INNER JOIN knowledge_artifact a ON a.id = c.artifact_id
+        WHERE c.organization_id = ${organizationId}
+          AND a.archived_at IS NULL
+          AND to_tsvector('english', c.content) @@ websearch_to_tsquery('english', ${lexical})
+        ORDER BY similarity DESC
+        LIMIT ${corpusLimit}
+      `);
+      corpusLex = ((r3 as unknown as { rows?: CorpusRow[] }).rows ??
+        (r3 as unknown as CorpusRow[])) as CorpusRow[];
+    } catch (err) {
+      log.warn("[searchBrain]", "corpus full-text query failed", { error: err });
+    }
+    try {
+      const r4 = await db.execute(sql`
+        SELECT
+          id,
+          kind,
+          title,
+          body,
+          outcome_label,
+          quality_score,
+          updated_at,
+          ts_rank_cd(to_tsvector('english', title || ' ' || body), websearch_to_tsquery('english', ${lexical})) AS similarity
+        FROM knowledge_entry
+        WHERE organization_id = ${organizationId}
+          AND archived_at IS NULL
+          AND to_tsvector('english', title || ' ' || body) @@ websearch_to_tsquery('english', ${lexical})
+        ORDER BY similarity DESC
+        LIMIT ${entryLimit}
+      `);
+      entryLex = ((r4 as unknown as { rows?: EntryRow[] }).rows ??
+        (r4 as unknown as EntryRow[])) as EntryRow[];
+    } catch (err) {
+      log.warn("[searchBrain]", "entry full-text query failed", { error: err });
+    }
+  }
+
+  const vectorUsable = !stubbed;
+  const corpusVec = vectorUsable ? corpusRows : [];
+  const entryVec = vectorUsable ? entryRows : [];
+  const listCount = (vectorUsable ? 1 : 0) + (lexical ? 1 : 0);
+
+  // Fuse per source (chunk ids and entry ids never collide: both uuids,
+  // but keep the namespaces apart anyway).
+  const corpusFused = reciprocalRankFusion([
+    corpusVec.map((r) => r.chunk_id),
+    corpusLex.map((r) => r.chunk_id),
+  ]);
+  const entryFused = reciprocalRankFusion([
+    entryVec.map((r) => r.id),
+    entryLex.map((r) => r.id),
+  ]);
+  const corpusById = new Map<string, CorpusRow>();
+  for (const r of [...corpusLex, ...corpusVec]) corpusById.set(r.chunk_id, r);
+  const entryById = new Map<string, EntryRow>();
+  for (const r of [...entryLex, ...entryVec]) entryById.set(r.id, r);
+  const vecSim = new Map<string, number>();
+  for (const r of corpusVec) vecSim.set(r.chunk_id, Number(r.similarity));
+  for (const r of entryVec) vecSim.set(r.id, Number(r.similarity));
+  const matchedBy = (id: string, fused: Map<string, { lists: number[] }>): ("vector" | "lexical")[] =>
+    (fused.get(id)?.lists ?? []).map((i) => (i === 0 ? "vector" : "lexical"));
+
   const hits: BrainHit[] = [
-    ...corpusRows.map<BrainHit>((r) => ({
-      source: "corpus",
-      id: r.chunk_id,
-      artifactId: r.artifact_id,
-      artifactTitle: r.artifact_title,
-      artifactKind: r.artifact_kind,
-      outcomeLabel: (r.artifact_outcome ?? "none") as BrainOutcomeLabel,
-      title: r.artifact_title || "(untitled artifact)",
-      content: r.content,
-      similarity:
-        Number(r.similarity) +
-        rankBoost(
-          {
-            outcomeLabel: r.artifact_outcome,
-            kind: r.artifact_kind,
-            updatedAt: r.artifact_updated_at,
-          },
-          now,
-        ),
-    })),
-    ...entryRows.map<BrainHit>((r) => ({
-      source: "entry",
-      id: r.id,
-      entryKind: r.kind,
-      outcomeLabel: (r.outcome_label ?? "none") as BrainOutcomeLabel,
-      title: r.title,
-      content: r.body,
-      similarity:
-        Number(r.similarity) +
-        rankBoost(
-          {
-            outcomeLabel: r.outcome_label,
-            kind: r.kind,
-            updatedAt: r.updated_at,
-            qualityScore: r.quality_score == null ? null : Number(r.quality_score),
-            curated: true,
-          },
-          now,
-        ),
-    })),
+    ...[...corpusFused.entries()].map<BrainHit>(([id, f]) => {
+      const r = corpusById.get(id)!;
+      const fused = fusedToUnit(f.score, Math.max(1, listCount));
+      return {
+        source: "corpus",
+        id: r.chunk_id,
+        artifactId: r.artifact_id,
+        artifactTitle: r.artifact_title,
+        artifactKind: r.artifact_kind,
+        outcomeLabel: (r.artifact_outcome ?? "none") as BrainOutcomeLabel,
+        title: r.artifact_title || "(untitled artifact)",
+        content: r.content,
+        matchedBy: matchedBy(id, corpusFused),
+        similarity:
+          Math.max(vecSim.get(id) ?? 0, fused) +
+          rankBoost(
+            {
+              outcomeLabel: r.artifact_outcome,
+              kind: r.artifact_kind,
+              updatedAt: r.artifact_updated_at,
+            },
+            now,
+          ),
+      };
+    }),
+    ...[...entryFused.entries()].map<BrainHit>(([id, f]) => {
+      const r = entryById.get(id)!;
+      const fused = fusedToUnit(f.score, Math.max(1, listCount));
+      return {
+        source: "entry",
+        id: r.id,
+        entryKind: r.kind,
+        outcomeLabel: (r.outcome_label ?? "none") as BrainOutcomeLabel,
+        title: r.title,
+        content: r.body,
+        matchedBy: matchedBy(id, entryFused),
+        similarity:
+          Math.max(vecSim.get(id) ?? 0, fused) +
+          rankBoost(
+            {
+              outcomeLabel: r.outcome_label,
+              kind: r.kind,
+              updatedAt: r.updated_at,
+              qualityScore: r.quality_score == null ? null : Number(r.quality_score),
+              curated: true,
+            },
+            now,
+          ),
+      };
+    }),
   ]
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, take);
