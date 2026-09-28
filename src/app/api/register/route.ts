@@ -9,6 +9,7 @@ import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { consumeToken, issueToken } from "@/lib/tokens";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
+import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 import {
   anySignupAllowed,
   selfServiceRegistrationAllowed,
@@ -54,6 +55,8 @@ async function provisionUserAndOrg(opts: {
         role: "admin",
         status: "active",
       });
+      // BL-TIER-ASSIGN — default tier on creation (best-effort).
+      await ensureTenantSubscription({ organizationId: org.id });
       return { userId: user.id, organizationId: org.id };
     } catch (err) {
       await db

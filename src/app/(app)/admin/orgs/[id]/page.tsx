@@ -157,10 +157,12 @@ export default async function TenantDetailPage({
   // "No tier" to make the gap visible.
   //
   // BL-16 Phase C-2 — also load the list of active tiers for the
-  // assignment dropdown. Both queries run in series since
-  // currentTier informs whether the dropdown should render at all.
-  const currentTier = await getCurrentTier(org.id);
-  const activeTiers = currentTier ? await listActiveTiersAction() : [];
+  // assignment dropdown. BL-TIER-ASSIGN — always: a tenant with no
+  // subscription row is exactly the one that needs the dropdown.
+  const [currentTier, activeTiers] = await Promise.all([
+    getCurrentTier(org.id),
+    listActiveTiersAction(),
+  ]);
 
   // BL-15 Phase B-2 — load active admins for the transfer-ownership
   // dropdown + the primary admin's identity for the Identity panel.
@@ -370,14 +372,18 @@ export default async function TenantDetailPage({
             per-tenant changes live in <code>tenant_subscription.custom_overrides</code>.
             Effective values shown above apply both layers.
           </p>
-          {currentTier && activeTiers.length > 1 ? (
+          {activeTiers.length > 0 ? (
             <TierAssignmentForm
               organizationId={org.id}
-              currentTierId={currentTier.tierId}
-              currentTierName={currentTier.tierName}
+              currentTierId={currentTier?.tierId ?? null}
+              currentTierName={currentTier?.tierName ?? null}
               tiers={activeTiers}
             />
-          ) : null}
+          ) : (
+            <p className="mt-3 font-mono text-[10px] text-muted">
+              No active tiers exist. Create or re-activate one in /admin/tiers first.
+            </p>
+          )}
           {/* BL-17 Slice 5 — enterprise wire-invoice flow. Superadmin-only
               path for sales-led deals where the customer pays by wire
               against a hosted invoice, not by card via self-serve

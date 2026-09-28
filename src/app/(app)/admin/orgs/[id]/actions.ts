@@ -7,13 +7,13 @@ import {
   memberships,
   organizations,
   subscriptionTiers,
-  tenantSubscriptions,
   users,
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { parseDomainList } from "@/lib/email-domain";
 import { log } from "@/lib/log";
+import { assignTenantTier } from "@/lib/tenant-subscription";
 
 /**
  * BL-16 Phase C-2 — change a tenant's subscription tier.
@@ -39,76 +39,25 @@ export async function changeTenantTierAction(input: {
     return { ok: false, error: "Pick an organization and a tier." };
   }
 
-  // Validate the target tier exists + is active.
-  const [tier] = await db
-    .select({
-      id: subscriptionTiers.id,
-      name: subscriptionTiers.name,
-      slug: subscriptionTiers.slug,
-      active: subscriptionTiers.active,
-    })
-    .from(subscriptionTiers)
-    .where(eq(subscriptionTiers.id, input.tierId))
+  // The org must exist (a bad id would otherwise create an orphan row
+  // only the FK stops).
+  const [org] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId))
     .limit(1);
-
-  if (!tier) {
-    return { ok: false, error: "Target tier not found." };
-  }
-  if (!tier.active) {
-    return {
-      ok: false,
-      error: `Cannot assign tenants to retired tier "${tier.name}". Pick an active tier.`,
-    };
-  }
-
-  // Load the current subscription so we can record the from-tier in
-  // the audit metadata.
-  const [current] = await db
-    .select({
-      tierId: tenantSubscriptions.tierId,
-      tierName: subscriptionTiers.name,
-      tierSlug: subscriptionTiers.slug,
-    })
-    .from(tenantSubscriptions)
-    .innerJoin(
-      subscriptionTiers,
-      eq(subscriptionTiers.id, tenantSubscriptions.tierId),
-    )
-    .where(eq(tenantSubscriptions.organizationId, input.organizationId))
-    .limit(1);
-
-  if (!current) {
-    return {
-      ok: false,
-      error:
-        "Tenant has no subscription row. Onboarding may not have completed.",
-    };
-  }
-
-  if (current.tierId === input.tierId) {
-    return {
-      ok: false,
-      error: `Tenant is already on the ${tier.name} tier.`,
-    };
-  }
+  if (!org) return { ok: false, error: "Organization not found." };
 
   try {
-    await db
-      .update(tenantSubscriptions)
-      .set({ tierId: input.tierId, updatedAt: new Date() })
-      .where(eq(tenantSubscriptions.organizationId, input.organizationId));
-
-    await recordAudit({
+    // BL-TIER-ASSIGN — inserts the row when the tenant has none (the
+    // action used to refuse with "no subscription row"); validates the
+    // target tier is active and differs; audited as tenant.tier_change.
+    const res = await assignTenantTier({
       organizationId: input.organizationId,
+      tierId: input.tierId,
       actor: { userId: actor.id, email: actor.email },
-      action: "tenant.tier_change",
-      resourceType: "tenant_subscription",
-      resourceId: input.organizationId,
-      metadata: {
-        fromTier: { id: current.tierId, name: current.tierName, slug: current.tierSlug },
-        toTier: { id: tier.id, name: tier.name, slug: tier.slug },
-      },
     });
+    if (!res.ok) return res;
 
     revalidatePath(`/admin/orgs/${input.organizationId}`);
     revalidatePath("/admin/tiers");

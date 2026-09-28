@@ -483,6 +483,49 @@ in the assessment report.
 
 ---
 
+### BL-TIER-ASSIGN — Platform admin cannot assign a first tier
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #282)
+
+User report (2026-09-28, platform admin): on `/admin/orgs/<id>` for a
+tenant created on 9/23 the Subscription tier panel shows **No tier**,
+offers no way to assign one, and only says "No tiers have Stripe Prices
+configured" (the enterprise wire-invoice form's note).
+
+Cause, confirmed in code: migration 0043 backfilled the organizations
+that existed then onto Platinum, and the admin manual claimed new
+organizations "default to Platinum at the application layer", but none
+of the four creation paths (platform-admin onboarding, `/api/register`,
+workspace creation, first sign-in) ever inserted a `tenant_subscription`
+row. The tenant page rendered the tier dropdown only when the tenant
+already had a tier (`currentTier && activeTiers.length > 1`) and
+`changeTenantTierAction` refused a tenant without a row ("Onboarding may
+not have completed"). Net effect: every tenant created after the backfill
+had no tier, was denied every gated feature, and could not be assigned
+one from the UI.
+
+Delivered:
+- `src/lib/tenant-subscription.ts`: `ensureTenantSubscription` (default
+  tier = Platinum, else the first active tier; best-effort, never fails
+  onboarding) called from all four creation paths; `assignTenantTier`
+  inserts the row when there is none, otherwise changes it, refuses
+  retired tiers and no-op changes, audits `tenant.tier_change` with
+  `fromTier: null` + `firstAssignment: true` on a first assignment.
+- `changeTenantTierAction` delegates to it (no more "no subscription
+  row" refusal). `/admin/orgs/[id]` always loads the active tiers and
+  renders `TierAssignmentForm` whenever one exists; with no current tier
+  the form reads **Assign tier** and explains that every gated feature
+  is denied until then.
+- ADMIN_MANUAL §6.1 (the promise is now true) and §6.5 (first
+  assignment; the wire-invoice note is a different path).
+- Runtime-tested (`tests/isolation/tenant-subscription.test.ts`): ensure
+  creates the row once on the default tier; assign creates on first
+  call, changes on the next, refuses the same tier and a retired tier;
+  tenant B's row is untouched by A's assignment.
+- Existing tenants showing "No tier" are fixed from the UI (Assign tier)
+  — no data migration.
+
+---
+
 ### BL-AUTH-INVITE — Platform-admin tenant invites + invite / password-reset truth
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #274)
 

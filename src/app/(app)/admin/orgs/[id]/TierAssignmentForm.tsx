@@ -11,6 +11,12 @@ type TierOption = {
   priceMonthlyCents: number;
 };
 
+/**
+ * BL-16 Phase C-2 — move a tenant between tiers. BL-TIER-ASSIGN — also
+ * the first assignment: a tenant with no subscription row (every org
+ * onboarded after migration 0043) gets "Assign tier" instead of a
+ * hidden form.
+ */
 export function TierAssignmentForm({
   organizationId,
   currentTierId,
@@ -18,12 +24,13 @@ export function TierAssignmentForm({
   tiers,
 }: {
   organizationId: string;
-  currentTierId: string;
-  currentTierName: string;
+  currentTierId: string | null;
+  currentTierName: string | null;
   tiers: TierOption[];
 }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<string>(currentTierId);
+  const firstAssignment = !currentTierId;
+  const [selected, setSelected] = useState<string>(currentTierId ?? tiers[0]?.id ?? "");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -33,7 +40,7 @@ export function TierAssignmentForm({
     setError(null);
     setNotice(null);
 
-    if (selected === currentTierId) {
+    if (!firstAssignment && selected === currentTierId) {
       setError(`Tenant is already on the ${currentTierName} tier.`);
       return;
     }
@@ -45,7 +52,9 @@ export function TierAssignmentForm({
     }
     if (
       !window.confirm(
-        `Move this tenant to the "${newTier.name}" tier? This changes their feature access + quotas immediately. The action is recorded in the tenant's audit log.`,
+        firstAssignment
+          ? `Put this tenant on the "${newTier.name}" tier? Feature access and quotas apply immediately. The action is recorded in the tenant's audit log.`
+          : `Move this tenant to the "${newTier.name}" tier? This changes their feature access + quotas immediately. The action is recorded in the tenant's audit log.`,
       )
     ) {
       return;
@@ -61,7 +70,9 @@ export function TierAssignmentForm({
         return;
       }
       setNotice(
-        `Tier changed to ${newTier.name}. Refresh the page to see the new effective quotas.`,
+        firstAssignment
+          ? `Tenant assigned to ${newTier.name}.`
+          : `Tier changed to ${newTier.name}. Refresh the page to see the new effective quotas.`,
       );
       router.refresh();
     });
@@ -69,7 +80,13 @@ export function TierAssignmentForm({
 
   return (
     <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
-      <label className="aur-label">Change tier</label>
+      <label className="aur-label">{firstAssignment ? "Assign tier" : "Change tier"}</label>
+      {firstAssignment ? (
+        <p className="font-mono text-[10px] leading-relaxed text-muted/80">
+          This tenant has no subscription row, so every gated feature is
+          denied until a tier is assigned.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <select
           className="aur-input flex-1 min-w-[200px]"
@@ -90,9 +107,9 @@ export function TierAssignmentForm({
         <button
           type="submit"
           className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
-          disabled={pending || selected === currentTierId}
+          disabled={pending || (!firstAssignment && selected === currentTierId) || !selected}
         >
-          {pending ? "Updating…" : "Change tier"}
+          {pending ? "Updating…" : firstAssignment ? "Assign tier" : "Change tier"}
         </button>
       </div>
 
