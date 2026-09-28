@@ -12,7 +12,7 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
-import type { SectionDraftMode } from "@/lib/ai-prompts";
+import { SECTION_DRAFT_PROMPT_VERSION, type SectionDraftMode } from "@/lib/ai-prompts";
 import { isTruncatedStop } from "@/lib/ai-stop";
 import {
   extractCitationStats,
@@ -111,6 +111,7 @@ export async function generateSectionDraftAction(input: {
       organizationId,
       feature: "section_draft",
       variant: cite ? `${input.mode}+cite` : input.mode,
+      promptVersion: SECTION_DRAFT_PROMPT_VERSION,
       system: prepared.prompt.system,
       messages: prepared.prompt.messages,
       maxTokens: prepared.maxTokens,

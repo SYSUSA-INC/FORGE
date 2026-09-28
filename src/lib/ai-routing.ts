@@ -74,6 +74,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   review_preflight: "standard",
   // Strong: what the customer submits or decides on.
   section_draft: "strong",
+  proposal_bootstrap: "strong",
   proposal_scan: "strong",
   proposal_scan_background: "strong",
   winner_analysis: "strong",

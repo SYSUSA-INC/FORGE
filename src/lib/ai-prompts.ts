@@ -537,6 +537,8 @@ export type SectionDraftSnapshot = {
     title: string;
     kind: string;
     pageLimit: number | null;
+    /** BL-AIP-5b — what Section L says this section must contain. */
+    instructions?: string;
     currentBodyPlain: string;
     currentWordCount: number;
   };
@@ -611,7 +613,10 @@ BL-9 Slice 7 — edit feedback:
 BL-AIP-6 — writing signals:
 - \`patternIntel.writingSignals.reviewComments\` are open colour-team comments on THIS section. Resolve each one in the text where it applies; do not acknowledge them in prose.
 - \`debriefWeaknesses\` are what the agency criticised in past debriefs and \`winnerGaps\` are what past winners had that we lacked. Where the section touches the same ground, write the concrete evidence that answers the criticism; never mention the debrief or the competitor.
-- \`draftAcceptance\` says how much of past AI drafts this team kept. A low figure means their owners rewrite heavily: be specific, avoid generic capability claims, and leave [BRACKETS] where only the team can supply the fact.`;
+- \`draftAcceptance\` says how much of past AI drafts this team kept. A low figure means their owners rewrite heavily: be specific, avoid generic capability claims, and leave [BRACKETS] where only the team can supply the fact.
+
+BL-AIP-5b — the section's brief:
+- When \`section.instructions\` is present it is what the solicitation's Section L says THIS section must contain. It is the section's brief: cover every item it names, in the order it names them, and nothing it forbids. It outranks section conventions and pattern guidance.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
@@ -627,6 +632,14 @@ const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
 /** BL-AIP-5 — how much of the general requirement list the drafter sees. */
 export const DRAFT_GENERAL_REQUIREMENTS = 60;
 export const DRAFT_REQUIREMENT_CHARS = 600;
+
+/**
+ * BL-AIP-5b — the drafter's prompt revision, stored on every
+ * ai_call_log row and on golden eval runs so a prompt change is
+ * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
+ * MODE_INSTRUCTIONS or the block layout below changes.
+ */
+export const SECTION_DRAFT_PROMPT_VERSION = "2026-09-28.1";
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
@@ -1755,4 +1768,101 @@ export const protestViabilitySchema = z.object({
   summary: z.string(),
   grounds: z.array(protestGroundSchema),
   disclaimer: z.string(),
+});
+
+// ────────────────────────────────────────────────────────────────────
+// BL-AIP-5b — proposal outline from Section L
+// ────────────────────────────────────────────────────────────────────
+
+export const PROPOSAL_BOOTSTRAP_PROMPT_VERSION = "2026-09-28.1";
+
+const PROPOSAL_BOOTSTRAP_SYSTEM = `You are a federal proposal manager inside FORGE. From a solicitation's instructions to offerors (Section L), its evaluation factors (Section M) and the extracted requirements, you produce the outline of the proposal the offeror must submit.
+
+Rules:
+- Sections are the volumes / sections / tabs the instructions ask for, in the order they ask for them, titled the way the instructions title them (keep numbering such as "Volume II" or "Tab C" in the title when the instructions use it). Do not invent a standard outline when the instructions are explicit; when they say nothing about structure, fall back to the conventional set: Executive Summary, Technical Approach, Management Approach, Past Performance, Price Volume, Compliance Matrix.
+- kind maps each section to the closest of: executive_summary, technical, management, past_performance, pricing, compliance.
+- pageLimit is the page cap the instructions state for that section, as a number; null when none is stated. Never guess a cap.
+- instructions is the section's brief: what Section L says it must contain, in the instructions' own terms (content, order, mandatory items, formatting that applies only to this section). Two to five sentences; never empty.
+- sourceRef is the paragraph or clause the section comes from (e.g. "L.4.2.3"), or "" when none.
+- dueDate is the proposal due date as YYYY-MM-DD only when the text states it literally; otherwise null.
+- proposedThemes are 1 to 3 win themes for this pursuit, each grounded in a Section M evaluation factor or a requirement: a short title, a one-sentence statement written as a claim the proposal will prove, and a rationale naming the factor it answers.
+- notes: anything an outline cannot carry — page-count rules that span volumes, font and margin rules, oral presentations, submission mechanics. One short paragraph.
+- Maximum 20 sections. Never fabricate limits, dates or factors that are not in the text.`;
+
+export type ProposalBootstrapInput = {
+  organizationName: string;
+  opportunity: {
+    title: string;
+    agency: string;
+    solicitationNumber: string;
+    naicsCode: string;
+    setAside: string;
+  };
+  sectionLSummary: string;
+  sectionMSummary: string;
+  /** The instructions-to-offerors stretch of the document, when found. */
+  sectionLText: string;
+  requirements: { kind: string; text: string; ref: string }[];
+  keyDates: { label: string; isoDate: string | null; type: string }[];
+  responseDueDate: string | null;
+};
+
+export function buildProposalBootstrapPrompt(
+  input: ProposalBootstrapInput,
+): { system: string; messages: AIMessage[] } {
+  const o = input.opportunity;
+  const user = [
+    `Opportunity: ${o.title}${o.solicitationNumber ? ` (${o.solicitationNumber})` : ""}${o.agency ? ` — ${o.agency}` : ""}${o.naicsCode ? ` · NAICS ${o.naicsCode}` : ""}${o.setAside ? ` · ${o.setAside}` : ""}.`,
+    `Offeror: ${input.organizationName}.`,
+    input.responseDueDate ? `Response due date already on record: ${input.responseDueDate}.` : "",
+    ``,
+    input.sectionLSummary ? `Section L summary (from intake):\n${input.sectionLSummary.slice(0, 4000)}` : "",
+    input.sectionMSummary ? `\nSection M summary (from intake):\n${input.sectionMSummary.slice(0, 3000)}` : "",
+    input.sectionLText
+      ? `\nInstructions to offerors — document text (authoritative where it differs from the summaries):\n"""\n${input.sectionLText}\n"""`
+      : "",
+    input.keyDates.length > 0
+      ? `\nKey dates extracted at intake:\n${input.keyDates
+          .map((d) => `- ${d.label}${d.isoDate ? ` — ${d.isoDate}` : ""} (${d.type})`)
+          .join("\n")}`
+      : "",
+    input.requirements.length > 0
+      ? `\nExtracted requirements (submission and format clauses first, ${input.requirements.length} shown):\n${input.requirements
+          .map((r, i) => `${i + 1}. [${r.ref || "?"}] ${r.kind.toUpperCase()}: ${r.text.slice(0, 300)}`)
+          .join("\n")}`
+      : "",
+    ``,
+    `Record the proposal outline with the record_proposal_outline tool.`,
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+
+  return {
+    system: PROPOSAL_BOOTSTRAP_SYSTEM,
+    messages: [{ role: "user", content: user }],
+  };
+}
+
+export const proposalBootstrapSchema = z.object({
+  sections: z.array(
+    z.object({
+      title: z.string(),
+      kind: z.enum([
+        "executive_summary",
+        "technical",
+        "management",
+        "past_performance",
+        "pricing",
+        "compliance",
+      ]),
+      pageLimit: z.number().nullable(),
+      instructions: z.string(),
+      sourceRef: z.string(),
+    }),
+  ),
+  dueDate: z.string().nullable(),
+  proposedThemes: z.array(
+    z.object({ title: z.string(), statement: z.string(), rationale: z.string() }),
+  ),
+  notes: z.string(),
 });

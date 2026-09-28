@@ -35,6 +35,9 @@ export const AI_FEATURES = {
   embedding_query: "Embeddings (query)",
   // BL-AIP-6 — AI colour-team pre-review when a review starts.
   review_preflight: "Colour-team pre-review",
+  // BL-AIP-5b — proposal outline (sections, page limits, due date,
+  // proposed themes) read from the solicitation's Section L.
+  proposal_bootstrap: "Outline from Section L",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

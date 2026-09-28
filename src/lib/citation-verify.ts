@@ -20,6 +20,7 @@ import {
   buildCitationVerifyPrompt,
   citationVerifySchema,
   type CitationVerifyClaim,
+  SECTION_DRAFT_PROMPT_VERSION,
 } from "@/lib/ai-prompts";
 import {
   citedClaims,
@@ -68,6 +69,7 @@ export async function verifyDraftCitations(input: {
       organizationId: input.organizationId,
       feature: "section_draft",
       variant: "verify",
+      promptVersion: SECTION_DRAFT_PROMPT_VERSION,
       schema: citationVerifySchema,
       toolName: "record_citation_verdicts",
       toolDescription: "Record, per claim id, whether the cited excerpt supports the sentence.",

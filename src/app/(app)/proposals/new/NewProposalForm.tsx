@@ -9,6 +9,8 @@ type OppOption = {
   title: string;
   agency: string;
   solicitationNumber: string;
+  /** BL-AIP-5b — a parsed solicitation with instructions to offerors exists. */
+  hasSectionL?: boolean;
 };
 
 type TeamMember = {
@@ -52,11 +54,15 @@ export function NewProposalForm({
     useState<string>(currentUserId);
   const [captureManagerUserId, setCaptureManagerUserId] = useState<string>("");
   const [pricingLeadUserId, setPricingLeadUserId] = useState<string>("");
+  // BL-AIP-5b — on by default whenever the opportunity has instructions;
+  // the user can keep the template instead.
+  const [bootstrap, setBootstrap] = useState(true);
 
   const selectedOpp = useMemo(
     () => opportunities.find((o) => o.id === opportunityId) ?? null,
     [opportunities, opportunityId],
   );
+  const canBootstrap = !!selectedOpp?.hasSectionL;
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === templateId) ?? null,
     [templates, templateId],
@@ -73,6 +79,7 @@ export function NewProposalForm({
         proposalManagerUserId: proposalManagerUserId || null,
         captureManagerUserId: captureManagerUserId || null,
         pricingLeadUserId: pricingLeadUserId || null,
+        bootstrapFromSolicitation: canBootstrap && bootstrap,
       });
       if (!res.ok) return setError(res.error);
       router.push(`/proposals/${res.id}`);
@@ -136,6 +143,25 @@ export function NewProposalForm({
         )}
       </div>
 
+      {canBootstrap ? (
+        <label className="flex cursor-pointer items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={bootstrap}
+            onChange={(e) => setBootstrap(e.target.checked)}
+          />
+          <span className="font-mono text-[11px] text-text">
+            Build the outline from the solicitation&apos;s Section L
+            <span className="block text-muted">
+              Sections in the instructed order with their page caps and a brief
+              each, the due date, and 1–3 proposed win themes from Section M.
+              Replaces the template&apos;s section list; one AI request.
+            </span>
+          </span>
+        </label>
+      ) : null}
+
       <div>
         <label className="aur-label">Proposal title</label>
         <input
@@ -183,7 +209,11 @@ export function NewProposalForm({
           disabled={pending || !opportunityId}
           className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
         >
-          {pending ? "Creating…" : "Create proposal"}
+          {pending
+            ? canBootstrap && bootstrap
+              ? "Creating… reading Section L"
+              : "Creating…"
+            : "Create proposal"}
         </button>
       </div>
     </form>

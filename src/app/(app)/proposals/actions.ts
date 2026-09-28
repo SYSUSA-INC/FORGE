@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -10,6 +10,7 @@ import {
   proposalSectionSnapshots,
   proposalTemplates,
   proposals,
+  solicitations,
   users,
   type ProposalSectionKind,
   type ProposalSectionStatus,
@@ -29,6 +30,7 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
+import { bootstrapProposal } from "@/lib/proposal-bootstrap";
 import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
 import {
   EMPTY_DOC,
@@ -67,7 +69,7 @@ async function ownsOpportunity(id: string, organizationId: string) {
 export async function listOpportunitiesForProposal() {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  return db
+  const rows = await db
     .select({
       id: opportunities.id,
       title: opportunities.title,
@@ -78,6 +80,22 @@ export async function listOpportunitiesForProposal() {
     .from(opportunities)
     .where(eq(opportunities.organizationId, organizationId))
     .orderBy(desc(opportunities.updatedAt));
+
+  // BL-AIP-5b — which opportunities have a parsed solicitation with
+  // instructions to offerors, so the form can offer the Section L
+  // bootstrap. One query, not one per opportunity.
+  const withInstructions = await db
+    .select({ opportunityId: solicitations.opportunityId })
+    .from(solicitations)
+    .where(
+      and(
+        eq(solicitations.organizationId, organizationId),
+        eq(solicitations.parseStatus, "parsed"),
+        sql`(length(${solicitations.sectionLSummary}) > 0 OR length(${solicitations.rawText}) > 2000)`,
+      ),
+    );
+  const hasSectionL = new Set(withInstructions.map((r) => r.opportunityId).filter(Boolean));
+  return rows.map((r) => ({ ...r, hasSectionL: hasSectionL.has(r.id) }));
 }
 
 export async function listProposalTeamCandidates() {
@@ -101,6 +119,15 @@ export async function listProposalTeamCandidates() {
     .orderBy(asc(users.name), asc(users.email));
 }
 
+export type CreateProposalResult =
+  | {
+      ok: true;
+      id: string;
+      /** BL-AIP-5b — outcome of the Section L bootstrap when requested. */
+      bootstrap?: { applied: boolean; sections?: number; error?: string };
+    }
+  | { ok: false; error: string };
+
 export async function createProposalAction(input: {
   opportunityId: string;
   title?: string;
@@ -108,7 +135,9 @@ export async function createProposalAction(input: {
   proposalManagerUserId?: string | null;
   captureManagerUserId?: string | null;
   pricingLeadUserId?: string | null;
-}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  /** BL-AIP-5b — build the outline from the solicitation's Section L. */
+  bootstrapFromSolicitation?: boolean;
+}): Promise<CreateProposalResult> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
@@ -217,6 +246,39 @@ export async function createProposalAction(input: {
       })),
     );
 
+    // BL-AIP-5b — replace the template's outline with the one Section L
+    // asks for (sections, page caps, briefs, due date, proposed themes).
+    // Runs before the compliance auto-map so rows map to the final
+    // sections. Gated and quota-metered like any draft; a failure keeps
+    // the template and reports why.
+    let bootstrap: { applied: boolean; sections?: number; error?: string } | undefined;
+    if (input.bootstrapFromSolicitation) {
+      try {
+        await ensureFeature(organizationId, "aiAutoDraft");
+        await enforceQuota(organizationId, "aiRequestsPerMonth");
+        const built = await bootstrapProposal({
+          organizationId,
+          proposalId: row.id,
+          mode: "create",
+          actor: { userId: actor.id, email: actor.email },
+        });
+        if (built.ok) {
+          bootstrap = { applied: true, sections: built.record.sections.length };
+        } else {
+          await refundQuota(organizationId, "aiRequestsPerMonth");
+          bootstrap = { applied: false, error: built.error };
+        }
+      } catch (err) {
+        if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
+          bootstrap = { applied: false, error: err.message };
+        } else {
+          await refundQuota(organizationId, "aiRequestsPerMonth");
+          log.warn("[createProposalAction]", "bootstrap failed", { error: err });
+          bootstrap = { applied: false, error: "The outline could not be built; the template was used." };
+        }
+      }
+    }
+
     // BL-AIP-5 — requirements-first: the matrix starts as the
     // solicitation's extracted requirements, and the rows are mapped to
     // the seeded sections in the background (high-confidence only,
@@ -265,8 +327,9 @@ export async function createProposalAction(input: {
       metadata: {
         title: input.title,
         opportunityId: input.opportunityId,
-        sectionCount: seedSections.length,
+        sectionCount: bootstrap?.applied ? bootstrap.sections : seedSections.length,
         seededComplianceItems: seededItems,
+        ...(bootstrap ? { bootstrap } : {}),
       },
     });
 
@@ -287,7 +350,7 @@ export async function createProposalAction(input: {
 
     revalidatePath("/proposals");
     revalidatePath("/");
-    return { ok: true, id: row.id };
+    return { ok: true, id: row.id, ...(bootstrap ? { bootstrap } : {}) };
   } catch (err) {
     // BL-16 Phase B-3d — refund only if the proposal row itself never
     // landed. If a downstream insert/audit failed, the proposal exists
@@ -514,6 +577,64 @@ export async function advanceProposalStageAction(
       ok: false,
       error: err instanceof Error ? err.message : "Stage change failed.",
     };
+  }
+}
+
+/**
+ * BL-AIP-5b — build (or rebuild) the outline from Section L on an
+ * existing proposal. Written sections are never removed; empty sections
+ * the instructions do not ask for are dropped; matching sections take
+ * the page cap and brief; themes and the due date are set only when
+ * empty. Gated and metered like a draft.
+ */
+export async function bootstrapProposalAction(
+  proposalId: string,
+): Promise<
+  | { ok: true; sections: number; inserted: number; updated: number; removed: number; kept: number; themesSeeded: boolean; dueDateSet: boolean }
+  | { ok: false; error: string }
+> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await ownsProposal(proposalId, organizationId))) {
+    return { ok: false, error: "Proposal not found." };
+  }
+  try {
+    await ensureFeature(organizationId, "aiAutoDraft");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
+  } catch (err) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message };
+    }
+    throw err;
+  }
+  try {
+    const built = await bootstrapProposal({
+      organizationId,
+      proposalId,
+      mode: "rebuild",
+      actor: { userId: actor.id, email: actor.email },
+    });
+    if (!built.ok) {
+      await refundQuota(organizationId, "aiRequestsPerMonth");
+      return built;
+    }
+    revalidatePath(`/proposals/${proposalId}`);
+    revalidatePath(`/proposals/${proposalId}/sections`);
+    const a = built.record.applied;
+    return {
+      ok: true,
+      sections: built.record.sections.length,
+      inserted: a.sectionsInserted,
+      updated: a.sectionsUpdated,
+      removed: a.sectionsRemoved,
+      kept: a.sectionsKept,
+      themesSeeded: a.themesSeeded,
+      dueDateSet: a.dueDateSet,
+    };
+  } catch (err) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    log.error("[bootstrapProposalAction]", "error", { error: err });
+    return { ok: false, error: err instanceof Error ? err.message : "Outline build failed." };
   }
 }
 
