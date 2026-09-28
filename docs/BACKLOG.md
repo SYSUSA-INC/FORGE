@@ -484,7 +484,7 @@ in the assessment report.
 ---
 
 ### BL-TIER-ASSIGN — Platform admin cannot assign a first tier
-**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #282)
 
 User report (2026-09-28, platform admin): on `/admin/orgs/<id>` for a
 tenant created on 9/23 the Subscription tier panel shows **No tier**,
