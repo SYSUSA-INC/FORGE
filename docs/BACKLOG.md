@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7b (part i) — the nightly scout** 🔄 (in PR)
+**BL-AIP-7b (part i) — the nightly scout** 🔄 (engine: PR #288; page: next PR)
 
 - **Find.** `runScoutForOrganization` (`src/lib/scout.ts`) re-runs the
   tenant's NAICS codes (organization + profile extras) and up to three
