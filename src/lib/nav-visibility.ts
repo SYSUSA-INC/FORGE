@@ -21,12 +21,6 @@ export type NavVisibility = {
   isOrgAdmin: boolean;
   isSuperadmin: boolean;
   hasWorkspace: boolean;
-  /**
-   * BL-NAV-PORTAL — a superadmin with an active Assume-identity session.
-   * A platform admin is otherwise walled off from tenant work entirely;
-   * impersonation is the one audited way in.
-   */
-  impersonating?: boolean;
 };
 
 export type NavItemLike = {

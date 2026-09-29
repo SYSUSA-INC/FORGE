@@ -73,7 +73,7 @@ Practical guidance for assignments:
 
 ### 2.1 Access
 
-Sign in at www.sysgov.com. Because an org admin holds two roles, sign-in first asks which portal to open — **Company Admin Portal** or the **Proposal Tool** (BL-NAV-PORTAL, `/portal`). Under the FORGE mark the sidebar then shows **Switch to: Workspace · Company admin** (BL-NAV-WORKSPACES). **Company admin** is the org admin's own console and carries only admin pages: People (Users & roles), Organization (Profile & domains, Billing, Templates, Integrations, AI Engine), Governance (Notification rules, Audit log) and the Admin guide. Members never see it. Everyday proposal work stays in **Workspace**; opening any admin page switches the sidebar to the console automatically.
+Sign in. Under the FORGE mark the sidebar shows **Switch to: Workspace · Company admin** (BL-NAV-WORKSPACES). **Company admin** is the org admin's own console and carries only admin pages: People (Users & roles), Organization (Profile & domains, Billing, Templates, Integrations, AI Engine), Governance (Notification rules, Audit log) and the Admin guide. Members never see it. Everyday proposal work stays in **Workspace**; opening any admin page switches the sidebar to the console automatically.
 
 ![Users page](docs/images/users-page.png)
 
@@ -170,7 +170,7 @@ Sign out and sign in again to refresh your session JWT. The sidebar will now sho
 
 ### 3.2 The SuperAdmin portal
 
-A platform admin signs in at www.sysgov.com and lands here, and only here (BL-NAV-PORTAL): the role is the platform's power user and is kept completely separate from tenant work. The sidebar offers no Switch-to row and no tenant pages, whatever tenant memberships the account carries, and a tenant page opened by bookmark or typed URL is sent back to `/admin`. It is a workspace of its own with nothing but platform pages: Tenants & users (Organizations, Platform users, Overview, Source requests), Commercial (Subscription tiers, AI usage & costs, Promo codes) and Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, the cross-tenant Audit log). To see inside a tenant, open it under Organizations and use **Assume identity** (audited, read-only); for the duration the tenant's Workspace and Company admin appear under Switch to, and Platform admin stays there to end it. The Organizations page has three tabs.
+Switch to **Platform admin** under the FORGE mark (BL-NAV-WORKSPACES). It is a workspace of its own with nothing but platform pages: Tenants & users (Organizations, Platform users, Overview, Source requests), Commercial (Subscription tiers, AI usage & costs, Promo codes) and Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, the cross-tenant Audit log). A superadmin who is not a member of any tenant lands here after sign-in; to work inside a tenant, open it under Organizations and use **Assume identity**. The Organizations page has three tabs.
 
 ![SuperAdmin portal](docs/images/admin-portal.png)
 

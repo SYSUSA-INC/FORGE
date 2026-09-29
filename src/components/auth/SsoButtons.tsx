@@ -15,9 +15,7 @@ export function SsoButtons({
   async function onClick(provider: "google" | "microsoft-entra-id") {
     setLoading(provider);
     try {
-      // BL-NAV-PORTAL — land on the portal picker unless the caller
-      // asked for a specific page.
-      await signIn(provider, { callbackUrl: callbackUrl ?? "/portal" });
+      await signIn(provider, { callbackUrl: callbackUrl ?? "/" });
     } catch {
       setLoading(null);
     }
