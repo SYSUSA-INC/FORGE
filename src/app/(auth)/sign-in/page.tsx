@@ -22,10 +22,13 @@ export default async function SignInPage({
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${proto}://${host}` : null;
-  const safeCallback = safeRedirectTarget(
+  const requested = safeRedirectTarget(
     sameOriginPath(searchParams.callbackUrl, origin),
     PORTAL_PICKER_PATH,
   );
+  // The root is the sign-in page itself (www.sysgov.com), not a
+  // destination: an account arriving from it lands by role.
+  const safeCallback = requested === "/" ? PORTAL_PICKER_PATH : requested;
 
   const session = await auth();
   if (session?.user) {
@@ -69,7 +72,7 @@ export default async function SignInPage({
             Sign in to Forge
           </h1>
           <p className="mt-2 text-sm text-muted">
-            Use your email and password.
+            Use your email and password. Your account&apos;s role decides where you land.
           </p>
 
           {verified ? (

@@ -30,11 +30,13 @@ export function SideNav({
   isOrgAdmin = false,
   isSuperadmin = false,
   hasWorkspace = true,
+  impersonating = false,
   user,
 }: {
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
   hasWorkspace?: boolean;
+  impersonating?: boolean;
   user: NavUser | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -63,6 +65,7 @@ export function SideNav({
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
         hasWorkspace={hasWorkspace}
+        impersonating={impersonating}
         user={user}
       />
     </aside>

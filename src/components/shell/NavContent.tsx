@@ -105,6 +105,7 @@ export function NavContent({
   isOrgAdmin = false,
   isSuperadmin = false,
   hasWorkspace = true,
+  impersonating = false,
   user,
   /** When true, parent shell can disable the rail toggle — useful in the
    *  mobile drawer where the nav is always full-width. */
@@ -115,6 +116,8 @@ export function NavContent({
   isSuperadmin?: boolean;
   /** False when the session has no active workspace; hides org-gated groups. */
   hasWorkspace?: boolean;
+  /** BL-NAV-PORTAL — a platform admin inside a tenant via Assume identity. */
+  impersonating?: boolean;
   user: NavUser | null;
   hideRailToggle?: boolean;
 }) {
@@ -169,7 +172,7 @@ export function NavContent({
     });
   }
 
-  const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace };
+  const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace, impersonating };
   const workspace = resolveWorkspace(pathname, visibility);
   const workspaces = availableWorkspaces(visibility);
   const meta = WORKSPACES[workspace];

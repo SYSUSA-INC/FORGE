@@ -72,7 +72,9 @@ export const WORKSPACES: Record<Workspace, WorkspaceMeta> = {
  * BL-NAV-PORTAL — how each workspace is offered as a portal at sign-in.
  * The roles behind the offer are read from the authenticated session,
  * never from the typed email, so the picker reveals nothing about an
- * account before its password is verified.
+ * account before its password is verified. A platform admin is offered
+ * the Super Admin Portal alone; a company admin chooses between the
+ * Company Admin Portal and the Proposal Tool; a member gets the tool.
  */
 export type PortalChoice = {
   workspace: Workspace;
@@ -85,7 +87,7 @@ export const PORTALS: Record<Workspace, { title: string; description: string }> 
   platform: {
     title: "Super Admin Portal",
     description:
-      "Platform administration across every tenant: organizations, platform users, subscription tiers, AI usage, background jobs and the cross-tenant audit log.",
+      "Platform administration across every tenant: organizations, platform users, subscription tiers, AI usage, background jobs and the cross-tenant audit log. A platform admin works only here; Assume identity on a tenant is the way into its workspace.",
   },
   company: {
     title: "Company Admin Portal",
@@ -299,13 +301,39 @@ export function workspaceForPath(pathname: string | null): Workspace {
   return "work";
 }
 
-/** The workspaces this person may switch to, in switcher order. */
+/**
+ * The workspaces this person may switch to, in switcher order.
+ *
+ * BL-NAV-PORTAL — a platform admin is the power user and works only in
+ * platform administration: no tenant workspace, whatever memberships the
+ * account carries. The one way into a tenant is Assume identity, which
+ * is audited; while it is active the impersonated tenant's workspace and
+ * company console are offered too, and Platform admin stays to end it.
+ */
 export function availableWorkspaces(v: NavVisibility): Workspace[] {
+  if (v.isSuperadmin && !v.impersonating) return ["platform"];
   const out: Workspace[] = [];
   if (v.hasWorkspace) out.push("work");
   if (v.hasWorkspace && (v.isOrgAdmin || v.isSuperadmin)) out.push("company");
   if (v.isSuperadmin) out.push("platform");
   return out;
+}
+
+/** Paths a platform admin may open without impersonating anyone. */
+const PLATFORM_ONLY_PATHS = ["/admin", "/platform", "/help"];
+
+/**
+ * BL-NAV-PORTAL — where the app shell sends a platform admin who opened a
+ * tenant page (a bookmark, a typed URL, a stale link): the platform
+ * home. Null when the page is theirs or when the person is not a walled
+ * platform admin. A null pathname (no middleware header) never redirects.
+ */
+export function platformOnlyRedirect(pathname: string | null, v: NavVisibility): string | null {
+  if (!v.isSuperadmin || v.impersonating) return null;
+  if (pathname === null) return null;
+  const p = pathname.split("?")[0] ?? "";
+  if (PLATFORM_ONLY_PATHS.some((prefix) => under(p, prefix))) return null;
+  return WORKSPACES.platform.home;
 }
 
 /** Where a person lands when the URL's workspace is not theirs. */

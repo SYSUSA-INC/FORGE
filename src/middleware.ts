@@ -36,11 +36,22 @@ function isMutatingRequest(req: NextRequest): boolean {
   return true;
 }
 
+/**
+ * BL-NAV-PORTAL — the app shell walls a platform admin off tenant pages,
+ * and a server layout cannot see the URL on its own: hand it the path.
+ */
+const PATHNAME_HEADER = "x-pathname";
+
 export default auth((req) => {
+  const { pathname } = req.nextUrl;
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set(PATHNAME_HEADER, pathname);
+  const withPath = { request: { headers: requestHeaders } };
+
   // Block mutations while impersonating, except the end-impersonation
   // route which itself is the way out.
   if (isImpersonationActive(req) && isMutatingRequest(req)) {
-    if (!req.nextUrl.pathname.startsWith(END_IMPERSONATION_PATH)) {
+    if (!pathname.startsWith(END_IMPERSONATION_PATH)) {
       return NextResponse.json(
         {
           ok: false,
@@ -51,7 +62,15 @@ export default auth((req) => {
       );
     }
   }
-  return NextResponse.next();
+
+  // BL-NAV-PORTAL — one sign-in page at the root. A signed-out visit to
+  // "/" shows the sign-in page in place (a rewrite, not a redirect), so
+  // the address stays www.sysgov.com; authorized() lets "/" through for
+  // this. Signed in, "/" is the Command Center as before.
+  if (pathname === "/" && !req.auth?.user) {
+    return NextResponse.rewrite(new URL("/sign-in", req.url), withPath);
+  }
+  return NextResponse.next(withPath);
 });
 
 export const config = {

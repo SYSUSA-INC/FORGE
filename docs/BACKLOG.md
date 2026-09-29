@@ -548,34 +548,50 @@ in the assessment report.
 
 ---
 
-### BL-NAV-PORTAL — Portal choice at sign-in: Super Admin / Company Admin / Proposal Tool
-**Priority:** P1  ·  **Effort:** XS  ·  **Status:** 🔄 in PR (PR #286)
+### BL-NAV-PORTAL — One sign-in at the root; the account's role decides the portal; platform admin walled off
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #286)
 
-User request (2026-09-28): based on the account signing in, offer the
-choice of the Super Admin Portal, the Company Admin Portal, or the
-Proposal Tool as a regular user.
+User request (2026-09-28/29): a single login page at www.sysgov.com.
+A regular user signs in as a regular user; a company admin signs in as
+a company admin or a company user; a platform admin signs in only as a
+platform admin — that role is the power user and must be completely
+segregated, focused on platform administration alone.
 
 Delivered:
-- `/portal` (BL-NAV-PORTAL, no app shell): after sign-in the account's
-  portals are read from its verified session — **Super Admin Portal**
-  (superadmin), **Company Admin Portal** (org admin with a tenant),
-  **Proposal Tool** (any member with a tenant). One portal opens
-  directly; several are offered as cards, highest hat first; none falls
-  through to the work home, which onboards the account. Bookmarkable;
-  a signed-out visit returns here after sign-in.
-- Sign-in (password and SSO) lands on `/portal` unless a `callbackUrl`
-  names a page. `portalChoices` / `portalLanding` in
-  `src/lib/nav-workspaces.ts` (tested).
+- **One sign-in page at the root.** A signed-out visit to `/` shows the
+  sign-in page in place (middleware rewrite, so the address stays
+  www.sysgov.com); any other signed-out page still goes to sign-in and
+  returns there afterwards. `authorized()` lets `/` through for this;
+  the Command Center itself still requires a session.
+- **Landing by role** (`/portal`, no app shell, `portalChoices` /
+  `portalLanding` in `src/lib/nav-workspaces.ts`, tested): a platform
+  admin → `/admin`, nothing else offered; a company admin → a choice of
+  **Company Admin Portal** or **Proposal Tool**; a member → the Proposal
+  Tool; an account with no tenant yet → onboarding as before. Password
+  and SSO sign-in land on `/portal`; a return path of `/` counts as
+  "no preference". Roles come from the verified session, never from
+  the typed email.
+- **Platform admin segregation.** `availableWorkspaces` offers a
+  superadmin the platform workspace only, whatever tenant memberships
+  the account carries: no Switch-to row, no tenant pages in the
+  sidebar, the platform badge in the top bar. The app shell also
+  redirects a superadmin who opens any tenant page (bookmark, typed
+  URL) to `/admin` — `platformOnlyRedirect`, path from the new
+  `x-pathname` request header the middleware sets; `/admin*`,
+  `/platform*` and `/help*` stay open. The one way into a tenant is
+  **Assume identity** (audited, read-only): while it is active the
+  impersonated tenant's Workspace and Company admin are offered and
+  Platform admin stays to end it (`NavVisibility.impersonating`).
 - The auth middleware sends a signed-out visitor to sign-in with an
   absolute `callbackUrl` on our own origin, which the safe-redirect rule
   rejected, so nobody ever returned to the page they had opened.
   `sameOriginPath` reduces it to its path + query (other origins still
   refused; tested), so a bookmark to `/admin` or `/users` lands there
   after sign-in.
-- Roles are checked after authentication, never from the typed email
-  alone, so the picker reveals nothing about an account before its
-  password is verified.
 - USER_MANUAL §2.1 and ADMIN_MANUAL §2.1 / §3.2.
+- Not changed: `requireCurrentOrg()` / `requireSuperadmin()` remain the
+  data boundary; the shell redirect and the sidebar decide what a
+  platform admin is offered and shown.
 
 ---
 

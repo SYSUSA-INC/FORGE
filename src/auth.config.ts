@@ -11,6 +11,10 @@ export const authConfig = {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
 
+      // BL-NAV-PORTAL — the middleware shows the sign-in page in place
+      // for a signed-out visit to the root (one sign-in page at
+      // www.sysgov.com); the Command Center itself still requires auth.
+      if (pathname === "/") return true;
       if (pathname === "/sign-in" || pathname.startsWith("/sign-in/")) return true;
       if (pathname === "/sign-up" || pathname.startsWith("/sign-up/")) return true;
       if (pathname === "/verify-email" || pathname.startsWith("/verify-email/"))

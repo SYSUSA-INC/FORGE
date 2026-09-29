@@ -12,13 +12,15 @@ import {
 export const dynamic = "force-dynamic";
 
 /**
- * BL-NAV-PORTAL — choose a portal after sign-in.
+ * BL-NAV-PORTAL — where an account goes after sign-in.
  *
  * Sign-in lands here. The account's portals come from its verified
- * session — Super Admin Portal for superadmins, Company Admin Portal for
- * org admins with a tenant, Proposal Tool for any member with a tenant.
- * One portal opens directly; several are offered; none falls through to
- * the work home, which onboards the account. No app shell: the person
+ * session: a platform admin gets the Super Admin Portal and nothing else
+ * (the power user is walled off from tenant work); a company admin
+ * chooses between the Company Admin Portal and the Proposal Tool; a
+ * member goes straight to the Proposal Tool; an account with no tenant
+ * yet falls through to the work home, which onboards it. One portal
+ * opens directly; only a real choice renders. No app shell: the person
  * has not entered a workspace yet.
  */
 export default async function PortalPage() {
@@ -30,10 +32,10 @@ export default async function PortalPage() {
   const isOrgAdmin = user.role === "admin" || isSuperadmin;
   // Same rule as the shell: the session's own tenant, or, for a
   // superadmin, an active impersonation session.
-  const hasWorkspace =
-    Boolean(user.organizationId) ||
-    (isSuperadmin && !!user.id && !!(await getActiveImpersonationSession(user.id)));
-  const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace };
+  const impersonating =
+    isSuperadmin && !!user.id && !!(await getActiveImpersonationSession(user.id));
+  const hasWorkspace = Boolean(user.organizationId) || impersonating;
+  const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace, impersonating };
 
   const choices = portalChoices(visibility);
   if (choices.length < 2) redirect(portalLanding(visibility));

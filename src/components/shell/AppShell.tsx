@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { HeaderSettingsLink, HeaderWorkspace } from "@/components/shell/HeaderWorkspace";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
@@ -10,6 +12,7 @@ import { UserMenu } from "@/components/auth/UserMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { auth } from "@/auth";
 import { getActiveImpersonationSession } from "@/lib/impersonation";
+import { platformOnlyRedirect } from "@/lib/nav-workspaces";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -17,14 +20,29 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const isSuperadmin = user?.isSuperadmin ?? false;
   const isOrgAdmin = (user?.role === "admin" || isSuperadmin) ?? false;
 
+  // BL-NAV-PORTAL — a platform admin with an active Assume-identity
+  // session; the one audited way into a tenant's pages.
+  const impersonating =
+    isSuperadmin && !!user?.id && !!(await getActiveImpersonationSession(user.id));
+
   // BL-QC-links — does this session resolve to a workspace? The same
   // rule requireCurrentOrg() applies: the session's own organizationId,
   // or, for a superadmin, an active impersonation session. Without one,
   // every org-gated page redirects to /onboarding, so the nav hides
   // those groups instead of offering two dozen dead links.
-  const hasWorkspace =
-    Boolean(user?.organizationId) ||
-    (isSuperadmin && !!user?.id && !!(await getActiveImpersonationSession(user.id)));
+  const hasWorkspace = Boolean(user?.organizationId) || impersonating;
+
+  // BL-NAV-PORTAL — a platform admin works only in platform
+  // administration. A tenant page opened by bookmark or typed URL sends
+  // them to the platform home unless they are impersonating. The path
+  // comes from the middleware (x-pathname); without it, no redirect.
+  const away = platformOnlyRedirect(headers().get("x-pathname"), {
+    isOrgAdmin,
+    isSuperadmin,
+    hasWorkspace,
+    impersonating,
+  });
+  if (away) redirect(away);
 
   // Trim down to what the nav needs — avoid passing the full session
   // user object across the client boundary.
@@ -46,6 +64,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
         hasWorkspace={hasWorkspace}
+        impersonating={impersonating}
         user={navUser}
       />
 
@@ -55,6 +74,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             isOrgAdmin={isOrgAdmin}
             isSuperadmin={isSuperadmin}
             hasWorkspace={hasWorkspace}
+            impersonating={impersonating}
             user={navUser}
           />
 
@@ -69,6 +89,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             isOrgAdmin={isOrgAdmin}
             isSuperadmin={isSuperadmin}
             hasWorkspace={hasWorkspace}
+            impersonating={impersonating}
           />
 
           <div className="ml-auto flex items-center gap-2 md:gap-3">
@@ -83,6 +104,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               isOrgAdmin={isOrgAdmin}
               isSuperadmin={isSuperadmin}
               hasWorkspace={hasWorkspace}
+              impersonating={impersonating}
             />
             <UserMenu user={user} />
           </div>
