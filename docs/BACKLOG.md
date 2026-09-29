@@ -548,8 +548,22 @@ in the assessment report.
 
 ---
 
+### BL-NAV-PORTAL — Sign-in portal picker and platform-admin wall (reverted)
+**Priority:** P1  ·  **Effort:** XS  ·  **Status:** ↩️ reverted (PR #286 shipped 2026-09-29, reverted the same day at the user's request)
+
+PR #286 added a `/portal` picker after sign-in, showed the sign-in page
+at the site root, and walled a platform admin off tenant work. The
+user chose to keep the sidebar **Switch to** row from BL-NAV-WORKSPACES
+(Workspace · Company admin · Platform admin) instead, so the whole PR
+was reverted. Nothing of it remains in the code; sign-in lands on `/`
+as before. If a role-based landing is wanted later, the pure
+`portalChoices` / `portalLanding` helpers and the same-origin
+`callbackUrl` fix from PR #286 can be recovered from its history.
+
+---
+
 ### BL-NAV-WORKSPACES — Role-scoped workspaces: work / company admin / platform admin
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #285)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #285)
 
 User request (2026-09-28): strip the platform-admin surface out of the
 tenant portal into its own page with only platform-admin menu items,
