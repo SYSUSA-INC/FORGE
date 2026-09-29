@@ -99,13 +99,15 @@ The top-right avatar is your **user menu**. Click it to see your name/email and 
 
 The sidebar shows one **workspace** at a time, scoped to the hat you are wearing (BL-NAV-WORKSPACES). People who wear more than one see a **Switch to** row under the FORGE mark; everyone else sees only their own.
 
+There is one sign-in page, at the site root (www.sysgov.com), and your account's role decides where you land (BL-NAV-PORTAL). A regular user goes straight to the Proposal Tool. A company admin is asked whether to open the **Company Admin Portal** or the **Proposal Tool** (the `/portal` page, which you can also open at any time). A platform admin lands in the **Super Admin Portal** and nowhere else. Opening a page while signed out brings you back to that page after sign-in.
+
 | Workspace | Who | What it contains |
 |---|---|---|
 | **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, New Opportunity, Solicitations, In-flight Proposals, New Proposals); Platform Intelligence (Company Search, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge); Inbox; My organization (Settings, Integrations, AI Engine — read-only for non-admins); Help |
 | **Company admin** | org admins | People (Users & roles); Organization (Profile & domains, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit log); Admin guide |
 | **Platform admin** | platform superadmins | Tenants & users (Organizations, Platform users, Overview, Source requests); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit log); Admin guide |
 
-The active workspace follows the page you are on: a platform-admin URL opens the platform workspace, a company-admin URL the company console, everything else the workspace — so links inside a workspace keep you there and a bookmark opens the right one. A superadmin with no tenant membership lands in Platform admin, which has no tenant pages at all; to work inside a tenant they use **Assume identity** on the tenant's page.
+The active workspace follows the page you are on: a platform-admin URL opens the platform workspace, a company-admin URL the company console, everything else the workspace — so links inside a workspace keep you there and a bookmark opens the right one. A platform admin always lands in Platform admin, which has no tenant pages at all, whatever tenant memberships the account carries; opening a tenant page by bookmark sends them back to `/admin`. To see inside a tenant they use **Assume identity** on the tenant's page, which is audited and read-only, and the tenant's Workspace and Company admin appear in the sidebar for the duration.
 
 The older single-tree description below is kept for reference; the group-visibility rules are unchanged (admin-only children still hide from members).
 

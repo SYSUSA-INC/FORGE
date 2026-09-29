@@ -548,8 +548,55 @@ in the assessment report.
 
 ---
 
+### BL-NAV-PORTAL — One sign-in at the root; the account's role decides the portal; platform admin walled off
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #286)
+
+User request (2026-09-28/29): a single login page at www.sysgov.com.
+A regular user signs in as a regular user; a company admin signs in as
+a company admin or a company user; a platform admin signs in only as a
+platform admin — that role is the power user and must be completely
+segregated, focused on platform administration alone.
+
+Delivered:
+- **One sign-in page at the root.** A signed-out visit to `/` shows the
+  sign-in page in place (middleware rewrite, so the address stays
+  www.sysgov.com); any other signed-out page still goes to sign-in and
+  returns there afterwards. `authorized()` lets `/` through for this;
+  the Command Center itself still requires a session.
+- **Landing by role** (`/portal`, no app shell, `portalChoices` /
+  `portalLanding` in `src/lib/nav-workspaces.ts`, tested): a platform
+  admin → `/admin`, nothing else offered; a company admin → a choice of
+  **Company Admin Portal** or **Proposal Tool**; a member → the Proposal
+  Tool; an account with no tenant yet → onboarding as before. Password
+  and SSO sign-in land on `/portal`; a return path of `/` counts as
+  "no preference". Roles come from the verified session, never from
+  the typed email.
+- **Platform admin segregation.** `availableWorkspaces` offers a
+  superadmin the platform workspace only, whatever tenant memberships
+  the account carries: no Switch-to row, no tenant pages in the
+  sidebar, the platform badge in the top bar. The app shell also
+  redirects a superadmin who opens any tenant page (bookmark, typed
+  URL) to `/admin` — `platformOnlyRedirect`, path from the new
+  `x-pathname` request header the middleware sets; `/admin*`,
+  `/platform*` and `/help*` stay open. The one way into a tenant is
+  **Assume identity** (audited, read-only): while it is active the
+  impersonated tenant's Workspace and Company admin are offered and
+  Platform admin stays to end it (`NavVisibility.impersonating`).
+- The auth middleware sends a signed-out visitor to sign-in with an
+  absolute `callbackUrl` on our own origin, which the safe-redirect rule
+  rejected, so nobody ever returned to the page they had opened.
+  `sameOriginPath` reduces it to its path + query (other origins still
+  refused; tested), so a bookmark to `/admin` or `/users` lands there
+  after sign-in.
+- USER_MANUAL §2.1 and ADMIN_MANUAL §2.1 / §3.2.
+- Not changed: `requireCurrentOrg()` / `requireSuperadmin()` remain the
+  data boundary; the shell redirect and the sidebar decide what a
+  platform admin is offered and shown.
+
+---
+
 ### BL-NAV-WORKSPACES — Role-scoped workspaces: work / company admin / platform admin
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #285)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #285)
 
 User request (2026-09-28): strip the platform-admin surface out of the
 tenant portal into its own page with only platform-admin menu items,

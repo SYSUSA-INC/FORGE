@@ -68,6 +68,66 @@ export const WORKSPACES: Record<Workspace, WorkspaceMeta> = {
   },
 };
 
+/**
+ * BL-NAV-PORTAL — how each workspace is offered as a portal at sign-in.
+ * The roles behind the offer are read from the authenticated session,
+ * never from the typed email, so the picker reveals nothing about an
+ * account before its password is verified. A platform admin is offered
+ * the Super Admin Portal alone; a company admin chooses between the
+ * Company Admin Portal and the Proposal Tool; a member gets the tool.
+ */
+export type PortalChoice = {
+  workspace: Workspace;
+  title: string;
+  description: string;
+  home: string;
+};
+
+export const PORTALS: Record<Workspace, { title: string; description: string }> = {
+  platform: {
+    title: "Super Admin Portal",
+    description:
+      "Platform administration across every tenant: organizations, platform users, subscription tiers, AI usage, background jobs and the cross-tenant audit log. A platform admin works only here; Assume identity on a tenant is the way into its workspace.",
+  },
+  company: {
+    title: "Company Admin Portal",
+    description:
+      "Administer your organization only: people and roles, profile and domains, billing, templates, integrations, notification rules and the audit log.",
+  },
+  work: {
+    title: "Proposal Tool",
+    description:
+      "Everyday capture and proposal work: opportunities, solicitations, proposals, intelligence and the FORGE Brain.",
+  },
+};
+
+/** The picker page; sign-in lands here when the account holds several portals. */
+export const PORTAL_PICKER_PATH = "/portal";
+
+/** Sign-in offers the portals highest hat first. */
+const PORTAL_ORDER: Workspace[] = ["platform", "company", "work"];
+
+/** The portals this account may enter, in the order the picker shows them. */
+export function portalChoices(v: NavVisibility): PortalChoice[] {
+  const available = availableWorkspaces(v);
+  return PORTAL_ORDER.filter((w) => available.includes(w)).map((w) => ({
+    workspace: w,
+    ...PORTALS[w],
+    home: WORKSPACES[w].home,
+  }));
+}
+
+/**
+ * Where sign-in lands: the picker when the account holds more than one
+ * portal, that portal's home when it holds exactly one, and the work
+ * home — which onboards an account with no tenant yet — otherwise.
+ */
+export function portalLanding(v: NavVisibility): string {
+  const choices = portalChoices(v);
+  if (choices.length > 1) return PORTAL_PICKER_PATH;
+  return choices[0]?.home ?? WORKSPACES.work.home;
+}
+
 /** Everyday proposal operations — what every member works in. */
 const WORK_NAV: WorkspaceNavGroup[] = [
   { id: "command", label: "Command Center", icon: "▦", href: "/", needsWorkspace: true },
@@ -241,13 +301,39 @@ export function workspaceForPath(pathname: string | null): Workspace {
   return "work";
 }
 
-/** The workspaces this person may switch to, in switcher order. */
+/**
+ * The workspaces this person may switch to, in switcher order.
+ *
+ * BL-NAV-PORTAL — a platform admin is the power user and works only in
+ * platform administration: no tenant workspace, whatever memberships the
+ * account carries. The one way into a tenant is Assume identity, which
+ * is audited; while it is active the impersonated tenant's workspace and
+ * company console are offered too, and Platform admin stays to end it.
+ */
 export function availableWorkspaces(v: NavVisibility): Workspace[] {
+  if (v.isSuperadmin && !v.impersonating) return ["platform"];
   const out: Workspace[] = [];
   if (v.hasWorkspace) out.push("work");
   if (v.hasWorkspace && (v.isOrgAdmin || v.isSuperadmin)) out.push("company");
   if (v.isSuperadmin) out.push("platform");
   return out;
+}
+
+/** Paths a platform admin may open without impersonating anyone. */
+const PLATFORM_ONLY_PATHS = ["/admin", "/platform", "/help"];
+
+/**
+ * BL-NAV-PORTAL — where the app shell sends a platform admin who opened a
+ * tenant page (a bookmark, a typed URL, a stale link): the platform
+ * home. Null when the page is theirs or when the person is not a walled
+ * platform admin. A null pathname (no middleware header) never redirects.
+ */
+export function platformOnlyRedirect(pathname: string | null, v: NavVisibility): string | null {
+  if (!v.isSuperadmin || v.impersonating) return null;
+  if (pathname === null) return null;
+  const p = pathname.split("?")[0] ?? "";
+  if (PLATFORM_ONLY_PATHS.some((prefix) => under(p, prefix))) return null;
+  return WORKSPACES.platform.home;
 }
 
 /** Where a person lands when the URL's workspace is not theirs. */

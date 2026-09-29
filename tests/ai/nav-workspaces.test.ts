@@ -8,6 +8,10 @@ import {
   availableWorkspaces,
   defaultWorkspace,
   NAV_BY_WORKSPACE,
+  platformOnlyRedirect,
+  PORTAL_PICKER_PATH,
+  portalChoices,
+  portalLanding,
   resolveWorkspace,
   WORKSPACES,
   workspaceForPath,
@@ -15,8 +19,16 @@ import {
 
 const member = { isOrgAdmin: false, isSuperadmin: false, hasWorkspace: true };
 const orgAdmin = { isOrgAdmin: true, isSuperadmin: false, hasWorkspace: true };
+// A platform admin who is also a member of a tenant: still walled off.
 const superWithTenant = { isOrgAdmin: true, isSuperadmin: true, hasWorkspace: true };
 const superNoTenant = { isOrgAdmin: true, isSuperadmin: true, hasWorkspace: false };
+// A platform admin inside a tenant through Assume identity.
+const superImpersonating = {
+  isOrgAdmin: true,
+  isSuperadmin: true,
+  hasWorkspace: true,
+  impersonating: true,
+};
 const nobody = { isOrgAdmin: false, isSuperadmin: false, hasWorkspace: false };
 
 describe("workspaceForPath", () => {
@@ -38,24 +50,85 @@ describe("workspaceForPath", () => {
 });
 
 describe("availableWorkspaces / defaultWorkspace / resolveWorkspace", () => {
-  it("offers each hat only to who wears it", () => {
+  it("offers each hat only to who wears it; a platform admin is walled off from tenant work", () => {
     expect(availableWorkspaces(member)).toEqual(["work"]);
     expect(availableWorkspaces(orgAdmin)).toEqual(["work", "company"]);
-    expect(availableWorkspaces(superWithTenant)).toEqual(["work", "company", "platform"]);
+    // BL-NAV-PORTAL — tenant membership does not open tenant work for a platform admin…
+    expect(availableWorkspaces(superWithTenant)).toEqual(["platform"]);
     expect(availableWorkspaces(superNoTenant)).toEqual(["platform"]);
+    // …Assume identity does, and keeps Platform admin to end it.
+    expect(availableWorkspaces(superImpersonating)).toEqual(["work", "company", "platform"]);
     expect(availableWorkspaces(nobody)).toEqual([]);
   });
 
   it("lands people in their own workspace", () => {
     expect(defaultWorkspace(member)).toBe("work");
+    expect(defaultWorkspace(superWithTenant)).toBe("platform");
     expect(defaultWorkspace(superNoTenant)).toBe("platform");
+    expect(defaultWorkspace(superImpersonating)).toBe("work");
     expect(defaultWorkspace(nobody)).toBe("work");
     // A member on an admin URL is shown the work workspace (the page itself refuses).
     expect(resolveWorkspace("/users", member)).toBe("work");
     expect(resolveWorkspace("/users", orgAdmin)).toBe("company");
     expect(resolveWorkspace("/admin/tiers", orgAdmin)).toBe("work");
     expect(resolveWorkspace("/admin/tiers", superWithTenant)).toBe("platform");
+    expect(resolveWorkspace("/", superWithTenant)).toBe("platform");
     expect(resolveWorkspace("/", superNoTenant)).toBe("platform");
+    expect(resolveWorkspace("/", superImpersonating)).toBe("work");
+    expect(resolveWorkspace("/users", superImpersonating)).toBe("company");
+  });
+});
+
+describe("BL-NAV-PORTAL — platformOnlyRedirect", () => {
+  it("sends a platform admin off every tenant page to the platform home", () => {
+    expect(platformOnlyRedirect("/", superWithTenant)).toBe("/admin");
+    expect(platformOnlyRedirect("/opportunities/abc", superWithTenant)).toBe("/admin");
+    expect(platformOnlyRedirect("/settings/ai-engine", superWithTenant)).toBe("/admin");
+    expect(platformOnlyRedirect("/onboarding", superNoTenant)).toBe("/admin");
+    expect(platformOnlyRedirect("/users", superWithTenant)).toBe("/admin");
+  });
+
+  it("leaves platform pages, help, impersonation and everyone else alone", () => {
+    expect(platformOnlyRedirect("/admin", superWithTenant)).toBeNull();
+    expect(platformOnlyRedirect("/admin/orgs/abc/users", superWithTenant)).toBeNull();
+    expect(platformOnlyRedirect("/platform/audit-log", superWithTenant)).toBeNull();
+    expect(platformOnlyRedirect("/help/admin", superWithTenant)).toBeNull();
+    // "/administration-like" prefixes are not platform pages.
+    expect(platformOnlyRedirect("/adminish", superWithTenant)).toBe("/admin");
+    // Inside a tenant via Assume identity, tenant pages are the point.
+    expect(platformOnlyRedirect("/", superImpersonating)).toBeNull();
+    expect(platformOnlyRedirect("/proposals/1", superImpersonating)).toBeNull();
+    // Members and company admins are never redirected.
+    expect(platformOnlyRedirect("/", member)).toBeNull();
+    expect(platformOnlyRedirect("/admin", orgAdmin)).toBeNull();
+    // Without the middleware's path header nothing redirects.
+    expect(platformOnlyRedirect(null, superWithTenant)).toBeNull();
+  });
+});
+
+describe("BL-NAV-PORTAL — portal choice at sign-in", () => {
+  it("offers a member the tool, a company admin a choice, a platform admin the platform only", () => {
+    expect(portalChoices(member).map((c) => c.title)).toEqual(["Proposal Tool"]);
+    expect(portalChoices(orgAdmin).map((c) => c.title)).toEqual([
+      "Company Admin Portal",
+      "Proposal Tool",
+    ]);
+    expect(portalChoices(superWithTenant).map((c) => c.title)).toEqual(["Super Admin Portal"]);
+    expect(portalChoices(superNoTenant).map((c) => c.home)).toEqual(["/admin"]);
+    expect(portalChoices(nobody)).toEqual([]);
+    // Each choice lands on its workspace's home.
+    for (const c of portalChoices(orgAdmin)) {
+      expect(c.home).toBe(WORKSPACES[c.workspace].home);
+    }
+  });
+
+  it("lands single-portal accounts directly and the company admin on the picker", () => {
+    expect(portalLanding(member)).toBe("/");
+    expect(portalLanding(superWithTenant)).toBe("/admin");
+    expect(portalLanding(superNoTenant)).toBe("/admin");
+    expect(portalLanding(orgAdmin)).toBe(PORTAL_PICKER_PATH);
+    // No tenant and no platform role: the work home onboards the account.
+    expect(portalLanding(nobody)).toBe("/");
   });
 });
 
