@@ -549,7 +549,7 @@ in the assessment report.
 ---
 
 ### BL-NAV-PORTAL — Portal choice at sign-in: Super Admin / Company Admin / Proposal Tool
-**Priority:** P1  ·  **Effort:** XS  ·  **Status:** 🔄 in PR
+**Priority:** P1  ·  **Effort:** XS  ·  **Status:** 🔄 in PR (PR #286)
 
 User request (2026-09-28): based on the account signing in, offer the
 choice of the Super Admin Portal, the Company Admin Portal, or the
