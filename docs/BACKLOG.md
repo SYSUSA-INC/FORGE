@@ -313,6 +313,48 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
+**BL-AIP-7b (part i) — the nightly scout** 🔄 (in PR)
+
+- **Find.** `runScoutForOrganization` (`src/lib/scout.ts`) re-runs the
+  tenant's NAICS codes (organization + profile extras) and up to three
+  profile keywords against SAM.gov for notices posted in the last N days
+  (default 3), and turns watchlisted awards whose period of performance
+  ends within 180 days into recompete candidates (`award:<id>`).
+  Notices already imported or already seen are dropped (unique per
+  organization + notice id).
+- **Ground.** Each find is scored 0–100 with named signals (`scoutFit`,
+  pure, tested): NAICS match, set-aside eligibility from the
+  organization's socio-economic flags, the recompete radar
+  (`flagSamResults`), the record at that customer
+  (`getCustomerIntelligence`), keyword hits, the due date, the
+  watchlist source.
+- **Triage.** The ten best-fitting new finds go to the model as a forced
+  tool (`scoutTriageSchema`: pursue / watch / skip, confidence,
+  rationale, next actions; feature `opportunity_triage`, "fast" class,
+  `SCOUT_TRIAGE_PROMPT_VERSION`), grounded in the score, the recompete
+  match, the customer record and the team's own history. Gated by
+  `aiAutoDraft` + the monthly request quota (refund on failure); skipped
+  in stub mode (candidates are still scored).
+- **Learn.** `/opportunities/scout` (sidebar: Opportunities → Scout)
+  lists new finds fit-first with the scout's take; **Import as
+  opportunity** creates the opportunity (stage from the notice type)
+  and **Dismiss** remembers it. The decision grades the call
+  (`gradeTriage`, pure, tested: import ↔ pursue, dismiss ↔ skip, watch
+  inconclusive); the track shows on the page and the newest decisions
+  are shown to the next night's prompt (`learningExamples`).
+- **Run.** `/api/cron/scout` 09:00 UTC daily (`runScoutCron`: enabled
+  tenants with codes or keywords, not scouted in 20 h, 25 per tick in a
+  time budget); org admins can **Run scout now** and edit the profile
+  (keywords, extra NAICS, days back, on/off). Migration 0089 adds
+  `scout_profile`, `scout_run`, `scout_candidate`.
+- Audited: `scout.profile.update`, `scout.run`,
+  `scout.candidate.import`, `scout.candidate.dismiss`.
+- Runtime-tested (`tests/isolation/scout.test.ts`): candidates,
+  decisions, the track and the profile are per organization; an import
+  creates the opportunity in the deciding organization only and grades
+  the call; a decided candidate cannot be decided again.
+- Part ii (nightly PWin snapshots + "PWin movers") follows as its own PR.
+
 **BL-AIP-5b (part ii) — the golden eval set** ✅ (PR #283)
 
 - **Cases.** `listGoldenCases` (`src/lib/golden-eval.ts`) = sections
@@ -532,11 +574,9 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-7b nightly scout (re-run saved searches + org NAICS, score with
-recompete / PWin prior / customer intel, structured `opportunity_triage`
-stored as briefs, learn from import vs dismiss; watchlisted expiring
-awards → draft opportunities) and nightly PWin snapshots / "PWin
-movers"; BL-AIP-7c a real AI Engine control panel (per-feature model
+BL-AIP-7b part ii nightly PWin snapshots / "PWin movers" (part i, the
+nightly scout, is in PR — see BL-AIP-7b above); BL-AIP-7c a real AI
+Engine control panel (per-feature model
 class within tier → `customOverrides.aiModels`, monthly budget vs
 `aiTokensPerMonth`, burn-down from `ai_call_log`, all features);
 BL-AIP-7d ⌘K palette with Brain answers and AI-assisted onboarding from

@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/jobs",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/scout",
+      "schedule": "0 9 * * *"
     }
   ]
 }
