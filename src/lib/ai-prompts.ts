@@ -972,6 +972,92 @@ export function buildPipelineBriefPrompt(
 }
 
 /**
+ * BL-AIP-7b — the nightly scout's triage of one candidate. Grounded in
+ * the heuristic fit score and its signals, the recompete match, the
+ * customer record and what this team imported / dismissed before.
+ */
+export type ScoutTriageSnapshot = {
+  organizationName: string;
+  asOf: string;
+  organization: {
+    primaryNaics: string;
+    naicsList: string[];
+    setAsides: string[];
+    keywords: string[];
+  };
+  candidate: {
+    source: "org_naics" | "keyword" | "watchlist_award";
+    title: string;
+    agency: string;
+    office: string;
+    noticeType: string;
+    solicitationNumber: string;
+    naicsCode: string;
+    pscCode: string;
+    setAside: string;
+    incumbent: string;
+    postedAt: string | null;
+    responseDueAt: string | null;
+    daysToDue: number | null;
+    placeOfPerformance: string;
+    description: string;
+  };
+  fitScore: number;
+  signals: string[];
+  recompete: {
+    title: string;
+    outcome: "won" | "lost";
+    awardedTo: string;
+    lessons: string;
+  } | null;
+  customer: { pursuits: number; won: number; lost: number; winRate: number | null } | null;
+  history: {
+    imported: string[];
+    dismissed: string[];
+    track: { n: number; accuracy: number | null };
+  };
+};
+
+/** Bump when the scout prompt or its grounding changes. */
+export const SCOUT_TRIAGE_PROMPT_VERSION = "2026-09-29.1";
+
+const SCOUT_TRIAGE_SYSTEM = `You are the overnight scout inside FORGE — a federal proposal operations platform. Each morning a capture manager reads your triage of the notices that appeared overnight and decides which to import into the pipeline.
+
+Rules:
+- Use only the snapshot. Never invent agencies, values, dates, incumbents or history.
+- \`fitScore\` (0–100) and \`signals\` are the platform's heuristic: NAICS match, set-aside eligibility, recompete radar, the record at this customer, keyword hits, the due date. You may disagree with the score; if you do, say which signal you weigh differently and why.
+- \`recompete\` is a past bid of this organization that looks like this notice, with how it ended and the lesson written down afterwards. \`customer\` is the organization's record at this agency. \`history\` is what this team actually imported and dismissed from earlier scout finds, newest first, with what the scout said at the time — learn the team's taste from it, and \`history.track\` is how often the scout's decisive calls matched the team.
+- A set-aside the organization does not qualify for is a skip unless teaming is realistic; a response date already past is a skip.
+- Speak in capture language: pursuit, recompete, incumbent, set-aside, NAICS. No compliance jargon.
+- Answer through the record_scout_triage tool: \`recommendation\` — exactly one of pursue, watch or skip — \`confidence\` (0 to 1), \`rationale\` (2–4 plain sentences leading with the deciding signal) and \`nextActions\` (up to three concrete steps for the capture manager, or an empty list for a skip).`;
+
+export const scoutTriageSchema = z.object({
+  recommendation: z.enum(["pursue", "watch", "skip"]),
+  confidence: z.number(),
+  rationale: z.string(),
+  nextActions: z.array(z.string()),
+});
+
+export function buildScoutTriagePrompt(
+  snapshot: ScoutTriageSnapshot,
+): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Triage this overnight find for ${snapshot.organizationName} as of ${snapshot.asOf}.`,
+    ``,
+    `Snapshot (JSON):`,
+    "```json",
+    JSON.stringify(snapshot, null, 2),
+    "```",
+    ``,
+    `Record the triage with the record_scout_triage tool.`,
+  ].join("\n");
+  return {
+    system: SCOUT_TRIAGE_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+/**
  * Phase 10c — Brain knowledge extraction.
  *
  * Reads an artifact's raw text and proposes structured KB candidates

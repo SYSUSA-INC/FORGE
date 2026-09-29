@@ -59,6 +59,9 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   // listed so the ledger's feature keys stay exhaustive (BL-AIP-4).
   embedding: "fast",
   embedding_query: "fast",
+  // BL-AIP-7b — short, structured, grounded by a heuristic score and the
+  // tenant's own history; runs nightly for every tenant, so it stays cheap.
+  opportunity_triage: "fast",
   // Standard: everyday extraction, review, mapping and chat.
   opportunity_brief: "standard",
   pipeline_brief: "standard",

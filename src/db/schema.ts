@@ -3715,3 +3715,136 @@ export const aiBriefs = pgTable(
 export type AiBrief = typeof aiBriefs.$inferSelect;
 export type NewAiBrief = typeof aiBriefs.$inferInsert;
 export type AiBriefKind = (typeof aiBriefKindEnum.enumValues)[number];
+
+/**
+ * BL-AIP-7b — the nightly scout.
+ *
+ * `scout_profile` holds a tenant's scout settings (one optional row;
+ * defaults apply without one). `scout_run` records each nightly or
+ * manual run. `scout_candidate` is a SAM.gov notice, or an expiring
+ * award from the watchlist, that the scout found: the grounding
+ * signals, the heuristic fit score, the model's triage and the human
+ * decision that grades it. Every row carries organization_id.
+ * Migration 0089.
+ */
+export const scoutCandidateStatusEnum = pgEnum("scout_candidate_status", [
+  "new",
+  "imported",
+  "dismissed",
+]);
+
+export const scoutCandidateSourceEnum = pgEnum("scout_candidate_source", [
+  "org_naics",
+  "keyword",
+  "watchlist_award",
+]);
+
+export const scoutProfiles = pgTable("scout_profile", {
+  organizationId: uuid("organization_id")
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(true),
+  keywords: text("keywords").array().notNull().default(sql`ARRAY[]::text[]`),
+  extraNaics: text("extra_naics").array().notNull().default(sql`ARRAY[]::text[]`),
+  postedDaysBack: integer("posted_days_back").notNull().default(3),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const scoutRuns = pgTable(
+  "scout_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** cron | manual */
+    trigger: text("trigger").notNull().default("cron"),
+    searches: integer("searches").notNull().default(0),
+    found: integer("found").notNull().default(0),
+    created: integer("created").notNull().default(0),
+    triaged: integer("triaged").notNull().default(0),
+    skippedGated: integer("skipped_gated").notNull().default(0),
+    errors: integer("errors").notNull().default(0),
+    stubbed: boolean("stubbed").notNull().default(false),
+    note: text("note").notNull().default(""),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => ({
+    orgStartedIdx: index("scout_run_org_started_idx").on(t.organizationId, t.startedAt),
+  }),
+);
+
+export const scoutCandidates = pgTable(
+  "scout_candidate",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").references(() => scoutRuns.id, { onDelete: "set null" }),
+    source: scoutCandidateSourceEnum("source").notNull(),
+    status: scoutCandidateStatusEnum("status").notNull().default("new"),
+    /** SAM.gov notice id, or `award:<usaspending id>` for a watchlisted award. */
+    noticeId: text("notice_id").notNull(),
+    title: text("title").notNull().default(""),
+    agency: text("agency").notNull().default(""),
+    office: text("office").notNull().default(""),
+    solicitationNumber: text("solicitation_number").notNull().default(""),
+    noticeType: text("notice_type").notNull().default(""),
+    setAside: text("set_aside").notNull().default(""),
+    naicsCode: text("naics_code").notNull().default(""),
+    pscCode: text("psc_code").notNull().default(""),
+    incumbent: text("incumbent").notNull().default(""),
+    postedAt: timestamp("posted_at", { mode: "date" }),
+    responseDueAt: timestamp("response_due_at", { mode: "date" }),
+    placeOfPerformance: text("place_of_performance").notNull().default(""),
+    description: text("description").notNull().default(""),
+    uiLink: text("ui_link").notNull().default(""),
+    /** 0..100 heuristic fit before the model's take. */
+    fitScore: integer("fit_score").notNull().default(0),
+    signals: jsonb("signals").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** pursue | watch | skip; null until triaged. */
+    recommendation: text("recommendation"),
+    /** 0..1 */
+    confidence: real("confidence"),
+    rationale: text("rationale").notNull().default(""),
+    nextActions: jsonb("next_actions").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    promptVersion: text("prompt_version").notNull().default(""),
+    model: text("model").notNull().default(""),
+    stubbed: boolean("stubbed").notNull().default(false),
+    /** correct | wrong | inconclusive, set by the human decision. */
+    grade: text("grade"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    opportunityId: uuid("opportunity_id").references(() => opportunities.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgNoticeIdx: uniqueIndex("scout_candidate_org_notice_idx").on(t.organizationId, t.noticeId),
+    orgStatusCreatedIdx: index("scout_candidate_org_status_created_idx").on(
+      t.organizationId,
+      t.status,
+      t.createdAt,
+    ),
+  }),
+);
+
+export type ScoutProfile = typeof scoutProfiles.$inferSelect;
+export type ScoutRun = typeof scoutRuns.$inferSelect;
+export type ScoutCandidate = typeof scoutCandidates.$inferSelect;
+export type NewScoutCandidate = typeof scoutCandidates.$inferInsert;
+export type ScoutCandidateStatus = (typeof scoutCandidateStatusEnum.enumValues)[number];
+export type ScoutCandidateSource = (typeof scoutCandidateSourceEnum.enumValues)[number];

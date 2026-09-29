@@ -38,6 +38,9 @@ export const AI_FEATURES = {
   // BL-AIP-5b — proposal outline (sections, page limits, due date,
   // proposed themes) read from the solicitation's Section L.
   proposal_bootstrap: "Outline from Section L",
+  // BL-AIP-7b — the nightly scout's pursue / watch / skip triage of a
+  // SAM.gov notice or an expiring watchlisted award.
+  opportunity_triage: "Opportunity triage (scout)",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;
