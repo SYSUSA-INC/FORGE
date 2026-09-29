@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SsoButtons } from "@/components/auth/SsoButtons";
-import { PORTAL_PICKER_PATH } from "@/lib/nav-workspaces";
-import { safeRedirectTarget, sameOriginPath } from "@/lib/safe-redirect";
+import { safeRedirectTarget } from "@/lib/safe-redirect";
 import { SignInForm } from "./SignInForm";
 
 export default async function SignInPage({
@@ -12,23 +10,10 @@ export default async function SignInPage({
 }: {
   searchParams: { error?: string; callbackUrl?: string; verified?: string };
 }) {
-  // Validate callbackUrl — only allow same-origin paths. The auth
-  // middleware hands us an absolute URL on our own origin (the page a
-  // signed-out visitor opened), which is reduced to its path first;
-  // anything off-origin / protocol-relative / pointing at an API route
-  // falls back to the portal picker (BL-NAV-PORTAL), which sends the
-  // account to its one portal or offers the several it holds.
-  const h = headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const origin = host ? `${proto}://${host}` : null;
-  const requested = safeRedirectTarget(
-    sameOriginPath(searchParams.callbackUrl, origin),
-    PORTAL_PICKER_PATH,
-  );
-  // The root is the sign-in page itself (www.sysgov.com), not a
-  // destination: an account arriving from it lands by role.
-  const safeCallback = requested === "/" ? PORTAL_PICKER_PATH : requested;
+  // Validate callbackUrl — only allow same-origin relative paths.
+  // Anything off-origin / protocol-relative / pointing at an API
+  // route falls back to "/". Prevents phishing redirects.
+  const safeCallback = safeRedirectTarget(searchParams.callbackUrl);
 
   const session = await auth();
   if (session?.user) {
@@ -72,7 +57,7 @@ export default async function SignInPage({
             Sign in to Forge
           </h1>
           <p className="mt-2 text-sm text-muted">
-            Use your email and password. Your account&apos;s role decides where you land.
+            Use your email and password.
           </p>
 
           {verified ? (

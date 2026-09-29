@@ -15,20 +15,13 @@ export function HeaderWorkspace({
   isOrgAdmin,
   isSuperadmin,
   hasWorkspace,
-  impersonating = false,
 }: {
   isOrgAdmin: boolean;
   isSuperadmin: boolean;
   hasWorkspace: boolean;
-  impersonating?: boolean;
 }) {
   const pathname = usePathname();
-  const workspace = resolveWorkspace(pathname, {
-    isOrgAdmin,
-    isSuperadmin,
-    hasWorkspace,
-    impersonating,
-  });
+  const workspace = resolveWorkspace(pathname, { isOrgAdmin, isSuperadmin, hasWorkspace });
 
   if (workspace === "work") {
     return (
@@ -73,20 +66,13 @@ export function HeaderSettingsLink({
   isOrgAdmin,
   isSuperadmin,
   hasWorkspace,
-  impersonating = false,
 }: {
   isOrgAdmin: boolean;
   isSuperadmin: boolean;
   hasWorkspace: boolean;
-  impersonating?: boolean;
 }) {
   const pathname = usePathname();
-  const workspace = resolveWorkspace(pathname, {
-    isOrgAdmin,
-    isSuperadmin,
-    hasWorkspace,
-    impersonating,
-  });
+  const workspace = resolveWorkspace(pathname, { isOrgAdmin, isSuperadmin, hasWorkspace });
   if (!hasWorkspace || workspace !== "work") return null;
   return (
     <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">
