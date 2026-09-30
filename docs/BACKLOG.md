@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7c — a real AI Engine control panel** 🔄 (in PR)
+**BL-AIP-7c — a real AI Engine control panel** 🔄 (PR #292)
 
 - **Every feature, its class, its model.** `/settings/ai-engine` opens
   with the control panel: one row per AI feature (all 21 in
