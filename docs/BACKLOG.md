@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7b (part ii) — nightly PWin snapshots and "PWin movers"** 🔄 (in PR)
+**BL-AIP-7b (part ii) — nightly PWin snapshots and "PWin movers"** 🔄 (PR #291)
 
 - **Nightly snapshots.** `/api/cron/pwin-snapshots` at 09:30 UTC
   (`runPwinSnapshotCron`, `src/lib/pwin-nightly.ts`): for every enabled
