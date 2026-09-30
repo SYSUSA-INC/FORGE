@@ -589,7 +589,7 @@ in the assessment report.
 ---
 
 ### BL-NAV-RESTORE — Put the full menu back in the everyday sidebar; admin items for admins only
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #290)
 
 User report (2026-09-30): after the workspace split "we have lost many
 menu items that were previously there and had some unique
