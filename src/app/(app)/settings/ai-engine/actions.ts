@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import { setAiBudget, setAiFeatureRouting, type AiControlResult } from "@/lib/ai-engine-control";
+import type { AiModelClass } from "@/lib/ai-routing";
 import { runGoldenEval } from "@/lib/golden-eval";
 import {
   enforceQuota,
@@ -11,6 +13,49 @@ import {
   refundQuota,
 } from "@/lib/subscription-gates";
 import { log } from "@/lib/log";
+
+/**
+ * BL-AIP-7c — route one AI feature to a model class (or back to the tier
+ * default). Org admins only; the lib refuses a platform-pinned model.
+ */
+export async function setAiFeatureRoutingAction(
+  feature: string,
+  value: "default" | AiModelClass,
+): Promise<AiControlResult> {
+  const { organizationId } = await requireCurrentOrg();
+  const actor = await requireOrgAdmin(organizationId);
+  const res = await setAiFeatureRouting({
+    organizationId,
+    feature,
+    value,
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (res.ok) revalidatePath("/settings/ai-engine");
+  return res;
+}
+
+/**
+ * BL-AIP-7c — set the organization's own monthly AI ceiling. Blank or a
+ * value at or above the tier cap means the tier cap applies. Org admins
+ * only.
+ */
+export async function setAiBudgetAction(input: {
+  tokensPerMonth: number | null;
+  requestsPerMonth: number | null;
+}): Promise<AiControlResult> {
+  const { organizationId } = await requireCurrentOrg();
+  const actor = await requireOrgAdmin(organizationId);
+  const res = await setAiBudget({
+    organizationId,
+    budget: {
+      tokensPerMonth: input.tokensPerMonth ?? undefined,
+      requestsPerMonth: input.requestsPerMonth ?? undefined,
+    },
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (res.ok) revalidatePath("/settings/ai-engine");
+  return res.ok ? { ok: true } : res;
+}
 
 /**
  * BL-AIP-5b — run the golden eval for this org: re-draft up to
