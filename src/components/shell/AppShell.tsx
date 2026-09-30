@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { CommandPalette } from "@/components/shell/CommandPalette";
 import { HeaderSettingsLink, HeaderWorkspace } from "@/components/shell/HeaderWorkspace";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
@@ -115,6 +116,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       </div>
+      {/* BL-AIP-7d — ⌘K: pages, records and Brain answers from one box. */}
+      {hasWorkspace ? (
+        <CommandPalette isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} hasWorkspace={hasWorkspace} />
+      ) : null}
     </>
   );
 }

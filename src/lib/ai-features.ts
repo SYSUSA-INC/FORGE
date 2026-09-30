@@ -41,6 +41,9 @@ export const AI_FEATURES = {
   // BL-AIP-7b — the nightly scout's pursue / watch / skip triage of a
   // SAM.gov notice or an expiring watchlisted award.
   opportunity_triage: "Opportunity triage (scout)",
+  // BL-AIP-7d — a question typed into the ⌘K palette, answered from the
+  // org's own Brain with citations.
+  brain_answer: "Brain answer (⌘K)",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

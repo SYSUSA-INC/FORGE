@@ -1058,6 +1058,72 @@ export function buildScoutTriagePrompt(
 }
 
 /**
+ * BL-AIP-7d — a Brain answer for the ⌘K palette.
+ *
+ * The person typed a question; the Brain's top hits are the only
+ * sources. The model answers in a few sentences, cites the sources by
+ * number, and says so when they do not answer the question. Bump the
+ * version whenever the system prompt or the source layout changes.
+ */
+export const BRAIN_ANSWER_PROMPT_VERSION = "2026-09-30.1";
+
+export type BrainAnswerSourceInput = {
+  n: number;
+  title: string;
+  /** "entry" (curated knowledge entry) or "corpus" (imported document). */
+  source: "entry" | "corpus";
+  kind: string;
+  outcomeLabel: string;
+  excerpt: string;
+};
+
+const BRAIN_ANSWER_SYSTEM = `You answer questions inside FORGE — a federal proposal operations platform — from one organization's own knowledge base ("the Brain"): curated entries (capabilities, past performance, personnel, boilerplate) and excerpts of documents it imported (old proposals, contracts, debriefs).
+
+Rules:
+- Use only the numbered sources. Never add facts, names, numbers, dates or contract details that are not in them.
+- Answer in two to five plain sentences a capture manager can act on. Lead with the answer, not with a description of the sources.
+- Cite every claim with the source number in square brackets, e.g. [2]. List the numbers you relied on in \`citations\`.
+- A source marked "won" is content from a winning proposal; prefer it when sources disagree, and say which.
+- If the sources do not answer the question, say exactly that in one sentence, suggest what the person could look for or add to the Brain, cite nothing, and set \`confidence\` at or below 0.2.
+- \`confidence\` (0 to 1) is how completely the sources answer the question.
+- Answer through the record_brain_answer tool.`;
+
+export const brainAnswerSchema = z.object({
+  answer: z.string(),
+  citations: z.array(z.number()),
+  confidence: z.number(),
+});
+
+export function buildBrainAnswerPrompt(input: {
+  question: string;
+  sources: BrainAnswerSourceInput[];
+}): { system: string; messages: AIMessage[] } {
+  const sources = input.sources
+    .map((s) =>
+      [
+        `[${s.n}] ${s.title}`,
+        `    type: ${s.source === "entry" ? `knowledge entry (${s.kind})` : `imported document (${s.kind})`}${
+          s.outcomeLabel && s.outcomeLabel !== "none" ? ` · outcome: ${s.outcomeLabel}` : ""
+        }`,
+        `    ${s.excerpt}`,
+      ].join("\n"),
+    )
+    .join("\n\n");
+  const userPrompt = [
+    `Question: ${input.question}`,
+    ``,
+    `Sources:`,
+    sources || "(none)",
+    ``,
+    `Record the answer with the record_brain_answer tool.`,
+  ].join("\n");
+  return {
+    system: BRAIN_ANSWER_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+/**
  * Phase 10c — Brain knowledge extraction.
  *
  * Reads an artifact's raw text and proposes structured KB candidates

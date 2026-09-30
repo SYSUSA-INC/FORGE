@@ -75,6 +75,8 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   compliance_automap: "standard",
   loss_intelligence: "standard",
   review_preflight: "standard",
+  // BL-AIP-7d — grounded in six Brain hits, short answer, must cite.
+  brain_answer: "standard",
   // Strong: what the customer submits or decides on.
   section_draft: "strong",
   proposal_bootstrap: "strong",
