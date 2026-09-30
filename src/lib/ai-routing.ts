@@ -130,12 +130,21 @@ export function modelTableFor(provider: AIProviderName): ModelRoutingTable {
 
 /**
  * Per-tenant model overrides, stored in tenant_subscription.custom_overrides
- * under `aiModels`. Keys may be feature keys or class keys.
+ * under `aiModels`. Keys may be feature keys or class keys. A feature's
+ * value may be a literal model (pinned by a platform admin) or, since
+ * BL-AIP-7c, a class name chosen by the tenant's own admin on the AI
+ * Engine control panel — the class resolves through the provider table
+ * at call time, so env model changes follow it.
  */
 export type AiModelOverrides = Record<string, string>;
 
+export function isModelClass(v: unknown): v is AiModelClass {
+  return v === "fast" || v === "standard" || v === "strong";
+}
+
 export type ModelRouteSource =
   | "tenant_feature"
+  | "tenant_feature_class"
   | "tenant_class"
   | "provider_table"
   | "none";
@@ -155,7 +164,14 @@ export function resolveModelForFeature(input: {
   const modelClass = AI_FEATURE_MODEL_CLASS[input.feature];
   const overrides = input.tenantOverrides ?? {};
 
-  const byFeature = cleanModel(overrides[input.feature]);
+  const raw = overrides[input.feature];
+  if (isModelClass(raw)) {
+    const fromClass = modelTableFor(input.provider)[raw];
+    return fromClass
+      ? { model: fromClass, modelClass: raw, source: "tenant_feature_class" }
+      : { model: null, modelClass: raw, source: "none" };
+  }
+  const byFeature = cleanModel(raw);
   if (byFeature) return { model: byFeature, modelClass, source: "tenant_feature" };
 
   const byClass = cleanModel(overrides[modelClass]);

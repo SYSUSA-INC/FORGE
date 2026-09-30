@@ -3185,12 +3185,15 @@ export const tenantSubscriptions = pgTable(
      * The runtime gate reads tier.X then applies overrides.X on top.
      * `aiModels` (BL-AI-ROUTING) is keyed by AI feature or model class
      * and read by the AI gateway; see src/lib/ai-routing.ts.
+     * `aiBudget` (BL-AIP-7c) is the tenant admin's own monthly ceiling;
+     * it can only lower the effective quota, never raise it.
      */
     customOverrides: jsonb("custom_overrides")
       .$type<{
         featureFlags?: Partial<TierFeatureFlags>;
         quotas?: Partial<TierQuotas>;
         aiModels?: Record<string, string>;
+        aiBudget?: { tokensPerMonth?: number; requestsPerMonth?: number };
       }>()
       .notNull()
       .default({}),

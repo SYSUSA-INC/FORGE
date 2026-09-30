@@ -313,7 +313,40 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7b (part ii) — nightly PWin snapshots and "PWin movers"** 🔄 (PR #291)
+**BL-AIP-7c — a real AI Engine control panel** 🔄 (in PR)
+
+- **Every feature, its class, its model.** `/settings/ai-engine` opens
+  with the control panel: one row per AI feature (all 21 in
+  `AI_FEATURES`) with its default class, the model the gateway will
+  request for this tenant (`resolveModelForFeature` with the tenant's
+  overrides), where that comes from (tier default / your override /
+  pinned by platform) and this month's calls, tokens and errors.
+- **Per-feature class override, tenant-owned.** An org admin moves a
+  feature to fast / standard / strong from the row; the choice is
+  stored as the class name in `customOverrides.aiModels[feature]` and
+  the router resolves it through the provider table at call time
+  (`isModelClass`, source `tenant_feature_class`), so env model changes
+  follow. A literal model set there by a platform admin stays
+  read-only for the tenant ("pinned by platform").
+- **Monthly budget that really gates.** `customOverrides.aiBudget`
+  (tokens / requests per month) is the tenant's own ceiling;
+  `getCurrentTier` applies it on top of tier × platform overrides
+  (`applyAiBudget`, pure: it can only lower, never raise), so the
+  existing token pre-check and request quota refuse calls past it.
+  `CurrentTier.platformQuotas` keeps the pre-budget caps for display.
+  Type-only schema change (label `schema-no-migration`).
+- **Burn-down from the ledger.** Month-to-date tokens and requests
+  against the effective cap with the pace so far, the projected
+  month-end total and the day the cap is reached at that pace
+  (`burnDown`, pure); tokens per day as bars; per-feature usage from
+  `ai_call_log` (`getTenantAiUsage`).
+- Audited: `ai_engine.routing.update`, `ai_engine.budget.update`.
+  Runtime-tested (`tests/isolation/ai-engine-control.test.ts`): routing
+  and budget land on the deciding tenant only, a pinned model is
+  refused, the budget only lowers and is applied to the effective
+  quotas, usage reads the tenant's own ledger rows.
+
+**BL-AIP-7b (part ii) — nightly PWin snapshots and "PWin movers"** ✅ (PR #291)
 
 - **Nightly snapshots.** `/api/cron/pwin-snapshots` at 09:30 UTC
   (`runPwinSnapshotCron`, `src/lib/pwin-nightly.ts`): for every enabled
@@ -604,9 +637,6 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-7c a real AI Engine control panel (per-feature model
-class within tier → `customOverrides.aiModels`, monthly budget vs
-`aiTokensPerMonth`, burn-down from `ai_call_log`, all features);
 BL-AIP-7d ⌘K palette with Brain answers and AI-assisted onboarding from
 UEI; BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and

@@ -11,6 +11,7 @@ import {
   type TierFeatureFlags,
   type TierQuotas,
 } from "@/db/schema";
+import { applyAiBudget, type AiBudget } from "@/lib/ai-control";
 import { log } from "@/lib/log";
 
 /**
@@ -77,10 +78,17 @@ export type CurrentTier = {
      * "strong"). Read by the AI gateway; see src/lib/ai-routing.ts.
      */
     aiModels?: Record<string, string>;
+    /**
+     * BL-AIP-7c — the tenant admin's own monthly ceiling, set on the AI
+     * Engine control panel. Only ever lowers the effective quota.
+     */
+    aiBudget?: AiBudget;
   };
   /** Effective flags = tier × overrides. */
   effectiveFlags: TierFeatureFlags;
-  /** Effective quotas = tier × overrides. */
+  /** Quotas = tier × platform overrides, before the tenant's own budget. */
+  platformQuotas: TierQuotas;
+  /** Effective quotas = tier × overrides × the tenant's budget (which only lowers). */
   effectiveQuotas: TierQuotas;
 };
 
@@ -121,15 +129,18 @@ export async function getCurrentTier(
     featureFlags?: Partial<TierFeatureFlags>;
     quotas?: Partial<TierQuotas>;
     aiModels?: Record<string, string>;
+    aiBudget?: AiBudget;
   };
 
   const effectiveFlags: TierFeatureFlags = row.tierActive
     ? mergeFlags(row.tierFeatureFlags, overrides.featureFlags)
     : DENY_ALL_FLAGS;
-  const effectiveQuotas: TierQuotas = mergeQuotas(
+  const platformQuotas: TierQuotas = mergeQuotas(
     row.tierQuotas,
     overrides.quotas,
   );
+  // BL-AIP-7c — the tenant's own budget can only lower the cap.
+  const effectiveQuotas: TierQuotas = applyAiBudget(platformQuotas, overrides.aiBudget);
 
   return {
     tierId: row.tierId,
@@ -140,6 +151,7 @@ export async function getCurrentTier(
     quotas: row.tierQuotas,
     overrides,
     effectiveFlags,
+    platformQuotas,
     effectiveQuotas,
   };
 }
