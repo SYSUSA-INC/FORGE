@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7d (part i) — ⌘K: pages, records and Brain answers from one box** 🔄 (PR pending)
+**BL-AIP-7d (part i) — ⌘K: pages, records and Brain answers from one box** 🔄 (PR #293)
 
 - **The header search works.** The dead input with the ⌘K badge
   (assessment §5 row 1) is now a button that opens the command palette;
