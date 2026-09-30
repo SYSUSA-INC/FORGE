@@ -323,8 +323,10 @@ defect in the assessment plus its neighbours:
   row with trigger **nightly** when it differs from the last nightly
   row — PWin, confidence or factors (`snapshotChanged`, pure) — or when
   that row is six days old, so every live pursuit has a weekly
-  baseline. No migration: `trigger` is a text column; the type gains
-  the value. `getPwinTrack` (Brier) still reads outcome rows only.
+  baseline. No migration: `trigger` is a text column; only the
+  TypeScript union in `schema.ts` gains the value (PR label
+  `schema-no-migration`, the coupling gate's type-only escape).
+  `getPwinTrack` (Brier) still reads outcome rows only.
 - **Movers.** `listPwinMovers` reads the last week of nightly and
   applied snapshots for the tenant's live opportunities and returns the
   biggest moves (`computeMovers`, pure, tested: latest against the
