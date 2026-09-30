@@ -313,6 +313,36 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
+**BL-AIP-7b (part ii) — nightly PWin snapshots and "PWin movers"** 🔄 (PR #291)
+
+- **Nightly snapshots.** `/api/cron/pwin-snapshots` at 09:30 UTC
+  (`runPwinSnapshotCron`, `src/lib/pwin-nightly.ts`): for every enabled
+  tenant with a live opportunity (40 per tick in a time budget), the
+  calibrated PWin of each live opportunity (100 per tenant, most
+  recently touched first) is computed and frozen as a `pwin_snapshot`
+  row with trigger **nightly** when it differs from the last nightly
+  row — PWin, confidence or factors (`snapshotChanged`, pure) — or when
+  that row is six days old, so every live pursuit has a weekly
+  baseline. No migration: `trigger` is a text column; only the
+  TypeScript union in `schema.ts` gains the value (PR label
+  `schema-no-migration`, the coupling gate's type-only escape).
+  `getPwinTrack` (Brier) still reads outcome rows only.
+- **Movers.** `listPwinMovers` reads the last week of nightly and
+  applied snapshots for the tenant's live opportunities and returns the
+  biggest moves (`computeMovers`, pure, tested: latest against the
+  oldest inside the window, ≥ 5 points, largest first) with the factor
+  changes behind each (`explainMove`: up to two, e.g. "▲ Evaluation:
+  rollup 4/5", "▼ Incumbency: no longer applies").
+- **Surfaces.** `PwinMoversPanel` on the Command Center (six) and on
+  `/intelligence` (ten): from → to with direction, stage, confidence,
+  days, agency and the reasons; links to the opportunity; renders
+  nothing until two snapshots of a pursuit differ.
+- Runtime-tested (`tests/isolation/pwin-nightly.test.ts`): the nightly
+  run freezes one row for a live opportunity and skips it while nothing
+  moved, per organization; movers come from the organization's own
+  rows only and ignore a baseline outside the window; nightly rows
+  never enter the Brier track.
+
 **BL-AIP-7b (part i) — the nightly scout** ✅ (engine: PR #288; page: PR #289)
 
 - **Find.** `runScoutForOrganization` (`src/lib/scout.ts`) re-runs the
@@ -574,9 +604,7 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-7b part ii nightly PWin snapshots / "PWin movers" (part i, the
-nightly scout, is in PR — see BL-AIP-7b above); BL-AIP-7c a real AI
-Engine control panel (per-feature model
+BL-AIP-7c a real AI Engine control panel (per-feature model
 class within tier → `customOverrides.aiModels`, monthly budget vs
 `aiTokensPerMonth`, burn-down from `ai_call_log`, all features);
 BL-AIP-7d ⌘K palette with Brain answers and AI-assisted onboarding from

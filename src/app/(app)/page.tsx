@@ -6,6 +6,7 @@ import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_LABELS as OPP_STAGE_LABELS } from "@/lib/opportunity-types";
 import { STAGE_LABELS as PROP_STAGE_LABELS } from "@/lib/proposal-types";
 import { CommandCenterStageGrid } from "./CommandCenterStageGrid";
+import { PwinMoversPanel } from "./PwinMoversPanel";
 import { RecompeteAttentionPanel } from "./RecompeteAttentionPanel";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,11 @@ export default async function DashboardPage() {
       {/* BL-FB-WIN-RECOMPETE — open work that looks like a pursuit we
           already decided. Renders nothing when the radar is clear. */}
       <RecompeteAttentionPanel organizationId={organizationId} />
+
+      {/* BL-AIP-7b part ii — live pursuits whose calibrated PWin moved
+          most this week, from the nightly snapshots. Nothing until two
+          snapshots of a pursuit differ. */}
+      <PwinMoversPanel organizationId={organizationId} />
 
       <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         {snap.nextDue ? (
