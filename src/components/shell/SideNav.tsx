@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NavContent } from "@/components/shell/NavContent";
+import type { Workspace } from "@/lib/nav-workspaces";
 
 type NavUser = {
   name: string | null;
@@ -30,11 +31,13 @@ export function SideNav({
   isOrgAdmin = false,
   isSuperadmin = false,
   hasWorkspace = true,
+  preferredWorkspace = null,
   user,
 }: {
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
   hasWorkspace?: boolean;
+  preferredWorkspace?: Workspace | null;
   user: NavUser | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -63,6 +66,7 @@ export function SideNav({
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
         hasWorkspace={hasWorkspace}
+        preferredWorkspace={preferredWorkspace}
         user={user}
       />
     </aside>

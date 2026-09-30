@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { resolveWorkspace, WORKSPACES } from "@/lib/nav-workspaces";
+import { resolveWorkspace, WORKSPACES, type Workspace } from "@/lib/nav-workspaces";
 
 /**
  * BL-NAV-WORKSPACES — the top bar's middle and its Settings shortcut
@@ -15,13 +15,19 @@ export function HeaderWorkspace({
   isOrgAdmin,
   isSuperadmin,
   hasWorkspace,
+  preferredWorkspace = null,
 }: {
   isOrgAdmin: boolean;
   isSuperadmin: boolean;
   hasWorkspace: boolean;
+  preferredWorkspace?: Workspace | null;
 }) {
   const pathname = usePathname();
-  const workspace = resolveWorkspace(pathname, { isOrgAdmin, isSuperadmin, hasWorkspace });
+  const workspace = resolveWorkspace(
+    pathname,
+    { isOrgAdmin, isSuperadmin, hasWorkspace },
+    preferredWorkspace,
+  );
 
   if (workspace === "work") {
     return (
@@ -66,13 +72,19 @@ export function HeaderSettingsLink({
   isOrgAdmin,
   isSuperadmin,
   hasWorkspace,
+  preferredWorkspace = null,
 }: {
   isOrgAdmin: boolean;
   isSuperadmin: boolean;
   hasWorkspace: boolean;
+  preferredWorkspace?: Workspace | null;
 }) {
   const pathname = usePathname();
-  const workspace = resolveWorkspace(pathname, { isOrgAdmin, isSuperadmin, hasWorkspace });
+  const workspace = resolveWorkspace(
+    pathname,
+    { isOrgAdmin, isSuperadmin, hasWorkspace },
+    preferredWorkspace,
+  );
   if (!hasWorkspace || workspace !== "work") return null;
   return (
     <Link href="/settings" className="aur-btn-ghost hidden md:inline-flex">

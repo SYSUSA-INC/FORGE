@@ -97,15 +97,17 @@ The top-right avatar is your **user menu**. Click it to see your name/email and 
 
 ### 2.1 Sidebar navigation — three workspaces
 
-The sidebar shows one **workspace** at a time, scoped to the hat you are wearing (BL-NAV-WORKSPACES). People who wear more than one see a **Switch to** row under the FORGE mark; everyone else sees only their own.
+The sidebar shows one **workspace** at a time, scoped to the hat you are wearing (BL-NAV-WORKSPACES). People who wear more than one see a **Workspace** switcher under the FORGE mark (three segments: Workspace · Company admin · Platform admin; lettered squares W · C · P when the sidebar is collapsed); everyone else sees only their own.
 
 | Workspace | Who | What it contains |
 |---|---|---|
-| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, New Opportunity, Solicitations, In-flight Proposals, New Proposals); Platform Intelligence (Company Search, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge); Inbox; My organization (Settings, Integrations, AI Engine — read-only for non-admins); Help |
-| **Company admin** | org admins | People (Users & roles); Organization (Profile & domains, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit log); Admin guide |
-| **Platform admin** | platform superadmins | Tenants & users (Organizations, Platform users, Overview, Source requests); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit log); Admin guide |
+| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
+| **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit Log); Admin guide |
+| **Platform admin** | platform superadmins | Tenants & users (Tenants, Platform users, Overview, Source requests); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
 
-The active workspace follows the page you are on: a platform-admin URL opens the platform workspace, a company-admin URL the company console, everything else the workspace — so links inside a workspace keep you there and a bookmark opens the right one. A superadmin with no tenant membership lands in Platform admin, which has no tenant pages at all; to work inside a tenant they use **Assume identity** on the tenant's page.
+The everyday Workspace is the complete map of the product: everything a member can open is listed there, and an admin also sees the Administration group in the same tree, so administering the organization never requires switching (BL-NAV-RESTORE). Regular members never see the Administration group or the Admin guide.
+
+The workspace you pick with the switcher sticks: it stays while you open pages it lists (an admin opening Users & Roles from the everyday tree stays in it), and only changes when you open a page it does not list — a platform-admin URL opens the platform workspace, a bookmark opens the workspace that lists it. A superadmin with no tenant membership lands in Platform admin, which has no tenant pages at all; to work inside a tenant they use **Assume identity** on the tenant's page.
 
 The older single-tree description below is kept for reference; the group-visibility rules are unchanged (admin-only children still hide from members).
 

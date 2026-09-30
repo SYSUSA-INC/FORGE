@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavContent } from "@/components/shell/NavContent";
+import type { Workspace } from "@/lib/nav-workspaces";
 
 type NavUser = {
   name: string | null;
@@ -14,11 +15,13 @@ export function MobileNav({
   isOrgAdmin = false,
   isSuperadmin = false,
   hasWorkspace = true,
+  preferredWorkspace = null,
   user,
 }: {
   isOrgAdmin?: boolean;
   isSuperadmin?: boolean;
   hasWorkspace?: boolean;
+  preferredWorkspace?: Workspace | null;
   user: NavUser | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -93,6 +96,7 @@ export function MobileNav({
           isOrgAdmin={isOrgAdmin}
           isSuperadmin={isSuperadmin}
           hasWorkspace={hasWorkspace}
+          preferredWorkspace={preferredWorkspace}
           user={user}
           hideRailToggle
         />
