@@ -4,6 +4,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getAIProviderStatus } from "@/lib/ai";
 import { latestBrief, toStoredBrief } from "@/lib/briefs";
 import { safeQuery } from "@/lib/schema-resilience";
+import { PwinMoversPanel } from "../PwinMoversPanel";
 import { PipelineBriefPanel } from "./PipelineBriefPanel";
 import { ProviderStatusPanel } from "./ProviderStatusPanel";
 import { OutcomeInsightsPanel } from "./OutcomeInsightsPanel";
@@ -79,6 +80,9 @@ export default async function IntelligencePage() {
           all={providerStatus.all}
         />
       </section>
+
+      {/* BL-AIP-7b part ii — the week's biggest PWin moves, from the nightly snapshots. */}
+      <PwinMoversPanel organizationId={organizationId} limit={10} eyebrowSuffix=" · nightly model snapshots" />
 
       <section className="mb-8">
         <div className="mb-3 flex items-center justify-end">

@@ -133,6 +133,8 @@ Each group is collapsible — click the group header (or its chevron) to fold it
 
 The default landing page after sign-in is the **Command Center** (`/`). It's the at-a-glance home — a 10-tile stage grid for opportunities (count + value range + due hint per stage), a "Next deadline" panel highlighting the soonest non-past-due opportunity, and a "Proposal stages" breakdown. Clicking any tile **navigates** to the Opportunities Dashboard pre-filtered to that stage.
 
+Two panels appear only when there is something to say. **Needs attention** lists open work that looks like a recompete of a pursuit you already decided. **PWin movers** (BL-AIP-7b) lists the live pursuits whose calibrated PWin moved most over the last seven days — from → to, the stage, the model's confidence, and the one or two factor changes behind the move (an evaluation that was scored, an incumbent that appeared, a proposal whose readiness changed). Every night FORGE freezes the model's estimate for each live opportunity when it changed, so a move is always explained by something that happened in your pipeline. The same panel, longer, is on **FORGE Brain** (`/intelligence`).
+
 The **Opportunities Dashboard** (`/opportunities`) is the same tile grid plus an editable filter + search + the per-opportunity list. Clicking a tile here **filters in place** rather than navigating.
 
 Both pages source from the same `getOrganizationSnapshot()` aggregate, so the numbers can't disagree. Mutations on either page (creating an opportunity, advancing a stage, closing a review, etc.) refresh the Command Center on the next nav with no manual reload.

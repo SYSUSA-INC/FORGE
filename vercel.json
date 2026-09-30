@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/scout",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/pwin-snapshots",
+      "schedule": "30 9 * * *"
     }
   ]
 }

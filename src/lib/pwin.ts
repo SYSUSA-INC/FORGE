@@ -351,7 +351,7 @@ export async function computePwin(
   };
 }
 
-export type PwinSnapshotTrigger = "apply" | "outcome";
+export type PwinSnapshotTrigger = "apply" | "outcome" | "nightly";
 
 export async function snapshotPwin(input: {
   organizationId: string;

@@ -824,10 +824,13 @@ export type SectionChatMessage = typeof sectionChatMessages.$inferSelect;
 export type NewSectionChatMessage = typeof sectionChatMessages.$inferInsert;
 
 // BL-FB-X-PWIN-MODEL — frozen PWin estimates. `trigger` is "apply"
-// (a user applied the model value to the opportunity record) or
-// "outcome" (a proposal was decided; `outcome` is set). The outcome rows
-// are what the Brier score is computed from.
-export type PwinSnapshotTriggerKind = "apply" | "outcome";
+// (a user applied the model value to the opportunity record),
+// "outcome" (a proposal was decided; `outcome` is set) or, since
+// BL-AIP-7b, "nightly" (the cron froze the estimate of a live
+// opportunity because it changed, or as a weekly baseline). The outcome
+// rows are what the Brier score is computed from; the nightly rows are
+// what "PWin movers" are computed from.
+export type PwinSnapshotTriggerKind = "apply" | "outcome" | "nightly";
 
 export const pwinSnapshots = pgTable(
   "pwin_snapshot",
