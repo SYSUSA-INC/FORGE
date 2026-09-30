@@ -79,6 +79,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
     children: [
       { href: "/opportunities", label: "Dashboard" },
       { href: "/pipeline", label: "Pipeline" },
+      { href: "/opportunities/scout", label: "Scout" },
       { href: "/opportunities/new", label: "New Opportunity" },
       { href: "/solicitations", label: "Solicitations" },
       { href: "/proposals", label: "In-flight Proposals" },
