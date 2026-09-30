@@ -8,14 +8,21 @@ import { ImpersonationBanner } from "@/components/shell/ImpersonationBanner";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { getActiveImpersonationSession } from "@/lib/impersonation";
+import { isWorkspace, WORKSPACE_COOKIE } from "@/lib/nav-workspaces";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const user = session?.user ?? null;
   const isSuperadmin = user?.isSuperadmin ?? false;
   const isOrgAdmin = (user?.role === "admin" || isSuperadmin) ?? false;
+
+  // BL-NAV-RESTORE — the workspace the person chose with the switcher;
+  // read server-side so the first render already shows it.
+  const cookieWorkspace = cookies().get(WORKSPACE_COOKIE)?.value;
+  const preferredWorkspace = isWorkspace(cookieWorkspace) ? cookieWorkspace : null;
 
   // BL-QC-links — does this session resolve to a workspace? The same
   // rule requireCurrentOrg() applies: the session's own organizationId,
@@ -46,6 +53,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         isOrgAdmin={isOrgAdmin}
         isSuperadmin={isSuperadmin}
         hasWorkspace={hasWorkspace}
+        preferredWorkspace={preferredWorkspace}
         user={navUser}
       />
 
@@ -55,6 +63,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             isOrgAdmin={isOrgAdmin}
             isSuperadmin={isSuperadmin}
             hasWorkspace={hasWorkspace}
+            preferredWorkspace={preferredWorkspace}
             user={navUser}
           />
 
@@ -69,6 +78,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             isOrgAdmin={isOrgAdmin}
             isSuperadmin={isSuperadmin}
             hasWorkspace={hasWorkspace}
+            preferredWorkspace={preferredWorkspace}
           />
 
           <div className="ml-auto flex items-center gap-2 md:gap-3">
@@ -83,6 +93,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               isOrgAdmin={isOrgAdmin}
               isSuperadmin={isSuperadmin}
               hasWorkspace={hasWorkspace}
+              preferredWorkspace={preferredWorkspace}
             />
             <UserMenu user={user} />
           </div>

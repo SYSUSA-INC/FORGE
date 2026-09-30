@@ -8,6 +8,7 @@ import {
   availableWorkspaces,
   NAV_BY_WORKSPACE,
   resolveWorkspace,
+  WORKSPACE_COOKIE,
   WORKSPACES,
   type Workspace,
   type WorkspaceNavGroup,
@@ -88,6 +89,20 @@ function itemMatches(pathname: string | null, search: string, href: string): boo
   return search === `?${query}`;
 }
 
+/**
+ * BL-NAV-RESTORE — with imports and creates listed next to their parent
+ * pages (/opportunities/import beside /opportunities), the most specific
+ * matching link is the active one, not every prefix of the URL.
+ */
+function activeChildHref(children: WorkspaceNavItem[], pathname: string | null, search: string): string | null {
+  let best: string | null = null;
+  for (const c of children) {
+    if (!itemMatches(pathname, search, c.href)) continue;
+    if (best === null || c.href.length > best.length) best = c.href;
+  }
+  return best;
+}
+
 function initialsFor(name: string | null, email: string): string {
   const seed = name?.trim() || email;
   return (
@@ -105,6 +120,7 @@ export function NavContent({
   isOrgAdmin = false,
   isSuperadmin = false,
   hasWorkspace = true,
+  preferredWorkspace = null,
   user,
   /** When true, parent shell can disable the rail toggle — useful in the
    *  mobile drawer where the nav is always full-width. */
@@ -115,6 +131,8 @@ export function NavContent({
   isSuperadmin?: boolean;
   /** False when the session has no active workspace; hides org-gated groups. */
   hasWorkspace?: boolean;
+  /** BL-NAV-RESTORE — the workspace chosen with the switcher (cookie), read by the shell. */
+  preferredWorkspace?: Workspace | null;
   user: NavUser | null;
   hideRailToggle?: boolean;
 }) {
@@ -170,7 +188,7 @@ export function NavContent({
   }
 
   const visibility = { isOrgAdmin, isSuperadmin, hasWorkspace };
-  const workspace = resolveWorkspace(pathname, visibility);
+  const workspace = resolveWorkspace(pathname, visibility, preferredWorkspace);
   const workspaces = availableWorkspaces(visibility);
   const meta = WORKSPACES[workspace];
   const visibleGroups = visibleNavGroups(NAV_BY_WORKSPACE[workspace], visibility);
@@ -192,7 +210,12 @@ export function NavContent({
         </div>
 
         {workspaces.length > 1 ? (
-          <div className="flex flex-col items-center gap-1 border-b border-layer/10 py-2">
+          <div
+            role="group"
+            aria-label="Workspace"
+            title="Workspace"
+            className="flex flex-col items-center gap-1 border-b border-layer/10 py-2"
+          >
             {workspaces.map((w) => (
               <WorkspaceSwitchLink
                 key={w}
@@ -326,9 +349,13 @@ export function NavContent({
       {workspaces.length > 1 ? (
         <div className="border-b border-layer/10 px-3 py-2">
           <div className="mb-1 px-1 font-mono text-[9px] uppercase tracking-[0.25em] text-subtle">
-            Switch to
+            Workspace
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div
+            role="group"
+            aria-label="Workspace"
+            className={`grid gap-1 ${workspaces.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
+          >
             {workspaces.map((w) => (
               <WorkspaceSwitchLink
                 key={w}
@@ -443,7 +470,7 @@ export function NavContent({
                   className="ml-[1.4rem] mt-0.5 flex flex-col border-l border-layer/[0.08] pl-0"
                 >
                   {children.map((c) => {
-                    const active = itemMatches(pathname, search, c.href);
+                    const active = c.href === activeChildHref(children, pathname, search);
                     return (
                       <li
                         key={c.href}
@@ -477,7 +504,20 @@ export function NavContent({
   );
 }
 
-/** One entry of the workspace switcher — a pill (expanded) or a letter (rail). */
+/** BL-NAV-RESTORE — remember the chosen workspace for the shell (a year, same site). */
+function rememberWorkspace(target: Workspace): void {
+  if (typeof document === "undefined") return;
+  try {
+    document.cookie = `${WORKSPACE_COOKIE}=${target}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch {
+    /* cookies blocked — the URL still decides */
+  }
+}
+
+/**
+ * One entry of the workspace switcher — a full-width segment (expanded)
+ * or a lettered square with its name as a tooltip (collapsed rail).
+ */
 function WorkspaceSwitchLink({
   target,
   active,
@@ -490,18 +530,22 @@ function WorkspaceSwitchLink({
   onNavigate?: () => void;
 }) {
   const m = WORKSPACES[target];
+  const choose = () => {
+    rememberWorkspace(target);
+    onNavigate?.();
+  };
   if (compact) {
     return (
       <Link
         href={m.home}
-        onClick={onNavigate}
-        title={m.label}
+        onClick={choose}
+        title={`Switch to ${m.label}`}
         aria-label={`Switch to ${m.label}`}
         aria-current={active ? "true" : undefined}
-        className={`flex h-7 w-7 items-center justify-center rounded-md font-mono text-[10px] font-bold transition-colors ${
+        className={`flex h-9 w-9 items-center justify-center rounded-md border font-mono text-[11px] font-bold transition-colors ${
           active
-            ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
-            : "text-muted hover:bg-layer/[0.05] hover:text-text"
+            ? "border-cobalt/40 bg-gradient-to-br from-cobalt/30 to-brass/15 text-text"
+            : "border-layer/10 text-muted hover:border-layer/20 hover:bg-layer/[0.05] hover:text-text"
         }`}
       >
         {m.initial}
@@ -511,9 +555,9 @@ function WorkspaceSwitchLink({
   return (
     <Link
       href={m.home}
-      onClick={onNavigate}
+      onClick={choose}
       aria-current={active ? "true" : undefined}
-      className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors ${
+      className={`block truncate rounded-md border px-2 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
         active
           ? "border-cobalt/40 bg-cobalt/10 text-text"
           : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20 hover:text-text"

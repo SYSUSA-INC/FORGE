@@ -68,7 +68,16 @@ export const WORKSPACES: Record<Workspace, WorkspaceMeta> = {
   },
 };
 
-/** Everyday proposal operations — what every member works in. */
+/**
+ * Everyday proposal operations — what every member works in.
+ *
+ * BL-NAV-RESTORE — the everyday tree is the complete map of the product
+ * again: every page a member can open is listed (imports and creates
+ * included), and the pages an org admin administers sit in an
+ * **Administration** group that only admins see (`admin: true`, filtered
+ * by `visibleNavGroups`), so nothing needs a workspace switch. The
+ * Company admin workspace remains as the admin-only console view.
+ */
 const WORK_NAV: WorkspaceNavGroup[] = [
   { id: "command", label: "Command Center", icon: "▦", href: "/", needsWorkspace: true },
   {
@@ -81,7 +90,11 @@ const WORK_NAV: WorkspaceNavGroup[] = [
       { href: "/pipeline", label: "Pipeline" },
       { href: "/opportunities/scout", label: "Scout" },
       { href: "/opportunities/new", label: "New Opportunity" },
+      { href: "/opportunities/import", label: "Import from SAM.gov" },
+      { href: "/opportunities/import/ebuy", label: "Paste from eBuy" },
+      { href: "/opportunities/import/gsa", label: "Paste GSA email" },
       { href: "/solicitations", label: "Solicitations" },
+      { href: "/solicitations/new", label: "New Solicitation" },
       { href: "/proposals", label: "In-flight Proposals" },
       { href: "/proposals/new", label: "New Proposals" },
     ],
@@ -93,6 +106,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
     needsWorkspace: true,
     children: [
       { href: "/companies", label: "Company Search" },
+      { href: "/companies/new", label: "Add company" },
       { href: "/intelligence", label: "FORGE Brain" },
       { href: "/intelligence/losses", label: "Loss intelligence" },
       { href: "/intelligence/awards", label: "Awards & recompetes" },
@@ -100,18 +114,35 @@ const WORK_NAV: WorkspaceNavGroup[] = [
       { href: "/intelligence/watchlist", label: "Watchlist" },
       { href: "/intelligence/saved-searches", label: "Saved searches" },
       { href: "/knowledge-base", label: "Knowledge" },
+      { href: "/knowledge-base/import", label: "Knowledge import" },
+      { href: "/knowledge-base/usaspending", label: "USAspending import" },
+      { href: "/knowledge-base/new", label: "New knowledge entry" },
     ],
   },
-  { id: "inbox", label: "Inbox", icon: "✉", href: "/notifications", needsWorkspace: true },
   {
-    id: "org",
-    label: "My organization",
+    id: "ops",
+    label: "Operations Management",
     icon: "⚙",
     needsWorkspace: true,
     children: [
       { href: "/settings", label: "Settings" },
       { href: "/settings/integrations", label: "Integrations" },
       { href: "/settings/ai-engine", label: "AI Engine" },
+      { href: "/notifications", label: "Notifications" },
+    ],
+  },
+  {
+    id: "administration",
+    label: "Administration",
+    icon: "◆",
+    admin: true,
+    needsWorkspace: true,
+    children: [
+      { href: "/users", label: "Users & Roles" },
+      { href: "/settings/billing", label: "Billing" },
+      { href: "/settings/templates", label: "Templates" },
+      { href: "/notifications/rules", label: "Notification rules" },
+      { href: "/audit-log", label: "Audit Log" },
     ],
   },
   {
@@ -120,6 +151,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
     icon: "?",
     children: [
       { href: "/help/user", label: "User guide" },
+      { href: "/help/admin", label: "Admin guide", admin: true },
       { href: "/help/faq", label: "FAQ" },
     ],
   },
@@ -133,7 +165,7 @@ const COMPANY_NAV: WorkspaceNavGroup[] = [
     icon: "◉",
     admin: true,
     needsWorkspace: true,
-    children: [{ href: "/users", label: "Users & roles" }],
+    children: [{ href: "/users", label: "Users & Roles" }],
   },
   {
     id: "organization",
@@ -142,7 +174,7 @@ const COMPANY_NAV: WorkspaceNavGroup[] = [
     admin: true,
     needsWorkspace: true,
     children: [
-      { href: "/settings", label: "Profile & domains" },
+      { href: "/settings", label: "Settings" },
       { href: "/settings/billing", label: "Billing" },
       { href: "/settings/templates", label: "Templates" },
       { href: "/settings/integrations", label: "Integrations" },
@@ -157,7 +189,7 @@ const COMPANY_NAV: WorkspaceNavGroup[] = [
     needsWorkspace: true,
     children: [
       { href: "/notifications/rules", label: "Notification rules" },
-      { href: "/audit-log", label: "Audit log" },
+      { href: "/audit-log", label: "Audit Log" },
     ],
   },
   {
@@ -176,7 +208,7 @@ const PLATFORM_NAV: WorkspaceNavGroup[] = [
     icon: "✱",
     superadmin: true,
     children: [
-      { href: "/admin", label: "Organizations" },
+      { href: "/admin", label: "Tenants" },
       { href: "/admin?tab=users", label: "Platform users" },
       { href: "/admin?tab=overview", label: "Overview" },
       { href: "/admin/source-requests", label: "Source requests" },
@@ -203,7 +235,7 @@ const PLATFORM_NAV: WorkspaceNavGroup[] = [
       { href: "/admin/errors", label: "Production errors" },
       { href: "/admin/migrations", label: "Database migrations" },
       { href: "/admin/sba-8a", label: "SBA 8(a) registry" },
-      { href: "/platform/audit-log", label: "Audit log (all tenants)" },
+      { href: "/platform/audit-log", label: "Audit Log" },
     ],
   },
   {
@@ -258,12 +290,52 @@ export function defaultWorkspace(v: NavVisibility): Workspace {
 }
 
 /**
- * The workspace to render for this URL and person: the URL's workspace
- * when they may use it, else their default — a member on a settings
- * page stays in the work workspace, a superadmin without a tenant
- * lands in platform admin.
+ * BL-NAV-RESTORE — the workspace a person chose with the switcher is
+ * remembered in this cookie (set by the switcher, read by the shell), so
+ * an admin who opens Users & Roles from the everyday tree stays in the
+ * everyday tree instead of being moved to the console.
  */
-export function resolveWorkspace(pathname: string | null, v: NavVisibility): Workspace {
+export const WORKSPACE_COOKIE = "forge.workspace";
+
+export function isWorkspace(v: unknown): v is Workspace {
+  return v === "work" || v === "company" || v === "platform";
+}
+
+function hrefsOf(ws: Workspace): string[] {
+  return NAV_BY_WORKSPACE[ws]
+    .flatMap((g) => [g.href, ...(g.children ?? []).map((c) => c.href)])
+    .filter((h): h is string => !!h)
+    .map((h) => h.split("?")[0]!);
+}
+
+/** Whether a URL is one of this workspace's listed pages, or under one. */
+export function pathInWorkspace(pathname: string | null, ws: Workspace): boolean {
+  const p = (pathname ?? "/").split("?")[0] ?? "/";
+  return hrefsOf(ws).some((h) => (h === "/" ? p === "/" : under(p, h)));
+}
+
+/**
+ * The workspace to render for this URL and person. The one they chose
+ * wins while the URL is a page it lists; otherwise the URL's own
+ * workspace when they may use it; otherwise the chosen one again (an
+ * unlisted page such as /onboarding never bounces them); otherwise
+ * their default — a member on an admin URL is shown the work workspace
+ * (the page itself refuses), a superadmin without a tenant lands in
+ * platform admin.
+ */
+export function resolveWorkspace(
+  pathname: string | null,
+  v: NavVisibility,
+  preferred?: Workspace | null,
+): Workspace {
+  const available = availableWorkspaces(v);
+  const chosen = preferred && available.includes(preferred) ? preferred : null;
+  if (chosen && pathInWorkspace(pathname, chosen)) return chosen;
+  // The URL's own workspace — when the person may use it and, once they
+  // have chosen one, only when it actually lists the page.
   const wanted = workspaceForPath(pathname);
-  return availableWorkspaces(v).includes(wanted) ? wanted : defaultWorkspace(v);
+  if (available.includes(wanted) && (chosen === null || pathInWorkspace(pathname, wanted))) {
+    return wanted;
+  }
+  return chosen ?? defaultWorkspace(v);
 }

@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7b (part i) — the nightly scout** 🔄 (engine: PR #288 ✅; page: in PR)
+**BL-AIP-7b (part i) — the nightly scout** ✅ (engine: PR #288; page: PR #289)
 
 - **Find.** `runScoutForOrganization` (`src/lib/scout.ts`) re-runs the
   tenant's NAICS codes (organization + profile extras) and up to three
@@ -585,6 +585,53 @@ position from the editor instead of the last edited paragraph) and
 "resolve" on AI review comments from the editor; BL-AIP-7 proactive
 scout / stored graded briefs / AI Engine controls. Details and evidence
 in the assessment report.
+
+---
+
+### BL-NAV-RESTORE — Put the full menu back in the everyday sidebar; admin items for admins only
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+
+User report (2026-09-30): after the workspace split "we have lost many
+menu items that were previously there and had some unique
+functionalities". Assessment (every sidebar link across the sidebar's
+13 revisions compared with the three trees): no page lost its link,
+but six org-admin items (Users & Roles, Billing, Templates,
+Notification rules, Audit Log, Admin guide) and the whole platform
+group moved behind the **Switch to** pills, several labels were
+renamed (Notifications → Inbox, Tenants → Organizations, Settings →
+Profile & domains), and the import / create pages (Import from SAM.gov,
+Paste from eBuy, Paste GSA email, New Solicitation, Knowledge import,
+USAspending import, New knowledge entry, Add company) were never in
+any menu. User decision: keep the three workspaces and the switcher,
+stop hiding admin items from admins, and make sure regular users see
+only workspace items.
+
+Delivered:
+- **Everyday tree complete again** (`WORK_NAV`): Opportunities lists
+  the import and paste pages and New Solicitation; Platform
+  Intelligence lists Add company, Knowledge import, USAspending import
+  and New knowledge entry; **Operations Management** (Settings,
+  Integrations, AI Engine, Notifications) replaces "My organization" +
+  "Inbox"; a new **Administration** group (Users & Roles, Billing,
+  Templates, Notification rules, Audit Log) and the Admin guide carry
+  `admin: true`, so `visibleNavGroups` / `visibleNavChildren` show them
+  to org admins and superadmins only — a member's tree is unchanged
+  apart from the added pages (tested).
+- **Labels restored**: Tenants, Settings, Audit Log.
+- **Switcher**: a full-width labelled segmented control ("Workspace")
+  in the expanded sidebar; larger lettered squares with "Switch to …"
+  tooltips in the collapsed rail.
+- **The chosen workspace sticks** (`forge.workspace` cookie, set by the
+  switcher, read by `AppShell`): `resolveWorkspace(pathname, v,
+  preferred)` keeps the chosen tree while the URL is a page it lists,
+  so an admin opening Users & Roles from the everyday tree is not moved
+  to the console; a page the tree does not list still switches; an
+  unlisted page (onboarding) never bounces (`pathInWorkspace`, tested).
+- The most specific matching link is the active one
+  (`activeChildHref`), so Import from SAM.gov no longer lights up
+  Dashboard as well.
+- The company and platform consoles are unchanged as admin-only views.
+- USER_MANUAL §2.1, ADMIN_MANUAL §2.1.
 
 ---
 
