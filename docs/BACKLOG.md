@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-GEN-BLOCKS — Reusable content block library
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #296)
 
 The org-wide "boilerplate.docx" everyone copied from becomes a
 library: boilerplate knowledge entries are the content blocks,
@@ -4492,7 +4492,7 @@ into the draft when topically relevant. Evaluators respond to
 hearing their own words. Per-section toggle.
 
 ### BL-FB-GEN-BLOCKS — Reusable content block library
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #296) — canonical entry under Active priorities
 
 Versioned, taggable boilerplate registry: "our cyber capability v3,"
 "key personnel intro," "transition risk methodology." Drop into any
