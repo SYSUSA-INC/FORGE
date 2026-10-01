@@ -1,9 +1,17 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { completeForTenant } from "@/lib/ai";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import {
+  attachChatDocument,
+  listChatAttachments,
+  removeChatAttachment,
+  saveChatAttachmentToKnowledge,
+  type ChatAttachmentView,
+} from "@/lib/section-chat-attachments";
 import {
   appendSectionChatTurns,
   CHAT_MAX_TOKENS,
@@ -32,6 +40,69 @@ export type ChatMessage = {
   authorName?: string;
   isMine?: boolean;
 };
+
+export type { ChatAttachmentView } from "@/lib/section-chat-attachments";
+
+/**
+ * BL-FB-CHAT-UPLOAD — attach a document to this section's conversation.
+ * Any member who can chat may attach; the text stays with the thread.
+ */
+export async function attachChatDocumentAction(
+  formData: FormData,
+): Promise<{ ok: true; attachment: ChatAttachmentView } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const file = formData.get("file");
+  const sectionId = String(formData.get("sectionId") ?? "");
+  if (!(file instanceof File)) return { ok: false, error: "Pick a file to attach." };
+  try {
+    return await attachChatDocument({
+      organizationId,
+      sectionId,
+      fileName: file.name,
+      contentType: file.type,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      actor: { userId: user.id, email: user.email },
+    });
+  } catch (err) {
+    log.error("[attachChatDocumentAction]", "error", { error: err });
+    return { ok: false, error: err instanceof Error ? err.message : "Could not attach the file." };
+  }
+}
+
+export async function listChatAttachmentsAction(
+  sectionId: string,
+): Promise<{ ok: true; attachments: ChatAttachmentView[] } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return { ok: true, attachments: await listChatAttachments({ organizationId, sectionId: String(sectionId ?? "") }) };
+}
+
+export async function removeChatAttachmentAction(
+  attachmentId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return removeChatAttachment({
+    organizationId,
+    attachmentId: String(attachmentId ?? ""),
+    actor: { userId: user.id, email: user.email },
+  });
+}
+
+export async function saveChatAttachmentToKnowledgeAction(
+  attachmentId: string,
+): Promise<{ ok: true; artifactId: string; embedded: boolean } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await saveChatAttachmentToKnowledge({
+    organizationId,
+    attachmentId: String(attachmentId ?? ""),
+    actor: { userId: user.id, email: user.email },
+  });
+  if (res.ok) revalidatePath("/knowledge-base/import");
+  return res;
+}
 
 export type ChatWithSectionResult =
   | { ok: true; reply: string; stubbed: boolean }

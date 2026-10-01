@@ -1110,8 +1110,46 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-CHAT-UPLOAD — Mid-chat document upload
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #298)
+
+Drop a sample SOW, a capability brief or a prior proposal into the
+section chat and the AI uses it as a reference for the conversation
+("model my Technical Approach on this structure"). The document is
+scoped to the conversation; it never reaches the Brain unless the
+author saves it to Knowledge.
+
+- **Attachments live with the thread.** `section_chat_attachment`
+  (migration 0092, mirrored in `schema.ts`): the file's extracted text
+  (PDF, DOCX, XLSX, PPTX, text; 20 MB, 120k chars, 5 per section),
+  the uploader, and the Knowledge artifact it became if saved. Every
+  row carries `organization_id`; **Clear chat** deletes them with the
+  thread (`clearSectionChat`).
+- **The chat reads them.** `prepareSectionChat` appends a "Reference
+  documents" block — each attachment excerpted to its share of a 16k
+  character budget (`renderAttachmentsBlock`, pure) with instructions
+  to use them for structure, scope and vocabulary, quote only short
+  phrases and never present their facts as the organization's.
+- **Attach / remove / save.** `attachChatDocumentAction` (FormData,
+  `extractTextFromAny`), `removeChatAttachmentAction`,
+  `saveChatAttachmentToKnowledgeAction` (creates a text-only
+  `knowledge_artifact` from the extracted text, source `uploaded`,
+  status `indexed`, embedded best-effort, linked back as
+  `saved_artifact_id`), `listChatAttachmentsAction`; audited
+  `section_chat.attach`, `section_chat.detach`,
+  `section_chat.attachment.save_to_knowledge`
+  (`src/lib/section-chat-attachments.ts`).
+- **Chat tab.** A 📎 **Attach a document** control under the thread;
+  chips per attachment with size, **Save to Knowledge** (then a link
+  to the artifact) and remove.
+- Unit-tested (`tests/ai/chat-attachments.test.ts`); runtime-tested
+  (`tests/isolation/chat-attachments.test.ts`): attachments are read,
+  removed, saved and cleared for the deciding tenant only; the prompt
+  block carries them; audits. Sync migration 0092 on
+  `/admin/migrations` after deploy.
+
 ### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #297)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #297)
 
 Evaluators respond to hearing their own words. The agency's own
 language — the evaluation phrases of Section M, the recurring
@@ -4521,7 +4559,7 @@ both drive drafts AND are checked post-hoc. Single biggest quality
 lever on generated content.
 
 ### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #297) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #297) — canonical entry under Active priorities
 
 Mine the solicitation's own Section L/M language and the agency's
 strategic plan / mission statement; paraphrase those phrases back
@@ -4608,7 +4646,7 @@ Mermaid block. Embedded inline. Foundation for richer mid-doc visuals.
 ### Area 6 — Chat ("Multi-modal section co-pilot")
 
 ### BL-FB-CHAT-UPLOAD — Mid-chat document upload
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #298) — canonical entry under Active priorities
 
 Drop a sample SOW, capability brief, or prior proposal into the chat;
 the AI uses it as a reference for the current message ("model my

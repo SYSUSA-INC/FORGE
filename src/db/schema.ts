@@ -823,6 +823,44 @@ export const sectionChatMessages = pgTable(
 export type SectionChatMessage = typeof sectionChatMessages.$inferSelect;
 export type NewSectionChatMessage = typeof sectionChatMessages.$inferInsert;
 
+/**
+ * BL-FB-CHAT-UPLOAD — a document dropped into a section's chat
+ * (drizzle/0092). Holds the extracted text, scoped to the section's
+ * conversation: it reaches the model as reference and never the Brain
+ * until the author saves it to Knowledge (`savedArtifactId`). Clearing
+ * the chat removes the rows. Every row carries organization_id.
+ */
+export const sectionChatAttachments = pgTable(
+  "section_chat_attachment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    fileName: text("file_name").notNull().default(""),
+    contentType: text("content_type").notNull().default(""),
+    fileSize: integer("file_size").notNull().default(0),
+    text: text("text").notNull().default(""),
+    chars: integer("chars").notNull().default(0),
+    savedArtifactId: uuid("saved_artifact_id").references((): AnyPgColumn => knowledgeArtifacts.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSectionIdx: index("sca_org_section_idx").on(t.organizationId, t.sectionId),
+  }),
+);
+
+export type SectionChatAttachment = typeof sectionChatAttachments.$inferSelect;
+
 // BL-FB-X-PWIN-MODEL — frozen PWin estimates. `trigger` is "apply"
 // (a user applied the model value to the opportunity record),
 // "outcome" (a proposal was decided; `outcome` is set) or, since

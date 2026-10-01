@@ -10,10 +10,16 @@ import {
   type ABDraftResult,
 } from "./ab-actions";
 import {
+  attachChatDocumentAction,
   clearSectionChatAction,
   getSectionChatHistoryAction,
+  listChatAttachmentsAction,
+  removeChatAttachmentAction,
+  saveChatAttachmentToKnowledgeAction,
+  type ChatAttachmentView,
   type ChatMessage,
 } from "./chat-actions";
+import { CHAT_ATTACHMENT_ACCEPT, describeChars } from "@/lib/chat-attachments-logic";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
 import {
   isChatStreamEvent,
@@ -207,12 +213,15 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
   // chat tab is shown, so reopening a section resumes the conversation.
   const [chatLoaded, setChatLoaded] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  // BL-FB-CHAT-UPLOAD — reference documents scoped to this conversation.
+  const [attachments, setAttachments] = useState<ChatAttachmentView[]>([]);
+  const [attachBusy, setAttachBusy] = useState(false);
   useEffect(() => {
     if (!open || activeTab !== "chat" || chatLoaded || chatLoading) return;
     let cancelled = false;
     setChatLoading(true);
-    getSectionChatHistoryAction(sectionId)
-      .then((res) => {
+    Promise.all([getSectionChatHistoryAction(sectionId), listChatAttachmentsAction(sectionId)])
+      .then(([res, att]) => {
         if (cancelled) return;
         if (res.ok) {
           setChatHistory(
@@ -224,6 +233,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
             })),
           );
         }
+        if (att.ok) setAttachments(att.attachments);
         setChatLoaded(true);
       })
       .catch(() => {
@@ -458,6 +468,43 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
         setChatPending(false);
       }
     }
+  }
+
+  // BL-FB-CHAT-UPLOAD — attach / remove / save reference documents.
+  async function attachFile(file: File) {
+    setAttachBusy(true);
+    setChatError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("sectionId", sectionId);
+      const res = await attachChatDocumentAction(fd);
+      if (!res.ok) {
+        setChatError(res.error);
+        return;
+      }
+      setAttachments((list) => [...list, res.attachment]);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Could not attach the file.");
+    } finally {
+      setAttachBusy(false);
+    }
+  }
+  async function removeAttachment(id: string) {
+    const res = await removeChatAttachmentAction(id);
+    if (!res.ok) {
+      setChatError(res.error);
+      return;
+    }
+    setAttachments((list) => list.filter((a) => a.id !== id));
+  }
+  async function saveAttachment(id: string) {
+    const res = await saveChatAttachmentToKnowledgeAction(id);
+    if (!res.ok) {
+      setChatError(res.error);
+      return;
+    }
+    setAttachments((list) => list.map((a) => (a.id === id ? { ...a, savedArtifactId: res.artifactId } : a)));
   }
 
   function applyChatSuggestion(text: string) {
@@ -850,6 +897,55 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
             </div>
           ) : null}
 
+          {/* BL-FB-CHAT-UPLOAD — reference documents scoped to this conversation */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {attachments.map((a) => (
+              <span
+                key={a.id}
+                className="aur-chip normal-case tracking-normal"
+                title={`${a.fileName} · ${describeChars(a.chars)}${a.authorName ? ` · ${a.authorName}` : ""}`}
+              >
+                <span aria-hidden>📎</span>
+                <span className="max-w-[10rem] truncate text-text">{a.fileName}</span>
+                <span className="text-subtle">{describeChars(a.chars)}</span>
+                {a.savedArtifactId ? (
+                  <a href={`/knowledge-base/import/${a.savedArtifactId}`} className="text-emerald-300 hover:underline">
+                    in Knowledge
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void saveAttachment(a.id)}
+                    className="hover:text-text"
+                    title="Save this document to Knowledge so the Brain can search it"
+                  >
+                    Save to Knowledge
+                  </button>
+                )}
+                <button type="button" onClick={() => void removeAttachment(a.id)} className="hover:text-rose-300" aria-label={`Remove ${a.fileName}`}>
+                  ×
+                </button>
+              </span>
+            ))}
+            <label
+              className={`aur-chip cursor-pointer normal-case tracking-normal hover:text-text ${attachBusy ? "opacity-60" : ""}`}
+              title="Attach a PDF, Word, Excel, PowerPoint or text file as a reference for this conversation (kept with the thread, not sent to the Brain)"
+            >
+              {attachBusy ? "Reading…" : "📎 Attach a document"}
+              <input
+                type="file"
+                className="hidden"
+                accept={CHAT_ATTACHMENT_ACCEPT}
+                disabled={attachBusy || chatPending}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void attachFile(f);
+                }}
+              />
+            </label>
+          </div>
+
           {/* Input */}
           <div className="flex gap-2">
             <textarea
@@ -880,8 +976,9 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
               onClick={() => {
                 chatAbortRef.current?.abort();
                 setChatHistory([]);
+                setAttachments([]);
                 setChatError(null);
-                // BL-FB-CHAT-PERSIST — clear the saved thread too.
+                // BL-FB-CHAT-PERSIST — clear the saved thread too (and its attachments).
                 void clearSectionChatAction(sectionId).then((res) => {
                   if (!res.ok) setChatError(res.error);
                 });
