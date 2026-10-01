@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299)
 
 The section header shows live pages against the cap as the author
 types — "4.2 / 3 pages · over by 1.2" — as a colour-coded ring. No
@@ -1130,7 +1130,7 @@ interruption to typing; constant visibility. Companion to Tighten.
 - Unit-tested (`tests/ai/page-budget.test.ts`). No migration.
 
 ### BL-FB-SCAN-TONE — Reading-level + tone enforcement
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299)
 
 Marketing language, passive voice and reading level, checked in the
 browser as the author types, with click-to-fix into Improve mode.
@@ -4582,7 +4582,7 @@ Cross-volume claim extraction + reconciliation. High-value for
 multi-volume responses where different writers own different volumes.
 
 ### BL-FB-SCAN-TONE — Reading-level + tone enforcement
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299) — canonical entry under Active priorities
 
 Flag marketing-speak ("world-class," "best-in-class," "robust",
 "leverage"), passive voice over a threshold, and reading-level above
@@ -4591,7 +4591,7 @@ score; click-to-fix surfaces an Improve-mode draft pre-loaded with
 the offending phrases.
 
 ### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299) — canonical entry under Active priorities
 
 Section header shows live page count vs cap as the user types
 (4.2 / 3 pages — over by 1.2 pages). Color-coded ring. No interruption
