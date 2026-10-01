@@ -21,6 +21,7 @@ import { runInBackground } from "@/lib/background";
 import { extractMentionUserIds } from "@/lib/mentions";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { runReviewPreflight } from "@/lib/review-preflight";
+import { setReviewCommentResolved } from "@/lib/section-review-comments";
 import { log } from "@/lib/log";
 
 const COLOR_LABELS: Record<ReviewColor, string> = {
@@ -598,41 +599,17 @@ export async function toggleCommentResolvedAction(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  const [row] = await db
-    .select({
-      id: proposalReviewComments.id,
-      reviewId: proposalReviewComments.reviewId,
-      proposalId: proposalReviews.proposalId,
-    })
-    .from(proposalReviewComments)
-    .innerJoin(
-      proposalReviews,
-      eq(proposalReviews.id, proposalReviewComments.reviewId),
-    )
-    .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
-    .where(
-      and(
-        eq(proposalReviewComments.id, input.commentId),
-        eq(proposals.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-  if (!row) return { ok: false, error: "Comment not found." };
-  await db
-    .update(proposalReviewComments)
-    .set({ resolved: input.resolved })
-    .where(eq(proposalReviewComments.id, input.commentId));
-  await recordAudit({
+  // BL-AIP-6b — shared with the editor's Resolve (src/lib/section-review-comments.ts).
+  const res = await setReviewCommentResolved({
     organizationId,
+    commentId: input.commentId,
+    resolved: input.resolved,
     actor: { userId: actor.id, email: actor.email },
-    action: input.resolved
-      ? "proposal.review.comment.resolve"
-      : "proposal.review.comment.unresolve",
-    resourceType: "proposal_review_comment",
-    resourceId: input.commentId,
-    metadata: { reviewId: row.reviewId, proposalId: row.proposalId },
+    via: "review",
   });
-  revalidatePath(`/proposals/${row.proposalId}/reviews/${row.reviewId}`);
+  if (!res.ok) return res;
+  revalidatePath(`/proposals/${res.proposalId}/reviews/${res.reviewId}`);
+  revalidatePath(`/proposals/${res.proposalId}/sections`);
   return { ok: true };
 }
 

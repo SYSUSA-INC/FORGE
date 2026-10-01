@@ -87,6 +87,24 @@ export function focusParagraph(previous: string, next: string): string {
   return "";
 }
 
+/**
+ * BL-AIP-6b — the paragraph to research: the block under the editor's
+ * cursor when the editor reports one that is still in the text, else
+ * the edit-diff heuristic above (the rail used to follow the last edited
+ * paragraph even after the writer clicked elsewhere).
+ */
+export function pickFocus(cursorParagraph: string | null | undefined, previous: string, next: string): string {
+  const c = (cursorParagraph ?? "").trim();
+  if (c && next.includes(c)) return c;
+  return focusParagraph(previous, next);
+}
+
+/** A move to a different paragraph with enough text in it is worth a lookup of its own. */
+export function focusMoved(previousFocus: string, nextFocus: string, minChars = 40): boolean {
+  const n = nextFocus.trim();
+  return n.length >= minChars && n !== previousFocus.trim();
+}
+
 /** Rail refreshes only when the text moved enough to be worth a lookup. */
 export function shouldRefresh(previous: string, next: string, minDelta = 40): boolean {
   if (next.trim().length < 80) return false;

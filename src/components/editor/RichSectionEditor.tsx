@@ -147,7 +147,23 @@ type Props = {
    * the list without hunting for the toggle).
    */
   reviewSignal?: number;
+  /**
+   * BL-AIP-6b — the plain text of the block the cursor is in, reported
+   * on every selection or document change, so the research rail anchors
+   * to the paragraph being written rather than the last one edited.
+   */
+  onCursorParagraph?: (paragraph: string) => void;
 };
+
+/** Plain text of the textblock that contains the selection head. */
+function textblockAtCursor(e: NonNullable<ReturnType<typeof useEditor>>): string {
+  const $head = e.state.selection.$head;
+  for (let d = $head.depth; d >= 0; d--) {
+    const node = $head.node(d);
+    if (node.isTextblock) return node.textContent;
+  }
+  return "";
+}
 
 function collabEnabled(): boolean {
   return process.env.NEXT_PUBLIC_COLLAB_ENABLED === "1";
@@ -164,8 +180,12 @@ export function RichSectionEditor({
   snapshots,
   docVersion,
   reviewSignal,
+  onCursorParagraph,
 }: Props) {
   const useCollab = !!collab && collabEnabled();
+  // BL-AIP-6b — read through a ref so a new callback never rebuilds the editor.
+  const cursorParagraphRef = useRef(onCursorParagraph);
+  cursorParagraphRef.current = onCursorParagraph;
   // Local toggle for track-changes sidebar visibility (independent of
   // tracking mode which lives in the extension storage / Y.Map).
   const [tcSidebarOpen, setTcSidebarOpen] = useState(false);
@@ -351,6 +371,10 @@ export function RichSectionEditor({
         .split(/\s+/g)
         .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
       onChange(next, plain, words);
+      cursorParagraphRef.current?.(textblockAtCursor(e));
+    },
+    onSelectionUpdate: ({ editor: e }) => {
+      cursorParagraphRef.current?.(textblockAtCursor(e));
     },
   });
 

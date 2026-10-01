@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
-import { focusParagraph, shouldRefresh } from "@/lib/research-signals";
+import { focusMoved, focusParagraph, pickFocus, shouldRefresh } from "@/lib/research-signals";
 import { THEME } from "@/lib/theme-colors";
 import { researchForSectionAction, type ResearchRailResult } from "./research-actions";
 
@@ -20,11 +20,14 @@ const DEBOUNCE_MS = 2_500;
 export function ResearchRail({
   sectionId,
   text,
+  cursorParagraph,
   onInsertTracked,
 }: {
   sectionId: string;
   /** The section as plain text, updated on every keystroke. */
   text: string;
+  /** BL-AIP-6b — the block the editor's cursor is in, when the editor reports it. */
+  cursorParagraph?: string;
   /** Append a passage as a tracked insertion by FORGE AI. */
   onInsertTracked: (text: string) => void;
 }) {
@@ -34,6 +37,7 @@ export function ResearchRail({
   const [pending, setPending] = useState(false);
   const [focus, setFocus] = useState("");
   const lastLookupRef = useRef<string>("");
+  const lastFocusRef = useRef<string>("");
   const prevTextRef = useRef<string>("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inflightRef = useRef(0);
@@ -51,6 +55,7 @@ export function ResearchRail({
       }
       setData(res.data);
       lastLookupRef.current = currentText;
+      lastFocusRef.current = currentFocus;
     } catch (err) {
       if (id !== inflightRef.current) return;
       setError(err instanceof Error ? err.message : "Research lookup failed.");
@@ -59,14 +64,18 @@ export function ResearchRail({
     }
   }
 
-  // Debounced refresh as the text moves.
+  // Debounced refresh as the text moves — or, BL-AIP-6b, as the cursor
+  // moves to another paragraph once something has been looked up.
   useEffect(() => {
     if (!open) return;
     const prev = prevTextRef.current;
     prevTextRef.current = text;
-    const nextFocus = focusParagraph(prev, text);
+    const nextFocus = pickFocus(cursorParagraph, prev, text);
     if (nextFocus) setFocus(nextFocus);
-    if (!shouldRefresh(lastLookupRef.current, text)) return;
+    const textMoved = shouldRefresh(lastLookupRef.current, text);
+    const cursorMoved =
+      lastLookupRef.current !== "" && text.trim().length >= 80 && focusMoved(lastFocusRef.current, nextFocus);
+    if (!textMoved && !cursorMoved) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       void lookup(text, nextFocus || focus);
@@ -76,7 +85,7 @@ export function ResearchRail({
     };
     // `focus` is read for the fallback only; the paragraph is recomputed each change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, open, sectionId]);
+  }, [text, cursorParagraph, open, sectionId]);
 
   const counts = data
     ? data.hits.length + data.unaddressed.length + data.missingThemes.length + data.contradictions.length
@@ -179,7 +188,9 @@ export function ResearchRail({
 
           {data ? (
             <Group
-              title={`Brain passages${focus ? " for this paragraph" : ""}`}
+              title={`Brain passages${
+                focus ? (cursorParagraph?.trim() ? " for the paragraph at your cursor" : " for this paragraph") : ""
+              }`}
               tone={THEME.indigo}
               trailing={data.stubbed ? <StubModeBanner variant="inline" /> : null}
             >

@@ -12,6 +12,8 @@ import { Panel } from "@/components/ui/Panel";
 import { listProposalTeamCandidates } from "../../actions";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
 import { runInBackground } from "@/lib/background";
+import { listOpenReviewCommentsBySection } from "@/lib/section-review-comments";
+import type { SectionReviewComment } from "@/lib/review-comments";
 import { AutoDraftButton } from "./ai/AutoDraftButton";
 import { SectionsClient } from "./SectionsClient";
 
@@ -58,6 +60,13 @@ export default async function ProposalSectionsPage({
     .orderBy(asc(proposalSections.ordering));
 
   const team = await listProposalTeamCandidates();
+
+  // BL-AIP-6b — open colour-team review comments, shown and resolvable
+  // per section inside the editor.
+  const openComments: Record<string, SectionReviewComment[]> = await listOpenReviewCommentsBySection({
+    organizationId,
+    proposalId: params.id,
+  }).catch(() => ({}));
 
   // BL-FB-SCAN-CONTINUOUS — pull the latest persisted health scan so
   // every section list row can show its red/amber/green status dot.
@@ -128,6 +137,7 @@ export default async function ProposalSectionsPage({
             scanIssue: issue?.issue ?? null,
             themeReinforced: coverage?.reinforced ?? null,
             themeTotal: coverage?.total ?? null,
+            reviewComments: openComments[s.id] ?? [],
           };
         })}
         team={team}
