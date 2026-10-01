@@ -53,11 +53,15 @@ describe("BL-AIP-6b — review comments in the editor", () => {
   it("lists the open, section-anchored comments of the deciding tenant only", async () => {
     const a = await listOpenReviewCommentsBySection({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId });
     expect(Object.keys(a)).toEqual([sectionA]);
-    expect(a[sectionA]!.map((c) => [c.id, c.authorName, c.color, c.reviewId])).toEqual([
-      [aiComment, null, "pink", reviewA],
-      [humanComment, expect.stringContaining("Test "), "pink", reviewA],
-    ]);
-    expect(a[sectionA]![0]!.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // Both rows were inserted in one statement and share created_at, so
+    // their relative order is not asserted — only the set and the fields.
+    const got = a[sectionA]!;
+    expect(got.map((c) => c.id).sort()).toEqual([aiComment, humanComment].sort());
+    expect(got.find((c) => c.id === aiComment)).toMatchObject({ authorName: null, color: "pink", reviewId: reviewA });
+    const human = got.find((c) => c.id === humanComment)!;
+    expect(human.authorName).toContain("Test ");
+    expect(human.color).toBe("pink");
+    expect(got[0]!.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     // Another tenant asking about A's proposal gets nothing; its own has none.
     expect(await listOpenReviewCommentsBySection({ organizationId: fx.orgB.organizationId, proposalId: fx.orgA.proposalId })).toEqual({});
