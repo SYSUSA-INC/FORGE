@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, knowledgeEntries, organizations } from "@/db/schema";
 import { getAIProviderStatus } from "@/lib/ai";
@@ -148,9 +148,11 @@ describe("BL-AIP-7d part ii — onboarding from a UEI", () => {
     const audits = await db
       .select({ metadata: auditLogs.metadata })
       .from(auditLogs)
-      .where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "onboarding.apply")));
+      .where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "onboarding.apply")))
+      .orderBy(asc(auditLogs.createdAt), asc(auditLogs.id));
     expect(audits).toHaveLength(2);
     expect(audits[0]!.metadata).toMatchObject({ keywords: ["zero trust", "cloud migration"], agencies: ["DISA"], runScout: false });
+    expect(audits[1]!.metadata).toMatchObject({ keywords: ["cloud migration", "devsecops"], agencies: [], entryId: null });
     const none = await db
       .select({ id: auditLogs.id })
       .from(auditLogs)
