@@ -89,7 +89,7 @@ After signing in you'll see the main **app shell**:
 ![App shell](docs/images/app-shell.png)
 
 - **Left sidebar** — collapsible navigation with a wide mode (full labels + group headers) and an icon-rail mode (icons only, hover to see labels). Click the chevron at the top to toggle. Groups: Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Sub-items render with tree-connector lines so the hierarchy stays visually obvious. See §2.2 for the full nav structure.
-- **Top bar** — the mobile hamburger, live session clock, Settings shortcut, and your avatar
+- **Top bar** — the mobile hamburger, the **⌘K search box** (find a page or a record, or ask the Brain — see §2.1.1), live session clock, Settings shortcut, and your avatar
 - **Content area** — changes with the page you're on
 - **User identity card** — pinned at the bottom of the sidebar. Shows your name, email, and active org. Click your avatar in the top bar (or the identity card directly) to open the user menu.
 
@@ -108,6 +108,16 @@ The sidebar shows one **workspace** at a time, scoped to the hat you are wearing
 The everyday Workspace is the complete map of the product: everything a member can open is listed there, and an admin also sees the Administration group in the same tree, so administering the organization never requires switching (BL-NAV-RESTORE). Regular members never see the Administration group or the Admin guide.
 
 The workspace you pick with the switcher sticks: it stays while you open pages it lists (an admin opening Users & Roles from the everyday tree stays in it), and only changes when you open a page it does not list — a platform-admin URL opens the platform workspace, a bookmark opens the workspace that lists it. A superadmin with no tenant membership lands in Platform admin, which has no tenant pages at all; to work inside a tenant they use **Assume identity** on the tenant's page.
+
+#### 2.1.1 ⌘K — find anything, ask the Brain
+
+Press **⌘K** (Ctrl+K on Windows) anywhere in the app, or click the search box in the top bar, to open the command palette. One box does three things as you type:
+
+- **Go to** — every page your sidebar lists, ranked by how well its name matches ("scout", "ai eng", "new prop"). You only ever see pages you can open: members never see the Administration or Platform admin pages here.
+- **In your workspace** — opportunities (by title, agency or solicitation number), proposals, solicitations, companies (by name or UEI) and knowledge entries of your organization, a few per kind, most recently touched first.
+- **Ask the Brain** — type a question ("What did we do for NAVSEA?", "Do we hold a CMMI appraisal?") and press Enter on the *Ask the Brain* row (it sits first when your text reads as a question, last otherwise; any text of six characters or more can be asked). The answer is written **only from your own Brain** — knowledge entries and imported documents — in a few sentences that cite their sources by number, with the cited sources listed underneath as links; a source marked *won* comes from a winning proposal. When the Brain has nothing that answers, it says so and suggests what to add. **Confidence** is how completely the sources answered. If AI is not enabled for your plan, or the monthly AI request quota is spent, the row explains why instead.
+
+↑/↓ move, Enter opens the highlighted page or record (or asks), Esc closes (or, on an answer, goes back to the box). Brain questions are recorded in the Audit Log as `brain.answer`.
 
 The older single-tree description below is kept for reference; the group-visibility rules are unchanged (admin-only children still hide from members).
 

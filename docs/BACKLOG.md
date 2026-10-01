@@ -313,7 +313,42 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7c — a real AI Engine control panel** 🔄 (PR #292)
+**BL-AIP-7d (part i) — ⌘K: pages, records and Brain answers from one box** 🔄 (PR #293)
+
+- **The header search works.** The dead input with the ⌘K badge
+  (assessment §5 row 1) is now a button that opens the command palette;
+  ⌘K / Ctrl+K opens it anywhere in the app (`CommandPalette`, mounted by
+  `AppShell` for every session with a workspace).
+- **Go to.** Every page the person's sidebar lists, derived from the
+  navigation trees through the same visibility rules (`paletteCommands`,
+  pure: admin and platform pages never appear for a member), ranked by
+  label prefix → word prefix → substring → group (`rankCommands`).
+- **Find.** Opportunities (title, agency, solicitation number),
+  proposals, solicitations, companies (name, UEI) and live knowledge
+  entries of the current organization by ILIKE, four per kind, most
+  recently touched first (`searchWorkspace`, `src/lib/palette-search.ts`;
+  wildcard characters neutralised). Debounced from the palette;
+  `paletteSearchAction` reads as `requireCurrentOrg()`.
+- **Ask the Brain.** Any text of six characters or more can be sent to
+  the Brain; a question mark or a question word puts that row first.
+  `answerFromBrain` (`src/lib/brain-answer.ts`) takes the six best
+  `searchBrain` hits (hybrid, outcome-boosted) as the only sources, the
+  new `brain_answer` feature (standard class) writes two to five
+  sentences citing them by number (`BRAIN_ANSWER_PROMPT_VERSION`,
+  `brainAnswerSchema`), and the panel shows the answer with the cited
+  sources as links to the entry or the imported document. Gated by
+  `aiAutoDraft` and the monthly request quota (refunded when the model
+  returns nothing usable), 60 questions per tenant per hour. In stub
+  mode, or when the output fails validation, the top source's excerpt
+  stands in and the panel says so. Audited as `brain.answer`.
+- Unit-tested (`tests/ai/palette.test.ts`); runtime-tested
+  (`tests/isolation/palette.test.ts`): search returns the deciding
+  tenant's rows only per kind and skips archived entries; a Brain
+  answer is built from the tenant's own sources only and is refused
+  without the feature.
+- Part ii (own PR): AI-assisted onboarding from a UEI.
+
+**BL-AIP-7c — a real AI Engine control panel** ✅ (PR #292)
 
 - **Every feature, its class, its model.** `/settings/ai-engine` opens
   with the control panel: one row per AI feature (all 21 in
@@ -637,8 +672,8 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-7d ⌘K palette with Brain answers and AI-assisted onboarding from
-UEI; BL-AIP-6b paragraph-anchored rail (cursor
+BL-AIP-7d part ii AI-assisted onboarding from UEI; BL-AIP-6b
+paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and
 "resolve" on AI review comments from the editor; BL-AIP-7 proactive
 scout / stored graded briefs / AI Engine controls. Details and evidence
