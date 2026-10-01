@@ -27,6 +27,9 @@ import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import { ContentBlocksPanel } from "./ai/ContentBlocksPanel";
 import { ResearchRail } from "./ai/ResearchRail";
+import { TonePanel } from "./ai/TonePanel";
+import { PageBudgetRing } from "./PageBudgetRing";
+import { normalizePageCap } from "@/lib/page-budget";
 import { ReviewCommentsPanel } from "./ReviewCommentsPanel";
 import { describeOpenComments, type SectionReviewComment } from "@/lib/review-comments";
 import {
@@ -403,6 +406,13 @@ function SectionRow({
   // BL-AIP-6b — the block under the cursor, reported by the editor, so
   // the research rail follows the paragraph being written.
   const [cursorParagraph, setCursorParagraph] = useState("");
+  // BL-FB-SCAN-TONE — "Fix with AI" from the tone panel opens Improve
+  // mode in the AI panel with the findings as guidance.
+  const [improveRequest, setImproveRequest] = useState<{ hint: string; nonce: number } | null>(null);
+  const [aiPending, setAiPending] = useState(false);
+  // BL-FB-SCAN-PAGE-REALTIME — the cap as typed, so the ring follows an
+  // unsaved cap change too.
+  const liveCap = normalizePageCap(pageLimit);
 
   // BL-AIP-2 — the editor reads `doc` once at mount. Every replacement
   // from outside it (AI accept, Brain insert, snapshot restore) bumps
@@ -576,11 +586,12 @@ function SectionRow({
           <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
             <span>{SECTION_KIND_LABELS[section.kind]}</span>
             <span>·</span>
-            <span>{section.wordCount} words</span>
-            {section.pageLimit ? (
+            <span>{words} words</span>
+            {liveCap !== null ? (
               <>
                 <span>·</span>
-                <span>{section.pageLimit}p cap</span>
+                {/* BL-FB-SCAN-PAGE-REALTIME — live pages against the cap */}
+                <PageBudgetRing words={words} cap={liveCap} />
               </>
             ) : null}
             {section.authorName || section.authorEmail ? (
@@ -669,6 +680,8 @@ function SectionRow({
               getCurrentText={() => plainRef.current}
               onAccept={(doc, plain, count) => replaceDoc(doc, plain, count)}
               onApplyTracked={applyTracked}
+              improveRequest={improveRequest}
+              onPendingChange={setAiPending}
             />
             <BrainSuggestPanel
               sectionId={section.id}
@@ -701,8 +714,9 @@ function SectionRow({
             />
             <div className="flex items-center justify-between">
               <label className="aur-label mb-0">Content</label>
-              <span className="font-mono text-[10px] text-muted">
-                {words} words
+              <span className="flex items-center gap-2 font-mono text-[10px] text-muted">
+                <span>{words} words</span>
+                {liveCap !== null ? <PageBudgetRing words={words} cap={liveCap} size={12} /> : null}
                 {dirty ? (
                   <span
                     className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-200"
@@ -731,6 +745,12 @@ function SectionRow({
               snapshots={snapshots}
             />
             <input type="hidden" value={plainContent} readOnly />
+            {/* BL-FB-SCAN-TONE — marketing language, passive voice, reading level */}
+            <TonePanel
+              text={plainContent}
+              fixBusy={aiPending}
+              onFix={(hint) => setImproveRequest({ hint, nonce: Date.now() })}
+            />
             {/* BL-AIP-6 — research while you write */}
             <ResearchRail
               sectionId={section.id}

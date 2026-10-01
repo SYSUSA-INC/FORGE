@@ -1110,8 +1110,61 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+
+The section header shows live pages against the cap as the author
+types — "4.2 / 3 pages · over by 1.2" — as a colour-coded ring. No
+interruption to typing; constant visibility. Companion to Tighten.
+
+- **One density everywhere.** `pageBudget` (`src/lib/page-budget.ts`,
+  pure) estimates pages at 350 words per page — the assumption the
+  drafter's "aim for the page cap" instruction and the health scan's
+  THIN flag already use — and classifies the section: empty, thin
+  (under 60% of the cap, what the scan flags), ok, near (90%+), over,
+  with the room left or the overrun in words and pages.
+- **The ring.** `PageBudgetRing` (SVG, theme colours: muted / green /
+  brass / red) in the section row's header next to the live word count
+  and again beside the editor's word count; hover for the explanation.
+  It follows the cap as typed in the cap field, not only the saved one.
+- Unit-tested (`tests/ai/page-budget.test.ts`). No migration.
+
+### BL-FB-SCAN-TONE — Reading-level + tone enforcement
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+
+Marketing language, passive voice and reading level, checked in the
+browser as the author types, with click-to-fix into Improve mode.
+
+- **Three heuristics, no model call.** `checkTone`
+  (`src/lib/tone-check.ts`, pure): 30 marketing phrases with their
+  inflections and a plain-language replacement each ("leverage" → use,
+  "world-class" → name the credential), technical uses excepted
+  ("unique identifier", "robust regression"); passive voice by shape
+  (a form of *to be*, up to two adverbs, a past participle — regular
+  "-ed" or an irregular list), reported as a share of sentences once
+  there are five; Flesch-Kincaid grade from a syllable heuristic,
+  judged against grade 14 (college sophomore, the evaluator standard)
+  once there are 40 prose words. Headings, labels and list markers are
+  not sentences.
+- **The panel.** `TonePanel` under the editor, 800 ms after the last
+  keystroke: a one-line summary ("grade 13 · 8% passive · 2 flagged
+  phrases") coloured by the worst flag, expanding to the three rows
+  with the passive examples and the phrases as chips with their
+  replacements.
+- **Fix with AI.** `buildToneFixHint` turns the findings into the
+  author's guidance (phrases to replace with their counts, the passive
+  share to get under, the grade to reach; never a change of facts),
+  bounded at 2,000 chars. The AI panel opens on Improve with it:
+  `/api/ai/draft` accepts `hint`, `prepareSectionDraft` passes it as
+  `section.authorGuidance`, and the system prompt tells the drafter to
+  do every item it names and change nothing else
+  (`SECTION_DRAFT_PROMPT_VERSION` → `2026-10-01.2`). The result lands
+  as tracked changes like every Improve; Regenerate keeps the guidance.
+- Unit-tested (`tests/ai/tone-check.test.ts`,
+  `tests/ai/section-draft-prompt.test.ts`). No migration.
+
 ### BL-FB-CHAT-UPLOAD — Mid-chat document upload
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #298)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #298)
 
 Drop a sample SOW, a capability brief or a prior proposal into the
 section chat and the AI uses it as a reference for the conversation
@@ -4529,7 +4582,7 @@ Cross-volume claim extraction + reconciliation. High-value for
 multi-volume responses where different writers own different volumes.
 
 ### BL-FB-SCAN-TONE — Reading-level + tone enforcement
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
 
 Flag marketing-speak ("world-class," "best-in-class," "robust",
 "leverage"), passive voice over a threshold, and reading-level above
@@ -4538,7 +4591,7 @@ score; click-to-fix surfaces an Improve-mode draft pre-loaded with
 the offending phrases.
 
 ### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
 
 Section header shows live page count vs cap as the user types
 (4.2 / 3 pages — over by 1.2 pages). Color-coded ring. No interruption
@@ -4646,7 +4699,7 @@ Mermaid block. Embedded inline. Foundation for richer mid-doc visuals.
 ### Area 6 — Chat ("Multi-modal section co-pilot")
 
 ### BL-FB-CHAT-UPLOAD — Mid-chat document upload
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #298) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #298) — canonical entry under Active priorities
 
 Drop a sample SOW, capability brief, or prior proposal into the chat;
 the AI uses it as a reference for the current message ("model my

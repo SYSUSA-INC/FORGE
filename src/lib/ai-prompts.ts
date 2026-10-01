@@ -539,6 +539,12 @@ export type SectionDraftSnapshot = {
     pageLimit: number | null;
     /** BL-AIP-5b — what Section L says this section must contain. */
     instructions?: string;
+    /**
+     * BL-FB-SCAN-TONE — what the author asked this pass to fix (the tone
+     * check's click-to-fix names the phrases, the passive share and the
+     * reading level to reach). Improve mode only; bounded at 2,000 chars.
+     */
+    authorGuidance?: string;
     currentBodyPlain: string;
     currentWordCount: number;
   };
@@ -630,7 +636,10 @@ BL-AIP-5b — the section's brief:
 
 BL-FB-GEN-VOC — the customer's own language:
 - When the prompt lists "The customer's own words", those phrases are how THIS agency describes what it is buying — read from its Section M (evaluation), its requirements and its mission statement. Where a paragraph is about the same thing, say it in their words: the phrase itself or a close paraphrase, so the evaluator reads their own vocabulary in the answer. Evaluation phrases matter most.
-- Never force a phrase into a paragraph about something else, never string several together, never quote more than a short phrase verbatim, and never say that you are mirroring the solicitation. The facts still come only from the snapshot.`;
+- Never force a phrase into a paragraph about something else, never string several together, never quote more than a short phrase verbatim, and never say that you are mirroring the solicitation. The facts still come only from the snapshot.
+
+BL-FB-SCAN-TONE — the author's guidance:
+- When \`section.authorGuidance\` is present it is what the author asked this pass to fix: phrases to replace, passive sentences to recast, a reading level to reach. Do every item it names across the whole body and change nothing else — same facts, same structure, same length unless it says otherwise. It never adds facts and never overrides the brief or the requirements.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
@@ -653,7 +662,7 @@ export const DRAFT_REQUIREMENT_CHARS = 600;
  * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
  * MODE_INSTRUCTIONS or the block layout below changes.
  */
-export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-01.1";
+export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-01.2";
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
