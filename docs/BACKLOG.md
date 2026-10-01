@@ -1110,8 +1110,45 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #297)
+
+Evaluators respond to hearing their own words. The agency's own
+language — the evaluation phrases of Section M, the recurring
+operative phrases of the requirements, the mission words of the
+opportunity — now reaches the drafter, the chat and the writer.
+
+- **Reading the customer's voice.** `extractCustomerVoice`
+  (`src/lib/customer-voice.ts`, pure): two- and three-word phrases from
+  the Section M summary and evaluation sentences of the full text
+  (weight 3), the opportunity description (2) and the requirement
+  clauses (1); generic proposal vocabulary ("best value", "past
+  performance") never counts; a shorter phrase folds into an equally
+  weighted longer one. `getCustomerVoice` (`customer-voice-signals.ts`)
+  reads every solicitation on the proposal's opportunity plus the
+  newest one's full text (200k chars) — scoped by organization.
+- **The drafter and the chat echo it.** `SectionDraftSnapshot.
+  customerVoice` lists up to 12 phrases with their source; the system
+  prompt tells the model to say the same thing in the customer's words
+  where a paragraph is about the same thing, never to force or string
+  them, never to say it is mirroring the solicitation
+  (`SECTION_DRAFT_PROMPT_VERSION` → `2026-10-01.1`). The section chat's
+  system prompt carries the same list.
+- **Per-section switch.** `proposal_section.echo_customer_voice`
+  (migration 0091, default on); flipped from the research rail
+  (`setSectionCustomerVoiceAction`), audited
+  `proposal_section.customer_voice.update`.
+- **"Their words" in the rail.** The research rail shows how many of
+  the customer's phrases the section echoes and which it does not yet
+  (`phraseCoverage`, stemmed match), with the source and the sentence
+  it came from on hover, next to the switch.
+- Unit-tested (`tests/ai/customer-voice.test.ts`); runtime-tested
+  (`tests/isolation/customer-voice.test.ts`): phrases come from the
+  deciding tenant's own solicitations; the switch is scoped and
+  audited. Sync migration 0091 on `/admin/migrations` after deploy.
+
 ### BL-FB-GEN-BLOCKS — Reusable content block library
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #296)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #296)
 
 The org-wide "boilerplate.docx" everyone copied from becomes a
 library: boilerplate knowledge entries are the content blocks,
@@ -4484,7 +4521,7 @@ both drive drafts AND are checked post-hoc. Single biggest quality
 lever on generated content.
 
 ### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #297) — canonical entry under Active priorities
 
 Mine the solicitation's own Section L/M language and the agency's
 strategic plan / mission statement; paraphrase those phrases back
@@ -4492,7 +4529,7 @@ into the draft when topically relevant. Evaluators respond to
 hearing their own words. Per-section toggle.
 
 ### BL-FB-GEN-BLOCKS — Reusable content block library
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #296) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #296) — canonical entry under Active priorities
 
 Versioned, taggable boilerplate registry: "our cyber capability v3,"
 "key personnel intro," "transition risk methodology." Drop into any

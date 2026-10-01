@@ -899,6 +899,9 @@ export const proposalSections = pgTable("proposal_section", {
   // BL-AIP-5b — what Section L says this section must contain; the
   // drafter reads it as the section's brief (migration 0086).
   instructions: text("instructions").notNull().default(""),
+  // BL-FB-GEN-VOC — whether AI drafts and chat for this section echo the
+  // customer's own phrases (drizzle/0091). On by default.
+  echoCustomerVoice: boolean("echo_customer_voice").notNull().default(true),
   authorUserId: text("author_user_id").references(() => users.id, {
     onDelete: "set null",
   }),

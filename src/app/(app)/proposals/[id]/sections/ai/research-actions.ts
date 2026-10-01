@@ -1,10 +1,26 @@
 "use server";
 
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { setSectionCustomerVoice } from "@/lib/customer-voice-signals";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { gatherResearchForSection, type ResearchRailResult } from "@/lib/research-rail";
 
-export type { ResearchRailResult } from "@/lib/research-rail";
+export type { CustomerVoiceCoverage, ResearchRailResult } from "@/lib/research-rail";
+
+/** BL-FB-GEN-VOC — turn echoing the customer's language on or off for this section. */
+export async function setSectionCustomerVoiceAction(
+  sectionId: string,
+  enabled: boolean,
+): Promise<{ ok: true; enabled: boolean } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return setSectionCustomerVoice({
+    organizationId,
+    sectionId: String(sectionId ?? ""),
+    enabled: enabled === true,
+    actor: { userId: user.id, email: user.email },
+  });
+}
 
 export type ResearchActionResult =
   | { ok: true; data: ResearchRailResult }

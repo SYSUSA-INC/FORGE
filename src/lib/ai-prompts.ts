@@ -585,6 +585,16 @@ export type SectionDraftSnapshot = {
     excerpt: string;
     outcomeLabel?: string;
   }[];
+  /**
+   * BL-FB-GEN-VOC — the customer's own phrases (Section M, requirements,
+   * mission text) for the drafter to echo where topically relevant.
+   * Present only when the section's echo switch is on and the
+   * solicitation gave us something to read.
+   */
+  customerVoice?: {
+    agency: string;
+    phrases: { phrase: string; source: "evaluation" | "requirement" | "mission" }[];
+  };
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -616,7 +626,11 @@ BL-AIP-6 — writing signals:
 - \`draftAcceptance\` says how much of past AI drafts this team kept. A low figure means their owners rewrite heavily: be specific, avoid generic capability claims, and leave [BRACKETS] where only the team can supply the fact.
 
 BL-AIP-5b — the section's brief:
-- When \`section.instructions\` is present it is what the solicitation's Section L says THIS section must contain. It is the section's brief: cover every item it names, in the order it names them, and nothing it forbids. It outranks section conventions and pattern guidance.`;
+- When \`section.instructions\` is present it is what the solicitation's Section L says THIS section must contain. It is the section's brief: cover every item it names, in the order it names them, and nothing it forbids. It outranks section conventions and pattern guidance.
+
+BL-FB-GEN-VOC — the customer's own language:
+- When the prompt lists "The customer's own words", those phrases are how THIS agency describes what it is buying — read from its Section M (evaluation), its requirements and its mission statement. Where a paragraph is about the same thing, say it in their words: the phrase itself or a close paraphrase, so the evaluator reads their own vocabulary in the answer. Evaluation phrases matter most.
+- Never force a phrase into a paragraph about something else, never string several together, never quote more than a short phrase verbatim, and never say that you are mirroring the solicitation. The facts still come only from the snapshot.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
@@ -639,7 +653,7 @@ export const DRAFT_REQUIREMENT_CHARS = 600;
  * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
  * MODE_INSTRUCTIONS or the block layout below changes.
  */
-export const SECTION_DRAFT_PROMPT_VERSION = "2026-09-28.1";
+export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-01.1";
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
@@ -723,17 +737,30 @@ export function buildSectionDraftPrompt(
         ].join("\n")
       : "";
 
+  // BL-FB-GEN-VOC — the customer's own words, after the themes: the
+  // vocabulary to hold while writing, below the themes in altitude.
+  const voiceBlock =
+    snapshot.customerVoice && snapshot.customerVoice.phrases.length > 0
+      ? [
+          `The customer's own words${snapshot.customerVoice.agency ? ` (${snapshot.customerVoice.agency})` : ""} — echo these where a paragraph is about the same thing, as the phrase or a close paraphrase; never force them in elsewhere:`,
+          ...snapshot.customerVoice.phrases.map((p) => `- "${p.phrase}" (${p.source})`),
+        ].join("\n")
+      : "";
+
   // Pass the snapshot as JSON but omit the solicitation + winThemes +
-  // sources fields (formatted above) so we don't double-print large text.
+  // sources + customerVoice fields (formatted above) so we don't
+  // double-print large text.
   const {
     solicitation: _omitSol,
     winThemes: _omitThemes,
     sources: _omitSources,
+    customerVoice: _omitVoice,
     ...snapshotForJson
   } = snapshot;
   void _omitSol;
   void _omitThemes;
   void _omitSources;
+  void _omitVoice;
 
   // BL-AIP-2 — `draft_alt` is a first draft too; it used to fall through
   // to the "tightened body" instruction, contaminating variant B of
@@ -751,6 +778,8 @@ export function buildSectionDraftPrompt(
     ``,
     themesBlock,
     themesBlock ? `` : "",
+    voiceBlock,
+    voiceBlock ? `` : "",
     solicitationBlock,
     solicitationBlock ? `` : "",
     citationBlock,

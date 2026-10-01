@@ -23,8 +23,20 @@ import {
   proposals,
 } from "@/db/schema";
 import { searchBrain, type BrainHit } from "@/lib/brain-retrieval";
+import { phraseCoverage, type CustomerPhraseSource } from "@/lib/customer-voice";
+import { getCustomerVoice } from "@/lib/customer-voice-signals";
 import { itemsNotCovered } from "@/lib/research-signals";
 import { log } from "@/lib/log";
+
+/** BL-FB-GEN-VOC — the customer's phrases this draft does and does not echo yet. */
+export type CustomerVoiceCoverage = {
+  /** The section's echo switch. */
+  enabled: boolean;
+  agency: string;
+  total: number;
+  echoed: string[];
+  missing: { phrase: string; source: CustomerPhraseSource; sample: string }[];
+};
 
 export type ResearchRailResult = {
   hits: BrainHit[];
@@ -40,6 +52,8 @@ export type ResearchRailResult = {
   stubbed: boolean;
   /** Set when the Brain lookup was skipped or declined. */
   brainNote?: string;
+  /** BL-FB-GEN-VOC — null when the lookup failed. */
+  customerVoice: CustomerVoiceCoverage | null;
 };
 
 const HITS = 4;
@@ -58,6 +72,7 @@ export async function gatherResearchForSection(input: {
     .select({
       sectionTitle: proposalSections.title,
       sectionKind: proposalSections.kind,
+      echoCustomerVoice: proposalSections.echoCustomerVoice,
       proposalId: proposals.id,
       winThemes: proposals.winThemes,
       agency: opportunities.agency,
@@ -144,5 +159,23 @@ export async function gatherResearchForSection(input: {
     brainNote = "Write a little more in this paragraph to search the Brain.";
   }
 
-  return { hits, unaddressed, missingThemes, contradictions, stubbed, brainNote };
+  // BL-FB-GEN-VOC — which of the customer's phrases the draft echoes.
+  let customerVoice: CustomerVoiceCoverage | null = null;
+  try {
+    const voice = await getCustomerVoice({ organizationId, proposalId: row.proposalId });
+    if (voice) {
+      const cov = phraseCoverage(text, voice.phrases);
+      customerVoice = {
+        enabled: row.echoCustomerVoice,
+        agency: voice.agency,
+        total: voice.phrases.length,
+        echoed: cov.echoed.map((p) => p.phrase),
+        missing: cov.missing.slice(0, 8).map((p) => ({ phrase: p.phrase, source: p.source, sample: p.sample })),
+      };
+    }
+  } catch (err) {
+    log.warn("[research-rail]", "customer voice failed", { error: err });
+  }
+
+  return { hits, unaddressed, missingThemes, contradictions, stubbed, brainNote, customerVoice };
 }

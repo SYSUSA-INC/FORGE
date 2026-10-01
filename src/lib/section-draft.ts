@@ -31,6 +31,8 @@ import {
   type SectionDraftSnapshot,
 } from "@/lib/ai-prompts";
 import { searchBrain } from "@/lib/brain-retrieval";
+import { voiceGuidance } from "@/lib/customer-voice";
+import { getCustomerVoice } from "@/lib/customer-voice-signals";
 import {
   MAX_DRAFT_SOURCES,
   SOURCE_EXCERPT_CHARS,
@@ -198,6 +200,20 @@ export async function prepareSectionDraft(input: {
     patternIntel = undefined;
   }
 
+  // BL-FB-GEN-VOC — the customer's own phrases, when this section echoes
+  // them. Best-effort; a failure degrades to no block.
+  let customerVoice: SectionDraftSnapshot["customerVoice"];
+  if (row.section.echoCustomerVoice) {
+    try {
+      const voice = await getCustomerVoice({ organizationId, proposalId: row.proposal.id });
+      if (voice && voice.phrases.length > 0) {
+        customerVoice = { agency: voice.agency, phrases: voiceGuidance(voice.phrases, 12) };
+      }
+    } catch (err) {
+      log.warn("[prepareSectionDraft]", "customer voice failed", { error: err });
+    }
+  }
+
   // BL-AIP-2 — prefer the editor's live text over the saved body.
   const liveBody =
     typeof input.currentBodyPlain === "string" ? input.currentBodyPlain.trim() : undefined;
@@ -235,6 +251,7 @@ export async function prepareSectionDraft(input: {
       title: t.title ?? "",
       statement: t.statement ?? "",
     })),
+    ...(customerVoice ? { customerVoice } : {}),
   };
 
   // Improve / tighten require existing content to be useful.
