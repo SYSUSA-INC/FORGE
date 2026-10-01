@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { listEntryVersions } from "@/lib/entry-versions";
 import { getKnowledgeEntryAction } from "../actions";
 import { EditEntryClient } from "./EditEntryClient";
+import { VersionHistoryPanel } from "./VersionHistoryPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +16,12 @@ export default async function KnowledgeEntryPage({
   params: { id: string };
 }) {
   await requireAuth();
-  await requireCurrentOrg();
+  const { organizationId } = await requireCurrentOrg();
 
   const row = await getKnowledgeEntryAction(params.id);
   if (!row) notFound();
+  // BL-FB-GEN-BLOCKS — the entry's changelog.
+  const versions = await listEntryVersions({ organizationId, entryId: row.id }).catch(() => []);
 
   return (
     <>
@@ -51,6 +55,18 @@ export default async function KnowledgeEntryPage({
           }}
         />
       </Panel>
+      <div className="mt-4">
+        <Panel
+          title="Version history"
+          eyebrow={
+            versions.length
+              ? `${versions.length} version${versions.length === 1 ? "" : "s"}${row.kind === "boilerplate" ? " · content block" : ""}`
+              : "Nothing tracked yet"
+          }
+        >
+          <VersionHistoryPanel id={row.id} versions={versions} />
+        </Panel>
+      </div>
     </>
   );
 }

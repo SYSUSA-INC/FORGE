@@ -1110,6 +1110,40 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-GEN-BLOCKS — Reusable content block library
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending)
+
+The org-wide "boilerplate.docx" everyone copied from becomes a
+library: boilerplate knowledge entries are the content blocks,
+insertable into any section by tag and version-controlled with a
+changelog.
+
+- **Version history.** `knowledge_entry_version` (migration 0090,
+  mirrored in `schema.ts`): one row per saved state of title / body /
+  tags, numbered from 1, with the change note, words added / removed
+  (`versionDelta`, pure) and the author. `createKnowledgeEntryAction`
+  records v1; `updateKnowledgeEntryAction` records a version whenever
+  title, body or tags change (kind / outcome edits do not) and takes
+  an optional **What changed?** note from the editor; an entry that
+  predates the table keeps its pre-change state as v1 on its first
+  tracked save (`recordEntryVersion`, `src/lib/entry-versions.ts`).
+- **Changelog + restore.** `/knowledge-base/[id]` shows the history
+  newest first (version, date, author, delta, note, expandable text);
+  **Restore** writes an older state back onto the entry — re-scored
+  and re-embedded like any save — and records it as the next version
+  ("Restored v2"); audited `knowledge_entry.version.restore`.
+- **Insert a content block.** In the section editor, a picker lists
+  the org's live boilerplate entries with latest version and reuse
+  count (`listContentBlocks`, `src/lib/content-blocks.ts`), filtered
+  by tag chips or text (`filterBlocks` / `collectTags`, pure); Insert
+  drops the block in as a tracked suggestion by FORGE AI and bumps
+  the entry's `reuse_count` (`recordBlockUse`, audited
+  `knowledge_entry.reuse` with proposal and section).
+- Unit-tested (`tests/ai/content-blocks.test.ts`); runtime-tested
+  (`tests/isolation/content-blocks.test.ts`): versions, restore, the
+  block list and reuse read and write the deciding tenant only; lazy
+  v1; audits. Sync migration 0090 on `/admin/migrations` after deploy.
+
 ### BL-FB-X-BRAIN-MINE — Won proposals always mine into the Brain
 **Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #250)
 
@@ -4458,7 +4492,7 @@ into the draft when topically relevant. Evaluators respond to
 hearing their own words. Per-section toggle.
 
 ### BL-FB-GEN-BLOCKS — Reusable content block library
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending) — canonical entry under Active priorities
 
 Versioned, taggable boilerplate registry: "our cyber capability v3,"
 "key personnel intro," "transition risk methodology." Drop into any

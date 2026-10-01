@@ -19,6 +19,12 @@ import {
   embedKnowledgeEntry,
 } from "@/lib/knowledge-entry-embed";
 import { scoreKnowledgeEntry } from "@/lib/knowledge-quality";
+import {
+  listEntryVersions,
+  recordEntryVersion,
+  restoreEntryVersion,
+  type EntryVersionView,
+} from "@/lib/entry-versions";
 import { log } from "@/lib/log";
 
 const KINDS: KnowledgeKind[] = [
@@ -158,6 +164,15 @@ export async function createKnowledgeEntryAction(input: {
       await embedKnowledgeEntry(organizationId, row.id, finalTitle, finalBody).catch((err) => {
         log.warn("[createKnowledgeEntryAction]", "embed failed", { error: err });
       });
+      // BL-FB-GEN-BLOCKS — v1 of the changelog.
+      await recordEntryVersion({
+        organizationId,
+        entryId: row.id,
+        state: { title: finalTitle, body: finalBody, tags: finalTags },
+        previous: null,
+        changeNote: "Created",
+        actor: { userId: user.id, email: user.email },
+      }).catch((err) => log.warn("[createKnowledgeEntryAction]", "version record failed", { error: err }));
     }
     await recordAudit({
       organizationId,
@@ -178,6 +193,40 @@ export async function createKnowledgeEntryAction(input: {
   }
 }
 
+/** BL-FB-GEN-BLOCKS — the entry's changelog, newest first. */
+export async function listEntryVersionsAction(id: string): Promise<EntryVersionView[]> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return listEntryVersions({ organizationId, entryId: String(id ?? "") });
+}
+
+/** BL-FB-GEN-BLOCKS — write an older version back; the restore becomes the next version. */
+export async function restoreEntryVersionAction(
+  id: string,
+  version: number,
+): Promise<{ ok: true; version: number } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const n = Math.trunc(Number(version));
+  if (!Number.isFinite(n) || n < 1) return { ok: false, error: "Unknown version." };
+  try {
+    const res = await restoreEntryVersion({
+      organizationId,
+      entryId: String(id ?? ""),
+      version: n,
+      actor: { userId: actor.id, email: actor.email },
+    });
+    if (res.ok) {
+      revalidatePath("/knowledge-base");
+      revalidatePath(`/knowledge-base/${id}`);
+    }
+    return res;
+  } catch (err) {
+    log.error("[restoreEntryVersionAction]", "error", { error: err });
+    return { ok: false, error: err instanceof Error ? err.message : "Restore failed." };
+  }
+}
+
 export async function updateKnowledgeEntryAction(
   id: string,
   input: {
@@ -186,6 +235,8 @@ export async function updateKnowledgeEntryAction(
     body?: string;
     tags?: string[];
     outcomeLabel?: KnowledgeOutcomeLabel;
+    /** BL-FB-GEN-BLOCKS — what changed, for the changelog. */
+    changeNote?: string;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireAuth();
@@ -258,8 +309,25 @@ export async function updateKnowledgeEntryAction(
       action: "knowledge_entry.update",
       resourceType: "knowledge_entry",
       resourceId: id,
-      metadata: { fields: Object.keys(input) },
+      metadata: { fields: Object.keys(input).filter((k) => k !== "changeNote") },
     });
+
+    // BL-FB-GEN-BLOCKS — a changed title, body or tag list is a new
+    // version; kind / outcome edits are not.
+    const contentChanged =
+      merged.title !== current.title ||
+      merged.body !== current.body ||
+      JSON.stringify([...merged.tags].sort()) !== JSON.stringify([...(current.tags ?? [])].sort());
+    if (contentChanged) {
+      await recordEntryVersion({
+        organizationId,
+        entryId: id,
+        state: { title: merged.title, body: merged.body, tags: merged.tags },
+        previous: { title: current.title, body: current.body, tags: current.tags ?? [] },
+        changeNote: String(input.changeNote ?? ""),
+        actor: { userId: actor.id, email: actor.email },
+      }).catch((err) => log.warn("[updateKnowledgeEntryAction]", "version record failed", { error: err }));
+    }
 
     // Re-embed when title or body changed so the vector matches the
     // current content. Tag-only edits don't need re-embedding.
