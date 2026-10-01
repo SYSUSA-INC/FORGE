@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import { focusMoved, focusParagraph, pickFocus, shouldRefresh } from "@/lib/research-signals";
 import { THEME } from "@/lib/theme-colors";
-import { researchForSectionAction, type ResearchRailResult } from "./research-actions";
+import {
+  researchForSectionAction,
+  setSectionCustomerVoiceAction,
+  type ResearchRailResult,
+} from "./research-actions";
 
 /**
  * BL-AIP-6 — research while you write.
@@ -88,8 +92,28 @@ export function ResearchRail({
   }, [text, cursorParagraph, open, sectionId]);
 
   const counts = data
-    ? data.hits.length + data.unaddressed.length + data.missingThemes.length + data.contradictions.length
+    ? data.hits.length +
+      data.unaddressed.length +
+      data.missingThemes.length +
+      data.contradictions.length +
+      (data.customerVoice?.missing.length ?? 0)
     : 0;
+
+  // BL-FB-GEN-VOC — the section's echo switch, flipped from the rail.
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  async function toggleVoice(next: boolean) {
+    setVoiceBusy(true);
+    try {
+      const res = await setSectionCustomerVoiceAction(sectionId, next);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setData((d) => (d && d.customerVoice ? { ...d, customerVoice: { ...d.customerVoice, enabled: res.enabled } } : d));
+    } finally {
+      setVoiceBusy(false);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/5">
@@ -166,6 +190,44 @@ export function ResearchRail({
                   {t.statement ? <span className="text-muted"> — {t.statement}</span> : null}
                 </li>
               ))}
+            </Group>
+          ) : null}
+
+          {data && data.customerVoice ? (
+            <Group
+              title={`Their words${data.customerVoice.agency ? ` · ${data.customerVoice.agency}` : ""}`}
+              tone={THEME.cobalt}
+              trailing={
+                <label className="flex items-center gap-1 normal-case tracking-normal text-muted" title="Ask the AI drafter and chat to echo the customer's own phrases in this section">
+                  <input
+                    type="checkbox"
+                    checked={data.customerVoice.enabled}
+                    disabled={voiceBusy}
+                    onChange={(e) => void toggleVoice(e.target.checked)}
+                  />
+                  echo in AI drafts
+                </label>
+              }
+            >
+              {data.customerVoice.total === 0 ? (
+                <li className="font-mono text-[11px] text-muted">
+                  No solicitation text to read the customer&apos;s language from yet — parse the solicitation and the evaluation
+                  phrases appear here.
+                </li>
+              ) : (
+                <>
+                  <li className="font-mono text-[10px] text-muted">
+                    {data.customerVoice.echoed.length} of {data.customerVoice.total} customer phrases echoed in this section
+                    {data.customerVoice.missing.length === 0 ? " — all of them." : "; not yet:"}
+                  </li>
+                  {data.customerVoice.missing.map((m) => (
+                    <li key={m.phrase} className="flex flex-wrap items-center gap-1.5" title={m.sample}>
+                      <span className="aur-chip normal-case tracking-normal text-text">{m.phrase}</span>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-muted">{m.source}</span>
+                    </li>
+                  ))}
+                </>
+              )}
             </Group>
           ) : null}
 

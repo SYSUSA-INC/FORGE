@@ -24,6 +24,8 @@ import {
 import type { AIMessage } from "@/lib/ai";
 import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
+import { voiceGuidance } from "@/lib/customer-voice";
+import { getCustomerVoice } from "@/lib/customer-voice-signals";
 import { gatherWritingSignals, renderWritingSignals } from "@/lib/writing-signals";
 
 /** BL-AIP-5 — how many general requirements the chat sees (mapped rows always go in full). */
@@ -167,6 +169,21 @@ export async function prepareSectionChat(input: {
     // best effort
   }
 
+  // BL-FB-GEN-VOC — the customer's own words, when this section echoes them.
+  let voiceBlock = "";
+  if (row.section.echoCustomerVoice) {
+    try {
+      const voice = await getCustomerVoice({ organizationId, proposalId: row.proposal.id });
+      if (voice && voice.phrases.length > 0) {
+        voiceBlock = `\nThe customer's own words${voice.agency ? ` (${voice.agency})` : ""} — where a suggestion is about the same thing, say it in these words or a close paraphrase; never force them in elsewhere, never say you are mirroring the solicitation:\n${voiceGuidance(voice.phrases, 12)
+          .map((p) => `  - "${p.phrase}" (${p.source})`)
+          .join("\n")}`;
+      }
+    } catch {
+      // best effort
+    }
+  }
+
   const contextBlock = [
     `Organization: ${orgRow?.name ?? "unknown"}`,
     `Proposal: ${row.proposal.title}`,
@@ -178,6 +195,7 @@ export async function prepareSectionChat(input: {
     row.opportunityDescription &&
       `Opportunity description: ${row.opportunityDescription.slice(0, 800)}`,
     themesBlock,
+    voiceBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
     signalsBlock && `\nWhat the team has learned (resolve reviewer comments in the text; answer past weaknesses with evidence; never cite them):\n${signalsBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
