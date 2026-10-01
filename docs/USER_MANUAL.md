@@ -618,6 +618,12 @@ The score re-computes on every save. Low scores aren't a verdict on the entry �
 
 **Org admin only**: there's a **Score unscored** button in the `/knowledge-base` header that retroactively scores entries that predate the quality-scoring feature (i.e., `quality_scored_at IS NULL`). Same idempotent backfill pattern as "Embed missing". Click as many times as needed; processes 100 entries per click.
 
+### 8.5.1 Content blocks and version history
+
+**Boilerplate entries are your content blocks.** Anything the team used to copy out of a shared "boilerplate.docx" — the company overview, the security posture statement, the transition risk methodology — belongs here as a **Boilerplate** entry with tags. In the section editor, **▣ Insert a content block** lists every live boilerplate entry with its version and how often it has been used; filter by a tag chip or by typing part of the title, a tag or the text, then **Insert**. The block arrives as a tracked suggestion by FORGE AI, so you accept or edit it in Track changes before saving, and the entry's **Used N times** counter goes up. **History** opens the entry.
+
+**Every entry keeps a version history.** Each save that changes the title, body or tags becomes a new version; the optional **What changed?** line on the editor is the changelog note. The **Version history** panel under the editor lists versions newest first — number, date, author, words added and removed, the note — and **Show** reveals the full text of any version. **Restore** writes an older version back (the current text is kept as a version too, and the restore shows up as "Restored v2"). Entries created before version history start theirs on the next edit, with the pre-edit text kept as v1.
+
 ### 8.6 Tips for getting the most out of the Knowledge base
 
 - **Upload everything**. The Brain ranks by relevance, not recency. Old contracts from five years ago still ground the Brain when you're pursuing a similar deal today.

@@ -2281,6 +2281,42 @@ export type NewKnowledgeEntry = typeof knowledgeEntries.$inferInsert;
 export type KnowledgeKind = (typeof knowledgeKindEnum.enumValues)[number];
 
 /**
+ * BL-FB-GEN-BLOCKS — version history of a knowledge entry (drizzle/0090).
+ * One row per saved state of title / body / tags, numbered from 1; the
+ * entry row itself holds the current state. Restoring writes the entry
+ * back and appends a new row. Every row carries organization_id.
+ */
+export const knowledgeEntryVersions = pgTable(
+  "knowledge_entry_version",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => knowledgeEntries.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+    changeNote: text("change_note").notNull().default(""),
+    wordsAdded: integer("words_added").notNull().default(0),
+    wordsRemoved: integer("words_removed").notNull().default(0),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    entryVersionUq: uniqueIndex("knowledge_entry_version_entry_version_uq").on(t.entryId, t.version),
+    orgEntryIdx: index("knowledge_entry_version_org_entry_idx").on(t.organizationId, t.entryId),
+  }),
+);
+
+export type KnowledgeEntryVersion = typeof knowledgeEntryVersions.$inferSelect;
+
+/**
  * Knowledge artifacts — the raw corpus the FORGE Brain reads to build
  * its intelligence. Anything that gives historical context about the
  * organization belongs here: old proposals, RFPs we responded to,

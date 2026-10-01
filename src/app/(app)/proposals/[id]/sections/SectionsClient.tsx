@@ -25,6 +25,7 @@ import {
 } from "@/components/editor/RichSectionEditor";
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
+import { ContentBlocksPanel } from "./ai/ContentBlocksPanel";
 import { ResearchRail } from "./ai/ResearchRail";
 import { ReviewCommentsPanel } from "./ReviewCommentsPanel";
 import { describeOpenComments, type SectionReviewComment } from "@/lib/review-comments";
@@ -675,6 +676,20 @@ function SectionRow({
                 // BL-AIP-6 — appended as a tracked insertion; the rest of
                 // the document (tables, lists, pending suggestions) is
                 // left exactly as it is instead of rebuilt from plain text.
+                if (plainRef.current.trim()) {
+                  insertTracked(text);
+                  return;
+                }
+                const next = text.trim();
+                const doc = fromPlainText(next);
+                replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
+              }}
+            />
+            {/* BL-FB-GEN-BLOCKS — versioned boilerplate, inserted by tag as a tracked suggestion */}
+            <ContentBlocksPanel
+              proposalId={proposalId}
+              sectionId={section.id}
+              onInsert={(text) => {
                 if (plainRef.current.trim()) {
                   insertTracked(text);
                   return;

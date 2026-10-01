@@ -63,6 +63,8 @@ export function EditEntryClient({
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
   const [tagsRaw, setTagsRaw] = useState(initial.tags.join(", "));
+  // BL-FB-GEN-BLOCKS — one line for the changelog.
+  const [changeNote, setChangeNote] = useState("");
 
   function save(e: FormEvent) {
     e.preventDefault();
@@ -79,9 +81,11 @@ export function EditEntryClient({
         body,
         tags,
         outcomeLabel,
+        changeNote,
       });
       if (!res.ok) return setError(res.error);
       setNotice("Saved.");
+      setChangeNote("");
       router.refresh();
     });
   }
@@ -183,6 +187,21 @@ export function EditEntryClient({
           type="text"
           value={tagsRaw}
           onChange={(e) => setTagsRaw(e.target.value)}
+          className="aur-input"
+        />
+      </div>
+
+      <div>
+        <label className="aur-label" htmlFor="kb-change-note">
+          What changed? <span className="normal-case tracking-normal text-subtle">(optional · goes in the version history)</span>
+        </label>
+        <input
+          id="kb-change-note"
+          type="text"
+          value={changeNote}
+          onChange={(e) => setChangeNote(e.target.value)}
+          maxLength={500}
+          placeholder="e.g. Updated the CMMC level and the FY26 contract count"
           className="aur-input"
         />
       </div>
