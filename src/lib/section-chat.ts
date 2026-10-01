@@ -26,6 +26,8 @@ import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { voiceGuidance } from "@/lib/customer-voice";
 import { getCustomerVoice } from "@/lib/customer-voice-signals";
+import { renderAttachmentsBlock } from "@/lib/chat-attachments-logic";
+import { deleteChatAttachmentsForSection, loadChatAttachmentTexts } from "@/lib/section-chat-attachments";
 import { gatherWritingSignals, renderWritingSignals } from "@/lib/writing-signals";
 
 /** BL-AIP-5 — how many general requirements the chat sees (mapped rows always go in full). */
@@ -184,6 +186,16 @@ export async function prepareSectionChat(input: {
     }
   }
 
+  // BL-FB-CHAT-UPLOAD — documents the author attached to this conversation.
+  let attachmentsBlock = "";
+  try {
+    attachmentsBlock = renderAttachmentsBlock(
+      await loadChatAttachmentTexts({ organizationId, sectionId: input.sectionId }),
+    );
+  } catch {
+    // best effort
+  }
+
   const contextBlock = [
     `Organization: ${orgRow?.name ?? "unknown"}`,
     `Proposal: ${row.proposal.title}`,
@@ -197,6 +209,7 @@ export async function prepareSectionChat(input: {
     themesBlock,
     voiceBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
+    attachmentsBlock && `\n${attachmentsBlock}`,
     signalsBlock && `\nWhat the team has learned (resolve reviewer comments in the text; answer past weaknesses with evidence; never cite them):\n${signalsBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
     (liveBody || row.section.content?.trim()) &&
@@ -366,7 +379,7 @@ export async function appendSectionChatTurns(input: {
   });
 }
 
-/** Delete a section's thread; returns rows removed. */
+/** Delete a section's thread (and, BL-FB-CHAT-UPLOAD, its attachments); returns message rows removed. */
 export async function clearSectionChat(input: {
   organizationId: string;
   sectionId: string;
@@ -380,5 +393,6 @@ export async function clearSectionChat(input: {
       ),
     )
     .returning({ id: sectionChatMessages.id });
+  await deleteChatAttachmentsForSection({ organizationId: input.organizationId, sectionId: input.sectionId });
   return deleted.length;
 }
