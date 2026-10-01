@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #297)
 
 Evaluators respond to hearing their own words. The agency's own
 language — the evaluation phrases of Section M, the recurring
@@ -4521,7 +4521,7 @@ both drive drafts AND are checked post-hoc. Single biggest quality
 lever on generated content.
 
 ### BL-FB-GEN-VOC — Voice-of-customer paraphrasing
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #297) — canonical entry under Active priorities
 
 Mine the solicitation's own Section L/M language and the agency's
 strategic plan / mission statement; paraphrase those phrases back
