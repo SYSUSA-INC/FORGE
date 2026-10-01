@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7d (part ii) — AI-assisted onboarding from a UEI** 🔄 (PR pending)
+**BL-AIP-7d (part ii) — AI-assisted onboarding from a UEI** 🔄 (PR #294)
 
 - **A "Getting started" panel on the Command Center** for org admins
   until the organization has a UEI, its NAICS, scout keywords and a
