@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-UPLOAD — Mid-chat document upload
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #298)
 
 Drop a sample SOW, a capability brief or a prior proposal into the
 section chat and the AI uses it as a reference for the conversation
@@ -4646,7 +4646,7 @@ Mermaid block. Embedded inline. Foundation for richer mid-doc visuals.
 ### Area 6 — Chat ("Multi-modal section co-pilot")
 
 ### BL-FB-CHAT-UPLOAD — Mid-chat document upload
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR pending) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #298) — canonical entry under Active priorities
 
 Drop a sample SOW, capability brief, or prior proposal into the chat;
 the AI uses it as a reference for the current message ("model my
