@@ -26,6 +26,8 @@ import {
 import { AiAssistantPanel } from "./ai/AiAssistantPanel";
 import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import { ResearchRail } from "./ai/ResearchRail";
+import { ReviewCommentsPanel } from "./ReviewCommentsPanel";
+import { describeOpenComments, type SectionReviewComment } from "@/lib/review-comments";
 import {
   addCustomSectionAction,
   removeSectionAction,
@@ -57,6 +59,9 @@ type Section = {
   // null when no scan exists or no themes are configured.
   themeReinforced: number | null;
   themeTotal: number | null;
+  // BL-AIP-6b — open colour-team review comments (human and FORGE AI
+  // pre-review) on this section, resolvable from the editor.
+  reviewComments: SectionReviewComment[];
 };
 
 type TeamMember = { id: string; name: string | null; email: string };
@@ -394,6 +399,9 @@ function SectionRow({
   const [authorUserId, setAuthorUserId] = useState<string>(
     section.authorUserId ?? "",
   );
+  // BL-AIP-6b — the block under the cursor, reported by the editor, so
+  // the research rail follows the paragraph being written.
+  const [cursorParagraph, setCursorParagraph] = useState("");
 
   // BL-AIP-2 — the editor reads `doc` once at mount. Every replacement
   // from outside it (AI accept, Brain insert, snapshot restore) bumps
@@ -551,6 +559,15 @@ function SectionRow({
                 total={section.themeTotal}
               />
             ) : null}
+            {/* BL-AIP-6b — open review comments on this section */}
+            {section.reviewComments.length > 0 ? (
+              <span
+                className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-200"
+                title={describeOpenComments(section.reviewComments)}
+              >
+                ✎ {section.reviewComments.length}
+              </span>
+            ) : null}
             <span className="truncate font-display text-[14px] font-semibold text-text">
               {section.title}
             </span>
@@ -643,6 +660,8 @@ function SectionRow({
           </div>
 
           <div className="mt-3 flex flex-col gap-2">
+            {/* BL-AIP-6b — what reviewers and the AI pre-review asked of this section */}
+            <ReviewCommentsPanel proposalId={proposalId} comments={section.reviewComments} />
             <AiAssistantPanel
               sectionId={section.id}
               hasContent={plainContent.trim().length > 0}
@@ -683,6 +702,7 @@ function SectionRow({
               doc={bodyDoc}
               docVersion={docVersion}
               reviewSignal={reviewSignal}
+              onCursorParagraph={setCursorParagraph}
               onChange={(doc, plain, count) => {
                 setBodyDoc(doc);
                 setPlainContent(plain);
@@ -700,6 +720,7 @@ function SectionRow({
             <ResearchRail
               sectionId={section.id}
               text={plainContent}
+              cursorParagraph={cursorParagraph}
               onInsertTracked={insertTracked}
             />
           </div>

@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a (stored, grounded, graded briefs) in PR (PR #284); BL-AIP-7b / 7c / 7d next
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a shipped (PR #284); BL-AIP-7b shipped (PRs #288, #289, #291); BL-AIP-7c shipped (PR #292); BL-AIP-7d shipped (PRs #293, #294); BL-AIP-6b — the program's last slice — in PR (PR #295)
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -278,7 +278,7 @@ defect in the assessment plus its neighbours:
   Vercel's `waitUntil` so the instance is not frozen mid-flight; the
   nine `void …` sites use it.
 
-**BL-AIP-7a — stored, grounded, graded briefs** 🔄 (PR #284)
+**BL-AIP-7a — stored, grounded, graded briefs** ✅ (PR #284)
 
 - **Grounded.** The pursuit brief's snapshot now carries the calibrated
   PWin with its factors and track record (`computePwin`), recompete
@@ -313,7 +313,35 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7d (part ii) — AI-assisted onboarding from a UEI** 🔄 (PR #294)
+**BL-AIP-6b — the rail follows the cursor; review comments resolved in the editor** 🔄 (PR #295)
+
+- **Paragraph under the cursor.** `RichSectionEditor` reports the
+  plain text of the textblock the selection is in on every selection
+  or document change (`onCursorParagraph`); the research rail uses it
+  as the paragraph to research while it is still in the text
+  (`pickFocus`, pure) instead of the last edited paragraph, and a move
+  to a different paragraph of 40+ characters refreshes the lookup on
+  the same 2.5 s debounce (`focusMoved`, pure). The group reads "Brain
+  passages for the paragraph at your cursor".
+- **Review comments in the editor.** The sections page loads every
+  open, section-anchored colour-team comment of the proposal
+  (`listOpenReviewCommentsBySection`, `src/lib/section-review-comments.ts`,
+  scoped review → proposal → organization); each section row shows a
+  ✎ count and the expanded section lists them above the AI panel —
+  colour, reviewer or **FORGE AI**, the pre-review's severity parsed
+  from its body (`parseReviewBody`, pure), text, **Resolve** and a
+  link to the review. Resolve goes through `setReviewCommentResolved`,
+  now shared with the review page's toggle, audited
+  `proposal.review.comment.resolve` with `via: editor | review`, and
+  takes the comment out of the drafter's open-comment signals
+  (`writing-signals.ts` already read only unresolved ones).
+- Unit-tested (`tests/ai/research-signals.test.ts`,
+  `tests/ai/review-comments.test.ts`); runtime-tested
+  (`tests/isolation/section-review-comments.test.ts`): listing and
+  resolve read and write the deciding tenant only; audits carry the
+  origin. No migration.
+
+**BL-AIP-7d (part ii) — AI-assisted onboarding from a UEI** ✅ (PR #294)
 
 - **A "Getting started" panel on the Command Center** for org admins
   until the organization has a UEI, its NAICS, scout keywords and a
@@ -701,17 +729,14 @@ defect in the assessment plus its neighbours:
   proposal manager or a platform admin may pass `override.reason`
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
-**Queued slices (from the assessment, in order):**
-BL-AIP-6b paragraph-anchored rail (cursor
-position from the editor instead of the last edited paragraph) and
-"resolve" on AI review comments from the editor; BL-AIP-7 proactive
-scout / stored graded briefs / AI Engine controls. Details and evidence
-in the assessment report.
+**Queued slices:** none — BL-AIP-6b was the last slice the assessment
+scheduled. §8 of the assessment report describes what the program set
+out to deliver; new AI work starts a new ticket.
 
 ---
 
 ### BL-NAV-RESTORE — Put the full menu back in the everyday sidebar; admin items for admins only
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #290)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #290)
 
 User report (2026-09-30): after the workspace split "we have lost many
 menu items that were previously there and had some unique
@@ -805,7 +830,7 @@ Delivered:
 ---
 
 ### BL-TIER-ASSIGN — Platform admin cannot assign a first tier
-**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #282)
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #282)
 
 User report (2026-09-28, platform admin): on `/admin/orgs/<id>` for a
 tenant created on 9/23 the Subscription tier panel shows **No tier**,
@@ -900,7 +925,7 @@ expiry reminders; SSO domain auto-join.
 ---
 
 ### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
-**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #276)
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #276)
 
 User request (2026-09-25): "by DEFAULT people CAN ONLY join the tenant
 based on their email domain … no admin should be able to add anyone
@@ -1627,7 +1652,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
 ## Platform intelligence (Brain & Knowledge)
 
 ### BL-10 — Knowledge ingestion improvements
-**Priority:** P2  ·  **Effort:** M (phased)  ·  **Depends on:** —
+**Priority:** P2  ·  **Effort:** M (phased)  ·  **Depends on:** —  ·  **Status:** ✅ Phases A, B-1, B-2, C-1, C-2, D-1, D-2 shipped
 
 Per spec: "Knowledge — critical area where a company can dump all its
 historical data... The data provided here will be leveraged by the
@@ -1960,7 +1985,7 @@ modules. Constants moved into sibling `audit-retention-constants.ts`.
 ---
 
 ### BL-13 — Notifications rules engine
-**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** Phase A + B + C + D shipped; Phase E queued
+**Priority:** P0  ·  **Effort:** L  ·  **Depends on:** —  ·  **Status:** ✅ Phases A–E shipped (E-1, E-2a–E-2d below)
 
 Per spec: "notifications can be configured, who receives them, their
 frequency, and whether there is an SLA for escalations. These should
@@ -2451,7 +2476,7 @@ tenant" question without the security-sensitive surface.
   never invisible to the tenant.
 - ✅ *shipped (PR #229)*
 
-**Phase B-3c — Audit isolation status check** 🟡 in-flight:
+**Phase B-3c — Audit isolation status check** ✅ shipped (PR #239; runtime tests PR #241):
 - New table `isolation_check_result` (tenant-scoped via
   `organization_id`) carries per-run summary + a per-table jsonb
   details array.
@@ -2747,7 +2772,7 @@ Per spec: "currently active subscriptions, trials, subscription
 types, and expiring subscriptions."
 
 **Scope:**
-- Stripe (or Paddle / Lemon Squeezy — decision pending) integration
+- Stripe integration (decision: Slice 1 ADR, PR #218; Slices 1–5 shipped, Slice 5 paused pending launch readiness — see Active priorities)
 - Webhook handler for `customer.subscription.{created,updated,deleted}`
 - Trial management: 14-day default; configurable per tier; expiry
   notifications via BL-13

@@ -5,10 +5,39 @@ import { describe, expect, it } from "vitest";
 import {
   coverageScore,
   distinctiveTerms,
+  focusMoved,
   focusParagraph,
   itemsNotCovered,
+  pickFocus,
   shouldRefresh,
 } from "@/lib/research-signals";
+
+describe("BL-AIP-6b — cursor-anchored focus", () => {
+  const text = "First paragraph about staffing.\n\nSecond paragraph about transition.\n\nThird about pricing.";
+
+  it("prefers the paragraph under the cursor while it is still in the text", () => {
+    expect(pickFocus("Second paragraph about transition.", "", text)).toBe("Second paragraph about transition.");
+    expect(pickFocus("  Second paragraph about transition.  ", text, text)).toBe("Second paragraph about transition.");
+    // A stale cursor paragraph (no longer in the text) falls back to the edit
+    // heuristic: the first paragraph that differs from the previous text.
+    expect(pickFocus("Gone paragraph.", "", text)).toBe("First paragraph about staffing.");
+    expect(pickFocus("Gone paragraph.", "First paragraph about staffing.\n\nSecond paragraph about transition.", text)).toBe(
+      "Third about pricing.",
+    );
+    expect(pickFocus("", "First paragraph about staffing.\n\nSecond", text)).toBe("Second paragraph about transition.");
+    expect(pickFocus(null, "", "")).toBe("");
+  });
+
+  it("treats a move to another substantial paragraph as worth a lookup", () => {
+    const a = "A paragraph that is comfortably longer than forty characters.";
+    const b = "Another paragraph that is also comfortably longer than forty.";
+    expect(focusMoved(a, b)).toBe(true);
+    expect(focusMoved(a, a)).toBe(false);
+    expect(focusMoved(a, ` ${a} `)).toBe(false);
+    expect(focusMoved(a, "short")).toBe(false);
+    expect(focusMoved("", b)).toBe(true);
+  });
+});
 
 describe("BL-AIP-6 — coverage", () => {
   it("extracts distinctive terms and ignores stopwords", () => {

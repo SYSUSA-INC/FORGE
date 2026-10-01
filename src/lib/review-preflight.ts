@@ -38,7 +38,9 @@ import { log } from "@/lib/log";
 
 export const PREFLIGHT_MAX_SECTIONS = 8;
 export const PREFLIGHT_MAX_COMMENTS_PER_SECTION = 3;
-export const AI_REVIEW_PREFIX = "[FORGE AI pre-review";
+// BL-AIP-6b — the prefix lives in the pure module the editor parses it with.
+import { AI_REVIEW_PREFIX } from "@/lib/review-comments";
+export { AI_REVIEW_PREFIX };
 
 export type ReviewPreflightSummary = {
   sectionsReviewed: number;
