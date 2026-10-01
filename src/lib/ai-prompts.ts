@@ -1124,6 +1124,63 @@ export function buildBrainAnswerPrompt(input: {
 }
 
 /**
+ * BL-AIP-7d part ii — a starting setup from the SAM.gov registration.
+ *
+ * The only facts are the organization's own registration: name, NAICS
+ * codes, SBA certifications, state, website. The model proposes a
+ * capability-statement draft, scout keywords, extra NAICS to watch and
+ * target agencies; the admin edits everything before it is saved. Bump
+ * the version whenever the system prompt or the input layout changes.
+ */
+export const ONBOARDING_ASSIST_PROMPT_VERSION = "2026-10-01.1";
+
+export type OnboardingAssistInput = {
+  name: string;
+  state: string;
+  website: string;
+  primaryNaics: string;
+  naicsList: string[];
+  certifications: string[];
+  sbaDescriptions: string[];
+};
+
+const ONBOARDING_ASSIST_SYSTEM = `You help a small federal contractor set up FORGE — a federal proposal operations platform — on its first day, from nothing but its SAM.gov registration.
+
+Rules:
+- Use only the registration. You may use your general knowledge of what a NAICS code covers and which federal agencies buy in it; never invent contracts, customers, past performance, certifications, staff, or numbers for this company.
+- \`capabilityStatement\`: 3–6 sentences in the company's voice, present tense, that a proposal manager can edit into a real capability statement: what the company does (from the NAICS codes, in plain words, not code numbers), the set-asides it qualifies for, where it is based. Where a real statement would need a fact you do not have (a contract, a customer, a clearance), write a bracketed placeholder such as [customer] or [contract number] rather than guessing.
+- \`scoutKeywords\`: 5–10 short search terms (1–3 words each) that find this company's kind of work on SAM.gov — the services behind its NAICS codes, not the codes themselves and not generic words like "services" or "government".
+- \`extraNaics\`: up to 5 NAICS codes the company does not list but that buyers commonly use for the same work; digits only; an empty list is fine.
+- \`targetAgencies\`: 3–6 federal agencies or components that buy heavily in these NAICS codes, each with one sentence of \`why\` (what they buy, any small-business set-aside pattern). Prefer specific components (e.g. "Naval Information Warfare Systems Command") over departments when the work is specific.
+- Answer through the record_onboarding_setup tool.`;
+
+export const onboardingAssistSchema = z.object({
+  capabilityStatement: z.string(),
+  scoutKeywords: z.array(z.string()),
+  extraNaics: z.array(z.string()),
+  targetAgencies: z.array(z.object({ name: z.string(), why: z.string() })),
+});
+
+export function buildOnboardingAssistPrompt(
+  input: OnboardingAssistInput,
+): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Propose a starting setup for ${input.name || "this company"}.`,
+    ``,
+    `Registration (JSON):`,
+    "```json",
+    JSON.stringify(input, null, 2),
+    "```",
+    ``,
+    `Record the setup with the record_onboarding_setup tool.`,
+  ].join("\n");
+  return {
+    system: ONBOARDING_ASSIST_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+/**
  * Phase 10c — Brain knowledge extraction.
  *
  * Reads an artifact's raw text and proposes structured KB candidates

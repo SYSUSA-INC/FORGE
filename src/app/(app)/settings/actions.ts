@@ -10,7 +10,7 @@ import {
   requireOrgAdmin,
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
-import { fetchSamGovByUei } from "@/lib/samgov";
+import { applySamGovProfile } from "@/lib/onboarding";
 import type { OrgProfile } from "@/lib/org-types";
 import { hasErrors, validateOrgProfile } from "@/lib/validators";
 import { log } from "@/lib/log";
@@ -141,51 +141,19 @@ export async function applySamGovSyncAction(uei: string): Promise<
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
-  const result = await fetchSamGovByUei(uei.trim());
-  if (!result.ok) {
-    return { ok: false, error: result.error };
-  }
-
-  const p = result.profile;
-
+  // BL-AIP-7d part ii — the pull + write lives in src/lib/onboarding.ts,
+  // shared with the Command Center's Getting-started panel.
   try {
-    await db
-      .update(organizations)
-      .set({
-        name: p.name || undefined,
-        website: p.website,
-        uei: p.uei,
-        cageCode: p.cageCode,
-        dunsNumber: p.dunsNumber,
-        addressLine1: p.address.line1,
-        addressLine2: p.address.line2,
-        city: p.address.city,
-        state: p.address.state,
-        zip: p.address.zip,
-        country: p.address.country,
-        contactName: p.contactName,
-        contactTitle: p.contactTitle,
-        phone: p.phone,
-        email: p.email,
-        primaryNaics: p.primaryNaics,
-        naicsList: p.naicsList,
-        socioEconomic: p.socioEconomic,
-        syncSource: "samgov",
-        lastSyncedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(organizations.id, organizationId));
-
-    await recordAudit({
+    const result = await applySamGovProfile({
       organizationId,
+      uei,
       actor: { userId: actor.id, email: actor.email },
-      action: "settings.samgov_sync",
-      resourceType: "organization",
-      resourceId: organizationId,
-      metadata: { uei },
+      via: "settings",
     });
+    if (!result.ok) return { ok: false, error: result.error };
 
     revalidatePath("/settings");
+    revalidatePath("/");
     return { ok: true };
   } catch (err) {
     log.error("[applySamGovSyncAction]", "failed", { error: err });

@@ -44,6 +44,9 @@ export const AI_FEATURES = {
   // BL-AIP-7d — a question typed into the ⌘K palette, answered from the
   // org's own Brain with citations.
   brain_answer: "Brain answer (⌘K)",
+  // BL-AIP-7d part ii — a starting setup (capability statement, scout
+  // keywords, target agencies) proposed from the SAM.gov registration.
+  onboarding_assist: "Onboarding assistant",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;
