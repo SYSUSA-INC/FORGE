@@ -127,7 +127,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a shipped (PR #284); BL-AIP-7b shipped (PRs #288, #289, #291); BL-AIP-7c shipped (PR #292); BL-AIP-7d shipped (PRs #293, #294); BL-AIP-6b — the program's last slice — in PR (PR pending)
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a shipped (PR #284); BL-AIP-7b shipped (PRs #288, #289, #291); BL-AIP-7c shipped (PR #292); BL-AIP-7d shipped (PRs #293, #294); BL-AIP-6b — the program's last slice — in PR (PR #295)
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -313,7 +313,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-6b — the rail follows the cursor; review comments resolved in the editor** 🔄 (PR pending)
+**BL-AIP-6b — the rail follows the cursor; review comments resolved in the editor** 🔄 (PR #295)
 
 - **Paragraph under the cursor.** `RichSectionEditor` reports the
   plain text of the textblock the selection is in on every selection
