@@ -6,6 +6,7 @@ import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_LABELS as OPP_STAGE_LABELS } from "@/lib/opportunity-types";
 import { STAGE_LABELS as PROP_STAGE_LABELS } from "@/lib/proposal-types";
 import { CommandCenterStageGrid } from "./CommandCenterStageGrid";
+import { GettingStartedPanel } from "./GettingStartedPanel";
 import { PwinMoversPanel } from "./PwinMoversPanel";
 import { RecompeteAttentionPanel } from "./RecompeteAttentionPanel";
 
@@ -19,8 +20,9 @@ export const dynamic = "force-dynamic";
  * the dashboard is where you go to drill in.
  */
 export default async function DashboardPage() {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  const isOrgAdmin = user.role === "admin" || user.isSuperadmin;
 
   const snap = await getOrganizationSnapshot(organizationId);
 
@@ -77,6 +79,11 @@ export default async function DashboardPage() {
           },
         ]}
       />
+
+      {/* BL-AIP-7d part ii — setup from the SAM.gov registration, for
+          org admins, until UEI, NAICS, scout keywords and a capability
+          statement are all in place. */}
+      <GettingStartedPanel organizationId={organizationId} isOrgAdmin={isOrgAdmin} />
 
       {/* Stage widget grid — same data + visuals as /opportunities so
           the two pages can never disagree. Click a tile to drill into

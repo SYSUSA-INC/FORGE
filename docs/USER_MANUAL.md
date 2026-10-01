@@ -149,6 +149,15 @@ The **Opportunities Dashboard** (`/opportunities`) is the same tile grid plus an
 
 Both pages source from the same `getOrganizationSnapshot()` aggregate, so the numbers can't disagree. Mutations on either page (creating an opportunity, advancing a stage, closing a review, etc.) refresh the Command Center on the next nav with no manual reload.
 
+#### 2.2.1 Getting started from your UEI (org admins)
+
+Until your organization has a UEI, its NAICS codes, scout keywords and a capability statement, org admins see a **Getting started** panel at the top of the Command Center (members never see it, and it disappears on its own once the four are in place):
+
+1. **Your SAM.gov registration** — enter your 12-character Unique Entity ID and click **Pull from SAM.gov**. FORGE fills in the company profile (name, address, CAGE, NAICS codes, set-asides) exactly as **Settings → Sync from SAM.gov** would. If the panel says SAM.gov lookups are not configured, ask your platform administrator, or fill the profile by hand under Settings.
+2. **A starting setup, proposed by the AI** — click **Propose a starting setup**. From the registration alone the AI drafts a **capability statement** (bracketed placeholders such as `[contract number]` mark facts only you can supply — it never invents contracts, customers or staff), picks **scout keywords**, suggests **extra NAICS to watch** and names **target agencies** with a reason each. Edit the text, remove or add keywords (Enter adds one), remove codes or agencies, then **Save to FORGE**: the keywords and extra NAICS go to the Scout profile (added to anything already there), the statement becomes a knowledge entry tagged `onboarding` that the Brain can cite, and the target agencies are kept with it. Tick **Run the scout now** to get the first overnight-style finds immediately. **Propose again** asks for a fresh proposal.
+
+If AI is not enabled for your plan the second step explains why; when the platform runs without a live AI provider the proposal is built from the registration only and says so.
+
 ---
 
 ## 3. Roles & responsibilities

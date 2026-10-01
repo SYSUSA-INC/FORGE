@@ -313,7 +313,37 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-7d (part i) — ⌘K: pages, records and Brain answers from one box** 🔄 (PR #293)
+**BL-AIP-7d (part ii) — AI-assisted onboarding from a UEI** 🔄 (PR #294)
+
+- **A "Getting started" panel on the Command Center** for org admins
+  until the organization has a UEI, its NAICS, scout keywords and a
+  capability entry (`onboardingStatus`, pure; `getOnboardingState`).
+  Nothing for members; nothing once complete.
+- **Step 1 — the registration.** A 12-character UEI pulls the SAM.gov
+  entity onto the organization (`applySamGovProfile`,
+  `src/lib/onboarding.ts`, now also behind Settings → Sync from SAM.gov;
+  audited `settings.samgov_sync` with `via`).
+- **Step 2 — a starting setup from the AI.** `proposeOnboarding` sends
+  the registration alone to the new `onboarding_assist` feature
+  (standard class, `ONBOARDING_ASSIST_PROMPT_VERSION`): a
+  capability-statement draft with bracketed placeholders for facts the
+  model cannot know, 5–10 scout keywords, up to 5 extra NAICS, 3–6
+  target agencies with a reason each. Gated by `aiAutoDraft` and the
+  request quota (refunded when unusable); in stub mode or on an
+  unusable answer `fallbackProposal` (pure) builds a placeholder from
+  the registration. Everything is editable (`sanitizeProposal`, pure:
+  caps, de-duplication, NAICS digits only and never a code the
+  organization already has).
+- **Save.** `applyOnboardingProposal` merges keywords and extra NAICS
+  into the scout profile (never replacing), stores the statement as a
+  `capability` knowledge entry tagged `onboarding` with the agencies in
+  its metadata (quality-scored, embedded best-effort), and optionally
+  runs the scout once. Audited `onboarding.assist.generate`,
+  `onboarding.apply` (+ `scout.run`). Unit- and runtime-tested
+  (`tests/ai/onboarding.test.ts`, `tests/isolation/onboarding.test.ts`:
+  deciding tenant only; merge semantics; audits). No migration.
+
+**BL-AIP-7d (part i) — ⌘K: pages, records and Brain answers from one box** ✅ (PR #293)
 
 - **The header search works.** The dead input with the ⌘K badge
   (assessment §5 row 1) is now a button that opens the command palette;
@@ -672,8 +702,7 @@ defect in the assessment plus its neighbours:
   (≥ 10 chars), recorded as `proposal.export.gate_override`.
 
 **Queued slices (from the assessment, in order):**
-BL-AIP-7d part ii AI-assisted onboarding from UEI; BL-AIP-6b
-paragraph-anchored rail (cursor
+BL-AIP-6b paragraph-anchored rail (cursor
 position from the editor instead of the last edited paragraph) and
 "resolve" on AI review comments from the editor; BL-AIP-7 proactive
 scout / stored graded briefs / AI Engine controls. Details and evidence
