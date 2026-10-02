@@ -151,6 +151,18 @@ type Props = {
   improveRequest?: { hint: string; nonce: number } | null;
   /** Reports whether a draft pass is running (the tone panel disables its button). */
   onPendingChange?: (pending: boolean) => void;
+  /**
+   * BL-FB-CHAT-SIDEBYSIDE — "side" puts the panel in the left pane next
+   * to the draft: always open, on the Chat tab, with a taller thread.
+   */
+  layout?: "stacked" | "side";
+  onLayoutChange?: (layout: "stacked" | "side") => void;
+  /**
+   * The chat reply as it streams and once it is done — or an earlier
+   * reply the author asks to preview (`explicit`) — so the right pane can
+   * show it as edits to the draft. null clears the preview.
+   */
+  onSuggestion?: (s: { text: string; streaming: boolean; explicit: boolean } | null) => void;
 };
 
 /** The routes cap the live body at 60k characters. */
@@ -183,9 +195,17 @@ export function AiAssistantPanel({
   onApplyTracked,
   improveRequest,
   onPendingChange,
+  layout = "stacked",
+  onLayoutChange,
+  onSuggestion,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
+  // BL-FB-CHAT-SIDEBYSIDE — the left pane is always open, on the chat.
+  const isOpen = open || layout === "side";
+  useEffect(() => {
+    if (layout === "side") setActiveTab("chat");
+  }, [layout]);
 
   // Generate tab state. `pending` is plain state (not useTransition)
   // because the draft streams over fetch rather than a server action.
@@ -420,6 +440,7 @@ export function AiAssistantPanel({
     if (!msg || chatPending) return;
     setChatInput("");
     setChatError(null);
+    onSuggestion?.(null);
 
     const priorHistory = chatHistory;
     // Optimistic user turn + an empty assistant bubble that fills in as
@@ -480,14 +501,17 @@ export function AiAssistantPanel({
           if (ev.type === "delta") {
             acc += ev.text;
             setAssistant(acc);
+            onSuggestion?.({ text: acc, streaming: true, explicit: false });
             scroll();
           } else if (ev.type === "done") {
             finished = true;
             setAssistant(ev.reply);
+            onSuggestion?.({ text: ev.reply, streaming: false, explicit: false });
             scroll();
           } else {
             finished = true;
             setChatError(ev.error);
+            onSuggestion?.(null);
             rollback();
           }
         },
@@ -495,11 +519,13 @@ export function AiAssistantPanel({
       );
       if (!finished && !ac.signal.aborted) {
         setChatError("The connection closed before the reply finished.");
+        onSuggestion?.(null);
         rollback();
       }
     } catch (err) {
       if (!ac.signal.aborted) {
         setChatError(err instanceof Error ? err.message : "Chat request failed.");
+        onSuggestion?.(null);
         rollback();
       }
     } finally {
@@ -562,7 +588,7 @@ export function AiAssistantPanel({
     });
   }
 
-  if (!open) {
+  if (!isOpen) {
     return (
       <button
         type="button"
@@ -599,18 +625,33 @@ export function AiAssistantPanel({
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            cancelDraft();
-            setOpen(false);
-            setResult(null);
-            setError(null);
-          }}
-          className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text"
-        >
-          Close
-        </button>
+        <div className="flex items-center gap-3">
+          {/* BL-FB-CHAT-SIDEBYSIDE — chat beside the draft, or stacked above it */}
+          {onLayoutChange ? (
+            <button
+              type="button"
+              onClick={() => onLayoutChange(layout === "side" ? "stacked" : "side")}
+              className="hidden font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text md:inline"
+              title={layout === "side" ? "Stack the AI panel above the draft" : "Chat on the left, draft on the right"}
+            >
+              {layout === "side" ? "⇆ Stacked" : "⇆ Side by side"}
+            </button>
+          ) : null}
+          {layout !== "side" ? (
+            <button
+              type="button"
+              onClick={() => {
+                cancelDraft();
+                setOpen(false);
+                setResult(null);
+                setError(null);
+              }}
+              className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text"
+            >
+              Close
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* ── Generate tab ── */}
@@ -901,7 +942,11 @@ export function AiAssistantPanel({
 
           {/* Message history */}
           {chatHistory.length > 0 ? (
-            <div className="flex max-h-[340px] flex-col gap-2 overflow-y-auto rounded-md border border-layer/10 bg-canvas p-2">
+            <div
+              className={`flex flex-col gap-2 overflow-y-auto rounded-md border border-layer/10 bg-canvas p-2 ${
+                layout === "side" ? "max-h-[55vh]" : "max-h-[340px]"
+              }`}
+            >
               {chatHistory.map((msg, i) => (
                 <div
                   key={i}
@@ -922,15 +967,28 @@ export function AiAssistantPanel({
                     }`}
                   >
                     <div className="whitespace-pre-wrap">{msg.content}</div>
-                    {msg.role === "assistant" ? (
-                      <button
-                        type="button"
-                        onClick={() => applyChatSuggestion(msg.content)}
-                        className="mt-1.5 font-mono text-[9px] uppercase tracking-wider text-teal hover:text-teal/80"
-                        title={canApplyTracked ? "Apply as tracked changes by FORGE AI" : "Replace the section with this text"}
-                      >
-                        {canApplyTracked ? "Apply as tracked changes ↑" : "Apply to section ↑"}
-                      </button>
+                    {msg.role === "assistant" && msg.content ? (
+                      <div className="mt-1.5 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => applyChatSuggestion(msg.content)}
+                          className="font-mono text-[9px] uppercase tracking-wider text-teal hover:text-teal/80"
+                          title={canApplyTracked ? "Apply as tracked changes by FORGE AI" : "Replace the section with this text"}
+                        >
+                          {canApplyTracked ? "Apply as tracked changes ↑" : "Apply to section ↑"}
+                        </button>
+                        {/* BL-FB-CHAT-SIDEBYSIDE — pick paragraphs in the right pane first */}
+                        {layout === "side" && onSuggestion ? (
+                          <button
+                            type="button"
+                            onClick={() => onSuggestion({ text: msg.content, streaming: false, explicit: true })}
+                            className="font-mono text-[9px] uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
+                            title="Show this reply as edits to the draft, paragraph by paragraph"
+                          >
+                            Preview as edits →
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -1032,6 +1090,7 @@ export function AiAssistantPanel({
                 setChatHistory([]);
                 setAttachments([]);
                 setChatError(null);
+                onSuggestion?.(null);
                 // BL-FB-CHAT-PERSIST — clear the saved thread too (and its attachments).
                 void clearSectionChatAction(sectionId).then((res) => {
                   if (!res.ok) setChatError(res.error);

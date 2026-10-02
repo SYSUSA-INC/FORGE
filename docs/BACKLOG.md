@@ -1110,8 +1110,42 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #300)
+
+Chat on the left, the draft on the right. A reply that reads as a
+rewrite is previewed against the draft paragraph by paragraph while it
+streams, and the author picks which paragraphs to take before they
+land as tracked changes — surgical edits instead of all-or-nothing.
+
+- **The layout.** **⇆ Side by side** in the AI panel's header (and in
+  the content header when stacked) puts the panel in a left pane,
+  always open on the Chat tab with a taller thread, and the content
+  header, editor and preview in a right pane; Brain passages and
+  content blocks move below the panes. Remembered per browser
+  (`forge.sections.sideBySide`); one column on narrow screens.
+- **The preview.** `previewOps` (`src/lib/draft-preview.ts`, pure)
+  aligns the reply to the draft with the same rule as
+  `applyAsTrackedChanges` — normalised paragraphs, a removed run paired
+  with the added run that follows while they resemble each other
+  (`PAIR_THRESHOLD`, now exported) — into kept / new / removed / edited
+  ops, edited ones with word-level parts. `looksLikeRewrite` opens the
+  preview as soon as a streaming reply keeps or edits a paragraph of
+  the draft (forty words into an empty draft); an answer about the
+  draft leaves the editor in view, with **Preview as edits →** on the
+  message for the author to open it anyway. The editor stays mounted
+  behind the preview so collab and track-changes state survive.
+- **Pick, then apply.** `DraftPreview` lists the ops with a checkbox
+  per change; **Apply n of m as tracked changes** composes the text
+  (`composeSelection`: unticked paragraphs stay exactly as the draft
+  has them) and hands it to the existing tracked apply, so every change
+  is still accepted or rejected in Track changes and recorded against
+  FORGE AI. Taking all gives the reply; taking none gives the draft.
+- Unit-tested (`tests/ai/draft-preview.test.ts`). No server change,
+  no migration.
+
 ### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299)
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #299)
 
 The section header shows live pages against the cap as the author
 types — "4.2 / 3 pages · over by 1.2" — as a colour-coded ring. No
@@ -1130,7 +1164,7 @@ interruption to typing; constant visibility. Companion to Tighten.
 - Unit-tested (`tests/ai/page-budget.test.ts`). No migration.
 
 ### BL-FB-SCAN-TONE — Reading-level + tone enforcement
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299)
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #299)
 
 Marketing language, passive voice and reading level, checked in the
 browser as the author types, with click-to-fix into Improve mode.
@@ -4582,7 +4616,7 @@ Cross-volume claim extraction + reconciliation. High-value for
 multi-volume responses where different writers own different volumes.
 
 ### BL-FB-SCAN-TONE — Reading-level + tone enforcement
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #299) — canonical entry under Active priorities
 
 Flag marketing-speak ("world-class," "best-in-class," "robust",
 "leverage"), passive voice over a threshold, and reading-level above
@@ -4591,7 +4625,7 @@ score; click-to-fix surfaces an Improve-mode draft pre-loaded with
 the offending phrases.
 
 ### BL-FB-SCAN-PAGE-REALTIME — Realtime page-budget warnings
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #299) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #299) — canonical entry under Active priorities
 
 Section header shows live page count vs cap as the user types
 (4.2 / 3 pages — over by 1.2 pages). Color-coded ring. No interruption
@@ -4707,7 +4741,7 @@ Technical Approach on this structure"). Document is scoped to the
 conversation, not persisted to the KB unless explicitly saved.
 
 ### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #300) — canonical entry under Active priorities
 
 Cursor-style two-pane layout: chat left, live section draft right.
 AI-suggested edits stream into the draft in real time; user accepts
