@@ -1110,8 +1110,40 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-CHAT-SLASH — Slash commands in chat
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+
+Power-user shortcuts in the section chat for the instructions authors
+type most. Each command expands to a full, structured instruction the
+model receives; the thread stores and shows what the author typed.
+
+- **Five commands.** `/win-theme [theme]` (reinforce every win theme,
+  or theme *n* / a named one), `/shrink-by 30%` (also `200 words`,
+  `1 page`; keeps every fact, number, marker and reference),
+  `/add-citation` (mark every concrete claim with its source or
+  `[NEEDS CITATION]`), `/check-compliance` (ADDRESSED / PARTLY / MISSING
+  per mapped requirement with the sentence that addresses it, the
+  counts and the three gaps to close first; never rewrites) and `/voc`
+  (rewrite in the customer's own words where the topic matches, never
+  forced). `src/lib/chat-commands.ts` (pure): the registry,
+  `parseSlashCommand`, `suggestCommands`, `parseShrinkTarget`,
+  `expandSlashCommand`, `describeSlashCommand`, `messageForModel`.
+- **Expanded server-side.** `/api/ai/chat` and `chatWithSectionAction`
+  refuse a malformed command with its usage before any gate, quota or
+  rate limit is spent; `prepareSectionChat` hands the model the
+  expansion of the new turn and of earlier command turns in the
+  history, while `section_chat_message` keeps the raw command so the
+  thread reads as typed. The system prompt is unchanged.
+- **In the chat tab.** Typing `/` opens a popover of matching commands
+  (arrow keys, Tab or Enter to pick; it closes once the token is exactly
+  one command so Enter sends); a row of command chips under the box
+  starts one with a click; a command turn renders as the command with
+  its meaning beneath; a bad command is explained in place with the
+  text left to fix.
+- Unit-tested (`tests/ai/chat-commands.test.ts`). No migration.
+
 ### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #300)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #300)
 
 Chat on the left, the draft on the right. A reply that reads as a
 rewrite is previewed against the draft paragraph by paragraph while it
@@ -4741,7 +4773,7 @@ Technical Approach on this structure"). Document is scoped to the
 conversation, not persisted to the KB unless explicitly saved.
 
 ### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #300) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #300) — canonical entry under Active priorities
 
 Cursor-style two-pane layout: chat left, live section draft right.
 AI-suggested edits stream into the draft in real time; user accepts
@@ -4750,7 +4782,7 @@ current "Apply to section" full-replace flow when the user wants
 surgical edits.
 
 ### BL-FB-CHAT-SLASH — Slash commands in chat
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
 
 Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
 `/check-compliance`, `/voc` (rewrite in voice-of-customer). Each maps

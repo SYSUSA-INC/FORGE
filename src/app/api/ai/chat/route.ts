@@ -3,6 +3,7 @@ import { z } from "zod";
 import { completeForTenant } from "@/lib/ai";
 import type { ChatStreamEvent } from "@/lib/ai-stream-types";
 import { requireApiTenant } from "@/lib/api-tenant";
+import { expandSlashCommand } from "@/lib/chat-commands";
 import { log } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
@@ -58,6 +59,13 @@ export async function POST(req: NextRequest) {
       { ok: false, error: "Invalid request." },
       { status: 400 },
     );
+  }
+
+  // BL-FB-CHAT-SLASH — a malformed command is refused with its usage
+  // before any gate, quota or rate limit is spent.
+  const slash = expandSlashCommand(body.message);
+  if (slash && !slash.ok) {
+    return NextResponse.json({ ok: false, error: slash.error }, { status: 400 });
   }
 
   try {

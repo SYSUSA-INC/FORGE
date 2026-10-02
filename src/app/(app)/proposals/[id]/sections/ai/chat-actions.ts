@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { completeForTenant } from "@/lib/ai";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { expandSlashCommand } from "@/lib/chat-commands";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   attachChatDocument,
@@ -123,6 +124,10 @@ export async function chatWithSectionAction(input: {
 }): Promise<ChatWithSectionResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+
+  // BL-FB-CHAT-SLASH — a malformed command is refused before any gate is spent.
+  const slash = expandSlashCommand(String(input.message ?? ""));
+  if (slash && !slash.ok) return { ok: false, error: slash.error };
 
   try {
     await ensureFeature(organizationId, "aiAutoDraft");

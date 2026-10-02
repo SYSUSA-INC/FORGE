@@ -20,6 +20,13 @@ import {
   type ChatMessage,
 } from "./chat-actions";
 import { CHAT_ATTACHMENT_ACCEPT, describeChars } from "@/lib/chat-attachments-logic";
+import {
+  CHAT_COMMANDS,
+  describeSlashCommand,
+  expandSlashCommand,
+  suggestCommands,
+  type ChatCommand,
+} from "@/lib/chat-commands";
 import type { SectionDraftMode } from "@/lib/ai-prompts";
 import {
   isChatStreamEvent,
@@ -252,6 +259,8 @@ export function AiAssistantPanel({
   const [chatPending, setChatPending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  // BL-FB-CHAT-SLASH — the highlighted row of the command popover.
+  const [slashIndex, setSlashIndex] = useState(0);
 
   // BL-FB-CHAT-PERSIST — load the section's thread the first time the
   // chat tab is shown, so reopening a section resumes the conversation.
@@ -438,6 +447,13 @@ export function AiAssistantPanel({
   async function sendChat() {
     const msg = chatInput.trim();
     if (!msg || chatPending) return;
+    // BL-FB-CHAT-SLASH — a malformed command is explained here, with the
+    // text left in place to fix; the server refuses it the same way.
+    const slash = expandSlashCommand(msg);
+    if (slash && !slash.ok) {
+      setChatError(slash.error);
+      return;
+    }
     setChatInput("");
     setChatError(null);
     onSuggestion?.(null);
@@ -586,6 +602,21 @@ export function AiAssistantPanel({
     import("@/lib/tiptap-doc").then(({ fromPlainText }) => {
       onAccept(fromPlainText(text), text, words);
     });
+  }
+
+  // BL-FB-CHAT-SLASH — while the author types a command token, the
+  // matching commands show above the box; once the token is exactly one
+  // command the popover closes so Enter sends.
+  const slashToken = chatInput.startsWith("/") && !/\s/.test(chatInput) ? chatInput.slice(1) : null;
+  const slashOptions = slashToken !== null ? suggestCommands(slashToken) : [];
+  const slashOpen =
+    !chatPending &&
+    slashOptions.length > 0 &&
+    !(slashOptions.length === 1 && slashOptions[0]!.name === slashToken?.toLowerCase());
+  function pickCommand(c: ChatCommand) {
+    setChatInput(c.takesArgs === "none" ? `/${c.name}` : `/${c.name} `);
+    setSlashIndex(0);
+    setChatError(null);
   }
 
   if (!isOpen) {
@@ -966,7 +997,15 @@ export function AiAssistantPanel({
                         : "border border-layer/10 bg-layer/[0.03] text-foreground"
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    {msg.role === "user" && describeSlashCommand(msg.content) ? (
+                      /* BL-FB-CHAT-SLASH — a command turn shows as what was typed, with its meaning */
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-[11px] text-teal">{msg.content.trim()}</span>
+                        <span className="font-body text-[10px] text-muted">{describeSlashCommand(msg.content)}</span>
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    )}
                     {msg.role === "assistant" && msg.content ? (
                       <div className="mt-1.5 flex flex-wrap gap-3">
                         <button
@@ -1058,18 +1097,69 @@ export function AiAssistantPanel({
             </label>
           </div>
 
+          {/* BL-FB-CHAT-SLASH — command popover */}
+          {slashOpen ? (
+            <ul
+              role="listbox"
+              aria-label="Chat commands"
+              className="flex flex-col rounded-md border border-teal/30 bg-canvas p-1"
+            >
+              {slashOptions.map((c, i) => (
+                <li key={c.name} role="option" aria-selected={i === slashIndex}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      pickCommand(c);
+                    }}
+                    onMouseEnter={() => setSlashIndex(i)}
+                    className={`flex w-full items-baseline gap-3 rounded px-2 py-1 text-left ${
+                      i === slashIndex ? "bg-teal/15" : "hover:bg-layer/[0.05]"
+                    }`}
+                  >
+                    <span className="shrink-0 font-mono text-[11px] text-teal">{c.usage}</span>
+                    <span className="min-w-0 font-body text-[11px] text-muted">
+                      {c.description}
+                      {c.argsHint ? <span className="text-subtle"> · {c.argsHint}</span> : null}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
           {/* Input */}
           <div className="flex gap-2">
             <textarea
               value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
+              onChange={(e) => {
+                setChatInput(e.target.value);
+                setSlashIndex(0);
+              }}
               onKeyDown={(e) => {
+                if (slashOpen) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSlashIndex((i) => (i + 1) % slashOptions.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSlashIndex((i) => (i - 1 + slashOptions.length) % slashOptions.length);
+                    return;
+                  }
+                  if (e.key === "Tab" || e.key === "Enter") {
+                    e.preventDefault();
+                    pickCommand(slashOptions[Math.min(slashIndex, slashOptions.length - 1)]!);
+                    return;
+                  }
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   sendChat();
                 }
               }}
-              placeholder="Ask about this section… (Enter to send, Shift+Enter for newline)"
+              placeholder="Ask about this section… (Enter to send, Shift+Enter for newline, / for commands)"
               rows={2}
               className="flex-1 resize-none rounded-md border border-layer/10 bg-layer/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-muted/50 focus:border-teal/40 focus:outline-none"
             />
@@ -1082,6 +1172,23 @@ export function AiAssistantPanel({
               Send
             </button>
           </div>
+          {/* BL-FB-CHAT-SLASH — the commands, one click to start one */}
+          {!chatInput ? (
+            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-subtle">
+              <span>Commands</span>
+              {CHAT_COMMANDS.map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  onClick={() => pickCommand(c)}
+                  className="rounded border border-layer/10 px-1.5 py-0.5 normal-case tracking-normal text-muted hover:border-teal/40 hover:text-teal"
+                  title={c.description}
+                >
+                  /{c.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {chatHistory.length > 0 ? (
             <button
               type="button"

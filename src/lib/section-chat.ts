@@ -27,6 +27,7 @@ import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { voiceGuidance } from "@/lib/customer-voice";
 import { getCustomerVoice } from "@/lib/customer-voice-signals";
 import { renderAttachmentsBlock } from "@/lib/chat-attachments-logic";
+import { messageForModel } from "@/lib/chat-commands";
 import { deleteChatAttachmentsForSection, loadChatAttachmentTexts } from "@/lib/section-chat-attachments";
 import { gatherWritingSignals, renderWritingSignals } from "@/lib/writing-signals";
 
@@ -222,12 +223,15 @@ export async function prepareSectionChat(input: {
     .filter(Boolean)
     .join("\n");
 
+  // BL-FB-CHAT-SLASH — the thread stores what the author typed
+  // ("/shrink-by 30%"); the model reads the command's expansion, for the
+  // new turn and for earlier command turns in the history alike.
   const messages: AIMessage[] = [
     ...input.history.slice(-CHAT_HISTORY_TURNS).map((m) => ({
       role: m.role,
-      content: m.content,
+      content: m.role === "user" ? messageForModel(m.content) : m.content,
     })),
-    { role: "user" as const, content: input.message },
+    { role: "user" as const, content: messageForModel(input.message) },
   ];
 
   return {
