@@ -107,7 +107,8 @@ export function paragraphSimilarity(a: string, b: string): number {
   return union === 0 ? 0 : inter / union;
 }
 
-const PAIR_THRESHOLD = 0.3;
+/** Similarity at or above which a removed and an added paragraph are "the same one, edited". */
+export const PAIR_THRESHOLD = 0.3;
 
 /** Split a rewrite into paragraphs the way fromPlainText does. */
 export function splitParagraphs(text: string): string[] {

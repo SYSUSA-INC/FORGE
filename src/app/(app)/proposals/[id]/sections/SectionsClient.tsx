@@ -28,8 +28,10 @@ import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import { ContentBlocksPanel } from "./ai/ContentBlocksPanel";
 import { ResearchRail } from "./ai/ResearchRail";
 import { TonePanel } from "./ai/TonePanel";
+import { DraftPreview } from "./ai/DraftPreview";
 import { PageBudgetRing } from "./PageBudgetRing";
 import { normalizePageCap } from "@/lib/page-budget";
+import { looksLikeRewrite, previewOps } from "@/lib/draft-preview";
 import { ReviewCommentsPanel } from "./ReviewCommentsPanel";
 import { describeOpenComments, type SectionReviewComment } from "@/lib/review-comments";
 import {
@@ -74,6 +76,9 @@ type CurrentUser = {
   id: string;
   displayName: string;
 };
+
+/** BL-FB-CHAT-SIDEBYSIDE — the layout choice, remembered per browser. */
+const SIDE_BY_SIDE_KEY = "forge.sections.sideBySide";
 
 const STATUSES: ProposalSectionStatus[] = [
   "not_started",
@@ -410,6 +415,66 @@ function SectionRow({
   // mode in the AI panel with the findings as guidance.
   const [improveRequest, setImproveRequest] = useState<{ hint: string; nonce: number } | null>(null);
   const [aiPending, setAiPending] = useState(false);
+  // BL-FB-CHAT-SIDEBYSIDE — chat on the left, draft on the right; a reply
+  // that reads as a rewrite is previewed against the draft paragraph by
+  // paragraph and applied as tracked changes, paragraphs of the author's
+  // choosing.
+  const [sideBySide, setSideBySide] = useState(false);
+  useEffect(() => {
+    try {
+      setSideBySide(window.localStorage.getItem(SIDE_BY_SIDE_KEY) === "1");
+    } catch {
+      // no storage — stacked
+    }
+  }, []);
+  const [suggestion, setSuggestion] = useState<{ id: number; text: string; streaming: boolean } | null>(null);
+  const [rightTab, setRightTab] = useState<"draft" | "preview">("draft");
+  const previewDecidedRef = useRef(false);
+  function changeLayout(next: "stacked" | "side") {
+    setSideBySide(next === "side");
+    if (next === "stacked") setRightTab("draft");
+    try {
+      window.localStorage.setItem(SIDE_BY_SIDE_KEY, next === "side" ? "1" : "0");
+    } catch {
+      // no storage — this visit only
+    }
+  }
+  function onSuggestion(s: { text: string; streaming: boolean; explicit: boolean } | null) {
+    if (!s || !s.text.trim()) {
+      setSuggestion(null);
+      setRightTab("draft");
+      previewDecidedRef.current = false;
+      return;
+    }
+    if (!sideBySide) return;
+    setSuggestion((prev) => ({ id: prev && !s.explicit ? prev.id : Date.now(), text: s.text, streaming: s.streaming }));
+    if (s.explicit) {
+      setRightTab("preview");
+      previewDecidedRef.current = true;
+      return;
+    }
+    // Open the preview as soon as the reply reads as a rewrite of the
+    // draft; an answer about the draft leaves the editor in view.
+    if (previewDecidedRef.current) return;
+    const draft = plainRef.current;
+    if (looksLikeRewrite(previewOps(draft, s.text), !draft.trim())) {
+      setRightTab("preview");
+      previewDecidedRef.current = true;
+    } else if (!s.streaming) {
+      previewDecidedRef.current = true;
+    }
+  }
+  function applyPreview(text: string) {
+    if (plainRef.current.trim()) {
+      applyTracked(text);
+    } else {
+      const next = text.trim();
+      replaceDoc(fromPlainText(next), next, next.split(/\s+/).filter(Boolean).length);
+    }
+    setRightTab("draft");
+    setSuggestion(null);
+    previewDecidedRef.current = false;
+  }
   // BL-FB-SCAN-PAGE-REALTIME — the cap as typed, so the ring follows an
   // unsaved cap change too.
   const liveCap = normalizePageCap(pageLimit);
@@ -549,6 +614,42 @@ function SectionRow({
 
   const words = wordCount;
 
+  // Brain passages and content blocks: above the editor when stacked,
+  // below the two panes when side by side.
+  const helperPanels = (
+    <>
+      <BrainSuggestPanel
+        sectionId={section.id}
+        onInsert={(text) => {
+          // BL-AIP-6 — appended as a tracked insertion; the rest of
+          // the document (tables, lists, pending suggestions) is
+          // left exactly as it is instead of rebuilt from plain text.
+          if (plainRef.current.trim()) {
+            insertTracked(text);
+            return;
+          }
+          const next = text.trim();
+          const doc = fromPlainText(next);
+          replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
+        }}
+      />
+      {/* BL-FB-GEN-BLOCKS — versioned boilerplate, inserted by tag as a tracked suggestion */}
+      <ContentBlocksPanel
+        proposalId={proposalId}
+        sectionId={section.id}
+        onInsert={(text) => {
+          if (plainRef.current.trim()) {
+            insertTracked(text);
+            return;
+          }
+          const next = text.trim();
+          const doc = fromPlainText(next);
+          replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
+        }}
+      />
+    </>
+  );
+
   return (
     <li className="overflow-hidden rounded-lg border border-layer/10 bg-layer/[0.02]">
       <button
@@ -674,77 +775,97 @@ function SectionRow({
           <div className="mt-3 flex flex-col gap-2">
             {/* BL-AIP-6b — what reviewers and the AI pre-review asked of this section */}
             <ReviewCommentsPanel proposalId={proposalId} comments={section.reviewComments} />
-            <AiAssistantPanel
-              sectionId={section.id}
-              hasContent={plainContent.trim().length > 0}
-              getCurrentText={() => plainRef.current}
-              onAccept={(doc, plain, count) => replaceDoc(doc, plain, count)}
-              onApplyTracked={applyTracked}
-              improveRequest={improveRequest}
-              onPendingChange={setAiPending}
-            />
-            <BrainSuggestPanel
-              sectionId={section.id}
-              onInsert={(text) => {
-                // BL-AIP-6 — appended as a tracked insertion; the rest of
-                // the document (tables, lists, pending suggestions) is
-                // left exactly as it is instead of rebuilt from plain text.
-                if (plainRef.current.trim()) {
-                  insertTracked(text);
-                  return;
-                }
-                const next = text.trim();
-                const doc = fromPlainText(next);
-                replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
-              }}
-            />
-            {/* BL-FB-GEN-BLOCKS — versioned boilerplate, inserted by tag as a tracked suggestion */}
-            <ContentBlocksPanel
-              proposalId={proposalId}
-              sectionId={section.id}
-              onInsert={(text) => {
-                if (plainRef.current.trim()) {
-                  insertTracked(text);
-                  return;
-                }
-                const next = text.trim();
-                const doc = fromPlainText(next);
-                replaceDoc(doc, next, next.split(/\s+/).filter(Boolean).length);
-              }}
-            />
-            <div className="flex items-center justify-between">
-              <label className="aur-label mb-0">Content</label>
-              <span className="flex items-center gap-2 font-mono text-[10px] text-muted">
-                <span>{words} words</span>
-                {liveCap !== null ? <PageBudgetRing words={words} cap={liveCap} size={12} /> : null}
-                {dirty ? (
-                  <span
-                    className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-200"
-                    title="Changes in this section have not been saved"
-                  >
-                    unsaved
+            {/* BL-FB-CHAT-SIDEBYSIDE — one column stacked, or chat left / draft right */}
+            <div
+              className={
+                sideBySide
+                  ? "grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-start"
+                  : "flex flex-col gap-2"
+              }
+            >
+              <div className="flex min-w-0 flex-col gap-2">
+                <AiAssistantPanel
+                  sectionId={section.id}
+                  hasContent={plainContent.trim().length > 0}
+                  getCurrentText={() => plainRef.current}
+                  onAccept={(doc, plain, count) => replaceDoc(doc, plain, count)}
+                  onApplyTracked={applyTracked}
+                  improveRequest={improveRequest}
+                  onPendingChange={setAiPending}
+                  layout={sideBySide ? "side" : "stacked"}
+                  onLayoutChange={changeLayout}
+                  onSuggestion={onSuggestion}
+                />
+                {!sideBySide ? helperPanels : null}
+              </div>
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <label className="aur-label mb-0">Content</label>
+                    {sideBySide && suggestion ? (
+                      <div className="flex gap-1 rounded border border-layer/10 p-0.5">
+                        {(["draft", "preview"] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setRightTab(tab)}
+                            className={`rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                              rightTab === tab ? "bg-indigo-400/20 text-indigo-200" : "text-muted hover:text-text"
+                            }`}
+                          >
+                            {tab === "draft" ? "Draft" : `Edits preview${suggestion.streaming ? " · streaming…" : ""}`}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <span className="flex items-center gap-2 font-mono text-[10px] text-muted">
+                    <span>{words} words</span>
+                    {liveCap !== null ? <PageBudgetRing words={words} cap={liveCap} size={12} /> : null}
+                    {dirty ? (
+                      <span
+                        className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-200"
+                        title="Changes in this section have not been saved"
+                      >
+                        unsaved
+                      </span>
+                    ) : null}
                   </span>
+                </div>
+                {/* The editor stays mounted behind the preview so collab and track-changes state survive the switch. */}
+                <div className={sideBySide && rightTab === "preview" && suggestion ? "hidden" : "contents"}>
+                  <RichSectionEditor
+                    doc={bodyDoc}
+                    docVersion={docVersion}
+                    reviewSignal={reviewSignal}
+                    onCursorParagraph={setCursorParagraph}
+                    onChange={(doc, plain, count) => {
+                      setBodyDoc(doc);
+                      setPlainContent(plain);
+                      setWordCount(count);
+                      setDirty(true);
+                    }}
+                    placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
+                    collab={collab}
+                    trackChanges={trackChanges}
+                    comments={comments}
+                    snapshots={snapshots}
+                  />
+                </div>
+                {sideBySide && rightTab === "preview" && suggestion ? (
+                  <DraftPreview
+                    key={suggestion.id}
+                    draft={plainContent}
+                    proposed={suggestion.text}
+                    streaming={suggestion.streaming}
+                    onApply={applyPreview}
+                    onBack={() => setRightTab("draft")}
+                  />
                 ) : null}
-              </span>
+                <input type="hidden" value={plainContent} readOnly />
+              </div>
             </div>
-            <RichSectionEditor
-              doc={bodyDoc}
-              docVersion={docVersion}
-              reviewSignal={reviewSignal}
-              onCursorParagraph={setCursorParagraph}
-              onChange={(doc, plain, count) => {
-                setBodyDoc(doc);
-                setPlainContent(plain);
-                setWordCount(count);
-                setDirty(true);
-              }}
-              placeholder="Draft prose here. Use the toolbar for headings, lists, tables, links."
-              collab={collab}
-              trackChanges={trackChanges}
-              comments={comments}
-              snapshots={snapshots}
-            />
-            <input type="hidden" value={plainContent} readOnly />
+            {sideBySide ? helperPanels : null}
             {/* BL-FB-SCAN-TONE — marketing language, passive voice, reading level */}
             <TonePanel
               text={plainContent}
