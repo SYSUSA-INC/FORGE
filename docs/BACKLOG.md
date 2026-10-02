@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #300)
 
 Chat on the left, the draft on the right. A reply that reads as a
 rewrite is previewed against the draft paragraph by paragraph while it
@@ -4741,7 +4741,7 @@ Technical Approach on this structure"). Document is scoped to the
 conversation, not persisted to the KB unless explicitly saved.
 
 ### BL-FB-CHAT-SIDEBYSIDE — Side-by-side draft preview
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #300) — canonical entry under Active priorities
 
 Cursor-style two-pane layout: chat left, live section draft right.
 AI-suggested edits stream into the draft in real time; user accepts
