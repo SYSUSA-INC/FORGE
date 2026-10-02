@@ -87,8 +87,14 @@ export async function prepareSectionDraft(input: {
    * typing instead of the last Save.
    */
   currentBodyPlain?: string;
+  /**
+   * BL-FB-SCAN-TONE — what the author asked this pass to fix (click-to-fix
+   * from the tone check). Reaches the prompt as `section.authorGuidance`.
+   */
+  hint?: string;
 }): Promise<PreparedSectionDraft> {
   const { organizationId } = input;
+  const authorGuidance = (input.hint ?? "").trim().slice(0, 2000);
 
   const [row] = await db
     .select({
@@ -235,6 +241,7 @@ export async function prepareSectionDraft(input: {
       pageLimit: row.section.pageLimit,
       // BL-AIP-5b — Section L's brief for this section, when bootstrapped.
       ...(row.section.instructions ? { instructions: row.section.instructions } : {}),
+      ...(authorGuidance ? { authorGuidance } : {}),
       currentBodyPlain: (liveBody ?? row.section.content ?? "").slice(0, 4000),
       currentWordCount:
         liveBody !== undefined

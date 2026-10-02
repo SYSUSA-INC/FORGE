@@ -48,6 +48,8 @@ const bodySchema = z.object({
    * Tighten work on what the writer sees rather than the last saved copy.
    */
   currentBodyPlain: z.string().max(60_000).optional(),
+  /** BL-FB-SCAN-TONE — the tone check's click-to-fix guidance for Improve mode. */
+  hint: z.string().max(2000).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -83,6 +85,7 @@ export async function POST(req: NextRequest) {
     mode,
     cite: body.cite,
     currentBodyPlain: body.currentBodyPlain,
+    hint: body.hint,
   });
   if (!prepared.ok) {
     await refundQuota(organizationId, "aiRequestsPerMonth");

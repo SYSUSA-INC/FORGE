@@ -144,6 +144,13 @@ type Props = {
    * The default action whenever the section already has content.
    */
   onApplyTracked?: (text: string) => void;
+  /**
+   * BL-FB-SCAN-TONE — click-to-fix from the tone check: open the panel
+   * and run Improve with this guidance. A new nonce starts a new pass.
+   */
+  improveRequest?: { hint: string; nonce: number } | null;
+  /** Reports whether a draft pass is running (the tone panel disables its button). */
+  onPendingChange?: (pending: boolean) => void;
 };
 
 /** The routes cap the live body at 60k characters. */
@@ -168,13 +175,30 @@ const MODES: { key: SectionDraftMode; label: string; description: string }[] = [
   },
 ];
 
-export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentText, onApplyTracked }: Props) {
+export function AiAssistantPanel({
+  sectionId,
+  hasContent,
+  onAccept,
+  getCurrentText,
+  onApplyTracked,
+  improveRequest,
+  onPendingChange,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
 
   // Generate tab state. `pending` is plain state (not useTransition)
   // because the draft streams over fetch rather than a server action.
   const [pending, setPending] = useState(false);
+  // BL-FB-SCAN-TONE — the guidance the running / finished pass was given.
+  const [guidance, setGuidance] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // A request that predates this mount (section collapsed and reopened)
+  // is not re-run.
+  const lastRequestRef = useRef(improveRequest?.nonce ?? 0);
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Success | null>(null);
@@ -254,14 +278,16 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
     setStreamText("");
   }
 
-  async function generate(forMode: SectionDraftMode) {
+  async function generate(forMode: SectionDraftMode, hint?: string) {
     draftAbortRef.current?.abort();
     const ac = new AbortController();
     draftAbortRef.current = ac;
 
     setError(null);
     setResult(null);
+    setAbResult(null);
     setMode(forMode);
+    setGuidance(hint?.trim() ? hint.trim() : null);
     setStreamText("");
     setSources([]);
     setSourcesStubbed(false);
@@ -278,6 +304,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
           mode: forMode,
           cite,
           currentBodyPlain: getCurrentText?.().slice(0, LIVE_BODY_MAX_CHARS),
+          ...(hint?.trim() ? { hint: hint.trim() } : {}),
         }),
         signal: ac.signal,
       });
@@ -323,6 +350,19 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
       }
     }
   }
+
+  // BL-FB-SCAN-TONE — a click on "Fix with AI" opens the panel on the
+  // Generate tab and runs Improve with the tone findings as guidance.
+  useEffect(() => {
+    if (!improveRequest || improveRequest.nonce === lastRequestRef.current) return;
+    lastRequestRef.current = improveRequest.nonce;
+    setOpen(true);
+    setActiveTab("generate");
+    void generate("improve", improveRequest.hint);
+    setTimeout(() => rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    // `generate` reads the latest props itself; the request is the only trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [improveRequest]);
 
   function accept() {
     if (!result) return;
@@ -535,7 +575,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
   }
 
   return (
-    <div className="rounded-md border border-teal/40 bg-teal/[0.04] p-3">
+    <div ref={rootRef} className="rounded-md border border-teal/40 bg-teal/[0.04] p-3">
       {/* Header + tabs */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3">
@@ -699,6 +739,15 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                 <span className="font-mono text-[10px] text-teal">generating…</span>
               ) : null}
             </button>
+            {pending && guidance ? (
+              /* BL-FB-SCAN-TONE — what this pass was asked to fix. */
+              <details className="mt-2 rounded-md border border-amber-400/30 bg-amber-400/5 px-3 py-2">
+                <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-widest text-amber-200">
+                  Guidance for this pass · from the tone check
+                </summary>
+                <pre className="mt-1 whitespace-pre-wrap font-body text-[11px] leading-relaxed text-muted">{guidance}</pre>
+              </details>
+            ) : null}
             {pending ? (
               /* BL-AI-STREAMING — live preview fills in as the model writes. */
               <div className="mt-2 flex flex-col gap-1.5">
@@ -746,6 +795,11 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
             <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-teal">
               {MODES.find((m) => m.key === result.mode)?.label} preview ·{" "}
               {result.text.split(/\s+/).filter(Boolean).length} words
+              {guidance ? (
+                <span className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 tracking-widest text-amber-200" title={guidance}>
+                  guided by the tone check
+                </span>
+              ) : null}
             </div>
             {result.truncated ? (
               <div className="mb-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 font-mono text-[11px] text-gold">
@@ -793,7 +847,7 @@ export function AiAssistantPanel({ sectionId, hasContent, onAccept, getCurrentTe
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => generate(result.mode)}
+                  onClick={() => generate(result.mode, guidance ?? undefined)}
                   className="aur-btn aur-btn-ghost text-[11px]"
                 >
                   Regenerate

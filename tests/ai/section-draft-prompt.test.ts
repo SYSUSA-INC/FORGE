@@ -40,4 +40,21 @@ describe("buildSectionDraftPrompt output instruction", () => {
     expect(userText("improve")).toContain("Return the improved body.");
     expect(userText("tighten")).toContain("Return the tightened body.");
   });
+
+  // BL-FB-SCAN-TONE — click-to-fix guidance travels in the snapshot and
+  // the system prompt says how to treat it.
+  it("carries the author's guidance when present and not otherwise", () => {
+    const guided = buildSectionDraftPrompt("improve", {
+      ...snapshot,
+      section: {
+        ...snapshot.section,
+        currentBodyPlain: "We leverage a robust approach.",
+        currentWordCount: 5,
+        authorGuidance: 'Replace "leverage" (×1 — use).',
+      },
+    });
+    expect(guided.messages[0]!.content).toContain('"authorGuidance": "Replace \\"leverage\\" (×1 — use)."');
+    expect(guided.system).toContain("section.authorGuidance");
+    expect(userText("improve")).not.toContain("authorGuidance");
+  });
 });
