@@ -7,6 +7,12 @@ import { describe, expect, it } from "vitest";
 import { REVIEW_COLORS } from "@/lib/review-types";
 import {
   CHECKLIST_LIMITS,
+  SUMMARY_LIMITS,
+  dueReminderDue,
+  dueReminderSubject,
+  heuristicSummary,
+  sanitizeSummary,
+  summaryMarkdown,
   REVIEW_CHECKLIST_TEMPLATES,
   checklistProgress,
   consolidateComments,
@@ -147,5 +153,67 @@ describe("review workflow logic", () => {
       "- [ ] Orphaned section comment. — Bo",
     ]);
     expect(consolidateComments(SECTIONS, [])).toEqual([]);
+  });
+});
+
+describe("review workflow logic — Slice 2 follow-ups", () => {
+  const groups = consolidateComments(SECTIONS, [
+    { id: "c1", sectionId: "s1", body: "Where is the incumbent?", resolved: false, authorName: null, createdAt: "2026-10-03T10:00:00Z" },
+    { id: "c2", sectionId: "s1", body: "Cite the PWS paragraph.", resolved: false, authorName: "Ana", createdAt: "2026-10-03T10:01:00Z" },
+    { id: "c3", sectionId: "s3", body: "Strong past performance story — keep it.", resolved: false, authorName: "Bo", createdAt: "2026-10-03T10:02:00Z" },
+    { id: "c4", sectionId: "s2", body: "Done.", resolved: true, authorName: "Bo", createdAt: "2026-10-03T10:03:00Z" },
+  ]);
+
+  it("cleans the model's debrief and refuses an empty one", () => {
+    const s = sanitizeSummary(
+      {
+        headline: "  Red Team leaves the technical volume short on proof.  ",
+        themes: [{ title: "Proof", detail: "Claims lack contract numbers.", sections: ["Technical Approach", 42] }, { title: "", detail: "dropped" }],
+        mustFix: ["Name the incumbent", "", 7],
+        strengths: "not a list",
+        nextSteps: Array.from({ length: 12 }, (_, i) => `step ${i}`),
+      },
+      { fallback: false, model: "m" },
+    );
+    expect(s).toEqual({
+      headline: "Red Team leaves the technical volume short on proof.",
+      themes: [{ title: "Proof", detail: "Claims lack contract numbers.", sections: ["Technical Approach"] }],
+      mustFix: ["Name the incumbent"],
+      strengths: [],
+      nextSteps: Array.from({ length: SUMMARY_LIMITS.maxItems }, (_, i) => `step ${i}`),
+      fallback: false,
+      model: "m",
+    });
+    expect(sanitizeSummary({ headline: "", themes: [], mustFix: [] }, { fallback: false, model: "m" })).toBeNull();
+    expect(sanitizeSummary(null, { fallback: false, model: "m" })).toBeNull();
+  });
+
+  it("writes the heuristic debrief from the comments themselves", () => {
+    const s = heuristicSummary({
+      colorLabel: "Red Team",
+      groups,
+      verdicts: [{ name: "Ana", verdict: "Conditional" }, { name: "Bo", verdict: null }],
+      checklist: { total: 7, done: 5, of: 14, perReviewer: [] },
+      uncheckedLabels: ["Claims carry proof"],
+      sectionNumbers: new Map(SECTIONS.map((s) => [s.id, s.ordering])),
+    });
+    expect(s.headline).toBe("Red Team: 3 open comments across 2 sections, 1 resolved, 1 conditional.");
+    expect(s.themes.map((t) => t.title)).toEqual(["§1 Technical Approach needs the most work", "§3 Past Performance needs the most work"]);
+    expect(s.mustFix).toEqual(["§1 Technical Approach: Where is the incumbent?", "§1 Technical Approach: Cite the PWS paragraph.", "§3 Past Performance: Strong past performance story — keep it."]);
+    expect(s.strengths).toEqual(["Strong past performance story — keep it."]);
+    expect(s.nextSteps).toEqual(["Checklist still open: Claims carry proof", "Finish the checklist (5/14 ticks).", "1 reviewer still to submit a verdict."]);
+    expect(s.fallback).toBe(true);
+    expect(summaryMarkdown(s).split("\n").slice(0, 4)).toEqual([`**${s.headline}**`, "", "## Themes", "- **§1 Technical Approach needs the most work** — 2 open comments from FORGE AI, Ana. (Technical Approach)"]);
+    expect(summaryMarkdown(s)).toContain("- [ ] §1 Technical Approach: Where is the incumbent?");
+  });
+
+  it("knows when the day-before reminder is due", () => {
+    const now = new Date("2026-10-03T08:00:00Z");
+    expect(dueReminderDue(now, null)).toBe(false);
+    expect(dueReminderDue(now, new Date("2026-10-05T08:00:00Z"))).toBe(false);
+    expect(dueReminderDue(now, new Date("2026-10-04T07:00:00Z"))).toBe(true);
+    expect(dueReminderDue(now, new Date("2026-10-01T00:00:00Z"))).toBe(true);
+    expect(dueReminderSubject("Red Team", "NOAA IT", new Date("2026-10-04T07:00:00Z"), now)).toBe("Red Team review of NOAA IT is due tomorrow — your verdict is still open");
+    expect(dueReminderSubject("Red Team", "NOAA IT", new Date("2026-10-01T00:00:00Z"), now)).toBe("Red Team review of NOAA IT is overdue — your verdict is still open");
   });
 });

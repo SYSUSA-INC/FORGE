@@ -81,6 +81,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   onboarding_assist: "standard",
   // BL-FB-GEN-GRAPHICS — a short structured spec from the section text.
   graphics_suggest: "standard",
+  review_summary: "standard",
   // Strong: what the customer submits or decides on.
   section_draft: "strong",
   proposal_bootstrap: "strong",

@@ -11,6 +11,7 @@ import { db } from "@/db";
 import {
   proposalReviewAssignments,
   proposalReviewChecklistItems,
+  proposalReviewComments,
   proposalReviewSectionAssignments,
   proposalReviews,
   proposalSections,
@@ -177,4 +178,60 @@ export async function getReviewWorkflow(input: { organizationId: string; reviewI
       .where(eq(proposalReviewChecklistItems.reviewId, review.id)),
   ]);
   return { sectionAssignments, checklistStates };
+}
+
+export type CarryResult = { ok: true; carried: number } | { ok: false; error: string };
+
+/**
+ * Slice 2 — carry the open comments of an earlier round of the same
+ * proposal into a new one: each becomes a fresh open comment on the new
+ * round (same section, same author, lineage on `carried_from_comment_id`)
+ * and the original is resolved, so an item is open in exactly one round
+ * and the editor and drafter see it once. Audited.
+ */
+export async function carryOpenComments(input: {
+  organizationId: string;
+  fromReviewId: string;
+  toReviewId: string;
+  actor: Actor;
+}): Promise<CarryResult> {
+  const { organizationId } = input;
+  if (input.fromReviewId === input.toReviewId) return { ok: false, error: "A round cannot carry from itself." };
+  const [from, to] = await Promise.all([loadOwnedReview(organizationId, input.fromReviewId), loadOwnedReview(organizationId, input.toReviewId)]);
+  if (!from || !to) return { ok: false, error: "Review not found." };
+  if (from.proposalId !== to.proposalId) return { ok: false, error: "Both rounds must belong to the same proposal." };
+  if (to.status !== "in_progress") return { ok: false, error: "The receiving round is closed." };
+
+  const open = await db
+    .select({
+      id: proposalReviewComments.id,
+      sectionId: proposalReviewComments.sectionId,
+      userId: proposalReviewComments.userId,
+      body: proposalReviewComments.body,
+    })
+    .from(proposalReviewComments)
+    .where(and(eq(proposalReviewComments.reviewId, from.id), eq(proposalReviewComments.resolved, false)));
+  if (open.length > 0) {
+    await db.insert(proposalReviewComments).values(
+      open.map((c) => ({ reviewId: to.id, sectionId: c.sectionId, userId: c.userId, body: c.body, carriedFromCommentId: c.id })),
+    );
+    await db
+      .update(proposalReviewComments)
+      .set({ resolved: true })
+      .where(inArray(proposalReviewComments.id, open.map((c) => c.id)));
+  }
+  await db
+    .update(proposalReviews)
+    .set({ carriedFromReviewId: from.id, updatedAt: new Date() })
+    .where(eq(proposalReviews.id, to.id));
+
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "proposal.review.carry",
+    resourceType: "proposal_review",
+    resourceId: to.id,
+    metadata: { proposalId: to.proposalId, fromReviewId: from.id, carried: open.length },
+  });
+  return { ok: true, carried: open.length };
 }

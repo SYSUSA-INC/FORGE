@@ -47,6 +47,14 @@ export default async function ProposalReviewsPage({
     listProposalSectionsForReview(params.id),
   ]);
 
+  // BL-FB-X-COLOR-TEAM Slice 2 — closed rounds with open comments the next round can carry.
+  const carryCandidates = data.reviews
+    .filter((r) => r.status !== "in_progress" && (data.openComments[r.id] ?? 0) > 0)
+    .map((r) => ({
+      reviewId: r.id,
+      label: `${REVIEW_COLOR_LABELS[r.color]} · ${r.closedAt ? `closed ${new Date(r.closedAt).toLocaleDateString()}` : STATUS_LABELS[r.status]} · ${data.openComments[r.id]} open`,
+    }));
+
   const assignmentsByReview = new Map<
     string,
     {
@@ -152,6 +160,7 @@ export default async function ProposalReviewsPage({
                         </div>
                         <div className="mt-1 font-mono text-[10px] text-muted">
                           {submittedCount}/{assigns.length} reviewers submitted
+                          {data.openComments[r.id] ? ` · ${data.openComments[r.id]} open comment${data.openComments[r.id] === 1 ? "" : "s"}` : ""}
                           {r.dueDate
                             ? ` · due ${new Date(r.dueDate).toLocaleDateString()}`
                             : ""}
@@ -201,6 +210,7 @@ export default async function ProposalReviewsPage({
         colors={REVIEW_COLORS}
         reviewers={reviewers}
         sections={sections}
+        carryCandidates={carryCandidates}
       />
     </div>
   );

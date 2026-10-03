@@ -22,16 +22,20 @@ export function StartReviewPanel({
   colors,
   reviewers,
   sections = [],
+  carryCandidates = [],
 }: {
   proposalId: string;
   colors: ColorDef[];
   reviewers: Reviewer[];
   sections?: SectionRow[];
+  /** Slice 2 — earlier rounds with open comments the new round can take over. */
+  carryCandidates?: { reviewId: string; label: string }[];
 }) {
   const router = useRouter();
   const [color, setColor] = useState<ReviewColor>("pink");
   const [dueDate, setDueDate] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [carryFrom, setCarryFrom] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sectionAssignments, setSectionAssignments] = useState<Record<string, string[]>>({});
   const [checklist, setChecklist] = useState<ReviewChecklistItem[]>(REVIEW_CHECKLIST_TEMPLATES.pink);
@@ -82,12 +86,14 @@ export function StartReviewPanel({
         sectionAssignments: sectionMap,
         instructions,
         checklist,
+        carryFromReviewId: carryFrom || null,
       });
       if (!res.ok) return setError(res.error);
       setSelected(new Set());
       setSectionAssignments({});
       setDueDate("");
       setInstructions("");
+      setCarryFrom("");
       router.push(`/proposals/${proposalId}/reviews/${res.reviewId}`);
     });
   }
@@ -123,6 +129,20 @@ export function StartReviewPanel({
             placeholder="What this round should concentrate on — e.g. score Factor 2 as the evaluator would; ignore formatting."
           />
         </div>
+        {carryCandidates.length > 0 ? (
+          <div>
+            <label className="aur-label">Carry open comments from</label>
+            <select className="aur-input text-[12px]" value={carryFrom} onChange={(e) => setCarryFrom(e.target.value)}>
+              <option value="">Start clean</option>
+              {carryCandidates.map((c) => (
+                <option key={c.reviewId} value={c.reviewId}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <div className="mt-1 font-mono text-[10px] text-muted">The earlier round's open comments reopen on this one and close there.</div>
+          </div>
+        ) : null}
         <div>
           <label className="aur-label">Reviewers</label>
           {reviewers.length === 0 ? (

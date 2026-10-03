@@ -41,10 +41,16 @@ const TRIGGER_EVENT_KIND_VALUES: [
   "proposal_section_overdue",
   "review_request_pending",
   "review_completed",
+  "review_assignment_added",
+  "review_due_soon",
   "compliance_overdue",
   "audit_anomaly",
   "membership_invited",
   "membership_disabled",
+  "comment_mentioned",
+  "opportunity_reviewed",
+  "solicitation_role_assigned",
+  "proposal_section_assigned",
 ];
 
 const RECIPIENT_STRATEGY_VALUES: [

@@ -50,6 +50,7 @@ export const AI_FEATURES = {
   // BL-FB-GEN-GRAPHICS — diagrams a section would benefit from, proposed
   // from its own text as small node/edge specs.
   graphics_suggest: "Graphics suggestions",
+  review_summary: "Colour-team round summary",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

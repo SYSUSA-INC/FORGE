@@ -1185,12 +1185,31 @@ export const proposalReviews = pgTable("proposal_review", {
    * change never rewrites a closed round.
    */
   checklist: jsonb("checklist").$type<ReviewChecklistItem[]>().notNull().default(sql`'[]'::jsonb`),
+  /** BL-FB-X-COLOR-TEAM Slice 2 — the closed round whose open comments were carried into this one. */
+  carriedFromReviewId: uuid("carried_from_review_id").references((): AnyPgColumn => proposalReviews.id, { onDelete: "set null" }),
+  /** BL-FB-X-COLOR-TEAM Slice 2 — AI summary of the consolidated report, as last generated. */
+  aiSummary: jsonb("ai_summary").$type<ReviewAiSummary>(),
+  aiSummaryAt: timestamp("ai_summary_at"),
+  /** BL-FB-X-COLOR-TEAM Slice 2 — the once-only due-date reminder to unsubmitted reviewers. */
+  dueReminderSentAt: timestamp("due_reminder_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 /** One line of a review round's checklist (`proposal_review.checklist`). */
 export type ReviewChecklistItem = { key: string; label: string; hint?: string };
+
+/** BL-FB-X-COLOR-TEAM Slice 2 — what the round's reviewers said, in brief (`proposal_review.ai_summary`). */
+export type ReviewAiSummary = {
+  headline: string;
+  themes: { title: string; detail: string; sections: string[] }[];
+  mustFix: string[];
+  strengths: string[];
+  nextSteps: string[];
+  /** True when the heuristic summary stood in for the model. */
+  fallback: boolean;
+  model: string;
+};
 
 export const proposalReviewAssignments = pgTable(
   "proposal_review_assignment",
@@ -1225,6 +1244,8 @@ export const proposalReviewComments = pgTable("proposal_review_comment", {
   userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   body: text("body").notNull(),
   resolved: boolean("resolved").notNull().default(false),
+  /** BL-FB-X-COLOR-TEAM Slice 2 — the earlier round's comment this one carries forward. */
+  carriedFromCommentId: uuid("carried_from_comment_id").references((): AnyPgColumn => proposalReviewComments.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1504,6 +1525,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "opportunity_reviewed",
     "solicitation_role_assigned",
     "proposal_section_assigned",
+    // BL-FB-X-COLOR-TEAM Slice 2 — reviewer reminder before a round's due date (migration 0095).
+    "review_due_soon",
   ],
 );
 

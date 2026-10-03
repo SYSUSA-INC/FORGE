@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { dispatchKeyDateReminders } from "@/lib/solicitation-key-date-cron";
 import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
 import { dispatchSolicitationQaPolls } from "@/lib/solicitation-qa";
+import { dispatchReviewDueReminders } from "@/lib/review-reminders";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -54,13 +55,20 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon, qaPolls] = await Promise.allSettled([
+  const [keyDates, dueSoon, qaPolls, reviewReminders] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
     dispatchSolicitationQaPolls(),
+    // BL-FB-X-COLOR-TEAM Slice 2 — day-before nudge to unsubmitted reviewers.
+    dispatchReviewDueReminders(),
   ]);
 
   const failures: string[] = [];
+  if (reviewReminders.status === "rejected") {
+    const message = reviewReminders.reason instanceof Error ? reviewReminders.reason.message : String(reviewReminders.reason);
+    log.error("[solicitation-key-date-cron]", "review reminders failed", { error: message });
+    failures.push(`reviewReminders: ${message}`);
+  }
   if (qaPolls.status === "rejected") {
     const message = qaPolls.reason instanceof Error ? qaPolls.reason.message : String(qaPolls.reason);
     log.error("[solicitation-key-date-cron]", "Q&A poll failed", { error: message });
@@ -92,6 +100,7 @@ export async function GET(req: NextRequest) {
     opportunityDueSoon:
       dueSoon.status === "fulfilled" ? dueSoon.value : null,
     solicitationQa: qaPolls.status === "fulfilled" ? qaPolls.value : null,
+    reviewReminders: reviewReminders.status === "fulfilled" ? reviewReminders.value : null,
   };
 
   if (failures.length > 0) {

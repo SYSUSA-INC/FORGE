@@ -25,6 +25,8 @@ type CommentRow = {
   createdAt: string;
   authorName: string | null;
   authorEmail: string | null;
+  /** Slice 2 — the colour of the earlier round this comment was carried from. */
+  carriedFrom?: string | null;
 };
 
 export function CommentsPanel({
@@ -210,10 +212,17 @@ export function CommentsPanel({
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
-                    {sec
-                      ? `§${sec.ordering} · ${sec.title}`
-                      : "General"}
+                  <span className="flex flex-wrap items-center gap-1">
+                    <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                      {sec
+                        ? `§${sec.ordering} · ${sec.title}`
+                        : "General"}
+                    </span>
+                    {c.carriedFrom ? (
+                      <span className="rounded border border-indigo-400/20 bg-indigo-400/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-indigo-300" title="Carried forward from an earlier round">
+                        from {c.carriedFrom}
+                      </span>
+                    ) : null}
                   </span>
                   <div className="flex items-center gap-3 font-mono text-[10px] text-muted">
                     <span>{c.authorName ?? c.authorEmail ?? "Unknown"}</span>

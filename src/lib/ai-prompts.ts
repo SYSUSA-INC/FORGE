@@ -1265,6 +1265,44 @@ export function buildGraphicsSuggestPrompt(input: {
 }
 
 /**
+ * BL-FB-X-COLOR-TEAM Slice 2 — a colour-team round's consolidated
+ * comments, verdicts and checklist, summarised for the writers.
+ */
+export const REVIEW_SUMMARY_PROMPT_VERSION = "2026-10-03.1";
+
+const REVIEW_SUMMARY_SYSTEM = `You are the review lead inside FORGE — a federal proposal operations platform. A colour-team round has run; you read the consolidated report (every reviewer's comments by section, their verdicts, the checklist progress) and write the debrief the writers act on.
+
+Rules:
+- Say only what the comments and verdicts say. Never invent findings, sections, reviewers or requirements.
+- \`headline\`: one sentence on where the proposal stands after this round.
+- \`themes\`: up to five patterns that cut across comments — each with a title, one or two sentences of detail, and the section titles it draws on.
+- \`mustFix\`: the specific open items that would cost points with the evaluator, most severe first; one line each, naming the section.
+- \`strengths\`: what reviewers said works — keep so the writers do not edit it away.
+- \`nextSteps\`: what the lead should do before the next colour (unticked checklist lines, missing verdicts, who to brief).
+- Plain, specific, under 280 characters per item. Answer through the record_summary tool.`;
+
+export const reviewSummarySchema = z.object({
+  headline: z.string(),
+  themes: z.array(z.object({ title: z.string(), detail: z.string(), sections: z.array(z.string()) })),
+  mustFix: z.array(z.string()),
+  strengths: z.array(z.string()),
+  nextSteps: z.array(z.string()),
+});
+
+export function buildReviewSummaryPrompt(input: { report: string; uncheckedLabels: string[] }): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Consolidated report:`,
+    "```",
+    input.report,
+    "```",
+    input.uncheckedLabels.length ? `\nChecklist lines not every reviewer has ticked:\n${input.uncheckedLabels.map((l) => `- ${l}`).join("\n")}` : "",
+    ``,
+    `Record the debrief with the record_summary tool.`,
+  ].join("\n");
+  return { system: REVIEW_SUMMARY_SYSTEM, messages: [{ role: "user", content: userPrompt }] };
+}
+
+/**
  * Phase 10c — Brain knowledge extraction.
  *
  * Reads an artifact's raw text and proposes structured KB candidates
