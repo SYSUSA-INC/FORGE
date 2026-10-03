@@ -47,6 +47,9 @@ export const AI_FEATURES = {
   // BL-AIP-7d part ii — a starting setup (capability statement, scout
   // keywords, target agencies) proposed from the SAM.gov registration.
   onboarding_assist: "Onboarding assistant",
+  // BL-FB-GEN-GRAPHICS — diagrams a section would benefit from, proposed
+  // from its own text as small node/edge specs.
+  graphics_suggest: "Graphics suggestions",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

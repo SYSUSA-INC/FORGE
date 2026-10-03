@@ -1219,6 +1219,52 @@ export function buildOnboardingAssistPrompt(
 }
 
 /**
+ * BL-FB-GEN-GRAPHICS — diagrams a section would benefit from, as small
+ * node/edge specs drawn only from what the section already says.
+ */
+export const GRAPHICS_SUGGEST_PROMPT_VERSION = "2026-10-03.1";
+
+const GRAPHICS_SUGGEST_SYSTEM = `You are a proposal graphics lead inside FORGE — a federal proposal operations platform. Evaluators remember a good diagram longer than a paragraph. Read one proposal section and propose the diagrams it would benefit from, as small specs a renderer draws.
+
+Rules:
+- Propose at most three diagrams, and only kinds the text supports: "architecture" (components and how they connect — each node carries a \`group\` tier such as Users, Application, Data, Platform, Security), "process" (steps in order — edges chain them), "org" (roles — edges run from manager to report; one root), "timeline" (periods or milestones in order, the period in the label, e.g. "Day 1–30: transition").
+- Every node is something the text names: a system, a component, a step, a role, a milestone. Never invent systems, roles, vendors, dates or numbers. If the text supports no diagram, return an empty list.
+- Labels are at most six words; ids are short lowercase tokens; two to twelve nodes per diagram; edges only between listed ids.
+- \`title\` is the diagram's caption (under 80 characters); \`why\` is one sentence on what the evaluator gains.
+- Answer through the record_graphics tool.`;
+
+export const graphicsSuggestSchema = z.object({
+  suggestions: z.array(
+    z.object({
+      kind: z.enum(["architecture", "process", "org", "timeline"]),
+      title: z.string(),
+      why: z.string(),
+      nodes: z.array(z.object({ id: z.string(), label: z.string(), group: z.string().optional() })),
+      edges: z.array(z.object({ from: z.string(), to: z.string(), label: z.string().optional() })),
+    }),
+  ),
+});
+
+export function buildGraphicsSuggestPrompt(input: {
+  title: string;
+  kind: string;
+  agency: string;
+  text: string;
+}): { system: string; messages: AIMessage[] } {
+  const userPrompt = [
+    `Section: "${input.title}" (kind: ${input.kind})${input.agency ? ` for ${input.agency}` : ""}.`,
+    ``,
+    `Section text:`,
+    "```",
+    input.text,
+    "```",
+    ``,
+    `Record the diagrams with the record_graphics tool.`,
+  ].join("\n");
+  return { system: GRAPHICS_SUGGEST_SYSTEM, messages: [{ role: "user", content: userPrompt }] };
+}
+
+/**
  * Phase 10c — Brain knowledge extraction.
  *
  * Reads an artifact's raw text and proposes structured KB candidates

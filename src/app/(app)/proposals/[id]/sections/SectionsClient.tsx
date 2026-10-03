@@ -28,6 +28,7 @@ import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import { ContentBlocksPanel } from "./ai/ContentBlocksPanel";
 import { ResearchRail } from "./ai/ResearchRail";
 import { TonePanel } from "./ai/TonePanel";
+import { GraphicsPanel } from "./ai/GraphicsPanel";
 import { DraftPreview } from "./ai/DraftPreview";
 import { PageBudgetRing } from "./PageBudgetRing";
 import { normalizePageCap } from "@/lib/page-budget";
@@ -523,6 +524,16 @@ function SectionRow({
     setReviewSignal((v) => v + 1);
     setNotice("Inserted as a tracked suggestion by FORGE AI. Accept it in Track changes, then save.");
   }
+  // BL-FB-GEN-GRAPHICS — a diagram lands as an image node at the end of
+  // the section (images are not tracked changes; the author moves it).
+  function insertImage(src: string, alt: string) {
+    const doc: TipTapDoc = {
+      type: "doc",
+      content: [...(bodyDocRef.current.content ?? []), { type: "image", attrs: { src, alt, title: alt } }],
+    };
+    replaceDoc(doc, projectToPlain(doc), countDocWords(doc));
+    setNotice(`Inserted "${alt}" at the end of the section. Drag it where it belongs, then save.`);
+  }
 
   // Server data changed underneath us (snapshot restore, or a refresh
   // while there are no unsaved edits): adopt it. Never while dirty —
@@ -872,6 +883,8 @@ function SectionRow({
               fixBusy={aiPending}
               onFix={(hint) => setImproveRequest({ hint, nonce: Date.now() })}
             />
+            {/* BL-FB-GEN-GRAPHICS — diagrams the section would benefit from */}
+            <GraphicsPanel sectionId={section.id} getCurrentText={() => plainRef.current} onInsertImage={insertImage} />
             {/* BL-AIP-6 — research while you write */}
             <ResearchRail
               sectionId={section.id}
