@@ -20,6 +20,8 @@ import {
   type ChatMessage,
 } from "./chat-actions";
 import { CHAT_ATTACHMENT_ACCEPT, describeChars } from "@/lib/chat-attachments-logic";
+import { DICTATION_LIMITS, mergeTranscript } from "@/lib/dictation";
+import { useDictation } from "./useDictation";
 import {
   CHAT_COMMANDS,
   describeSlashCommand,
@@ -261,6 +263,8 @@ export function AiAssistantPanel({
   const chatBottomRef = useRef<HTMLDivElement>(null);
   // BL-FB-CHAT-SLASH — the highlighted row of the command popover.
   const [slashIndex, setSlashIndex] = useState(0);
+  // BL-FB-CHAT-VOICE — dictation lands in the chat box as prose.
+  const dictation = useDictation((text) => setChatInput((v) => mergeTranscript(v, text)));
 
   // BL-FB-CHAT-PERSIST — load the section's thread the first time the
   // chat tab is shown, so reopening a section resumes the conversation.
@@ -1163,6 +1167,26 @@ export function AiAssistantPanel({
               rows={2}
               className="flex-1 resize-none rounded-md border border-layer/10 bg-layer/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-muted/50 focus:border-teal/40 focus:outline-none"
             />
+            {/* BL-FB-CHAT-VOICE — click to dictate, click again to stop */}
+            <button
+              type="button"
+              onClick={dictation.toggle}
+              disabled={dictation.mode === null || dictation.mode === "none" || dictation.status === "transcribing" || chatPending}
+              aria-pressed={dictation.status === "listening" || dictation.status === "recording"}
+              aria-label={dictation.status === "idle" ? "Dictate" : "Stop dictating"}
+              title={
+                dictation.mode === "none"
+                  ? "Dictation needs Chrome, Edge or Safari, or a transcription provider on the server"
+                  : dictation.mode === "record"
+                    ? "Record a clip (up to 2 minutes); it is transcribed on the server"
+                    : "Dictate with the browser's speech recognition; nothing leaves the device"
+              }
+              className={`aur-btn aur-btn-ghost shrink-0 self-end text-[11px] disabled:opacity-40 ${
+                dictation.status === "listening" || dictation.status === "recording" ? "border-rose-400/60 text-rose-300" : ""
+              }`}
+            >
+              {dictation.status === "transcribing" ? "…" : dictation.status === "idle" ? "🎙" : "■"}
+            </button>
             <button
               type="button"
               onClick={sendChat}
@@ -1172,6 +1196,31 @@ export function AiAssistantPanel({
               Send
             </button>
           </div>
+          {dictation.status !== "idle" || dictation.error ? (
+            <div
+              className={`rounded-md border px-3 py-1.5 font-mono text-[10px] ${
+                dictation.error ? "border-rose/40 bg-rose/10 text-rose" : "border-rose-400/30 bg-rose-400/5 text-rose-200"
+              }`}
+            >
+              {dictation.error ? (
+                <span>
+                  {dictation.error}{" "}
+                  <button type="button" onClick={dictation.clearError} className="underline">
+                    dismiss
+                  </button>
+                </span>
+              ) : dictation.status === "transcribing" ? (
+                "Transcribing the clip…"
+              ) : dictation.status === "recording" ? (
+                `Recording… click ■ to stop (up to ${DICTATION_LIMITS.maxSeconds} s)`
+              ) : (
+                <>
+                  Listening… click ■ to stop
+                  {dictation.interim ? <span className="ml-2 normal-case text-muted">{dictation.interim}</span> : null}
+                </>
+              )}
+            </div>
+          ) : null}
           {/* BL-FB-CHAT-SLASH — the commands, one click to start one */}
           {!chatInput ? (
             <div className="flex flex-wrap items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-subtle">
