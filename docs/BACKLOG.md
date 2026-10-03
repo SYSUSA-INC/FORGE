@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #305)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -5076,7 +5076,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #305) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer
