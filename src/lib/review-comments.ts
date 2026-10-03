@@ -20,6 +20,7 @@ export const REVIEW_COLOR_LABELS: Record<ReviewColor, string> = {
   red: "Red Team",
   gold: "Gold Team",
   white_gloves: "White Gloves",
+  green: "Green Team",
 };
 
 export type SectionReviewComment = {

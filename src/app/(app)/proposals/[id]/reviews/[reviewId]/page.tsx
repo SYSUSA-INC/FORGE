@@ -21,10 +21,15 @@ import {
   VERDICT_LABELS,
   computeOverallVerdict,
 } from "@/lib/review-types";
+import { getReviewWorkflow } from "@/lib/review-workflow";
+import { checklistProgress, consolidateComments, consolidatedReport } from "@/lib/review-workflow-logic";
 import { ReviewerList } from "./ReviewerList";
 import { SubmitVerdictPanel } from "./SubmitVerdictPanel";
 import { CommentsPanel } from "./CommentsPanel";
 import { CloseReviewPanel } from "./CloseReviewPanel";
+import { ChecklistPanel } from "./ChecklistPanel";
+import { ConsolidatedReport } from "./ConsolidatedReport";
+import { CoveragePanel } from "./CoveragePanel";
 import { listOrgReviewers } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +103,36 @@ export default async function ReviewDetailPage({
     assignmentRows.map((a) => a.verdict ?? null),
   );
 
+  // BL-FB-X-COLOR-TEAM — section scopes, checklist ticks, consolidated comments.
+  const workflow = await getReviewWorkflow({ organizationId, reviewId: r.id });
+  const roundReviewers = assignmentRows.map((a) => ({ userId: a.userId, name: a.name ?? null, email: a.email ?? "" }));
+  const groups = consolidateComments(
+    sections,
+    commentRows.map((c) => ({
+      id: c.id,
+      sectionId: c.sectionId,
+      body: c.body,
+      resolved: c.resolved,
+      authorName: c.userId ? c.authorName ?? c.authorEmail ?? "Reviewer" : null,
+      createdAt: c.createdAt.toISOString(),
+    })),
+  );
+  const sectionNumbers = Object.fromEntries(sections.map((s) => [s.id, s.ordering] as const));
+  const report = consolidatedReport({
+    proposalTitle: review.proposal.title,
+    colorLabel: REVIEW_COLOR_LABELS[r.color],
+    dueDate: r.dueDate ? new Date(r.dueDate).toLocaleDateString() : null,
+    instructions: r.instructions,
+    groups,
+    sectionNumbers: new Map(Object.entries(sectionNumbers)),
+    verdicts: assignmentRows.map((a) => ({
+      name: a.name ?? a.email ?? "Reviewer",
+      verdict: a.verdict ? VERDICT_LABELS[a.verdict] : null,
+      summary: a.summary,
+    })),
+    checklist: checklistProgress(r.checklist, workflow.checklistStates, roundReviewers.map((x) => x.userId)),
+  });
+
   const colorHex = REVIEW_COLOR_HEX[r.color];
   const statusColor = STATUS_COLORS[r.status];
 
@@ -151,8 +186,23 @@ export default async function ReviewDetailPage({
         </div>
       </div>
 
+      {r.instructions ? (
+        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/5 px-4 py-3">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-indigo-300">Instructions to reviewers</div>
+          <p className="mt-1 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">{r.instructions}</p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2 flex flex-col gap-4">
+          <CoveragePanel
+            reviewId={r.id}
+            sections={sections}
+            reviewers={roundReviewers}
+            sectionAssignments={workflow.sectionAssignments}
+            currentUserId={actor.id}
+            canEdit={r.status === "in_progress"}
+          />
           <CommentsPanel
             reviewId={r.id}
             proposalId={params.id}
@@ -179,6 +229,14 @@ export default async function ReviewDetailPage({
         </div>
 
         <div className="flex flex-col gap-4">
+          <ChecklistPanel
+            reviewId={r.id}
+            items={r.checklist}
+            states={workflow.checklistStates}
+            reviewers={roundReviewers}
+            currentUserId={actor.id}
+            canTick={!!actorAssignment && r.status === "in_progress"}
+          />
           <ReviewerList
             reviewId={r.id}
             assignments={assignmentRows.map((a) => ({
@@ -220,6 +278,8 @@ export default async function ReviewDetailPage({
               ) : null}
             </Panel>
           ) : null}
+
+          <ConsolidatedReport groups={groups} sectionNumbers={sectionNumbers} report={report} />
         </div>
       </div>
     </div>

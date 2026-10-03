@@ -1110,8 +1110,46 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-X-COLOR-TEAM — Color-team review workflow
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR
+
+The "schedule a red team for Friday" process most teams run in email
+and Word, inside the review round FORGE already keeps (colour, due
+date, reviewers, verdicts, comments). Slice 1 adds the lead's tools:
+
+- **Sections per reviewer.** A reviewer is scoped to any number of
+  sections (`proposal_review_section_assignment`); none means the whole
+  proposal. The **Section coverage** matrix on the review page shows
+  who reads what, flags sections nobody covers, and lets the lead
+  re-scope while the round is open. The first section is mirrored onto
+  the legacy single `section_id` for older readers.
+- **Reviewer checklist.** Each colour has a template of what an
+  experienced lead asks for (`REVIEW_CHECKLIST_TEMPLATES`, pure
+  `src/lib/review-workflow-logic.ts`); the start form shows it, lets
+  the lead trim or add lines, and the round stores its own copy
+  (`proposal_review.checklist`). Assigned reviewers tick their copy and
+  leave a note per line (`proposal_review_checklist_item`); everyone
+  sees each reviewer's progress.
+- **Instructions and Green Team.** `proposal_review.instructions`
+  carries the lead's charge for the round; `green` (price volume:
+  basis of estimate, realism, Section L pricing rules) joins the
+  colours, with its own checklist and pre-review guidance.
+- **Comment consolidation.** Every reviewer's comments fold into one
+  per-section summary with open / resolved counts and authors; the
+  Markdown hand-off report (verdicts, checklist progress, open items as
+  task boxes) copies in one click.
+- Server side `src/lib/review-workflow.ts` (`setReviewerSections`,
+  `setChecklistItem`, `getReviewWorkflow`), scoped review → proposal →
+  organization, closed rounds refused, audited
+  `proposal.review.sections.set` / `proposal.review.checklist.set`.
+  Migration `0094_review_workflow.sql`. Unit-tested
+  (`tests/ai/review-workflow.test.ts`); runtime-tested
+  (`tests/isolation/review-workflow.test.ts`).
+- **Later slices:** carry open comments into the next colour's round;
+  AI summary of the report; reviewer reminders before the due date.
+
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR (PR #304)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #304)
 
 "This Technical Approach would benefit from a notional architecture
 diagram" — with the diagram. A **Graphics** panel under the editor
@@ -4872,7 +4910,7 @@ already in the Brain — the auto-harvest of won proposals
 time.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR (PR #304) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #304) — canonical entry under Active priorities
 
 Section-aware suggestions: "this Technical Approach section would
 benefit from a notional architecture diagram" with a starter SVG or
@@ -5038,7 +5076,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer

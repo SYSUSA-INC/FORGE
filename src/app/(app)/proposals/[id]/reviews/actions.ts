@@ -8,6 +8,7 @@ import {
   memberships,
   proposalReviewAssignments,
   proposalReviewComments,
+  proposalReviewSectionAssignments,
   proposalReviews,
   proposalSections,
   proposals,
@@ -21,6 +22,8 @@ import { runInBackground } from "@/lib/background";
 import { extractMentionUserIds } from "@/lib/mentions";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { runReviewPreflight } from "@/lib/review-preflight";
+import { setChecklistItem, setReviewerSections } from "@/lib/review-workflow";
+import { CHECKLIST_LIMITS, REVIEW_CHECKLIST_TEMPLATES, sanitizeChecklist } from "@/lib/review-workflow-logic";
 import { setReviewCommentResolved } from "@/lib/section-review-comments";
 import { log } from "@/lib/log";
 
@@ -29,6 +32,7 @@ const COLOR_LABELS: Record<ReviewColor, string> = {
   red: "Red Team",
   gold: "Gold Team",
   white_gloves: "White Gloves",
+  green: "Green Team",
 };
 
 const VERDICT_LABELS: Record<ReviewVerdict, string> = {
@@ -71,8 +75,16 @@ export async function startReviewAction(input: {
   color: ReviewColor;
   dueDate?: string | null;
   reviewerUserIds: string[];
-  /** Optional per-reviewer section scope. Keyed by user id. */
-  sectionAssignments?: Record<string, string | null>;
+  /**
+   * Optional per-reviewer section scope, keyed by user id: one section
+   * (older callers) or several (BL-FB-X-COLOR-TEAM); null / empty =
+   * the whole proposal.
+   */
+  sectionAssignments?: Record<string, string | string[] | null>;
+  /** BL-FB-X-COLOR-TEAM — the lead's charge to the reviewers. */
+  instructions?: string;
+  /** BL-FB-X-COLOR-TEAM — the checklist for this round; the colour's template when omitted. */
+  checklist?: unknown;
 }): Promise<{ ok: true; reviewId: string } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -83,15 +95,15 @@ export async function startReviewAction(input: {
     return { ok: false, error: "Assign at least one reviewer." };
   }
 
+  const scopeByUser = new Map<string, string[]>();
+  for (const [uid, scope] of Object.entries(input.sectionAssignments ?? {})) {
+    const ids = (Array.isArray(scope) ? scope : [scope]).filter((id): id is string => typeof id === "string" && id.length > 0);
+    if (ids.length > 0) scopeByUser.set(uid, Array.from(new Set(ids)));
+  }
+
   // Validate any per-reviewer section assignments belong to this proposal
   // — prevents injecting section ids from another org's proposal.
-  const requestedSectionIds = Array.from(
-    new Set(
-      Object.values(input.sectionAssignments ?? {}).filter(
-        (id): id is string => typeof id === "string" && id.length > 0,
-      ),
-    ),
-  );
+  const requestedSectionIds = Array.from(new Set(Array.from(scopeByUser.values()).flat()));
   if (requestedSectionIds.length > 0) {
     const validSections = await db
       .select({ id: proposalSections.id })
@@ -110,6 +122,9 @@ export async function startReviewAction(input: {
     }
   }
 
+  const checklist = sanitizeChecklist(input.checklist) ?? REVIEW_CHECKLIST_TEMPLATES[input.color];
+  const instructions = (input.instructions ?? "").trim().slice(0, CHECKLIST_LIMITS.maxInstructionsChars);
+
   try {
     const [review] = await db
       .insert(proposalReviews)
@@ -120,6 +135,8 @@ export async function startReviewAction(input: {
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         startedByUserId: actor.id,
         startedAt: new Date(),
+        instructions,
+        checklist,
       })
       .returning({ id: proposalReviews.id });
     if (!review) return { ok: false, error: "Could not create review." };
@@ -127,9 +144,16 @@ export async function startReviewAction(input: {
     const assignmentRows = input.reviewerUserIds.map((uid) => ({
       reviewId: review.id,
       userId: uid,
-      sectionId: input.sectionAssignments?.[uid] ?? null,
+      // The legacy single scope mirrors the first of the reviewer's sections.
+      sectionId: scopeByUser.get(uid)?.[0] ?? null,
     }));
     await db.insert(proposalReviewAssignments).values(assignmentRows);
+    const scopeRows = input.reviewerUserIds.flatMap((uid) =>
+      (scopeByUser.get(uid) ?? []).map((sectionId) => ({ reviewId: review.id, userId: uid, sectionId })),
+    );
+    if (scopeRows.length > 0) {
+      await db.insert(proposalReviewSectionAssignments).values(scopeRows).onConflictDoNothing();
+    }
 
     await recordAudit({
       organizationId,
@@ -487,6 +511,50 @@ export async function unassignReviewerAction(input: {
   if (review) {
     revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
   }
+  return { ok: true };
+}
+
+/** BL-FB-X-COLOR-TEAM — scope one reviewer of the round to these sections (none = whole proposal). */
+export async function setReviewerSectionsAction(input: {
+  reviewId: string;
+  userId: string;
+  sectionIds: string[];
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await setReviewerSections({
+    organizationId,
+    reviewId: input.reviewId,
+    userId: input.userId,
+    sectionIds: input.sectionIds,
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (!res.ok) return res;
+  revalidatePath(`/proposals/${res.proposalId}/reviews/${input.reviewId}`);
+  revalidatePath(`/proposals/${res.proposalId}/sections`);
+  return { ok: true };
+}
+
+/** BL-FB-X-COLOR-TEAM — the signed-in reviewer ticks or clears one checklist line, with an optional note. */
+export async function setChecklistItemAction(input: {
+  reviewId: string;
+  itemKey: string;
+  checked: boolean;
+  note?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await setChecklistItem({
+    organizationId,
+    reviewId: input.reviewId,
+    userId: actor.id,
+    itemKey: input.itemKey,
+    checked: input.checked,
+    note: input.note,
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (!res.ok) return res;
+  revalidatePath(`/proposals/${res.proposalId}/reviews/${input.reviewId}`);
   return { ok: true };
 }
 

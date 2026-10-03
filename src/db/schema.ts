@@ -1145,6 +1145,8 @@ export const reviewColorEnum = pgEnum("review_color", [
   "red",
   "gold",
   "white_gloves",
+  // BL-FB-X-COLOR-TEAM — pricing / cost-volume review (migration 0094).
+  "green",
 ]);
 
 export const reviewStatusEnum = pgEnum("review_status", [
@@ -1175,9 +1177,20 @@ export const proposalReviews = pgTable("proposal_review", {
   }),
   startedAt: timestamp("started_at"),
   closedAt: timestamp("closed_at"),
+  /** BL-FB-X-COLOR-TEAM — the lead's charge to the reviewers for this round. */
+  instructions: text("instructions").notNull().default(""),
+  /**
+   * BL-FB-X-COLOR-TEAM — the checklist this round was started with: a
+   * copy of the colour's template (edited or not), so a later template
+   * change never rewrites a closed round.
+   */
+  checklist: jsonb("checklist").$type<ReviewChecklistItem[]>().notNull().default(sql`'[]'::jsonb`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+/** One line of a review round's checklist (`proposal_review.checklist`). */
+export type ReviewChecklistItem = { key: string; label: string; hint?: string };
 
 export const proposalReviewAssignments = pgTable(
   "proposal_review_assignment",
@@ -1215,8 +1228,57 @@ export const proposalReviewComments = pgTable("proposal_review_comment", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/**
+ * BL-FB-X-COLOR-TEAM — a reviewer scoped to several sections of one
+ * round. No rows = the reviewer reads the whole proposal. The first
+ * section is mirrored onto `proposal_review_assignment.section_id` for
+ * readers that predate this table.
+ */
+export const proposalReviewSectionAssignments = pgTable(
+  "proposal_review_section_assignment",
+  {
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => proposalReviews.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.reviewId, t.userId, t.sectionId] }),
+    sectionIdx: index("proposal_review_section_assignment_section_idx").on(t.reviewId, t.sectionId),
+  }),
+);
+
+/** BL-FB-X-COLOR-TEAM — one reviewer's tick (and note) on one checklist line of a round. */
+export const proposalReviewChecklistItems = pgTable(
+  "proposal_review_checklist_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => proposalReviews.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemKey: text("item_key").notNull(),
+    checked: boolean("checked").notNull().default(false),
+    note: text("note").notNull().default(""),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    uniqueIdx: uniqueIndex("proposal_review_checklist_item_unique_idx").on(t.reviewId, t.userId, t.itemKey),
+  }),
+);
+
 export type ProposalReview = typeof proposalReviews.$inferSelect;
 export type NewProposalReview = typeof proposalReviews.$inferInsert;
+export type ProposalReviewSectionAssignment = typeof proposalReviewSectionAssignments.$inferSelect;
+export type ProposalReviewChecklistItemRow = typeof proposalReviewChecklistItems.$inferSelect;
 export type ReviewColor = (typeof reviewColorEnum.enumValues)[number];
 export type ReviewStatus = (typeof reviewStatusEnum.enumValues)[number];
 export type ReviewVerdict = (typeof reviewVerdictEnum.enumValues)[number];
