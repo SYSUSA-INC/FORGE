@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-SLASH — Slash commands in chat
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #301)
 
 Power-user shortcuts in the section chat for the instructions authors
 type most. Each command expands to a full, structured instruction the
@@ -4782,7 +4782,7 @@ current "Apply to section" full-replace flow when the user wants
 surgical edits.
 
 ### BL-FB-CHAT-SLASH — Slash commands in chat
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #301) — canonical entry under Active priorities
 
 Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
 `/check-compliance`, `/voc` (rewrite in voice-of-customer). Each maps
