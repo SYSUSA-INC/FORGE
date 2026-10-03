@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR (PR #304)
 
 "This Technical Approach would benefit from a notional architecture
 diagram" — with the diagram. A **Graphics** panel under the editor
@@ -4872,7 +4872,7 @@ already in the Brain — the auto-harvest of won proposals
 time.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR (PR #304) — canonical entry under Active priorities
 
 Section-aware suggestions: "this Technical Approach section would
 benefit from a notional architecture diagram" with a starter SVG or
