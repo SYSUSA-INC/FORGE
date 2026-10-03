@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -4972,7 +4972,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
