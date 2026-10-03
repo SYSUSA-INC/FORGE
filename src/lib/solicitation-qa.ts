@@ -56,7 +56,12 @@ export type SolicitationQaView = {
   addedByName: string | null;
 };
 
-/** The solicitation's answers, newest document first, in document order. */
+/**
+ * The solicitation's answers, newest document first, in document order.
+ * Pairs of one document share a posted date and a source, so the sort
+ * is by those and then the ordinal — never by each row's own insert
+ * time, which would put the last pair of a document first.
+ */
 export async function listSolicitationQa(input: {
   organizationId: string;
   solicitationId: string;
@@ -82,7 +87,7 @@ export async function listSolicitationQa(input: {
         eq(solicitationQa.solicitationId, input.solicitationId),
       ),
     )
-    .orderBy(desc(solicitationQa.createdAt), asc(solicitationQa.ordinal));
+    .orderBy(desc(solicitationQa.postedAt), asc(solicitationQa.sourceRef), asc(solicitationQa.ordinal));
   return rows.map((r) => ({
     ...r,
     affectedRefs: r.affectedRefs ?? [],
