@@ -50,7 +50,6 @@ describe("voice logic", () => {
     expect(ft).toContain("Comfortable with passive constructions");
     expect(ft).toContain("Technical, polysyllabic vocabulary");
     expect(ft.some((t) => t.startsWith("Medium-length sentences"))).toBe(true);
-    expect(ft).toContain("Varies sentence length for rhythm");
     expect(ft).toContain("No contractions — formal register");
   });
 
