@@ -9,6 +9,7 @@ import { Panel } from "@/components/ui/Panel";
 import { OpportunityForm } from "../OpportunityForm";
 import { listOpportunityOwners } from "../actions";
 import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
+import { CustomerContactsPanel } from "./CustomerContactsPanel";
 import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
 import { PwinPanel } from "./PwinPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
@@ -96,6 +97,8 @@ export default async function OpportunityOverviewPage({
           target={{ kind: "opportunity", id: opp.id }}
         />
         <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
+        {/* BL-FB-X-CRM — who we know at this agency; nothing when the agency is blank. */}
+        <CustomerContactsPanel organizationId={organizationId} opportunityId={opp.id} />
         <OpportunityBriefPanel
           opportunityId={opp.id}
           initial={briefRow ? toStoredBrief(briefRow) : null}

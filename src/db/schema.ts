@@ -1140,6 +1140,71 @@ export type NewCompany = typeof companies.$inferInsert;
 export type CompanyRelationship =
   (typeof companyRelationshipEnum.enumValues)[number];
 
+/**
+ * BL-FB-X-CRM — a person we know at a customer agency: role, how to
+ * reach them, when we last spoke and when we should next. `agencyKey`
+ * is the normalised agency name (`agencyKey()` in crm-logic.ts) that
+ * matches an opportunity's agency to the people we know there. Role
+ * and touch kind are text with the vocabulary in crm-logic.ts.
+ */
+export const customerContacts = pgTable(
+  "customer_contact",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agency: text("agency").notNull().default(""),
+    agencyKey: text("agency_key").notNull().default(""),
+    office: text("office").notNull().default(""),
+    name: text("name").notNull(),
+    title: text("title").notNull().default(""),
+    role: text("role").notNull().default("other"),
+    email: text("email").notNull().default(""),
+    phone: text("phone").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    /** Our side's relationship owner. */
+    ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "set null" }),
+    lastTouchAt: timestamp("last_touch_at"),
+    nextTouchAt: timestamp("next_touch_at"),
+    touchCount: integer("touch_count").notNull().default(0),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgAgencyIdx: index("customer_contact_org_agency_idx").on(t.organizationId, t.agencyKey),
+  }),
+);
+
+/** BL-FB-X-CRM — one interaction with a contact; the dates on the contact roll up from these. */
+export const customerTouches = pgTable(
+  "customer_touch",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => customerContacts.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().default("note"),
+    occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+    summary: text("summary").notNull().default(""),
+    opportunityId: uuid("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+    /** A follow-up agreed in this touch; copied onto the contact. */
+    nextTouchAt: timestamp("next_touch_at"),
+    loggedByUserId: text("logged_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgContactIdx: index("customer_touch_org_contact_idx").on(t.organizationId, t.contactId, t.occurredAt),
+  }),
+);
+
+export type CustomerContact = typeof customerContacts.$inferSelect;
+export type CustomerTouch = typeof customerTouches.$inferSelect;
+
 export const reviewColorEnum = pgEnum("review_color", [
   "pink",
   "red",
