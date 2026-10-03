@@ -8,7 +8,7 @@
  * consolidated comment report handed to the writers when the round
  * closes. No I/O here; the server side is `review-workflow.ts`.
  */
-import type { ReviewChecklistItem, ReviewColor } from "@/db/schema";
+import type { ReviewAiSummary, ReviewChecklistItem, ReviewColor } from "@/db/schema";
 
 export const CHECKLIST_LIMITS = {
   maxItems: 20,
@@ -230,4 +230,106 @@ export function consolidatedReport(input: {
     for (const c of g.resolved) lines.push(`- [x] ${c.body.replace(/\s+/g, " ").trim()} — ${c.authorName ?? "FORGE AI"}`);
   }
   return lines.join("\n");
+}
+
+// ── Slice 2 — round follow-ups ──────────────────────────────────────
+
+export const SUMMARY_LIMITS = { maxThemes: 5, maxItems: 8, maxChars: 280, maxHeadlineChars: 200 } as const;
+
+const clip = (s: unknown, n: number) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, n) : "");
+const clipList = (v: unknown, n: number = SUMMARY_LIMITS.maxItems) =>
+  Array.isArray(v) ? v.map((s) => clip(s, SUMMARY_LIMITS.maxChars)).filter(Boolean).slice(0, n) : [];
+
+/** Clean the model's summary; null when it carries nothing worth storing. */
+export function sanitizeSummary(raw: unknown, meta: { fallback: boolean; model: string }): ReviewAiSummary | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const headline = clip(o.headline, SUMMARY_LIMITS.maxHeadlineChars);
+  const themes = Array.isArray(o.themes)
+    ? o.themes
+        .map((t) => {
+          const x = t && typeof t === "object" ? (t as Record<string, unknown>) : {};
+          return { title: clip(x.title, 120), detail: clip(x.detail, SUMMARY_LIMITS.maxChars), sections: clipList(x.sections, 6) };
+        })
+        .filter((t) => t.title)
+        .slice(0, SUMMARY_LIMITS.maxThemes)
+    : [];
+  const summary: ReviewAiSummary = {
+    headline,
+    themes,
+    mustFix: clipList(o.mustFix),
+    strengths: clipList(o.strengths),
+    nextSteps: clipList(o.nextSteps),
+    fallback: meta.fallback,
+    model: meta.model,
+  };
+  return headline || themes.length || summary.mustFix.length ? summary : null;
+}
+
+/**
+ * The summary without a model: counts, the sections with most open
+ * comments as themes, the open comments of the busiest sections as the
+ * must-fix list, praise words as strengths, unticked checklist lines as
+ * next steps.
+ */
+export function heuristicSummary(input: {
+  colorLabel: string;
+  groups: readonly CommentGroup[];
+  verdicts: readonly { name: string; verdict: string | null }[];
+  checklist: ChecklistProgress | null;
+  uncheckedLabels?: readonly string[];
+  sectionNumbers?: ReadonlyMap<string, number>;
+}): ReviewAiSummary {
+  const open = input.groups.reduce((n, g) => n + g.open.length, 0);
+  const resolved = input.groups.reduce((n, g) => n + g.resolved.length, 0);
+  const verdicts = input.verdicts.filter((v) => v.verdict);
+  const fails = verdicts.filter((v) => /fail/i.test(v.verdict!)).length;
+  const conds = verdicts.filter((v) => /conditional/i.test(v.verdict!)).length;
+  const verdictPhrase = verdicts.length === 0 ? "no verdicts yet" : fails > 0 ? `${fails} fail${fails === 1 ? "" : "s"}` : conds > 0 ? `${conds} conditional` : "all pass";
+  const busiest = [...input.groups].filter((g) => g.open.length > 0).sort((a, b) => b.open.length - a.open.length);
+  const label = (g: CommentGroup) => {
+    const n = g.sectionId ? input.sectionNumbers?.get(g.sectionId) : undefined;
+    return n !== undefined ? `§${n} ${g.title}` : g.title;
+  };
+  const praise = /\b(strong|clear|compelling|well[- ]written|good|excellent|convincing)\b/i;
+  return {
+    headline: `${input.colorLabel}: ${open} open comment${open === 1 ? "" : "s"} across ${busiest.length} section${busiest.length === 1 ? "" : "s"}, ${resolved} resolved, ${verdictPhrase}.`,
+    themes: busiest.slice(0, SUMMARY_LIMITS.maxThemes).map((g) => ({
+      title: `${label(g)} needs the most work`,
+      detail: `${g.open.length} open comment${g.open.length === 1 ? "" : "s"} from ${g.authors.join(", ")}.`,
+      sections: [g.title],
+    })),
+    mustFix: busiest.flatMap((g) => g.open.map((c) => `${label(g)}: ${clip(c.body, SUMMARY_LIMITS.maxChars)}`)).slice(0, SUMMARY_LIMITS.maxItems),
+    strengths: input.groups.flatMap((g) => [...g.open, ...g.resolved].filter((c) => praise.test(c.body)).map((c) => clip(c.body, SUMMARY_LIMITS.maxChars))).slice(0, 3),
+    nextSteps: [
+      ...(input.uncheckedLabels ?? []).slice(0, 4).map((l) => `Checklist still open: ${l}`),
+      ...(input.checklist && input.checklist.of > 0 && input.checklist.done < input.checklist.of ? [`Finish the checklist (${input.checklist.done}/${input.checklist.of} ticks).`] : []),
+      ...(verdicts.length < input.verdicts.length ? [`${input.verdicts.length - verdicts.length} reviewer${input.verdicts.length - verdicts.length === 1 ? "" : "s"} still to submit a verdict.`] : []),
+    ].slice(0, SUMMARY_LIMITS.maxItems),
+    fallback: true,
+    model: "",
+  };
+}
+
+/** The summary as Markdown for the clipboard. */
+export function summaryMarkdown(s: ReviewAiSummary): string {
+  const lines = [`**${s.headline}**`];
+  if (s.themes.length) lines.push("", "## Themes", ...s.themes.map((t) => `- **${t.title}** — ${t.detail}${t.sections.length ? ` (${t.sections.join(", ")})` : ""}`));
+  if (s.mustFix.length) lines.push("", "## Must fix", ...s.mustFix.map((m) => `- [ ] ${m}`));
+  if (s.strengths.length) lines.push("", "## Strengths", ...s.strengths.map((m) => `- ${m}`));
+  if (s.nextSteps.length) lines.push("", "## Next steps", ...s.nextSteps.map((m) => `- ${m}`));
+  return lines.join("\n");
+}
+
+export const DUE_REMINDER_HORIZON_MS = 24 * 60 * 60 * 1000;
+
+/** True once a round is within a day of its due date, or past it. */
+export function dueReminderDue(now: Date, dueDate: Date | null | undefined): boolean {
+  if (!dueDate) return false;
+  return dueDate.getTime() - now.getTime() <= DUE_REMINDER_HORIZON_MS;
+}
+
+export function dueReminderSubject(colorLabel: string, proposalTitle: string, dueDate: Date, now: Date): string {
+  const overdue = dueDate.getTime() < now.getTime();
+  return `${colorLabel} review of ${proposalTitle} ${overdue ? "is overdue" : "is due tomorrow"} — your verdict is still open`;
 }

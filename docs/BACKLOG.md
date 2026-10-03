@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #305)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #305)  ·  🔄 Slice 2 in PR
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -1145,8 +1145,39 @@ date, reviewers, verdicts, comments). Slice 1 adds the lead's tools:
   Migration `0094_review_workflow.sql`. Unit-tested
   (`tests/ai/review-workflow.test.ts`); runtime-tested
   (`tests/isolation/review-workflow.test.ts`).
-- **Later slices:** carry open comments into the next colour's round;
-  AI summary of the report; reviewer reminders before the due date.
+**Slice 2 — what follows a round:**
+
+- **Carry forward.** The start form offers the closed rounds that still
+  have open comments; the chosen round's open comments reopen on the
+  new round (same section and author, lineage on
+  `proposal_review_comment.carried_from_comment_id`, the round's
+  `carried_from_review_id`) and close on the old one, so an item is
+  open in exactly one round and the editor and drafter see it once. A
+  "from Pink Team" chip marks each carried comment.
+  `carryOpenComments` (`src/lib/review-workflow.ts`), audited
+  `proposal.review.carry`.
+- **Round debrief.** `summarizeReview` (`src/lib/review-summary.ts`)
+  feeds the consolidated report to `review_summary` (standard class,
+  prompt version `2026-10-03.1`, `reviewSummarySchema`) and stores the
+  headline, cross-reviewer themes, must-fix list, strengths to keep and
+  next steps on `proposal_review.ai_summary`; `heuristicSummary` (pure)
+  stands in under the stub provider or an unusable answer (slot
+  refunded). Gated by `aiAutoDraft` and the request quota; audited
+  `proposal.review.summarize`; copied as Markdown from the panel.
+- **Reminder before the due date.** The daily cron
+  (`dispatchReviewDueReminders`, `src/lib/review-reminders.ts`, on the
+  08:00 UTC tick) fires the new rules-engine trigger `review_due_soon`
+  once per open round within a day of its due date or past it, naming
+  only the reviewers without a verdict (`mentioned_in_payload`), then
+  stamps `due_reminder_sent_at`. Default rule seeded per tenant
+  (in-app + email) by migration 0096; migration 0095 adds the enum
+  value and columns.
+- Tests: `tests/ai/review-workflow.test.ts` (summary hygiene, heuristic
+  debrief, reminder window); `tests/isolation/review-followups.test.ts`
+  (carry scoped to the owning tenant and proposal, summary gated and
+  stored, reminders reach unsubmitted reviewers once).
+- **Later:** carried comments shown in the editor with their origin;
+  reminder cadence per tenant.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #304)
@@ -5076,7 +5107,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #305) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #305) · 🔄 Slice 2 in PR — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer

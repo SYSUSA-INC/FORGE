@@ -481,6 +481,7 @@ Run formal color-team reviews. **Start review** panel:
 - Due date (optional) and **instructions to reviewers** — what this round should concentrate on
 - Check reviewers, and for each one tick the sections they read (no ticks = the whole proposal)
 - **Checklist** — the colour's template of what to check, which you can trim or extend; the round keeps its own copy
+- **Carry open comments from** — when an earlier round closed with comments still open, pick it here and they reopen on the new round (marked "from Pink Team") and close on the old one, so nothing raised at Pink is lost by Red
 
 When you click Start, the review is in progress and reviewers get access. Clicking into a review shows:
 - **Section coverage** — a sections × reviewers grid; sections nobody covers are flagged, and the lead can re-scope anyone while the round is open
@@ -488,6 +489,9 @@ When you click Start, the review is in progress and reviewers get access. Clicki
 - **Reviewer list** with each person's verdict badge and submission state
 - **Comments panel** — add section-scoped or general comments, resolve them (the resolve action is recorded with your name)
 - **Consolidated comments** — every reviewer's comments folded into one per-section summary (open / resolved, who said what) with **Copy report**: the Markdown hand-off the writers work from after the round
+- **Round debrief** — **Summarise this round** reads every comment, verdict and checklist tick and writes the debrief: a headline, themes that cut across reviewers, the must-fix list, strengths to keep and the lead's next steps. It is stored on the round and copies as Markdown; it counts one AI request and needs AI drafting on your tier. Without a live model it is built from the comments themselves.
+
+**Reviewers are nudged the day before.** If a round has a due date, the reviewers who have not yet submitted a verdict get a reminder (in-app and email by default) the day before it is due, or once if it is already overdue. Admins can change or switch off the "Color-team review due soon" rule under notification rules.
 - **Submit your verdict** (if you're an assigned reviewer) — Pass / Conditional / Fail + summary
 - **Close review** (final verdict + summary) or **Cancel review** — only the proposal manager (or an admin) can close or cancel; the action is stamped with their name and a timestamp
 

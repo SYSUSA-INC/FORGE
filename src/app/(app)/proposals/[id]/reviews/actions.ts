@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -22,7 +22,8 @@ import { runInBackground } from "@/lib/background";
 import { extractMentionUserIds } from "@/lib/mentions";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { runReviewPreflight } from "@/lib/review-preflight";
-import { setChecklistItem, setReviewerSections } from "@/lib/review-workflow";
+import { summarizeReview, type SummarizeReviewResult } from "@/lib/review-summary";
+import { carryOpenComments, setChecklistItem, setReviewerSections } from "@/lib/review-workflow";
 import { CHECKLIST_LIMITS, REVIEW_CHECKLIST_TEMPLATES, sanitizeChecklist } from "@/lib/review-workflow-logic";
 import { setReviewCommentResolved } from "@/lib/section-review-comments";
 import { log } from "@/lib/log";
@@ -85,6 +86,8 @@ export async function startReviewAction(input: {
   instructions?: string;
   /** BL-FB-X-COLOR-TEAM — the checklist for this round; the colour's template when omitted. */
   checklist?: unknown;
+  /** BL-FB-X-COLOR-TEAM Slice 2 — an earlier round of this proposal whose open comments move into the new one. */
+  carryFromReviewId?: string | null;
 }): Promise<{ ok: true; reviewId: string } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -155,6 +158,21 @@ export async function startReviewAction(input: {
       await db.insert(proposalReviewSectionAssignments).values(scopeRows).onConflictDoNothing();
     }
 
+    // Slice 2 — the previous round's open comments open this one. A
+    // refusal (wrong proposal, foreign round) is logged, never fatal:
+    // the round exists and the lead sees the comments did not arrive.
+    let carried = 0;
+    if (input.carryFromReviewId) {
+      const res = await carryOpenComments({
+        organizationId,
+        fromReviewId: input.carryFromReviewId,
+        toReviewId: review.id,
+        actor: { userId: actor.id, email: actor.email },
+      });
+      if (res.ok) carried = res.carried;
+      else log.warn("[startReviewAction]", "carry-forward refused", { reviewId: review.id, error: res.error });
+    }
+
     await recordAudit({
       organizationId,
       actor: { userId: actor.id, email: actor.email },
@@ -165,6 +183,8 @@ export async function startReviewAction(input: {
         proposalId: input.proposalId,
         color: input.color,
         reviewerCount: input.reviewerUserIds.length,
+        carriedFromReviewId: input.carryFromReviewId ?? null,
+        carried,
       },
     });
 
@@ -558,6 +578,18 @@ export async function setChecklistItemAction(input: {
   return { ok: true };
 }
 
+/** BL-FB-X-COLOR-TEAM Slice 2 — the AI debrief of this round, stored on it. */
+export async function summarizeReviewAction(input: { reviewId: string }): Promise<SummarizeReviewResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await summarizeReview({ organizationId, reviewId: input.reviewId, actor: { userId: actor.id, email: actor.email } });
+  if (res.ok) {
+    const [review] = await db.select({ proposalId: proposalReviews.proposalId }).from(proposalReviews).where(eq(proposalReviews.id, input.reviewId)).limit(1);
+    if (review) revalidatePath(`/proposals/${review.proposalId}/reviews/${input.reviewId}`);
+  }
+  return res;
+}
+
 export async function addReviewCommentAction(input: {
   reviewId: string;
   sectionId?: string | null;
@@ -766,7 +798,7 @@ export async function listReviewsForProposal(proposalId: string) {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await assertProposalOwned(proposalId, organizationId))) {
-    return { reviews: [], assignments: [] };
+    return { reviews: [], assignments: [], openComments: {} as Record<string, number> };
   }
 
   const reviews = await db
@@ -776,6 +808,16 @@ export async function listReviewsForProposal(proposalId: string) {
     .orderBy(desc(proposalReviews.createdAt));
 
   const reviewIds = reviews.map((r) => r.id);
+  // Slice 2 — open comments per round, so the start form can offer to carry them.
+  const openRows =
+    reviewIds.length === 0
+      ? []
+      : await db
+          .select({ reviewId: proposalReviewComments.reviewId, n: count() })
+          .from(proposalReviewComments)
+          .where(and(inArray(proposalReviewComments.reviewId, reviewIds), eq(proposalReviewComments.resolved, false)))
+          .groupBy(proposalReviewComments.reviewId);
+  const openComments = Object.fromEntries(openRows.map((r) => [r.reviewId, Number(r.n)] as const));
   const assignments =
     reviewIds.length === 0
       ? []
@@ -792,5 +834,5 @@ export async function listReviewsForProposal(proposalId: string) {
           .leftJoin(users, eq(users.id, proposalReviewAssignments.userId))
           .where(inArray(proposalReviewAssignments.reviewId, reviewIds));
 
-  return { reviews, assignments };
+  return { reviews, assignments, openComments };
 }

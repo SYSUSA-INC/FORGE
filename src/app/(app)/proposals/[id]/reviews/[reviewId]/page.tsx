@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -30,6 +30,7 @@ import { CloseReviewPanel } from "./CloseReviewPanel";
 import { ChecklistPanel } from "./ChecklistPanel";
 import { ConsolidatedReport } from "./ConsolidatedReport";
 import { CoveragePanel } from "./CoveragePanel";
+import { ReviewSummaryPanel } from "./ReviewSummaryPanel";
 import { listOrgReviewers } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -90,11 +91,27 @@ export default async function ReviewDetailPage({
       createdAt: proposalReviewComments.createdAt,
       authorName: users.name,
       authorEmail: users.email,
+      carriedFromCommentId: proposalReviewComments.carriedFromCommentId,
     })
     .from(proposalReviewComments)
     .leftJoin(users, eq(users.id, proposalReviewComments.userId))
     .where(eq(proposalReviewComments.reviewId, r.id))
     .orderBy(desc(proposalReviewComments.createdAt));
+
+  // Slice 2 — which earlier round each carried comment came from, and the round this one carries.
+  const carriedIds = commentRows.map((c) => c.carriedFromCommentId).filter((id): id is string => !!id);
+  const carriedSources =
+    carriedIds.length === 0
+      ? []
+      : await db
+          .select({ id: proposalReviewComments.id, color: proposalReviews.color })
+          .from(proposalReviewComments)
+          .innerJoin(proposalReviews, eq(proposalReviews.id, proposalReviewComments.reviewId))
+          .where(inArray(proposalReviewComments.id, carriedIds));
+  const carriedColor = new Map(carriedSources.map((s) => [s.id, REVIEW_COLOR_LABELS[s.color]] as const));
+  const [carriedRound] = r.carriedFromReviewId
+    ? await db.select({ color: proposalReviews.color }).from(proposalReviews).where(eq(proposalReviews.id, r.carriedFromReviewId)).limit(1)
+    : [];
 
   const reviewers = await listOrgReviewers();
   const actorAssignment = assignmentRows.find((a) => a.userId === actor.id);
@@ -183,6 +200,11 @@ export default async function ReviewDetailPage({
               Due {new Date(r.dueDate).toLocaleDateString()}
             </span>
           ) : null}
+          {carriedRound ? (
+            <span className="rounded border border-indigo-400/20 bg-indigo-400/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-indigo-300">
+              Carries {REVIEW_COLOR_LABELS[carriedRound.color]} open comments
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -203,6 +225,7 @@ export default async function ReviewDetailPage({
             currentUserId={actor.id}
             canEdit={r.status === "in_progress"}
           />
+          <ReviewSummaryPanel reviewId={r.id} summary={r.aiSummary ?? null} summaryAt={r.aiSummaryAt ? r.aiSummaryAt.toISOString() : null} />
           <CommentsPanel
             reviewId={r.id}
             proposalId={params.id}
@@ -224,6 +247,7 @@ export default async function ReviewDetailPage({
               // BL-AIP-6 — pre-review comments carry no user; label them.
               authorName: c.authorName ?? (c.userId ? null : "FORGE AI"),
               authorEmail: c.authorEmail,
+              carriedFrom: c.carriedFromCommentId ? carriedColor.get(c.carriedFromCommentId) ?? "an earlier round" : null,
             }))}
           />
         </div>

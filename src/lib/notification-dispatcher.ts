@@ -413,6 +413,10 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
       // distinction between initial fan-out and late-add lives in
       // the trigger event kind + rule, not in the inbox row.
       return "review_assigned" as const;
+    case "review_due_soon":
+      // BL-FB-X-COLOR-TEAM Slice 2 — a nudge about a review the user
+      // already holds; the inbox row reads as the assignment it refers to.
+      return "review_assigned" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
