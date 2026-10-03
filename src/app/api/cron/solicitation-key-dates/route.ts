@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { dispatchKeyDateReminders } from "@/lib/solicitation-key-date-cron";
 import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
+import { dispatchSolicitationQaPolls } from "@/lib/solicitation-qa";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -22,6 +23,10 @@ export const maxDuration = 60;
  * is due in 1, 3 or 7 days (see `dispatchOpportunityDueSoon`). The two
  * scans are independent; a failure in one is reported in the response
  * without blocking the other.
+ *
+ * BL-FB-SOL-QA — the same tick polls the SAM.gov notices of live
+ * solicitations for new Q&A attachments (`dispatchSolicitationQaPolls`,
+ * bounded, skipped without SAMGOV_API_KEY).
  *
  * Auth: Bearer ${CRON_SECRET} — same pattern as all other cron routes.
  */
@@ -49,12 +54,18 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon] = await Promise.allSettled([
+  const [keyDates, dueSoon, qaPolls] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
+    dispatchSolicitationQaPolls(),
   ]);
 
   const failures: string[] = [];
+  if (qaPolls.status === "rejected") {
+    const message = qaPolls.reason instanceof Error ? qaPolls.reason.message : String(qaPolls.reason);
+    log.error("[solicitation-key-date-cron]", "Q&A poll failed", { error: message });
+    failures.push(`solicitationQa: ${message}`);
+  }
   if (keyDates.status === "rejected") {
     const message =
       keyDates.reason instanceof Error
@@ -80,6 +91,7 @@ export async function GET(req: NextRequest) {
     ...(keyDates.status === "fulfilled" ? keyDates.value : {}),
     opportunityDueSoon:
       dueSoon.status === "fulfilled" ? dueSoon.value : null,
+    solicitationQa: qaPolls.status === "fulfilled" ? qaPolls.value : null,
   };
 
   if (failures.length > 0) {

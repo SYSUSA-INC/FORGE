@@ -61,6 +61,8 @@ type ItemRow = {
   aiAssessment: AIAssessment;
   aiAssessedAt: string | null;
   evidence: EvidenceRowType[];
+  /** BL-FB-SOL-QA — the contracting-officer answer that refines this row. */
+  amendedByQa: { id: string; solicitationId: string; question: string; answer: string } | null;
 };
 
 export function ComplianceClient({
@@ -782,6 +784,20 @@ function ItemRowCard({
             <div className="whitespace-pre-wrap font-body text-[13px] text-text">
               {item.requirementText}
             </div>
+            {item.amendedByQa ? (
+              /* BL-FB-SOL-QA — the contracting officer refined this requirement */
+              <div
+                className="mt-1 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 font-body text-[11px] leading-relaxed text-text"
+                title={item.amendedByQa.question || "Contracting-officer answer"}
+              >
+                <span className="mr-1.5 font-mono text-[9px] uppercase tracking-widest text-amber-200">Amended by Q&A</span>
+                {item.amendedByQa.answer.slice(0, 240)}
+                {item.amendedByQa.answer.length > 240 ? "…" : ""}{" "}
+                <a href={`/solicitations/${item.amendedByQa.solicitationId}`} className="text-teal underline">
+                  Q&A →
+                </a>
+              </div>
+            ) : null}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-muted">
               {item.volume ? <span>Vol: {item.volume}</span> : null}
               {item.rfpPageReference ? (

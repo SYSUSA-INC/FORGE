@@ -6,6 +6,7 @@ import {
   complianceItems,
   proposalSections,
   proposals,
+  solicitationQa,
   users,
 } from "@/db/schema";
 import { Panel } from "@/components/ui/Panel";
@@ -68,6 +69,7 @@ export default async function ProposalCompliancePage({
       sectionOrdering: proposalSections.ordering,
       aiAssessment: complianceItems.aiAssessment,
       aiAssessedAt: complianceItems.aiAssessedAt,
+      amendedByQaId: complianceItems.amendedByQaId,
     })
     .from(complianceItems)
     .leftJoin(users, eq(users.id, complianceItems.ownerUserId))
@@ -110,6 +112,22 @@ export default async function ProposalCompliancePage({
     arr.push(e);
     evidenceByItem.set(e.complianceItemId, arr);
   }
+
+  // BL-FB-SOL-QA — the contracting-officer answers that refine rows.
+  const qaIds = [...new Set(items.map((i) => i.amendedByQaId).filter((x): x is string => Boolean(x)))];
+  const qaRows =
+    qaIds.length > 0
+      ? await db
+          .select({
+            id: solicitationQa.id,
+            solicitationId: solicitationQa.solicitationId,
+            question: solicitationQa.question,
+            answer: solicitationQa.answer,
+          })
+          .from(solicitationQa)
+          .where(and(eq(solicitationQa.organizationId, organizationId), inArray(solicitationQa.id, qaIds)))
+      : [];
+  const qaById = new Map(qaRows.map((q) => [q.id, q]));
 
   const team = await listProposalTeamCandidates();
 
@@ -195,6 +213,7 @@ export default async function ProposalCompliancePage({
           aiAssessedAt: i.aiAssessedAt
             ? i.aiAssessedAt.toISOString()
             : null,
+          amendedByQa: i.amendedByQaId ? (qaById.get(i.amendedByQaId) ?? null) : null,
           evidence: (evidenceByItem.get(i.id) ?? []).map((e) => ({
             id: e.id,
             kind: e.kind,

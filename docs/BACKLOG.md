@@ -1110,8 +1110,53 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR
+
+Contracting officers answer industry questions as a "Questions and
+Answers" attachment on the SAM.gov notice, inside the notice
+description, or by email. FORGE now reads them, keeps the history
+with dates, names the requirements each answer refines and flags the
+compliance rows as amended by Q&A.
+
+- **Reading the answers.** `parseQaPairs` (`src/lib/solicitation-qa-
+  logic.ts`, pure) handles the federal formats (Q1/A1, Question /
+  Answer, Government Response, numbered questions, inline Q/A) and
+  drops unanswered questions; `looksLikeQaDocument` by file name or
+  by content; `extractRefs` reads section references (L.5.2.1, M-1,
+  PWS 3.2) and leaves decimals alone; `matchQaToRequirements` pairs an
+  answer with the requirements it names, else with those whose content
+  words it covers; `qaDedupeKey` keys a pair so a re-poll stores it
+  once.
+- **Polling the notice.** `fetchSamNotice` / `downloadSamResource`
+  (`samgov.ts`, with timeouts) read a notice's attachment links;
+  `pollSolicitationQa` downloads the links not seen before (5 per
+  poll, 20 MB each), extracts text with the solicitation pipeline,
+  keeps the Q&A documents and the description's Q&A, and remembers
+  `qa_checked_at` / `qa_seen_links`. The daily 08:00 UTC solicitation
+  tick (`/api/cron/solicitation-key-dates`) polls up to 25 live notices
+  not checked in 20 h (`dispatchSolicitationQaPolls`, skipped without
+  `SAMGOV_API_KEY`) and notifies the assigned team when answers land.
+- **Stored and flagged.** `solicitation_qa` (migration 0093; every row
+  carries `organization_id`; unique on solicitation + dedupe key) holds
+  source, file name, question, answer, affected refs and posted date.
+  `compliance_item.amended_by_qa_id` points the matrix rows of this
+  tenant's proposals on the opportunity at the answer (by requirement
+  number, else the seed's text match); the matrix row shows the answer
+  with a link to the Q&A, and the solicitation's requirement list marks
+  the clauses. Audited `solicitation.qa.poll` / `solicitation.qa.add`.
+- **The panel.** *Q&A from the contracting officer* on the solicitation
+  page: **Check SAM.gov now** (needs a notice ID and the key) and
+  **Paste Q&A** for answers received by email, with the last-checked
+  date, each answer's source and the requirements it refines.
+- Unit-tested (`tests/ai/solicitation-qa.test.ts`); runtime-tested
+  (`tests/isolation/solicitation-qa.test.ts`): answers land and flag
+  for the owning tenant only, re-paste stores nothing twice, polling
+  without a notice ID is refused, audits. Sync migration 0093 on
+  `/admin/migrations` after deploy.
+
 ### BL-FB-CHAT-SLASH — Slash commands in chat
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #301)
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #301)
 
 Power-user shortcuts in the section chat for the instructions authors
 type most. Each command expands to a full, structured instruction the
@@ -4425,7 +4470,7 @@ new rows in green, strikes deleted rows. Notification to proposal team
 on amendment ingestion.
 
 ### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
 
 Poll SAM.gov for Q&A responses on linked notice IDs. When the
 contracting officer answers a question that contradicts or refines a
@@ -4782,7 +4827,7 @@ current "Apply to section" full-replace flow when the user wants
 surgical edits.
 
 ### BL-FB-CHAT-SLASH — Slash commands in chat
-**Priority:** P3  ·  **Effort:** S  ·  **Status:** 🔄 in PR (PR #301) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #301) — canonical entry under Active priorities
 
 Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
 `/check-compliance`, `/voc` (rewrite in voice-of-customer). Each maps

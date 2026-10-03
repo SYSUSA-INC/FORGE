@@ -1296,6 +1296,11 @@ export const complianceItems = pgTable("compliance_item", {
   // Phase 14c — last AI pre-flight result for this item.
   aiAssessment: jsonb("ai_assessment").$type<ComplianceAIAssessment | null>(),
   aiAssessedAt: timestamp("ai_assessed_at"),
+  // BL-FB-SOL-QA — the contracting officer's answer that refines this
+  // requirement, when one matched at ingest (drizzle/0093).
+  amendedByQaId: uuid("amended_by_qa_id").references((): AnyPgColumn => solicitationQa.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
@@ -2033,6 +2038,11 @@ export const solicitations = pgTable("solicitation", {
     .$type<SolicitationKeyDate[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
+  // BL-FB-SOL-QA — when the SAM.gov notice was last checked for Q&A and
+  // the attachment links already read, so a poll downloads only what is
+  // new (drizzle/0093).
+  qaCheckedAt: timestamp("qa_checked_at", { withTimezone: true }),
+  qaSeenLinks: jsonb("qa_seen_links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2077,6 +2087,43 @@ export type SolicitationKeyDate = {
     | "protest_window"
     | "other";
 };
+
+// BL-FB-SOL-QA — a contracting officer's answer to an industry question,
+// read from a SAM.gov Q&A attachment, the notice description, or pasted
+// by the team. `affectedRefs` are the requirement references the answer
+// refines, matched at ingest; `dedupeKey` keeps a re-poll from storing
+// the same pair twice. Every row carries organization_id (drizzle/0093).
+export type SolicitationQaSource = "attachment" | "description" | "manual";
+
+export const solicitationQa = pgTable(
+  "solicitation_qa",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    source: text("source").$type<SolicitationQaSource>().notNull().default("manual"),
+    /** The attachment's file name or "notice description"; "pasted" for manual entries. */
+    sourceRef: text("source_ref").notNull().default(""),
+    ordinal: integer("ordinal").notNull().default(0),
+    question: text("question").notNull().default(""),
+    answer: text("answer").notNull(),
+    affectedRefs: jsonb("affected_refs").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    dedupeKey: text("dedupe_key").notNull().default(""),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    addedByUserId: text("added_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgSolicitationIdx: index("solicitation_qa_org_solicitation_idx").on(t.organizationId, t.solicitationId),
+    dedupeIdx: uniqueIndex("solicitation_qa_dedupe_idx").on(t.solicitationId, t.dedupeKey),
+  }),
+);
+
+export type SolicitationQa = typeof solicitationQa.$inferSelect;
 
 /**
  * BL-FB-SOL-BUNDLE — companion documents within a solicitation bundle.
