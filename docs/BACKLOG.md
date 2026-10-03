@@ -1110,8 +1110,53 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-GEN-VOICE — Per-author voice training
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR
+
+"This reads like AI" is mostly a voice problem: every author's
+sections come back in one register. Slice 1 measures how each author
+actually writes and hands that to the drafter and chat for the sections
+they own, so Sarah's sections read like Sarah and Mike's like Mike.
+
+- **Measured, not guessed.** `analyzeVoice` (pure
+  `src/lib/voice-logic.ts`, on the tone check's sentence and syllable
+  helpers) reads an author's texts for sentence length and spread,
+  paragraph size, long-word share, passive share, "we" / "you" / "I"
+  rates, contractions, numerals, list habit, favourite sentence openers,
+  recurring phrases and distinctive vocabulary; `describeVoice` turns
+  that into plain traits ("Short, direct sentences (about 9 words)",
+  "Active voice almost throughout", 'Writes as "we"'); `voiceGuidance`
+  writes the prompt fragment with measurable targets, the habits to use
+  sparingly, the author's own notes, and the rule that voice changes
+  how things are said, never what.
+- **From their own writing.** `rebuildVoiceProfile`
+  (`src/lib/voice.ts`) reads the sections the author owns in this
+  organization (120+ words, newest 40) plus the texts they pasted
+  (`author_voice_sample`), needs 300 words in all, and stores the
+  profile once per (organization, user) in `author_voice_profile`:
+  metrics, traits, guidance, the author's notes, an on/off switch.
+  Migration `0098_author_voice.sql`.
+- **In the drafter and chat.** `voiceGuidanceForSection` returns the
+  guidance when the section's author has an enabled profile in the
+  tenant; `prepareSectionDraft` carries it as `snapshot.authorVoice`
+  (own prompt block after the customer's words; system rule added;
+  `SECTION_DRAFT_PROMPT_VERSION` → `2026-10-03.1`) and
+  `prepareSectionChat` adds the same block to its context.
+- **My writing voice** on Settings: traits, what the AI is told,
+  Build / Rebuild from my writing, paste a sample (120+ words), the
+  switch and notes. Audited `voice.profile.rebuild`,
+  `voice.sample.add` / `.remove`, `voice.settings.update`.
+- Unit-tested (`tests/ai/voice-logic.test.ts`: two contrasting writers
+  measure, read and guide differently); runtime-tested
+  (`tests/isolation/voice.test.ts`: own sections and samples in the
+  owning tenant only, guidance only for the author's own sections while
+  enabled, samples and settings scoped, audits).
+- **Slice 2:** learn from accepted edits (`section_draft_signal`
+  before/after), an "in Sarah's voice" chip in the editor, a voice
+  comparison of a draft against the profile, team-wide house style.
+
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #307)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #307)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -4927,7 +4972,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
@@ -5145,7 +5190,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #307) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #307) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
