@@ -1110,8 +1110,48 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-GEN-GRAPHICS — Graphics suggestions
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR
+
+"This Technical Approach would benefit from a notional architecture
+diagram" — with the diagram. A **Graphics** panel under the editor
+reads the section and proposes up to three diagrams drawn only from
+what the text already says, each as a starter SVG the author inserts
+inline and a Mermaid block for other tools.
+
+- **A spec, not a picture.** A diagram is a small spec — kind
+  (architecture / process / org / timeline), nodes, edges — so it can
+  be checked and redrawn. `graphics_suggest` (standard class, prompt
+  version `2026-10-03.1`, `graphicsSuggestSchema`) asks the model for
+  specs whose every node is something the section names; `sanitizeSpec`
+  (`src/lib/graphics-logic.ts`, pure) caps nodes and edges, trims
+  labels, drops dangling edges. Without a live provider, or when the
+  model returns nothing usable (slot refunded), `proposeGraphics` mines
+  the text itself: numbered steps or sequence words → process; named
+  periods ("days 1–10", "within 30 days") → timeline; roles with the
+  program manager on top → org chart; components grouped into Users /
+  Application / Data / Platform tiers → architecture; ranked by the
+  section's kind.
+- **Drawn here.** `renderDiagramSvg` lays each kind out (snaking
+  process rows, tiered architecture bands, a levelled org tree, a
+  timeline axis) as a self-contained SVG in print colours from
+  `THEME_HEX`, no scripts or external assets; `toMermaid` writes the
+  same diagram as a flowchart with subgraphs per tier; `svgDataUri`
+  packs the SVG for the editor's image node.
+- **In the editor.** `GraphicsPanel` previews each suggestion with its
+  reason; **Insert into section** adds it at the end as an image (the
+  PDF export renders it; images are not tracked changes and the DOCX
+  export does not carry them yet), **Copy Mermaid**, **Download SVG**.
+  Gated by `aiAutoDraft` and the monthly request quota in
+  `suggestSectionGraphics` (`src/lib/graphics.ts`); audited
+  `section.graphics.suggest`.
+- Unit-tested (`tests/ai/graphics.test.ts`); runtime-tested
+  (`tests/isolation/graphics.test.ts`): suggestions for the owning
+  tenant's section only, the short-section and feature gates hold,
+  stub-mode heuristics render, audits. No migration.
+
 ### BL-FB-CHAT-VOICE — Voice input
-**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #303)
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #303)
 
 Dictation in the section chat for hands-free use: a 🎙 control beside
 **Send** that turns speech into prose in the box, with slash commands
@@ -4832,7 +4872,7 @@ already in the Brain — the auto-harvest of won proposals
 time.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
 
 Section-aware suggestions: "this Technical Approach section would
 benefit from a notional architecture diagram" with a starter SVG or
@@ -4867,7 +4907,7 @@ Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
 to a structured server action. Faster than typing the full instruction.
 
 ### BL-FB-CHAT-VOICE — Voice input
-**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #303) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #303) — canonical entry under Active priorities
 
 Push-to-talk dictation for drive-time / hands-free use. Web Speech API
 on supported browsers; Anthropic audio transcription on the others.

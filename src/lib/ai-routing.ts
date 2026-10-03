@@ -79,6 +79,8 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   brain_answer: "standard",
   // BL-AIP-7d part ii — one call per tenant, ever; the admin edits it.
   onboarding_assist: "standard",
+  // BL-FB-GEN-GRAPHICS — a short structured spec from the section text.
+  graphics_suggest: "standard",
   // Strong: what the customer submits or decides on.
   section_draft: "strong",
   proposal_bootstrap: "strong",
