@@ -233,6 +233,8 @@ export type SamOpportunity = {
   description: string;
   uiLink: string;
   award: { number?: string; amount?: string; date?: string } | null;
+  /** BL-FB-SOL-QA — attachment download URLs, when the notice has any. */
+  resourceLinks?: string[] | null;
 };
 
 export type SamOpportunitySearchParams = {
@@ -557,6 +559,117 @@ function parseKeywordTokens(keyword: string): string[] {
     tokens.push(...keyword.slice(lastIndex).trim().split(/\s+/));
   }
   return tokens.map((t) => t.trim()).filter((t) => t.length > 1);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-FB-SOL-QA — one notice and its attachments
+// ─────────────────────────────────────────────────────────────────────
+
+/** Abort after `ms` so a hung SAM.gov call cannot stall a request or a cron tick. */
+function timeoutSignal(ms: number): AbortSignal {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), ms);
+  if (typeof t === "object" && t && "unref" in t) (t as { unref(): void }).unref();
+  return ac.signal;
+}
+
+export type SamNotice = {
+  noticeId: string;
+  title: string;
+  solicitationNumber: string;
+  postedDate: string;
+  description: string;
+  uiLink: string;
+  resourceLinks: string[];
+};
+
+/** One notice by id: its posted date, description and attachment links. */
+export async function fetchSamNotice(
+  noticeId: string,
+): Promise<{ ok: true; notice: SamNotice } | { ok: false; error: string; status?: number }> {
+  const key = process.env.SAMGOV_API_KEY;
+  if (!key) return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
+  const id = noticeId.trim();
+  if (!id) return { ok: false, error: "Provide a notice ID." };
+  // The search API requires a posted-date window of a year at most.
+  const postedTo = new Date();
+  const postedFrom = new Date(postedTo.getTime() - 364 * 86_400_000);
+  const params = new URLSearchParams({
+    api_key: key,
+    noticeid: id,
+    limit: "1",
+    postedFrom: mmddyyyy(postedFrom),
+    postedTo: mmddyyyy(postedTo),
+  });
+  try {
+    const res = await fetch(`${SAM_OPP_BASE}?${params.toString()}`, { cache: "no-store", signal: timeoutSignal(20_000) });
+    const text = await res.text();
+    if (!res.ok) return { ok: false, error: friendlySamError(text, res.status), status: res.status };
+    const data = JSON.parse(text) as { opportunitiesData?: SamOpportunity[] };
+    const op = data.opportunitiesData?.[0];
+    if (!op) return { ok: false, error: "SAM.gov has no notice with that ID posted in the last year." };
+    const [enriched] = await enrichDescriptions([op], key);
+    return {
+      ok: true,
+      notice: {
+        noticeId: op.noticeId,
+        title: op.title ?? "",
+        solicitationNumber: op.solicitationNumber ?? "",
+        postedDate: op.postedDate ?? "",
+        description: enriched?.description ?? "",
+        uiLink: op.uiLink ?? "",
+        resourceLinks: (op.resourceLinks ?? []).filter((l): l is string => typeof l === "string" && isUrl(l)),
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Download one notice attachment, bounded; the file name comes from the response headers. */
+export async function downloadSamResource(
+  url: string,
+  maxBytes: number,
+): Promise<{ ok: true; fileName: string; contentType: string; bytes: Uint8Array } | { ok: false; error: string }> {
+  const key = process.env.SAMGOV_API_KEY;
+  if (!key) return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
+  const target = url.includes("api_key=")
+    ? url
+    : url + (url.includes("?") ? "&" : "?") + "api_key=" + encodeURIComponent(key);
+  const tooBig = `Attachment is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.`;
+  try {
+    const res = await fetch(target, { cache: "no-store", signal: timeoutSignal(45_000) });
+    if (!res.ok) return { ok: false, error: `SAM.gov ${res.status} downloading an attachment.` };
+    if (Number(res.headers.get("content-length") ?? "0") > maxBytes) return { ok: false, error: tooBig };
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > maxBytes) return { ok: false, error: tooBig };
+    return {
+      ok: true,
+      fileName: fileNameFromHeaders(res.headers, url),
+      contentType: (res.headers.get("content-type") ?? "").split(";")[0]!.trim(),
+      bytes,
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Content-Disposition file name (RFC 5987 form first), else the URL's last path segment. */
+export function fileNameFromHeaders(headers: Headers, url: string): string {
+  const cd = headers.get("content-disposition") ?? "";
+  const star = /filename\*\s*=\s*(?:utf-8)?''([^;]+)/i.exec(cd);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1]!.trim().replace(/^"|"$/g, ""));
+    } catch {
+      // fall through to the plain form
+    }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+  if (plain) return plain[1]!.trim();
+  const path = url.split("?")[0]!.split("/").filter(Boolean);
+  const last = path[path.length - 1] ?? "attachment";
+  return last === "download" ? (path[path.length - 2] ?? "attachment") : last;
 }
 
 export type SamEntitySearchResult = {

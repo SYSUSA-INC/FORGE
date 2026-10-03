@@ -26,7 +26,10 @@ import { listSolicitationDocumentsAction } from "./document-actions";
 import { SolicitationDocumentsPanel } from "./SolicitationDocumentsPanel";
 import { KeyDateTimeline } from "./KeyDateTimeline";
 import { CustomerHistoryPanel } from "./CustomerHistoryPanel";
+import { QaPanel } from "./QaPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
+import { listSolicitationQa } from "@/lib/solicitation-qa";
+import { normalizeRef } from "@/lib/solicitation-qa-logic";
 import { THEME } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +130,13 @@ export default async function SolicitationDetail({
 
   // BL-FB-SOL-BUNDLE — load companion documents for the bundle panel.
   const companionDocs = await listSolicitationDocumentsAction(s.id);
+
+  // BL-FB-SOL-QA — the contracting officer's answers and the requirement
+  // references they refine (marked in the requirements list below).
+  const qa = await safeQuery(() => listSolicitationQa({ organizationId, solicitationId: s.id }), [], {
+    tag: "solicitationQa",
+  });
+  const qaRefs = new Set(qa.flatMap((q) => q.affectedRefs));
 
   // BL-23: review + matrix + question state for the review panel.
   // Wrapped in safeQuery so a missing 0033 migration on a deployed
@@ -328,6 +338,17 @@ export default async function SolicitationDetail({
         />
       </div>
 
+      {/* BL-FB-SOL-QA — the contracting officer's answers */}
+      <div className="mb-4">
+        <QaPanel
+          solicitationId={s.id}
+          noticeId={s.noticeId}
+          qaCheckedAt={s.qaCheckedAt ? s.qaCheckedAt.toISOString() : null}
+          hasSamKey={Boolean(process.env.SAMGOV_API_KEY)}
+          initial={qa}
+        />
+      </div>
+
       {/* BL-FB-SOL-BUNDLE — companion document bundle */}
       <div className="mb-4">
         <SolicitationDocumentsPanel
@@ -427,6 +448,15 @@ export default async function SolicitationDetail({
                           {r.ref ? (
                             <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
                               {r.ref}
+                            </span>
+                          ) : null}
+                          {r.ref && qaRefs.has(normalizeRef(r.ref)) ? (
+                            /* BL-FB-SOL-QA — a contracting-officer answer refines this clause */
+                            <span
+                              className="rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-amber-200"
+                              title="A contracting-officer answer refines this requirement — see Q&A above"
+                            >
+                              amended by Q&A
                             </span>
                           ) : null}
                           {sourceDoc ? (
