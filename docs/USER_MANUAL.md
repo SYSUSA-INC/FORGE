@@ -570,6 +570,18 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 
 ---
 
+### 7.5 Customer contacts (CRM)
+
+**Platform Intelligence → Customer contacts** (`/contacts`) is the capture-side address book: the contracting officers, CORs, program managers and executives you know at each agency, grouped by agency and ordered by how warm the relationship is.
+
+- **Add contact** — agency and office, name, title, role, email, phone, who on your side owns the relationship, an optional next-touch date, and notes. The agency is normalised behind the scenes so "Department of the Navy", "Navy" and "U.S. Dept. of the Navy" group together.
+- **Warmth** — a 0–100 score from how recently and how often you have been in touch, weighted by the contact's role (hot ≥ 70, warm ≥ 40, cool ≥ 15). It is only as good as the touches you log.
+- **Log a touch** — on the contact page: meeting, call, email, industry day or note, with the date, what was said, the opportunity it served and the follow-up you agreed. The newest touch sets "last touch"; the agreed follow-up becomes the next touch and shows as **due** the week before and **overdue** after.
+- **Follow-up owed** — the page header counts overdue and due-this-week follow-ups; the filter shows only those.
+- **On the opportunity** — the overview's **Who we know at <agency>** panel lists the matched contacts warmest first, or offers to add the first one when nobody is known. Check it before a bid decision: a warm name is pre-RFP intelligence.
+
+Every add, edit, delete and touch is recorded in the audit log.
+
 ## 8. Knowledge base
 
 The Knowledge base is the corpus the FORGE Brain reads when it drafts sections, answers RFP questions, or proposes capabilities. Think of it as your company's institutional memory in a form the AI can actually use.

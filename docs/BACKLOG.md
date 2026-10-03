@@ -1110,8 +1110,54 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-X-CRM — Customer relationship CRM
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #307)
+
+"Who do we know at this customer, and when did we last talk?" — the
+pre-RFP question capture answers from memory and spreadsheets. A
+lightweight CRM scoped to capture, under **Customer contacts**
+(`/contacts`) and on every opportunity.
+
+**Slice 1 — people, touches, warmth:**
+
+- **Contacts per agency.** `customer_contact` (tenant-scoped): agency
+  and office, name, title, role (contracting officer, COR, program
+  manager, executive, small-business specialist, technical, other),
+  email, phone, notes, our relationship owner, last and next touch,
+  touch count. `agencyKey` (pure `src/lib/crm-logic.ts`) normalises
+  the agency name — "Department of the Navy", "Navy" and "U.S. Dept.
+  of the Navy" land on one key — so contacts group and match reliably.
+- **Touch log.** `customer_touch`: meeting / call / email / event /
+  note with a date, summary, the opportunity it served and the
+  follow-up agreed. Logging a touch rolls the dates up: last touch is
+  the newest date (a backfilled older touch never moves it back), a
+  new follow-up replaces the old one, a touch on or after the agreed
+  date clears it. Future-dated touches are refused.
+- **Warmth.** `warmthScore` 0–100 from recency (a month: 60; a
+  quarter: 45; half a year: 30; a year: 15; older: 5), frequency (five
+  points a touch, six touches) and the role's weight; hot ≥ 70, warm
+  ≥ 40, cool ≥ 15. `nextTouchStatus` flags overdue and due-this-week
+  follow-ups; `agencyRollups` gives the contacts page its per-agency
+  cards, warmest first.
+- **On the opportunity.** `CustomerContactsPanel` on the overview:
+  "Who we know at <agency>", the matched contacts warmest first with
+  role, recency and follow-up state; a one-line nudge with an "Add"
+  link prefilled with the agency when nobody is known.
+- Server side `src/lib/crm.ts` (`listContacts`, `getContact`,
+  `saveContact`, `deleteContact`, `logTouch`,
+  `contactsForOpportunity`), every read and write scoped by
+  `organizationId`, owner must be a member, opportunity must be the
+  tenant's; audited `crm.contact.create` / `.update` / `.delete`,
+  `crm.touch.log`. Migration `0097_customer_contacts.sql`. Sidebar
+  entry under Platform Intelligence. Unit-tested
+  (`tests/ai/crm-logic.test.ts`); runtime-tested
+  (`tests/isolation/crm.test.ts`).
+- **Slice 2:** procurement history per agency from USAspending joined
+  to the contacts, follow-up reminders through the rules engine,
+  contacts on the solicitation page, import from a vCard / CSV.
+
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #305)  ·  🔄 Slice 2 in PR (PR #306)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slice 1 PR #305 · Slice 2 PR #306)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -5099,7 +5145,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #307) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
@@ -5107,7 +5153,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #305) · 🔄 Slice 2 in PR (PR #306) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slice 1 PR #305 · Slice 2 PR #306) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer

@@ -1,0 +1,85 @@
+/**
+ * BL-FB-X-CRM — customer relationships, pure parts: agency keys and
+ * matching, warmth, follow-up status, recency wording, rollups.
+ */
+import { describe, expect, it } from "vitest";
+import {
+  agencyKey,
+  agencyRollups,
+  contactsForAgency,
+  describeRecency,
+  matchesAgency,
+  nextTouchStatus,
+  normalizeRole,
+  normalizeTouchKind,
+  warmthLabel,
+  warmthScore,
+} from "@/lib/crm-logic";
+
+const NOW = new Date("2026-10-03T12:00:00Z");
+const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000);
+const daysAhead = (n: number) => new Date(NOW.getTime() + n * 86_400_000);
+
+describe("crm logic", () => {
+  it("keys agencies so the same customer typed three ways matches", () => {
+    expect(agencyKey("Department of the Navy")).toBe("navy");
+    expect(agencyKey("U.S. Dept. of Energy (DOE)")).toBe("energy doe");
+    expect(agencyKey("The Office of Personnel Management")).toBe("personnel management");
+    expect(agencyKey("  NASA ")).toBe("nasa");
+    expect(agencyKey("")).toBe("");
+    expect(matchesAgency("Department of the Navy", "Navy")).toBe(true);
+    expect(matchesAgency("Department of Energy", "energy")).toBe(true);
+    expect(matchesAgency("Navy", "NAVSEA")).toBe(false);
+    expect(matchesAgency("Air Force", "Army")).toBe(false);
+    expect(matchesAgency("DOE", "Department of Energy")).toBe(false);
+    expect(matchesAgency("", "Navy")).toBe(false);
+    expect(normalizeRole("cor")).toBe("cor");
+    expect(normalizeRole("wizard")).toBe("other");
+    expect(normalizeTouchKind("call")).toBe("call");
+    expect(normalizeTouchKind(undefined)).toBe("note");
+  });
+
+  it("scores warmth from recency, frequency and role", () => {
+    expect(warmthScore({ lastTouchAt: daysAgo(10), touchCount: 3, role: "contracting_officer", now: NOW })).toBe(75);
+    expect(warmthLabel(75)).toBe("hot");
+    expect(warmthScore({ lastTouchAt: daysAgo(10), touchCount: 3, role: "other", now: NOW })).toBe(60);
+    expect(warmthLabel(60)).toBe("warm");
+    expect(warmthScore({ lastTouchAt: daysAgo(100), touchCount: 2, role: "program_manager", now: NOW })).toBe(38);
+    expect(warmthLabel(38)).toBe("cool");
+    expect(warmthScore({ lastTouchAt: daysAgo(400), touchCount: 1, role: "cor", now: NOW })).toBe(10);
+    expect(warmthLabel(10)).toBe("cold");
+    expect(warmthScore({ lastTouchAt: null, touchCount: 0, role: "cor", now: NOW })).toBe(0);
+    expect(warmthScore({ lastTouchAt: daysAgo(1).toISOString(), touchCount: 50, role: "cor", now: NOW })).toBe(90);
+  });
+
+  it("states where the follow-up stands and how long since we spoke", () => {
+    expect(nextTouchStatus(null, NOW)).toEqual({ state: "none", days: null });
+    expect(nextTouchStatus(daysAgo(2), NOW)).toEqual({ state: "overdue", days: -2 });
+    expect(nextTouchStatus(daysAhead(5), NOW)).toEqual({ state: "due_soon", days: 5 });
+    expect(nextTouchStatus(daysAhead(17).toISOString(), NOW)).toEqual({ state: "scheduled", days: 17 });
+    expect(describeRecency(null, NOW)).toBe("No contact yet");
+    expect(describeRecency(NOW, NOW)).toBe("Today");
+    expect(describeRecency(daysAgo(1), NOW)).toBe("1 day ago");
+    expect(describeRecency(daysAgo(12), NOW)).toBe("12 days ago");
+    expect(describeRecency(daysAgo(100), NOW)).toBe("3 months ago");
+    expect(describeRecency(daysAgo(800), NOW)).toBe("2 years ago");
+  });
+
+  it("rolls contacts up per agency, warmest first, and finds the people at an opportunity's agency", () => {
+    const contacts = [
+      { id: "a", agency: "Department of the Navy", agencyKey: "navy", name: "Ana", role: "contracting_officer" as const, lastTouchAt: daysAgo(10), nextTouchAt: daysAgo(1), touchCount: 3 },
+      { id: "b", agency: "Department of the Navy", agencyKey: "navy", name: "Bo", role: "technical" as const, lastTouchAt: daysAgo(200), nextTouchAt: daysAhead(3), touchCount: 1 },
+      { id: "c", agency: "Army", agencyKey: "army", name: "Cy", role: "other" as const, lastTouchAt: null, nextTouchAt: null, touchCount: 0 },
+    ];
+    const rollups = agencyRollups(contacts, NOW);
+    expect(rollups.map((r) => [r.agency, r.contacts, r.warmest, r.overdue, r.dueSoon])).toEqual([
+      ["Department of the Navy", 2, 75, 1, 1],
+      ["Army", 1, 0, 0, 0],
+    ]);
+    expect(rollups[0]!.lastTouchAt?.toISOString()).toBe(daysAgo(10).toISOString());
+    expect(contactsForAgency(contacts, "Navy", NOW).map((c) => c.id)).toEqual(["a", "b"]);
+    expect(contactsForAgency(contacts, "U.S. Army", NOW).map((c) => c.id)).toEqual(["c"]);
+    expect(contactsForAgency(contacts, "", NOW)).toEqual([]);
+    expect(contactsForAgency(contacts, "NASA", NOW)).toEqual([]);
+  });
+});
