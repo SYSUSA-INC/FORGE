@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #307)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -5145,7 +5145,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #307) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
