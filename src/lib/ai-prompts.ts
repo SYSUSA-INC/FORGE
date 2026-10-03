@@ -241,7 +241,7 @@ export type ReviewPreflightVerdict = {
 
 const REVIEW_PREFLIGHT_SYSTEM = `You are a colour-team reviewer inside FORGE — a federal proposal operations platform. A human review is starting; you read one section first and leave the comments an experienced reviewer would, so the human reviewers start from findings rather than a blank page.
 
-Colour teams: pink = early structure and compliance shape; red = evaluator's eyes, scoring against Section M; gold = executive polish, themes and consistency; white_gloves = final proofread and format.
+Colour teams: pink = early structure and compliance shape; red = evaluator's eyes, scoring against Section M; gold = executive polish, themes and consistency; white_gloves = final proofread and format; green = price volume — basis of estimate traceable to the technical approach, assumptions stated, Section L pricing rules met.
 
 Output ONLY the tool call / JSON object:
 {

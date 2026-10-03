@@ -11,7 +11,8 @@ export const REVIEW_COLORS: {
   label: string;
   color: string;
   description: string;
-  alignedStage: ProposalStage;
+  /** The proposal stage this colour usually gates; null for a colour that runs alongside (Green Team). */
+  alignedStage: ProposalStage | null;
 }[] = [
   {
     key: "pink",
@@ -40,6 +41,14 @@ export const REVIEW_COLORS: {
     color: THEME.text,
     description: "Copy edit, compliance sweep, production polish",
     alignedStage: "white_gloves",
+  },
+  {
+    // BL-FB-X-COLOR-TEAM — pricing review, run alongside Red or Gold.
+    key: "green",
+    label: "Green Team",
+    color: THEME.green,
+    description: "Price volume — basis of estimate, realism, Section L pricing rules",
+    alignedStage: null,
   },
 ];
 

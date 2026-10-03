@@ -477,13 +477,17 @@ Add custom sections with **+ Add** at the top (specify kind — Technical / Mana
 #### Reviews
 
 Run formal color-team reviews. **Start review** panel:
-- Pick color team (Pink / Red / Gold / White Gloves)
-- Due date (optional)
-- Check reviewers
+- Pick color team (Pink / Red / Gold / White Gloves / Green — the price-volume review)
+- Due date (optional) and **instructions to reviewers** — what this round should concentrate on
+- Check reviewers, and for each one tick the sections they read (no ticks = the whole proposal)
+- **Checklist** — the colour's template of what to check, which you can trim or extend; the round keeps its own copy
 
 When you click Start, the review is in progress and reviewers get access. Clicking into a review shows:
+- **Section coverage** — a sections × reviewers grid; sections nobody covers are flagged, and the lead can re-scope anyone while the round is open
+- **Reviewer checklist** — assigned reviewers tick their own copy and can leave a note per line; everyone sees each reviewer's progress
 - **Reviewer list** with each person's verdict badge and submission state
 - **Comments panel** — add section-scoped or general comments, resolve them (the resolve action is recorded with your name)
+- **Consolidated comments** — every reviewer's comments folded into one per-section summary (open / resolved, who said what) with **Copy report**: the Markdown hand-off the writers work from after the round
 - **Submit your verdict** (if you're an assigned reviewer) — Pass / Conditional / Fail + summary
 - **Close review** (final verdict + summary) or **Cancel review** — only the proposal manager (or an admin) can close or cancel; the action is stamped with their name and a timestamp
 
