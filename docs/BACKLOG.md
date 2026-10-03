@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #302)
 
 Contracting officers answer industry questions as a "Questions and
 Answers" attachment on the SAM.gov notice, inside the notice
@@ -4470,7 +4470,7 @@ new rows in green, strikes deleted rows. Notification to proposal team
 on amendment ingestion.
 
 ### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #302) — canonical entry under Active priorities
 
 Poll SAM.gov for Q&A responses on linked notice IDs. When the
 contracting officer answers a question that contradicts or refines a
