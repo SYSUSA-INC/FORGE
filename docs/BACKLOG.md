@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-VOICE — Voice input
-**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #303)
 
 Dictation in the section chat for hands-free use: a 🎙 control beside
 **Send** that turns speech into prose in the box, with slash commands
@@ -4867,7 +4867,7 @@ Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
 to a structured server action. Faster than typing the full instruction.
 
 ### BL-FB-CHAT-VOICE — Voice input
-**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #303) — canonical entry under Active priorities
 
 Push-to-talk dictation for drive-time / hands-free use. Web Speech API
 on supported browsers; Anthropic audio transcription on the others.
