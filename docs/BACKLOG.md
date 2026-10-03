@@ -1110,8 +1110,41 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-CHAT-VOICE — Voice input
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #303)
+
+Dictation in the section chat for hands-free use: a 🎙 control beside
+**Send** that turns speech into prose in the box, with slash commands
+and everything else unchanged.
+
+- **In the browser where it can.** Chrome, Edge and Safari transcribe
+  speech on the device (Web Speech API): interim words show under the
+  box as they are heard, finished phrases land in the box through
+  `mergeTranscript` (`src/lib/dictation.ts`, pure: one space or the
+  existing line break between pieces, a capital after a sentence end).
+  Nothing leaves the device and no quota is spent.
+- **Elsewhere, a clip.** Browsers without the API record the
+  microphone (MediaRecorder, up to 120 s / 4 MB — under Vercel's body
+  cap) and send the clip to `/api/ai/transcribe`, which exists only
+  when a provider is configured: any OpenAI-compatible
+  `/audio/transcriptions` endpoint via `TRANSCRIPTION_API_URL` +
+  `TRANSCRIPTION_API_KEY` (+ `TRANSCRIPTION_MODEL`, default whisper-1),
+  or `OPENAI_API_KEY` alone for OpenAI (`parseTranscriptionEnv`,
+  pure). The route keeps the chat's gates — tenant, `aiAutoDraft`,
+  monthly request quota (refunded on failure) — adds a 60/hour per-user
+  rate limit, accepts audio types only, and never stores the clip; its
+  GET tells the client whether the fallback exists, so the control is
+  disabled with the reason when neither path is available.
+- **Honest about the spec.** The original note said "Anthropic audio
+  transcription on the others"; no such capability exists, so the
+  fallback is provider-agnostic and off until configured. **Settings →
+  Status** shows the transcription row.
+- Unit-tested (`tests/ai/dictation.test.ts`: merge, container choice,
+  feature detection with injected globals, provider config). No
+  migration.
+
 ### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #302)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #302)
 
 Contracting officers answer industry questions as a "Questions and
 Answers" attachment on the SAM.gov notice, inside the notice
@@ -4470,7 +4503,7 @@ new rows in green, strikes deleted rows. Notification to proposal team
 on amendment ingestion.
 
 ### BL-FB-SOL-QA — Auto-Q&A ingestion from SAM.gov
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #302) — canonical entry under Active priorities
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #302) — canonical entry under Active priorities
 
 Poll SAM.gov for Q&A responses on linked notice IDs. When the
 contracting officer answers a question that contradicts or refines a
@@ -4834,7 +4867,7 @@ Power-user shortcuts: `/win-theme`, `/shrink-by 30%`, `/add-citation`,
 to a structured server action. Faster than typing the full instruction.
 
 ### BL-FB-CHAT-VOICE — Voice input
-**Priority:** P3  ·  **Effort:** M  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** M  ·  **Status:** 🔄 in PR (PR #303) — canonical entry under Active priorities
 
 Push-to-talk dictation for drive-time / hands-free use. Web Speech API
 on supported browsers; Anthropic audio transcription on the others.

@@ -12,6 +12,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { memberships, users, type Role } from "@/db/schema";
 import { getAIProviderStatus, type AIProviderStatus } from "@/lib/ai";
+import { parseTranscriptionEnv } from "@/lib/transcription-config";
 
 // ────────────────────────────────────────────────────────────────────
 // Members summary (Users & Roles tab)
@@ -163,6 +164,21 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
       detail: envSet("OPENAI_API_KEY")
         ? "OPENAI_API_KEY is set."
         : "Set OPENAI_API_KEY on Vercel. Without it, search falls back to keyword-only.",
+    },
+    {
+      // BL-FB-CHAT-VOICE — dictation fallback for browsers without the Web Speech API.
+      key: "transcription",
+      name: "Speech transcription",
+      category: "ai",
+      configured: parseTranscriptionEnv(process.env) !== null,
+      powers:
+        "Dictation in the section chat on browsers that cannot transcribe speech themselves (Chrome, Edge and Safari need nothing).",
+      detail: (() => {
+        const cfg = parseTranscriptionEnv(process.env);
+        return cfg
+          ? `Clips go to ${cfg.provider} (${cfg.model}).`
+          : "Optional. Set TRANSCRIPTION_API_URL + TRANSCRIPTION_API_KEY (any OpenAI-compatible /audio/transcriptions endpoint), or OPENAI_API_KEY alone for OpenAI.";
+      })(),
     },
     {
       key: "browserless",
