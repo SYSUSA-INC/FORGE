@@ -29,6 +29,7 @@ import { getCustomerVoice } from "@/lib/customer-voice-signals";
 import { renderAttachmentsBlock } from "@/lib/chat-attachments-logic";
 import { messageForModel } from "@/lib/chat-commands";
 import { deleteChatAttachmentsForSection, loadChatAttachmentTexts } from "@/lib/section-chat-attachments";
+import { voiceGuidanceForSection } from "@/lib/voice";
 import { gatherWritingSignals, renderWritingSignals } from "@/lib/writing-signals";
 
 /** BL-AIP-5 — how many general requirements the chat sees (mapped rows always go in full). */
@@ -187,6 +188,17 @@ export async function prepareSectionChat(input: {
     }
   }
 
+  // BL-FB-GEN-VOICE — the section author's own voice, when they have an enabled profile.
+  let authorVoiceBlock = "";
+  if (row.section.authorUserId) {
+    try {
+      const voice = await voiceGuidanceForSection({ organizationId, sectionId: input.sectionId });
+      if (voice) authorVoiceBlock = `\n${voice.guidance}`;
+    } catch {
+      // best effort
+    }
+  }
+
   // BL-FB-CHAT-UPLOAD — documents the author attached to this conversation.
   let attachmentsBlock = "";
   try {
@@ -209,6 +221,7 @@ export async function prepareSectionChat(input: {
       `Opportunity description: ${row.opportunityDescription.slice(0, 800)}`,
     themesBlock,
     voiceBlock,
+    authorVoiceBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
     attachmentsBlock && `\n${attachmentsBlock}`,
     signalsBlock && `\nWhat the team has learned (resolve reviewer comments in the text; answer past weaknesses with evidence; never cite them):\n${signalsBlock}`,

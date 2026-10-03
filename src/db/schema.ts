@@ -1205,6 +1205,83 @@ export const customerTouches = pgTable(
 export type CustomerContact = typeof customerContacts.$inferSelect;
 export type CustomerTouch = typeof customerTouches.$inferSelect;
 
+/** BL-FB-GEN-VOICE — what `analyzeVoice()` (voice-logic.ts) measures in an author's writing. */
+export type VoiceMetrics = {
+  words: number;
+  sentences: number;
+  paragraphs: number;
+  avgSentenceLength: number;
+  sentenceLengthSpread: number;
+  avgParagraphSentences: number;
+  longWordRate: number;
+  passiveRate: number;
+  wePerThousand: number;
+  youPerThousand: number;
+  iPerThousand: number;
+  contractionsPerThousand: number;
+  numbersPerThousand: number;
+  listRate: number;
+  openers: string[];
+  phrases: string[];
+  vocabulary: string[];
+};
+
+/**
+ * BL-FB-GEN-VOICE — one author's writing voice in one organization:
+ * the measured profile, the traits it reads as, the prompt guidance the
+ * drafter and chat receive for sections this author owns, and the
+ * author's own notes. Rebuilt from their sections and pasted samples.
+ */
+export const authorVoiceProfiles = pgTable(
+  "author_voice_profile",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    metrics: jsonb("metrics").$type<VoiceMetrics>(),
+    traits: jsonb("traits").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    guidance: text("guidance").notNull().default(""),
+    customGuidance: text("custom_guidance").notNull().default(""),
+    sampleCount: integer("sample_count").notNull().default(0),
+    sampleWords: integer("sample_words").notNull().default(0),
+    builtAt: timestamp("built_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserIdx: uniqueIndex("author_voice_profile_org_user_idx").on(t.organizationId, t.userId),
+  }),
+);
+
+/** BL-FB-GEN-VOICE — a text the author pasted as a sample of their writing. */
+export const authorVoiceSamples = pgTable(
+  "author_voice_sample",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    source: text("source").notNull().default("pasted"),
+    title: text("title").notNull().default(""),
+    text: text("text").notNull(),
+    words: integer("words").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserIdx: index("author_voice_sample_org_user_idx").on(t.organizationId, t.userId),
+  }),
+);
+
+export type AuthorVoiceProfile = typeof authorVoiceProfiles.$inferSelect;
+
 export const reviewColorEnum = pgEnum("review_color", [
   "pink",
   "red",
