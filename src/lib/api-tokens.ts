@@ -7,9 +7,9 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, count, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
-import { apiTokens, organizations, users } from "@/db/schema";
+import { apiTokens, memberships, organizations, users } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -60,7 +60,11 @@ export type ApiTokenListRow = {
   lastUsedAt: Date | null;
   revokedAt: Date | null;
   createdBy: string;
+  /** Who revoked it: a member's name, "FORGE support" for a platform admin, or null while not revoked. */
+  revokedBy: string | null;
 };
+
+export const PLATFORM_REVOKER_LABEL = "FORGE support";
 
 export async function listApiTokens(organizationId: string): Promise<ApiTokenListRow[]> {
   const rows = await db
@@ -72,6 +76,7 @@ export async function listApiTokens(organizationId: string): Promise<ApiTokenLis
       expiresAt: apiTokens.expiresAt,
       lastUsedAt: apiTokens.lastUsedAt,
       revokedAt: apiTokens.revokedAt,
+      revokedByUserId: apiTokens.revokedByUserId,
       creatorName: users.name,
       creatorEmail: users.email,
     })
@@ -79,11 +84,26 @@ export async function listApiTokens(organizationId: string): Promise<ApiTokenLis
     .leftJoin(users, eq(users.id, apiTokens.createdByUserId))
     .where(eq(apiTokens.organizationId, organizationId))
     .orderBy(desc(apiTokens.createdAt));
+
+  // A platform admin who isn't a member of this workspace shows as FORGE support.
+  const revokerIds = [...new Set(rows.map((r) => r.revokedByUserId).filter((id): id is string => !!id))];
+  const revokers = revokerIds.length
+    ? await db
+        .select({ id: users.id, name: users.name, email: users.email, isSuperadmin: users.isSuperadmin, memberId: memberships.userId })
+        .from(users)
+        .leftJoin(memberships, and(eq(memberships.userId, users.id), eq(memberships.organizationId, organizationId)))
+        .where(inArray(users.id, revokerIds))
+    : [];
+  const revokerLabel = new Map(
+    revokers.map((u) => [u.id, u.isSuperadmin && !u.memberId ? PLATFORM_REVOKER_LABEL : u.name || u.email || "A former member"]),
+  );
+
   const now = new Date();
-  return rows.map(({ creatorName, creatorEmail, ...r }) => ({
+  return rows.map(({ creatorName, creatorEmail, revokedByUserId, ...r }) => ({
     ...r,
     state: tokenState(r, now),
     createdBy: creatorName || creatorEmail || "A former member",
+    revokedBy: r.revokedAt ? (revokedByUserId ? revokerLabel.get(revokedByUserId) ?? "A former member" : "A former member") : null,
   }));
 }
 
@@ -142,12 +162,17 @@ export async function createApiToken(input: {
   return { ok: true, id: row.id, token };
 }
 
+/**
+ * Revoke one token. `platformReason` is set when a platform admin revokes
+ * from /admin/orgs/[id]; it goes into the workspace's audit log.
+ */
 export async function revokeApiToken(input: {
   organizationId: string;
   tokenId: string;
   actor: Actor;
+  platformReason?: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { organizationId, tokenId, actor } = input;
+  const { organizationId, tokenId, actor, platformReason } = input;
   const [row] = await db
     .update(apiTokens)
     .set({ revokedAt: new Date(), revokedByUserId: actor.userId })
@@ -160,9 +185,44 @@ export async function revokeApiToken(input: {
     action: "api_token.revoke",
     resourceType: "api_token",
     resourceId: tokenId,
-    metadata: { name: row.name, prefix: row.prefix },
+    metadata: { name: row.name, prefix: row.prefix, ...(platformReason ? { byPlatformAdmin: true, reason: platformReason } : {}) },
   });
   return { ok: true };
+}
+
+/**
+ * Platform admin — revoke every active token of a workspace at once (a
+ * leaked token, a compromised integration). One audit row lists them.
+ */
+export async function revokeAllApiTokens(input: {
+  organizationId: string;
+  actor: Actor;
+  reason: string;
+}): Promise<{ ok: true; revoked: number }> {
+  const { organizationId, actor, reason } = input;
+  const now = new Date();
+  const rows = await db
+    .update(apiTokens)
+    .set({ revokedAt: now, revokedByUserId: actor.userId })
+    .where(
+      and(
+        eq(apiTokens.organizationId, organizationId),
+        isNull(apiTokens.revokedAt),
+        or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, now)),
+      ),
+    )
+    .returning({ id: apiTokens.id, name: apiTokens.name, prefix: apiTokens.tokenPrefix });
+  if (rows.length > 0) {
+    await recordAudit({
+      organizationId,
+      actor,
+      action: "api_token.revoke_all",
+      resourceType: "api_token",
+      resourceId: organizationId,
+      metadata: { byPlatformAdmin: true, reason, count: rows.length, tokens: rows.map((r) => `${r.prefix} (${r.name})`) },
+    });
+  }
+  return { ok: true, revoked: rows.length };
 }
 
 export type ApiCaller = {

@@ -52,6 +52,16 @@ export function validateTokenName(raw: unknown): { ok: true; value: string } | {
   return { ok: true, value };
 }
 
+export const REVOKE_REASON_MAX = 300;
+
+/** A platform admin says why they revoke a workspace's token; it goes into that workspace's audit log. */
+export function validateRevokeReason(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
+  const value = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ") : "";
+  if (value.length < 3) return { ok: false, error: "Say why — the workspace's admins see it in their audit log." };
+  if (value.length > REVOKE_REASON_MAX) return { ok: false, error: `Keep the reason to ${REVOKE_REASON_MAX} characters.` };
+  return { ok: true, value };
+}
+
 /** When a token made now with this lifetime expires; null = never. Undefined for a lifetime not on offer. */
 export function tokenExpiry(days: unknown, now: Date = new Date()): Date | null | undefined {
   if (!(TOKEN_EXPIRY_DAYS as readonly unknown[]).includes(days)) return undefined;

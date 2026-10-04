@@ -15,6 +15,7 @@ const ENDPOINTS: { path: string; what: string }[] = [
   { path: "GET /api/v1/opportunities/{id}", what: "One opportunity, with its description." },
   { path: "GET /api/v1/proposals", what: "Proposals, newest change first." },
   { path: "GET /api/v1/proposals/{id}", what: "One proposal with its section outline (titles, status, word counts)." },
+  { path: "GET /api/v1/openapi.json", what: "The OpenAPI 3.1 description of all of the above. No token needed." },
 ];
 
 /**
@@ -74,6 +75,13 @@ export default async function ApiAccessPage() {
         <p className="mt-3 font-mono text-[11px] text-muted">
           List parameters: limit (1–{API_PAGE_MAX}, default 50) · cursor · updated_since (ISO 8601) · stage. Rate limit:{" "}
           {API_RATE_LIMIT.limit} requests a minute per token. Every answered request is recorded in the audit log.
+        </p>
+        <p className="mt-2 font-body text-[13px] text-muted">
+          Import the{" "}
+          <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer" className="text-text underline-offset-2 hover:underline">
+            OpenAPI document
+          </a>{" "}
+          into Postman, Insomnia or a client generator to get every endpoint, parameter and field.
         </p>
       </Panel>
     </>

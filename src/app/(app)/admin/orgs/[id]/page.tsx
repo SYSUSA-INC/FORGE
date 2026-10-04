@@ -28,6 +28,7 @@ import { IsolationCheckPanel } from "./IsolationCheckPanel";
 import { ItarRestrictedToggle } from "./ItarRestrictedToggle";
 import { TenantDomainsEditor } from "./TenantDomainsEditor";
 import { TenantAddonsSection } from "./TenantAddonsSection";
+import { TenantApiTokensSection } from "./TenantApiTokensSection";
 import { TrialControls } from "./TrialControls";
 
 export const dynamic = "force-dynamic";
@@ -416,6 +417,9 @@ export default async function TenantDetailPage({
 
         {/* BL-PACKAGES add-ons Slice 1 — grants on top of the tier */}
         <TenantAddonsSection organizationId={org.id} currentTier={currentTier} />
+
+        {/* BL-16 API Slice 2a — the tenant's API tokens, revocable here */}
+        <TenantApiTokensSection organizationId={org.id} />
 
         <Panel title="Storage & config">
           <dl className="grid grid-cols-[180px_1fr] gap-y-2 font-mono text-[12px]">

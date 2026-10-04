@@ -602,6 +602,8 @@ Migration 0107 adds `api_token` — sync it on `/admin/migrations` after deployi
 - **Limits:** 20 active tokens per tenant; 120 requests a minute per token (429 with `Retry-After`); list pages of at most 100 rows.
 - **Audit:** `api_token.create` / `api_token.revoke` with the token's name and prefix, and `api.v1.read` for every answered request (actor "API token forge_xxxxxx… (name)", path, query and row count) in the tenant's own log.
 - Ending a trial pauses AI only, so a trial tenant's API keeps working if its tier includes it.
+- **Platform admins: a tenant's tokens.** `/admin/orgs/[id]` has an **API tokens** panel listing every token of that tenant (prefix, creator, last use, expiry, status). **Revoke** stops one token; **Revoke all active** stops every active one at once. Both need a reason, which is written to the tenant's audit log (`api_token.revoke` with `byPlatformAdmin` and `reason`, or one `api_token.revoke_all` row listing the prefixes). The tenant's Settings → API access then shows "revoked by FORGE support". Revoking is permanent; to pause a tenant's API without revoking, use the `apiAccess` override above instead.
+- **OpenAPI document:** `/api/v1/openapi.json` is public and token-free. It describes the endpoints and holds no tenant data.
 
 ### 6.11 Operating practices
 
