@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { formatMoney } from "@/lib/customer-patterns";
+import { describeRecency } from "@/lib/crm-logic";
 import type { AgencyProcurementHistory } from "@/lib/crm-history";
-import { agencyHistoryAction } from "./actions";
+import { agencyHistoryAction, cachedAgencyHistoryAction } from "./actions";
 
 type Loaded = Extract<AgencyProcurementHistory, { ok: true }>;
 
 /**
  * BL-FB-X-CRM Slice 2 — "what do they buy": the agency's recent awards
- * from USAspending next to the people we know there. Loads on click only;
- * the public API is slow and the answer is the same for everyone in the
- * tenant, so nobody pays for it on page render.
+ * from USAspending next to the people we know there. Slice 3: whatever
+ * the tenant fetched in the last day shows at once from the cache; the
+ * public API is asked only on the first load or on **Refresh**.
  */
 export function AgencyHistoryPanel({ agency, compact }: { agency: string; compact?: boolean }) {
   const [pending, startTransition] = useTransition();
@@ -20,10 +21,24 @@ export function AgencyHistoryPanel({ agency, compact }: { agency: string; compac
   const [disabled, setDisabled] = useState(false);
   const [open, setOpen] = useState(!compact);
 
-  function load() {
+  // Slice 3 — the cached answer, if any, without asking USAspending.
+  useEffect(() => {
+    if (!agency.trim()) return;
+    let cancelled = false;
+    cachedAgencyHistoryAction(agency)
+      .then((res) => {
+        if (!cancelled && res && res.ok) setData(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [agency]);
+
+  function load(force: boolean) {
     setError(null);
     startTransition(async () => {
-      const res = await agencyHistoryAction(agency);
+      const res = await agencyHistoryAction(agency, force);
       if (!res.ok) {
         setDisabled(!!res.disabled);
         return setError(res.error);
@@ -40,12 +55,18 @@ export function AgencyHistoryPanel({ agency, compact }: { agency: string; compac
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">What {agency} buys · USAspending</span>
         {data ? (
-          <button type="button" onClick={() => setOpen((v) => !v)} className="font-mono text-[10px] text-indigo-300 hover:underline">
-            {open ? "hide" : "show"}
-          </button>
+          <>
+            <span className={`font-mono text-[10px] ${data.stale ? "text-amber-200" : "text-subtle"}`} title={new Date(data.fetchedAt).toLocaleString()}>
+              fetched {describeRecency(data.fetchedAt).toLowerCase()}
+              {data.stale ? " · older than a day" : ""}
+            </span>
+            <button type="button" onClick={() => setOpen((v) => !v)} className="font-mono text-[10px] text-indigo-300 hover:underline">
+              {open ? "hide" : "show"}
+            </button>
+          </>
         ) : null}
-        <button type="button" onClick={load} disabled={pending || disabled} className="aur-btn aur-btn-ghost ml-auto text-[11px] disabled:opacity-60">
-          {pending ? "Loading…" : data ? "Reload" : "Load awards"}
+        <button type="button" onClick={() => load(!!data)} disabled={pending || disabled} className="aur-btn aur-btn-ghost ml-auto text-[11px] disabled:opacity-60">
+          {pending ? "Loading…" : data ? "Refresh" : "Load awards"}
         </button>
       </div>
       {error ? <p className={`mt-1 font-mono text-[11px] ${disabled ? "text-muted" : "text-rose-300"}`}>{error}</p> : null}

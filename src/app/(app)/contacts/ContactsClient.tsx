@@ -8,6 +8,7 @@ import { Panel } from "@/components/ui/Panel";
 import { CONTACT_ROLES, CONTACT_ROLE_LABELS, agencyRollups, describeRecency, nextTouchStatus, normalizeRole, warmthScore } from "@/lib/crm-logic";
 import { AgencyHistoryPanel } from "./AgencyHistoryPanel";
 import { ContactForm, type OwnerOption } from "./ContactForm";
+import { ContactsImportPanel } from "./ContactsImportPanel";
 import { WarmthChip } from "./WarmthChip";
 
 export type ContactRow = {
@@ -43,6 +44,9 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
   const [role, setRole] = useState("all");
   const [owed, setOwed] = useState(false);
   const [adding, setAdding] = useState(!!prefillAgency);
+  // Slice 3 — the import panel and what it just did.
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const typed = useMemo(() => contacts.map((c) => ({ ...c, role: normalizeRole(c.role) })), [contacts]);
   const filtered = useMemo(() => {
@@ -66,9 +70,14 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
         title="Customer contacts"
         subtitle="Who we know at each agency, how warm the relationship is, and who we owe a call. Log every meeting so the next pursuit starts from a name, not a cold notice."
         actions={
-          <button type="button" onClick={() => setAdding((v) => !v)} className="aur-btn aur-btn-primary">
-            {adding ? "Close" : "+ Add contact"}
-          </button>
+          <>
+            <button type="button" onClick={() => setImporting((v) => !v)} className="aur-btn aur-btn-ghost" title="Import contacts from a CSV or a vCard export">
+              {importing ? "Close import" : "Import"}
+            </button>
+            <button type="button" onClick={() => setAdding((v) => !v)} className="aur-btn aur-btn-primary">
+              {adding ? "Close" : "+ Add contact"}
+            </button>
+          </>
         }
         meta={[
           { label: "Contacts", value: String(contacts.length) },
@@ -78,6 +87,18 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
         ]}
       />
 
+      {notice ? <div className="mb-3 rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">{notice}</div> : null}
+      {importing ? (
+        <Panel title="Import contacts" eyebrow="CSV or vCard" className="mb-4">
+          <ContactsImportPanel
+            onDone={(msg) => {
+              setImporting(false);
+              setNotice(msg);
+              router.refresh();
+            }}
+          />
+        </Panel>
+      ) : null}
       {adding ? (
         <Panel title="New contact" eyebrow="Customer relationship" className="mb-4">
           <ContactForm owners={owners} initial={{ agency: prefillAgency }} submitLabel="Add contact" onSaved={() => router.refresh()} />

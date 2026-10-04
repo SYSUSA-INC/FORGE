@@ -1258,6 +1258,61 @@ export const customerTouches = pgTable(
 export type CustomerContact = typeof customerContacts.$inferSelect;
 export type CustomerTouch = typeof customerTouches.$inferSelect;
 
+/** BL-FB-X-CRM Slice 3 — what the contacts pages show for an agency's procurement history (crm-history.ts builds it). */
+export type AgencyHistoryPayload = {
+  agency: string;
+  awards: {
+    awardId: string;
+    recipientName: string;
+    amount: number;
+    awardingSubAgency: string;
+    awardType: string;
+    startDate: string | null;
+    endDate: string | null;
+    description: string;
+    naicsCode: string;
+    setAsideCode: string;
+    uiUrl: string;
+  }[];
+  summary: {
+    awards: number;
+    totalObligated: number;
+    topRecipients: { name: string; amount: number; awards: number }[];
+    naicsMix: { code: string; amount: number }[];
+    endingWithinYear: number;
+    latestEndDate: string | null;
+    subAgencies: string[];
+  };
+  totalRecords: number;
+  naicsFiltered: boolean;
+  matchedAs: "subagency" | "agency";
+};
+
+/**
+ * BL-FB-X-CRM Slice 3 — what USAspending last said about an agency, per
+ * tenant (drizzle/0103): kept a day so the panel opens instantly and the
+ * public API is asked at most once per agency per day. Every row carries
+ * organization_id.
+ */
+export const agencyHistoryCache = pgTable(
+  "agency_history_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agencyKey: text("agency_key").notNull(),
+    agency: text("agency").notNull(),
+    payload: jsonb("payload").$type<AgencyHistoryPayload>().notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgAgencyIdx: uniqueIndex("agency_history_cache_org_agency_idx").on(t.organizationId, t.agencyKey),
+  }),
+);
+
+export type AgencyHistoryCacheRow = typeof agencyHistoryCache.$inferSelect;
+
 /** BL-FB-GEN-VOICE — what `analyzeVoice()` (voice-logic.ts) measures in an author's writing. */
 export type VoiceMetrics = {
   words: number;

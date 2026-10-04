@@ -592,7 +592,10 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 - **What they buy** — each agency card and each contact page has **Load awards**: the agency's recent contract awards from USAspending (largest first), summarised as obligated total, who wins there, the NAICS mix, offices seen and how many awards end within a year, with the full list and links underneath. It loads only when you click, and your workspace's NAICS codes are tried first so you see the part of their spend you can compete for. If the button says awards intel is in preview, ask an admin to enable it.
 - **Follow-up reminders** — the morning before an agreed next touch (and again if a new date is agreed), the relationship owner gets a notification "Follow-up with <name> (<agency>) is due tomorrow" linking to the contact; an overdue date says so. The reminder goes through **Settings → Notification rules** (trigger "Customer contact follow-up due"), so admins can change channels or switch it off. Contacts with no owner are not reminded — set one.
 
-Every add, edit, delete and touch is recorded in the audit log; so is each procurement lookup.
+- **Import** — bring your spreadsheet or address book in: paste a CSV with a header row (name and agency are required; office, title, role, email, phone, notes and next touch are read when present) or choose a `.csv` or `.vcf` export from Outlook, Google or Apple Contacts. The preview marks every row **new** or **already known** (by email, or by agency and name) before anything is written; you choose whether known people are skipped or updated with the file's fields. Roles are read from a role column or guessed from the title.
+- **What they buy, remembered** — once anyone on the team has loaded an agency's awards, the panel opens with that answer at once and says when it was fetched; **Refresh** asks USAspending again, and an answer older than a day is marked so.
+
+Every add, edit, delete, touch and import is recorded in the audit log; so is each procurement lookup.
 
 ## 8. Knowledge base
 

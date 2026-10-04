@@ -6,7 +6,9 @@ import { db } from "@/db";
 import { memberships, opportunities, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { deleteContact, logTouch, saveContact, type ContactInput, type TouchInput } from "@/lib/crm";
-import { agencyProcurementHistory, type AgencyProcurementHistory } from "@/lib/crm-history";
+import { agencyProcurementHistory, cachedAgencyHistory, type AgencyProcurementHistory } from "@/lib/crm-history";
+import { commitContactImport, previewContactImport, type ImportCommit, type ImportPreview } from "@/lib/crm-import";
+import type { ImportRow } from "@/lib/crm-import-logic";
 
 function revalidateCrm(contactId?: string | null) {
   revalidatePath("/contacts");
@@ -43,11 +45,39 @@ export async function logTouchAction(input: TouchInput & { contactId: string }):
   return res;
 }
 
-/** BL-FB-X-CRM Slice 2 — what this agency has been buying, from USAspending, on demand. */
-export async function agencyHistoryAction(agency: string): Promise<AgencyProcurementHistory> {
+/** BL-FB-X-CRM Slice 2 — what this agency has been buying, from USAspending, on demand (Slice 3: cached a day; `force` refreshes). */
+export async function agencyHistoryAction(agency: string, force = false): Promise<AgencyProcurementHistory> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  return agencyProcurementHistory({ organizationId, agency, actor: { userId: actor.id, email: actor.email } });
+  return agencyProcurementHistory({ organizationId, agency, actor: { userId: actor.id, email: actor.email }, force: force === true });
+}
+
+/** BL-FB-X-CRM Slice 3 — the cached answer for this agency, if the tenant fetched one; no external call. */
+export async function cachedAgencyHistoryAction(agency: string): Promise<AgencyProcurementHistory | null> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return cachedAgencyHistory({ organizationId, agency: String(agency ?? "") });
+}
+
+/** BL-FB-X-CRM Slice 3 — parse a pasted or uploaded CSV / vCard and mark the people we already have. Writes nothing. */
+export async function previewContactImportAction(input: { text: string; fileName?: string }): Promise<ImportPreview> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return previewContactImport({ organizationId, text: String(input.text ?? ""), fileName: typeof input.fileName === "string" ? input.fileName : "" });
+}
+
+/** BL-FB-X-CRM Slice 3 — write the previewed rows; duplicates skipped or updated. Audited. */
+export async function commitContactImportAction(input: { rows: Partial<ImportRow>[]; duplicates: "skip" | "update" }): Promise<ImportCommit> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await commitContactImport({
+    organizationId,
+    rows: Array.isArray(input.rows) ? input.rows : [],
+    duplicates: input.duplicates === "update" ? "update" : "skip",
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (res.ok) revalidateCrm();
+  return res;
 }
 
 /** Active members, for the relationship-owner picker. */
