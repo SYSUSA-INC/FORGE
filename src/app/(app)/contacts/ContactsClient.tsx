@@ -8,6 +8,7 @@ import { Panel } from "@/components/ui/Panel";
 import { CONTACT_ROLES, CONTACT_ROLE_LABELS, agencyRollups, describeRecency, nextTouchStatus, normalizeRole, warmthScore } from "@/lib/crm-logic";
 import { AgencyHistoryPanel } from "./AgencyHistoryPanel";
 import { ContactForm, type OwnerOption } from "./ContactForm";
+import { ContactsImportPanel } from "./ContactsImportPanel";
 import { WarmthChip } from "./WarmthChip";
 
 export type ContactRow = {
@@ -37,12 +38,30 @@ export function NextTouchBadge({ nextTouchAt }: { nextTouchAt: string | null }) 
 }
 
 /** BL-FB-X-CRM — contacts grouped by agency, warmest agency first, follow-ups owed up top. */
-export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: ContactRow[]; owners: OwnerOption[]; prefillAgency: string }) {
+export function ContactsClient({
+  contacts,
+  owners,
+  prefillAgency,
+  initialAdding = false,
+  initialOwed = false,
+  initialImporting = false,
+}: {
+  contacts: ContactRow[];
+  owners: OwnerOption[];
+  prefillAgency: string;
+  /** Slice 3 — the Customer Relations menu deep-links into the page. */
+  initialAdding?: boolean;
+  initialOwed?: boolean;
+  initialImporting?: boolean;
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
-  const [owed, setOwed] = useState(false);
-  const [adding, setAdding] = useState(!!prefillAgency);
+  const [owed, setOwed] = useState(initialOwed);
+  const [adding, setAdding] = useState(!!prefillAgency || initialAdding);
+  // Slice 3 — the import panel and what it just did.
+  const [importing, setImporting] = useState(initialImporting);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const typed = useMemo(() => contacts.map((c) => ({ ...c, role: normalizeRole(c.role) })), [contacts]);
   const filtered = useMemo(() => {
@@ -62,13 +81,18 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
   return (
     <>
       <PageHeader
-        eyebrow="Capture"
+        eyebrow="Customer Relations"
         title="Customer contacts"
         subtitle="Who we know at each agency, how warm the relationship is, and who we owe a call. Log every meeting so the next pursuit starts from a name, not a cold notice."
         actions={
-          <button type="button" onClick={() => setAdding((v) => !v)} className="aur-btn aur-btn-primary">
-            {adding ? "Close" : "+ Add contact"}
-          </button>
+          <>
+            <button type="button" onClick={() => setImporting((v) => !v)} className="aur-btn aur-btn-ghost" title="Import contacts from a CSV or a vCard export">
+              {importing ? "Close import" : "Import"}
+            </button>
+            <button type="button" onClick={() => setAdding((v) => !v)} className="aur-btn aur-btn-primary">
+              {adding ? "Close" : "+ Add contact"}
+            </button>
+          </>
         }
         meta={[
           { label: "Contacts", value: String(contacts.length) },
@@ -78,6 +102,18 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
         ]}
       />
 
+      {notice ? <div className="mb-3 rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">{notice}</div> : null}
+      {importing ? (
+        <Panel title="Import contacts" eyebrow="CSV or vCard" className="mb-4">
+          <ContactsImportPanel
+            onDone={(msg) => {
+              setImporting(false);
+              setNotice(msg);
+              router.refresh();
+            }}
+          />
+        </Panel>
+      ) : null}
       {adding ? (
         <Panel title="New contact" eyebrow="Customer relationship" className="mb-4">
           <ContactForm owners={owners} initial={{ agency: prefillAgency }} submitLabel="Add contact" onSaved={() => router.refresh()} />

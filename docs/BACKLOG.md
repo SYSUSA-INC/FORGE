@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #313 · Slice 1 PR #309)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #313 · Slice 1 PR #309)
 
 Capture manager, writer and AI in one thread, tied to the section
 instead of a Slack side-channel. BL-FB-CHAT-PERSIST already made the
@@ -1185,7 +1185,7 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   section opts in, audits).
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #312 · Slice 1 PR #308)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #312 · Slice 1 PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -1275,7 +1275,7 @@ they own, so Sarah's sections read like Sarah and Mike's like Mike.
   between two authors on the same proposal.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #311 · Slice 1 PR #307)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -1313,7 +1313,7 @@ lightweight CRM scoped to capture, under **Customer contacts**
   `organizationId`, owner must be a member, opportunity must be the
   tenant's; audited `crm.contact.create` / `.update` / `.delete`,
   `crm.touch.log`. Migration `0097_customer_contacts.sql`. Sidebar
-  entry under Platform Intelligence. Unit-tested
+  entry (moved to the **Customer Relations** group in Slice 3). Unit-tested
   (`tests/ai/crm-logic.test.ts`); runtime-tested
   (`tests/isolation/crm.test.ts`).
 
@@ -1352,8 +1352,51 @@ lightweight CRM scoped to capture, under **Customer contacts**
   (`tests/isolation/crm-reminders.test.ts`: owner-only delivery, once
   per date, re-arm, unowned skipped, other tenant untouched, agency
   match scoped, lookup gated).
-- **Later:** import from a vCard / CSV; cache the agency history per
-  tenant for a day.
+
+**Slice 3 — bring the spreadsheet in, and remember what they buy:**
+
+- **Import from CSV or vCard.** **Import** on `/contacts`: paste a CSV
+  or choose a `.csv` / `.vcf` file. `parseContactsCsv` (pure
+  `src/lib/crm-import-logic.ts`) reads a header row by the usual
+  aliases (name and agency required; office, title, role, email, phone,
+  notes and next touch when present; unknown columns are listed, never
+  guessed), handles quoted cells and both date styles; `parseVcards`
+  reads vCard 3.0 / 4.0 exports from Outlook, Google or Apple (FN or N,
+  ORG as agency and office, TITLE, item-prefixed EMAIL, TEL, folded
+  NOTE lines, ROLE). `guessRole` reads the role column or the title
+  ("Contracting Officer's Representative" → COR, "Deputy Director" →
+  executive, "OSDBU" → small business). Rows without a name or an
+  agency are skipped with a reason.
+- **Duplicates, before anything is written.** `detectDuplicates` marks
+  rows the tenant already has — by email first, then by agency key and
+  name — and `dedupeWithinImport` drops the same person twice in one
+  file. The preview table shows every row as **new** or **already
+  known · email/name**; the import then creates the new people in one
+  insert and skips the duplicates or updates them with the file's
+  non-empty fields (blanks never erase what the team knew). Rows are
+  re-normalised and duplicates re-detected server-side
+  (`src/lib/crm-import.ts`); one audit row `crm.contact.import` with
+  the counts. Up to 500 rows a time.
+- **Customer Relations menu.** The CRM pages leave Platform
+  Intelligence for their own sidebar group, **Customer Relations**
+  (`nav-workspaces.ts`, between Opportunities and Platform
+  Intelligence): Customer contacts, Follow-ups owed (`/contacts?owed=1`),
+  New contact (`?add=1`) and Import contacts (`?import=1`); the contacts
+  page reads those deep links.
+- **Agency history cached a day.** `agency_history_cache` (migration
+  0103, one row per organization and agency key): the awards and
+  summary the panel shows, kept 24 hours. The panel now opens with the
+  cached answer at once (`cachedAgencyHistory`, no external call) and
+  says when it was fetched; **Refresh** asks USAspending again; a
+  cached answer older than a day is marked stale and refetched on the
+  next load, and still beats an empty panel when USAspending has
+  nothing live.
+- Unit-tested (`tests/ai/crm-import-logic.test.ts`); runtime-tested
+  (`tests/isolation/crm-import.test.ts`: preview against the owning
+  tenant's people only, create / skip / update in the owning tenant,
+  audit, cache served per tenant and flagged stale, gated by the flag).
+- **Later:** a scheduled refresh of cached agencies the team watches;
+  an export of the contact list.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slice 1 PR #305 · Slice 2 PR #306)
@@ -5142,7 +5185,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
@@ -5284,7 +5327,7 @@ telemetry, same posture as `section_draft_signal`; clearing a thread
 is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #313 · Slice 1 PR #309) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #313 · Slice 1 PR #309) — canonical entry under Active priorities
 
 Capture manager + writer + AI in the same thread; `@mention` a team
 member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces
@@ -5360,7 +5403,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #311 · Slice 1 PR #307) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth

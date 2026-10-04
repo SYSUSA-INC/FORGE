@@ -88,7 +88,7 @@ After signing in you'll see the main **app shell**:
 
 ![App shell](docs/images/app-shell.png)
 
-- **Left sidebar** — collapsible navigation with a wide mode (full labels + group headers) and an icon-rail mode (icons only, hover to see labels). Click the chevron at the top to toggle. Groups: Command Center, Operations, Opportunities, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Sub-items render with tree-connector lines so the hierarchy stays visually obvious. See §2.2 for the full nav structure.
+- **Left sidebar** — collapsible navigation with a wide mode (full labels + group headers) and an icon-rail mode (icons only, hover to see labels). Click the chevron at the top to toggle. Groups: Command Center, Operations, Opportunities, Customer Relations, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Sub-items render with tree-connector lines so the hierarchy stays visually obvious. See §2.2 for the full nav structure.
 - **Top bar** — the mobile hamburger, the **⌘K search box** (find a page or a record, or ask the Brain — see §2.1.1), live session clock, Settings shortcut, and your avatar
 - **Content area** — changes with the page you're on
 - **User identity card** — pinned at the bottom of the sidebar. Shows your name, email, and active org. Click your avatar in the top bar (or the identity card directly) to open the user menu.
@@ -101,7 +101,7 @@ The sidebar shows one **workspace** at a time, scoped to the hat you are wearing
 
 | Workspace | Who | What it contains |
 |---|---|---|
-| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
+| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Customer Relations (Customer contacts, Follow-ups owed, New contact, Import contacts); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
 | **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit Log); Admin guide |
 | **Platform admin** | platform superadmins | Tenants & users (Tenants, Platform users, Overview, Source requests); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
 
@@ -128,6 +128,7 @@ Each group is collapsible — click the group header (or its chevron) to fold it
 | **Command Center** | (none — direct link to `/`) | Everyone |
 | **Operations Management** | Audit Log, Notification rules, Users | Org admins |
 | **Opportunities** | Opportunities Dashboard, In-flight Proposals, New Proposals, Pipeline, Companies | Everyone |
+| **Customer Relations** | Customer contacts, Follow-ups owed, New contact, Import contacts | Everyone |
 | **Platform Intelligence** | Knowledge base, Watchlist, Firms, Awards, Solicitations | Everyone |
 | **Brain** | (direct link) | Everyone |
 | **Help** | User Guide, Admin Guide, FAQ | Everyone (admin guide only for admins) |
@@ -582,7 +583,7 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 
 ### 7.5 Customer contacts (CRM)
 
-**Platform Intelligence → Customer contacts** (`/contacts`) is the capture-side address book: the contracting officers, CORs, program managers and executives you know at each agency, grouped by agency and ordered by how warm the relationship is.
+**Customer Relations → Customer contacts** (`/contacts`) is the capture-side address book (the Customer Relations menu also deep-links to **Follow-ups owed**, **New contact** and **Import contacts**): the contracting officers, CORs, program managers and executives you know at each agency, grouped by agency and ordered by how warm the relationship is.
 
 - **Add contact** — agency and office, name, title, role, email, phone, who on your side owns the relationship, an optional next-touch date, and notes. The agency is normalised behind the scenes so "Department of the Navy", "Navy" and "U.S. Dept. of the Navy" group together.
 - **Warmth** — a 0–100 score from how recently and how often you have been in touch, weighted by the contact's role (hot ≥ 70, warm ≥ 40, cool ≥ 15). It is only as good as the touches you log.
@@ -592,7 +593,10 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 - **What they buy** — each agency card and each contact page has **Load awards**: the agency's recent contract awards from USAspending (largest first), summarised as obligated total, who wins there, the NAICS mix, offices seen and how many awards end within a year, with the full list and links underneath. It loads only when you click, and your workspace's NAICS codes are tried first so you see the part of their spend you can compete for. If the button says awards intel is in preview, ask an admin to enable it.
 - **Follow-up reminders** — the morning before an agreed next touch (and again if a new date is agreed), the relationship owner gets a notification "Follow-up with <name> (<agency>) is due tomorrow" linking to the contact; an overdue date says so. The reminder goes through **Settings → Notification rules** (trigger "Customer contact follow-up due"), so admins can change channels or switch it off. Contacts with no owner are not reminded — set one.
 
-Every add, edit, delete and touch is recorded in the audit log; so is each procurement lookup.
+- **Import** — bring your spreadsheet or address book in: paste a CSV with a header row (name and agency are required; office, title, role, email, phone, notes and next touch are read when present) or choose a `.csv` or `.vcf` export from Outlook, Google or Apple Contacts. The preview marks every row **new** or **already known** (by email, or by agency and name) before anything is written; you choose whether known people are skipped or updated with the file's fields. Roles are read from a role column or guessed from the title.
+- **What they buy, remembered** — once anyone on the team has loaded an agency's awards, the panel opens with that answer at once and says when it was fetched; **Refresh** asks USAspending again, and an answer older than a day is marked so.
+
+Every add, edit, delete, touch and import is recorded in the audit log; so is each procurement lookup.
 
 ## 8. Knowledge base
 
