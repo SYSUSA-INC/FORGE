@@ -1407,7 +1407,7 @@ lightweight CRM scoped to capture, under **Customer contacts**
   an export of the contact list.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (Slice 1 PR #305 · Slice 2 PR #306)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #316 · Slice 1 PR #305 · Slice 2 PR #306)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -5445,7 +5445,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (Slice 1 PR #305 · Slice 2 PR #306) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #316 · Slice 1 PR #305 · Slice 2 PR #306) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer
