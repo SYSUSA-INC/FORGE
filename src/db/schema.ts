@@ -3701,8 +3701,11 @@ export const tierAddons = pgTable("tier_addon", {
   slug: varchar("slug", { length: 32 }).notNull().unique(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
-  kind: text("kind").$type<"ai_tokens" | "feature">().notNull().default("ai_tokens"),
+  kind: text("kind").$type<"ai_tokens" | "feature" | "seats" | "storage">().notNull().default("ai_tokens"),
   aiTokensPerMonth: integer("ai_tokens_per_month").notNull().default(0),
+  // Slice 2b (drizzle/0108) — seats or GB each unit adds, for the seats
+  // and storage kinds.
+  amountPerUnit: integer("amount_per_unit").notNull().default(0),
   featureFlag: text("feature_flag").$type<keyof TierFeatureFlags>(),
   priceMonthlyCents: integer("price_monthly_cents").notNull().default(0),
   stripePriceId: text("stripe_price_id"),

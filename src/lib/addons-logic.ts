@@ -10,13 +10,20 @@
 
 import type { TierFeatureFlags, TierQuotas } from "@/db/schema";
 
-export const ADDON_KINDS = ["ai_tokens", "feature"] as const;
+export const ADDON_KINDS = ["ai_tokens", "feature", "seats", "storage"] as const;
 export type AddonKind = (typeof ADDON_KINDS)[number];
 
 export const ADDON_KIND_LABELS: Record<AddonKind, string> = {
   ai_tokens: "AI token top-up",
   feature: "Feature unlock",
+  seats: "Extra seats",
+  storage: "Extra storage",
 };
+
+/** Kinds a tenant can hold several of (quantity); a feature unlock is on or off. */
+export function addonStacks(kind: AddonKind): boolean {
+  return kind !== "feature";
+}
 
 export const ADDON_FLAG_KEYS = [
   "aiAutoDraft",
@@ -43,6 +50,8 @@ export const ADDON_LIMITS = {
   tokensMax: 1_000_000_000,
   priceCentsMax: 10_000_000,
   quantity: { min: 1, max: 100 },
+  /** Seats or GB per unit for the seats / storage kinds. */
+  amountMax: 100_000,
   noteMax: 300,
 } as const;
 
@@ -55,6 +64,7 @@ export type AddonCatalogRow = {
   kind: AddonKind;
   aiTokensPerMonth: number;
   featureFlag: keyof TierFeatureFlags | null;
+  amountPerUnit: number;
   priceMonthlyCents: number;
   stripePriceId: string | null;
   sortOrder: number;
@@ -70,6 +80,7 @@ export type TenantAddonRow = {
   kind: AddonKind;
   aiTokensPerMonth: number;
   featureFlag: keyof TierFeatureFlags | null;
+  amountPerUnit: number;
   priceMonthlyCents: number;
   quantity: number;
   status: "active" | "canceled";
@@ -89,6 +100,8 @@ export type AddonEffect = {
   kind: AddonKind;
   aiTokensPerMonth: number;
   featureFlag: keyof TierFeatureFlags | null;
+  /** Seats / GB per unit for the seats and storage kinds. */
+  amountPerUnit?: number;
   quantity: number;
 };
 
@@ -97,6 +110,9 @@ export type AddonEffectsApplied = {
   flags: TierFeatureFlags;
   /** Tokens the live top-ups add per month (0 when the tier is already unlimited or there are none). */
   extraTokens: number;
+  /** Seats / GB the live seat and storage add-ons add (0 when that quota is already unlimited). */
+  extraSeats: number;
+  extraStorageGb: number;
   /** Flags the live unlocks turned on that the tier and overrides had off. */
   unlockedFlags: (keyof TierFeatureFlags)[];
 };
@@ -107,8 +123,9 @@ function isFlagKey(key: unknown): key is keyof TierFeatureFlags {
 
 /**
  * Add the live grants' effects on top of a tier's merged quotas and
- * flags. A tier cap of 0 means unlimited and stays 0; a feature already
- * on stays on and is not counted as unlocked.
+ * flags. A quota of 0 means unlimited and stays 0 (tokens, seats and
+ * storage alike); a feature already on stays on and is not counted as
+ * unlocked.
  */
 export function applyAddonEffects(input: {
   quotas: TierQuotas;
@@ -116,12 +133,19 @@ export function applyAddonEffects(input: {
   effects: AddonEffect[];
 }): AddonEffectsApplied {
   let extraTokens = 0;
+  let extraSeats = 0;
+  let extraStorageGb = 0;
   const flags: TierFeatureFlags = { ...input.flags };
   const unlockedFlags: (keyof TierFeatureFlags)[] = [];
   for (const e of input.effects) {
     const qty = Math.max(1, Math.floor(e.quantity || 1));
+    const amount = Math.max(0, Math.floor(e.amountPerUnit || 0)) * qty;
     if (e.kind === "ai_tokens") {
       extraTokens += Math.max(0, Math.floor(e.aiTokensPerMonth || 0)) * qty;
+    } else if (e.kind === "seats") {
+      extraSeats += amount;
+    } else if (e.kind === "storage") {
+      extraStorageGb += amount;
     } else if (e.kind === "feature" && isFlagKey(e.featureFlag)) {
       if (!flags[e.featureFlag]) {
         flags[e.featureFlag] = true;
@@ -129,9 +153,21 @@ export function applyAddonEffects(input: {
       }
     }
   }
-  const unlimited = input.quotas.aiTokensPerMonth === 0;
-  const quotas: TierQuotas = unlimited || extraTokens === 0 ? input.quotas : { ...input.quotas, aiTokensPerMonth: input.quotas.aiTokensPerMonth + extraTokens };
-  return { quotas, flags, extraTokens: unlimited ? 0 : extraTokens, unlockedFlags };
+  // 0 = unlimited: an add-on can't raise what has no ceiling.
+  const raise = (base: number, extra: number) => (base === 0 ? 0 : extra);
+  const tokens = raise(input.quotas.aiTokensPerMonth, extraTokens);
+  const seats = raise(input.quotas.seatsIncluded, extraSeats);
+  const storage = raise(input.quotas.storageGb, extraStorageGb);
+  const quotas: TierQuotas =
+    tokens + seats + storage === 0
+      ? input.quotas
+      : {
+          ...input.quotas,
+          aiTokensPerMonth: input.quotas.aiTokensPerMonth + tokens,
+          seatsIncluded: input.quotas.seatsIncluded + seats,
+          storageGb: input.quotas.storageGb + storage,
+        };
+  return { quotas, flags, extraTokens: tokens, extraSeats: seats, extraStorageGb: storage, unlockedFlags };
 }
 
 /** Whether a grant counts right now: active, started, not ended, and its catalogue entry still on sale or honoured. */
@@ -152,6 +188,7 @@ export type AddonInput = {
   kind: AddonKind;
   aiTokensPerMonth: number;
   featureFlag: keyof TierFeatureFlags | null;
+  amountPerUnit: number;
   priceMonthlyCents: number;
   stripePriceId: string | null;
   sortOrder: number;
@@ -169,14 +206,19 @@ export function sanitizeAddonInput(raw: unknown): { ok: true; value: AddonInput 
   const name = typeof r.name === "string" ? r.name.trim() : "";
   if (!name || name.length > ADDON_LIMITS.nameMax) return { ok: false, error: `Name: 1–${ADDON_LIMITS.nameMax} characters.` };
   const description = typeof r.description === "string" ? r.description.trim().slice(0, ADDON_LIMITS.descriptionMax) : "";
-  const kind = r.kind;
-  if (kind !== "ai_tokens" && kind !== "feature") return { ok: false, error: "Kind: AI token top-up or feature unlock." };
+  const kind = r.kind as AddonKind;
+  if (!(ADDON_KINDS as readonly unknown[]).includes(kind)) return { ok: false, error: "Kind: AI token top-up, feature unlock, extra seats or extra storage." };
   const whole = (v: unknown, max: number) => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= max ? v : null);
   const aiTokensPerMonth = kind === "ai_tokens" ? whole(r.aiTokensPerMonth, ADDON_LIMITS.tokensMax) : 0;
   if (aiTokensPerMonth === null) return { ok: false, error: `Tokens per month: a whole number up to ${ADDON_LIMITS.tokensMax.toLocaleString()}.` };
   if (kind === "ai_tokens" && aiTokensPerMonth === 0) return { ok: false, error: "A token top-up must add at least one token per month." };
   const featureFlag = kind === "feature" ? (isFlagKey(r.featureFlag) ? r.featureFlag : null) : null;
   if (kind === "feature" && !featureFlag) return { ok: false, error: "A feature unlock needs a feature." };
+  const sized = kind === "seats" || kind === "storage";
+  const amountPerUnit = sized ? whole(r.amountPerUnit, ADDON_LIMITS.amountMax) : 0;
+  if (amountPerUnit === null || (sized && amountPerUnit === 0)) {
+    return { ok: false, error: `${kind === "seats" ? "Seats" : "GB"} per unit: a whole number from 1 to ${ADDON_LIMITS.amountMax.toLocaleString()}.` };
+  }
   const priceMonthlyCents = whole(r.priceMonthlyCents, ADDON_LIMITS.priceCentsMax);
   if (priceMonthlyCents === null) return { ok: false, error: "Price: a whole number of cents." };
   const stripeRaw = typeof r.stripePriceId === "string" ? r.stripePriceId.trim() : "";
@@ -185,7 +227,7 @@ export function sanitizeAddonInput(raw: unknown): { ok: true; value: AddonInput 
   const active = r.active !== false;
   return {
     ok: true,
-    value: { slug, name, description, kind, aiTokensPerMonth, featureFlag, priceMonthlyCents, stripePriceId: stripeRaw || null, sortOrder, active },
+    value: { slug, name, description, kind, aiTokensPerMonth, featureFlag, amountPerUnit, priceMonthlyCents, stripePriceId: stripeRaw || null, sortOrder, active },
   };
 }
 
@@ -200,10 +242,18 @@ export function formatTokenCount(n: number): string {
   return n.toLocaleString();
 }
 
-/** "+500K AI tokens / month" or "Unlocks Winner analysis". */
-export function describeAddon(a: { kind: AddonKind; aiTokensPerMonth: number; featureFlag: keyof TierFeatureFlags | null }, quantity = 1): string {
+/** "+500K AI tokens / month", "+5 seats", "+50 GB storage" or "Unlocks Winner analysis". */
+export function describeAddon(
+  a: { kind: AddonKind; aiTokensPerMonth: number; featureFlag: keyof TierFeatureFlags | null; amountPerUnit?: number },
+  quantity = 1,
+): string {
   if (a.kind === "feature") return `Unlocks ${a.featureFlag ? ADDON_FLAG_LABELS[a.featureFlag] : "a feature"}`;
   const qty = Math.max(1, quantity);
+  if (a.kind === "seats" || a.kind === "storage") {
+    const per = a.amountPerUnit ?? 0;
+    const unit = a.kind === "seats" ? (n: number) => `${n.toLocaleString()} seat${n === 1 ? "" : "s"}` : (n: number) => `${n.toLocaleString()} GB storage`;
+    return `+${unit(per * qty)}${qty > 1 ? ` (${qty} × ${per.toLocaleString()})` : ""}`;
+  }
   return `+${formatTokenCount(a.aiTokensPerMonth * qty)} AI tokens / month${qty > 1 ? ` (${qty} × ${formatTokenCount(a.aiTokensPerMonth)})` : ""}`;
 }
 

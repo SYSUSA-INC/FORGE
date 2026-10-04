@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { TierFeatureFlags, TierQuotas } from "@/db/schema";
 import {
   addonIsLive,
+  addonStacks,
   applyAddonEffects,
   canBillOnPlan,
   reconcilePlanItems,
@@ -53,7 +54,7 @@ describe("applyAddonEffects", () => {
   });
 
   it("is a no-op without effects and ignores unknown flags and bad quantities", () => {
-    expect(applyAddonEffects({ quotas, flags, effects: [] })).toEqual({ quotas, flags, extraTokens: 0, unlockedFlags: [] });
+    expect(applyAddonEffects({ quotas, flags, effects: [] })).toEqual({ quotas, flags, extraTokens: 0, extraSeats: 0, extraStorageGb: 0, unlockedFlags: [] });
     const out = applyAddonEffects({
       quotas,
       flags,
@@ -165,5 +166,41 @@ describe("Slice 2a — add-ons on the plan's own subscription", () => {
       added: ["si_new"],
     });
     expect(reconcilePlanItems([], [])).toEqual({ end: [], quantity: [], added: [] });
+  });
+});
+
+describe("Slice 2b — seats and storage add-ons", () => {
+  it("raises seats and storage by quantity, and never an unlimited quota", () => {
+    const out = applyAddonEffects({
+      quotas,
+      flags,
+      effects: [
+        { kind: "seats", aiTokensPerMonth: 0, featureFlag: null, amountPerUnit: 5, quantity: 2 },
+        { kind: "storage", aiTokensPerMonth: 0, featureFlag: null, amountPerUnit: 50, quantity: 1 },
+      ],
+    });
+    expect(out.quotas).toMatchObject({ seatsIncluded: 15, storageGb: 60, aiTokensPerMonth: 1_000_000 });
+    expect(out).toMatchObject({ extraSeats: 10, extraStorageGb: 50, extraTokens: 0 });
+    const unlimited = applyAddonEffects({
+      quotas: { ...quotas, seatsIncluded: 0, storageGb: 0 },
+      flags,
+      effects: [{ kind: "seats", aiTokensPerMonth: 0, featureFlag: null, amountPerUnit: 5, quantity: 1 }],
+    });
+    expect(unlimited.quotas.seatsIncluded).toBe(0);
+    expect(unlimited.extraSeats).toBe(0);
+  });
+
+  it("validates the per-unit amount and describes the add-on", () => {
+    const base = { slug: "seats-5", name: "5 seats", kind: "seats", priceMonthlyCents: 5000 };
+    expect(sanitizeAddonInput({ ...base, amountPerUnit: 5 })).toMatchObject({ ok: true, value: { kind: "seats", amountPerUnit: 5, aiTokensPerMonth: 0, featureFlag: null } });
+    expect(sanitizeAddonInput({ ...base, amountPerUnit: 0 }).ok).toBe(false);
+    expect(sanitizeAddonInput({ ...base, kind: "storage", amountPerUnit: 1.5 }).ok).toBe(false);
+    expect(sanitizeAddonInput({ ...base, kind: "storage", amountPerUnit: 100 })).toMatchObject({ ok: true, value: { kind: "storage", amountPerUnit: 100 } });
+    expect(sanitizeAddonInput({ ...base, kind: "ai_tokens", aiTokensPerMonth: 1000, amountPerUnit: 9 })).toMatchObject({ ok: true, value: { amountPerUnit: 0 } });
+    expect(describeAddon({ kind: "seats", aiTokensPerMonth: 0, featureFlag: null, amountPerUnit: 5 })).toBe("+5 seats");
+    expect(describeAddon({ kind: "seats", aiTokensPerMonth: 0, featureFlag: null, amountPerUnit: 1 })).toBe("+1 seat");
+    expect(describeAddon({ kind: "storage", aiTokensPerMonth: 0, featureFlag: null, amountPerUnit: 50 }, 3)).toBe("+150 GB storage (3 × 50)");
+    expect(addonStacks("seats")).toBe(true);
+    expect(addonStacks("feature")).toBe(false);
   });
 });

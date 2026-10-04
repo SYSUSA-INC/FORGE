@@ -7,6 +7,8 @@ import {
   type TierQuotas,
 } from "@/db/schema";
 import { auth } from "@/auth";
+import { listAddonCatalog } from "@/lib/addons";
+import { describeAddon, formatMonthlyPrice } from "@/lib/addons-logic";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +84,8 @@ export default async function PricingPage() {
     .from(subscriptionTiers)
     .where(eq(subscriptionTiers.active, true))
     .orderBy(asc(subscriptionTiers.sortOrder));
+  // BL-PACKAGES add-ons Slice 2b — the à la carte catalogue, also public.
+  const addons = await listAddonCatalog({ activeOnly: true });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 md:py-20">
@@ -213,6 +217,30 @@ export default async function PricingPage() {
           })}
         </div>
       )}
+
+      {addons.length > 0 ? (
+        <section className="mt-16">
+          <div className="text-center">
+            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-teal">Add-ons</div>
+            <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-text">Add what your plan doesn&apos;t include.</h2>
+            <p className="mx-auto mt-2 max-w-2xl font-body text-[14px] leading-relaxed text-muted">
+              Add-ons sit on top of any plan, bill monthly on the same invoice, and can be changed or removed any time under Settings → Billing.
+            </p>
+          </div>
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {addons.map((a) => (
+              <div key={a.id} className="aur-card flex flex-col p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="font-display text-[15px] font-semibold text-text">{a.name}</h3>
+                  <div className="font-display text-[15px] text-text">{a.stripePriceId || a.priceMonthlyCents > 0 ? formatMonthlyPrice(a.priceMonthlyCents) : "Contact sales"}</div>
+                </div>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">{describeAddon(a)}</div>
+                {a.description ? <p className="mt-2 font-body text-[12.5px] leading-relaxed text-muted">{a.description}</p> : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-16 text-center">
         <p className="font-body text-[13px] text-muted">
