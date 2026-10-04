@@ -3688,6 +3688,71 @@ export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
 export type NewTenantSubscription = typeof tenantSubscriptions.$inferInsert;
 
 /**
+ * BL-PACKAGES add-ons Slice 1 — the à la carte catalogue (drizzle/0105).
+ *
+ * Platform-wide, not tenant-scoped: what a tenant can buy or be granted
+ * on top of its tier. `kind` is `ai_tokens` (extra `ai_tokens_per_month`
+ * per unit) or `feature` (turns one `TierFeatureFlags` key on).
+ * `stripe_price_id` is the recurring monthly Stripe Price when the
+ * add-on is sold by card; null = granted by a platform admin only.
+ */
+export const tierAddons = pgTable("tier_addon", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: varchar("slug", { length: 32 }).notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  kind: text("kind").$type<"ai_tokens" | "feature">().notNull().default("ai_tokens"),
+  aiTokensPerMonth: integer("ai_tokens_per_month").notNull().default(0),
+  featureFlag: text("feature_flag").$type<keyof TierFeatureFlags>(),
+  priceMonthlyCents: integer("price_monthly_cents").notNull().default(0),
+  stripePriceId: text("stripe_price_id"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type TierAddon = typeof tierAddons.$inferSelect;
+
+/**
+ * BL-PACKAGES add-ons Slice 1 — a tenant's grant of one catalogue entry
+ * (drizzle/0105). `source` is `manual` (platform admin on
+ * /admin/orgs/[id]) or `stripe` (checkout; the webhook keeps `status`
+ * in step with the Stripe subscription). The subscription gate adds
+ * every live grant (active, started, not ended, catalogue entry active)
+ * on top of the tier and overrides.
+ */
+export const tenantAddons = pgTable(
+  "tenant_addon",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    addonId: uuid("addon_id")
+      .notNull()
+      .references(() => tierAddons.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull().default(1),
+    status: text("status").$type<"active" | "canceled">().notNull().default("active"),
+    source: text("source").$type<"manual" | "stripe">().notNull().default("manual"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    stripeSubscriptionItemId: text("stripe_subscription_item_id"),
+    grantedByUserId: text("granted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    note: text("note").notNull().default(""),
+    startsAt: timestamp("starts_at").notNull().defaultNow(),
+    endsAt: timestamp("ends_at"),
+    canceledAt: timestamp("canceled_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgStatusIdx: index("tenant_addon_org_status_idx").on(t.organizationId, t.status),
+  }),
+);
+
+export type TenantAddon = typeof tenantAddons.$inferSelect;
+
+/**
  * BL-17 Slice 2 — Stripe webhook event ledger.
  *
  * One row per Stripe event we receive. Three jobs:

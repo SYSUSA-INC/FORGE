@@ -30,6 +30,8 @@ Effort key:
 | 3b | **BL-PACKAGES Slice 2** — Migrate 7 lib-helper AI callers | P1 | M | ✅ shipped (PR #213) — 100% tenant AI paths token-capped |
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
+| 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | 🔄 in PR (PR #317) |
+| 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ⏳ queued (written, parked until 1a merges) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1046,7 +1048,7 @@ the dark block, no white-alpha utility anywhere in `src`).
 ---
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slices 1–4: PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ⏳ remaining: à la carte add-on system
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  🔄 add-ons Slice 1a in PR (PR #317; Slice 1b queued)
 
 Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
 
@@ -1057,7 +1059,49 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
 - Public pricing page surfacing the packages (Slice 4) and tenant-facing upgrade flow via Stripe Checkout + customer portal (BL-17 Slices 3–4).
 - Promo codes: Stripe promotion codes accepted at checkout (`allow_promotion_codes`); the FORGE-side `promo_code` table is managed at `/admin/promo-codes`.
 
-**Remaining (not started):** the à la carte add-on system (AI top-ups, advanced reporting) — needs `tier_addon` / `tenant_addon` tables, Stripe price mapping and a tenant-facing picker. Paused with BL-17 Slice 5 pending launch readiness; token top-ups can be handled by a tier change until then.
+**Add-ons Slice 1a — the à la carte system, catalogue and grants (2026-10-04):**
+
+- **Catalogue.** `tier_addon` (migration 0105; platform-wide): slug,
+  name, description, `kind` (`ai_tokens` = extra tokens per month per
+  unit, or `feature` = one `TierFeatureFlags` key), price, optional
+  monthly Stripe Price id, sort order, active. Edited by platform admins
+  on `/admin/tiers` (new panel; `tier_addon.create` / `tier_addon.update`
+  audited like tier edits). Retiring an add-on is refused while any
+  tenant holds it, like retiring a tier.
+- **Grants.** `tenant_addon` (tenant-scoped): the catalogue entry,
+  quantity, `source` (`manual` | `stripe`), status, optional end date,
+  the Stripe subscription when bought. Platform admins grant and end
+  them on `/admin/orgs/[id]` (`tenant.addon.grant` / `tenant.addon.revoke`
+  in the tenant's log); a grant counts while active, started, not ended
+  and its catalogue entry is active (`addonIsLive`, pure).
+- **Gate.** `getCurrentTier` adds the live grants on top of tier ×
+  overrides (`applyAddonEffects`, pure): token top-ups raise
+  `aiTokensPerMonth` (an unlimited cap stays unlimited), feature unlocks
+  turn their flag on; the tenant's own AI budget still only lowers. The
+  result carries `addons: { count, extraTokens, unlockedFlags }` for the
+  billing page, the admin tenant page and the AI Engine panel. A retired
+  tier still denies everything.
+- Tests: `tests/ai/addons-logic.test.ts` (effects, liveness, input
+  rules, wording); `tests/isolation/addons.test.ts` (a grant raises the
+  owning tenant's cap and unlocks its feature only, ending and expiry
+  stop it, audits land in the tenant's log).
+- **Slice 1b (next, written and parked):** the tenant-facing picker on
+  `/settings/billing` — the catalogue with what the organization holds
+  and this month's cap split into tier + add-ons; org admins buy an
+  add-on with a Stripe Price through Checkout (a separate recurring
+  subscription per add-on with quantity for top-ups, metadata
+  `kind: addon` on the session and `forgeAddonSlug` on the
+  subscription); the webhook records the grant on
+  `checkout.session.completed` (idempotent by subscription id), keeps it
+  in step on `customer.subscription.updated` and ends it on `.deleted`
+  — serving until the paid period ends — without touching the plan row
+  (the plan handlers skip add-on subscriptions, recognised by the grant,
+  the metadata or the Price). Add-ons without a Stripe Price show
+  "Contact sales".
+- **Later:** add-on items on the plan's own Stripe subscription (one
+  invoice), proration on quantity changes, add-ons on the public
+  pricing page, seats and storage as add-on kinds, advanced-reporting
+  features behind an unlock.
 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 

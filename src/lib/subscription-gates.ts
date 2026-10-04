@@ -11,6 +11,8 @@ import {
   type TierFeatureFlags,
   type TierQuotas,
 } from "@/db/schema";
+import { activeAddonEffects } from "@/lib/addons";
+import { applyAddonEffects } from "@/lib/addons-logic";
 import { applyAiBudget, type AiBudget } from "@/lib/ai-control";
 import { log } from "@/lib/log";
 
@@ -84,12 +86,18 @@ export type CurrentTier = {
      */
     aiBudget?: AiBudget;
   };
-  /** Effective flags = tier × overrides. */
+  /** Effective flags = tier × overrides × live add-ons. */
   effectiveFlags: TierFeatureFlags;
-  /** Quotas = tier × platform overrides, before the tenant's own budget. */
+  /** Quotas = tier × platform overrides × live add-ons, before the tenant's own budget. */
   platformQuotas: TierQuotas;
-  /** Effective quotas = tier × overrides × the tenant's budget (which only lowers). */
+  /** Effective quotas = platform quotas × the tenant's budget (which only lowers). */
   effectiveQuotas: TierQuotas;
+  /**
+   * BL-PACKAGES add-ons — what the tenant's live grants contributed:
+   * tokens added to the monthly cap (0 when the tier is unlimited) and
+   * the flags they turned on that the tier and overrides had off.
+   */
+  addons: { count: number; extraTokens: number; unlockedFlags: (keyof TierFeatureFlags)[] };
 };
 
 /**
@@ -122,6 +130,10 @@ export async function getCurrentTier(
 
   if (!row) return null;
 
+  // BL-PACKAGES add-ons — the tenant's live grants (manual or Stripe)
+  // add on top of tier × overrides. A retired tier still denies all.
+  const addonEffects = await activeAddonEffects({ organizationId });
+
   // Retired tier — return the row but the caller's ensureFeature path
   // will deny every feature. Surface the tier name in the error so the
   // operator knows what to upgrade.
@@ -132,13 +144,18 @@ export async function getCurrentTier(
     aiBudget?: AiBudget;
   };
 
-  const effectiveFlags: TierFeatureFlags = row.tierActive
+  const baseFlags: TierFeatureFlags = row.tierActive
     ? mergeFlags(row.tierFeatureFlags, overrides.featureFlags)
     : DENY_ALL_FLAGS;
-  const platformQuotas: TierQuotas = mergeQuotas(
+  const baseQuotas: TierQuotas = mergeQuotas(
     row.tierQuotas,
     overrides.quotas,
   );
+  const applied = row.tierActive
+    ? applyAddonEffects({ quotas: baseQuotas, flags: baseFlags, effects: addonEffects })
+    : { quotas: baseQuotas, flags: baseFlags, extraTokens: 0, unlockedFlags: [] as (keyof TierFeatureFlags)[] };
+  const effectiveFlags = applied.flags;
+  const platformQuotas = applied.quotas;
   // BL-AIP-7c — the tenant's own budget can only lower the cap.
   const effectiveQuotas: TierQuotas = applyAiBudget(platformQuotas, overrides.aiBudget);
 
@@ -153,6 +170,7 @@ export async function getCurrentTier(
     effectiveFlags,
     platformQuotas,
     effectiveQuotas,
+    addons: { count: addonEffects.length, extraTokens: applied.extraTokens, unlockedFlags: applied.unlockedFlags },
   };
 }
 

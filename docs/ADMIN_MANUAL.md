@@ -569,7 +569,17 @@ Each create/update writes a `promo_code.create` / `promo_code.update` audit row.
 
 **Note on redemption**: Phase C-4 ships CRUD only. The actual redemption flow (applying a code to a `tenant_subscription` to discount the next period) pairs with **BL-17** (external billing integration). For now, codes exist in the DB ready for that wiring; nothing changes when a tenant types one in.
 
-### 6.9 Operating practices
+### 6.9 À la carte add-ons
+
+Add-ons sit on top of any tier (BL-PACKAGES add-ons Slice 1; migration 0105 adds `tier_addon` and `tenant_addon` — sync it on `/admin/migrations` after deploying). Two kinds: a **token top-up** raises a tenant's monthly AI token cap by its amount per unit (a tier whose cap is 0 = unlimited gains nothing), and a **feature unlock** turns one feature flag on for the tenant. The subscription gate adds every *live* grant on top of the tier and its overrides — live means active, started, not past its end date, and its catalogue entry still active; the tenant's own AI budget still only lowers the result.
+
+**Catalogue** — the panel under the tier list on **Platform admin → Tiers** (`/admin/tiers`). **+ New add-on** takes a slug (fixed once created; Stripe metadata references it), name, kind, the tokens per unit or the feature, a monthly price, an optional **Stripe Price id** (monthly, recurring) and a sort order. Without a Stripe Price the add-on is "grant only": tenants see **Contact sales** and you grant it by hand. Each create/update writes `tier_addon.create` / `tier_addon.update` into your own org's audit log (or the deploy log for a pure superadmin), like tier edits. Retiring an add-on is refused while any tenant grant is active — end those first.
+
+**Grants** — the **Add-ons** panel on `/admin/orgs/<id>` lists what the tenant holds (granted or bought via Stripe, quantity, since/ends, live or not) and what is counting right now. **Grant an add-on** picks a catalogue entry, a quantity (1–100; only top-ups stack), a note and an optional end date; it counts immediately. **End now** cancels a grant immediately; for a Stripe-bought one it stops counting here but Stripe keeps billing until the subscription is cancelled in Stripe — the panel says so. Both write `tenant.addon.grant` / `tenant.addon.revoke` into the **target tenant's** audit log.
+
+**Bought by card** — Slice 1b adds the tenant-facing picker on `/settings/billing` (Stripe Checkout against the add-on's Price, the webhook recording and ending the grant with its Stripe subscription). Until then every add-on is granted by hand from the tenant page; the Stripe Price id on a catalogue entry is stored for that slice and has no effect yet.
+
+### 6.10 Operating practices
 
 - **Tier edits are platform-wide and immediate**. Flipping Bronze's `aiAutoDraft` from `false` to `true` unlocks the feature for every Bronze tenant the moment the gate's next read fires. No deploy needed. Audit the change in your shared ops doc the same day.
 - **Custom tier is the right place for sales-negotiated terms**. Don't edit Bronze/Silver/Gold/Platinum prices ad-hoc for one customer — that affects everyone. Move them to Custom and use `custom_overrides`.
