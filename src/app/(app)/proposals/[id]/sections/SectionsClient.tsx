@@ -42,6 +42,7 @@ import {
   saveSectionAction,
 } from "../../actions";
 import { recordChangeDecisionsAction } from "./change-decision-actions";
+import { SectionPresence } from "./SectionPresence";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
 import { THEME } from "@/lib/theme-colors";
 
@@ -748,6 +749,8 @@ function SectionRow({
                 <span>{section.authorName ?? section.authorEmail}</span>
               </>
             ) : null}
+            {/* BL-FB-CHAT-MULTI Slice 3 — who else has this section open (checks in only while open) */}
+            {open ? <SectionPresence sectionId={section.id} /> : null}
             {/* BL-FB-CHAT-MULTI Slice 2 — teammates wrote in the thread since you looked */}
             {chatUnread > 0 ? (
               <span

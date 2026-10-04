@@ -881,6 +881,30 @@ export const sectionChatReads = pgTable(
 export type SectionChatRead = typeof sectionChatReads.$inferSelect;
 
 /**
+ * BL-FB-CHAT-MULTI Slice 3 — who has a section open (drizzle/0112): the
+ * last check-in of each member's open section. "Here" = seen in the last
+ * 75 seconds; stale rows are swept on the next check-in.
+ */
+export const sectionPresence = pgTable(
+  "section_presence",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.organizationId, t.sectionId, t.userId] }),
+  }),
+);
+
+/**
  * BL-FB-CHAT-UPLOAD — a document dropped into a section's chat
  * (drizzle/0092). Holds the extracted text, scoped to the section's
  * conversation: it reaches the model as reference and never the Brain
