@@ -53,6 +53,7 @@ async function createTierAndSubscribe(opts: {
     bulkExport: false,
     apiAccess: false,
     customTemplates: false,
+    advancedReporting: false,
   };
   const quotas: TierQuotas = {
     aiRequestsPerMonth: 0,

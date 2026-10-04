@@ -127,6 +127,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
       { href: "/intelligence/firms", label: "8(a) firms" },
       { href: "/intelligence/watchlist", label: "Watchlist" },
       { href: "/intelligence/saved-searches", label: "Saved searches" },
+      { href: "/reports", label: "Reports" },
       { href: "/knowledge-base", label: "Knowledge" },
       { href: "/knowledge-base/import", label: "Knowledge import" },
       { href: "/knowledge-base/usaspending", label: "USAspending import" },

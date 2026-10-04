@@ -32,6 +32,7 @@ export const ADDON_FLAG_KEYS = [
   "bulkExport",
   "apiAccess",
   "customTemplates",
+  "advancedReporting",
 ] as const satisfies readonly (keyof TierFeatureFlags)[];
 
 export const ADDON_FLAG_LABELS: Record<keyof TierFeatureFlags, string> = {
@@ -41,6 +42,7 @@ export const ADDON_FLAG_LABELS: Record<keyof TierFeatureFlags, string> = {
   bulkExport: "Bulk export",
   apiAccess: "API access",
   customTemplates: "Custom templates",
+  advancedReporting: "Advanced reporting",
 };
 
 export const ADDON_LIMITS = {

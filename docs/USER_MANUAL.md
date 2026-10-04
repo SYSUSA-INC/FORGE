@@ -105,7 +105,7 @@ The sidebar shows one **workspace** at a time, scoped to the hat you are wearing
 
 | Workspace | Who | What it contains |
 |---|---|---|
-| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Customer Relations (Customer contacts, Follow-ups owed, New contact, Import contacts); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, API access, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
+| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Customer Relations (Customer contacts, Follow-ups owed, New contact, Import contacts); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Reports, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, API access, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
 | **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine, API access); Governance (Notification rules, Audit Log); Admin guide |
 | **Platform admin** | platform superadmins | Organizations & users (Overview, Organizations, Platform users, Trial requests, Source requests — the first three are the SuperAdmin portal's tabs, in the portal's order; a menu click opens the tab and a tab click updates the menu); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
 
@@ -415,6 +415,18 @@ Each entry shows the author's avatar, name, kind, body, and timestamp. You can d
 ### 5.5 Pipeline brief (FORGE Brain page)
 
 **Intelligence → Pipeline brief** writes a 4–7 sentence take on your whole portfolio — what to chase, what to abandon, what is at risk this week — with **Priorities this week** and **Risks** listed underneath. Since BL-AIP-7a it is grounded in the PWin model's track record and your loss intelligence (the patterns and competitors you keep losing to), it is stored (the last one shows on load; a new one is written when the pipeline changes or you click **Regenerate**), and you can mark it useful or not.
+
+### 5.6 Reports
+
+**Platform Intelligence → Reports** (`/reports`) shows how your pursuits turn out. It's part of some plans (or an add-on); without it the page says so and links to Billing.
+
+- **Range** — Last 12 months (default), Last 24 months or All time, counted by when each opportunity was created. The header shows the totals for the range: opportunities, win rate, value won and open pipeline value.
+- **Win rate by agency, by NAICS and by set-aside** — won, lost and no-bid counts, the win rate (won ÷ (won + lost); no-bids are shown beside it, not in the rate) and the value won. Blank values are grouped as "(not set)". Busiest first.
+- **Stage funnel** — for each stage, how many opportunities sit there now, how many got at least that far, and what share of the previous stage got there. A lost bid counts as having reached Submitted; a no-bid as having left at Qualification.
+- **Created and won by month** — the last 12 months: opportunities added and won each month and the value won (won month = award date, or when it was marked won).
+- **Download CSV** on each table saves exactly what the table shows. Each download is recorded in the Audit Log.
+
+Values come from each opportunity's value range (the high figure, else the low one).
 
 ## 6. Proposals
 

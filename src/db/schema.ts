@@ -3557,6 +3557,8 @@ export type TierFeatureFlags = {
   bulkExport: boolean;
   apiAccess: boolean;
   customTemplates: boolean;
+  /** Slice 2c — the Reports page (drizzle/0109 sets it on existing tiers). */
+  advancedReporting: boolean;
 };
 
 /**

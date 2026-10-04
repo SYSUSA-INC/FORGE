@@ -37,6 +37,7 @@ const FEATURE_LABELS: Record<keyof TierFeatureFlags, string> = {
   bulkExport: "Bulk export (CSV / Excel)",
   apiAccess: "Public API access",
   customTemplates: "Custom proposal templates",
+  advancedReporting: "Reports: win rates, stage funnel, pipeline trends",
 };
 
 const QUOTA_LABELS: Record<keyof TierQuotas, string> = {

@@ -59,8 +59,8 @@ describe("ends and extensions", () => {
 
 describe("pauseAiFlags", () => {
   it("switches off only the AI-powered flags", () => {
-    const all = { aiAutoDraft: true, winnerAnalysis: true, complianceMatrix: true, bulkExport: true, apiAccess: true, customTemplates: true };
-    expect(pauseAiFlags(all)).toEqual({ aiAutoDraft: false, winnerAnalysis: false, complianceMatrix: false, bulkExport: true, apiAccess: true, customTemplates: true });
+    const all = { aiAutoDraft: true, winnerAnalysis: true, complianceMatrix: true, bulkExport: true, apiAccess: true, customTemplates: true, advancedReporting: true };
+    expect(pauseAiFlags(all)).toEqual({ aiAutoDraft: false, winnerAnalysis: false, complianceMatrix: false, bulkExport: true, apiAccess: true, customTemplates: true, advancedReporting: true });
     expect(all.aiAutoDraft).toBe(true);
     expect([...TRIAL_PAUSED_FLAGS].sort()).toEqual(["aiAutoDraft", "complianceMatrix", "winnerAnalysis"]);
   });

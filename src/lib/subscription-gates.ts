@@ -156,7 +156,8 @@ export async function getCurrentTier(
 
   const trial = trialState(row.status, row.trialUntil);
   const baseFlags: TierFeatureFlags = row.tierActive
-    ? mergeFlags(row.tierFeatureFlags, overrides.featureFlags)
+    ? // A flag added after a tier was saved reads as off until set.
+      mergeFlags({ ...DENY_ALL_FLAGS, ...row.tierFeatureFlags }, overrides.featureFlags)
     : DENY_ALL_FLAGS;
   const baseQuotas: TierQuotas = mergeQuotas(
     row.tierQuotas,
@@ -238,6 +239,7 @@ const DENY_ALL_FLAGS: TierFeatureFlags = {
   bulkExport: false,
   apiAccess: false,
   customTemplates: false,
+  advancedReporting: false,
 };
 
 function mergeFlags(
@@ -252,6 +254,7 @@ function mergeFlags(
     bulkExport: overrides.bulkExport ?? base.bulkExport,
     apiAccess: overrides.apiAccess ?? base.apiAccess,
     customTemplates: overrides.customTemplates ?? base.customTemplates,
+    advancedReporting: overrides.advancedReporting ?? base.advancedReporting,
   };
 }
 

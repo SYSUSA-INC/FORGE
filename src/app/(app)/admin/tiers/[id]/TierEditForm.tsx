@@ -25,6 +25,7 @@ const FLAG_LABELS: Record<keyof TierFeatureFlags, string> = {
   bulkExport: "Bulk export",
   apiAccess: "API access",
   customTemplates: "Custom templates",
+  advancedReporting: "Advanced reporting",
 };
 
 const QUOTA_LABELS: Record<keyof TierQuotas, string> = {
