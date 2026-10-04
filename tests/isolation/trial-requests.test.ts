@@ -77,8 +77,9 @@ describe("BL-AUTH-ABUSE — Request-a-trial queue", () => {
     const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.organizationId, approved.organizationId));
     expect(audits.map((a) => a.action).sort()).toEqual(["org.create", "tenant.trial_start", "trial_request.approve"]);
 
-    // The same person can ask again once the earlier request is decided.
-    expect((await submitTrialRequest({ value: input(`ana@${domain}`), sourceIp: "203.0.113.7" })).kind).toBe("queued");
+    // The approved workspace now owns the company's domain, so a repeat
+    // request from it is sent to that workspace's admin, not queued.
+    expect(await submitTrialRequest({ value: input(`ana@${domain}`), sourceIp: "203.0.113.7" })).toEqual({ kind: "owned_domain", organizationName: "Trial Co" });
   });
 
   it("declines without creating anything", async () => {
@@ -91,5 +92,8 @@ describe("BL-AUTH-ABUSE — Request-a-trial queue", () => {
     expect(await approveTrialRequest({ requestId: queued.id, actor })).toEqual({ ok: false, error: "This request was already declined." });
     const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(and(eq(auditLogs.organizationId, fx.orgB.organizationId), eq(auditLogs.action, "trial_request.decline")));
     expect(audits).toHaveLength(1);
+
+    // Once declined, the same person may ask again.
+    expect((await submitTrialRequest({ value: input(`dee@${domain}`, "Dee Co"), sourceIp: "198.51.100.2" })).kind).toBe("queued");
   });
 });
