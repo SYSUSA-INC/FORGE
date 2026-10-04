@@ -14,6 +14,7 @@ import { triggerProposalScanIfStaleAction } from "../scan-actions";
 import { runInBackground } from "@/lib/background";
 import { listOpenReviewCommentsBySection } from "@/lib/section-review-comments";
 import type { SectionReviewComment } from "@/lib/review-comments";
+import { getHouseStyle, voiceAuthorIds } from "@/lib/voice";
 import { AutoDraftButton } from "./ai/AutoDraftButton";
 import { SectionsClient } from "./SectionsClient";
 
@@ -63,6 +64,13 @@ export default async function ProposalSectionsPage({
     .orderBy(asc(proposalSections.ordering));
 
   const team = await listProposalTeamCandidates();
+
+  // BL-FB-GEN-VOICE Slice 2 — whose sections the drafter writes in their
+  // own voice, and whether the team has a house style (header chips).
+  const [voiceAuthors, style] = await Promise.all([
+    voiceAuthorIds({ organizationId }).catch(() => [] as string[]),
+    getHouseStyle({ organizationId }).catch(() => ({ orgName: "", houseStyle: "" })),
+  ]);
 
   // BL-AIP-6b — open colour-team review comments, shown and resolvable
   // per section inside the editor.
@@ -150,6 +158,8 @@ export default async function ProposalSectionsPage({
           id: user.id,
           displayName: user.name || user.email || user.id,
         }}
+        voiceAuthorIds={voiceAuthors}
+        houseStyle={style.houseStyle.trim().length > 0}
       />
     </Panel>
   );

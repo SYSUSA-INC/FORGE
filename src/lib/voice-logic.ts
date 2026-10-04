@@ -22,6 +22,10 @@ export const VOICE_LIMITS = {
   maxGuidanceChars: 1_400,
   maxCustomChars: 600,
   maxTitleChars: 120,
+  /** Slice 2 — a draft shorter than this is not compared against the profile. */
+  checkMinWords: 60,
+  /** Slice 2 — the team's house style, as the admin types it. */
+  maxHouseStyleChars: 1_200,
 } as const;
 
 const STOP = new Set(
@@ -45,10 +49,20 @@ function topN(counts: Map<string, number>, n: number, min = 2): string[] {
 
 /** Measure how these texts are written; null when there is too little to read. */
 export function analyzeVoice(samples: readonly string[]): VoiceMetrics | null {
+  if (tokens(samples.join("\n\n")).length < VOICE_LIMITS.minProfileWords) return null;
+  return measure(samples);
+}
+
+/** Slice 2 — measure one draft for the voice check; null under the check's smaller minimum. */
+export function measureVoice(text: string): VoiceMetrics | null {
+  if (tokens(text).length < VOICE_LIMITS.checkMinWords) return null;
+  return measure([text]);
+}
+
+function measure(samples: readonly string[]): VoiceMetrics {
   const paragraphs = samples.flatMap((s) => s.split(/\n\s*\n|\n(?=\s*(?:[-•*]|\d+[.)])\s)/).map((p) => p.trim()).filter((p) => p.length > 0));
   const text = samples.join("\n\n");
   const words = tokens(text);
-  if (words.length < VOICE_LIMITS.minProfileWords) return null;
   const sentences = splitSentences(text).filter((s) => tokens(s).length >= 2);
   const lengths = sentences.map((s) => tokens(s).length);
   const avg = lengths.reduce((a, b) => a + b, 0) / Math.max(1, lengths.length);
@@ -155,4 +169,122 @@ export function voiceGuidance(input: { authorName: string; metrics: VoiceMetrics
 /** Word count the sample gate uses. */
 export function sampleWordCount(text: string): number {
   return tokens(text).length;
+}
+
+// ── Slice 2 — learn from edits, check a draft, house style ──────────
+
+/** An author's profile is rebuilt from a save at most this often. */
+export const AUTO_REBUILD_MIN_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * The sentences of a saved section the author wrote themselves: those
+ * found in no AI draft of the section, exactly or nearly (four words in
+ * five shared with a draft sentence of similar length). What an author
+ * accepted verbatim is the model's voice, not theirs, and must not train
+ * their profile.
+ */
+export function authoredSentences(savedText: string, draftTexts: readonly string[]): string[] {
+  const drafts = draftTexts.flatMap((d) => splitSentences(d)).map((s) => tokens(s)).filter((t) => t.length > 0);
+  const exact = new Set(drafts.map((t) => t.join(" ")));
+  const out: string[] = [];
+  for (const sentence of splitSentences(savedText)) {
+    const t = tokens(sentence);
+    if (t.length === 0) continue;
+    if (exact.has(t.join(" "))) continue;
+    const mine = new Set(t);
+    const nearly = drafts.some((d) => {
+      if (d.length < t.length * 0.6 || d.length > t.length * 1.6) return false;
+      let shared = 0;
+      for (const w of new Set(d)) if (mine.has(w)) shared += 1;
+      return shared / mine.size >= 0.8;
+    });
+    if (!nearly) out.push(sentence);
+  }
+  return out;
+}
+
+export type VoiceFindingKind = "sentence_length" | "passive" | "vocabulary" | "we" | "you" | "contractions" | "numbers" | "lists";
+export type VoiceFinding = {
+  kind: VoiceFindingKind;
+  severity: "high" | "medium";
+  /** Short, for the panel row. */
+  label: string;
+  /** The measurement behind it. */
+  detail: string;
+  /** The instruction Improve mode receives. */
+  fix: string;
+};
+
+const pct = (n: number) => `${Math.round(n * 100)}%`;
+
+/** Where a draft departs from how the author writes; empty when it reads like them. */
+export function compareVoice(draft: VoiceMetrics, profile: VoiceMetrics): VoiceFinding[] {
+  const f: VoiceFinding[] = [];
+  const d = Math.round(draft.avgSentenceLength);
+  const p = Math.round(profile.avgSentenceLength);
+  const ratio = draft.avgSentenceLength / Math.max(1, profile.avgSentenceLength);
+  if (ratio >= 1.4) {
+    f.push({ kind: "sentence_length", severity: ratio >= 1.8 ? "high" : "medium", label: "Sentences run long", detail: `${d} words per sentence; the author averages ${p}`, fix: `Shorten sentences to about ${p} words on average (now ${d}); split them rather than cut content.` });
+  } else if (ratio <= 0.65) {
+    f.push({ kind: "sentence_length", severity: ratio <= 0.5 ? "high" : "medium", label: "Sentences run short", detail: `${d} words per sentence; the author averages ${p}`, fix: `Let sentences run to about ${p} words on average (now ${d}); join the choppy ones.` });
+  }
+  const passiveGap = draft.passiveRate - profile.passiveRate;
+  if (draft.passiveRate >= 0.15 && passiveGap >= 0.15) {
+    f.push({ kind: "passive", severity: passiveGap >= 0.3 ? "high" : "medium", label: "More passive than the author writes", detail: `${pct(draft.passiveRate)} of sentences are passive; the author writes ${pct(profile.passiveRate)}`, fix: `Recast passive sentences in the active voice with a named actor (${pct(draft.passiveRate)} passive now; the author writes ${pct(profile.passiveRate)}).` });
+  }
+  const vocabGap = draft.longWordRate - profile.longWordRate;
+  if (vocabGap >= 0.06) {
+    f.push({ kind: "vocabulary", severity: vocabGap >= 0.1 ? "high" : "medium", label: "Heavier vocabulary than the author's", detail: `${pct(draft.longWordRate)} long words; the author runs ${pct(profile.longWordRate)}`, fix: `Replace polysyllabic and Latinate words with the plain ones the author uses (${pct(draft.longWordRate)} long words now; the author runs ${pct(profile.longWordRate)}).` });
+  } else if (vocabGap <= -0.08 && profile.longWordRate > 0.2) {
+    f.push({ kind: "vocabulary", severity: "medium", label: "Plainer than the author writes", detail: `${pct(draft.longWordRate)} long words; the author runs ${pct(profile.longWordRate)}`, fix: "Use the precise technical vocabulary the author uses; do not simplify terms of art." });
+  }
+  if (profile.wePerThousand >= 25 && draft.wePerThousand < profile.wePerThousand * 0.4) {
+    f.push({ kind: "we", severity: "medium", label: 'Fewer "we" than the author writes', detail: `${draft.wePerThousand} per 1,000 words; the author writes ${profile.wePerThousand}`, fix: 'Speak as "we" / "our team" where the draft names the company or hides the actor.' });
+  } else if (profile.wePerThousand < 8 && draft.wePerThousand >= 25) {
+    f.push({ kind: "we", severity: "medium", label: 'More "we" than the author writes', detail: `${draft.wePerThousand} per 1,000 words; the author writes ${profile.wePerThousand}`, fix: 'Cut most "we" / "our" openers; the author names the work, not the team.' });
+  }
+  if (profile.youPerThousand >= 8 && draft.youPerThousand < 2) {
+    f.push({ kind: "you", severity: "medium", label: 'The author addresses the evaluator as "you"', detail: `${draft.youPerThousand} per 1,000 words; the author writes ${profile.youPerThousand}`, fix: 'Address the evaluator directly as "you" where it reads naturally.' });
+  }
+  if (profile.contractionsPerThousand < 1 && draft.contractionsPerThousand >= 3) {
+    f.push({ kind: "contractions", severity: "medium", label: "Contractions where the author uses none", detail: `${draft.contractionsPerThousand} per 1,000 words`, fix: "Expand every contraction; the author writes in a formal register." });
+  }
+  if (profile.numbersPerThousand >= 15 && draft.numbersPerThousand < profile.numbersPerThousand * 0.4) {
+    f.push({ kind: "numbers", severity: "medium", label: "Fewer numbers than the author leans on", detail: `${draft.numbersPerThousand} per 1,000 words; the author writes ${profile.numbersPerThousand}`, fix: "Carry the argument with the numbers and metrics the snapshot already contains; add none that are not there." });
+  }
+  if (profile.listRate >= 0.25 && draft.listRate === 0 && draft.paragraphs >= 3) {
+    f.push({ kind: "lists", severity: "medium", label: "The author breaks this kind of content into lists", detail: `no lists in ${draft.paragraphs} paragraphs; ${pct(profile.listRate)} of the author's paragraphs are lists`, fix: "Turn enumerations and steps into lists rather than long paragraphs." });
+  }
+  return f.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "high" ? -1 : 1));
+}
+
+export function voiceCheckSummary(findings: readonly VoiceFinding[], authorName: string): string {
+  const name = authorName.trim() || "the author";
+  if (findings.length === 0) return `reads like ${name}`;
+  return `${findings.length} difference${findings.length === 1 ? "" : "s"} from ${name}'s voice`;
+}
+
+/** Improve-mode guidance from the findings: how to say it, never what. Empty when nothing is flagged. */
+export function buildVoiceFixHint(findings: readonly VoiceFinding[], authorName: string): string {
+  if (findings.length === 0) return "";
+  const name = authorName.trim() || "the author";
+  const lines = [`Bring this draft into ${name}'s voice without changing its facts, structure or length:`];
+  for (const f of findings.slice(0, 6)) lines.push(`- ${f.fix}`);
+  lines.push("- Voice changes how things are said, never what is said: keep every fact, number and citation exactly as it is.");
+  return lines.join("\n");
+}
+
+/** The team-wide rules the drafter and chat receive before any author's voice; empty when none are set. */
+export function houseStyleGuidance(orgName: string, text: string): string {
+  const rules = text
+    .replace(/\r\n?/g, "\n")
+    .split(/\n+/)
+    .map((l) => l.replace(/^[\s\-•*]+|^\s*\d+[.)]\s*/, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (rules.length === 0) return "";
+  const name = orgName.trim() || "the team";
+  const lines = [`House style for ${name} — every section follows these rules, whoever the author is:`];
+  for (const r of rules.slice(0, 20)) lines.push(`- ${r}`);
+  lines.push("- House style governs how things are said, never what is said; the brief and the requirements still win.");
+  return lines.join("\n");
 }

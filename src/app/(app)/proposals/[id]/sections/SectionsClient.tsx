@@ -28,6 +28,7 @@ import { BrainSuggestPanel } from "./ai/BrainSuggestPanel";
 import { ContentBlocksPanel } from "./ai/ContentBlocksPanel";
 import { ResearchRail } from "./ai/ResearchRail";
 import { TonePanel } from "./ai/TonePanel";
+import { VoiceCheckPanel } from "./ai/VoiceCheckPanel";
 import { GraphicsPanel } from "./ai/GraphicsPanel";
 import { DraftPreview } from "./ai/DraftPreview";
 import { PageBudgetRing } from "./PageBudgetRing";
@@ -210,6 +211,8 @@ export function SectionsClient({
   currentUser,
   initialSectionId = null,
   initialTab = null,
+  voiceAuthorIds = [],
+  houseStyle = false,
 }: {
   proposalId: string;
   sections: Section[];
@@ -218,6 +221,10 @@ export function SectionsClient({
   /** BL-FB-CHAT-MULTI — the section a mention notification points at, opened with its chat. */
   initialSectionId?: string | null;
   initialTab?: "chat" | null;
+  /** BL-FB-GEN-VOICE Slice 2 — members whose sections the drafter writes in their voice. */
+  voiceAuthorIds?: string[];
+  /** BL-FB-GEN-VOICE Slice 2 — whether the organization has a house style. */
+  houseStyle?: boolean;
 }) {
   const [expanded, setExpanded] = useState<string | null>(
     (initialSectionId && sections.some((s) => s.id === initialSectionId) ? initialSectionId : null) ?? sections[0]?.id ?? null,
@@ -238,6 +245,8 @@ export function SectionsClient({
             open={expanded === s.id}
             onToggle={() => setExpanded(expanded === s.id ? null : s.id)}
             initialChatOpen={initialTab === "chat" && s.id === initialSectionId}
+            voiceOn={!!s.authorUserId && voiceAuthorIds.includes(s.authorUserId)}
+            houseStyle={houseStyle}
           />
         ))}
       </ul>
@@ -323,6 +332,8 @@ function SectionRow({
   open,
   onToggle,
   initialChatOpen = false,
+  voiceOn = false,
+  houseStyle = false,
 }: {
   proposalId: string;
   section: Section;
@@ -332,6 +343,9 @@ function SectionRow({
   onToggle: () => void;
   /** BL-FB-CHAT-MULTI — open the AI panel on the chat tab (a mention notification landed here). */
   initialChatOpen?: boolean;
+  /** BL-FB-GEN-VOICE Slice 2 — the section's author has an enabled voice profile. */
+  voiceOn?: boolean;
+  houseStyle?: boolean;
 }) {
   // BL-9 Slice 2b — collab config (undefined when feature flag is off).
   // Memoized via inline call: the inputs (section.id, currentUser) are
@@ -721,6 +735,19 @@ function SectionRow({
                 <span>{section.authorName ?? section.authorEmail}</span>
               </>
             ) : null}
+            {/* BL-FB-GEN-VOICE Slice 2 — what the drafter and chat write this section in */}
+            {voiceOn ? (
+              <span
+                className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-plum-300"
+                title={`The drafter and chat write this section in ${section.authorName ?? section.authorEmail ?? "the author"}'s voice${houseStyle ? ", under the team's house style" : ""}.`}
+              >
+                ✦ in {(section.authorName ?? section.authorEmail ?? "the author").split(/[\s@]/)[0]}&apos;s voice
+              </span>
+            ) : houseStyle ? (
+              <span className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-plum-300" title="The drafter and chat follow the team's house style for this section.">
+                ✦ house style
+              </span>
+            ) : null}
           </div>
         </div>
         <span
@@ -892,6 +919,14 @@ function SectionRow({
             {/* BL-FB-SCAN-TONE — marketing language, passive voice, reading level */}
             <TonePanel
               text={plainContent}
+              fixBusy={aiPending}
+              onFix={(hint) => setImproveRequest({ hint, nonce: Date.now() })}
+            />
+            {/* BL-FB-GEN-VOICE Slice 2 — does the draft read like its author? */}
+            <VoiceCheckPanel
+              sectionId={section.id}
+              text={plainContent}
+              enabled={voiceOn}
               fixBusy={aiPending}
               onFix={(hint) => setImproveRequest({ hint, nonce: Date.now() })}
             />

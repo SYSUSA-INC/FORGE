@@ -193,15 +193,15 @@ export async function prepareSectionChat(input: {
     }
   }
 
-  // BL-FB-GEN-VOICE — the section author's own voice, when they have an enabled profile.
+  // BL-FB-GEN-VOICE — the team's house style and the section author's own
+  // voice, when they have an enabled profile (Slice 2: house style applies
+  // with or without an author).
   let authorVoiceBlock = "";
-  if (row.section.authorUserId) {
-    try {
-      const voice = await voiceGuidanceForSection({ organizationId, sectionId: input.sectionId });
-      if (voice) authorVoiceBlock = `\n${voice.guidance}`;
-    } catch {
-      // best effort
-    }
+  try {
+    const voice = await voiceGuidanceForSection({ organizationId, sectionId: input.sectionId });
+    if (voice) authorVoiceBlock = `\n${voice.guidance}`;
+  } catch {
+    // best effort
   }
 
   // BL-FB-CHAT-UPLOAD — documents the author attached to this conversation.

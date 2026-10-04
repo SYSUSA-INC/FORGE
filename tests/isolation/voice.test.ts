@@ -8,10 +8,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, proposalSections } from "@/db/schema";
-import { addVoiceSample, getVoiceProfile, rebuildVoiceProfile, removeVoiceSample, updateVoiceSettings, voiceGuidanceForSection } from "@/lib/voice";
+import { auditLogs, authorVoiceProfiles, proposalSections, sectionDraftSignals } from "@/db/schema";
+import {
+  addVoiceSample,
+  getHouseStyle,
+  getVoiceProfile,
+  rebuildVoiceProfile,
+  refreshVoiceAfterSave,
+  removeVoiceSample,
+  updateHouseStyle,
+  updateVoiceSettings,
+  voiceAuthorIds,
+  voiceGuidanceForSection,
+  voiceProfileForSection,
+} from "@/lib/voice";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const SECTION_TEXT = Array.from({ length: 6 }, () => "We fix the backlog first. Our team runs the help desk every day. We measure every ticket and cut the wait to ten minutes. We own the outcome, and we say so. First, we baseline. Then we cut the queue.").join(" ");
@@ -102,5 +114,59 @@ describe("BL-FB-GEN-VOICE — author voice", () => {
     const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
     expect(audits.filter((a) => a.action === "voice.settings.update")).toHaveLength(2);
     expect(audits.filter((a) => a.action === "voice.sample.remove")).toHaveLength(1);
+  });
+
+  it("Slice 2: learns from the author's own words, layers the house style, serves the editor's check", async () => {
+    // House style applies to every section of the tenant, with or without an author.
+    expect(await voiceGuidanceForSection({ organizationId: fx.orgA.organizationId, sectionId: unownedSection })).toBeNull();
+    expect(await updateHouseStyle({ organizationId: fx.orgA.organizationId, text: "  Never say leverage.\r\n- Open with the customer's outcome.  ", actor: actorA })).toEqual({
+      ok: true,
+      houseStyle: "Never say leverage.\n- Open with the customer's outcome.",
+    });
+    expect((await getHouseStyle({ organizationId: fx.orgA.organizationId })).houseStyle).toContain("Never say leverage.");
+    expect((await getHouseStyle({ organizationId: fx.orgB.organizationId })).houseStyle).toBe("");
+    const styled = await voiceGuidanceForSection({ organizationId: fx.orgA.organizationId, sectionId: unownedSection });
+    expect(styled).toMatchObject({ authorVoice: false, houseStyle: true });
+    expect(styled?.guidance).toContain("House style for ");
+    expect(styled?.guidance).toContain("- Never say leverage.");
+    expect(await voiceGuidanceForSection({ organizationId: fx.orgB.organizationId, sectionId: unownedSection })).toBeNull();
+
+    // The AI's sentences the author kept do not train the profile.
+    const aiDraft = "The modernization initiative will be implemented in accordance with the established governance framework. Comprehensive stakeholder engagement is anticipated throughout the lifecycle.";
+    await db.insert(sectionDraftSignals).values({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, sectionId: ownSection, createdByUserId: fx.orgA.userId, mode: "draft", sectionKind: "technical", draftText: aiDraft, draftWordCount: 24, stubbed: false });
+    await db.update(proposalSections).set({ content: `${aiDraft} ${SECTION_TEXT}`, wordCount: 230 }).where(eq(proposalSections.id, ownSection));
+    const built = await rebuildVoiceProfile({ organizationId: fx.orgA.organizationId, userId: fx.orgA.userId, actor: actorA });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.aiWordsDropped).toBeGreaterThanOrEqual(20);
+    expect(built.traits).toContain("Active voice almost throughout");
+    const both = await voiceGuidanceForSection({ organizationId: fx.orgA.organizationId, sectionId: ownSection });
+    expect(both).toMatchObject({ authorVoice: true, houseStyle: true });
+    expect(both!.guidance.indexOf("House style for ")).toBeLessThan(both!.guidance.indexOf("Write in Test "));
+
+    // A save by the author re-learns once the profile is an hour old; nobody else's save does.
+    expect(await refreshVoiceAfterSave({ organizationId: fx.orgA.organizationId, sectionId: ownSection, userId: fx.orgA.userId, actor: actorA })).toEqual({ refreshed: false, reason: "throttled" });
+    await db
+      .update(authorVoiceProfiles)
+      .set({ builtAt: new Date(Date.now() - 2 * 3_600_000) })
+      .where(and(eq(authorVoiceProfiles.organizationId, fx.orgA.organizationId), eq(authorVoiceProfiles.userId, fx.orgA.userId)));
+    expect(await refreshVoiceAfterSave({ organizationId: fx.orgA.organizationId, sectionId: ownSection, userId: fx.orgB.userId, actor: { userId: fx.orgB.userId } })).toEqual({ refreshed: false, reason: "not_author" });
+    expect(await refreshVoiceAfterSave({ organizationId: fx.orgA.organizationId, sectionId: ownSection, userId: fx.orgA.userId, actor: actorA })).toEqual({ refreshed: true, reason: "rebuilt" });
+    expect(await refreshVoiceAfterSave({ organizationId: fx.orgB.organizationId, sectionId: ownSection, userId: fx.orgA.userId, actor: actorA })).toEqual({ refreshed: false, reason: "not_author" });
+
+    // The editor's check reads the author's metrics for their own sections in the tenant only.
+    const profile = await voiceProfileForSection({ organizationId: fx.orgA.organizationId, sectionId: ownSection });
+    expect(profile?.author).toContain("Test ");
+    expect(profile?.metrics.words).toBeGreaterThanOrEqual(300);
+    expect(await voiceProfileForSection({ organizationId: fx.orgA.organizationId, sectionId: unownedSection })).toBeNull();
+    expect(await voiceProfileForSection({ organizationId: fx.orgB.organizationId, sectionId: ownSection })).toBeNull();
+    expect(await voiceAuthorIds({ organizationId: fx.orgA.organizationId })).toEqual([fx.orgA.userId]);
+    expect(await voiceAuthorIds({ organizationId: fx.orgB.organizationId })).toEqual([]);
+
+    const audits = await db.select({ action: auditLogs.action, metadata: auditLogs.metadata }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
+    expect(audits.filter((a) => a.action === "voice.house_style.update")).toHaveLength(1);
+    const rebuilds = audits.filter((a) => a.action === "voice.profile.rebuild");
+    expect(rebuilds).toHaveLength(2);
+    expect(rebuilds.map((a) => (a.metadata as { trigger?: string }).trigger).sort()).toEqual(["manual", "save"]);
   });
 });

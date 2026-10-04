@@ -6,6 +6,7 @@ import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { rowToOrgProfile } from "@/lib/org-types";
 import { getVoiceProfile } from "@/lib/voice";
 import { AuditRetentionPanel } from "./AuditRetentionPanel";
+import { HouseStylePanel } from "./HouseStylePanel";
 import { SettingsClient } from "./SettingsClient";
 import { VoicePanel } from "./VoicePanel";
 
@@ -55,6 +56,8 @@ export default async function SettingsPage() {
           }
           samples={voice.samples.map((s) => ({ id: s.id, title: s.title, words: s.words, createdAt: s.createdAt.toISOString() }))}
         />
+        {/* BL-FB-GEN-VOICE Slice 2 — the team's rules under every author's voice */}
+        <HouseStylePanel initialText={org.houseStyle} orgName={org.name ?? ""} canEdit={canEdit} />
       </div>
     </>
   );

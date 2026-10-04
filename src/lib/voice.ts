@@ -3,16 +3,22 @@
  * profile is rebuilt from the sections they own in this organization
  * plus the texts they pasted, stored once per (organization, user), and
  * handed to the drafter and chat for sections this author owns.
- * Server-only; callers own auth; mutations audited.
+ *
+ * Slice 2: the rebuild subtracts the sentences the AI drafted and the
+ * author merely kept (`section_draft_signal`), so the profile is the
+ * author's own prose; a save by the author re-learns at most once an
+ * hour; the team's house style (`organization.house_style`) is layered
+ * under every author's voice; the editor can read the profile to check
+ * a draft against it. Server-only; callers own auth; mutations audited.
  */
 import "server-only";
 
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { authorVoiceProfiles, authorVoiceSamples, proposalSections, proposals, users, type TipTapDoc } from "@/db/schema";
+import { authorVoiceProfiles, authorVoiceSamples, organizations, proposalSections, proposals, sectionDraftSignals, users, type TipTapDoc, type VoiceMetrics } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { projectToPlain } from "@/lib/tiptap-doc";
-import { VOICE_LIMITS, analyzeVoice, describeVoice, sampleWordCount, voiceGuidance } from "@/lib/voice-logic";
+import { AUTO_REBUILD_MIN_INTERVAL_MS, VOICE_LIMITS, analyzeVoice, authoredSentences, describeVoice, houseStyleGuidance, sampleWordCount, voiceGuidance } from "@/lib/voice-logic";
 
 type Actor = { userId: string | null; email?: string | null };
 
@@ -37,11 +43,15 @@ export async function getVoiceProfile(input: { organizationId: string; userId: s
 }
 
 export type RebuildResult =
-  | { ok: true; traits: string[]; sampleCount: number; sampleWords: number; sections: number; pasted: number }
+  | { ok: true; traits: string[]; sampleCount: number; sampleWords: number; sections: number; pasted: number; aiWordsDropped: number }
   | { ok: false; error: string };
 
-/** Read the author's sections in this organization and their pasted samples; measure; store. */
-export async function rebuildVoiceProfile(input: { organizationId: string; userId: string; actor: Actor }): Promise<RebuildResult> {
+/**
+ * Read the author's sections in this organization and their pasted
+ * samples; drop the sentences the AI drafted and they kept; measure;
+ * store.
+ */
+export async function rebuildVoiceProfile(input: { organizationId: string; userId: string; actor: Actor; trigger?: "manual" | "save" }): Promise<RebuildResult> {
   const { organizationId } = input;
   const pasted = await db
     .select({ text: authorVoiceSamples.text })
@@ -50,7 +60,7 @@ export async function rebuildVoiceProfile(input: { organizationId: string; userI
     .orderBy(desc(authorVoiceSamples.createdAt))
     .limit(VOICE_LIMITS.maxSamples);
   const sectionRows = await db
-    .select({ content: proposalSections.content, bodyDoc: proposalSections.bodyDoc })
+    .select({ id: proposalSections.id, content: proposalSections.content, bodyDoc: proposalSections.bodyDoc })
     .from(proposalSections)
     .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
     .where(
@@ -62,9 +72,28 @@ export async function rebuildVoiceProfile(input: { organizationId: string; userI
     )
     .orderBy(desc(proposalSections.updatedAt))
     .limit(Math.max(0, VOICE_LIMITS.maxSamples - pasted.length));
-  const sectionTexts = sectionRows
-    .map((r) => (projectToPlain(r.bodyDoc as TipTapDoc | null) || r.content || "").slice(0, VOICE_LIMITS.maxSampleChars))
-    .filter((t) => sampleWordCount(t) >= VOICE_LIMITS.minSampleWords);
+
+  // Slice 2 — what the AI drafted for these sections. A sentence the
+  // author accepted verbatim is the model's voice, not theirs.
+  const drafts = new Map<string, string[]>();
+  if (sectionRows.length > 0) {
+    const signals = await db
+      .select({ sectionId: sectionDraftSignals.sectionId, draftText: sectionDraftSignals.draftText })
+      .from(sectionDraftSignals)
+      .where(and(eq(sectionDraftSignals.organizationId, organizationId), inArray(sectionDraftSignals.sectionId, sectionRows.map((r) => r.id))))
+      .orderBy(desc(sectionDraftSignals.createdAt))
+      .limit(VOICE_LIMITS.maxSamples * 3);
+    for (const s of signals) drafts.set(s.sectionId, [...(drafts.get(s.sectionId) ?? []), s.draftText]);
+  }
+  let aiWordsDropped = 0;
+  const sectionTexts: string[] = [];
+  for (const r of sectionRows) {
+    const full = (projectToPlain(r.bodyDoc as TipTapDoc | null) || r.content || "").slice(0, VOICE_LIMITS.maxSampleChars);
+    const ai = drafts.get(r.id);
+    const own = ai?.length ? authoredSentences(full, ai).join(" ") : full;
+    aiWordsDropped += Math.max(0, sampleWordCount(full) - sampleWordCount(own));
+    if (sampleWordCount(own) >= VOICE_LIMITS.minSampleWords) sectionTexts.push(own);
+  }
   const texts = [...pasted.map((p) => p.text), ...sectionTexts];
   const metrics = analyzeVoice(texts);
   if (!metrics) {
@@ -94,9 +123,38 @@ export async function rebuildVoiceProfile(input: { organizationId: string; userI
     action: "voice.profile.rebuild",
     resourceType: "author_voice_profile",
     resourceId: input.userId,
-    metadata: { sampleCount: texts.length, sampleWords: metrics.words, sections: sectionTexts.length, pasted: pasted.length, traits: traits.length },
+    metadata: { sampleCount: texts.length, sampleWords: metrics.words, sections: sectionTexts.length, pasted: pasted.length, traits: traits.length, aiWordsDropped, trigger: input.trigger ?? "manual" },
   });
-  return { ok: true, traits, sampleCount: texts.length, sampleWords: metrics.words, sections: sectionTexts.length, pasted: pasted.length };
+  return { ok: true, traits, sampleCount: texts.length, sampleWords: metrics.words, sections: sectionTexts.length, pasted: pasted.length, aiWordsDropped };
+}
+
+export type RefreshResult = { refreshed: boolean; reason: "not_author" | "no_profile" | "throttled" | "too_little" | "rebuilt" };
+
+/**
+ * Slice 2 — after a section save by its author: re-learn their voice from
+ * what they kept and rewrote, when they have a built profile and it is
+ * more than an hour old. Anyone else's save, or an unbuilt profile,
+ * changes nothing.
+ */
+export async function refreshVoiceAfterSave(input: { organizationId: string; sectionId: string; userId: string; actor: Actor; now?: Date }): Promise<RefreshResult> {
+  const { organizationId } = input;
+  const now = input.now ?? new Date();
+  const [section] = await db
+    .select({ authorUserId: proposalSections.authorUserId })
+    .from(proposalSections)
+    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+    .where(and(eq(proposalSections.id, input.sectionId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  if (!section || section.authorUserId !== input.userId) return { refreshed: false, reason: "not_author" };
+  const [profile] = await db
+    .select({ builtAt: authorVoiceProfiles.builtAt })
+    .from(authorVoiceProfiles)
+    .where(and(eq(authorVoiceProfiles.organizationId, organizationId), eq(authorVoiceProfiles.userId, input.userId)))
+    .limit(1);
+  if (!profile?.builtAt) return { refreshed: false, reason: "no_profile" };
+  if (now.getTime() - profile.builtAt.getTime() < AUTO_REBUILD_MIN_INTERVAL_MS) return { refreshed: false, reason: "throttled" };
+  const res = await rebuildVoiceProfile({ organizationId, userId: input.userId, actor: input.actor, trigger: "save" });
+  return res.ok ? { refreshed: true, reason: "rebuilt" } : { refreshed: false, reason: "too_little" };
 }
 
 /** Store a text the author pasted as a sample of their writing; audited. */
@@ -147,20 +205,92 @@ export async function updateVoiceSettings(input: { organizationId: string; userI
   return { ok: true };
 }
 
-export type SectionVoice = { author: string; guidance: string };
+// ── Slice 2 — house style ────────────────────────────────────────────
 
-/** The guidance for a section's author, when they own one that is enabled; null otherwise. */
-export async function voiceGuidanceForSection(input: { organizationId: string; sectionId: string }): Promise<SectionVoice | null> {
+export async function getHouseStyle(input: { organizationId: string }): Promise<{ orgName: string; houseStyle: string }> {
   const { organizationId } = input;
+  const [org] = await db.select({ name: organizations.name, houseStyle: organizations.houseStyle }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  return { orgName: org?.name?.trim() || "the team", houseStyle: org?.houseStyle ?? "" };
+}
+
+/** The team's writing rules; an empty text clears them. Tenant admins only (callers gate); audited. */
+export async function updateHouseStyle(input: { organizationId: string; text: string; actor: Actor }): Promise<{ ok: true; houseStyle: string } | { ok: false; error: string }> {
+  const { organizationId } = input;
+  const houseStyle = input.text.replace(/\r\n?/g, "\n").trim().slice(0, VOICE_LIMITS.maxHouseStyleChars);
   const [row] = await db
-    .select({ guidance: authorVoiceProfiles.guidance, enabled: authorVoiceProfiles.enabled, name: users.name, email: users.email })
+    .update(organizations)
+    .set({ houseStyle, updatedAt: new Date() })
+    .where(eq(organizations.id, organizationId))
+    .returning({ id: organizations.id });
+  if (!row) return { ok: false, error: "Organization not found." };
+  await recordAudit({ organizationId, actor: input.actor, action: "voice.house_style.update", resourceType: "organization", resourceId: organizationId, metadata: { chars: houseStyle.length, cleared: houseStyle.length === 0 } });
+  return { ok: true, houseStyle };
+}
+
+// ── For the drafter, the chat and the editor ─────────────────────────
+
+async function sectionAuthor(organizationId: string, sectionId: string): Promise<{ found: boolean; authorUserId: string | null }> {
+  const [section] = await db
+    .select({ authorUserId: proposalSections.authorUserId })
     .from(proposalSections)
     .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
-    .innerJoin(authorVoiceProfiles, and(eq(authorVoiceProfiles.userId, proposalSections.authorUserId), eq(authorVoiceProfiles.organizationId, organizationId)))
-    .innerJoin(users, eq(users.id, authorVoiceProfiles.userId))
-    .where(and(eq(proposalSections.id, input.sectionId), eq(proposals.organizationId, organizationId)))
-    .orderBy(asc(authorVoiceProfiles.createdAt))
+    .where(and(eq(proposalSections.id, sectionId), eq(proposals.organizationId, organizationId)))
     .limit(1);
-  if (!row || !row.enabled || !row.guidance.trim()) return null;
-  return { author: row.name?.trim() || row.email?.split("@")[0] || "the author", guidance: row.guidance };
+  return { found: !!section, authorUserId: section?.authorUserId ?? null };
+}
+
+export type SectionVoice = { author: string; guidance: string; authorVoice: boolean; houseStyle: boolean };
+
+/**
+ * The guidance for a section: the team's house style, then the author's
+ * own voice when they have an enabled profile; null when there is
+ * neither or the section is not this organization's.
+ */
+export async function voiceGuidanceForSection(input: { organizationId: string; sectionId: string }): Promise<SectionVoice | null> {
+  const { organizationId } = input;
+  const section = await sectionAuthor(organizationId, input.sectionId);
+  if (!section.found) return null;
+  let author: { name: string; guidance: string } | null = null;
+  if (section.authorUserId) {
+    const [row] = await db
+      .select({ guidance: authorVoiceProfiles.guidance, enabled: authorVoiceProfiles.enabled, name: users.name, email: users.email })
+      .from(authorVoiceProfiles)
+      .innerJoin(users, eq(users.id, authorVoiceProfiles.userId))
+      .where(and(eq(authorVoiceProfiles.organizationId, organizationId), eq(authorVoiceProfiles.userId, section.authorUserId)))
+      .limit(1);
+    if (row && row.enabled && row.guidance.trim()) author = { name: row.name?.trim() || row.email?.split("@")[0] || "the author", guidance: row.guidance };
+  }
+  const style = await getHouseStyle({ organizationId });
+  const parts: string[] = [];
+  if (style.houseStyle) parts.push(houseStyleGuidance(style.orgName, style.houseStyle));
+  if (author) parts.push(author.guidance);
+  if (parts.length === 0) return null;
+  return { author: author?.name ?? style.orgName, guidance: parts.join("\n\n"), authorVoice: !!author, houseStyle: !!style.houseStyle };
+}
+
+export type SectionVoiceProfile = { author: string; metrics: VoiceMetrics; traits: string[] };
+
+/** Slice 2 — the author's measured profile for the editor's voice check; null without an enabled, built profile. */
+export async function voiceProfileForSection(input: { organizationId: string; sectionId: string }): Promise<SectionVoiceProfile | null> {
+  const { organizationId } = input;
+  const section = await sectionAuthor(organizationId, input.sectionId);
+  if (!section.found || !section.authorUserId) return null;
+  const [row] = await db
+    .select({ metrics: authorVoiceProfiles.metrics, traits: authorVoiceProfiles.traits, enabled: authorVoiceProfiles.enabled, name: users.name, email: users.email })
+    .from(authorVoiceProfiles)
+    .innerJoin(users, eq(users.id, authorVoiceProfiles.userId))
+    .where(and(eq(authorVoiceProfiles.organizationId, organizationId), eq(authorVoiceProfiles.userId, section.authorUserId)))
+    .limit(1);
+  if (!row || !row.enabled || !row.metrics) return null;
+  return { author: row.name?.trim() || row.email?.split("@")[0] || "the author", metrics: row.metrics, traits: row.traits };
+}
+
+/** Slice 2 — the members whose sections the drafter writes in their voice (enabled, built profiles), for the editor's chip. */
+export async function voiceAuthorIds(input: { organizationId: string }): Promise<string[]> {
+  const { organizationId } = input;
+  const rows = await db
+    .select({ userId: authorVoiceProfiles.userId })
+    .from(authorVoiceProfiles)
+    .where(and(eq(authorVoiceProfiles.organizationId, organizationId), eq(authorVoiceProfiles.enabled, true), isNotNull(authorVoiceProfiles.builtAt)));
+  return rows.map((r) => r.userId);
 }
