@@ -3753,6 +3753,41 @@ export const tenantAddons = pgTable(
 export type TenantAddon = typeof tenantAddons.$inferSelect;
 
 /**
+ * BL-AUTH-ABUSE Slice 2b — the Request-a-trial queue (drizzle/0106).
+ * Platform-level: a request becomes a tenant only when a platform admin
+ * approves it, and `createdOrganizationId` then points at the trial
+ * workspace. One pending request per email (partial unique index).
+ */
+export const trialRequests = pgTable(
+  "trial_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    emailDomain: text("email_domain").notNull(),
+    company: text("company").notNull(),
+    jobTitle: text("job_title").notNull().default(""),
+    message: text("message").notNull().default(""),
+    status: text("status").$type<"pending" | "approved" | "declined">().notNull().default("pending"),
+    sourceIp: text("source_ip").notNull().default(""),
+    decidedAt: timestamp("decided_at"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    declineReason: text("decline_reason").notNull().default(""),
+    createdOrganizationId: uuid("created_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    statusCreatedIdx: index("trial_request_status_created_idx").on(t.status, t.createdAt),
+    pendingEmailUq: uniqueIndex("trial_request_pending_email_uq")
+      .on(t.email)
+      .where(sql`${t.status} = 'pending'`),
+  }),
+);
+
+export type TrialRequest = typeof trialRequests.$inferSelect;
+
+/**
  * BL-17 Slice 2 — Stripe webhook event ledger.
  *
  * One row per Stripe event we receive. Three jobs:

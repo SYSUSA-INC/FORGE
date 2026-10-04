@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { allowlist, memberships, organizations, users } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { listPendingApprovals } from "@/lib/invite-approval";
+import { pendingTrialRequestCount } from "@/lib/trial-requests";
 import { AdminClient } from "./AdminClient";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,8 @@ export default async function AdminPage({
   // BL-AUTH-DOMAIN — the platform admin's approval queue: cross-domain
   // invites every tenant admin has requested and nobody has approved.
   const approvals = await listPendingApprovals({});
+  // BL-AUTH-ABUSE Slice 2b — Request-a-trial submissions waiting for a decision.
+  const pendingTrialRequests = await pendingTrialRequestCount();
 
   const userRows = await db
     .select({
@@ -157,6 +160,7 @@ export default async function AdminPage({
         activeUsers: usersWithOrgs.filter((u) => !u.disabled).length,
         pendingAdminInvites: pendingAdminInvites.length,
         pendingApprovals: approvals.length,
+        pendingTrialRequests,
       }}
     />
   );

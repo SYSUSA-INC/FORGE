@@ -33,6 +33,10 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 ## 1. Getting started
 
+### 1.0 Request a trial
+
+New to FORGE and not invited by a colleague? Open **https://www.sysgov.com/request-trial** (or **Request a trial** on the sign-up page) and enter your name, **company email**, company, and optionally your job title and what you'd like to try. Personal mailboxes (Gmail, Outlook, Yahoo …) and throwaway inboxes can't request a trial, and if your company is already on FORGE you'll be asked to get an invitation from its admin instead. We review every request; once approved you get an email inviting you to your own workspace with a **14-day trial**. When the trial ends your work stays and editing carries on; AI features pause until your admin chooses a plan.
+
 ### 1.1 Create your account
 
 Open **https://www.sysgov.com/sign-up**.
@@ -103,7 +107,7 @@ The sidebar shows one **workspace** at a time, scoped to the hat you are wearing
 |---|---|---|
 | **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Customer Relations (Customer contacts, Follow-ups owed, New contact, Import contacts); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
 | **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit Log); Admin guide |
-| **Platform admin** | platform superadmins | Organizations & users (Overview, Organizations, Platform users, Source requests — the first three are the SuperAdmin portal's tabs, in the portal's order; a menu click opens the tab and a tab click updates the menu); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
+| **Platform admin** | platform superadmins | Organizations & users (Overview, Organizations, Platform users, Trial requests, Source requests — the first three are the SuperAdmin portal's tabs, in the portal's order; a menu click opens the tab and a tab click updates the menu); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
 
 The everyday Workspace is the complete map of the product: everything a member can open is listed there, and an admin also sees the Administration group in the same tree, so administering the organization never requires switching (BL-NAV-RESTORE). Regular members never see the Administration group or the Admin guide.
 

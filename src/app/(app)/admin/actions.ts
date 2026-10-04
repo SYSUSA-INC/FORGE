@@ -8,7 +8,6 @@ import {
   memberships,
   organizations,
   users,
-  type Role,
 } from "@/db/schema";
 import { requireAuth, requireSuperadmin } from "@/lib/auth-helpers";
 import {
@@ -18,12 +17,11 @@ import {
   type PurgeCandidate,
 } from "@/lib/account-hygiene";
 import { recordAudit } from "@/lib/audit-log";
-import { domainOf, inviteAwaitsApproval, isPublicEmailDomain } from "@/lib/email-domain";
+import { inviteAwaitsApproval } from "@/lib/email-domain";
 import { deliverInvite, deliverPasswordReset } from "@/lib/invite-send";
 import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
 import { issueToken } from "@/lib/tokens";
-import { defaultOrgSlug } from "@/lib/org-defaults";
-import { ensureTenantSubscription } from "@/lib/tenant-subscription";
+import { provisionOrganizationWithAdminInvite } from "@/lib/org-provisioning";
 import { validateEmail } from "@/lib/validators";
 
 
@@ -47,83 +45,23 @@ export async function createOrganizationAction(input: {
     return { ok: false, error: emailError ?? "Enter an admin email." };
   }
 
-  // BL-AUTH-DOMAIN — the new tenant owns its first admin's domain, so
-  // their colleagues can be invited without platform approval. A public
-  // mailbox provider is never a tenant domain; the admin invite is then
-  // cross-domain and carries the superadmin's approval stamp.
-  const adminDomain = domainOf(adminEmail);
-  const ownsDomain = !!adminDomain && !isPublicEmailDomain(adminDomain);
-
-  const [org] = await db
-    .insert(organizations)
-    .values({
-      name: orgName,
-      slug: defaultOrgSlug(orgName),
-      emailDomains: ownsDomain ? [adminDomain] : [],
-    })
-    .returning({ id: organizations.id });
-  if (!org) return { ok: false, error: "Could not create organization." };
-
-  // BL-TIER-ASSIGN — new tenants land on the default tier; the manual
-  // promised this and no path did it.
-  const subscription = await ensureTenantSubscription({ organizationId: org.id });
-
-  const [invite] = await db
-    .insert(allowlist)
-    .values({
-      email: adminEmail,
-      organizationId: org.id,
-      role: "admin" as Role,
-      title: input.adminTitle?.trim() || null,
-      invitedByUserId: actor.id,
-      crossDomain: !ownsDomain,
-      platformApprovedAt: ownsDomain ? null : new Date(),
-      platformApprovedByUserId: ownsDomain ? null : actor.id,
-    })
-    .returning({ id: allowlist.id });
-  if (!invite) {
-    await db
-      .delete(organizations)
-      .where(eq(organizations.id, org.id))
-      .catch(() => undefined);
-    return { ok: false, error: "Could not create invitation." };
-  }
-
-  const token = await issueToken("invite", invite.id);
-
-  const delivery = await deliverInvite({
-    to: adminEmail,
-    inviteId: invite.id,
-    token,
-    organizationName: orgName,
-    inviterName: actor.name ?? actor.email ?? "Platform admin",
-    role: "admin",
-    tag: "[createOrganizationAction]",
+  // The workspace, its domain, default tier, admin invite and org.create
+  // audit row: shared with approved trial requests (BL-AUTH-ABUSE 2b).
+  const res = await provisionOrganizationWithAdminInvite({
+    orgName,
+    adminEmail,
+    adminTitle: input.adminTitle,
+    actor: { id: actor.id, email: actor.email, name: actor.name },
   });
-
-  await recordAudit({
-    organizationId: org.id,
-    actor: { userId: actor.id, email: actor.email },
-    action: "org.create",
-    resourceType: "organization",
-    resourceId: org.id,
-    metadata: {
-      name: orgName,
-      primaryAdminEmail: adminEmail,
-      emailDomains: ownsDomain ? [adminDomain] : [],
-      superadmin: true,
-      emailSent: delivery.emailSent,
-      tier: subscription.tier?.slug ?? null,
-    },
-  });
+  if (!res.ok) return res;
 
   revalidatePath("/admin");
   return {
     ok: true,
-    inviteId: invite.id,
-    inviteUrl: delivery.inviteUrl,
-    emailSent: delivery.emailSent,
-    warning: delivery.warning,
+    inviteId: res.inviteId,
+    inviteUrl: res.inviteUrl,
+    emailSent: res.emailSent,
+    warning: res.warning,
   };
 }
 
