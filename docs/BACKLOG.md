@@ -31,7 +31,9 @@ Effort key:
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
 | 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | ✅ shipped (PR #317) |
-| 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | 🔄 in PR (PR #318) |
+| 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ✅ shipped (PR #318) |
+| 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | 🔄 in PR (PR #319) |
+| 3h | **BL-AUTH-ABUSE Slice 2** — Request-a-trial queue, platform-admin approval into a trial workspace, trial expiry in the gate | P1 | M | ⏳ queued |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -934,6 +936,68 @@ expiry reminders; SSO domain auto-join.
 
 ---
 
+### BL-AUTH-ABUSE — Bot and spam accounts: removal, sign-up hardening, trials
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 Slice 1 in PR (PR #319)  ·  Slice 2 queued
+
+User request (2026-10-04): "we had some garbage accounts created by bots
+or spammers in our system, as a super admin I should be able to delete
+them. What controls do we enforce for creating user names … if people
+want to try it down the road, how do we allow trials?" Chosen over BL-9
+Slice 6 (GovCloud / FedRAMP), which stays gated on the business triggers
+in `docs/architecture/aws-deployment-roadmap.md` (AWS-commercial move
+first; a federal / CUI customer in the pipeline).
+
+**Slice 1 — remove what got in, keep the next ones out:**
+
+- **Delete an account.** Platform users → row → **Delete…**
+  (`deleteUserAction` → `deleteUserAccount`, `src/lib/account-hygiene.ts`).
+  Every FK to `user` is CASCADE (memberships, sessions, per-user
+  settings) or SET NULL (authored content keeps its row, unattributed),
+  so the delete is safe for tenant data. Refused for yourself, a
+  superadmin (revoke first) and the last active admin of a workspace
+  with other members (`deletionBlocker`, pure). Workspaces only that
+  person belongs to are deleted too when the checkbox is on. The account
+  goes first, then the emptied workspaces; pending verify / reset tokens
+  are dropped. Audited `user.delete` in every surviving workspace and in
+  the acting admin's own.
+- **Clean up unverified sign-ups in bulk.** A panel above the list:
+  **Preview** (`listUnverifiedPurgeCandidates`) lists accounts that never
+  verified, are ≥ N days old (default 7, 1–365) and are alone in every
+  workspace they hold (`purgeDecision`, pure); **Delete N accounts**
+  (`purgeUnverifiedAccounts`) removes only the previewed ids still
+  eligible — the delete re-checks "never verified" in its own WHERE —
+  then their now-empty workspaces. One audit row, `user.purge_unverified`.
+  A status filter (Everyone / Unverified / Disabled / No workspace) finds
+  the rest.
+- **Name rules.** `validatePersonName` (pure) on both sign-up paths:
+  2–80 characters, letters (any script) / spaces / hyphens /
+  apostrophes / periods / commas, no digits, links (`word.word`),
+  addresses or emoji, and no keyboard mash (a token with > 2
+  lower→upper flips, a > 6-consonant run or > 30 characters). Real
+  names in the test set — "VanDerBerg", "Brzęczyszczykiewicz",
+  "J.R.R. Tolkien", "李小龙" — pass.
+- **Self-service bot checks** (only when `SIGNUP_MODE=open`; invites are
+  token-authorised and exempt): a hidden honeypot field, the form's fill
+  time (< 2.5 s, or missing because the endpoint was called directly),
+  and a short list of disposable-inbox domains. Honeypot / timing hits
+  are answered `{ ok: true }` and create nothing (logged), so a script
+  gets no signal; a disposable domain gets a plain "use your work email".
+  The 5-per-hour per-IP limit still runs first.
+- Tests: `tests/ai/account-hygiene-logic.test.ts` (names, domains, bot
+  signals, purge rule, delete guard); `tests/isolation/account-hygiene.test.ts`
+  (guards, a shared workspace keeps its data and hears about it, a sole
+  workspace goes only when asked, the purge takes exactly the previewed
+  eligible accounts and their workspaces, audits).
+
+**Slice 2 — trials (queued):** a public **Request a trial** form (same
+name / honeypot / timing / disposable checks, work email required) into
+a platform-level `trial_request` queue; platform admins approve from the
+portal, which creates the workspace and its admin invite with
+`tenant_subscription.status = 'trial'` and `trial_until` = approval + 14
+days (configurable), or decline. The subscription gate treats an expired
+trial like a retired tier (features denied, billing page says so) until
+a plan is chosen or a platform admin extends it.
+
 ### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #276)
 
@@ -1048,7 +1112,7 @@ the dark block, no white-alpha utility anywhere in `src`).
 ---
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ✅ add-ons Slice 1a shipped (PR #317)  ·  🔄 add-ons Slice 1b in PR (PR #318)
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ✅ add-ons Slice 1a shipped (PR #317)  ·  ✅ add-ons Slice 1b shipped (PR #318)
 
 Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
 
@@ -1117,7 +1181,7 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
   purchase is recorded once per subscription and a replay updates the
   quantity, an unknown subscription is not ours, cancellation ends the
   right grant with its paid period and audits in the tenant's log).
-  Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9 "Bought by card".
+  Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9 "Bought by card". Shipped in PR #318.
 - **Later:** add-on items on the plan's own Stripe subscription (one
   invoice), proration on quantity changes, add-ons on the public
   pricing page, seats and storage as add-on kinds, advanced-reporting
@@ -2418,6 +2482,10 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     deletions). Esc or backdrop click closes it. Anyone can open
     the diff (it's a read-only view), independent of ownership.
 - **Slice 6** — AWS GovCloud lift; FedRAMP 20x Moderate submission.
+  Gated (2026-10-04): needs the AWS-commercial move (Trigger D) and a
+  federal / CUI customer in the pipeline (Triggers E / F in
+  `docs/architecture/aws-deployment-roadmap.md`); deferred in favour of
+  BL-AUTH-ABUSE at the user's call.
 - **Slice 7** — Brain feedback loop: every accepted/rejected change
   feeds the pattern-intel pipeline. ✅ *shipped (PR #268)*
   - `section_change_decision` (drizzle/0078, org-scoped): one row per

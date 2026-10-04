@@ -211,15 +211,20 @@ Per-row actions:
 
 ![Platform users tab](docs/images/admin-users.png)
 
-Every user on the platform with their org memberships + role in each org. Search by name, email, or org name. Per-row actions:
+Every user on the platform with their org memberships + role in each org. Search by name, email, or org name, and narrow the list with **Everyone / Unverified / Disabled / No workspace**. Per-row actions:
 
 - **Reset password** — issues a password-reset link (valid 1 hour) and emails it to the user; the link is also shown to you with **Copy link** in case the email cannot be sent. Works for every account, including people who signed up through Google / Microsoft and never had a password, and people whose invite acceptance never finished: setting a password through the link also marks their email verified, so they can sign in with email + password afterwards. Use this any time someone reports a stuck sign-in.
 - **Make / Revoke superadmin** — toggles `user.is_superadmin`. Requires confirmation when granting. You can't revoke your own superadmin (so a single superadmin can't accidentally lock the platform out of its highest privilege).
 - **Disable / Enable** — toggles `user.disabled_at`. Disabled users cannot sign in via **any** provider (Credentials, Google, Microsoft). You can't disable yourself.
+- **Delete…** (BL-AUTH-ABUSE) — removes the account permanently, for bot and spam accounts or people added in error. The confirmation spells out what happens: their memberships, sessions and per-user settings go; content they wrote stays, without their name. When they are the only person in a workspace (typically the one sign-up created for them) a checkbox, on by default, deletes that workspace too. Refused for yourself, for a superadmin (revoke first) and for the only admin of a workspace that still has other members (make someone else admin there first). Recorded as `user.delete` in your own audit log and in every workspace they belonged to that remains.
+
+**Clean up unverified sign-ups** (the panel above the list) removes bot and spam accounts in bulk: accounts that never verified their email, are at least N days old (default 7) and are alone in every workspace they hold. Anyone sharing a workspace with another person is left out and counted. **Preview** lists them with the workspaces that go with them; **Delete N accounts** removes only those listed — anyone who verified or joined someone since the preview is skipped. One audit row, `user.purge_unverified`, with the count and the first 50 addresses.
+
+**Sign-up protections.** Every sign-up name, invited or self-service, must look like a person's: 2–80 letters, spaces, hyphens, apostrophes, periods or commas, in any script — no digits, links, addresses or keyboard mash. When `SIGNUP_MODE=open`, self-service sign-up also refuses disposable inboxes (Mailinator, YOPmail, Guerrilla Mail and similar), and a request that fills the form's hidden field, arrives faster than a person can type, or skips the form altogether is answered as if it succeeded and creates nothing (logged as `self-service sign-up dropped as automated`). The 5-per-hour per-IP limit still applies first. Invitations are token-authorised and skip the bot checks.
 
 Operational rules of thumb for the platform tab:
 
-- **Match the action to the problem.** Forgotten password → Reset password. Account compromised → Disable, then Reset, then Enable. Person left the company → Disable (don't delete; their authored content stays attributed). Granted access in error → Disable first, then go investigate before deleting.
+- **Match the action to the problem.** Forgotten password → Reset password. Account compromised → Disable, then Reset, then Enable. Person left the company → Disable (don't delete; their authored content stays attributed). Granted access in error → Disable first, then go investigate before deleting. Bot or spam account → Delete, or the unverified clean-up for many at once.
 - **Keep the superadmin roster small.** Superadmin sees every org. Two or three people platform-wide is usually right. Audit it monthly.
 - **Confirm grants in writing.** Granting superadmin is a privileged action; the UI requires a confirm click but doesn't write the rationale anywhere. Capture the reason in your shared admin doc the same day.
 

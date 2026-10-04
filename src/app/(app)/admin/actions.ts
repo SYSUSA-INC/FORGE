@@ -11,6 +11,12 @@ import {
   type Role,
 } from "@/db/schema";
 import { requireAuth, requireSuperadmin } from "@/lib/auth-helpers";
+import {
+  deleteUserAccount,
+  listUnverifiedPurgeCandidates,
+  purgeUnverifiedAccounts,
+  type PurgeCandidate,
+} from "@/lib/account-hygiene";
 import { recordAudit } from "@/lib/audit-log";
 import { domainOf, inviteAwaitsApproval, isPublicEmailDomain } from "@/lib/email-domain";
 import { deliverInvite, deliverPasswordReset } from "@/lib/invite-send";
@@ -356,6 +362,56 @@ export async function deleteOrganizationAction(
 
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * BL-AUTH-ABUSE Slice 1 — delete one account (spam, bot, granted in
+ * error). Refuses yourself, platform admins and the last admin of a
+ * workspace with other members; `deleteSoleWorkspaces` also removes the
+ * workspaces nobody else belongs to. Audited (user.delete).
+ */
+export async function deleteUserAction(
+  userId: string,
+  opts: { deleteSoleWorkspaces: boolean },
+): Promise<{ ok: true; deletedWorkspaces: string[] } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  if (!userId) return { ok: false, error: "Pick a user." };
+  const res = await deleteUserAccount({
+    userId,
+    actor: { id: actor.id, email: actor.email, organizationId: actor.organizationId },
+    deleteSoleWorkspaces: !!opts?.deleteSoleWorkspaces,
+  });
+  if (!res.ok) return res;
+  revalidatePath("/admin");
+  return { ok: true, deletedWorkspaces: res.deletedWorkspaces.map((w) => w.name) };
+}
+
+/** BL-AUTH-ABUSE Slice 1 — what the bulk clean-up of unverified sign-ups would remove. Read-only. */
+export async function previewUnverifiedPurgeAction(
+  olderThanDays: number,
+): Promise<{ ok: true; candidates: PurgeCandidate[]; sharedWorkspace: number; cutoff: string }> {
+  await requireSuperadmin();
+  const res = await listUnverifiedPurgeCandidates({ olderThanDays });
+  return { ok: true, ...res };
+}
+
+/**
+ * BL-AUTH-ABUSE Slice 1 — delete the previewed unverified accounts that
+ * are still eligible, with the workspaces only they belonged to. Audited
+ * once (user.purge_unverified).
+ */
+export async function purgeUnverifiedAccountsAction(input: {
+  olderThanDays: number;
+  userIds: string[];
+}): Promise<{ ok: true; deleted: number; workspacesDeleted: number; skipped: number }> {
+  const actor = await requireSuperadmin();
+  const res = await purgeUnverifiedAccounts({
+    olderThanDays: input.olderThanDays,
+    userIds: Array.isArray(input.userIds) ? input.userIds.filter((id) => typeof id === "string") : [],
+    actor: { id: actor.id, email: actor.email, organizationId: actor.organizationId },
+  });
+  revalidatePath("/admin");
+  return { ok: true, ...res };
 }
 
 /**

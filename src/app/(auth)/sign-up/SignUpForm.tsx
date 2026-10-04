@@ -1,12 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 type InviteProps = { id: string; token: string; email: string };
 
 export function SignUpForm({ invite }: { invite?: InviteProps }) {
   const router = useRouter();
+  // BL-AUTH-ABUSE — how long the form was open before submit, and a field
+  // no person sees; both tell the server a script from a person.
+  const openedAt = useRef(0);
+  const [companyUrl, setCompanyUrl] = useState("");
+  useEffect(() => {
+    openedAt.current = Date.now();
+  }, []);
   const [name, setName] = useState("");
   const [email, setEmail] = useState(invite?.email ?? "");
   const [password, setPassword] = useState("");
@@ -34,6 +41,8 @@ export function SignUpForm({ invite }: { invite?: InviteProps }) {
           password,
           inviteId: invite?.id,
           inviteToken: invite?.token,
+          companyUrl,
+          elapsedMs: openedAt.current ? Date.now() - openedAt.current : null,
         }),
       });
       const data = (await res.json()) as {
@@ -68,7 +77,27 @@ export function SignUpForm({ invite }: { invite?: InviteProps }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          minLength={2}
+          maxLength={80}
         />
+        <div className="mt-1 font-mono text-[10px] text-muted">
+          The name colleagues know you by — letters, spaces, hyphens and apostrophes.
+        </div>
+      </div>
+
+      {/* Hidden from people (and screen readers); scripts fill it in. */}
+      <div aria-hidden="true" className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden">
+        <label>
+          Company website
+          <input
+            type="text"
+            name="companyUrl"
+            tabIndex={-1}
+            autoComplete="off"
+            value={companyUrl}
+            onChange={(e) => setCompanyUrl(e.target.value)}
+          />
+        </label>
       </div>
 
       <div>

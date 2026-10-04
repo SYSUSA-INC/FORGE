@@ -14,6 +14,12 @@ import {
   anySignupAllowed,
   selfServiceRegistrationAllowed,
 } from "@/lib/signup-mode";
+import {
+  HONEYPOT_FIELD,
+  isDisposableEmailDomain,
+  signupBotSignal,
+  validatePersonName,
+} from "@/lib/account-hygiene-logic";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -235,6 +241,8 @@ export async function POST(req: Request) {
       name?: unknown;
       inviteId?: unknown;
       inviteToken?: unknown;
+      elapsedMs?: unknown;
+      [HONEYPOT_FIELD]?: unknown;
     };
     try {
       payload = (await req.json()) as typeof payload;
@@ -246,11 +254,45 @@ export async function POST(req: Request) {
     }
 
     const password = typeof payload.password === "string" ? payload.password : "";
-    const name = typeof payload.name === "string" ? payload.name.trim() : "";
     const inviteId =
       typeof payload.inviteId === "string" ? payload.inviteId.trim() : "";
     const inviteToken =
       typeof payload.inviteToken === "string" ? payload.inviteToken.trim() : "";
+    const isInvite = !!(inviteId && inviteToken);
+
+    // Self-service signup path. Gated behind SIGNUP_MODE=open. Default
+    // (invite_only) rejects with 403 — bots and unsolicited public signup
+    // can't auto-provision orgs.
+    if (!isInvite && !selfServiceRegistrationAllowed()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Public sign-up is disabled. Ask your organization admin for an invitation, or contact support@sysgov.com.",
+        },
+        { status: 403 },
+      );
+    }
+
+    // BL-AUTH-ABUSE — a self-service request that filled the hidden field,
+    // came faster than a person types, or skipped the form entirely is
+    // answered like a success and creates nothing, so the script learns
+    // nothing to adapt to. Invites are token-authorised and exempt.
+    if (!isInvite) {
+      const bot = signupBotSignal({ honeypot: payload[HONEYPOT_FIELD], elapsedMs: payload.elapsedMs });
+      if (bot) {
+        log.warn("[register]", "self-service sign-up dropped as automated", { signal: bot, ip });
+        return NextResponse.json({ ok: true });
+      }
+    }
+
+    // BL-AUTH-ABUSE — a person's name: letters, spaces, hyphens and
+    // apostrophes; no links, addresses, digits or keyboard mash.
+    const nameCheck = validatePersonName(payload.name);
+    if (!nameCheck.ok) {
+      return NextResponse.json({ ok: false, error: nameCheck.error }, { status: 400 });
+    }
+    const name = nameCheck.name;
 
     const pwError = validatePasswordStrength(password);
     if (pwError) {
@@ -261,7 +303,7 @@ export async function POST(req: Request) {
     // Invite path — email is taken from allowlist, email is pre-verified.
     // Always allowed (when sign-up isn't fully disabled), regardless of
     // SIGNUP_MODE — the allowlist + token IS the authorization.
-    if (inviteId && inviteToken) {
+    if (isInvite) {
       const res = await acceptInvite({
         inviteId,
         rawToken: inviteToken,
@@ -277,20 +319,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, verified: true });
     }
 
-    // Self-service signup path. Gated behind SIGNUP_MODE=open. Default
-    // (invite_only) rejects with 403 — bots and unsolicited public signup
-    // can't auto-provision orgs.
-    if (!selfServiceRegistrationAllowed()) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Public sign-up is disabled. Ask your organization admin for an invitation, or contact support@sysgov.com.",
-        },
-        { status: 403 },
-      );
-    }
-
     // Self-service signup path — auto-creates org, requires email verification.
     const email =
       typeof payload.email === "string"
@@ -300,6 +328,14 @@ export async function POST(req: Request) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
         { ok: false, error: "Enter a valid email address." },
+        { status: 400 },
+      );
+    }
+
+    // BL-AUTH-ABUSE — throwaway inboxes can't found a workspace.
+    if (isDisposableEmailDomain(domainOf(email))) {
+      return NextResponse.json(
+        { ok: false, error: "Use your work email — disposable inboxes can't be used to sign up." },
         { status: 400 },
       );
     }
