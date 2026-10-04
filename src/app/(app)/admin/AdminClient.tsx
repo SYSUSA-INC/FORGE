@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useTransition } from "react";
+import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { InviteLinkNotice } from "@/components/auth/InviteLinkNotice";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -92,17 +92,33 @@ export function AdminClient({
   users,
   approvals = [],
   stats,
-  initialTab = "organizations",
+  initialTab = "overview",
 }: {
   currentUserId: string;
   orgs: OrgRow[];
   users: UserRow[];
   approvals?: ApprovalRow[];
   stats: Stats;
-  /** BL-NAV-WORKSPACES — `/admin?tab=users` opens the Platform users tab. */
+  /** BL-NAV-WORKSPACES — `/admin?tab=<overview|organizations|users>` opens that tab. */
   initialTab?: Tab;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  // Menu ↔ tabs stay in step: a sidebar link changes the URL and the page
+  // re-renders with the tab it names (picked up here); a tab click writes
+  // the same URL back so the sidebar highlights it; a bare /admin is
+  // normalised to its first tab so the menu has something to highlight.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+  useEffect(() => {
+    if (!searchParams.get("tab")) router.replace(`/admin?tab=${initialTab}`, { scroll: false });
+  }, [searchParams, router, initialTab]);
+  function openTab(key: Tab) {
+    setTab(key);
+    router.replace(`/admin?tab=${key}`, { scroll: false });
+  }
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
@@ -196,7 +212,8 @@ export function AdminClient({
         {tabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            type="button"
+            onClick={() => openTab(t.key)}
             className={`relative -mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
               tab === t.key
                 ? "border-teal-400 text-text"

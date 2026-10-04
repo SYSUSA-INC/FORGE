@@ -804,6 +804,14 @@ tenant portal into its own page with only platform-admin menu items,
 and give the company admin a separate page with only the items that
 role needs.
 
+Follow-up (2026-10-04): the SuperAdmin portal's menu group now reads
+**Organizations & users** and lists the portal's tabs in the portal's
+own order and words — Overview, Organizations, Platform users — then
+Source requests. `/admin` opens on Overview (its first tab); a menu
+click opens its tab, and a tab click writes the same `?tab=` URL back
+so the sidebar highlights it (`AdminClient` syncs state with the URL
+both ways).
+
 Delivered:
 - `src/lib/nav-workspaces.ts` (pure, tested): three navigation trees —
   **work** (Command Center, Opportunities, Platform Intelligence, Inbox,

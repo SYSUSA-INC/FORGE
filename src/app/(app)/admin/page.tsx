@@ -13,11 +13,12 @@ export default async function AdminPage({
   searchParams?: { tab?: string };
 }) {
   const actor = await requireSuperadmin();
-  // BL-NAV-WORKSPACES — the platform-admin sidebar deep-links the tabs.
+  // BL-NAV-WORKSPACES — the platform-admin sidebar deep-links the tabs;
+  // the portal opens on its first tab, Overview, like the menu.
   const initialTab =
-    searchParams?.tab === "users" || searchParams?.tab === "overview"
+    searchParams?.tab === "users" || searchParams?.tab === "organizations" || searchParams?.tab === "overview"
       ? searchParams.tab
-      : "organizations";
+      : "overview";
 
   const orgRows = await db
     .select({

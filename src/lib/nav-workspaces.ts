@@ -217,14 +217,17 @@ const COMPANY_NAV: WorkspaceNavGroup[] = [
 /** Platform administration — superadmins only, no tenant work pages. */
 const PLATFORM_NAV: WorkspaceNavGroup[] = [
   {
+    // The three portal tabs, in the portal's order and with its labels, so
+    // the menu and the tabs read as one thing; each link opens its tab and
+    // a tab click writes the same URL back, so the menu follows.
     id: "tenants",
-    label: "Tenants & users",
+    label: "Organizations & users",
     icon: "✱",
     superadmin: true,
     children: [
-      { href: "/admin", label: "Tenants" },
-      { href: "/admin?tab=users", label: "Platform users" },
       { href: "/admin?tab=overview", label: "Overview" },
+      { href: "/admin?tab=organizations", label: "Organizations" },
+      { href: "/admin?tab=users", label: "Platform users" },
       { href: "/admin/source-requests", label: "Source requests" },
     ],
   },
