@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/pwin-snapshots",
       "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/crm-agency-refresh",
+      "schedule": "45 4 * * *"
     }
   ]
 }

@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { CONTACT_ROLES, CONTACT_ROLE_LABELS, agencyRollups, describeRecency, nextTouchStatus, normalizeRole, warmthScore } from "@/lib/crm-logic";
+import { CONTACT_ROLES, CONTACT_ROLE_LABELS, agencyRollups, contactCsvRow, describeRecency, nextTouchStatus, normalizeRole, warmthScore } from "@/lib/crm-logic";
+import { downloadCsv } from "@/lib/csv-export";
+import { recordContactExportAction } from "./actions";
 import { AgencyHistoryPanel } from "./AgencyHistoryPanel";
 import { ContactForm, type OwnerOption } from "./ContactForm";
 import { ContactsImportPanel } from "./ContactsImportPanel";
@@ -78,6 +80,19 @@ export function ContactsClient({
   const overdue = all.reduce((n, r) => n + r.overdue, 0);
   const dueSoon = all.reduce((n, r) => n + r.dueSoon, 0);
 
+  // Slice 4 — the list as filtered on screen, as CSV; the export is recorded first.
+  async function exportList() {
+    const rows = filtered.map((c) => contactCsvRow(c));
+    if (rows.length === 0) return;
+    await recordContactExportAction({ count: rows.length, filtered: rows.length !== contacts.length });
+    const headers = Object.keys(rows[0]!);
+    downloadCsv(
+      `contacts-${new Date().toISOString().slice(0, 10)}.csv`,
+      rows,
+      headers.map((h) => ({ header: h, get: (r: Record<string, string | number>) => r[h] })),
+    );
+  }
+
   return (
     <>
       <PageHeader
@@ -86,6 +101,15 @@ export function ContactsClient({
         subtitle="Who we know at each agency, how warm the relationship is, and who we owe a call. Log every meeting so the next pursuit starts from a name, not a cold notice."
         actions={
           <>
+            <button
+              type="button"
+              onClick={exportList}
+              disabled={filtered.length === 0}
+              className="aur-btn aur-btn-ghost disabled:opacity-50"
+              title="Download the contacts shown below as a CSV file"
+            >
+              Download CSV
+            </button>
             <button type="button" onClick={() => setImporting((v) => !v)} className="aur-btn aur-btn-ghost" title="Import contacts from a CSV or a vCard export">
               {importing ? "Close import" : "Import"}
             </button>

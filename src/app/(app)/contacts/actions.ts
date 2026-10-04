@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { memberships, opportunities, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { recordRead } from "@/lib/audit-log";
 import { deleteContact, logTouch, saveContact, type ContactInput, type TouchInput } from "@/lib/crm";
 import { agencyProcurementHistory, cachedAgencyHistory, type AgencyProcurementHistory } from "@/lib/crm-history";
 import { commitContactImport, previewContactImport, type ImportCommit, type ImportPreview } from "@/lib/crm-import";
@@ -101,4 +102,23 @@ export async function listTouchOpportunities() {
     .where(eq(opportunities.organizationId, organizationId))
     .orderBy(desc(opportunities.updatedAt))
     .limit(100);
+}
+
+/**
+ * BL-FB-X-CRM Slice 4 — the contact list is about to be downloaded as CSV
+ * (built in the browser from the rows on screen). A list of named
+ * government contacts leaving the platform is a sensitive read: recorded.
+ */
+export async function recordContactExportAction(input: { count: number; filtered: boolean }): Promise<{ ok: true }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await recordRead({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "crm.contacts.export",
+    resourceType: "customer_contact",
+    resourceId: "list",
+    metadata: { count: Math.max(0, Math.floor(Number(input.count) || 0)), filtered: !!input.filtered },
+  });
+  return { ok: true };
 }

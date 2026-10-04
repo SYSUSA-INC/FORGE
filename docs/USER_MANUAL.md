@@ -644,7 +644,10 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 - **Import** — bring your spreadsheet or address book in: paste a CSV with a header row (name and agency are required; office, title, role, email, phone, notes and next touch are read when present) or choose a `.csv` or `.vcf` export from Outlook, Google or Apple Contacts. The preview marks every row **new** or **already known** (by email, or by agency and name) before anything is written; you choose whether known people are skipped or updated with the file's fields. Roles are read from a role column or guessed from the title.
 - **What they buy, remembered** — once anyone on the team has loaded an agency's awards, the panel opens with that answer at once and says when it was fetched; **Refresh** asks USAspending again, and an answer older than a day is marked so.
 
-Every add, edit, delete, touch and import is recorded in the audit log; so is each procurement lookup.
+- **Warm every morning** — FORGE refreshes the awards of the agencies your team has contacts at overnight, so the panel is fresh when you open it (when awards intelligence is switched on for your workspace).
+- **Download CSV** — the button in the page header saves the contacts shown below — all of them, or just the ones your search, role filter or "follow-ups owed" leaves — with role, agency, owner, last and next touch, warmth and follow-up state.
+
+Every add, edit, delete, touch, import and download is recorded in the audit log; so is each procurement lookup, including the overnight refresh.
 
 ## 8. Knowledge base
 
