@@ -28,6 +28,7 @@ describe("workspaceForPath", () => {
     expect(workspaceForPath("/platform/audit-log")).toBe("platform");
     expect(workspaceForPath("/users")).toBe("company");
     expect(workspaceForPath("/settings/billing")).toBe("company");
+    expect(workspaceForPath("/settings/api")).toBe("company");
     expect(workspaceForPath("/notifications/rules")).toBe("company");
     expect(workspaceForPath("/settings")).toBe("work");
     expect(workspaceForPath("/settings/ai-engine")).toBe("work");
@@ -119,7 +120,7 @@ describe("BL-NAV-RESTORE — the everyday tree is complete, and admin items are 
         "/help/user",
       ]),
     );
-    for (const h of ["/users", "/settings/billing", "/settings/templates", "/notifications/rules", "/audit-log", "/help/admin"]) {
+    for (const h of ["/users", "/settings/billing", "/settings/templates", "/settings/api", "/notifications/rules", "/audit-log", "/help/admin"]) {
       expect(hrefs).not.toContain(h);
     }
   });
@@ -132,6 +133,7 @@ describe("BL-NAV-RESTORE — the everyday tree is complete, and admin items are 
       "/users",
       "/settings/billing",
       "/settings/templates",
+      "/settings/api",
       "/notifications/rules",
       "/audit-log",
     ]);

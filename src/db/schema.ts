@@ -3788,6 +3788,35 @@ export const trialRequests = pgTable(
 export type TrialRequest = typeof trialRequests.$inferSelect;
 
 /**
+ * BL-16 apiAccess — a workspace's API tokens for the read-only /api/v1
+ * API (drizzle/0107). Only the SHA-256 of the token is stored; the
+ * prefix is kept for display and the audit trail. Revoked, not deleted.
+ */
+export const apiTokens = pgTable(
+  "api_token",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenPrefix: varchar("token_prefix", { length: 16 }).notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at"),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+    revokedByUserId: text("revoked_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("api_token_org_created_idx").on(t.organizationId, t.createdAt),
+  }),
+);
+
+export type ApiToken = typeof apiTokens.$inferSelect;
+
+/**
  * BL-17 Slice 2 — Stripe webhook event ledger.
  *
  * One row per Stripe event we receive. Three jobs:

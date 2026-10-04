@@ -268,6 +268,26 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 
 **Trials.** A workspace on a trial shows the days left in a line under the top bar and under **Current plan**. When the trial ends without a plan, nothing you have done is lost and **editing carries on as usual** — you can still write, create proposals, invite colleagues, upload and export. Only the AI features pause (drafting, chat, analyses and AI checks) until an admin chooses a plan here.
 
+### 4.15 API access (admins)
+
+**Settings → API access** lets an org admin connect FORGE to other systems — a CRM, a BI dashboard, an internal report — through a read-only API. It is part of some plans (or an add-on); without it the page says so and links to Billing.
+
+- **Create a token** with a name (say what will use it, e.g. "Salesforce sync") and a lifetime: 30 days, 90 days, 1 year or never. The token (`forge_…`) is shown **once** — copy it into the other system straight away; FORGE keeps only a fingerprint and can't show it again. If it is lost, revoke it and make a new one.
+- The list shows each token's first characters, who made it, when it was last used, when it expires and whether it is active, expired or revoked. **Revoke** stops it immediately. A workspace can have 20 active tokens. Tokens belong to the workspace, so they keep working if the person who made them leaves — revoke the ones you no longer need.
+- **Calling the API.** Send the token on every request as `Authorization: Bearer forge_…`. Everything is read-only JSON:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/v1/me` | The workspace and token you are calling with |
+| `GET /api/v1/opportunities` | Pipeline opportunities, newest change first |
+| `GET /api/v1/opportunities/{id}` | One opportunity, with its description |
+| `GET /api/v1/proposals` | Proposals, newest change first |
+| `GET /api/v1/proposals/{id}` | One proposal with its section outline (titles, status, word counts — not the text) |
+
+  Lists take `limit` (1–100, default 50), `stage` (an opportunity or proposal stage), `updated_since` (an ISO 8601 date-time — handy for syncing only what changed) and `cursor`: each page returns `nextCursor`; pass it back to get the next page, until it is `null`. For example: `curl -H "Authorization: Bearer forge_…" "https://<your FORGE address>/api/v1/opportunities?updated_since=2026-10-01T00:00:00Z"`.
+- Each token can make 120 requests a minute. Answers: `401` missing, unknown, revoked or expired token; `403` the plan no longer includes API access, or the workspace is disabled; `404` no such record in your workspace; `429` too many requests (wait the seconds in `Retry-After`).
+- Every answered request is recorded in your **Audit Log** under the token's name.
+
 ---
 
 ## 5. Opportunities
