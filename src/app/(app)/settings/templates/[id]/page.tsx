@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import { templateAuthoringRefusal } from "@/lib/template-gate";
 import { getTemplateForEditAction } from "../actions";
 import { EditTemplateClient } from "./EditTemplateClient";
 
@@ -17,6 +18,7 @@ export default async function EditTemplatePage({
 
   const t = await getTemplateForEditAction(params.id);
   if (!t) notFound();
+  const locked = await templateAuthoringRefusal(organizationId);
 
   return (
     <>
@@ -29,6 +31,7 @@ export default async function EditTemplatePage({
       />
       <EditTemplateClient
         id={t.id}
+        locked={locked}
         initial={{
           name: t.name,
           description: t.description,

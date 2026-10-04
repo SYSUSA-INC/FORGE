@@ -471,7 +471,7 @@ Feature flags gate specific actions in the app. When the flag is `false` for a t
 | `complianceMatrix` | AI compliance preflight | `runCompliancePreflightAction` |
 | `bulkExport` | Audit-log CSV download | `exportAuditLogCsvAction` |
 | `apiAccess` | Workspace API tokens and the read-only `/api/v1` API | `createApiToken` and every `/api/v1` request (see §6.10) |
-| `customTemplates` | Custom proposal template editing | (reserved) |
+| `customTemplates` | Authoring proposal templates: create, edit, upload or remove the Word file, switch HTML/Word mode. Using existing templates (on `/proposals/new`, as the default, archive / unarchive) is never gated. | `src/lib/template-gate.ts`, checked in every authoring action under `settings/templates/actions.ts` |
 
 ### 6.3 How quotas work
 
