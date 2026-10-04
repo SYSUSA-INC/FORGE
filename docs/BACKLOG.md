@@ -42,7 +42,7 @@ Effort key:
 | 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | ✅ shipped (PR #326) |
 | 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | ✅ shipped (PR #327) |
 | 3p | **BL-FB-X-CRM Slice 4** — Nightly refresh of the agencies teams have contacts at; contact list CSV export | P3 | S | ✅ shipped (PR #328) |
-| 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | 🔄 in progress |
+| 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | 🔄 in PR (PR #329) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1780,7 +1780,7 @@ CRM follow-ups are fifth.
   nothing). Docs: USER_MANUAL §7.5, ADMIN_MANUAL cron table.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in progress (Slices 1–3 PR #305 · PR #306 · PR #316)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in PR (PR #329 · Slices 1–3 PR #305 · PR #306 · PR #316)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -5922,7 +5922,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in progress (Slices 1–3 PR #305 · PR #306 · PR #316) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in PR (PR #329 · Slices 1–3 PR #305 · PR #306 · PR #316) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer
