@@ -63,6 +63,16 @@ export function ReviewCommentsPanel({
             <li key={c.id} className="rounded border border-layer/10 bg-layer/[0.02] p-2">
               <div className="flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-wider text-muted">
                 <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5">{REVIEW_COLOR_LABELS[c.color]}</span>
+                {/* BL-FB-X-COLOR-TEAM Slice 3 — carried forward unresolved from an earlier round */}
+                {c.carriedFrom ? (
+                  <Link
+                    href={`/proposals/${proposalId}/reviews/${c.carriedFrom.reviewId}`}
+                    className="rounded border border-indigo-400/30 bg-indigo-400/5 px-1.5 py-0.5 text-indigo-300 hover:underline"
+                    title="Still open when the earlier round closed; carried into this one. Opens the round it came from."
+                  >
+                    ↪ carried from {REVIEW_COLOR_LABELS[c.carriedFrom.color]}
+                  </Link>
+                ) : null}
                 {c.authorName === null ? (
                   <span className="rounded border border-violet/40 bg-violet/10 px-1.5 py-0.5 text-text">FORGE AI</span>
                 ) : (

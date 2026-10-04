@@ -1283,7 +1283,7 @@ they own, so Sarah's sections read like Sarah and Mike's like Mike.
   between two authors on the same proposal.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -1407,7 +1407,7 @@ lightweight CRM scoped to capture, under **Customer contacts**
   an export of the contact list.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slice 1 PR #305 · Slice 2 PR #306)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (Slice 1 PR #305 · Slice 2 PR #306)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -1472,8 +1472,34 @@ date, reviewers, verdicts, comments). Slice 1 adds the lead's tools:
   debrief, reminder window); `tests/isolation/review-followups.test.ts`
   (carry scoped to the owning tenant and proposal, summary gated and
   stored, reminders reach unsubmitted reviewers once).
-- **Later:** carried comments shown in the editor with their origin;
-  reminder cadence per tenant.
+
+**Slice 3 — the tenant's cadence, and carried comments where the writer works:**
+
+- **Reminder cadence per tenant.** `organization.review_reminder_days_before`
+  (default 1) and `review_reminder_repeat_days` (default 0 = once only),
+  migration 0104, edited by org admins under **Settings → Review
+  reminders** (audited `settings.review_reminders.update`; whole days,
+  0–14 each). `dispatchReviewDueReminders` joins the organization,
+  scans every open round due within the widest window any tenant may
+  set, and asks `reviewReminderDue` (pure) per round: the first reminder
+  once the due date is within `daysBefore` days (0 = on the day), then
+  — only while the round is overdue and `repeatDays` is set — another
+  every `repeatDays` days after the last, the stamp moving each time.
+  Subjects now read "is due today / tomorrow / in N days / is overdue";
+  the payload carries `repeat`; the cron body reports `repeats`.
+  Disabled tenants are skipped.
+- **Carried comments in the editor.** `listOpenReviewCommentsBySection`
+  resolves each comment's `carried_from_comment_id` to the round it came
+  from, and the editor's review-comments panel shows `↪ carried from
+  Pink Team` linking to that round, so a writer sees which notes have
+  already survived a round unanswered.
+- Tests: `tests/ai/review-workflow.test.ts` (cadence window, repeats
+  only while overdue, sanitising, subjects); `tests/isolation/review-followups.test.ts`
+  (daily repeat delivers again and only after a day, a wider window
+  stamps the other tenant's round under its own cadence, lineage
+  resolved in the owning tenant only).
+- **Later:** per-round cadence override; reminder preview on the review
+  page.
 
 ### BL-FB-GEN-GRAPHICS — Graphics suggestions
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #304)
@@ -5411,7 +5437,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
@@ -5419,7 +5445,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slice 1 PR #305 · Slice 2 PR #306) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (Slice 1 PR #305 · Slice 2 PR #306) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer

@@ -32,6 +32,8 @@ export type SectionReviewComment = {
   /** null = written by the FORGE AI pre-review. */
   authorName: string | null;
   createdAt: string;
+  /** BL-FB-X-COLOR-TEAM Slice 3 — the earlier round this comment was carried forward from, when it was. */
+  carriedFrom?: { reviewId: string; color: ReviewColor } | null;
 };
 
 export type ParsedReviewBody = {

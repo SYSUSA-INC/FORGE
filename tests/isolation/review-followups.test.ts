@@ -15,6 +15,7 @@ import {
   auditLogs,
   notificationDeliveries,
   notificationRules,
+  organizations,
   proposalReviewAssignments,
   proposalReviewComments,
   proposalReviews,
@@ -24,6 +25,7 @@ import { getAIProviderStatus } from "@/lib/ai";
 import { dispatchReviewDueReminders } from "@/lib/review-reminders";
 import { summarizeReview } from "@/lib/review-summary";
 import { carryOpenComments } from "@/lib/review-workflow";
+import { listOpenReviewCommentsBySection } from "@/lib/section-review-comments";
 import { REVIEW_CHECKLIST_TEMPLATES } from "@/lib/review-workflow-logic";
 import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
@@ -94,6 +96,16 @@ describe("BL-FB-X-COLOR-TEAM Slice 2 — round follow-ups", () => {
     expect(pink.every((c) => c.resolved)).toBe(true);
     const [round] = await db.select({ carriedFromReviewId: proposalReviews.carriedFromReviewId }).from(proposalReviews).where(eq(proposalReviews.id, redA));
     expect(round!.carriedFromReviewId).toBe(pinkA);
+
+    // Slice 3 — the editor sees where a carried comment came from; a fresh comment carries nothing.
+    await db.insert(proposalReviewComments).values({ reviewId: redA, sectionId: sectionA, userId: fx.orgA.userId, body: "New in red." });
+    const bySection = await listOpenReviewCommentsBySection({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId });
+    const inRed = (bySection[sectionA] ?? []).filter((c) => c.reviewId === redA);
+    expect(inRed.map((c) => [c.body, c.carriedFrom])).toEqual([
+      ["Name the incumbent and the contract number.", { reviewId: pinkA, color: "pink" }],
+      ["New in red.", null],
+    ]);
+    expect(await listOpenReviewCommentsBySection({ organizationId: fx.orgB.organizationId, proposalId: fx.orgA.proposalId })).toEqual({});
 
     // A second carry from the now-empty round moves nothing.
     expect(await carryOpenComments({ organizationId: fx.orgA.organizationId, fromReviewId: pinkA, toReviewId: redA, actor })).toEqual({ ok: true, carried: 0 });
@@ -168,5 +180,34 @@ describe("BL-FB-X-COLOR-TEAM Slice 2 — round follow-ups", () => {
     expect(again).toHaveLength(1);
     const [untouched] = await db.select({ at: proposalReviews.dueReminderSentAt }).from(proposalReviews).where(eq(proposalReviews.id, reviewB));
     expect(untouched!.at).toBeNull();
+
+    // Slice 3 — the tenant's cadence. A: repeat daily while overdue; the round is a day overdue and was reminded two days ago.
+    await db.update(organizations).set({ reviewReminderRepeatDays: 1 }).where(eq(organizations.id, fx.orgA.organizationId));
+    await db
+      .update(proposalReviews)
+      .set({ dueDate: new Date(Date.now() - 86_400_000), dueReminderSentAt: new Date(Date.now() - 2 * 86_400_000) })
+      .where(eq(proposalReviews.id, redA));
+    const repeat = await dispatchReviewDueReminders();
+    expect(repeat.repeats).toBeGreaterThanOrEqual(1);
+    const afterRepeat = await db
+      .select({ recipientUserId: notificationDeliveries.recipientUserId })
+      .from(notificationDeliveries)
+      .where(and(eq(notificationDeliveries.organizationId, fx.orgA.organizationId), eq(notificationDeliveries.ruleId, rule!.id)));
+    expect(afterRepeat).toHaveLength(2);
+    expect(afterRepeat.every((d) => d.recipientUserId === fx.orgA.userId)).toBe(true);
+    // Reminded just now: tomorrow's tick, not this one.
+    await dispatchReviewDueReminders();
+    expect(
+      await db
+        .select({ id: notificationDeliveries.id })
+        .from(notificationDeliveries)
+        .where(and(eq(notificationDeliveries.organizationId, fx.orgA.organizationId), eq(notificationDeliveries.ruleId, rule!.id))),
+    ).toHaveLength(2);
+    // B: seven days before. Its round, due next week, is now inside the window and gets stamped (no rule in B, so nothing is delivered).
+    await db.update(organizations).set({ reviewReminderDaysBefore: 7 }).where(eq(organizations.id, fx.orgB.organizationId));
+    await dispatchReviewDueReminders();
+    const [stampedB] = await db.select({ at: proposalReviews.dueReminderSentAt }).from(proposalReviews).where(eq(proposalReviews.id, reviewB));
+    expect(stampedB!.at).not.toBeNull();
+    expect(await db.select({ id: notificationDeliveries.id }).from(notificationDeliveries).where(eq(notificationDeliveries.organizationId, fx.orgB.organizationId))).toEqual([]);
   });
 });

@@ -7,6 +7,7 @@ import { rowToOrgProfile } from "@/lib/org-types";
 import { getVoiceProfile } from "@/lib/voice";
 import { AuditRetentionPanel } from "./AuditRetentionPanel";
 import { HouseStylePanel } from "./HouseStylePanel";
+import { ReviewReminderPanel } from "./ReviewReminderPanel";
 import { SettingsClient } from "./SettingsClient";
 import { VoicePanel } from "./VoicePanel";
 
@@ -58,6 +59,8 @@ export default async function SettingsPage() {
         />
         {/* BL-FB-GEN-VOICE Slice 2 — the team's rules under every author's voice */}
         <HouseStylePanel initialText={org.houseStyle} orgName={org.name ?? ""} canEdit={canEdit} />
+        {/* BL-FB-X-COLOR-TEAM Slice 3 — how colour-team reviewers are reminded */}
+        <ReviewReminderPanel initial={{ daysBefore: org.reviewReminderDaysBefore, repeatDays: org.reviewReminderRepeatDays }} canEdit={canEdit} />
       </div>
     </>
   );

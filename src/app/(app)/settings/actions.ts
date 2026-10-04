@@ -13,6 +13,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { applySamGovProfile } from "@/lib/onboarding";
 import type { OrgProfile } from "@/lib/org-types";
 import { hasErrors, validateOrgProfile } from "@/lib/validators";
+import { REMINDER_CADENCE_LIMITS, sanitizeReminderCadence } from "@/lib/review-workflow-logic";
 import { log } from "@/lib/log";
 import {
   AUDIT_RETENTION_MAX_DAYS,
@@ -86,6 +87,34 @@ export async function saveOrgProfileAction(profile: OrgProfile): Promise<
       error: err instanceof Error ? err.message : "Failed to save changes.",
     };
   }
+}
+
+/** BL-FB-X-COLOR-TEAM Slice 3 — how colour-team reviewers are reminded; org admins only. Audited. */
+export async function setReviewReminderCadenceAction(input: { daysBefore: number; repeatDays: number }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+  const cadence = sanitizeReminderCadence(input);
+  if (!cadence) {
+    return {
+      ok: false,
+      error: `Whole days only: 0–${REMINDER_CADENCE_LIMITS.daysBefore.max} before the due date, 0–${REMINDER_CADENCE_LIMITS.repeatDays.max} between repeats.`,
+    };
+  }
+  await db
+    .update(organizations)
+    .set({ reviewReminderDaysBefore: cadence.daysBefore, reviewReminderRepeatDays: cadence.repeatDays, updatedAt: new Date() })
+    .where(eq(organizations.id, organizationId));
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "settings.review_reminders.update",
+    resourceType: "organization",
+    resourceId: organizationId,
+    metadata: cadence,
+  });
+  revalidatePath("/settings");
+  return { ok: true };
 }
 
 export async function setAuditRetentionDaysAction(

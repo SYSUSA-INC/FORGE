@@ -6,7 +6,7 @@
  */
 import "server-only";
 
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { proposalReviewComments, proposalReviews, proposals, users } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
@@ -30,6 +30,7 @@ export async function listOpenReviewCommentsBySection(input: {
       authorName: users.name,
       authorEmail: users.email,
       createdAt: proposalReviewComments.createdAt,
+      carriedFromCommentId: proposalReviewComments.carriedFromCommentId,
     })
     .from(proposalReviewComments)
     .innerJoin(proposalReviews, eq(proposalReviews.id, proposalReviewComments.reviewId))
@@ -45,6 +46,21 @@ export async function listOpenReviewCommentsBySection(input: {
     )
     .orderBy(asc(proposalReviewComments.createdAt), asc(proposalReviewComments.id))
     .limit(MAX_COMMENTS);
+
+  // BL-FB-X-COLOR-TEAM Slice 3 — where a carried comment came from: the
+  // round (and colour) of the original, so the editor can say so.
+  const originIds = Array.from(new Set(rows.map((r) => r.carriedFromCommentId).filter((id): id is string => !!id)));
+  const origins = new Map<string, { reviewId: string; color: SectionReviewComment["color"] }>();
+  if (originIds.length > 0) {
+    const originRows = await db
+      .select({ id: proposalReviewComments.id, reviewId: proposalReviewComments.reviewId, color: proposalReviews.color })
+      .from(proposalReviewComments)
+      .innerJoin(proposalReviews, eq(proposalReviews.id, proposalReviewComments.reviewId))
+      .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
+      .where(and(eq(proposals.organizationId, organizationId), inArray(proposalReviewComments.id, originIds)));
+    for (const o of originRows) origins.set(o.id, { reviewId: o.reviewId, color: o.color });
+  }
+
   return groupBySection(
     rows.map<SectionReviewComment>((r) => ({
       id: r.id,
@@ -54,6 +70,7 @@ export async function listOpenReviewCommentsBySection(input: {
       body: r.body,
       authorName: r.userId ? r.authorName || r.authorEmail || "Reviewer" : null,
       createdAt: r.createdAt.toISOString(),
+      carriedFrom: r.carriedFromCommentId ? (origins.get(r.carriedFromCommentId) ?? null) : null,
     })),
   );
 }
