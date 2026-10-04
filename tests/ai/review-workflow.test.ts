@@ -8,8 +8,11 @@ import { REVIEW_COLORS } from "@/lib/review-types";
 import {
   CHECKLIST_LIMITS,
   SUMMARY_LIMITS,
+  DEFAULT_REMINDER_CADENCE,
   dueReminderDue,
   dueReminderSubject,
+  reviewReminderDue,
+  sanitizeReminderCadence,
   heuristicSummary,
   sanitizeSummary,
   summaryMarkdown,
@@ -215,5 +218,34 @@ describe("review workflow logic — Slice 2 follow-ups", () => {
     expect(dueReminderDue(now, new Date("2026-10-01T00:00:00Z"))).toBe(true);
     expect(dueReminderSubject("Red Team", "NOAA IT", new Date("2026-10-04T07:00:00Z"), now)).toBe("Red Team review of NOAA IT is due tomorrow — your verdict is still open");
     expect(dueReminderSubject("Red Team", "NOAA IT", new Date("2026-10-01T00:00:00Z"), now)).toBe("Red Team review of NOAA IT is overdue — your verdict is still open");
+    expect(dueReminderSubject("Red Team", "NOAA IT", new Date("2026-10-03T20:00:00Z"), now)).toBe("Red Team review of NOAA IT is due today — your verdict is still open");
+    expect(dueReminderSubject("Red Team", "NOAA IT", new Date("2026-10-06T08:00:00Z"), now)).toBe("Red Team review of NOAA IT is due in 3 days — your verdict is still open");
+  });
+
+  it("Slice 3: follows the tenant's cadence and repeats only while overdue", () => {
+    const now = new Date("2026-10-03T08:00:00Z");
+    const day = 86_400_000;
+    const at = (days: number) => new Date(now.getTime() + days * day);
+    // First reminder: inside the tenant's window, never sent.
+    expect(reviewReminderDue(now, at(3), null)).toBe(false);
+    expect(reviewReminderDue(now, at(3), null, { daysBefore: 3, repeatDays: 0 })).toBe(true);
+    expect(reviewReminderDue(now, at(2), null, { daysBefore: 1, repeatDays: 7 })).toBe(false);
+    expect(reviewReminderDue(now, at(0.5), null, { daysBefore: 0, repeatDays: 0 })).toBe(false);
+    expect(reviewReminderDue(now, at(-0.5), null, { daysBefore: 0, repeatDays: 0 })).toBe(true);
+    // Already reminded, not yet overdue: nothing more until it is.
+    expect(reviewReminderDue(now, at(1), at(-1), { daysBefore: 3, repeatDays: 1 })).toBe(false);
+    // Overdue and reminded two days ago: every day → due; every three days → not yet; once only → never.
+    expect(reviewReminderDue(now, at(-1), at(-2), { daysBefore: 1, repeatDays: 1 })).toBe(true);
+    expect(reviewReminderDue(now, at(-1), at(-2), { daysBefore: 1, repeatDays: 3 })).toBe(false);
+    expect(reviewReminderDue(now, at(-1), at(-2), DEFAULT_REMINDER_CADENCE)).toBe(false);
+    expect(reviewReminderDue(now, null, null, { daysBefore: 14, repeatDays: 1 })).toBe(false);
+
+    expect(sanitizeReminderCadence({ daysBefore: 3, repeatDays: 0 })).toEqual({ daysBefore: 3, repeatDays: 0 });
+    expect(sanitizeReminderCadence({ daysBefore: 0, repeatDays: 14 })).toEqual({ daysBefore: 0, repeatDays: 14 });
+    expect(sanitizeReminderCadence({ daysBefore: 15, repeatDays: 0 })).toBeNull();
+    expect(sanitizeReminderCadence({ daysBefore: 1.5, repeatDays: 0 })).toBeNull();
+    expect(sanitizeReminderCadence({ daysBefore: "2", repeatDays: 0 })).toBeNull();
+    expect(sanitizeReminderCadence({ daysBefore: 1, repeatDays: -1 })).toBeNull();
+    expect(sanitizeReminderCadence(null)).toBeNull();
   });
 });

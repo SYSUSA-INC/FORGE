@@ -231,6 +231,13 @@ export const organizations = pgTable("organization", {
   // voice. Edited by tenant admins under Settings → House style.
   houseStyle: text("house_style").notNull().default(""),
 
+  // BL-FB-X-COLOR-TEAM Slice 3 — reminder cadence for review rounds
+  // (drizzle/0104): days before the due date reviewers without a verdict
+  // are first reminded (0 = on the day), and every how many days again
+  // while the round is overdue (0 = once only).
+  reviewReminderDaysBefore: integer("review_reminder_days_before").notNull().default(1),
+  reviewReminderRepeatDays: integer("review_reminder_repeat_days").notNull().default(0),
+
   // BL-AUTH-DOMAIN — the email domains this tenant owns (drizzle/0083).
   // By default a person may only join the tenant that owns their
   // domain; an invite from any other domain is held until a platform

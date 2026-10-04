@@ -321,15 +321,55 @@ export function summaryMarkdown(s: ReviewAiSummary): string {
   return lines.join("\n");
 }
 
-export const DUE_REMINDER_HORIZON_MS = 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const DUE_REMINDER_HORIZON_MS = DAY_MS;
 
-/** True once a round is within a day of its due date, or past it. */
-export function dueReminderDue(now: Date, dueDate: Date | null | undefined): boolean {
+// ── Slice 3 — the tenant's reminder cadence ─────────────────────────
+
+/** How a tenant wants review reminders paced: first reminder N days before the due date, then every M days while overdue (0 = once). */
+export type ReminderCadence = { daysBefore: number; repeatDays: number };
+export const REMINDER_CADENCE_LIMITS = { daysBefore: { min: 0, max: 14 }, repeatDays: { min: 0, max: 14 } } as const;
+/** Slice 2's behaviour: the day before, once. */
+export const DEFAULT_REMINDER_CADENCE: ReminderCadence = { daysBefore: 1, repeatDays: 0 };
+
+/** Whole days inside the limits, or null when the input is not a cadence. */
+export function sanitizeReminderCadence(raw: { daysBefore?: unknown; repeatDays?: unknown } | null | undefined): ReminderCadence | null {
+  const whole = (v: unknown, lim: { min: number; max: number }) => (typeof v === "number" && Number.isInteger(v) && v >= lim.min && v <= lim.max ? v : null);
+  const daysBefore = whole(raw?.daysBefore, REMINDER_CADENCE_LIMITS.daysBefore);
+  const repeatDays = whole(raw?.repeatDays, REMINDER_CADENCE_LIMITS.repeatDays);
+  if (daysBefore === null || repeatDays === null) return null;
+  return { daysBefore, repeatDays };
+}
+
+/**
+ * Whether a round's reviewers are owed a reminder now: the first once the
+ * due date is within `daysBefore` days (or past) and none was sent; then,
+ * only while the round is overdue and `repeatDays` is set, another every
+ * `repeatDays` days after the last one.
+ */
+export function reviewReminderDue(now: Date, dueDate: Date | null | undefined, sentAt: Date | null | undefined, cadence: ReminderCadence = DEFAULT_REMINDER_CADENCE): boolean {
   if (!dueDate) return false;
-  return dueDate.getTime() - now.getTime() <= DUE_REMINDER_HORIZON_MS;
+  if (!sentAt) return dueDate.getTime() - now.getTime() <= cadence.daysBefore * DAY_MS;
+  if (cadence.repeatDays <= 0) return false;
+  if (dueDate.getTime() > now.getTime()) return false;
+  return now.getTime() - sentAt.getTime() >= cadence.repeatDays * DAY_MS;
+}
+
+/** True once a round is within a day of its due date, or past it (the default cadence, nothing sent yet). */
+export function dueReminderDue(now: Date, dueDate: Date | null | undefined): boolean {
+  return reviewReminderDue(now, dueDate, null, DEFAULT_REMINDER_CADENCE);
 }
 
 export function dueReminderSubject(colorLabel: string, proposalTitle: string, dueDate: Date, now: Date): string {
-  const overdue = dueDate.getTime() < now.getTime();
-  return `${colorLabel} review of ${proposalTitle} ${overdue ? "is overdue" : "is due tomorrow"} — your verdict is still open`;
+  const diff = dueDate.getTime() - now.getTime();
+  const days = Math.ceil(diff / DAY_MS);
+  const when =
+    diff < 0
+      ? "is overdue"
+      : dueDate.toISOString().slice(0, 10) === now.toISOString().slice(0, 10)
+        ? "is due today"
+        : days <= 1
+          ? "is due tomorrow"
+          : `is due in ${days} days`;
+  return `${colorLabel} review of ${proposalTitle} ${when} — your verdict is still open`;
 }
