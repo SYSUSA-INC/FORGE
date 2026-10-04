@@ -9,14 +9,18 @@
  * Slice 3: the answer is kept per tenant for a day (`agency_history_cache`)
  * so the panel opens instantly and the API is asked at most once per
  * agency per day; "Refresh" bypasses the cache.
+ *
+ * Slice 4: a nightly cron (`refreshWatchedAgencies`) refreshes the
+ * agencies teams have contacts at, so the panel is warm in the morning.
  */
 import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { agencyHistoryCache, organizations, type AgencyHistoryPayload } from "@/db/schema";
+import { agencyHistoryCache, customerContacts, organizations, type AgencyHistoryPayload } from "@/db/schema";
 import { recordRead } from "@/lib/audit-log";
-import { agencyAwardAttempts, agencyKey, summarizeAgencyAwards } from "@/lib/crm-logic";
+import { agencyAwardAttempts, agencyKey, pickAgenciesToRefresh, summarizeAgencyAwards } from "@/lib/crm-logic";
+import { log } from "@/lib/log";
 import { searchAwardsByCriteria } from "@/lib/usaspending";
 
 type Actor = { userId: string | null; email?: string | null };
@@ -134,4 +138,46 @@ export async function agencyProcurementHistory(input: { organizationId: string; 
   // Nothing live: an older answer still beats an empty panel.
   if (cached) return fromCache(cached, now);
   return { ok: false, error: lastError };
+}
+
+/** Slice 4 — agencies refreshed per nightly run, across all tenants. */
+export const AGENCY_REFRESH_PER_RUN = 40;
+
+/**
+ * Slice 4 — the nightly sweep (CRON_SECRET-gated route). Across tenants,
+ * by design: each tenant's watched agencies are the ones it has contacts
+ * at; each refresh is asked and cached under that tenant's own
+ * organizationId exactly as a user's "Refresh" would be, and recorded in
+ * that tenant's audit log. Skipped while awards intel is off.
+ */
+export async function refreshWatchedAgencies(input: { now?: Date; limit?: number } = {}): Promise<{ disabled?: true; candidates: number; refreshed: number; failed: number }> {
+  if (!enabled()) return { disabled: true, candidates: 0, refreshed: 0, failed: 0 };
+  const now = input.now ?? new Date();
+  const watched = await db
+    .selectDistinct({ organizationId: customerContacts.organizationId, agencyKey: customerContacts.agencyKey, agency: customerContacts.agency })
+    .from(customerContacts);
+  const cached = await db
+    .select({ organizationId: agencyHistoryCache.organizationId, agencyKey: agencyHistoryCache.agencyKey, fetchedAt: agencyHistoryCache.fetchedAt })
+    .from(agencyHistoryCache);
+  // Refresh a little before the day is up, so a morning visit finds it fresh.
+  const picked = pickAgenciesToRefresh(watched, cached, now, { limit: input.limit ?? AGENCY_REFRESH_PER_RUN, freshMs: AGENCY_HISTORY_TTL_MS - 2 * 60 * 60 * 1000 });
+  let refreshed = 0;
+  let failed = 0;
+  for (const w of picked) {
+    try {
+      const res = await agencyProcurementHistory({
+        organizationId: w.organizationId,
+        agency: w.agency,
+        actor: { userId: null, email: "cron:crm-agency-refresh" },
+        now,
+        force: true,
+      });
+      if (res.ok && !res.cached) refreshed += 1;
+      else failed += 1;
+    } catch (err) {
+      failed += 1;
+      log.warn("[crm-agency-refresh]", "refresh failed", { organizationId: w.organizationId, agencyKey: w.agencyKey, error: err });
+    }
+  }
+  return { candidates: picked.length, refreshed, failed };
 }

@@ -40,7 +40,8 @@ Effort key:
 | 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
 | 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | ✅ shipped (PR #325) |
 | 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | ✅ shipped (PR #326) |
-| 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | 🔄 in PR (PR #327) |
+| 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | ✅ shipped (PR #327) |
+| 3p | **BL-FB-X-CRM Slice 4** — Nightly refresh of the agencies teams have contacts at; contact list CSV export | P3 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1504,7 +1505,7 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   section opts in, audits).
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #327 · Slice 2 PR #312 · Slice 1 PR #308)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #327 · Slice 2 PR #312 · Slice 1 PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -1625,7 +1626,7 @@ voice follow-ups are fourth.
   USER_MANUAL §6 (House style), ADMIN_MANUAL (Author voice).
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in progress (Slice 3 PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -1745,8 +1746,37 @@ lightweight CRM scoped to capture, under **Customer contacts**
   (`tests/isolation/crm-import.test.ts`: preview against the owning
   tenant's people only, create / skip / update in the owning tenant,
   audit, cache served per tenant and flagged stale, gated by the flag).
-- **Later:** a scheduled refresh of cached agencies the team watches;
-  an export of the contact list.
+- ~~**Later:** a scheduled refresh of cached agencies the team watches;
+  an export of the contact list.~~ → Slice 4 below.
+
+**Slice 4 — warm every morning; take the list with you (2026-10-04):**
+
+User request (2026-10-04): the "Work I can build next" list in order;
+CRM follow-ups are fifth.
+
+- **Nightly refresh.** `/api/cron/crm-agency-refresh` (04:45 UTC,
+  `CRON_SECRET`) runs `refreshWatchedAgencies`: across tenants, the
+  agencies each tenant has contacts at (distinct
+  `customer_contact.agency_key`), never fetched first then the stalest,
+  skipping any fetched in the last 22 hours (`pickAgenciesToRefresh`,
+  pure), at most `AGENCY_REFRESH_PER_RUN` = 40 a night to stay polite to
+  USAspending. Each refresh goes through `agencyProcurementHistory`
+  under the tenant's own organizationId — cached there, recorded there
+  as `crm.agency.history` with actor `cron:crm-agency-refresh`. Off
+  while `AWARDS_INTEL_ENABLED` is off.
+- **Export.** **Download CSV** on `/contacts` saves the rows on screen
+  (after search, role and follow-up filters): name, title, role,
+  agency, office, email, phone, owner, last touch, touches, warmth, next
+  touch, follow-up state (`contactCsvRow`, pure). Built in the browser
+  after `recordContactExportAction` records `crm.contacts.export`
+  (count, filtered) — a list of named government contacts leaving the
+  platform.
+- No migration. Tests: `tests/ai/crm-logic.test.ts` (pick order,
+  freshness, limit, duplicates; the CSV row);
+  `tests/isolation/crm-refresh.test.ts` (USAspending stubbed: refreshes
+  each tenant's agencies under that tenant only, skips a fresh one,
+  audits in the owning tenant, off without the flag, a second run asks
+  nothing). Docs: USER_MANUAL §7.5, ADMIN_MANUAL cron table.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–3 shipped (PR #305 · PR #306 · PR #316)
@@ -5639,7 +5669,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #327 · Slice 2 PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #327 · Slice 2 PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
@@ -5857,7 +5887,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in progress (Slice 3 PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth

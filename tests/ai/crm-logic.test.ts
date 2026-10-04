@@ -5,6 +5,8 @@
 import { describe, expect, it } from "vitest";
 import {
   agencyAwardAttempts,
+  contactCsvRow,
+  pickAgenciesToRefresh,
   agencyKey,
   agencyRollups,
   contactsForAgency,
@@ -134,5 +136,46 @@ describe("crm logic", () => {
     expect(touchReminderDue(NOW, tomorrow, daysAgo(10))).toBe(true);
     expect(touchReminderSubject("Ana Rivera", "Navy", tomorrow, NOW)).toBe("Follow-up with Ana Rivera (Navy) is due tomorrow");
     expect(touchReminderSubject("Ana Rivera", "", daysAgo(2), NOW)).toBe("Follow-up with Ana Rivera is overdue");
+  });
+});
+
+describe("Slice 4 — nightly refresh and export", () => {
+  const NOW = new Date("2026-10-04T05:00:00Z");
+  const H = 3_600_000;
+  const w = (organizationId: string, agencyKey: string) => ({ organizationId, agencyKey, agency: agencyKey.toUpperCase() });
+
+  it("refreshes never-fetched agencies first, then the stalest, skipping fresh ones and duplicates", () => {
+    const watched = [w("a", "navy"), w("a", "navy"), w("a", "gsa"), w("b", "nasa"), w("b", "army"), w("a", "")];
+    const cached = [
+      { organizationId: "a", agencyKey: "gsa", fetchedAt: new Date(NOW.getTime() - 2 * H) },
+      { organizationId: "b", agencyKey: "nasa", fetchedAt: new Date(NOW.getTime() - 30 * H) },
+      { organizationId: "b", agencyKey: "army", fetchedAt: new Date(NOW.getTime() - 50 * H) },
+      { organizationId: "b", agencyKey: "navy", fetchedAt: new Date(NOW.getTime() - 99 * H) },
+    ];
+    const picked = pickAgenciesToRefresh(watched, cached, NOW, { limit: 10, freshMs: 22 * H });
+    expect(picked.map((p) => `${p.organizationId}/${p.agencyKey}`)).toEqual(["a/navy", "b/army", "b/nasa"]);
+    expect(pickAgenciesToRefresh(watched, cached, NOW, { limit: 1, freshMs: 22 * H })).toHaveLength(1);
+  });
+
+  it("writes a contact as the row the list shows, with warmth and follow-up", () => {
+    const row = contactCsvRow(
+      {
+        name: "Dana Ortiz",
+        title: "Contracting Officer",
+        role: "contracting_officer",
+        agency: "GSA",
+        office: "FAS",
+        email: "dana@gsa.gov",
+        phone: "",
+        ownerName: null,
+        lastTouchAt: "2026-09-30T12:00:00.000Z",
+        nextTouchAt: "2026-10-01T12:00:00.000Z",
+        touchCount: 3,
+      },
+      NOW,
+    );
+    expect(row).toMatchObject({ Name: "Dana Ortiz", Agency: "GSA", Owner: "", "Last touch": "2026-09-30", "Next touch": "2026-10-01", "Follow-up": "overdue", Touches: 3 });
+    expect(typeof row.Warmth).toBe("number");
+    expect(Object.keys(row)).toEqual(["Name", "Title", "Role", "Agency", "Office", "Email", "Phone", "Owner", "Last touch", "Touches", "Warmth", "Next touch", "Follow-up"]);
   });
 });

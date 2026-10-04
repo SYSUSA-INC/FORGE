@@ -269,3 +269,71 @@ export function touchReminderSubject(contactName: string, agency: string, nextTo
   const overdue = nextTouchAt.getTime() < now.getTime();
   return `Follow-up with ${contactName}${agency ? ` (${agency})` : ""} ${overdue ? "is overdue" : "is due tomorrow"}`;
 }
+
+// ── Slice 4 — keep watched agencies warm; export the list ────────────
+
+export type WatchedAgency = { organizationId: string; agencyKey: string; agency: string };
+
+/**
+ * Which agencies the nightly refresh should ask USAspending about: the
+ * ones a team has contacts at, never fetched first, then the stalest, and
+ * none fetched within `freshMs`. At most `limit`, to stay polite to a slow,
+ * rate-limited public API.
+ */
+export function pickAgenciesToRefresh(
+  watched: readonly WatchedAgency[],
+  cached: readonly { organizationId: string; agencyKey: string; fetchedAt: Date }[],
+  now: Date,
+  opts: { limit: number; freshMs: number },
+): WatchedAgency[] {
+  const seen = new Set<string>();
+  const unique = watched.filter((w) => {
+    const id = `${w.organizationId}|${w.agencyKey}`;
+    if (!w.agencyKey || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  const fetched = new Map(cached.map((c) => [`${c.organizationId}|${c.agencyKey}`, c.fetchedAt.getTime()]));
+  return unique
+    .map((w) => ({ w, at: fetched.get(`${w.organizationId}|${w.agencyKey}`) ?? null }))
+    .filter(({ at }) => at === null || now.getTime() - at >= opts.freshMs)
+    .sort((a, b) => (a.at ?? -Infinity) - (b.at ?? -Infinity) || a.w.agencyKey.localeCompare(b.w.agencyKey))
+    .slice(0, Math.max(0, opts.limit))
+    .map(({ w }) => w);
+}
+
+/** One contact as a CSV row: what the list shows, plus warmth and the follow-up state. */
+export function contactCsvRow(
+  c: {
+    name: string;
+    title: string;
+    role: string;
+    agency: string;
+    office: string;
+    email: string;
+    phone: string;
+    ownerName: string | null;
+    lastTouchAt: string | null;
+    nextTouchAt: string | null;
+    touchCount: number;
+  },
+  now: Date = new Date(),
+): Record<string, string | number> {
+  const role = normalizeRole(c.role);
+  const next = nextTouchStatus(c.nextTouchAt, now);
+  return {
+    Name: c.name,
+    Title: c.title,
+    Role: CONTACT_ROLE_LABELS[role],
+    Agency: c.agency,
+    Office: c.office,
+    Email: c.email,
+    Phone: c.phone,
+    Owner: c.ownerName ?? "",
+    "Last touch": c.lastTouchAt ? c.lastTouchAt.slice(0, 10) : "",
+    Touches: c.touchCount,
+    Warmth: warmthScore({ lastTouchAt: c.lastTouchAt, touchCount: c.touchCount, role, now }),
+    "Next touch": c.nextTouchAt ? c.nextTouchAt.slice(0, 10) : "",
+    "Follow-up": next.state === "none" ? "" : next.state.replace("_", " "),
+  };
+}
