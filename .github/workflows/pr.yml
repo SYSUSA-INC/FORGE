@@ -7,7 +7,9 @@ name: PR Checks
 # in production. Never again.
 #
 # Gates:
-#   - typecheck: tsc --noEmit
+#   - typecheck-lint: tsc --noEmit + next lint in one job
+#                (BL-QC-combined-job — one checkout and one `npm ci`
+#                for both; each still reports its own errors)
 #   - build:     next build (CRITICAL — this catches RSC boundary
 #                bugs like the one in PR #115 that crashed prod with
 #                `TypeError: n is not a function`)
@@ -16,7 +18,7 @@ name: PR Checks
 #   - migrate:   fresh-DB migration verification — applies every
 #                migration to an empty Postgres + verifies idempotency
 #
-# All four are required. None is allowed to be flaky. If any becomes
+# All are required. None is allowed to be flaky. If any becomes
 # flaky, fix the underlying issue rather than disabling the check.
 
 on:
@@ -31,9 +33,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Type check
+  typecheck-lint:
+    name: Type check + ESLint
     runs-on: ubuntu-latest
+    # BL-QC-combined-job: the former `Type check` (here) and `ESLint`
+    # (pr-quality.yml) jobs shared nothing but a checkout and an
+    # `npm ci`; they now run in one job. Both steps always run — a type
+    # error does not hide the lint errors behind it — and the final
+    # step fails the job if either did, naming which. The required
+    # status check on `main` is this job's name.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,7 +49,22 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
-      - run: npm run typecheck
+      - name: Type check (tsc --noEmit)
+        id: typecheck
+        run: npm run typecheck
+        continue-on-error: true
+      - name: ESLint (next lint)
+        id: lint
+        run: npm run lint
+        continue-on-error: true
+      - name: Gate
+        if: steps.typecheck.outcome != 'success' || steps.lint.outcome != 'success'
+        env:
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+        run: |
+          echo "::error::Type check: $TYPECHECK · ESLint: $LINT — see the step logs above."
+          exit 1
 
   build:
     name: Next build

@@ -12,9 +12,10 @@
   `organization_id`. Every server action that touches one must call
   an auth gate + scope by `organizationId`. See §1 of
   `docs/ENGINEERING_STANDARDS.md`.
-- **Pre-merge gate stack:** 8 robotic gates in
+- **Pre-merge gate stack:** 7 robotic gates in
   `.github/workflows/pr-quality.yml` + 5 in `.github/workflows/pr.yml`
-  + Vercel Preview deploy + CODEOWNERS. See §7 of the standards doc.
+  (type check and ESLint share one job) + Vercel Preview deploy +
+  CODEOWNERS. See §7 of the standards doc.
 - **Backlog:** `docs/BACKLOG.md` is the single source of truth for
   planned work. Every PR referencing `BL-N` must update the backlog
   entry (enforced by gate).
@@ -49,8 +50,8 @@
 
 - Conventional commit titles (PR title format gate enforces)
 - `package-lock.json` size (excluded from diff-size guard intentionally)
-- ESLint violations (ESLint gate catches)
-- TypeScript compile errors (Type check gate catches)
+- ESLint violations (Type check + ESLint gate catches)
+- TypeScript compile errors (Type check + ESLint gate catches)
 - RSC boundary violations (RSC boundary check catches)
 - Fresh-DB migration failures (Fresh-DB migration verification catches)
 - Tenant-scoped queries without `organizationId` (Multi-tenant

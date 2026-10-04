@@ -3795,11 +3795,27 @@ sync). Nothing to configure. Vercel's build log will show Next's
 ---
 
 ### BL-QC-combined-job — Consolidate typecheck + lint
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** queued
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** 🔄 in PR
 
 Cosmetic CI cleanup — combine the separate `typecheck` (in `pr.yml`)
 and `lint` (in `pr-quality.yml`) jobs into one job-run for slightly
 faster CI. No power change; just one less `npm ci` per PR.
+
+**Delivered:** `pr.yml` job `typecheck-lint`, display name **Type
+check + ESLint**: one checkout and one `npm ci`, then `npm run
+typecheck` and `npm run lint` as two steps that both always run
+(`continue-on-error`) and a final gate step that fails the job naming
+which one failed — so a type error never hides the lint findings, as
+the two parallel jobs never did. The `lint` job leaves
+`pr-quality.yml` (7 robotic gates remain there); lint now also runs on
+pushes to `main`, as the type check always did. Docs: PR_QUALITY,
+ENGINEERING_STANDARDS §7, AGENTS gate counts.
+
+**Operator step at merge:** in **Settings → Branches → main → Require
+status checks**, add **Type check + ESLint** and remove **Type check**
+and **ESLint**. A required check that no longer reports blocks every
+PR as "Expected — waiting for status", so do this in the same sitting
+as the merge.
 
 ---
 
