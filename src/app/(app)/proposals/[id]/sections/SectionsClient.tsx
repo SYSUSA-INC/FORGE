@@ -208,14 +208,19 @@ export function SectionsClient({
   sections,
   team,
   currentUser,
+  initialSectionId = null,
+  initialTab = null,
 }: {
   proposalId: string;
   sections: Section[];
   team: TeamMember[];
   currentUser: CurrentUser;
+  /** BL-FB-CHAT-MULTI — the section a mention notification points at, opened with its chat. */
+  initialSectionId?: string | null;
+  initialTab?: "chat" | null;
 }) {
   const [expanded, setExpanded] = useState<string | null>(
-    sections[0]?.id ?? null,
+    (initialSectionId && sections.some((s) => s.id === initialSectionId) ? initialSectionId : null) ?? sections[0]?.id ?? null,
   );
 
   return (
@@ -232,6 +237,7 @@ export function SectionsClient({
             currentUser={currentUser}
             open={expanded === s.id}
             onToggle={() => setExpanded(expanded === s.id ? null : s.id)}
+            initialChatOpen={initialTab === "chat" && s.id === initialSectionId}
           />
         ))}
       </ul>
@@ -316,6 +322,7 @@ function SectionRow({
   currentUser,
   open,
   onToggle,
+  initialChatOpen = false,
 }: {
   proposalId: string;
   section: Section;
@@ -323,6 +330,8 @@ function SectionRow({
   currentUser: CurrentUser;
   open: boolean;
   onToggle: () => void;
+  /** BL-FB-CHAT-MULTI — open the AI panel on the chat tab (a mention notification landed here). */
+  initialChatOpen?: boolean;
 }) {
   // BL-9 Slice 2b — collab config (undefined when feature flag is off).
   // Memoized via inline call: the inputs (section.id, currentUser) are
@@ -806,6 +815,9 @@ function SectionRow({
                   layout={sideBySide ? "side" : "stacked"}
                   onLayoutChange={changeLayout}
                   onSuggestion={onSuggestion}
+                  members={team}
+                  initialOpen={initialChatOpen}
+                  initialTab={initialChatOpen ? "chat" : undefined}
                 />
                 {!sideBySide ? helperPanels : null}
               </div>

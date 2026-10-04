@@ -785,7 +785,8 @@ export type NewAiCallLog = typeof aiCallLogs.$inferInsert;
 // and appends the new pair after a successful reply. `user_id` is the
 // author of a user turn (and the requester for the assistant turn);
 // null once the user is deleted.
-export type SectionChatRole = "user" | "assistant";
+/** BL-FB-CHAT-MULTI — "note" is a teammate's message on the thread that calls no model. */
+export type SectionChatRole = "user" | "assistant" | "note";
 
 export const sectionChatMessages = pgTable(
   "section_chat_message",
