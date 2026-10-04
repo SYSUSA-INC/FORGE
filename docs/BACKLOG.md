@@ -33,7 +33,7 @@ Effort key:
 | 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | ✅ shipped (PR #317) |
 | 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ✅ shipped (PR #318) |
 | 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | ✅ shipped (PR #319) |
-| 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | 🔄 in PR |
+| 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | 🔄 in PR (PR #320) |
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ⏳ queued |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -938,7 +938,7 @@ expiry reminders; SSO domain auto-join.
 ---
 
 ### BL-AUTH-ABUSE — Bot and spam accounts: removal, sign-up hardening, trials
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  🔄 Slice 2a in PR  ·  Slice 2b queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  🔄 Slice 2a in PR (PR #320)  ·  Slice 2b queued
 
 User request (2026-10-04): "we had some garbage accounts created by bots
 or spammers in our system, as a super admin I should be able to delete
