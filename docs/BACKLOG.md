@@ -44,7 +44,7 @@ Effort key:
 | 3p | **BL-FB-X-CRM Slice 4** — Nightly refresh of the agencies teams have contacts at; contact list CSV export | P3 | S | ✅ shipped (PR #328) |
 | 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | ✅ shipped (PR #329) |
 | 3r | **BL-FB-CHAT-MULTI Slice 3** — Presence: who else has a section open, in the section header | P3 | S | ✅ shipped (PR #330) |
-| 3s | **BL-21 help refresh (October 2026 pass)** — What's new in the user manual, FAQ for the new features, migrations 0104–0112 table in the admin manual | P3 | S | 🔄 in progress |
+| 3s | **BL-21 help refresh (October 2026 pass)** — What's new in the user manual, FAQ for the new features, migrations 0104–0112 table in the admin manual | P3 | S | 🔄 in PR (PR #331) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -5234,7 +5234,7 @@ guide. Tracked as continuous work, not a single PR.
   collapse-to-icons toggle. Existing CC-vs-Dashboard subsection
   renumbered to §2.2.
 
-- ✅ October 2026 pass (2026-10-04, after the "Work I can build next"
+- 🔄 October 2026 pass — in PR (PR #331) (2026-10-04, after the "Work I can build next"
   run: BL-16 apiAccess / customTemplates, add-ons 2a–2c, voice 3, CRM 4,
   colour-team 4, chat presence) — USER_MANUAL gains a **What's new —
   October 2026** section under Contents pointing to each feature's
