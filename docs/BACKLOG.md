@@ -36,7 +36,7 @@ Effort key:
 | 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | ✅ shipped (PR #320) |
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
 | 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | ✅ shipped (PR #322) |
-| 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | 🔄 in progress |
+| 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | 🔄 in PR (PR #323) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -3754,7 +3754,7 @@ nothing used it, because there was no API.
 (would also need `bulkExport`); webhooks out; platform-admin view and
 revoke of a tenant's tokens; an OpenAPI document.
 
-**customTemplates — the flag gates authoring, not use** 🔄 in progress (2026-10-04):
+**customTemplates — the flag gates authoring, not use** 🔄 in PR (PR #323, 2026-10-04):
 
 User decision (2026-10-04), asked because Bronze and Silver have the
 flag off yet every workspace could build templates: **block authoring**.
