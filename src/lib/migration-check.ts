@@ -21,7 +21,7 @@ import { log } from "@/lib/log";
  * fails when a newer file exists in drizzle/ (BL-TENANT-AUDIT 2026-09
  * found it pinned 24 migrations behind).
  */
-export const EXPECTED_LATEST_MIGRATION = "0106_trial_requests.sql";
+export const EXPECTED_LATEST_MIGRATION = "0107_api_tokens.sql";
 
 let didCheck = false;
 

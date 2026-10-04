@@ -105,8 +105,8 @@ The sidebar shows one **workspace** at a time, scoped to the hat you are wearing
 
 | Workspace | Who | What it contains |
 |---|---|---|
-| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Customer Relations (Customer contacts, Follow-ups owed, New contact, Import contacts); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
-| **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine); Governance (Notification rules, Audit Log); Admin guide |
+| **Workspace** (subtitle "Proposal Ops") | every member | Command Center; Opportunities (Dashboard, Pipeline, Scout, New Opportunity, Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New Solicitation, In-flight Proposals, New Proposals); Customer Relations (Customer contacts, Follow-ups owed, New contact, Import contacts); Platform Intelligence (Company Search, Add company, FORGE Brain, Loss intelligence, Awards & recompetes, 8(a) firms, Watchlist, Saved searches, Knowledge, Knowledge import, USAspending import, New knowledge entry); Operations Management (Settings, Integrations, AI Engine — read-only for non-admins — and Notifications); **Administration — org admins only** (Users & Roles, Billing, Templates, API access, Notification rules, Audit Log); Help (User guide, Admin guide for admins, FAQ) |
+| **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine, API access); Governance (Notification rules, Audit Log); Admin guide |
 | **Platform admin** | platform superadmins | Organizations & users (Overview, Organizations, Platform users, Trial requests, Source requests — the first three are the SuperAdmin portal's tabs, in the portal's order; a menu click opens the tab and a tab click updates the menu); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
 
 The everyday Workspace is the complete map of the product: everything a member can open is listed there, and an admin also sees the Administration group in the same tree, so administering the organization never requires switching (BL-NAV-RESTORE). Regular members never see the Administration group or the Admin guide.
@@ -267,6 +267,26 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 **Settings → Billing** shows your plan, when it renews, and the other plans you can move to. Below the plans, **Add-ons** lists what you can add on top of any plan à la carte: a **token top-up** raises this month's AI token cap by its amount (buy several to stack them; a plan with an unlimited cap needs none), and a **feature unlock** turns one feature on — for example Winner analysis on a plan that does not include it. The line above the list shows your AI token cap this month and how much of it comes from add-ons. An org admin adds one with **Add …**, which goes through the same card checkout as a plan; the add-on shows as **Active** within a few seconds of returning and counts immediately. Add-ons bought by card renew monthly with your plan and are cancelled from the billing portal; an add-on marked **Contact sales** is arranged with us and granted to your organization by hand. Everyone can see the list; only admins can buy.
 
 **Trials.** A workspace on a trial shows the days left in a line under the top bar and under **Current plan**. When the trial ends without a plan, nothing you have done is lost and **editing carries on as usual** — you can still write, create proposals, invite colleagues, upload and export. Only the AI features pause (drafting, chat, analyses and AI checks) until an admin chooses a plan here.
+
+### 4.15 API access (admins)
+
+**Settings → API access** lets an org admin connect FORGE to other systems — a CRM, a BI dashboard, an internal report — through a read-only API. It is part of some plans (or an add-on); without it the page says so and links to Billing.
+
+- **Create a token** with a name (say what will use it, e.g. "Salesforce sync") and a lifetime: 30 days, 90 days, 1 year or never. The token (`forge_…`) is shown **once** — copy it into the other system straight away; FORGE keeps only a fingerprint and can't show it again. If it is lost, revoke it and make a new one.
+- The list shows each token's first characters, who made it, when it was last used, when it expires and whether it is active, expired or revoked. **Revoke** stops it immediately. A workspace can have 20 active tokens. Tokens belong to the workspace, so they keep working if the person who made them leaves — revoke the ones you no longer need.
+- **Calling the API.** Send the token on every request as `Authorization: Bearer forge_…`. Everything is read-only JSON:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/v1/me` | The workspace and token you are calling with |
+| `GET /api/v1/opportunities` | Pipeline opportunities, newest change first |
+| `GET /api/v1/opportunities/{id}` | One opportunity, with its description |
+| `GET /api/v1/proposals` | Proposals, newest change first |
+| `GET /api/v1/proposals/{id}` | One proposal with its section outline (titles, status, word counts — not the text) |
+
+  Lists take `limit` (1–100, default 50), `stage` (an opportunity or proposal stage), `updated_since` (an ISO 8601 date-time — handy for syncing only what changed) and `cursor`: each page returns `nextCursor`; pass it back to get the next page, until it is `null`. For example: `curl -H "Authorization: Bearer forge_…" "https://<your FORGE address>/api/v1/opportunities?updated_since=2026-10-01T00:00:00Z"`.
+- Each token can make 120 requests a minute. Answers: `401` missing, unknown, revoked or expired token; `403` the plan no longer includes API access, or the workspace is disabled; `404` no such record in your workspace; `429` too many requests (wait the seconds in `Retry-After`).
+- Every answered request is recorded in your **Audit Log** under the token's name.
 
 ---
 

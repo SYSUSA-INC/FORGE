@@ -34,7 +34,8 @@ Effort key:
 | 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ✅ shipped (PR #318) |
 | 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | ✅ shipped (PR #319) |
 | 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | ✅ shipped (PR #320) |
-| 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | 🔄 in PR (PR #321) |
+| 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
+| 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | 🔄 in PR (PR #322) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -132,7 +133,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
-**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** 🟡 in progress — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a shipped (PR #284); BL-AIP-7b shipped (PRs #288, #289, #291); BL-AIP-7c shipped (PR #292); BL-AIP-7d shipped (PRs #293, #294); BL-AIP-6b — the program's last slice — in PR (PR #295)
+**Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** ✅ shipped — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a shipped (PR #284); BL-AIP-7b shipped (PRs #288, #289, #291); BL-AIP-7c shipped (PR #292); BL-AIP-7d shipped (PRs #293, #294); BL-AIP-6b — the program's last slice — shipped (PR #295)
 
 Five read-only audits (capture & intelligence, solicitations, proposal
 development & editor, Brain & AI engine, navigation & admin) of every
@@ -318,7 +319,7 @@ defect in the assessment plus its neighbours:
 - Audited: `opportunity.brief.generate`, `pipeline.brief.generate`,
   `ai_brief.feedback`.
 
-**BL-AIP-6b — the rail follows the cursor; review comments resolved in the editor** 🔄 (PR #295)
+**BL-AIP-6b — the rail follows the cursor; review comments resolved in the editor** ✅ (PR #295)
 
 - **Paragraph under the cursor.** `RichSectionEditor` reports the
   plain text of the textblock the selection is in on every selection
@@ -938,7 +939,7 @@ expiry reminders; SSO domain auto-join.
 ---
 
 ### BL-AUTH-ABUSE — Bot and spam accounts: removal, sign-up hardening, trials
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  ✅ Slice 2a shipped (PR #320)  ·  🔄 Slice 2b in PR (PR #321)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  ✅ Slice 2a shipped (PR #320)  ·  ✅ Slice 2b shipped (PR #321)
 
 User request (2026-10-04): "we had some garbage accounts created by bots
 or spammers in our system, as a super admin I should be able to delete
@@ -1612,7 +1613,7 @@ lightweight CRM scoped to capture, under **Customer contacts**
   an export of the contact list.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #316 · Slice 1 PR #305 · Slice 2 PR #306)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–3 shipped (PR #305 · PR #306 · PR #316)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -3527,7 +3528,8 @@ existing org per Phase A backfill) see no behavior change.
 
 Still ungated (deferred — flags exist but features aren't yet
 built or need design work):
-- `apiAccess` — no token endpoint exists yet
+- ~~`apiAccess` — no token endpoint exists yet~~ → gated by the
+  read-only API below (**apiAccess**, 2026-10-04)
 - `customTemplates` — gating semantics need design (view-only vs.
   create-only)
 
@@ -3698,6 +3700,57 @@ built or need design work):
   hint label.
 - "Promo codes →" link added to the SuperAdmin portal header next
   to Tiers.
+
+**apiAccess — workspace API tokens + read-only `/api/v1`** 🔄 in PR (PR #322, 2026-10-04):
+
+User request (2026-10-04): build the "Work I can build next" list in
+order; BL-16 `apiAccess` is first. The flag existed since Phase A but
+nothing used it, because there was no API.
+
+- Migration `0107_api_tokens.sql` — `api_token` (tenant-scoped): name,
+  `token_prefix` (first 12 characters, for display and the audit trail),
+  `token_hash` (SHA-256, unique), creator, `expires_at`, `last_used_at`,
+  `revoked_at` / `revoked_by_user_id`. Index `(organization_id,
+  created_at)`. Tokens belong to the workspace, not the admin who made
+  them; revoked, never deleted.
+- Token format `forge_` + 32 random bytes base64url (49 characters).
+  The plain token is returned once by create and never stored.
+- **Settings → API access** (`/settings/api`, org admins; in the
+  Administration group and the company console): create with a name
+  and a lifetime (30 / 90 / 365 days / never), copy-once reveal, list
+  with prefix · creator · created · last used · expiry · status,
+  revoke. At most 20 active tokens per workspace. A quick reference
+  (curl example, endpoints, parameters) sits under the list. When the
+  plan lacks `apiAccess` the page says so and links to billing; create
+  is refused server-side too.
+- `/api/v1` (read-only JSON; middleware lets `/api/v1/` through and
+  each handler authenticates the bearer token):
+  `GET /me`, `GET /opportunities`, `GET /opportunities/{id}` (adds
+  `description`), `GET /proposals`, `GET /proposals/{id}` (adds the
+  section outline — kind, title, ordering, status, word count, page
+  limit; not the text). Lists: `limit` (1–100, default 50), opaque
+  `cursor` (keyset on millisecond-truncated `updated_at` + id, so rows
+  sharing a timestamp are neither skipped nor repeated),
+  `updated_since` (ISO 8601) and `stage`. Unknown or another
+  workspace's id → 404.
+- Every request: token shape → hash lookup → revoked / expired 401 →
+  disabled workspace 403 → 120 requests a minute per token (429 with
+  `Retry-After`) → `apiAccess` on the plan, checked live (403), so
+  turning the flag off or ending an add-on stops every token at once.
+  `last_used_at` is written at most every 5 minutes.
+- Audit: `api_token.create`, `api_token.revoke`, and `api.v1.read`
+  (via `recordRead`, actor "API token forge_xxxxxx… (name)", with path,
+  query and row count) for every answered request.
+- `apiAccess` isn't paused when a trial ends (only AI is).
+- Pure rules in `src/lib/api-tokens-logic.ts`; tokens in
+  `src/lib/api-tokens.ts`; endpoints in `src/lib/api-v1.ts`; route
+  handlers stay thin. Tests: `tests/ai/api-tokens-logic.test.ts`,
+  `tests/isolation/api-tokens.test.ts` (through the real handlers).
+- Docs: USER_MANUAL §4.15, ADMIN_MANUAL §6.10.
+
+**Later:** write endpoints (scoped tokens); section text and exports
+(would also need `bulkExport`); webhooks out; platform-admin view and
+revoke of a tenant's tokens; an OpenAPI document.
 
 **What ships in a later phase**: the actual redemption flow
 (applying a code to a `tenant_subscription` to discount the next
@@ -5654,7 +5707,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #316 · Slice 1 PR #305 · Slice 2 PR #306) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–3 shipped (PR #305 · PR #306 · PR #316) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer

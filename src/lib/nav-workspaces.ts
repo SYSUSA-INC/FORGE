@@ -155,6 +155,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
       { href: "/users", label: "Users & Roles" },
       { href: "/settings/billing", label: "Billing" },
       { href: "/settings/templates", label: "Templates" },
+      { href: "/settings/api", label: "API access" },
       { href: "/notifications/rules", label: "Notification rules" },
       { href: "/audit-log", label: "Audit Log" },
     ],
@@ -193,6 +194,7 @@ const COMPANY_NAV: WorkspaceNavGroup[] = [
       { href: "/settings/templates", label: "Templates" },
       { href: "/settings/integrations", label: "Integrations" },
       { href: "/settings/ai-engine", label: "AI Engine" },
+      { href: "/settings/api", label: "API access" },
     ],
   },
   {
@@ -277,6 +279,7 @@ const COMPANY_PATHS = [
   "/notifications/rules",
   "/settings/billing",
   "/settings/templates",
+  "/settings/api",
   "/help/admin",
 ];
 

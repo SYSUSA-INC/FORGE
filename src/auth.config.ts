@@ -47,6 +47,10 @@ export const authConfig = {
       // The middleware can't run that check, so let the request through
       // unconditionally and the route enforces signing.
       if (pathname === "/api/webhooks/stripe") return true;
+      // BL-16 apiAccess — the public read-only API authenticates each
+      // request with a workspace API token (Authorization: Bearer forge_…)
+      // inside the route handler; there is no session to check here.
+      if (pathname.startsWith("/api/v1/")) return true;
 
       return !!auth?.user;
     },

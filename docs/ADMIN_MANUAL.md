@@ -73,7 +73,7 @@ Practical guidance for assignments:
 
 ### 2.1 Access
 
-Sign in. Under the FORGE mark the sidebar shows the **Workspace** switcher (Workspace · Company admin; BL-NAV-WORKSPACES). As an org admin you can administer from either: the everyday **Workspace** tree carries an **Administration** group (Users & Roles, Billing, Templates, Notification rules, Audit Log) and the Admin guide that only admins see (BL-NAV-RESTORE), and **Company admin** is the same set as a console of its own: People (Users & Roles), Organization (Settings, Billing, Templates, Integrations, AI Engine), Governance (Notification rules, Audit Log) and the Admin guide. Members never see the Administration group or the console. The workspace you pick sticks while you open pages it lists; opening a page it does not list switches to the workspace that does.
+Sign in. Under the FORGE mark the sidebar shows the **Workspace** switcher (Workspace · Company admin; BL-NAV-WORKSPACES). As an org admin you can administer from either: the everyday **Workspace** tree carries an **Administration** group (Users & Roles, Billing, Templates, API access, Notification rules, Audit Log) and the Admin guide that only admins see (BL-NAV-RESTORE), and **Company admin** is the same set as a console of its own: People (Users & Roles), Organization (Settings, Billing, Templates, Integrations, AI Engine, API access), Governance (Notification rules, Audit Log) and the Admin guide. Members never see the Administration group or the console. The workspace you pick sticks while you open pages it lists; opening a page it does not list switches to the workspace that does.
 
 ![Users page](docs/images/users-page.png)
 
@@ -470,7 +470,7 @@ Feature flags gate specific actions in the app. When the flag is `false` for a t
 | `winnerAnalysis` | Proposal-vs-winner analysis | `runWinnerAnalysisAction` |
 | `complianceMatrix` | AI compliance preflight | `runCompliancePreflightAction` |
 | `bulkExport` | Audit-log CSV download | `exportAuditLogCsvAction` |
-| `apiAccess` | Token-based API endpoints | (reserved; no endpoint yet) |
+| `apiAccess` | Workspace API tokens and the read-only `/api/v1` API | `createApiToken` and every `/api/v1` request (see §6.10) |
 | `customTemplates` | Custom proposal template editing | (reserved) |
 
 ### 6.3 How quotas work
@@ -590,7 +590,17 @@ Add-ons sit on top of any tier (BL-PACKAGES add-ons Slice 1; migration 0105 adds
 
 **Bought by card** — on `/settings/billing` an org admin buys an add-on with a Stripe Price through Checkout. Each add-on is its own recurring Stripe subscription (quantity for top-ups) carrying `forgeAddonSlug` in its metadata; the webhook records the grant on `checkout.session.completed` (`tenant.addon.purchased`), keeps quantity and status in step on `customer.subscription.updated`, and ends it on `customer.subscription.deleted` (`tenant.addon.cancelled`, serving until the paid period ends). Add-on subscriptions never touch the tenant's plan row: the plan handlers skip any subscription that is a known grant, carries the add-on metadata, or bills an add-on's Price. If a tenant had no Stripe customer before, the add-on checkout binds one so the billing portal works afterwards.
 
-### 6.10 Operating practices
+### 6.10 API access (`apiAccess`)
+
+Migration 0107 adds `api_token` — sync it on `/admin/migrations` after deploying. A tenant whose effective tier (or an add-on, or an override) has `apiAccess` gets **Settings → API access** (`/settings/api`), where its org admins create and revoke read-only API tokens; integrators call `/api/v1/…` with `Authorization: Bearer forge_…`. The tenant-facing reference is USER_MANUAL §4.15.
+
+- **The flag is checked on every request**, not only when a token is made. Turning `apiAccess` off for a tier, setting a `custom_overrides` of `{"featureFlags": {"apiAccess": false}}` on one tenant, or ending an add-on that unlocked it stops all of that tenant's tokens at once (403) without revoking them; turning it back on restores them. That is the fastest way to cut a tenant's API off in an incident. A disabled organization's tokens are refused too.
+- **Tokens belong to the workspace**, not to the admin who created them, so they keep working after that person leaves. Tenant admins see who made each token and when it was last used, and revoke there. FORGE stores only a SHA-256 of each token and its first 12 characters (`forge_xxxxxx`), so nobody — including platform admins — can recover a lost token; the tenant makes a new one.
+- **Limits:** 20 active tokens per tenant; 120 requests a minute per token (429 with `Retry-After`); list pages of at most 100 rows.
+- **Audit:** `api_token.create` / `api_token.revoke` with the token's name and prefix, and `api.v1.read` for every answered request (actor "API token forge_xxxxxx… (name)", path, query and row count) in the tenant's own log.
+- Ending a trial pauses AI only, so a trial tenant's API keeps working if its tier includes it.
+
+### 6.11 Operating practices
 
 - **Tier edits are platform-wide and immediate**. Flipping Bronze's `aiAutoDraft` from `false` to `true` unlocks the feature for every Bronze tenant the moment the gate's next read fires. No deploy needed. Audit the change in your shared ops doc the same day.
 - **Custom tier is the right place for sales-negotiated terms**. Don't edit Bronze/Silver/Gold/Platinum prices ad-hoc for one customer — that affects everyone. Move them to Custom and use `custom_overrides`.
