@@ -27,6 +27,7 @@ import { StartImpersonationForm } from "./StartImpersonationForm";
 import { IsolationCheckPanel } from "./IsolationCheckPanel";
 import { ItarRestrictedToggle } from "./ItarRestrictedToggle";
 import { TenantDomainsEditor } from "./TenantDomainsEditor";
+import { TenantAddonsSection } from "./TenantAddonsSection";
 
 export const dynamic = "force-dynamic";
 
@@ -400,6 +401,9 @@ export default async function TenantDetailPage({
             }))}
           />
         </Panel>
+
+        {/* BL-PACKAGES add-ons Slice 1 — grants on top of the tier */}
+        <TenantAddonsSection organizationId={org.id} currentTier={currentTier} />
 
         <Panel title="Storage & config">
           <dl className="grid grid-cols-[180px_1fr] gap-y-2 font-mono text-[12px]">

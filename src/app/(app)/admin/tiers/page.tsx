@@ -10,6 +10,7 @@ import {
   type TierQuotas,
 } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { AddonCatalogSection } from "./AddonCatalogSection";
 
 export const dynamic = "force-dynamic";
 
@@ -161,6 +162,9 @@ export default async function TiersPage() {
           </ul>
         )}
       </Panel>
+
+      {/* BL-PACKAGES add-ons Slice 1 — the à la carte catalogue */}
+      <AddonCatalogSection />
     </>
   );
 }
