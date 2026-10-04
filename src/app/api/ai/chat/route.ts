@@ -45,6 +45,8 @@ const bodySchema = z.object({
   message: z.string().trim().min(1).max(4000),
   /** BL-AIP-2 — the section text as it stands in the editor. */
   currentBodyPlain: z.string().max(60_000).optional(),
+  /** BL-FB-CHAT-MULTI Slice 2 — the thread message this question answers. */
+  replyToMessageId: z.string().uuid().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -154,6 +156,7 @@ export async function POST(req: NextRequest) {
               userMessage: body.message,
               assistantReply: reply,
               stubbed: ai.stubbed,
+              replyToMessageId: body.replyToMessageId ?? null,
             });
             // BL-FB-CHAT-MULTI — teammates named in the question hear about it.
             await notifySectionChatMentions({

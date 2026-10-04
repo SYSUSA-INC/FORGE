@@ -9,7 +9,7 @@
  */
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   complianceItems,
@@ -19,13 +19,14 @@ import {
   proposalSections,
   proposals,
   sectionChatMessages,
+  sectionChatReads,
   users,
   type SectionChatRole,
 } from "@/db/schema";
 import type { AIMessage } from "@/lib/ai";
 import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
 import { recordAudit } from "@/lib/audit-log";
-import { CHAT_NOTE_MAX_CHARS, memberLabel, mentionSubject, sectionChatLink } from "@/lib/chat-mentions";
+import { CHAT_NOTE_MAX_CHARS, CHAT_NOTES_TO_MODEL_MAX, memberLabel, mentionSubject, notesForModel, sectionChatLink } from "@/lib/chat-mentions";
 import { extractMentionUserIds, renderMentionsToPlain } from "@/lib/mentions";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
@@ -214,6 +215,30 @@ export async function prepareSectionChat(input: {
     // best effort
   }
 
+  // BL-FB-CHAT-MULTI Slice 2 — the team's notes, when this section opts
+  // in: context about what the team decided, never instructions.
+  let notesBlock = "";
+  if (row.section.chatNotesToModel) {
+    try {
+      const notes = await db
+        .select({ content: sectionChatMessages.content, name: users.name, email: users.email })
+        .from(sectionChatMessages)
+        .leftJoin(users, eq(users.id, sectionChatMessages.userId))
+        .where(and(eq(sectionChatMessages.organizationId, organizationId), eq(sectionChatMessages.sectionId, input.sectionId), eq(sectionChatMessages.role, "note")))
+        .orderBy(desc(sectionChatMessages.createdAt))
+        .limit(CHAT_NOTES_TO_MODEL_MAX);
+      const noteNames = notes.some((n) => n.content.includes("@[")) ? await memberNames(organizationId) : new Map<string, string>();
+      notesBlock = notesForModel(
+        notes.reverse().map((n) => ({
+          author: n.name?.trim() || n.email?.split("@")[0] || "A teammate",
+          content: renderMentionsToPlain(n.content, (id) => noteNames.get(id) ?? null),
+        })),
+      );
+    } catch {
+      // best effort
+    }
+  }
+
   const contextBlock = [
     `Organization: ${orgRow?.name ?? "unknown"}`,
     `Proposal: ${row.proposal.title}`,
@@ -229,6 +254,7 @@ export async function prepareSectionChat(input: {
     authorVoiceBlock,
     solBlock && `\nSolicitation context:\n${solBlock}`,
     attachmentsBlock && `\n${attachmentsBlock}`,
+    notesBlock && `\n${notesBlock}`,
     signalsBlock && `\nWhat the team has learned (resolve reviewer comments in the text; answer past weaknesses with evidence; never cite them):\n${signalsBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
     (liveBody || row.section.content?.trim()) &&
@@ -271,6 +297,8 @@ export async function prepareSectionChat(input: {
 /** Most recent turns shown when a thread is reopened. */
 export const CHAT_LOAD_LIMIT = 40;
 
+export type SectionChatReplyTarget = { id: string; role: SectionChatRole; authorName: string; content: string };
+
 export type SectionChatTurn = {
   id: string;
   role: SectionChatRole;
@@ -281,7 +309,33 @@ export type SectionChatTurn = {
   /** True when the viewer wrote this turn. */
   isMine: boolean;
   stubbed: boolean;
+  /** BL-FB-CHAT-MULTI Slice 2 — the message this one answers, when it is a reply. */
+  replyToMessageId: string | null;
+  replyTo: SectionChatReplyTarget | null;
 };
+
+/** The parents of the replies in a thread, by id, scoped to the section. */
+async function loadReplyTargets(organizationId: string, sectionId: string, ids: readonly string[]): Promise<Map<string, SectionChatReplyTarget>> {
+  const wanted = Array.from(new Set(ids));
+  if (wanted.length === 0) return new Map();
+  const rows = await db
+    .select({ id: sectionChatMessages.id, role: sectionChatMessages.role, content: sectionChatMessages.content, name: users.name, email: users.email })
+    .from(sectionChatMessages)
+    .leftJoin(users, eq(users.id, sectionChatMessages.userId))
+    .where(and(eq(sectionChatMessages.organizationId, organizationId), eq(sectionChatMessages.sectionId, sectionId), inArray(sectionChatMessages.id, wanted)));
+  return new Map(rows.map((r) => [r.id, { id: r.id, role: r.role, authorName: r.role === "assistant" ? "AI" : r.name?.trim() || r.email?.split("@")[0] || "", content: r.content }] as const));
+}
+
+/** A reply target is honoured only when it is a message of the same section in the same tenant. */
+async function replyTargetInThread(organizationId: string, sectionId: string, id: string | null | undefined): Promise<string | null> {
+  if (!id) return null;
+  const [p] = await db
+    .select({ id: sectionChatMessages.id })
+    .from(sectionChatMessages)
+    .where(and(eq(sectionChatMessages.id, id), eq(sectionChatMessages.organizationId, organizationId), eq(sectionChatMessages.sectionId, sectionId)))
+    .limit(1);
+  return p?.id ?? null;
+}
 
 /**
  * Confirm a section belongs to the org and return its proposal id.
@@ -321,6 +375,7 @@ export async function loadSectionChatHistory(input: {
       createdAt: sectionChatMessages.createdAt,
       userId: sectionChatMessages.userId,
       stubbed: sectionChatMessages.stubbed,
+      replyToMessageId: sectionChatMessages.replyToMessageId,
       authorName: users.name,
     })
     .from(sectionChatMessages)
@@ -333,6 +388,11 @@ export async function loadSectionChatHistory(input: {
     )
     .orderBy(desc(sectionChatMessages.createdAt))
     .limit(input.limit ?? CHAT_LOAD_LIMIT);
+  const targets = await loadReplyTargets(
+    input.organizationId,
+    input.sectionId,
+    rows.map((r) => r.replyToMessageId).filter((id): id is string => !!id),
+  );
 
   return rows.reverse().map((r) => ({
     id: r.id,
@@ -342,7 +402,118 @@ export async function loadSectionChatHistory(input: {
     authorName: r.authorName ?? "",
     isMine: r.userId === input.viewerUserId,
     stubbed: r.stubbed,
+    replyToMessageId: r.replyToMessageId,
+    replyTo: r.replyToMessageId ? (targets.get(r.replyToMessageId) ?? null) : null,
   }));
+}
+
+export type SectionChatThread = { messages: SectionChatTurn[]; lastReadAt: string | null; notesToModel: boolean };
+
+/**
+ * BL-FB-CHAT-MULTI Slice 2 — the thread for display plus what the viewer
+ * needs to read it: when they last looked (for the "new since you
+ * looked" line) and whether the model reads the team's notes here. Null
+ * when the section is not this organization's.
+ */
+export async function loadSectionChatThread(input: {
+  organizationId: string;
+  sectionId: string;
+  viewerUserId: string;
+  limit?: number;
+}): Promise<SectionChatThread | null> {
+  const { organizationId } = input;
+  const [section] = await db
+    .select({ chatNotesToModel: proposalSections.chatNotesToModel })
+    .from(proposalSections)
+    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+    .where(and(eq(proposalSections.id, input.sectionId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  if (!section) return null;
+  const [read] = await db
+    .select({ lastReadAt: sectionChatReads.lastReadAt })
+    .from(sectionChatReads)
+    .where(and(eq(sectionChatReads.organizationId, organizationId), eq(sectionChatReads.sectionId, input.sectionId), eq(sectionChatReads.userId, input.viewerUserId)))
+    .limit(1);
+  const messages = await loadSectionChatHistory(input);
+  return { messages, lastReadAt: read?.lastReadAt.toISOString() ?? null, notesToModel: section.chatNotesToModel };
+}
+
+/** BL-FB-CHAT-MULTI Slice 2 — the viewer has looked at this thread now; one row per (section, user). */
+export async function markSectionChatRead(input: {
+  organizationId: string;
+  sectionId: string;
+  userId: string;
+  now?: Date;
+}): Promise<{ ok: true; lastReadAt: string } | { ok: false; error: string }> {
+  const { organizationId } = input;
+  const owned = await findSectionForOrg({ organizationId, sectionId: input.sectionId });
+  if (!owned) return { ok: false, error: "Section not found." };
+  const now = input.now ?? new Date();
+  await db
+    .insert(sectionChatReads)
+    .values({ organizationId, sectionId: input.sectionId, userId: input.userId, lastReadAt: now, updatedAt: now })
+    .onConflictDoUpdate({ target: [sectionChatReads.sectionId, sectionChatReads.userId], set: { lastReadAt: now, updatedAt: now } });
+  return { ok: true, lastReadAt: now.toISOString() };
+}
+
+/**
+ * BL-FB-CHAT-MULTI Slice 2 — per section of a proposal, how many
+ * messages by someone else landed since the viewer last looked (all of
+ * them when they never have). The AI's replies to the viewer's own
+ * questions carry the viewer's id and are never new to them.
+ */
+export async function unreadChatCounts(input: {
+  organizationId: string;
+  proposalId: string;
+  viewerUserId: string;
+}): Promise<Record<string, number>> {
+  const { organizationId } = input;
+  const rows = await db
+    .select({ sectionId: sectionChatMessages.sectionId, n: count() })
+    .from(sectionChatMessages)
+    .leftJoin(
+      sectionChatReads,
+      and(
+        eq(sectionChatReads.sectionId, sectionChatMessages.sectionId),
+        eq(sectionChatReads.userId, input.viewerUserId),
+        eq(sectionChatReads.organizationId, organizationId),
+      ),
+    )
+    .where(
+      and(
+        eq(sectionChatMessages.organizationId, organizationId),
+        eq(sectionChatMessages.proposalId, input.proposalId),
+        or(isNull(sectionChatMessages.userId), ne(sectionChatMessages.userId, input.viewerUserId)),
+        or(isNull(sectionChatReads.lastReadAt), gt(sectionChatMessages.createdAt, sectionChatReads.lastReadAt)),
+      ),
+    )
+    .groupBy(sectionChatMessages.sectionId);
+  return Object.fromEntries(rows.map((r) => [r.sectionId, Number(r.n)] as const));
+}
+
+/** BL-FB-CHAT-MULTI Slice 2 — whether the chat model reads this section's team notes; audited. */
+export async function setSectionChatNotesToModel(input: {
+  organizationId: string;
+  sectionId: string;
+  enabled: boolean;
+  actor: { userId: string | null; email?: string | null };
+}): Promise<{ ok: true; enabled: boolean } | { ok: false; error: string }> {
+  const { organizationId } = input;
+  const owned = await findSectionForOrg({ organizationId, sectionId: input.sectionId });
+  if (!owned) return { ok: false, error: "Section not found." };
+  await db
+    .update(proposalSections)
+    .set({ chatNotesToModel: input.enabled, updatedAt: new Date() })
+    .where(eq(proposalSections.id, input.sectionId));
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "section_chat.notes_to_model",
+    resourceType: "proposal_section",
+    resourceId: input.sectionId,
+    metadata: { proposalId: owned.proposalId, enabled: input.enabled },
+  });
+  return { ok: true, enabled: input.enabled };
 }
 
 /**
@@ -388,7 +559,10 @@ export async function appendSectionChatTurns(input: {
   userMessage: string;
   assistantReply: string;
   stubbed: boolean;
+  /** BL-FB-CHAT-MULTI Slice 2 — the message the question answers; ignored unless it is in this thread. */
+  replyToMessageId?: string | null;
 }): Promise<{ userMessageId: string; assistantMessageId: string }> {
+  const replyToMessageId = await replyTargetInThread(input.organizationId, input.sectionId, input.replyToMessageId);
   const [u] = await db
     .insert(sectionChatMessages)
     .values({
@@ -398,6 +572,7 @@ export async function appendSectionChatTurns(input: {
       userId: input.userId,
       role: "user",
       content: input.userMessage,
+      replyToMessageId,
     })
     .returning({ id: sectionChatMessages.id });
   const [a] = await db
@@ -437,6 +612,8 @@ export async function appendSectionChatNote(input: {
   sectionId: string;
   userId: string;
   content: string;
+  /** BL-FB-CHAT-MULTI Slice 2 — the message the note answers; ignored unless it is in this thread. */
+  replyToMessageId?: string | null;
   actor: { userId: string | null; email?: string | null };
 }): Promise<NoteResult> {
   const { organizationId } = input;
@@ -444,24 +621,36 @@ export async function appendSectionChatNote(input: {
   if (!content) return { ok: false, error: "Write something first." };
   const owned = await findSectionForOrg({ organizationId, sectionId: input.sectionId });
   if (!owned) return { ok: false, error: "Section not found." };
+  const replyToMessageId = await replyTargetInThread(organizationId, input.sectionId, input.replyToMessageId);
   const [row] = await db
     .insert(sectionChatMessages)
-    .values({ organizationId, proposalId: owned.proposalId, sectionId: input.sectionId, userId: input.userId, role: "note", content })
+    .values({ organizationId, proposalId: owned.proposalId, sectionId: input.sectionId, userId: input.userId, role: "note", content, replyToMessageId })
     .returning({ id: sectionChatMessages.id, createdAt: sectionChatMessages.createdAt });
   if (!row) return { ok: false, error: "Could not post the note." };
   const [author] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
+  const targets = replyToMessageId ? await loadReplyTargets(organizationId, input.sectionId, [replyToMessageId]) : new Map<string, SectionChatReplyTarget>();
   await recordAudit({
     organizationId,
     actor: input.actor,
     action: "section_chat.note",
     resourceType: "proposal_section",
     resourceId: input.sectionId,
-    metadata: { proposalId: owned.proposalId, messageId: row.id, mentions: extractMentionUserIds(content).length },
+    metadata: { proposalId: owned.proposalId, messageId: row.id, mentions: extractMentionUserIds(content).length, replyTo: !!replyToMessageId },
   });
   return {
     ok: true,
     proposalId: owned.proposalId,
-    message: { id: row.id, role: "note", content, createdAt: row.createdAt.toISOString(), authorName: author?.name ?? author?.email ?? "", isMine: true, stubbed: false },
+    message: {
+      id: row.id,
+      role: "note",
+      content,
+      createdAt: row.createdAt.toISOString(),
+      authorName: author?.name ?? author?.email ?? "",
+      isMine: true,
+      stubbed: false,
+      replyToMessageId,
+      replyTo: replyToMessageId ? (targets.get(replyToMessageId) ?? null) : null,
+    },
   };
 }
 
@@ -506,7 +695,8 @@ export async function notifySectionChatMentions(input: {
     payload: { proposalId: input.proposalId, sectionId: input.sectionId, messageId: input.messageId, source: "section_chat", mentionedUserIds },
     subject: mentionSubject(authorName, section.title),
     body: renderMentionsToPlain(input.body, (id) => names.get(id) ?? null).slice(0, 500),
-    linkPath: sectionChatLink(input.proposalId, input.sectionId),
+    // Slice 2 — the link opens the chat scrolled to this message.
+    linkPath: sectionChatLink(input.proposalId, input.sectionId, input.messageId),
     proposalId: input.proposalId,
     actorUserId: input.actorUserId,
   });

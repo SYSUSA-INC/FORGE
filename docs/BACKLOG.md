@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #309)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #313 · Slice 1 PR #309)
 
 Capture manager, writer and AI in one thread, tied to the section
 instead of a Slack side-channel. BL-FB-CHAT-PERSIST already made the
@@ -1147,9 +1147,42 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   tenant's section only, seen by the team with its author, absent from
   the model's history; a mention reaches the named active member only,
   with the chat link; audits).
-- **Slice 2:** unread marker per section ("3 new since you looked"),
-  reply-to on a note, presence (who has the section open) once the
-  Hocuspocus layer is deployed, notes as optional model context.
+
+**Slice 2 — new since you looked, replies, notes the AI may read:**
+
+- **Unread markers.** `section_chat_read` (migration 0102) keeps when
+  each member last looked at a section's thread, upserted when the
+  chat opens (`markSectionChatRead`). The section header shows
+  `💬 3 new` for messages by teammates since then (`unreadChatCounts`
+  on the sections page; the viewer's own questions and the AI's replies
+  to them never count), and the thread draws a "3 new since you looked"
+  line where the new messages start (`unreadSplit`, pure, fixed at
+  load so it does not jump while reading). The badge clears as soon as
+  the thread is read.
+- **Reply-to.** **↩ Reply** on any note or question quotes it in the
+  composer; the next **Send** or **Note** carries
+  `reply_to_message_id` (honoured only for a message of the same thread
+  in the same tenant), the thread renders the quoted parent above the
+  reply (`replyPreview`) and a click jumps to it. The streaming route
+  and the action both accept it.
+- **Notes as model context.** A per-section switch, "Let the AI read
+  the team's notes on this section" (`proposal_section.chat_notes_to_model`,
+  off by default; audited `section_chat.notes_to_model`), adds the
+  last eight notes to the chat's context as `notesForModel` — labelled
+  as teammates talking to each other, never instructions, never quoted
+  back. The model's turn history still carries the exchange only.
+- **Scroll to the message.** A mention notification's link now carries
+  the message (`sectionChatLink(…, messageId)` → `&message=…`); the
+  sections page passes it down and the chat opens scrolled to that
+  message with a highlight. Without one, it opens at the first new
+  message.
+- Presence (who has the section open) stays deferred until the
+  Hocuspocus layer is deployed.
+- Unit-tested (`tests/ai/chat-mentions.test.ts`); runtime-tested
+  (`tests/isolation/section-chat-multi.test.ts`: unread counts per
+  viewer and tenant, reply targets kept in-thread and cross-tenant
+  targets dropped, read marks scoped, notes in the prompt only when the
+  section opts in, audits).
 
 ### BL-FB-GEN-VOICE — Per-author voice training
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #312 · Slice 1 PR #308)
@@ -5251,7 +5284,7 @@ telemetry, same posture as `section_draft_signal`; clearing a thread
 is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #309) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #313 · Slice 1 PR #309) — canonical entry under Active priorities
 
 Capture manager + writer + AI in the same thread; `@mention` a team
 member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces

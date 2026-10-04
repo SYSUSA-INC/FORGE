@@ -70,6 +70,9 @@ type Section = {
   // BL-AIP-6b — open colour-team review comments (human and FORGE AI
   // pre-review) on this section, resolvable from the editor.
   reviewComments: SectionReviewComment[];
+  // BL-FB-CHAT-MULTI Slice 2 — thread messages by teammates since the
+  // viewer last looked (the header badge).
+  chatUnread: number;
 };
 
 type TeamMember = { id: string; name: string | null; email: string };
@@ -211,6 +214,7 @@ export function SectionsClient({
   currentUser,
   initialSectionId = null,
   initialTab = null,
+  initialMessageId = null,
   voiceAuthorIds = [],
   houseStyle = false,
 }: {
@@ -221,6 +225,8 @@ export function SectionsClient({
   /** BL-FB-CHAT-MULTI — the section a mention notification points at, opened with its chat. */
   initialSectionId?: string | null;
   initialTab?: "chat" | null;
+  /** BL-FB-CHAT-MULTI Slice 2 — the thread message the notification points at. */
+  initialMessageId?: string | null;
   /** BL-FB-GEN-VOICE Slice 2 — members whose sections the drafter writes in their voice. */
   voiceAuthorIds?: string[];
   /** BL-FB-GEN-VOICE Slice 2 — whether the organization has a house style. */
@@ -245,6 +251,7 @@ export function SectionsClient({
             open={expanded === s.id}
             onToggle={() => setExpanded(expanded === s.id ? null : s.id)}
             initialChatOpen={initialTab === "chat" && s.id === initialSectionId}
+            initialMessageId={s.id === initialSectionId ? initialMessageId : null}
             voiceOn={!!s.authorUserId && voiceAuthorIds.includes(s.authorUserId)}
             houseStyle={houseStyle}
           />
@@ -332,6 +339,7 @@ function SectionRow({
   open,
   onToggle,
   initialChatOpen = false,
+  initialMessageId = null,
   voiceOn = false,
   houseStyle = false,
 }: {
@@ -343,6 +351,8 @@ function SectionRow({
   onToggle: () => void;
   /** BL-FB-CHAT-MULTI — open the AI panel on the chat tab (a mention notification landed here). */
   initialChatOpen?: boolean;
+  /** BL-FB-CHAT-MULTI Slice 2 — the thread message to scroll to and highlight. */
+  initialMessageId?: string | null;
   /** BL-FB-GEN-VOICE Slice 2 — the section's author has an enabled voice profile. */
   voiceOn?: boolean;
   houseStyle?: boolean;
@@ -429,6 +439,9 @@ function SectionRow({
   const [pageLimit, setPageLimit] = useState<string>(
     section.pageLimit === null ? "" : String(section.pageLimit),
   );
+  // BL-FB-CHAT-MULTI Slice 2 — the header badge clears once the thread is read.
+  const [chatUnread, setChatUnread] = useState(section.chatUnread);
+  const markChatRead = useCallback(() => setChatUnread(0), []);
   const [authorUserId, setAuthorUserId] = useState<string>(
     section.authorUserId ?? "",
   );
@@ -735,6 +748,15 @@ function SectionRow({
                 <span>{section.authorName ?? section.authorEmail}</span>
               </>
             ) : null}
+            {/* BL-FB-CHAT-MULTI Slice 2 — teammates wrote in the thread since you looked */}
+            {chatUnread > 0 ? (
+              <span
+                className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-amber-200"
+                title={`${chatUnread} chat message${chatUnread === 1 ? "" : "s"} from teammates since you last looked`}
+              >
+                💬 {chatUnread} new
+              </span>
+            ) : null}
             {/* BL-FB-GEN-VOICE Slice 2 — what the drafter and chat write this section in */}
             {voiceOn ? (
               <span
@@ -845,6 +867,8 @@ function SectionRow({
                   members={team}
                   initialOpen={initialChatOpen}
                   initialTab={initialChatOpen ? "chat" : undefined}
+                  initialMessageId={initialMessageId}
+                  onRead={markChatRead}
                 />
                 {!sideBySide ? helperPanels : null}
               </div>

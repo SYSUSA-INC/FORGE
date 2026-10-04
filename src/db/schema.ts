@@ -810,6 +810,13 @@ export const sectionChatMessages = pgTable(
     role: text("role").$type<SectionChatRole>().notNull(),
     content: text("content").notNull(),
     stubbed: boolean("stubbed").notNull().default(false),
+    // BL-FB-CHAT-MULTI Slice 2 — the message this one answers
+    // (drizzle/0102); null for a top-level message, cleared when the
+    // parent is deleted.
+    replyToMessageId: uuid("reply_to_message_id").references(
+      (): AnyPgColumn => sectionChatMessages.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -828,6 +835,40 @@ export const sectionChatMessages = pgTable(
 
 export type SectionChatMessage = typeof sectionChatMessages.$inferSelect;
 export type NewSectionChatMessage = typeof sectionChatMessages.$inferInsert;
+
+/**
+ * BL-FB-CHAT-MULTI Slice 2 — when a member last looked at a section's
+ * thread (drizzle/0102): one row per (section, user), upserted when the
+ * chat opens; messages newer than it, by anyone else, are "new since you
+ * looked". Every row carries organization_id.
+ */
+export const sectionChatReads = pgTable(
+  "section_chat_read",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    sectionUserIdx: uniqueIndex("scr_section_user_idx").on(t.sectionId, t.userId),
+    orgUserIdx: index("scr_org_user_idx").on(t.organizationId, t.userId),
+  }),
+);
+
+export type SectionChatRead = typeof sectionChatReads.$inferSelect;
 
 /**
  * BL-FB-CHAT-UPLOAD — a document dropped into a section's chat
@@ -946,6 +987,10 @@ export const proposalSections = pgTable("proposal_section", {
   // BL-FB-GEN-VOC — whether AI drafts and chat for this section echo the
   // customer's own phrases (drizzle/0091). On by default.
   echoCustomerVoice: boolean("echo_customer_voice").notNull().default(true),
+  // BL-FB-CHAT-MULTI Slice 2 — whether the chat model reads the team's
+  // notes on this section as context (drizzle/0102). Off by default:
+  // notes are for people unless the team says otherwise.
+  chatNotesToModel: boolean("chat_notes_to_model").notNull().default(false),
   authorUserId: text("author_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
