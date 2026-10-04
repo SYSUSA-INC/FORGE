@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, authorVoiceProfiles, proposalSections, sectionDraftSignals } from "@/db/schema";
+import { auditLogs, authorVoiceProfiles, proposalSections, sectionChangeDecisions, sectionDraftSignals } from "@/db/schema";
 import {
   addVoiceSample,
   getHouseStyle,
@@ -116,6 +116,32 @@ describe("BL-FB-GEN-VOICE — author voice", () => {
     const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
     expect(audits.filter((a) => a.action === "voice.settings.update")).toHaveLength(2);
     expect(audits.filter((a) => a.action === "voice.sample.remove")).toHaveLength(1);
+  });
+
+  it("BL-AIX Phase 0b: FORGE AI suggestions the author accepted don't train their voice", async () => {
+    const aiSuggestion =
+      "Our holistic paradigm will be operationalized across the enterprise ecosystem. Synergies are expected to be realized continuously by all stakeholders.";
+    await db.update(proposalSections).set({ content: `${aiSuggestion} ${SECTION_TEXT}`, wordCount: 230 }).where(eq(proposalSections.id, ownSection));
+    const before = await rebuildVoiceProfile({ organizationId: fx.orgA.organizationId, userId: fx.orgA.userId, actor: actorA });
+    if (!before.ok) throw new Error(before.error);
+
+    await db.insert(sectionChangeDecisions).values({
+      organizationId: fx.orgA.organizationId,
+      proposalId: fx.orgA.proposalId,
+      sectionId: ownSection,
+      sectionKind: "technical",
+      changeId: "ai-1",
+      changeType: "insert",
+      decision: "accept",
+      authorUserId: "forge-ai",
+      authorNameSnapshot: "FORGE AI",
+      decidedByUserId: fx.orgA.userId,
+      changeText: aiSuggestion,
+      wordCount: 21,
+    });
+    const after = await rebuildVoiceProfile({ organizationId: fx.orgA.organizationId, userId: fx.orgA.userId, actor: actorA });
+    if (!after.ok) throw new Error(after.error);
+    expect(after.aiWordsDropped - before.aiWordsDropped).toBeGreaterThanOrEqual(18);
   });
 
   it("Slice 2: learns from the author's own words, layers the house style, serves the editor's check", async () => {

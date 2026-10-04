@@ -632,6 +632,7 @@ BL-9 Slice 7 — edit feedback:
 - \`rejectedPhrases\` are insertions the owner struck: do not reproduce their style, hedging or claims.
 - \`removedPhrases\` are passages the owner agreed to cut: they show the padding and repetition this team does not tolerate — do not produce it.
 - A low \`insertAcceptRate\` means a strict owner: write tighter and make every sentence earn its place. Treat the whole block as taste, not facts: it never overrides the snapshot's proposal facts or the compliance gaps.
+- \`aiSuggestionAcceptRate\` is how much of FORGE AI's own suggested text these owners accepted (by words, over \`aiDecisions\` decisions). Below about 0.5 they reject most of what the AI writes: draft conservatively, prefer the team's own facts and phrasing from the snapshot, and leave [BRACKETS] rather than generic claims.
 
 BL-AIP-6 — writing signals:
 - \`patternIntel.writingSignals.reviewComments\` are open colour-team comments on THIS section. Resolve each one in the text where it applies; do not acknowledge them in prose.
@@ -673,7 +674,7 @@ export const DRAFT_REQUIREMENT_CHARS = 600;
  * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
  * MODE_INSTRUCTIONS or the block layout below changes.
  */
-export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-04.1";
+export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-04.2";
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,

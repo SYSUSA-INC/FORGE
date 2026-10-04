@@ -20,6 +20,7 @@ import {
   type EditFeedbackSummary,
 } from "@/lib/edit-feedback-summary";
 import { log } from "@/lib/log";
+import { isAiAuthor } from "@/lib/tracked-diff";
 
 const WINDOW_DAYS = 180;
 const SAMPLE_LIMIT = 300;
@@ -69,6 +70,9 @@ async function loadDecisions(input: {
       decision: sectionChangeDecisions.decision,
       text: sectionChangeDecisions.changeText,
       createdAt: sectionChangeDecisions.createdAt,
+      authorUserId: sectionChangeDecisions.authorUserId,
+      bulk: sectionChangeDecisions.bulk,
+      wordCount: sectionChangeDecisions.wordCount,
     })
     .from(sectionChangeDecisions)
     .where(where)
@@ -86,5 +90,9 @@ async function loadDecisions(input: {
       decision: r.decision as "accept" | "reject",
       text: r.text,
       createdAt: r.createdAt,
+      // BL-AIX Phase 0b — FORGE AI's own suggestions are judged, not imitated.
+      fromAi: isAiAuthor(r.authorUserId),
+      bulk: r.bulk,
+      wordCount: r.wordCount,
     }));
 }

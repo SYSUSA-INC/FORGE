@@ -203,10 +203,30 @@ the phases below.
       the same locator.
     - **Rows the team marked not applicable** are no longer sent as
       "MUST address" to the drafter, section chat or AI pre-review.
-  - **0b** — Truth in the learning signals:
-    - separate FORGE AI from human authors in edit learning;
-    - an AI-acceptance number that measures something;
-    - keep AI text out of voice profiles and preferred phrases.
+  - **0b** — Truth in the learning signals: 🔄 in progress.
+    - **Edit learning separates FORGE AI from people.** It reads each
+      decision's author, `bulk` flag and word count. FORGE AI's
+      accepted text and accept-all decisions no longer become
+      `preferredPhrases`; teammates' accept rates count human
+      suggestions only.
+    - **A new `aiSuggestionAcceptRate`**: the share of FORGE AI's
+      suggested text accepted, weighted by words, with accept-all at
+      half weight. It reaches the drafter with guidance (draft
+      conservatively below about 0.5) and Draft Insights.
+      `SECTION_DRAFT_PROMPT_VERSION` 2026-10-04.2.
+    - **Draft retention measures something.** It is now the share of
+      the draft's four-word runs still present (`shingleRetention` in
+      `ai-acceptance.ts`), not any matching word. It is graded only
+      once the saved document has no pending tracked changes and the
+      draft is at least 30 minutes old; until then the draft stays
+      pending and a later save grades it. Draft Insights excludes stub
+      drafts.
+    - **Voice rebuilds** drop sentences of FORGE AI suggestions the
+      author accepted (Improve, Tighten, chat Apply, content blocks),
+      not only first drafts.
+    - Tests: `tests/ai/ai-acceptance.test.ts`; additions to
+      `tests/ai/edit-feedback.test.ts` and
+      `tests/isolation/voice.test.ts`.
   - **0c** — Background reliability:
     - the scan-cron stall (gated proposals block the batch);
     - auto-draft as a resumable server job (snapshot, truncation check,

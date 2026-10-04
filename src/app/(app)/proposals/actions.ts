@@ -35,6 +35,7 @@ import { DEFAULT_SECTIONS, countWords } from "@/lib/proposal-types";
 import {
   EMPTY_DOC,
   countWords as countTipTapWords,
+  hasPendingTrackedChanges,
   projectToPlain,
   validateDoc,
 } from "@/lib/tiptap-doc";
@@ -831,12 +832,16 @@ export async function saveSectionAction(input: {
     // much of the AI draft the user retained. Only when body content
     // actually changed. Best-effort — never blocks the save.
     if (input.bodyDoc !== undefined || input.content !== undefined) {
-      const savedText = input.bodyDoc !== undefined
-        ? projectToPlain(validateDoc(input.bodyDoc) ?? EMPTY_DOC)
-        : (input.content ?? "");
+      const savedDoc = input.bodyDoc !== undefined ? validateDoc(input.bodyDoc) ?? EMPTY_DOC : null;
+      const savedText = savedDoc ? projectToPlain(savedDoc) : (input.content ?? "");
       try {
         const { resolveDraftSignal } = await import("@/lib/draft-signal");
-        await resolveDraftSignal({ sectionId: input.sectionId, organizationId, savedText });
+        await resolveDraftSignal({
+          sectionId: input.sectionId,
+          organizationId,
+          savedText,
+          savedHasPendingChanges: savedDoc ? hasPendingTrackedChanges(savedDoc) : false,
+        });
       } catch (err) {
         log.warn("[saveSectionAction]", "resolveDraftSignal failed", { error: err });
       }

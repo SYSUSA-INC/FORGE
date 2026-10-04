@@ -3,7 +3,9 @@
 import { and, avg, count, eq, isNotNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { sectionChangeDecisions, sectionDraftSignals } from "@/db/schema";
+import { aiSuggestionAcceptance } from "@/lib/ai-acceptance";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { FORGE_AI_AUTHOR } from "@/lib/tracked-diff";
 
 // BL-11 — per-proposal AI draft quality stats.
 // Groups resolved signals by section_kind and computes the average
@@ -19,10 +21,13 @@ export type DraftKindStat = {
 
 export type EditDecisionStats = {
   total: number;
-  /** Accepted insertions ÷ resolved insertions; null with none. */
+  /** Accepted insertions ÷ resolved insertions, human suggestions only; null with none. */
   insertAcceptRate: number | null;
-  /** Accepted deletions ÷ resolved deletions; null with none. */
+  /** Accepted deletions ÷ resolved deletions, human suggestions only; null with none. */
   deleteAcceptRate: number | null;
+  /** BL-AIX Phase 0b — FORGE AI suggestions decided, and the word-weighted share accepted. */
+  aiDecisions: number;
+  aiAcceptRate: number | null;
 };
 
 export type DraftInsights = {
@@ -57,6 +62,8 @@ export async function getDraftInsightsAction(
           isNotNull(sectionDraftSignals.acceptedFraction),
           // exclude draft_alt rows from per-kind stats (they are A/B artefacts)
           ne(sectionDraftSignals.mode, "draft_alt"),
+          // stub-mode drafts measure nothing
+          eq(sectionDraftSignals.stubbed, false),
         ),
       )
       .groupBy(sectionDraftSignals.sectionKind);
@@ -73,6 +80,7 @@ export async function getDraftInsightsAction(
           eq(sectionDraftSignals.proposalId, proposalId),
           eq(sectionDraftSignals.organizationId, organizationId),
           ne(sectionDraftSignals.mode, "draft_alt"),
+          eq(sectionDraftSignals.stubbed, false),
         ),
       );
 
@@ -100,7 +108,8 @@ export async function getDraftInsightsAction(
     const abVariantBWinRate =
       abTotal > 0 ? Number(abBWins) / abTotal : null;
 
-    // BL-9 Slice 7 — track-changes decisions, grouped by (type, decision).
+    // BL-9 Slice 7 — track-changes decisions, grouped by (type, decision),
+    // human suggestions only; BL-AIX Phase 0b — FORGE AI's are judged apart.
     const decisionRows = await db
       .select({
         changeType: sectionChangeDecisions.changeType,
@@ -112,9 +121,28 @@ export async function getDraftInsightsAction(
         and(
           eq(sectionChangeDecisions.proposalId, proposalId),
           eq(sectionChangeDecisions.organizationId, organizationId),
+          ne(sectionChangeDecisions.authorUserId, FORGE_AI_AUTHOR.id),
         ),
       )
       .groupBy(sectionChangeDecisions.changeType, sectionChangeDecisions.decision);
+    const aiRows = await db
+      .select({
+        decision: sectionChangeDecisions.decision,
+        bulk: sectionChangeDecisions.bulk,
+        wordCount: sectionChangeDecisions.wordCount,
+      })
+      .from(sectionChangeDecisions)
+      .where(
+        and(
+          eq(sectionChangeDecisions.proposalId, proposalId),
+          eq(sectionChangeDecisions.organizationId, organizationId),
+          eq(sectionChangeDecisions.authorUserId, FORGE_AI_AUTHOR.id),
+          eq(sectionChangeDecisions.changeType, "insert"),
+        ),
+      );
+    const ai = aiSuggestionAcceptance(
+      aiRows.map((r) => ({ decision: r.decision === "accept" ? "accept" : "reject", bulk: r.bulk, wordCount: r.wordCount })),
+    );
     const tally = (type: string, decision: string) =>
       Number(decisionRows.find((r) => r.changeType === type && r.decision === decision)?.n ?? 0);
     const insertsTotal = tally("insert", "accept") + tally("insert", "reject");
@@ -123,6 +151,8 @@ export async function getDraftInsightsAction(
       total: insertsTotal + deletesTotal,
       insertAcceptRate: insertsTotal > 0 ? tally("insert", "accept") / insertsTotal : null,
       deleteAcceptRate: deletesTotal > 0 ? tally("delete", "accept") / deletesTotal : null,
+      aiDecisions: ai?.decided ?? 0,
+      aiAcceptRate: ai?.rate ?? null,
     };
 
     return {
