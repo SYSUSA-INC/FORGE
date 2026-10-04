@@ -38,7 +38,7 @@ Effort key:
 | 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | ✅ shipped (PR #322) |
 | 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | ✅ shipped (PR #323) |
 | 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
-| 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | 🔄 in PR (PR #325) |
+| 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | ✅ shipped (PR #325) |
 | 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -1316,7 +1316,7 @@ the add-on follow-ups are third, one invoice and proration first.
   quantity follows; removal ends it; deleting the plan ends both).
   Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9.
 
-**Add-ons Slice 2b — seats, storage and the pricing page (2026-10-04)** 🔄 in PR (PR #325):
+**Add-ons Slice 2b — seats, storage and the pricing page (2026-10-04)** ✅ shipped (PR #325):
 
 - **Kinds.** `tier_addon.kind` gains `seats` (extra seats per unit) and
   `storage` (extra GB per unit); migration `0108_addon_units.sql` adds
