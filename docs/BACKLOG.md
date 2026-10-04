@@ -1313,7 +1313,7 @@ lightweight CRM scoped to capture, under **Customer contacts**
   `organizationId`, owner must be a member, opportunity must be the
   tenant's; audited `crm.contact.create` / `.update` / `.delete`,
   `crm.touch.log`. Migration `0097_customer_contacts.sql`. Sidebar
-  entry under Platform Intelligence. Unit-tested
+  entry (moved to the **Customer Relations** group in Slice 3). Unit-tested
   (`tests/ai/crm-logic.test.ts`); runtime-tested
   (`tests/isolation/crm.test.ts`).
 
@@ -1377,6 +1377,12 @@ lightweight CRM scoped to capture, under **Customer contacts**
   re-normalised and duplicates re-detected server-side
   (`src/lib/crm-import.ts`); one audit row `crm.contact.import` with
   the counts. Up to 500 rows a time.
+- **Customer Relations menu.** The CRM pages leave Platform
+  Intelligence for their own sidebar group, **Customer Relations**
+  (`nav-workspaces.ts`, between Opportunities and Platform
+  Intelligence): Customer contacts, Follow-ups owed (`/contacts?owed=1`),
+  New contact (`?add=1`) and Import contacts (`?import=1`); the contacts
+  page reads those deep links.
 - **Agency history cached a day.** `agency_history_cache` (migration
   0103, one row per organization and agency key): the awards and
   summary the panel shows, kept 24 hours. The panel now opens with the

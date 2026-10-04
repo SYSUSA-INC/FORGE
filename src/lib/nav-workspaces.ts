@@ -100,6 +100,20 @@ const WORK_NAV: WorkspaceNavGroup[] = [
     ],
   },
   {
+    // BL-FB-X-CRM Slice 3 — the customer side of capture in one place:
+    // who we know, who we owe a call, and how people get in.
+    id: "customers",
+    label: "Customer Relations",
+    icon: "◎",
+    needsWorkspace: true,
+    children: [
+      { href: "/contacts", label: "Customer contacts" },
+      { href: "/contacts?owed=1", label: "Follow-ups owed" },
+      { href: "/contacts?add=1", label: "New contact" },
+      { href: "/contacts?import=1", label: "Import contacts" },
+    ],
+  },
+  {
     id: "intel",
     label: "Platform Intelligence",
     icon: "◈",
@@ -107,7 +121,6 @@ const WORK_NAV: WorkspaceNavGroup[] = [
     children: [
       { href: "/companies", label: "Company Search" },
       { href: "/companies/new", label: "Add company" },
-      { href: "/contacts", label: "Customer contacts" },
       { href: "/intelligence", label: "FORGE Brain" },
       { href: "/intelligence/losses", label: "Loss intelligence" },
       { href: "/intelligence/awards", label: "Awards & recompetes" },

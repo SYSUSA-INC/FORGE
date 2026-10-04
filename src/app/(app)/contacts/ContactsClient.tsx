@@ -38,14 +38,29 @@ export function NextTouchBadge({ nextTouchAt }: { nextTouchAt: string | null }) 
 }
 
 /** BL-FB-X-CRM — contacts grouped by agency, warmest agency first, follow-ups owed up top. */
-export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: ContactRow[]; owners: OwnerOption[]; prefillAgency: string }) {
+export function ContactsClient({
+  contacts,
+  owners,
+  prefillAgency,
+  initialAdding = false,
+  initialOwed = false,
+  initialImporting = false,
+}: {
+  contacts: ContactRow[];
+  owners: OwnerOption[];
+  prefillAgency: string;
+  /** Slice 3 — the Customer Relations menu deep-links into the page. */
+  initialAdding?: boolean;
+  initialOwed?: boolean;
+  initialImporting?: boolean;
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
-  const [owed, setOwed] = useState(false);
-  const [adding, setAdding] = useState(!!prefillAgency);
+  const [owed, setOwed] = useState(initialOwed);
+  const [adding, setAdding] = useState(!!prefillAgency || initialAdding);
   // Slice 3 — the import panel and what it just did.
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(initialImporting);
   const [notice, setNotice] = useState<string | null>(null);
 
   const typed = useMemo(() => contacts.map((c) => ({ ...c, role: normalizeRole(c.role) })), [contacts]);
@@ -66,7 +81,7 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
   return (
     <>
       <PageHeader
-        eyebrow="Capture"
+        eyebrow="Customer Relations"
         title="Customer contacts"
         subtitle="Who we know at each agency, how warm the relationship is, and who we owe a call. Log every meeting so the next pursuit starts from a name, not a cold notice."
         actions={

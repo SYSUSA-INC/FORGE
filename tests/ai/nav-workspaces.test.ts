@@ -103,7 +103,7 @@ describe("BL-NAV-RESTORE — the chosen workspace is remembered", () => {
 describe("BL-NAV-RESTORE — the everyday tree is complete, and admin items are admin-only", () => {
   it("shows a member every workspace page and no administration", () => {
     const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, member);
-    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "intel", "ops", "help"]);
+    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "help"]);
     const hrefs = groups.flatMap((g) => visibleNavChildren(g.children, member).map((c) => c.href));
     expect(hrefs).toEqual(
       expect.arrayContaining([
@@ -126,7 +126,7 @@ describe("BL-NAV-RESTORE — the everyday tree is complete, and admin items are 
 
   it("shows an org admin the Administration group and the Admin guide in the same tree", () => {
     const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, orgAdmin);
-    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "intel", "ops", "administration", "help"]);
+    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "administration", "help"]);
     const admin = groups.find((g) => g.id === "administration")!;
     expect(visibleNavChildren(admin.children, orgAdmin).map((c) => c.href)).toEqual([
       "/users",
