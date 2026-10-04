@@ -16,7 +16,12 @@ import {
   appendSectionChatTurns,
   loadSectionChatHistory,
   loadSectionChatModelHistory,
+  loadSectionChatThread,
+  markSectionChatRead,
   notifySectionChatMentions,
+  prepareSectionChat,
+  setSectionChatNotesToModel,
+  unreadChatCounts,
 } from "@/lib/section-chat";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
@@ -107,12 +112,70 @@ describe("BL-FB-CHAT-MULTI — the team thread", () => {
     expect(inbox?.subject).toMatch(/^Test .* mentioned you in the chat on "Technical approach"$/);
     expect(inbox?.body).toContain("@Mate Teammate and @Test ");
     expect(inbox?.body).not.toContain("@[");
-    expect(inbox?.linkPath).toBe(`/proposals/${fx.orgA.proposalId}/sections?section=${sectionA}&tab=chat`);
+    // Slice 2 — the link opens the chat scrolled to the message.
+    expect(inbox?.linkPath).toBe(`/proposals/${fx.orgA.proposalId}/sections?section=${sectionA}&tab=chat&message=${note.message.id}`);
     expect(inbox?.proposalId).toBe(fx.orgA.proposalId);
 
     // No mention, or only the author: nothing goes out.
     expect(await notifySectionChatMentions({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, sectionId: sectionA, messageId: note.message.id, actorUserId: fx.orgA.userId, body: `@[${fx.orgA.userId}] note to self` })).toBe(0);
     // Another tenant naming A's member through A's section id gets nothing.
     expect(await notifySectionChatMentions({ organizationId: fx.orgB.organizationId, proposalId: fx.orgA.proposalId, sectionId: sectionA, messageId: note.message.id, actorUserId: fx.orgB.userId, body: `@[${teammate}] hi` })).toBe(0);
+  });
+
+  it("Slice 2: counts what is new per viewer, keeps replies in the thread, lets the model read notes on request", async () => {
+    const actor = { userId: fx.orgA.userId, email: "a@test" };
+    // Nobody has looked yet: everything by someone else is new.
+    const note = await appendSectionChatNote({ organizationId: fx.orgA.organizationId, sectionId: sectionA, userId: fx.orgA.userId, content: "Lead with the outcome.", actor });
+    expect(note.ok).toBe(true);
+    if (!note.ok) return;
+    await appendSectionChatTurns({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, sectionId: sectionA, userId: teammate, userMessage: "Draft the transition paragraph.", assistantReply: "Here is a draft.", stubbed: true, replyToMessageId: note.message.id });
+    expect(await unreadChatCounts({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, viewerUserId: teammate })).toEqual({ [sectionA]: 1 });
+    expect(await unreadChatCounts({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, viewerUserId: fx.orgA.userId })).toEqual({ [sectionA]: 2 });
+    expect(await unreadChatCounts({ organizationId: fx.orgB.organizationId, proposalId: fx.orgA.proposalId, viewerUserId: fx.orgB.userId })).toEqual({});
+
+    // The thread carries each reply's target; a target from another tenant's thread is dropped.
+    const thread = await loadSectionChatThread({ organizationId: fx.orgA.organizationId, sectionId: sectionA, viewerUserId: teammate });
+    expect(thread?.lastReadAt).toBeNull();
+    expect(thread?.notesToModel).toBe(false);
+    expect(thread?.messages.map((m) => [m.role, m.replyToMessageId])).toEqual([
+      ["note", null],
+      ["user", note.message.id],
+      ["assistant", null],
+    ]);
+    expect(thread?.messages[1]!.replyTo).toMatchObject({ id: note.message.id, role: "note", content: "Lead with the outcome." });
+    expect(thread?.messages[1]!.replyTo?.authorName).toContain("Test ");
+    const [secB] = await db.insert(proposalSections).values({ proposalId: fx.orgB.proposalId, kind: "technical", title: "B" }).returning({ id: proposalSections.id });
+    const bNote = await appendSectionChatNote({ organizationId: fx.orgB.organizationId, sectionId: secB!.id, userId: fx.orgB.userId, content: "B's note", actor: { userId: fx.orgB.userId } });
+    expect(bNote.ok).toBe(true);
+    if (!bNote.ok) return;
+    const cross = await appendSectionChatNote({ organizationId: fx.orgA.organizationId, sectionId: sectionA, userId: fx.orgA.userId, content: "Replying across tenants?", replyToMessageId: bNote.message.id, actor });
+    expect(cross.ok).toBe(true);
+    if (!cross.ok) return;
+    expect(cross.message.replyToMessageId).toBeNull();
+    expect(await loadSectionChatThread({ organizationId: fx.orgB.organizationId, sectionId: sectionA, viewerUserId: fx.orgB.userId })).toBeNull();
+
+    // Looking marks the thread read for this viewer only, and the badge clears.
+    expect((await markSectionChatRead({ organizationId: fx.orgA.organizationId, sectionId: sectionA, userId: teammate })).ok).toBe(true);
+    expect(await unreadChatCounts({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, viewerUserId: teammate })).toEqual({});
+    expect((await unreadChatCounts({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId, viewerUserId: fx.orgA.userId }))[sectionA]).toBe(2);
+    expect((await loadSectionChatThread({ organizationId: fx.orgA.organizationId, sectionId: sectionA, viewerUserId: teammate }))?.lastReadAt).not.toBeNull();
+    expect((await markSectionChatRead({ organizationId: fx.orgB.organizationId, sectionId: sectionA, userId: fx.orgB.userId })).ok).toBe(false);
+
+    // Notes reach the model only when the section opts in, as context under the author's name.
+    expect((await setSectionChatNotesToModel({ organizationId: fx.orgB.organizationId, sectionId: sectionA, enabled: true, actor: { userId: fx.orgB.userId } })).ok).toBe(false);
+    const before = await prepareSectionChat({ organizationId: fx.orgA.organizationId, sectionId: sectionA, history: [], message: "Where do we start?" });
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+    expect(before.system).not.toContain("Notes the team left");
+    expect(await setSectionChatNotesToModel({ organizationId: fx.orgA.organizationId, sectionId: sectionA, enabled: true, actor })).toEqual({ ok: true, enabled: true });
+    const after = await prepareSectionChat({ organizationId: fx.orgA.organizationId, sectionId: sectionA, history: [], message: "Where do we start?" });
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    expect(after.system).toContain("Notes the team left on this section");
+    expect(after.system).toMatch(/- Test .*: Lead with the outcome\./);
+    expect(after.system).not.toContain("Draft the transition paragraph.");
+
+    const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
+    expect(audits.filter((a) => a.action === "section_chat.notes_to_model")).toHaveLength(1);
   });
 });

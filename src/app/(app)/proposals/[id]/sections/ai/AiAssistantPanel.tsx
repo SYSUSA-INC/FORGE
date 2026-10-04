@@ -15,14 +15,26 @@ import {
   clearSectionChatAction,
   getSectionChatHistoryAction,
   listChatAttachmentsAction,
+  markSectionChatReadAction,
   postSectionChatNoteAction,
   removeChatAttachmentAction,
   saveChatAttachmentToKnowledgeAction,
+  setSectionChatNotesToModelAction,
   type ChatAttachmentView,
   type ChatMessage,
 } from "./chat-actions";
 import { CHAT_ATTACHMENT_ACCEPT, describeChars } from "@/lib/chat-attachments-logic";
-import { filterMembers, insertMention, memberLabel, mentionQuery, mentionResolver, type MentionMemberLike } from "@/lib/chat-mentions";
+import {
+  describeUnread,
+  filterMembers,
+  insertMention,
+  memberLabel,
+  mentionQuery,
+  mentionResolver,
+  replyPreview,
+  unreadSplit,
+  type MentionMemberLike,
+} from "@/lib/chat-mentions";
 import { DICTATION_LIMITS, mergeTranscript } from "@/lib/dictation";
 import { useDictation } from "./useDictation";
 import {
@@ -180,6 +192,10 @@ type Props = {
   /** BL-FB-CHAT-MULTI — a mention notification opens the panel on its chat. */
   initialTab?: ActiveTab;
   initialOpen?: boolean;
+  /** BL-FB-CHAT-MULTI Slice 2 — the message the notification points at: scrolled to and highlighted. */
+  initialMessageId?: string | null;
+  /** BL-FB-CHAT-MULTI Slice 2 — tells the section header the thread has been read. */
+  onRead?: () => void;
 };
 
 /** The routes cap the live body at 60k characters. */
@@ -218,6 +234,8 @@ export function AiAssistantPanel({
   members = [],
   initialTab,
   initialOpen = false,
+  initialMessageId = null,
+  onRead,
 }: Props) {
   const [open, setOpen] = useState(initialOpen);
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab ?? "generate");
@@ -289,22 +307,40 @@ export function AiAssistantPanel({
   // BL-FB-CHAT-UPLOAD — reference documents scoped to this conversation.
   const [attachments, setAttachments] = useState<ChatAttachmentView[]>([]);
   const [attachBusy, setAttachBusy] = useState(false);
+  // BL-FB-CHAT-MULTI Slice 2 — where the "new since you looked" line
+  // goes (fixed at load so it does not jump while reading), the message
+  // being answered, whether the model reads the team's notes, and the
+  // message a notification asked to open on.
+  const [unread, setUnread] = useState<{ index: number; count: number }>({ index: -1, count: 0 });
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [notesToModel, setNotesToModel] = useState(false);
+  const [focusMessageId, setFocusMessageId] = useState<string | null>(initialMessageId);
+  const messageRefs = useRef(new Map<string, HTMLDivElement>());
   useEffect(() => {
-    if (!open || activeTab !== "chat" || chatLoaded || chatLoading) return;
+    if (!isOpen || activeTab !== "chat" || chatLoaded || chatLoading) return;
     let cancelled = false;
     setChatLoading(true);
     Promise.all([getSectionChatHistoryAction(sectionId), listChatAttachmentsAction(sectionId)])
       .then(([res, att]) => {
         if (cancelled) return;
         if (res.ok) {
-          setChatHistory(
-            res.messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-              authorName: m.authorName,
-              isMine: m.isMine,
-            })),
-          );
+          const loaded = res.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            authorName: m.authorName,
+            isMine: m.isMine,
+            createdAt: m.createdAt,
+            replyToMessageId: m.replyToMessageId,
+            replyTo: m.replyTo,
+          }));
+          setChatHistory(loaded);
+          setUnread(unreadSplit(res.messages, res.lastReadAt));
+          setNotesToModel(res.notesToModel);
+          // Looked at now: the badge on the section header clears.
+          void markSectionChatReadAction(sectionId).then((r) => {
+            if (r.ok) onRead?.();
+          });
         }
         if (att.ok) setAttachments(att.attachments);
         setChatLoaded(true);
@@ -318,7 +354,36 @@ export function AiAssistantPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, activeTab, chatLoaded, chatLoading, sectionId]);
+    // `onRead` is a stable callback from the row; the load is keyed on the tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab, chatLoaded, chatLoading, sectionId]);
+
+  // Slice 2 — once the thread is in, scroll to the message a notification
+  // named (and highlight it), else to the first new message.
+  useEffect(() => {
+    if (!chatLoaded || chatHistory.length === 0) return;
+    const targetId = focusMessageId ?? (unread.index >= 0 ? chatHistory[unread.index]?.id : undefined);
+    if (!targetId) return;
+    const el = messageRefs.current.get(targetId);
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    // Scroll once per focus request; a later click can re-focus a parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatLoaded, focusMessageId]);
+
+  function jumpTo(messageId: string) {
+    setFocusMessageId(messageId);
+    const el = messageRefs.current.get(messageId);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function toggleNotesToModel(next: boolean) {
+    setNotesToModel(next);
+    const res = await setSectionChatNotesToModelAction(sectionId, next);
+    if (!res.ok) {
+      setNotesToModel(!next);
+      setChatError(res.error);
+    }
+  }
 
   function cancelDraft() {
     draftAbortRef.current?.abort();
@@ -477,13 +542,16 @@ export function AiAssistantPanel({
     setChatInput("");
     setChatError(null);
     onSuggestion?.(null);
+    // Slice 2 — the question answers a thread message, when one is picked.
+    const answering = replyTo;
+    setReplyTo(null);
 
     const priorHistory = chatHistory;
     // Optimistic user turn + an empty assistant bubble that fills in as
     // deltas arrive. Both are rolled back on failure.
     setChatHistory([
       ...priorHistory,
-      { role: "user", content: msg, isMine: true },
+      { role: "user", content: msg, isMine: true, replyToMessageId: answering?.id ?? null, replyTo: answering?.id ? { id: answering.id, role: answering.role, authorName: answering.authorName ?? "", content: answering.content } : null },
       { role: "assistant", content: "" },
     ]);
     setChatPending(true);
@@ -519,6 +587,7 @@ export function AiAssistantPanel({
           sectionId,
           message: msg,
           currentBodyPlain: getCurrentText?.().slice(0, LIVE_BODY_MAX_CHARS),
+          ...(answering?.id ? { replyToMessageId: answering.id } : {}),
         }),
         signal: ac.signal,
       });
@@ -660,23 +729,29 @@ export function AiAssistantPanel({
     if (!msg || chatPending) return;
     setChatInput("");
     setChatError(null);
+    const answering = replyTo;
+    setReplyTo(null);
     const prior = chatHistory;
-    setChatHistory([...prior, { role: "note", content: msg, isMine: true }]);
+    setChatHistory([...prior, { role: "note", content: msg, isMine: true, replyToMessageId: answering?.id ?? null }]);
     setChatPending(true);
     try {
-      const res = await postSectionChatNoteAction({ sectionId, content: msg });
+      const res = await postSectionChatNoteAction({ sectionId, content: msg, replyToMessageId: answering?.id ?? null });
       if (!res.ok) {
         setChatError(res.error);
         setChatHistory(prior);
         setChatInput(msg);
+        setReplyTo(answering);
         return;
       }
-      setChatHistory([...prior, { role: "note", content: res.message.content, isMine: true, authorName: res.message.authorName }]);
+      const m = res.message;
+      setChatHistory([...prior, { id: m.id, role: "note", content: m.content, isMine: true, authorName: m.authorName, createdAt: m.createdAt, replyToMessageId: m.replyToMessageId, replyTo: m.replyTo }]);
+      void markSectionChatReadAction(sectionId);
       setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Could not post the note.");
       setChatHistory(prior);
       setChatInput(msg);
+      setReplyTo(answering);
     } finally {
       setChatPending(false);
     }
@@ -1039,6 +1114,13 @@ export function AiAssistantPanel({
           {chatLoading ? (
             <div className="font-mono text-[10px] text-muted">Loading thread…</div>
           ) : null}
+          {/* BL-FB-CHAT-MULTI Slice 2 — the team decides whether the AI reads its notes here */}
+          {chatLoaded ? (
+            <label className="flex cursor-pointer items-center gap-2 font-mono text-[10px] text-muted" title="Off by default: notes are for people. On, the last few notes go to the model as context about what the team decided — never as instructions.">
+              <input type="checkbox" className="accent-indigo-400" checked={notesToModel} disabled={chatPending} onChange={(e) => void toggleNotesToModel(e.target.checked)} />
+              Let the AI read the team&apos;s notes on this section
+            </label>
+          ) : null}
 
           {/* Message history */}
           {chatHistory.length > 0 ? (
@@ -1049,9 +1131,22 @@ export function AiAssistantPanel({
             >
               {chatHistory.map((msg, i) => (
                 <div
-                  key={i}
+                  key={msg.id ?? `pending-${i}`}
+                  ref={(el) => {
+                    if (!msg.id) return;
+                    if (el) messageRefs.current.set(msg.id, el);
+                    else messageRefs.current.delete(msg.id);
+                  }}
                   className={`flex flex-col gap-1 ${msg.role !== "assistant" && msg.isMine !== false ? "items-end" : "items-start"}`}
                 >
+                  {/* Slice 2 — "new since you looked", fixed where it was at load */}
+                  {i === unread.index && unread.count > 0 ? (
+                    <div className="my-1 flex w-full items-center gap-2 self-stretch" role="separator" aria-label={describeUnread(unread.count)}>
+                      <span className="h-px flex-1 bg-amber-400/40" />
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-amber-200">{describeUnread(unread.count)}</span>
+                      <span className="h-px flex-1 bg-amber-400/40" />
+                    </div>
+                  ) : null}
                   <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
                     {msg.role === "assistant"
                       ? "AI"
@@ -1064,8 +1159,22 @@ export function AiAssistantPanel({
                         : msg.role === "note"
                           ? "border border-indigo-400/20 bg-indigo-400/5 text-text"
                           : "border border-layer/10 bg-layer/[0.03] text-foreground"
-                    }`}
+                    } ${msg.id && msg.id === focusMessageId ? "ring-2 ring-amber-400/60" : ""}`}
                   >
+                    {/* Slice 2 — the message this one answers; click to jump to it */}
+                    {msg.replyTo ? (
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(msg.replyTo!.id)}
+                        className="mb-1.5 flex w-full items-baseline gap-1.5 rounded border-l-2 border-indigo-400/50 bg-layer/[0.04] px-2 py-1 text-left font-body text-[11px] text-muted hover:text-text"
+                        title="Jump to the message this answers"
+                      >
+                        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-indigo-300">↩ {msg.replyTo.authorName || "a teammate"}</span>
+                        <span className="min-w-0 truncate">
+                          <MentionText body={replyPreview(msg.replyTo.content)} resolver={resolver} />
+                        </span>
+                      </button>
+                    ) : null}
                     {msg.role === "user" && describeSlashCommand(msg.content) ? (
                       /* BL-FB-CHAT-SLASH — a command turn shows as what was typed, with its meaning */
                       <div className="flex flex-col gap-0.5">
@@ -1098,6 +1207,22 @@ export function AiAssistantPanel({
                             Preview as edits →
                           </button>
                         ) : null}
+                      </div>
+                    ) : null}
+                    {/* Slice 2 — answer a teammate's note or question in the thread */}
+                    {msg.id && msg.role !== "assistant" && !chatPending ? (
+                      <div className="mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplyTo(msg);
+                            chatInputRef.current?.focus();
+                          }}
+                          className="font-mono text-[9px] uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
+                          title="Reply to this message (as a note, or as a question to the AI)"
+                        >
+                          ↩ Reply
+                        </button>
                       </div>
                     ) : null}
                   </div>
@@ -1219,6 +1344,19 @@ export function AiAssistantPanel({
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {/* Slice 2 — what the next Send or Note answers */}
+          {replyTo ? (
+            <div className="flex items-center gap-2 rounded-md border border-indigo-400/30 bg-indigo-400/5 px-2 py-1 font-body text-[11px] text-muted">
+              <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-indigo-300">↩ Replying to {replyTo.isMine === false && replyTo.authorName ? replyTo.authorName : "yourself"}</span>
+              <span className="min-w-0 flex-1 truncate">
+                <MentionText body={replyPreview(replyTo.content)} resolver={resolver} />
+              </span>
+              <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 hover:text-text" aria-label="Cancel reply">
+                ×
+              </button>
+            </div>
           ) : null}
 
           {/* Input */}

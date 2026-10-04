@@ -21,10 +21,13 @@ import {
   CHAT_TEMPERATURE,
   clearSectionChat,
   findSectionForOrg,
-  loadSectionChatHistory,
   loadSectionChatModelHistory,
+  loadSectionChatThread,
+  markSectionChatRead,
   notifySectionChatMentions,
   prepareSectionChat,
+  setSectionChatNotesToModel,
+  type SectionChatReplyTarget,
   type SectionChatTurn,
 } from "@/lib/section-chat";
 import {
@@ -43,6 +46,11 @@ export type ChatMessage = {
   /** BL-FB-CHAT-PERSIST — author of a user turn when it is not the viewer. */
   authorName?: string;
   isMine?: boolean;
+  /** BL-FB-CHAT-MULTI Slice 2 — persisted id and time (absent on an optimistic turn), and the message this one answers. */
+  id?: string;
+  createdAt?: string;
+  replyToMessageId?: string | null;
+  replyTo?: SectionChatReplyTarget | null;
 };
 
 export type { ChatAttachmentView } from "@/lib/section-chat-attachments";
@@ -124,6 +132,8 @@ export async function chatWithSectionAction(input: {
   sectionId: string;
   message: string;
   history?: ChatMessage[];
+  /** BL-FB-CHAT-MULTI Slice 2 — the thread message this question answers. */
+  replyToMessageId?: string | null;
 }): Promise<ChatWithSectionResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -200,6 +210,7 @@ export async function chatWithSectionAction(input: {
           userMessage: input.message,
           assistantReply: reply,
           stubbed: res.stubbed,
+          replyToMessageId: input.replyToMessageId ?? null,
         });
         // BL-FB-CHAT-MULTI — teammates named in the question hear about it.
         await notifySectionChatMentions({
@@ -232,7 +243,7 @@ export type PostNoteResult = { ok: true; message: SectionChatTurn } | { ok: fals
  * BL-FB-CHAT-MULTI — post a note to the team on this section's thread
  * without asking the AI; anyone it @mentions is notified.
  */
-export async function postSectionChatNoteAction(input: { sectionId: string; content: string }): Promise<PostNoteResult> {
+export async function postSectionChatNoteAction(input: { sectionId: string; content: string; replyToMessageId?: string | null }): Promise<PostNoteResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const res = await appendSectionChatNote({
@@ -240,6 +251,7 @@ export async function postSectionChatNoteAction(input: { sectionId: string; cont
     sectionId: String(input.sectionId ?? ""),
     userId: user.id,
     content: String(input.content ?? ""),
+    replyToMessageId: typeof input.replyToMessageId === "string" ? input.replyToMessageId : null,
     actor: { userId: user.id, email: user.email },
   });
   if (!res.ok) return res;
@@ -259,21 +271,50 @@ export async function postSectionChatNoteAction(input: { sectionId: string; cont
 }
 
 export type SectionChatHistoryResult =
-  | { ok: true; messages: SectionChatTurn[] }
+  | { ok: true; messages: SectionChatTurn[]; lastReadAt: string | null; notesToModel: boolean }
   | { ok: false; error: string };
 
-/** BL-FB-CHAT-PERSIST — the section's thread for display, oldest first. */
+/**
+ * BL-FB-CHAT-PERSIST — the section's thread for display, oldest first;
+ * Slice 2 adds when the viewer last looked and whether the model reads
+ * the team's notes here.
+ */
 export async function getSectionChatHistoryAction(
   sectionId: string,
 ): Promise<SectionChatHistoryResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  const messages = await loadSectionChatHistory({
+  const thread = await loadSectionChatThread({
     organizationId,
     sectionId,
     viewerUserId: user.id,
   });
-  return { ok: true, messages };
+  if (!thread) return { ok: false, error: "Section not found." };
+  return { ok: true, ...thread };
+}
+
+/** BL-FB-CHAT-MULTI Slice 2 — the viewer has looked at this thread now. */
+export async function markSectionChatReadAction(
+  sectionId: string,
+): Promise<{ ok: true; lastReadAt: string } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return markSectionChatRead({ organizationId, sectionId: String(sectionId ?? ""), userId: user.id });
+}
+
+/** BL-FB-CHAT-MULTI Slice 2 — let the chat model read (or stop reading) this section's team notes. */
+export async function setSectionChatNotesToModelAction(
+  sectionId: string,
+  enabled: boolean,
+): Promise<{ ok: true; enabled: boolean } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return setSectionChatNotesToModel({
+    organizationId,
+    sectionId: String(sectionId ?? ""),
+    enabled: enabled === true,
+    actor: { userId: user.id, email: user.email },
+  });
 }
 
 export type ClearSectionChatResult =

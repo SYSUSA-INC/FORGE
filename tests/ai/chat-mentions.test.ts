@@ -5,14 +5,20 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  CHAT_NOTES_TO_MODEL_MAX,
   MENTION_PICKER_MAX,
+  REPLY_PREVIEW_CHARS,
+  describeUnread,
   filterMembers,
   insertMention,
   memberLabel,
   mentionQuery,
   mentionResolver,
   mentionSubject,
+  notesForModel,
+  replyPreview,
   sectionChatLink,
+  unreadSplit,
 } from "@/lib/chat-mentions";
 
 const MEMBERS = [
@@ -55,5 +61,38 @@ describe("chat mentions", () => {
     expect(sectionChatLink("p1", "s 1")).toBe("/proposals/p1/sections?section=s%201&tab=chat");
     expect(mentionSubject("Ana Rivera", "Technical Approach")).toBe('Ana Rivera mentioned you in the chat on "Technical Approach"');
     expect(mentionSubject("", "")).toBe('A teammate mentioned you in the chat on "a section"');
+  });
+
+  it("Slice 2: links to the message, splits the thread at the last read, quotes replies, hands notes to the model", () => {
+    expect(sectionChatLink("p1", "s1", "m 1")).toBe("/proposals/p1/sections?section=s1&tab=chat&message=m%201");
+    const thread = [
+      { createdAt: "2026-10-04T10:00:00Z", isMine: true },
+      { createdAt: "2026-10-04T10:05:00Z", isMine: false },
+      { createdAt: "2026-10-04T10:10:00Z", isMine: false },
+      { createdAt: "2026-10-04T10:15:00Z", isMine: true },
+      { createdAt: "2026-10-04T10:20:00Z", isMine: false },
+    ];
+    expect(unreadSplit(thread, null)).toEqual({ index: 1, count: 3 });
+    expect(unreadSplit(thread, "2026-10-04T10:05:00Z")).toEqual({ index: 2, count: 2 });
+    expect(unreadSplit(thread, "2026-10-04T10:30:00Z")).toEqual({ index: -1, count: 0 });
+    expect(unreadSplit([], null)).toEqual({ index: -1, count: 0 });
+    expect(describeUnread(0)).toBe("");
+    expect(describeUnread(3)).toBe("3 new since you looked");
+
+    expect(replyPreview("  Own the\n\n transition   paragraph. ")).toBe("Own the transition paragraph.");
+    const long = replyPreview("x".repeat(200));
+    expect(long).toHaveLength(REPLY_PREVIEW_CHARS);
+    expect(long.endsWith("…")).toBe(true);
+
+    const block = notesForModel([
+      { author: "Ana", content: "Lead with the outcome." },
+      { author: "", content: "  " },
+      { author: "Bo", content: "Cite the\nPWS paragraph." },
+    ]);
+    const lines = block.split("\n");
+    expect(lines[0]).toMatch(/^Notes the team left on this section/);
+    expect(lines.slice(1)).toEqual(["- Ana: Lead with the outcome.", "- Bo: Cite the PWS paragraph."]);
+    expect(notesForModel([])).toBe("");
+    expect(notesForModel(Array.from({ length: 12 }, (_, i) => ({ author: `U${i}`, content: `n${i}` }))).split("\n")).toHaveLength(1 + CHAT_NOTES_TO_MODEL_MAX);
   });
 });

@@ -14,6 +14,7 @@ import { triggerProposalScanIfStaleAction } from "../scan-actions";
 import { runInBackground } from "@/lib/background";
 import { listOpenReviewCommentsBySection } from "@/lib/section-review-comments";
 import type { SectionReviewComment } from "@/lib/review-comments";
+import { unreadChatCounts } from "@/lib/section-chat";
 import { getHouseStyle, voiceAuthorIds } from "@/lib/voice";
 import { AutoDraftButton } from "./ai/AutoDraftButton";
 import { SectionsClient } from "./SectionsClient";
@@ -25,8 +26,8 @@ export default async function ProposalSectionsPage({
   searchParams,
 }: {
   params: { id: string };
-  /** BL-FB-CHAT-MULTI — a mention notification opens its section with the chat showing. */
-  searchParams?: { section?: string; tab?: string };
+  /** BL-FB-CHAT-MULTI — a mention notification opens its section with the chat showing, scrolled to the message (Slice 2). */
+  searchParams?: { section?: string; tab?: string; message?: string };
 }) {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -67,9 +68,11 @@ export default async function ProposalSectionsPage({
 
   // BL-FB-GEN-VOICE Slice 2 — whose sections the drafter writes in their
   // own voice, and whether the team has a house style (header chips).
-  const [voiceAuthors, style] = await Promise.all([
+  const [voiceAuthors, style, chatUnread] = await Promise.all([
     voiceAuthorIds({ organizationId }).catch(() => [] as string[]),
     getHouseStyle({ organizationId }).catch(() => ({ orgName: "", houseStyle: "" })),
+    // BL-FB-CHAT-MULTI Slice 2 — thread messages by teammates since this viewer last looked, per section.
+    unreadChatCounts({ organizationId, proposalId: params.id, viewerUserId: user.id }).catch(() => ({}) as Record<string, number>),
   ]);
 
   // BL-AIP-6b — open colour-team review comments, shown and resolvable
@@ -130,6 +133,7 @@ export default async function ProposalSectionsPage({
         proposalId={params.id}
         initialSectionId={typeof searchParams?.section === "string" ? searchParams.section : null}
         initialTab={searchParams?.tab === "chat" ? "chat" : null}
+        initialMessageId={typeof searchParams?.message === "string" ? searchParams.message : null}
         sections={sectionRows.map((s) => {
           const issue = issueBySection.get(s.id);
           const coverage = coverageBySection.get(s.id);
@@ -151,6 +155,7 @@ export default async function ProposalSectionsPage({
             themeReinforced: coverage?.reinforced ?? null,
             themeTotal: coverage?.total ?? null,
             reviewComments: openComments[s.id] ?? [],
+            chatUnread: chatUnread[s.id] ?? 0,
           };
         })}
         team={team}
