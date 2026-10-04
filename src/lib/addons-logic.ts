@@ -75,6 +75,7 @@ export type TenantAddonRow = {
   status: "active" | "canceled";
   source: "manual" | "stripe";
   stripeSubscriptionId: string | null;
+  stripeSubscriptionItemId: string | null;
   note: string;
   startsAt: string;
   endsAt: string | null;
@@ -210,4 +211,54 @@ export function formatMonthlyPrice(cents: number): string {
   if (cents === 0) return "Included";
   const dollars = cents / 100;
   return `$${Number.isInteger(dollars) ? dollars.toLocaleString() : dollars.toFixed(2)}/mo`;
+}
+
+// ── Slice 2a — add-ons on the plan's own Stripe subscription ──────────
+
+/** The parts of a Stripe subscription item the billing code reads. */
+export type StripeItemLite = { id: string; priceId: string | null; quantity: number | null; interval: string | null };
+
+/**
+ * Which item of a subscription bills the plan and which bill add-ons,
+ * told apart by Price: an item whose Price is an add-on's is an add-on;
+ * the first other item is the plan. A subscription can carry the plan
+ * and several add-ons on one invoice, in any order.
+ */
+export function splitSubscriptionItems(
+  items: StripeItemLite[],
+  addonPriceIds: ReadonlySet<string>,
+): { planItem: StripeItemLite | null; addonItems: StripeItemLite[] } {
+  const isAddon = (i: StripeItemLite) => !!i.priceId && addonPriceIds.has(i.priceId);
+  return { planItem: items.find((i) => !isAddon(i)) ?? null, addonItems: items.filter(isAddon) };
+}
+
+/**
+ * Can an add-on be billed as an item on the plan's subscription (one
+ * invoice, prorated)? Only on a live plan, and only when the add-on's
+ * Price recurs on the plan's interval — Stripe refuses mixed intervals,
+ * so a yearly plan with a monthly add-on keeps a separate subscription.
+ */
+export function canBillOnPlan(input: { planStatus: string | null; planInterval: string | null; addonInterval: string | null }): boolean {
+  const live = input.planStatus === "active" || input.planStatus === "trialing";
+  return live && !!input.planInterval && input.planInterval === input.addonInterval;
+}
+
+/**
+ * Line up a plan subscription's add-on items with the grants recorded
+ * for it: grants whose item is gone end; items with a different
+ * quantity update; items with no grant are new.
+ */
+export function reconcilePlanItems(
+  grants: { id: string; itemId: string; quantity: number }[],
+  items: { id: string; quantity: number }[],
+): { end: string[]; quantity: { grantId: string; quantity: number }[]; added: string[] } {
+  const byItem = new Map(items.map((i) => [i.id, i]));
+  const granted = new Set(grants.map((g) => g.itemId));
+  return {
+    end: grants.filter((g) => !byItem.has(g.itemId)).map((g) => g.id),
+    quantity: grants
+      .filter((g) => byItem.has(g.itemId) && byItem.get(g.itemId)!.quantity !== g.quantity)
+      .map((g) => ({ grantId: g.id, quantity: byItem.get(g.itemId)!.quantity })),
+    added: items.filter((i) => !granted.has(i.id)).map((i) => i.id),
+  };
 }

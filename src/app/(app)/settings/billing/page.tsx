@@ -53,6 +53,7 @@ export default async function BillingPage({
       currentPeriodEnd: tenantSubscriptions.currentPeriodEnd,
       cancelAt: tenantSubscriptions.cancelAt,
       hasStripeCustomer: tenantSubscriptions.stripeCustomerId,
+      stripeSubscriptionId: tenantSubscriptions.stripeSubscriptionId,
     })
     .from(tenantSubscriptions)
     .leftJoin(
@@ -290,7 +291,12 @@ export default async function BillingPage({
       </div>
 
       {/* BL-PACKAGES add-ons Slice 1 — à la carte on top of the plan */}
-      <AddonsSection organizationId={organizationId} isAdmin={isAdmin} tier={tier} />
+      <AddonsSection
+        organizationId={organizationId}
+        isAdmin={isAdmin}
+        tier={tier}
+        planSubscriptionId={current?.stripeSubscriptionId ?? null}
+      />
     </>
   );
 }

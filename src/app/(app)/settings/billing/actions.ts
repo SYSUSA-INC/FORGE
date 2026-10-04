@@ -1,6 +1,8 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import type Stripe from "stripe";
 import { db } from "@/db";
 import {
   organizations,
@@ -8,14 +10,20 @@ import {
   tenantSubscriptions,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
-import { getAddonBySlug } from "@/lib/addons";
-import { sanitizeAddonQuantity } from "@/lib/addons-logic";
+import { endGrantNow, getAddonBySlug, getTenantGrant, listAddonCatalog, provisionStripeAddon, setGrantQuantity, type AddonCatalogRow } from "@/lib/addons";
+import { ADDON_LIMITS, canBillOnPlan, sanitizeAddonQuantity, splitSubscriptionItems } from "@/lib/addons-logic";
 import { getStripeClient } from "@/lib/stripe";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 
 export type CheckoutSessionResult =
   | { ok: true; url: string }
+  | { ok: false; error: string };
+
+/** An add-on purchase either needs Checkout (url) or was added to the plan's subscription (url null). */
+export type AddonPurchaseResult =
+  | { ok: true; url: string }
+  | { ok: true; url: null; message: string }
   | { ok: false; error: string };
 
 /**
@@ -194,18 +202,107 @@ export async function createCheckoutSessionAction(input: {
 }
 
 /**
- * BL-PACKAGES add-ons Slice 1 — buy an add-on for the current tenant.
+ * BL-PACKAGES add-ons Slice 2a — one invoice. When the tenant already
+ * pays for a plan by card and the add-on's Price recurs on the plan's
+ * interval, the add-on becomes an item on the plan's own subscription
+ * (prorated for the rest of the period, then on the same invoice). A
+ * second purchase of a top-up raises the item's quantity. Returns null
+ * when the add-on can't ride on the plan, so the caller falls back to a
+ * separate checkout.
+ */
+async function addToPlanSubscription(input: {
+  stripe: Stripe;
+  organizationId: string;
+  actor: { id: string; email?: string | null };
+  addon: AddonCatalogRow;
+  quantity: number;
+  planSubscriptionId: string;
+}): Promise<AddonPurchaseResult | null> {
+  const { stripe, organizationId, addon } = input;
+  let plan: Stripe.Subscription;
+  let addonPrice: Stripe.Price;
+  try {
+    [plan, addonPrice] = await Promise.all([
+      stripe.subscriptions.retrieve(input.planSubscriptionId),
+      stripe.prices.retrieve(addon.stripePriceId!),
+    ]);
+  } catch (err) {
+    log.warn("[addToPlanSubscription]", "could not read the plan subscription; using a separate checkout", {
+      organizationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+  const catalog = await listAddonCatalog();
+  const addonPrices = new Set(catalog.map((a) => a.stripePriceId).filter((p): p is string => !!p));
+  const items = plan.items.data.map((i) => ({
+    id: i.id,
+    priceId: i.price?.id ?? null,
+    quantity: i.quantity ?? null,
+    interval: i.price?.recurring?.interval ?? null,
+  }));
+  const { planItem } = splitSubscriptionItems(items, addonPrices);
+  if (!canBillOnPlan({ planStatus: plan.status, planInterval: planItem?.interval ?? null, addonInterval: addonPrice.recurring?.interval ?? null })) {
+    return null;
+  }
+
+  const existing = items.find((i) => i.priceId === addon.stripePriceId);
+  if (existing && addon.kind !== "ai_tokens") return { ok: false, error: `You already have ${addon.name}.` };
+  try {
+    const total = existing ? Math.min(ADDON_LIMITS.quantity.max, (existing.quantity ?? 1) + input.quantity) : input.quantity;
+    const item = existing
+      ? await stripe.subscriptionItems.update(existing.id, { quantity: total, proration_behavior: "create_prorations" })
+      : await stripe.subscriptionItems.create({
+          subscription: plan.id,
+          price: addon.stripePriceId!,
+          quantity: total,
+          proration_behavior: "create_prorations",
+          metadata: { organizationId, forgeAddonSlug: addon.slug },
+        });
+    const res = await provisionStripeAddon({
+      organizationId,
+      addonSlug: addon.slug,
+      quantity: total,
+      stripeSubscriptionId: plan.id,
+      stripeSubscriptionItemId: item.id,
+      note: "Billed on the plan's subscription.",
+    });
+    if (!res.ok) return { ok: false, error: res.error };
+    await recordAudit({
+      organizationId,
+      actor: { userId: input.actor.id, email: input.actor.email },
+      action: "subscription.addon_added_to_plan",
+      resourceType: "tenant_addon",
+      resourceId: res.id,
+      metadata: { addonSlug: addon.slug, quantity: total, stripeSubscriptionItemId: item.id },
+    });
+    revalidatePath("/settings/billing");
+    return {
+      ok: true,
+      url: null,
+      message: `${addon.name} is on your plan now. Your next invoice includes it, prorated for the rest of this period.`,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[addToPlanSubscription]", "stripe item change failed", { organizationId, addonSlug: addon.slug, error: message });
+    return { ok: false, error: `Could not add it to your plan: ${message.slice(0, 200)}` };
+  }
+}
+
+/**
+ * BL-PACKAGES add-ons — buy an add-on for the current tenant.
  *
- * A separate recurring Stripe subscription per add-on (quantity for
- * token top-ups), so cancelling one never touches the plan. Both the
- * session and the subscription carry our metadata; the webhook reads
- * `forgeAddonSlug` to record the grant and keep it in step. Org admins
- * only, like plan checkout.
+ * Slice 2a: on a card-paid plan whose interval matches, the add-on is
+ * added to the plan's own subscription (one invoice, prorated). Else a
+ * separate recurring Stripe subscription per add-on (quantity for
+ * token top-ups) through Checkout, so cancelling one never touches the
+ * plan; the session and the subscription carry our metadata and the
+ * webhook reads `forgeAddonSlug` to record the grant. Org admins only.
  */
 export async function createAddonCheckoutSessionAction(input: {
   addonSlug: string;
   quantity: number;
-}): Promise<CheckoutSessionResult> {
+}): Promise<AddonPurchaseResult> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
@@ -234,7 +331,10 @@ export async function createAddonCheckoutSessionAction(input: {
     return { ok: false, error: "Could not load your organization." };
   }
   const [subRow] = await db
-    .select({ stripeCustomerId: tenantSubscriptions.stripeCustomerId })
+    .select({
+      stripeCustomerId: tenantSubscriptions.stripeCustomerId,
+      stripeSubscriptionId: tenantSubscriptions.stripeSubscriptionId,
+    })
     .from(tenantSubscriptions)
     .where(eq(tenantSubscriptions.organizationId, organizationId))
     .limit(1);
@@ -251,6 +351,18 @@ export async function createAddonCheckoutSessionAction(input: {
       error:
         "Checkout is not configured for this environment. Contact support if this is unexpected.",
     };
+  }
+
+  if (subRow?.stripeSubscriptionId) {
+    const onPlan = await addToPlanSubscription({
+      stripe,
+      organizationId,
+      actor,
+      addon,
+      quantity,
+      planSubscriptionId: subRow.stripeSubscriptionId,
+    });
+    if (onPlan) return onPlan;
   }
 
   const appUrl = (
@@ -305,6 +417,103 @@ export async function createAddonCheckoutSessionAction(input: {
       error: message,
     });
     return { ok: false, error: `Could not start checkout: ${message.slice(0, 200)}` };
+  }
+}
+
+/**
+ * BL-PACKAGES add-ons Slice 2a — change how many of a card-bought token
+ * top-up the tenant has. Stripe prorates the difference onto the next
+ * invoice; the grant follows at once (and the webhook confirms it).
+ */
+export async function changeAddonQuantityAction(input: {
+  tenantAddonId: string;
+  quantity: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const quantity = sanitizeAddonQuantity(input.quantity);
+  if (quantity === null) return { ok: false, error: `Quantity: a whole number from ${ADDON_LIMITS.quantity.min} to ${ADDON_LIMITS.quantity.max}.` };
+  const grant = await getTenantGrant({ organizationId, tenantAddonId: input.tenantAddonId });
+  if (!grant || grant.status !== "active") return { ok: false, error: "That add-on is no longer active." };
+  if (grant.source !== "stripe") return { ok: false, error: "This add-on was granted by FORGE — contact us to change it." };
+  if (grant.kind !== "ai_tokens") return { ok: false, error: "Only token top-ups have a quantity." };
+  if (quantity === grant.quantity) return { ok: true };
+
+  try {
+    const stripe = getStripeClient();
+    let itemId = grant.stripeSubscriptionItemId;
+    if (!itemId && grant.stripeSubscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(grant.stripeSubscriptionId);
+      itemId = sub.items.data[0]?.id ?? null;
+    }
+    if (!itemId) return { ok: false, error: "Could not find this add-on in Stripe. Use the billing portal." };
+    await stripe.subscriptionItems.update(itemId, { quantity, proration_behavior: "create_prorations" });
+    await setGrantQuantity({
+      organizationId,
+      tenantAddonId: grant.id,
+      quantity,
+      actor: { userId: actor.id, email: actor.email },
+      stripeSubscriptionItemId: itemId,
+    });
+    revalidatePath("/settings/billing");
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[changeAddonQuantityAction]", "stripe quantity change failed", { organizationId, error: message });
+    return { ok: false, error: `Could not change the quantity: ${message.slice(0, 200)}` };
+  }
+}
+
+/**
+ * BL-PACKAGES add-ons Slice 2a — remove a card-bought add-on. One billed
+ * on the plan's subscription is removed now and the unused time is
+ * credited on the next invoice; one with its own subscription is
+ * cancelled at the end of the period already paid for.
+ */
+export async function removeAddonAction(
+  tenantAddonId: string,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const grant = await getTenantGrant({ organizationId, tenantAddonId });
+  if (!grant || grant.status !== "active") return { ok: false, error: "That add-on is no longer active." };
+  if (grant.source !== "stripe" || !grant.stripeSubscriptionId) {
+    return { ok: false, error: "This add-on was granted by FORGE — contact us to remove it." };
+  }
+  const [subRow] = await db
+    .select({ stripeSubscriptionId: tenantSubscriptions.stripeSubscriptionId })
+    .from(tenantSubscriptions)
+    .where(eq(tenantSubscriptions.organizationId, organizationId))
+    .limit(1);
+  const onPlan = !!grant.stripeSubscriptionItemId && grant.stripeSubscriptionId === subRow?.stripeSubscriptionId;
+
+  try {
+    const stripe = getStripeClient();
+    if (onPlan) {
+      await stripe.subscriptionItems.del(grant.stripeSubscriptionItemId!, { proration_behavior: "create_prorations" });
+      await endGrantNow({ organizationId, tenantAddonId: grant.id, actor: { userId: actor.id, email: actor.email } });
+      revalidatePath("/settings/billing");
+      return { ok: true, message: "Removed. The unused part of this period is credited on your next invoice." };
+    }
+    await stripe.subscriptions.update(grant.stripeSubscriptionId, { cancel_at_period_end: true });
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "tenant.addon.cancel_requested",
+      resourceType: "tenant_addon",
+      resourceId: grant.id,
+      metadata: { stripeSubscriptionId: grant.stripeSubscriptionId },
+    });
+    revalidatePath("/settings/billing");
+    return { ok: true, message: "Cancelled. It stays on until the end of the period you have paid for." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[removeAddonAction]", "stripe removal failed", { organizationId, error: message });
+    return { ok: false, error: `Could not remove it: ${message.slice(0, 200)}` };
   }
 }
 

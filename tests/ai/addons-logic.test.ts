@@ -9,6 +9,9 @@ import type { TierFeatureFlags, TierQuotas } from "@/db/schema";
 import {
   addonIsLive,
   applyAddonEffects,
+  canBillOnPlan,
+  reconcilePlanItems,
+  splitSubscriptionItems,
   describeAddon,
   formatMonthlyPrice,
   formatTokenCount,
@@ -126,5 +129,41 @@ describe("wording", () => {
     expect(formatMonthlyPrice(0)).toBe("Included");
     expect(formatMonthlyPrice(4900)).toBe("$49/mo");
     expect(formatMonthlyPrice(4950)).toBe("$49.50/mo");
+  });
+});
+
+describe("Slice 2a — add-ons on the plan's own subscription", () => {
+  const addonPrices = new Set(["price_tokens", "price_export"]);
+  const item = (id: string, priceId: string | null, quantity = 1, interval = "month") => ({ id, priceId, quantity, interval });
+
+  it("tells the plan item from add-on items, whatever their order", () => {
+    const split = splitSubscriptionItems([item("si_a", "price_tokens", 3), item("si_p", "price_gold"), item("si_b", "price_export")], addonPrices);
+    expect(split.planItem?.id).toBe("si_p");
+    expect(split.addonItems.map((i) => i.id)).toEqual(["si_a", "si_b"]);
+    expect(splitSubscriptionItems([item("si_a", "price_tokens")], addonPrices).planItem).toBeNull();
+    expect(splitSubscriptionItems([], addonPrices)).toEqual({ planItem: null, addonItems: [] });
+  });
+
+  it("bills on the plan only for a live plan on the same interval", () => {
+    expect(canBillOnPlan({ planStatus: "active", planInterval: "month", addonInterval: "month" })).toBe(true);
+    expect(canBillOnPlan({ planStatus: "trialing", planInterval: "year", addonInterval: "year" })).toBe(true);
+    expect(canBillOnPlan({ planStatus: "active", planInterval: "year", addonInterval: "month" })).toBe(false);
+    expect(canBillOnPlan({ planStatus: "past_due", planInterval: "month", addonInterval: "month" })).toBe(false);
+    expect(canBillOnPlan({ planStatus: "canceled", planInterval: "month", addonInterval: "month" })).toBe(false);
+    expect(canBillOnPlan({ planStatus: "active", planInterval: null, addonInterval: "month" })).toBe(false);
+  });
+
+  it("lines plan items up with recorded grants", () => {
+    const grants = [
+      { id: "g1", itemId: "si_a", quantity: 2 },
+      { id: "g2", itemId: "si_b", quantity: 1 },
+      { id: "g3", itemId: "si_gone", quantity: 1 },
+    ];
+    expect(reconcilePlanItems(grants, [{ id: "si_a", quantity: 5 }, { id: "si_b", quantity: 1 }, { id: "si_new", quantity: 1 }])).toEqual({
+      end: ["g3"],
+      quantity: [{ grantId: "g1", quantity: 5 }],
+      added: ["si_new"],
+    });
+    expect(reconcilePlanItems([], [])).toEqual({ end: [], quantity: [], added: [] });
   });
 });

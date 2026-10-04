@@ -7,10 +7,13 @@ import {
   tenantSubscriptions,
 } from "@/db/schema";
 import {
-  getAddonByStripePriceId,
+  endPlanAddonGrants,
+  listAddonCatalog,
   provisionStripeAddon,
+  syncPlanAddonItems,
   syncStripeAddonSubscription,
 } from "@/lib/addons";
+import { splitSubscriptionItems, type StripeItemLite } from "@/lib/addons-logic";
 import {
   getStripeClient,
   getWebhookSecret,
@@ -388,69 +391,102 @@ async function handleCheckoutCompleted(
   });
 }
 
+function itemsOf(sub: Stripe.Subscription): StripeItemLite[] {
+  return (sub.items?.data ?? []).map((i) => ({
+    id: i.id,
+    priceId: i.price?.id ?? null,
+    quantity: i.quantity ?? null,
+    interval: i.price?.recurring?.interval ?? null,
+  }));
+}
+
+/** Add-on Stripe Price id → slug, retired add-ons included (they still bill until ended). */
+async function addonPriceSlugs(): Promise<Map<string, string>> {
+  const catalog = await listAddonCatalog();
+  return new Map(catalog.filter((a) => a.stripePriceId).map((a) => [a.stripePriceId!, a.slug]));
+}
+
 /**
- * BL-PACKAGES add-ons — is this Stripe subscription an add-on's rather
- * than the tenant's plan? Known by the grant we recorded for it, by the
- * metadata our checkout put on it, or by its Price being an add-on's.
- * Returns the add-on slug when it is one; null when it is the plan.
+ * The tenant whose plan this Stripe subscription is, if it is one. Since
+ * add-ons can ride on the plan's subscription (Slice 2a) and share its
+ * id, the plan is recognised first and never mistaken for an add-on's.
  */
-async function addonSlugOf(sub: Stripe.Subscription): Promise<string | null> {
+async function planOwnerOf(subscriptionId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ organizationId: tenantSubscriptions.organizationId })
+    .from(tenantSubscriptions)
+    .where(eq(tenantSubscriptions.stripeSubscriptionId, subscriptionId))
+    .limit(1);
+  return row?.organizationId ?? null;
+}
+
+/**
+ * BL-PACKAGES add-ons — is this Stripe subscription an add-on's own rather
+ * than a plan? Known by the metadata our checkout put on it, or by every
+ * item billing an add-on's Price. Returns the add-on slug when it is one.
+ */
+function addonSlugOf(sub: Stripe.Subscription, prices: Map<string, string>): string | null {
   const fromMetadata = typeof sub.metadata?.forgeAddonSlug === "string" ? sub.metadata.forgeAddonSlug : "";
   if (fromMetadata) return fromMetadata;
-  const priceId = sub.items?.data?.[0]?.price?.id ?? null;
-  if (!priceId) return null;
-  const addon = await getAddonByStripePriceId(priceId);
-  return addon?.slug ?? null;
+  const { planItem, addonItems } = splitSubscriptionItems(itemsOf(sub), new Set(prices.keys()));
+  return !planItem && addonItems[0]?.priceId ? (prices.get(addonItems[0].priceId) ?? null) : null;
 }
 
 async function handleSubscriptionUpdated(
   sub: Stripe.Subscription,
   organizationId: string | null,
 ): Promise<void> {
-  // BL-PACKAGES add-ons — an add-on's subscription keeps its grant in
-  // step and leaves the plan row alone. Stripe can deliver this event
-  // before the checkout one, so a not-yet-recorded add-on is recorded
-  // here when the tenant is known from the customer binding (never
-  // from the payload's own claims); otherwise the checkout event will.
-  const firstItem = sub.items?.data?.[0];
-  const synced = await syncStripeAddonSubscription({
-    stripeSubscriptionId: sub.id,
-    stripeStatus: sub.status,
-    quantity: firstItem?.quantity ?? null,
-    currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
-  });
-  if (synced.matched) return;
-  const addonSlug = await addonSlugOf(sub);
-  if (addonSlug) {
-    if (!organizationId) {
-      log.info("[stripe-webhook]", "add-on subscription for a not-yet-bound customer; waiting for checkout.session.completed", {
-        subscriptionId: sub.id,
+  const prices = await addonPriceSlugs();
+  const planOrg = await planOwnerOf(sub.id);
+  if (!planOrg) {
+    // BL-PACKAGES add-ons — an add-on's own subscription keeps its grant
+    // in step and leaves the plan row alone. Stripe can deliver this
+    // event before the checkout one, so a not-yet-recorded add-on is
+    // recorded here when the tenant is known from the customer binding
+    // (never from the payload's own claims); otherwise the checkout
+    // event will.
+    const firstItem = sub.items?.data?.[0];
+    const synced = await syncStripeAddonSubscription({
+      stripeSubscriptionId: sub.id,
+      stripeStatus: sub.status,
+      quantity: firstItem?.quantity ?? null,
+      currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+    });
+    if (synced.matched) return;
+    const addonSlug = addonSlugOf(sub, prices);
+    if (addonSlug) {
+      if (!organizationId) {
+        log.info("[stripe-webhook]", "add-on subscription for a not-yet-bound customer; waiting for checkout.session.completed", {
+          subscriptionId: sub.id,
+          addonSlug,
+        });
+        return;
+      }
+      const res = await provisionStripeAddon({
+        organizationId,
         addonSlug,
+        quantity: firstItem?.quantity ?? 1,
+        stripeSubscriptionId: sub.id,
+        stripeSubscriptionItemId: firstItem?.id ?? null,
       });
+      if (!res.ok) throw new Error(res.error);
       return;
     }
-    const res = await provisionStripeAddon({
-      organizationId,
-      addonSlug,
-      quantity: firstItem?.quantity ?? 1,
-      stripeSubscriptionId: sub.id,
-      stripeSubscriptionItemId: firstItem?.id ?? null,
-    });
-    if (!res.ok) throw new Error(res.error);
-    return;
   }
 
-  if (!organizationId) {
+  const orgId = planOrg ?? organizationId;
+  if (!orgId) {
     throw new Error(
       `customer.subscription.updated for unknown customer ${sub.customer as string}`,
     );
   }
 
   // BL-17 Slice 4 — when the customer changes plan via the Stripe
-  // Customer Portal, this event fires with the new Price id on the
-  // first subscription item. Re-resolve the FORGE tier so our
-  // tenant_subscription row reflects the change.
-  const priceId = sub.items.data[0]?.price?.id ?? null;
+  // Customer Portal, this event fires with the new Price id. Re-resolve
+  // the FORGE tier from the plan's item — not merely the first item,
+  // since add-ons billed on the plan (Slice 2a) are items too.
+  const { planItem, addonItems } = splitSubscriptionItems(itemsOf(sub), new Set(prices.keys()));
+  const priceId = planItem?.priceId ?? null;
   let resolvedTierId: string | null = null;
   if (priceId) {
     const tier = await resolveTierFromStripePriceId(priceId);
@@ -472,19 +508,29 @@ async function handleSubscriptionUpdated(
       cancelAt: sub.cancel_at ? new Date(sub.cancel_at * 1000) : null,
       updatedAt: new Date(),
     })
-    .where(eq(tenantSubscriptions.organizationId, organizationId));
+    .where(eq(tenantSubscriptions.organizationId, orgId));
+
+  // Add-ons billed on the plan follow its items: added, re-quantified
+  // (prorated by Stripe) or removed.
+  const addonSync = await syncPlanAddonItems({
+    organizationId: orgId,
+    stripeSubscriptionId: sub.id,
+    items: addonItems.map((i) => ({ id: i.id, slug: prices.get(i.priceId!)!, quantity: i.quantity ?? 1 })),
+  });
 
   await recordAudit({
-    organizationId,
+    organizationId: orgId,
     actor: { userId: null, email: "stripe-webhook" },
     action: "subscription.updated",
     resourceType: "tenant_subscription",
-    resourceId: organizationId,
+    resourceId: orgId,
     metadata: {
       stripeSubscriptionId: sub.id,
       stripeStatus: sub.status,
       tierId: resolvedTierId,
       stripePriceId: priceId,
+      addonItems: addonItems.length,
+      ...addonSync,
     },
   });
 }
@@ -493,20 +539,25 @@ async function handleSubscriptionDeleted(
   sub: Stripe.Subscription,
   organizationId: string | null,
 ): Promise<void> {
-  // BL-PACKAGES add-ons — cancelling an add-on ends its grant (it serves
-  // until the paid period ends) and must never cancel the plan.
-  const synced = await syncStripeAddonSubscription({
-    stripeSubscriptionId: sub.id,
-    stripeStatus: "canceled",
-    currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
-  });
-  if (synced.matched) return;
-  if (await addonSlugOf(sub)) {
-    log.info("[stripe-webhook]", "add-on subscription deleted before it was recorded; nothing to end", { subscriptionId: sub.id });
-    return;
+  const planOrg = await planOwnerOf(sub.id);
+  if (!planOrg) {
+    // BL-PACKAGES add-ons — cancelling an add-on's own subscription ends
+    // its grant (it serves until the paid period ends) and must never
+    // cancel the plan.
+    const synced = await syncStripeAddonSubscription({
+      stripeSubscriptionId: sub.id,
+      stripeStatus: "canceled",
+      currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+    });
+    if (synced.matched) return;
+    if (addonSlugOf(sub, await addonPriceSlugs())) {
+      log.info("[stripe-webhook]", "add-on subscription deleted before it was recorded; nothing to end", { subscriptionId: sub.id });
+      return;
+    }
   }
 
-  if (!organizationId) {
+  const orgId = planOrg ?? organizationId;
+  if (!orgId) {
     throw new Error(
       `customer.subscription.deleted for unknown customer ${sub.customer as string}`,
     );
@@ -519,15 +570,17 @@ async function handleSubscriptionDeleted(
       cancelAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(tenantSubscriptions.organizationId, organizationId));
+    .where(eq(tenantSubscriptions.organizationId, orgId));
+  // Add-ons billed on the plan's subscription end with it.
+  const addonsEnded = await endPlanAddonGrants({ organizationId: orgId, stripeSubscriptionId: sub.id, endsAt: new Date() });
 
   await recordAudit({
-    organizationId,
+    organizationId: orgId,
     actor: { userId: null, email: "stripe-webhook" },
     action: "subscription.cancelled",
     resourceType: "tenant_subscription",
-    resourceId: organizationId,
-    metadata: { stripeSubscriptionId: sub.id },
+    resourceId: orgId,
+    metadata: { stripeSubscriptionId: sub.id, addonsEnded },
   });
 }
 
