@@ -45,7 +45,7 @@ Effort key:
 | 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | ✅ shipped (PR #329) |
 | 3r | **BL-FB-CHAT-MULTI Slice 3** — Presence: who else has a section open, in the section header | P3 | S | ✅ shipped (PR #330) |
 | 3s | **BL-21 help refresh (October 2026 pass)** — What's new in the user manual, FAQ for the new features, migrations 0104–0112 table in the admin manual | P3 | S | ✅ shipped (PR #331) |
-| 3t | **BL-16 API Slice 2a** — Platform admins view and revoke a tenant's API tokens (one or all, with a reason); OpenAPI 3.1 document at `/api/v1/openapi.json` | P2 | S | 🔄 in PR (PR #333) |
+| 3t | **BL-16 API Slice 2a** — Platform admins view and revoke a tenant's API tokens (one or all, with a reason); OpenAPI 3.1 document at `/api/v1/openapi.json` | P2 | S | ✅ shipped (PR #333) |
 | 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -3978,7 +3978,7 @@ nothing used it, because there was no API.
 (would also need `bulkExport`); webhooks out; ~~platform-admin view and
 revoke of a tenant's tokens; an OpenAPI document~~ → Slice 2a below.
 
-**API Slice 2a — platform-admin token view/revoke + OpenAPI document** 🔄 in PR (PR #333, 2026-10-04):
+**API Slice 2a — platform-admin token view/revoke + OpenAPI document** ✅ shipped (PR #333, 2026-10-04):
 
 User request (2026-10-04): with the backlog drained, build the API
 access follow-ups next, in stages: 2a admin view/revoke + OpenAPI, 2b
