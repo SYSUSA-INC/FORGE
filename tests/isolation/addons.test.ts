@@ -1,8 +1,9 @@
 /**
  * BL-PACKAGES add-ons Slice 1 — against Postgres: a grant raises the
  * owning tenant's cap and unlocks its feature and nobody else's, an
- * ended or expired grant stops counting, and every write is audited in
- * the tenant's own log.
+ * ended or expired grant stops counting, Stripe provisioning is
+ * idempotent and cancellation by subscription id ends the right grant,
+ * and every write is audited in the tenant's own log.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -13,7 +14,9 @@ import {
   activeAddonEffects,
   grantTenantAddon,
   listTenantAddons,
+  provisionStripeAddon,
   revokeTenantAddon,
+  syncStripeAddonSubscription,
 } from "@/lib/addons";
 import { ensureFeature, getCurrentTier } from "@/lib/subscription-gates";
 import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
@@ -109,5 +112,35 @@ describe("BL-PACKAGES add-ons — grants on top of the tier", () => {
     expect(audits.filter((x) => x.action === "tenant.addon.grant")).toHaveLength(2);
     expect(audits.filter((x) => x.action === "tenant.addon.revoke")).toHaveLength(1);
     expect(audits.every((x) => x.organizationId === fx.orgA.organizationId)).toBe(true);
+  });
+
+  it("records a Stripe purchase once per subscription and ends it by subscription id", async () => {
+    const subId = `sub_${tag}_a`;
+    const first = await provisionStripeAddon({ organizationId: fx.orgA.organizationId, addonSlug: `tok-${tag}`, quantity: 3, stripeSubscriptionId: subId });
+    expect(first).toMatchObject({ ok: true, created: true });
+    const again = await provisionStripeAddon({ organizationId: fx.orgA.organizationId, addonSlug: `tok-${tag}`, quantity: 4, stripeSubscriptionId: subId });
+    expect(again).toMatchObject({ ok: true, created: false });
+    expect(await provisionStripeAddon({ organizationId: fx.orgA.organizationId, addonSlug: "nope", quantity: 1, stripeSubscriptionId: "sub_x" })).toEqual({ ok: false, error: 'Unknown add-on "nope".' });
+    const a = (await getCurrentTier(fx.orgA.organizationId))!;
+    expect(a.platformQuotas.aiTokensPerMonth).toBe(3_000_000); // 4 × 500K after the replay updated the quantity
+    expect((await listTenantAddons({ organizationId: fx.orgA.organizationId })).map((r) => [r.source, r.quantity, r.live])).toEqual([["stripe", 4, true]]);
+
+    // An unknown subscription is not ours (the webhook then treats it as the plan).
+    expect(await syncStripeAddonSubscription({ stripeSubscriptionId: "sub_unknown", stripeStatus: "canceled" })).toEqual({ matched: false, organizationId: null, status: null });
+
+    // Cancelled with a paid period left: serves until then, then ends.
+    const periodEnd = new Date(Date.now() + 86_400_000);
+    expect(await syncStripeAddonSubscription({ stripeSubscriptionId: subId, stripeStatus: "canceled", currentPeriodEnd: periodEnd })).toEqual({ matched: true, organizationId: fx.orgA.organizationId, status: "canceled" });
+    const [row] = await listTenantAddons({ organizationId: fx.orgA.organizationId });
+    expect(row!.status).toBe("canceled");
+    expect(row!.endsAt).toBe(periodEnd.toISOString());
+    expect(row!.live).toBe(false); // status canceled never counts, even inside the paid period
+    expect((await getCurrentTier(fx.orgA.organizationId))!.platformQuotas.aiTokensPerMonth).toBe(1_000_000);
+
+    // B saw nothing.
+    expect((await getCurrentTier(fx.orgB.organizationId))!.addons.count).toBe(0);
+    const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
+    expect(audits.filter((x) => x.action === "tenant.addon.purchased")).toHaveLength(1);
+    expect(audits.filter((x) => x.action === "tenant.addon.cancelled")).toHaveLength(1);
   });
 });

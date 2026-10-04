@@ -30,8 +30,8 @@ Effort key:
 | 3b | **BL-PACKAGES Slice 2** — Migrate 7 lib-helper AI callers | P1 | M | ✅ shipped (PR #213) — 100% tenant AI paths token-capped |
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
-| 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | 🔄 in PR (PR #317) |
-| 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ⏳ queued (written, parked until 1a merges) |
+| 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | ✅ shipped (PR #317) |
+| 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | 🔄 in PR |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1048,7 +1048,7 @@ the dark block, no white-alpha utility anywhere in `src`).
 ---
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  🔄 add-ons Slice 1a in PR (PR #317; Slice 1b queued)
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ✅ add-ons Slice 1a shipped (PR #317)  ·  🔄 add-ons Slice 1b in PR
 
 Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
 
@@ -1084,20 +1084,40 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
 - Tests: `tests/ai/addons-logic.test.ts` (effects, liveness, input
   rules, wording); `tests/isolation/addons.test.ts` (a grant raises the
   owning tenant's cap and unlocks its feature only, ending and expiry
-  stop it, audits land in the tenant's log).
-- **Slice 1b (next, written and parked):** the tenant-facing picker on
-  `/settings/billing` — the catalogue with what the organization holds
-  and this month's cap split into tier + add-ons; org admins buy an
-  add-on with a Stripe Price through Checkout (a separate recurring
-  subscription per add-on with quantity for top-ups, metadata
-  `kind: addon` on the session and `forgeAddonSlug` on the
-  subscription); the webhook records the grant on
-  `checkout.session.completed` (idempotent by subscription id), keeps it
-  in step on `customer.subscription.updated` and ends it on `.deleted`
-  — serving until the paid period ends — without touching the plan row
-  (the plan handlers skip add-on subscriptions, recognised by the grant,
-  the metadata or the Price). Add-ons without a Stripe Price show
-  "Contact sales".
+  stop it, audits land in the tenant's log). Shipped in PR #317.
+
+**Add-ons Slice 1b — the tenant-facing picker and Stripe (2026-10-04):**
+
+- **Buying.** `/settings/billing` gains an **Add-ons** panel: the
+  catalogue with what the organization holds (live grants, quantity) and
+  this month's AI token cap split into tier + add-ons (`AddonsSection`,
+  reading `getCurrentTier().addons`). Org admins buy an add-on with a
+  Stripe Price through Checkout (`createAddonCheckoutSessionAction`: a
+  separate recurring subscription per add-on with quantity for top-ups,
+  metadata `kind: addon` on the session and `forgeAddonSlug` on the
+  subscription; audited `subscription.addon_checkout_started`). Add-ons
+  without a Stripe Price show "Contact sales"; non-admins see the list
+  read-only. Returning from Checkout shows an "add-on will show as
+  active" flash.
+- **Webhook.** `checkout.session.completed` with our add-on metadata
+  records the grant (`provisionStripeAddon`, idempotent by subscription
+  id, `tenant.addon.purchased`) and binds the Stripe customer only when
+  the tenant had none — never the plan's tier or status.
+  `customer.subscription.updated` / `.deleted` first ask
+  `syncStripeAddonSubscription` whether the subscription is a known
+  grant (status and quantity follow Stripe; a cancelled add-on serves
+  until its paid period ends, `tenant.addon.cancelled`); an add-on
+  subscription not yet recorded (events can arrive out of order) is
+  recorded from the customer binding, or left for the checkout event
+  when the customer is not bound yet. The plan handlers therefore skip
+  any subscription that is a grant, carries the add-on metadata or
+  bills an add-on's Price, so an add-on cancellation cannot cancel the
+  plan.
+- Tests: `tests/isolation/addons.test.ts` gains the Stripe case (a
+  purchase is recorded once per subscription and a replay updates the
+  quantity, an unknown subscription is not ours, cancellation ends the
+  right grant with its paid period and audits in the tenant's log).
+  Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9 "Bought by card".
 - **Later:** add-on items on the plan's own Stripe subscription (one
   invoice), proration on quantity changes, add-ons on the public
   pricing page, seats and storage as add-on kinds, advanced-reporting

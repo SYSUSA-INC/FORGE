@@ -7,9 +7,9 @@
  *                 (manual, by a platform admin; audited in the tenant's log)
  *   gate input  — activeAddonEffects, read by getCurrentTier on every
  *                 gated call
-
- * Self-serve purchase through Stripe (the tenant picker on
- * /settings/billing and the webhook hooks) lands in Slice 1b.
+ *   Stripe      — provisionStripeAddon / syncStripeAddonSubscription,
+ *                 called by the webhook so a bought add-on appears and
+ *                 disappears with its Stripe subscription
  *
  * Server-only; callers own auth. Every tenant_addon write carries
  * organizationId.
@@ -50,6 +50,13 @@ export async function listAddonCatalog(input?: { activeOnly?: boolean }): Promis
 
 export async function getAddonBySlug(slug: string): Promise<AddonCatalogRow | null> {
   const [row] = await db.select(catalogColumns).from(tierAddons).where(eq(tierAddons.slug, slug)).limit(1);
+  return row ?? null;
+}
+
+/** The catalogue entry sold under a Stripe Price, for the webhook. */
+export async function getAddonByStripePriceId(stripePriceId: string): Promise<AddonCatalogRow | null> {
+  if (!stripePriceId) return null;
+  const [row] = await db.select(catalogColumns).from(tierAddons).where(eq(tierAddons.stripePriceId, stripePriceId)).limit(1);
   return row ?? null;
 }
 
@@ -254,4 +261,107 @@ export async function revokeTenantAddon(input: { organizationId: string; tenantA
     metadata: { addonId: row.addonId, slug: row.slug, quantity: row.quantity, source: row.source },
   });
   return { ok: true, source: row.source };
+}
+
+// ── Stripe ────────────────────────────────────────────────────────────
+
+/**
+ * A checkout for an add-on completed: record the grant, keyed by the
+ * Stripe subscription so a replayed webhook updates instead of
+ * duplicating. Audited as tenant.addon.purchased.
+ */
+export async function provisionStripeAddon(input: {
+  organizationId: string;
+  addonSlug: string;
+  quantity: number;
+  stripeSubscriptionId: string;
+  stripeSubscriptionItemId?: string | null;
+}): Promise<{ ok: true; id: string; created: boolean } | { ok: false; error: string }> {
+  const { organizationId } = input;
+  const addon = await getAddonBySlug(input.addonSlug);
+  if (!addon) return { ok: false, error: `Unknown add-on "${input.addonSlug}".` };
+  const quantity = sanitizeAddonQuantity(input.quantity) ?? 1;
+  const now = new Date();
+  const [existing] = await db
+    .select({ id: tenantAddons.id, organizationId: tenantAddons.organizationId })
+    .from(tenantAddons)
+    .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.stripeSubscriptionId, input.stripeSubscriptionId)))
+    .limit(1);
+  if (existing) {
+    await db
+      .update(tenantAddons)
+      .set({ quantity, status: "active", canceledAt: null, stripeSubscriptionItemId: input.stripeSubscriptionItemId ?? null, updatedAt: now })
+      .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.id, existing.id)));
+    return { ok: true, id: existing.id, created: false };
+  }
+  const [row] = await db
+    .insert(tenantAddons)
+    .values({
+      organizationId,
+      addonId: addon.id,
+      quantity,
+      status: "active",
+      source: "stripe",
+      stripeSubscriptionId: input.stripeSubscriptionId,
+      stripeSubscriptionItemId: input.stripeSubscriptionItemId ?? null,
+      note: "Bought through Stripe Checkout.",
+    })
+    .returning({ id: tenantAddons.id });
+  if (!row) return { ok: false, error: "Insert failed." };
+  await recordAudit({
+    organizationId,
+    actor: { userId: null, email: "stripe-webhook" },
+    action: "tenant.addon.purchased",
+    resourceType: "tenant_addon",
+    resourceId: row.id,
+    metadata: { addonId: addon.id, slug: addon.slug, quantity, stripeSubscriptionId: input.stripeSubscriptionId },
+  });
+  return { ok: true, id: row.id, created: true };
+}
+
+/**
+ * Keep a Stripe-sourced grant in step with its subscription. Returns
+ * `matched: false` when the subscription is not an add-on's — the
+ * webhook then treats it as the tenant's main plan.
+ */
+export async function syncStripeAddonSubscription(input: {
+  stripeSubscriptionId: string;
+  stripeStatus: string;
+  quantity?: number | null;
+  currentPeriodEnd?: Date | null;
+}): Promise<{ matched: boolean; organizationId: string | null; status: "active" | "canceled" | null }> {
+  const [row] = await db
+    .select({ id: tenantAddons.id, organizationId: tenantAddons.organizationId, status: tenantAddons.status, slug: tierAddons.slug })
+    .from(tenantAddons)
+    .innerJoin(tierAddons, eq(tierAddons.id, tenantAddons.addonId))
+    .where(eq(tenantAddons.stripeSubscriptionId, input.stripeSubscriptionId))
+    .limit(1);
+  if (!row) return { matched: false, organizationId: null, status: null };
+  const { organizationId } = row;
+  const ended = input.stripeStatus === "canceled" || input.stripeStatus === "unpaid" || input.stripeStatus === "incomplete_expired";
+  const status: "active" | "canceled" = ended ? "canceled" : "active";
+  const now = new Date();
+  const quantity = input.quantity != null ? sanitizeAddonQuantity(input.quantity) : null;
+  await db
+    .update(tenantAddons)
+    .set({
+      status,
+      canceledAt: ended ? now : null,
+      // A cancelled subscription keeps serving until the paid period ends.
+      endsAt: ended ? (input.currentPeriodEnd && input.currentPeriodEnd.getTime() > now.getTime() ? input.currentPeriodEnd : now) : null,
+      ...(quantity !== null ? { quantity } : {}),
+      updatedAt: now,
+    })
+    .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.id, row.id)));
+  if (status !== row.status) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: null, email: "stripe-webhook" },
+      action: ended ? "tenant.addon.cancelled" : "tenant.addon.reactivated",
+      resourceType: "tenant_addon",
+      resourceId: row.id,
+      metadata: { slug: row.slug, stripeSubscriptionId: input.stripeSubscriptionId, stripeStatus: input.stripeStatus },
+    });
+  }
+  return { matched: true, organizationId, status };
 }
