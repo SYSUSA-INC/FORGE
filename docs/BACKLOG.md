@@ -42,7 +42,8 @@ Effort key:
 | 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | ✅ shipped (PR #326) |
 | 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | ✅ shipped (PR #327) |
 | 3p | **BL-FB-X-CRM Slice 4** — Nightly refresh of the agencies teams have contacts at; contact list CSV export | P3 | S | ✅ shipped (PR #328) |
-| 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | 🔄 in PR (PR #329) |
+| 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | ✅ shipped (PR #329) |
+| 3r | **BL-FB-CHAT-MULTI Slice 3** — Presence: who else has a section open, in the section header | P3 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1432,7 +1433,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #313 · Slice 1 PR #309)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in progress (Slice 2 PR #313 · Slice 1 PR #309)
 
 Capture manager, writer and AI in one thread, tied to the section
 instead of a Slack side-channel. BL-FB-CHAT-PERSIST already made the
@@ -1497,8 +1498,36 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   sections page passes it down and the chat opens scrolled to that
   message with a highlight. Without one, it opens at the first new
   message.
-- Presence (who has the section open) stays deferred until the
-  Hocuspocus layer is deployed.
+- ~~Presence (who has the section open) stays deferred until the
+  Hocuspocus layer is deployed.~~ → Slice 3 below, without waiting on it.
+
+**Slice 3 — who else has the section open (2026-10-04):**
+
+User request (2026-10-04): the "Work I can build next" list in order;
+chat presence is seventh. Built so it works on serverless hosting today,
+without the Hocuspocus layer (BL-9 Slice 2c, an operator deploy); once
+that is live the collab editor's own cursors add live presence inside the
+text.
+
+- **Check-ins.** Migration `0112_section_presence.sql` adds
+  `section_presence` (organization, section, member → last seen; PK
+  leads with organization_id). While a section is open the page checks
+  in every 30 seconds (only when the tab is visible) through
+  `sectionPresenceAction` → `heartbeatSectionPresence`, which confirms
+  the section is the tenant's, upserts the member, sweeps that
+  section's rows older than ten minutes and returns the other members
+  seen in the last 75 seconds (`activeViewers`, pure). Closing the
+  section (or leaving the page) calls `leaveSectionPresenceAction`.
+- **In the header.** `SectionPresence` shows up to three initials and
+  "Ana is here" / "Ana and Ben are here" / "Ana, Ben and 2 others are
+  here" (`presenceLabel`, pure) beside the chat-unread chip; nothing
+  when you're alone. Not audited: presence is ephemeral and carries no
+  content.
+- Tests: `tests/ai/presence-logic.test.ts` (window, self excluded,
+  wording, initials); `tests/isolation/section-presence.test.ts`
+  (teammates seen, self never, another tenant refused and never
+  stored, ageing out, sweep, leave). Docs: USER_MANUAL (team chat),
+  ADMIN_MANUAL (team chat).
 - Unit-tested (`tests/ai/chat-mentions.test.ts`); runtime-tested
   (`tests/isolation/section-chat-multi.test.ts`: unread counts per
   viewer and tenant, reply targets kept in-thread and cross-tenant
@@ -1780,7 +1809,7 @@ CRM follow-ups are fifth.
   nothing). Docs: USER_MANUAL §7.5, ADMIN_MANUAL cron table.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in PR (PR #329 · Slices 1–3 PR #305 · PR #306 · PR #316)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 4 shipped (PR #329 · Slices 1–3 PR #305 · PR #306 · PR #316)
 
 The "schedule a red team for Friday" process most teams run in email
 and Word, inside the review round FORGE already keeps (colour, due
@@ -5838,7 +5867,7 @@ telemetry, same posture as `section_draft_signal`; clearing a thread
 is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #313 · Slice 1 PR #309) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in progress (Slice 2 PR #313 · Slice 1 PR #309) — canonical entry under Active priorities
 
 Capture manager + writer + AI in the same thread; `@mention` a team
 member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces
@@ -5922,7 +5951,7 @@ score. Pre-RFP intelligence — who do we know at this customer, when
 was the last conversation. Lightweight CRM scoped to capture.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in PR (PR #329 · Slices 1–3 PR #305 · PR #306 · PR #316) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 4 shipped (PR #329 · Slices 1–3 PR #305 · PR #306 · PR #316) — canonical entry under Active priorities
 
 Built-in pink / red / gold / green review templates with reviewer
 assignments per section, comment consolidation, and reviewer
