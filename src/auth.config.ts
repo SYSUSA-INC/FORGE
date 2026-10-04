@@ -20,6 +20,9 @@ export const authConfig = {
         return true;
       if (pathname.startsWith("/api/auth")) return true;
       if (pathname.startsWith("/api/register")) return true;
+      // BL-AUTH-ABUSE Slice 2b — the public Request-a-trial page and endpoint.
+      if (pathname === "/request-trial") return true;
+      if (pathname === "/api/trial-request") return true;
       if (pathname.startsWith("/api/forgot-password")) return true;
       if (pathname.startsWith("/api/reset-password")) return true;
       if (pathname.startsWith("/api/samgov/health")) return true;

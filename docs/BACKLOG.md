@@ -33,8 +33,8 @@ Effort key:
 | 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | ✅ shipped (PR #317) |
 | 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ✅ shipped (PR #318) |
 | 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | ✅ shipped (PR #319) |
-| 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | 🔄 in PR (PR #320) |
-| 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ⏳ queued |
+| 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | ✅ shipped (PR #320) |
+| 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | 🔄 in PR (PR #321) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -938,7 +938,7 @@ expiry reminders; SSO domain auto-join.
 ---
 
 ### BL-AUTH-ABUSE — Bot and spam accounts: removal, sign-up hardening, trials
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  🔄 Slice 2a in PR (PR #320)  ·  Slice 2b queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  ✅ Slice 2a shipped (PR #320)  ·  🔄 Slice 2b in PR (PR #321)
 
 User request (2026-10-04): "we had some garbage accounts created by bots
 or spammers in our system, as a super admin I should be able to delete
@@ -1042,6 +1042,38 @@ platform-level `trial_request` queue.
   quota and gateway with no provider call while proposals, seats,
   storage and export pass; extend restores AI from today; convert;
   tenant B untouched; audits in A only).
+
+**Slice 2b — Request a trial (2026-10-04):**
+
+- **Queue.** `trial_request` (migration 0106; platform-level — the
+  link to the tenant it becomes is `created_organization_id`, so it is
+  not a tenant table): name, company email + domain, company, job title,
+  message, status pending / approved / declined, decider, decline
+  reason, source IP; one pending request per email (partial unique
+  index).
+- **Asking.** Public `/request-trial` page (linked from the invite-only
+  sign-up page) → `POST /api/trial-request`: 3 per IP per hour, the
+  sign-up honeypot / fill-time checks (fake success, nothing stored),
+  `validateTrialRequest` (pure: the sign-up name rules; company email
+  only — public mailbox and disposable domains refused; company 2–120
+  characters, no links), a domain a tenant already owns is told to ask
+  that tenant's admin, a repeat while pending gets the same "received"
+  answer. Platform admins are emailed per new request (best-effort).
+- **Deciding.** `/admin/trial-requests` (new "Trial requests" entry
+  under Organizations & users; pending count in the portal header).
+  **Approve** (`approveTrialRequest`) claims the request first so two
+  admins can't both approve, creates the workspace named after the
+  company with the requester's domain owned and the requester invited as
+  admin (shared `provisionOrganizationWithAdminInvite`, also behind the
+  "New organization" form now), then starts the 14-day trial; a failure
+  before the workspace exists puts the request back. Audited
+  `org.create`, `tenant.trial_start`, `trial_request.approve` in the new
+  workspace. **Decline** keeps an internal reason, sends nothing,
+  audited `trial_request.decline` in the admin's own log.
+- Tests: `tests/ai/trial-request-logic.test.ts`;
+  `tests/isolation/trial-requests.test.ts` (queue once, owned domain
+  redirected, approve → workspace owning the domain + admin invite +
+  14-day trial + audits, no second decision, decline creates nothing).
 
 ### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #276)

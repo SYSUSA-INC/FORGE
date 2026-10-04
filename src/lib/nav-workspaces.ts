@@ -228,6 +228,7 @@ const PLATFORM_NAV: WorkspaceNavGroup[] = [
       { href: "/admin?tab=overview", label: "Overview" },
       { href: "/admin?tab=organizations", label: "Organizations" },
       { href: "/admin?tab=users", label: "Platform users" },
+      { href: "/admin/trial-requests", label: "Trial requests" },
       { href: "/admin/source-requests", label: "Source requests" },
     ],
   },

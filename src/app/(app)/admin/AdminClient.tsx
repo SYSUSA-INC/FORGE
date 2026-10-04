@@ -76,6 +76,8 @@ type Stats = {
   activeUsers: number;
   pendingAdminInvites: number;
   pendingApprovals: number;
+  /** BL-AUTH-ABUSE Slice 2b — Request-a-trial submissions waiting for a decision. */
+  pendingTrialRequests: number;
 };
 
 /** BL-AUTH-DOMAIN — one cross-domain invite waiting for the platform stamp. */
@@ -151,6 +153,13 @@ export function AdminClient({
               Migrations →
             </Link>
             <Link
+              href="/admin/trial-requests"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              title="Request-a-trial submissions waiting for a decision"
+            >
+              Trial requests{stats.pendingTrialRequests > 0 ? ` (${stats.pendingTrialRequests})` : ""} →
+            </Link>
+            <Link
               href="/admin/source-requests"
               className="aur-btn aur-btn-ghost text-[11px]"
             >
@@ -213,6 +222,11 @@ export function AdminClient({
             label: "Cross-domain approvals",
             value: String(stats.pendingApprovals),
             accent: stats.pendingApprovals > 0 ? "gold" : undefined,
+          },
+          {
+            label: "Trial requests",
+            value: String(stats.pendingTrialRequests),
+            accent: stats.pendingTrialRequests > 0 ? "gold" : undefined,
           },
         ]}
       />

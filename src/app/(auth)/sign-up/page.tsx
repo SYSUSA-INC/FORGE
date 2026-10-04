@@ -226,18 +226,20 @@ export default async function SignUpPage({
                 send will land you on this page with everything filled in.
               </p>
               <p className="mt-4 text-sm text-muted">
-                If you&apos;re evaluating FORGE for your organization, contact{" "}
-                <a
-                  href="mailto:support@sysgov.com"
-                  className="text-teal hover:underline"
-                >
-                  support@sysgov.com
-                </a>
-                .
+                Evaluating FORGE for your organization? Request a 14-day
+                trial with your company email and we&apos;ll set up a
+                workspace for you.
               </p>
+              {/* BL-AUTH-ABUSE Slice 2b */}
+              <Link
+                href="/request-trial"
+                className="aur-btn aur-btn-primary mt-6 flex w-full items-center justify-center py-3 text-sm"
+              >
+                Request a trial
+              </Link>
               <Link
                 href="/sign-in"
-                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+                className="aur-btn aur-btn-ghost mt-3 flex w-full items-center justify-center py-3 text-sm"
               >
                 Already have an account? Sign in
               </Link>
