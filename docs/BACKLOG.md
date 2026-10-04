@@ -989,14 +989,21 @@ first; a federal / CUI customer in the pipeline).
   workspace goes only when asked, the purge takes exactly the previewed
   eligible accounts and their workspaces, audits).
 
-**Slice 2 — trials (queued):** a public **Request a trial** form (same
-name / honeypot / timing / disposable checks, work email required) into
-a platform-level `trial_request` queue; platform admins approve from the
-portal, which creates the workspace and its admin invite with
-`tenant_subscription.status = 'trial'` and `trial_until` = approval + 14
-days (configurable), or decline. The subscription gate treats an expired
-trial like a retired tier (features denied, billing page says so) until
-a plan is chosen or a platform admin extends it.
+**Slice 2 — trials (queued; decisions 2026-10-04):** a public **Request
+a trial** form (same name / honeypot / timing checks) into a
+platform-level `trial_request` queue.
+- **Who:** company email only — public mailboxes (Gmail, Outlook, Yahoo
+  …) and disposable inboxes are refused; a domain an existing tenant
+  already owns is pointed at that tenant's admin instead.
+- **Approval:** a platform admin approves or declines every request in
+  the SuperAdmin portal; nothing is created before that. Approval
+  creates the workspace and its admin invite with
+  `tenant_subscription.status = 'trial'`.
+- **Length:** 14 days from approval (`trial_until`); a platform admin
+  can extend a single trial.
+- **At expiry without a plan: read-only.** Members still sign in, read
+  and export; AI calls and gated features stop and a banner points to
+  Billing, until a plan is chosen or the trial is extended.
 
 ### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #276)
