@@ -35,7 +35,7 @@ Effort key:
 | 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | ✅ shipped (PR #319) |
 | 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | ✅ shipped (PR #320) |
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
-| 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | 🔄 in progress |
+| 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | 🔄 in PR (PR #322) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -3701,7 +3701,7 @@ built or need design work):
 - "Promo codes →" link added to the SuperAdmin portal header next
   to Tiers.
 
-**apiAccess — workspace API tokens + read-only `/api/v1`** 🔄 in progress (2026-10-04):
+**apiAccess — workspace API tokens + read-only `/api/v1`** 🔄 in PR (PR #322, 2026-10-04):
 
 User request (2026-10-04): build the "Work I can build next" list in
 order; BL-16 `apiAccess` is first. The flag existed since Phase A but
