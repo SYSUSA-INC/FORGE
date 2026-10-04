@@ -10,13 +10,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { apiTokens, auditLogs, opportunities, tenantSubscriptions } from "@/db/schema";
+import { apiTokens, auditLogs, opportunities, proposalSections, tenantSubscriptions } from "@/db/schema";
 import { createApiToken, revokeApiToken } from "@/lib/api-tokens";
 import { GET as getMe } from "@/app/api/v1/me/route";
 import { GET as listOpps } from "@/app/api/v1/opportunities/route";
 import { GET as getOpp } from "@/app/api/v1/opportunities/[id]/route";
 import { GET as listProposals } from "@/app/api/v1/proposals/route";
 import { GET as getProposal } from "@/app/api/v1/proposals/[id]/route";
+import { GET as getSection } from "@/app/api/v1/proposals/[id]/sections/[sectionId]/route";
 import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const req = (path: string, token?: string) =>
@@ -132,5 +133,57 @@ describe("BL-16 apiAccess — tokens and /api/v1", () => {
 
     const since = await json(await listOpps(req(`/api/v1/opportunities?updated_since=${encodeURIComponent(same.toISOString())}`, made.token)));
     expect(since.body.data.map((o: { title: string }) => o.title).sort()).toEqual(["Same-ms 1", "Same-ms 2", "Same-ms 3", "Same-ms 4"]);
+  });
+
+  it("Slice 2b: returns a section's final text only through its own proposal and workspace", async () => {
+    const made = await createApiToken({ organizationId: fx.orgA.organizationId, name: "Docs sync", expiresInDays: 90, actor: { userId: fx.orgA.userId, email: "a@test" } });
+    if (!made.ok) throw new Error(made.error);
+    const [mine] = await db
+      .insert(proposalSections)
+      .values({
+        proposalId: fx.orgA.proposalId,
+        kind: "technical",
+        title: "Technical approach",
+        instructions: "Describe the approach.",
+        bodyDoc: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "We deliver " },
+                { type: "text", text: "late ", marks: [{ type: "tcDelete", attrs: {} }] },
+                { type: "text", text: "on time." },
+              ],
+            },
+          ],
+        },
+      })
+      .returning({ id: proposalSections.id });
+    const [theirs] = await db
+      .insert(proposalSections)
+      .values({ proposalId: fx.orgB.proposalId, kind: "management", title: "B's plan", content: "Secret plan." })
+      .returning({ id: proposalSections.id });
+
+    const ctx = (id: string, sectionId: string) => ({ params: { id, sectionId } });
+    const path = (p: string, s: string) => `/api/v1/proposals/${p}/sections/${s}`;
+
+    const ok = await json(await getSection(req(path(fx.orgA.proposalId, mine!.id), made.token), ctx(fx.orgA.proposalId, mine!.id)));
+    expect(ok).toMatchObject({
+      status: 200,
+      body: { data: { id: mine!.id, proposalId: fx.orgA.proposalId, title: "Technical approach", instructions: "Describe the approach.", text: "We deliver on time.", hasPendingChanges: true } },
+    });
+    expect(ok.body.data.html).not.toContain("late");
+
+    // Another workspace's section — by its own proposal id or smuggled under ours — is a 404.
+    expect((await getSection(req(path(fx.orgB.proposalId, theirs!.id), made.token), ctx(fx.orgB.proposalId, theirs!.id))).status).toBe(404);
+    expect((await getSection(req(path(fx.orgA.proposalId, theirs!.id), made.token), ctx(fx.orgA.proposalId, theirs!.id))).status).toBe(404);
+    expect((await getSection(req(path(fx.orgA.proposalId, "nope"), made.token), ctx(fx.orgA.proposalId, "nope"))).status).toBe(404);
+
+    const reads = await db
+      .select({ resourceId: auditLogs.resourceId })
+      .from(auditLogs)
+      .where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "api.v1.read")));
+    expect(reads.map((r) => r.resourceId)).toEqual(["proposals.sections.get"]);
   });
 });

@@ -45,7 +45,8 @@ Effort key:
 | 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | ✅ shipped (PR #329) |
 | 3r | **BL-FB-CHAT-MULTI Slice 3** — Presence: who else has a section open, in the section header | P3 | S | ✅ shipped (PR #330) |
 | 3s | **BL-21 help refresh (October 2026 pass)** — What's new in the user manual, FAQ for the new features, migrations 0104–0112 table in the admin manual | P3 | S | ✅ shipped (PR #331) |
-| 3t | **BL-16 API Slice 2a** — Platform admins view and revoke a tenant's API tokens (one or all, with a reason); OpenAPI 3.1 document at `/api/v1/openapi.json` | P2 | S | 🔄 in PR (PR #333) |
+| 3t | **BL-16 API Slice 2a** — Platform admins view and revoke a tenant's API tokens (one or all, with a reason); OpenAPI 3.1 document at `/api/v1/openapi.json` | P2 | S | ✅ shipped (PR #333) |
+| 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | 🔄 in PR (PR #334) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -3977,7 +3978,7 @@ nothing used it, because there was no API.
 (would also need `bulkExport`); webhooks out; ~~platform-admin view and
 revoke of a tenant's tokens; an OpenAPI document~~ → Slice 2a below.
 
-**API Slice 2a — platform-admin token view/revoke + OpenAPI document** 🔄 in PR (PR #333, 2026-10-04):
+**API Slice 2a — platform-admin token view/revoke + OpenAPI document** ✅ shipped (PR #333, 2026-10-04):
 
 User request (2026-10-04): with the backlog drained, build the API
 access follow-ups next, in stages: 2a admin view/revoke + OpenAPI, 2b
@@ -4008,6 +4009,31 @@ section text, 2c outbound webhooks.
   revoke scoped to the named tenant, "FORGE support" label, revoke-all
   only touches that tenant's active tokens with one audit row, the
   document is served without a token).
+- Docs: USER_MANUAL §4.15, ADMIN_MANUAL §6.10.
+
+**API Slice 2b — section text** 🔄 in PR (PR #334, 2026-10-04):
+
+User decision (2026-10-04): section text needs `apiAccess` only — not
+`bulkExport` as the original "Later" note suggested.
+
+- `GET /api/v1/proposals/{id}/sections/{sectionId}` → the section's
+  outline fields plus `proposalId`, `instructions` (the Section L
+  brief), `text` (plain), `html` and `hasPendingChanges`. The body is
+  the final view the PDF / DOCX exports use (`resolveTrackedChanges`):
+  pending insertions kept, pending deletions dropped. Sections saved
+  before the rich editor fall back to their plain `content`.
+- The section must belong to that proposal and the proposal to the
+  token's workspace (one query joining `proposal`); anything else, or
+  a malformed id, is a 404. Audited as `api.v1.read` /
+  `proposals.sections.get`.
+- OpenAPI 1.2.0 adds the path and a `SectionDetail` schema; the drift
+  test now also pins `SectionDetail` to the shaper's keys.
+- Pure shaping `apiSectionBody` in `src/lib/api-section-body.ts` (kept
+  out of `api-tokens-logic.ts`, which client components import; tests in
+  `tests/ai/api-openapi.test.ts`); isolation test in
+  `tests/isolation/api-tokens.test.ts` (own section → final text; the
+  other workspace's section by its own or a smuggled proposal id →
+  404; one audited read).
 - Docs: USER_MANUAL §4.15, ADMIN_MANUAL §6.10.
 
 **customTemplates — the flag gates authoring, not use** ✅ shipped (PR #323, 2026-10-04):

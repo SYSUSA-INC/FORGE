@@ -11,7 +11,16 @@ import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { opportunityStageEnum, proposalSectionKindEnum, proposalSectionStatusEnum, proposalStageEnum } from "@/db/schema";
 import { buildOpenApiDocument } from "@/lib/api-openapi";
-import { API_PAGE_DEFAULT, API_PAGE_MAX, apiOpportunity, apiProposal, apiSection, REVOKE_REASON_MAX, validateRevokeReason } from "@/lib/api-tokens-logic";
+import { apiSectionBody } from "@/lib/api-section-body";
+import {
+  API_PAGE_DEFAULT,
+  API_PAGE_MAX,
+  apiOpportunity,
+  apiProposal,
+  apiSection,
+  REVOKE_REASON_MAX,
+  validateRevokeReason,
+} from "@/lib/api-tokens-logic";
 
 const doc = buildOpenApiDocument({
   baseUrl: "https://forge.example/",
@@ -82,6 +91,7 @@ describe("OpenAPI document for /api/v1", () => {
     expect(props("Section")).toEqual(
       Object.keys(apiSection({ id: "s", kind: "technical", title: "", ordering: 0, status: "not_started", wordCount: 0, pageLimit: null, updatedAt: at })).sort(),
     );
+    expect(props("SectionDetail")).toEqual([...props("Section"), "proposalId", "instructions", ...Object.keys(apiSectionBody(null, ""))].sort());
     // Every documented field is required: the API always sends it, null or not.
     for (const s of Object.values(schemas)) expect([...s.required].sort()).toEqual(Object.keys(s.properties).sort());
   });
@@ -101,5 +111,38 @@ describe("validateRevokeReason", () => {
     expect(validateRevokeReason("no")).toMatchObject({ ok: false });
     expect(validateRevokeReason(undefined)).toMatchObject({ ok: false });
     expect(validateRevokeReason("x".repeat(REVOKE_REASON_MAX + 1))).toMatchObject({ ok: false });
+  });
+});
+
+describe("apiSectionBody", () => {
+  const doc = {
+    type: "doc" as const,
+    content: [
+      { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Approach" }] },
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "We deliver " },
+          { type: "text", text: "late ", marks: [{ type: "tcDelete", attrs: {} }] },
+          { type: "text", text: "on time", marks: [{ type: "tcInsert", attrs: {} }] },
+          { type: "text", text: "." },
+        ],
+      },
+    ],
+  };
+
+  it("returns the final view as text and HTML and flags pending suggestions", () => {
+    const body = apiSectionBody(doc, "ignored legacy text");
+    expect(body.text).toBe("Approach\n\nWe deliver on time.");
+    expect(body.html).toContain("<h2>Approach</h2>");
+    expect(body.html).not.toContain("late");
+    expect(body.hasPendingChanges).toBe(true);
+  });
+
+  it("falls back to the legacy plain content when there is no rich body", () => {
+    const body = apiSectionBody({ type: "doc", content: [] }, "First para.\n\nSecond para.");
+    expect(body).toMatchObject({ text: "First para.\n\nSecond para.", hasPendingChanges: false });
+    expect(body.html).toContain("<p>First para.</p>");
+    expect(apiSectionBody(null, "")).toEqual({ text: "", html: "", hasPendingChanges: false });
   });
 });
