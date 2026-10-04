@@ -77,7 +77,7 @@ describe("BL-PACKAGES add-ons — grants on top of the tier", () => {
     expect(a.platformQuotas.aiTokensPerMonth).toBe(2_000_000);
     expect(a.effectiveQuotas.aiTokensPerMonth).toBe(2_000_000);
     expect(a.effectiveFlags.winnerAnalysis).toBe(true);
-    expect(a.addons).toEqual({ count: 2, extraTokens: 1_000_000, unlockedFlags: ["winnerAnalysis"] });
+    expect(a.addons).toEqual({ count: 2, extraTokens: 1_000_000, extraSeats: 0, extraStorageGb: 0, unlockedFlags: ["winnerAnalysis"] });
     await expect(ensureFeature(fx.orgA.organizationId, "winnerAnalysis")).resolves.toBeUndefined();
 
     // B is untouched.
@@ -163,7 +163,7 @@ describe("BL-PACKAGES add-ons — grants on top of the tier", () => {
       const tier = await getCurrentTier(fx.orgA.organizationId);
       expect(tier!.effectiveQuotas.seatsIncluded).toBe(11);
       expect(tier!.addons).toMatchObject({ extraSeats: 10, extraStorageGb: 0 });
-      await expect(enforceSeatsQuota(fx.orgA.organizationId)).resolves.toBeUndefined();
+      await expect(enforceSeatsQuota(fx.orgA.organizationId)).resolves.toEqual({ used: 1, limit: 11 });
       expect((await getCurrentTier(fx.orgB.organizationId))!.addons.extraSeats).toBe(0);
 
       expect(await revokeTenantAddon({ organizationId: fx.orgA.organizationId, tenantAddonId: granted.id, actor })).toMatchObject({ ok: true });
