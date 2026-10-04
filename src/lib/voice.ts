@@ -18,7 +18,21 @@ import { db } from "@/db";
 import { authorVoiceProfiles, authorVoiceSamples, organizations, proposalSections, proposals, sectionDraftSignals, users, type TipTapDoc, type VoiceMetrics } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { projectToPlain } from "@/lib/tiptap-doc";
-import { AUTO_REBUILD_MIN_INTERVAL_MS, VOICE_LIMITS, analyzeVoice, authoredSentences, describeVoice, houseStyleGuidance, sampleWordCount, voiceGuidance } from "@/lib/voice-logic";
+import {
+  AUTO_REBUILD_MIN_INTERVAL_MS,
+  VOICE_LIMITS,
+  analyzeVoice,
+  authoredSentences,
+  describeVoice,
+  houseStyleGuidance,
+  isVolumeKind,
+  measureVoice,
+  sampleWordCount,
+  sanitizeVolumeStyles,
+  voiceGuidance,
+  volumeStyleGuidance,
+  type VolumeKind,
+} from "@/lib/voice-logic";
 
 type Actor = { userId: string | null; email?: string | null };
 
@@ -207,10 +221,43 @@ export async function updateVoiceSettings(input: { organizationId: string; userI
 
 // ── Slice 2 — house style ────────────────────────────────────────────
 
-export async function getHouseStyle(input: { organizationId: string }): Promise<{ orgName: string; houseStyle: string }> {
+export async function getHouseStyle(input: { organizationId: string }): Promise<{ orgName: string; houseStyle: string; byVolume: Partial<Record<VolumeKind, string>> }> {
   const { organizationId } = input;
-  const [org] = await db.select({ name: organizations.name, houseStyle: organizations.houseStyle }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
-  return { orgName: org?.name?.trim() || "the team", houseStyle: org?.houseStyle ?? "" };
+  const [org] = await db
+    .select({ name: organizations.name, houseStyle: organizations.houseStyle, byVolume: organizations.houseStyleByVolume })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  return { orgName: org?.name?.trim() || "the team", houseStyle: org?.houseStyle ?? "", byVolume: sanitizeVolumeStyles(org?.byVolume) };
+}
+
+/** Slice 3 — one volume's extra rules; an empty text clears them. Tenant admins only (callers gate); audited. */
+export async function updateVolumeStyle(input: {
+  organizationId: string;
+  volume: string;
+  text: string;
+  actor: Actor;
+}): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const { organizationId } = input;
+  if (!isVolumeKind(input.volume)) return { ok: false, error: "Unknown volume." };
+  const current = await getHouseStyle({ organizationId });
+  const next = sanitizeVolumeStyles({ ...current.byVolume, [input.volume]: input.text });
+  const [row] = await db
+    .update(organizations)
+    .set({ houseStyleByVolume: next, updatedAt: new Date() })
+    .where(eq(organizations.id, organizationId))
+    .returning({ id: organizations.id });
+  if (!row) return { ok: false, error: "Organization not found." };
+  const text = next[input.volume] ?? "";
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "voice.volume_style.update",
+    resourceType: "organization",
+    resourceId: organizationId,
+    metadata: { volume: input.volume, chars: text.length, cleared: text.length === 0 },
+  });
+  return { ok: true, text };
 }
 
 /** The team's writing rules; an empty text clears them. Tenant admins only (callers gate); audited. */
@@ -229,22 +276,23 @@ export async function updateHouseStyle(input: { organizationId: string; text: st
 
 // ── For the drafter, the chat and the editor ─────────────────────────
 
-async function sectionAuthor(organizationId: string, sectionId: string): Promise<{ found: boolean; authorUserId: string | null }> {
+async function sectionAuthor(organizationId: string, sectionId: string): Promise<{ found: boolean; authorUserId: string | null; kind: string | null }> {
   const [section] = await db
-    .select({ authorUserId: proposalSections.authorUserId })
+    .select({ authorUserId: proposalSections.authorUserId, kind: proposalSections.kind })
     .from(proposalSections)
     .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
     .where(and(eq(proposalSections.id, sectionId), eq(proposals.organizationId, organizationId)))
     .limit(1);
-  return { found: !!section, authorUserId: section?.authorUserId ?? null };
+  return { found: !!section, authorUserId: section?.authorUserId ?? null, kind: section?.kind ?? null };
 }
 
-export type SectionVoice = { author: string; guidance: string; authorVoice: boolean; houseStyle: boolean };
+export type SectionVoice = { author: string; guidance: string; authorVoice: boolean; houseStyle: boolean; volumeStyle: boolean };
 
 /**
- * The guidance for a section: the team's house style, then the author's
- * own voice when they have an enabled profile; null when there is
- * neither or the section is not this organization's.
+ * The guidance for a section: the team's house style, then its volume's
+ * extra rules (Slice 3), then the author's own voice when they have an
+ * enabled profile; null when there is none of these or the section is
+ * not this organization's.
  */
 export async function voiceGuidanceForSection(input: { organizationId: string; sectionId: string }): Promise<SectionVoice | null> {
   const { organizationId } = input;
@@ -263,9 +311,17 @@ export async function voiceGuidanceForSection(input: { organizationId: string; s
   const style = await getHouseStyle({ organizationId });
   const parts: string[] = [];
   if (style.houseStyle) parts.push(houseStyleGuidance(style.orgName, style.houseStyle));
+  const volumeText = section.kind && isVolumeKind(section.kind) ? style.byVolume[section.kind] : undefined;
+  if (volumeText && isVolumeKind(section.kind)) parts.push(volumeStyleGuidance(style.orgName, section.kind, volumeText));
   if (author) parts.push(author.guidance);
   if (parts.length === 0) return null;
-  return { author: author?.name ?? style.orgName, guidance: parts.join("\n\n"), authorVoice: !!author, houseStyle: !!style.houseStyle };
+  return {
+    author: author?.name ?? style.orgName,
+    guidance: parts.join("\n\n"),
+    authorVoice: !!author,
+    houseStyle: !!style.houseStyle,
+    volumeStyle: !!volumeText,
+  };
 }
 
 export type SectionVoiceProfile = { author: string; metrics: VoiceMetrics; traits: string[] };
@@ -293,4 +349,42 @@ export async function voiceAuthorIds(input: { organizationId: string }): Promise
     .from(authorVoiceProfiles)
     .where(and(eq(authorVoiceProfiles.organizationId, organizationId), eq(authorVoiceProfiles.enabled, true), isNotNull(authorVoiceProfiles.builtAt)));
   return rows.map((r) => r.userId);
+}
+
+export type ProposalAuthorVoice = { userId: string; name: string; sections: number; words: number; metrics: VoiceMetrics | null; traits: string[] };
+
+/**
+ * Slice 3 — how each author writes on one proposal, measured from their
+ * own sections on it (not their whole profile), for the Voices tab.
+ * Authors with too little text get no metrics. Busiest author first.
+ */
+export async function proposalVoices(input: { organizationId: string; proposalId: string }): Promise<ProposalAuthorVoice[]> {
+  const { organizationId } = input;
+  const rows = await db
+    .select({
+      authorUserId: proposalSections.authorUserId,
+      content: proposalSections.content,
+      bodyDoc: proposalSections.bodyDoc,
+      name: users.name,
+      email: users.email,
+    })
+    .from(proposalSections)
+    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+    .innerJoin(users, eq(users.id, proposalSections.authorUserId))
+    .where(and(eq(proposalSections.proposalId, input.proposalId), eq(proposals.organizationId, organizationId)));
+  const by = new Map<string, { name: string; texts: string[] }>();
+  for (const r of rows) {
+    if (!r.authorUserId) continue;
+    const text = (projectToPlain(r.bodyDoc as TipTapDoc | null) || r.content || "").trim();
+    const entry = by.get(r.authorUserId) ?? { name: r.name?.trim() || r.email?.split("@")[0] || "An author", texts: [] };
+    entry.texts.push(text);
+    by.set(r.authorUserId, entry);
+  }
+  return [...by.entries()]
+    .map(([userId, e]) => {
+      const joined = e.texts.filter(Boolean).join("\n\n").slice(0, VOICE_LIMITS.maxSampleChars * 4);
+      const metrics = measureVoice(joined);
+      return { userId, name: e.name, sections: e.texts.length, words: sampleWordCount(joined), metrics, traits: metrics ? describeVoice(metrics) : [] };
+    })
+    .sort((a, b) => b.words - a.words || a.name.localeCompare(b.name));
 }

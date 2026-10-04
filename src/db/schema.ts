@@ -230,6 +230,9 @@ export const organizations = pgTable("organization", {
   // drafter and chat receive for every section, under any author's own
   // voice. Edited by tenant admins under Settings → House style.
   houseStyle: text("house_style").notNull().default(""),
+  // Slice 3 (drizzle/0110) — extra rules for one volume (section kind),
+  // on top of houseStyle: { "<kind>": "<rules>" }.
+  houseStyleByVolume: jsonb("house_style_by_volume").$type<Record<string, string>>().notNull().default({}),
 
   // BL-FB-X-COLOR-TEAM Slice 3 — reminder cadence for review rounds
   // (drizzle/0104): days before the due date reviewers without a verdict

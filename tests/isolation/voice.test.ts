@@ -23,6 +23,8 @@ import {
   voiceAuthorIds,
   voiceGuidanceForSection,
   voiceProfileForSection,
+  proposalVoices,
+  updateVolumeStyle,
 } from "@/lib/voice";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
@@ -168,5 +170,35 @@ describe("BL-FB-GEN-VOICE — author voice", () => {
     const rebuilds = audits.filter((a) => a.action === "voice.profile.rebuild");
     expect(rebuilds).toHaveLength(2);
     expect(rebuilds.map((a) => (a.metadata as { trigger?: string }).trigger).sort()).toEqual(["manual", "save"]);
+  });
+  it("Slice 3: a volume's rules reach only that volume's sections; Voices reads the proposal's authors in the tenant", async () => {
+    const [mgmt] = await db
+      .select({ id: proposalSections.id })
+      .from(proposalSections)
+      .where(and(eq(proposalSections.proposalId, fx.orgA.proposalId), eq(proposalSections.title, "Management approach")));
+
+    expect(await updateVolumeStyle({ organizationId: fx.orgA.organizationId, volume: "bogus", text: "x", actor: actorA })).toEqual({ ok: false, error: "Unknown volume." });
+    expect(await updateVolumeStyle({ organizationId: fx.orgA.organizationId, volume: "technical", text: "Lead with the evaluator's benefit.", actor: actorA })).toEqual({ ok: true, text: "Lead with the evaluator's benefit." });
+
+    const tech = await voiceGuidanceForSection({ organizationId: fx.orgA.organizationId, sectionId: unownedSection });
+    expect(tech).toMatchObject({ volumeStyle: true, authorVoice: false });
+    expect(tech!.guidance).toContain("Technical volume");
+    expect(tech!.guidance).toContain("Lead with the evaluator's benefit.");
+    expect(await voiceGuidanceForSection({ organizationId: fx.orgA.organizationId, sectionId: mgmt!.id })).toBeNull();
+    expect((await getHouseStyle({ organizationId: fx.orgB.organizationId })).byVolume).toEqual({});
+
+    // Clearing it removes it.
+    expect(await updateVolumeStyle({ organizationId: fx.orgA.organizationId, volume: "technical", text: "  ", actor: actorA })).toEqual({ ok: true, text: "" });
+    expect(await voiceGuidanceForSection({ organizationId: fx.orgA.organizationId, sectionId: unownedSection })).toBeNull();
+
+    // Voices: A's two authored sections on A's proposal; B's section and B's tenant never mix in.
+    const voices = await proposalVoices({ organizationId: fx.orgA.organizationId, proposalId: fx.orgA.proposalId });
+    expect(voices).toHaveLength(1);
+    expect(voices[0]).toMatchObject({ userId: fx.orgA.userId, sections: 2 });
+    expect(voices[0]!.metrics).not.toBeNull();
+    expect(await proposalVoices({ organizationId: fx.orgB.organizationId, proposalId: fx.orgA.proposalId })).toEqual([]);
+
+    const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "voice.volume_style.update")));
+    expect(audits).toHaveLength(2);
   });
 });

@@ -288,3 +288,79 @@ export function houseStyleGuidance(orgName: string, text: string): string {
   lines.push("- House style governs how things are said, never what is said; the brief and the requirements still win.");
   return lines.join("\n");
 }
+
+// ── Slice 3 — house style per volume; two authors side by side ────────
+
+/** Proposal volumes, as FORGE's section kinds. */
+export const VOLUME_KINDS = ["executive_summary", "technical", "management", "past_performance", "pricing", "compliance"] as const;
+export type VolumeKind = (typeof VOLUME_KINDS)[number];
+export const VOLUME_LABELS: Record<VolumeKind, string> = {
+  executive_summary: "Executive summary",
+  technical: "Technical",
+  management: "Management",
+  past_performance: "Past performance",
+  pricing: "Price",
+  compliance: "Compliance",
+};
+
+export function isVolumeKind(k: unknown): k is VolumeKind {
+  return typeof k === "string" && (VOLUME_KINDS as readonly string[]).includes(k);
+}
+
+/** Per-volume rules as stored: known volumes only, trimmed, bounded, empty ones dropped. */
+export function sanitizeVolumeStyles(raw: unknown): Partial<Record<VolumeKind, string>> {
+  const out: Partial<Record<VolumeKind, string>> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isVolumeKind(k) || typeof v !== "string") continue;
+    const text = v.replace(/\r\n?/g, "\n").trim().slice(0, VOICE_LIMITS.maxHouseStyleChars);
+    if (text) out[k] = text;
+  }
+  return out;
+}
+
+/** One volume's extra rules, given on top of the team's house style; empty when none are set. */
+export function volumeStyleGuidance(orgName: string, kind: VolumeKind, text: string): string {
+  const rules = text
+    .replace(/\r\n?/g, "\n")
+    .split(/\n+/)
+    .map((l) => l.replace(/^[\s\-•*]+|^\s*\d+[.)]\s*/, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (rules.length === 0) return "";
+  const name = orgName.trim() || "the team";
+  const lines = [`House style for ${name}'s ${VOLUME_LABELS[kind]} volume — on top of the team rules, for sections in this volume:`];
+  for (const r of rules.slice(0, 20)) lines.push(`- ${r}`);
+  return lines.join("\n");
+}
+
+export type AuthorDifference = { kind: VoiceFindingKind; label: string; a: string; b: string };
+
+/**
+ * Where two authors' writing on the same proposal differs enough for an
+ * evaluator to notice the change of hands. The same thresholds as the
+ * draft-vs-profile check, applied both ways; empty when they read alike.
+ */
+export function authorDifferences(a: VoiceMetrics, b: VoiceMetrics): AuthorDifference[] {
+  const out: AuthorDifference[] = [];
+  const words = (n: number) => `${Math.round(n)} words`;
+  const ratio = a.avgSentenceLength / Math.max(1, b.avgSentenceLength);
+  if (ratio >= 1.4 || ratio <= 1 / 1.4) out.push({ kind: "sentence_length", label: "Sentence length", a: words(a.avgSentenceLength), b: words(b.avgSentenceLength) });
+  if (Math.abs(a.passiveRate - b.passiveRate) >= 0.15) out.push({ kind: "passive", label: "Passive voice", a: pct(a.passiveRate), b: pct(b.passiveRate) });
+  if (Math.abs(a.longWordRate - b.longWordRate) >= 0.06) out.push({ kind: "vocabulary", label: "Long words", a: pct(a.longWordRate), b: pct(b.longWordRate) });
+  const per = (n: number) => `${n} / 1,000 words`;
+  const lopsided = (x: number, y: number, high: number) => (x >= high && y < x * 0.4) || (y >= high && x < y * 0.4);
+  if (lopsided(a.wePerThousand, b.wePerThousand, 25)) out.push({ kind: "we", label: '"We" / "our"', a: per(a.wePerThousand), b: per(b.wePerThousand) });
+  if ((a.youPerThousand >= 8 && b.youPerThousand < 2) || (b.youPerThousand >= 8 && a.youPerThousand < 2)) out.push({ kind: "you", label: '"You" (the evaluator)', a: per(a.youPerThousand), b: per(b.youPerThousand) });
+  if ((a.contractionsPerThousand < 1 && b.contractionsPerThousand >= 3) || (b.contractionsPerThousand < 1 && a.contractionsPerThousand >= 3)) {
+    out.push({ kind: "contractions", label: "Contractions", a: per(a.contractionsPerThousand), b: per(b.contractionsPerThousand) });
+  }
+  if (lopsided(a.numbersPerThousand, b.numbersPerThousand, 15)) out.push({ kind: "numbers", label: "Numbers and metrics", a: per(a.numbersPerThousand), b: per(b.numbersPerThousand) });
+  if ((a.listRate >= 0.25 && b.listRate === 0) || (b.listRate >= 0.25 && a.listRate === 0)) out.push({ kind: "lists", label: "Lists", a: pct(a.listRate), b: pct(b.listRate) });
+  return out;
+}
+
+/** One line for the comparison header. */
+export function authorComparisonSummary(aName: string, bName: string, diffs: readonly AuthorDifference[]): string {
+  if (diffs.length === 0) return `${aName} and ${bName} read as one voice on this proposal.`;
+  return `${diffs.length} difference${diffs.length === 1 ? "" : "s"} an evaluator may notice between ${aName}'s and ${bName}'s sections.`;
+}

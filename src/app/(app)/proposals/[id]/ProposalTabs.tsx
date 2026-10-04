@@ -8,6 +8,7 @@ const TABS = [
   { key: "sections", label: "Sections" },
   { key: "reviews", label: "Reviews" },
   { key: "compliance", label: "Compliance" },
+  { key: "voices", label: "Voices" },
   { key: "outcome", label: "Outcome" },
 ];
 

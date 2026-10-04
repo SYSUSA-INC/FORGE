@@ -39,7 +39,8 @@ Effort key:
 | 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | ✅ shipped (PR #323) |
 | 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
 | 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | ✅ shipped (PR #325) |
-| 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | 🔄 in PR (PR #326) |
+| 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | ✅ shipped (PR #326) |
+| 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | 🔄 in PR (PR #327) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1340,7 +1341,7 @@ the add-on follow-ups are third, one invoice and proration first.
   (a seats grant lifts one tenant's seat limit past a full house and
   stops when ended). Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9.
 
-**Add-ons Slice 2c — Reports behind `advancedReporting` (2026-10-04)** 🔄 in PR (PR #326):
+**Add-ons Slice 2c — Reports behind `advancedReporting` (2026-10-04)** ✅ shipped (PR #326):
 
 User decision (2026-10-04): "Build a new Reports page" — new value
 behind the unlock, nothing existing taken away.
@@ -1503,7 +1504,7 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   section opts in, audits).
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #312 · Slice 1 PR #308)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #327 · Slice 2 PR #312 · Slice 1 PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -1589,8 +1590,39 @@ they own, so Sarah's sections read like Sarah and Mike's like Mike.
   style per tenant and under the author's voice, AI sentences dropped
   from the rebuild, save-time re-learn throttled and author-only, the
   editor's profile read scoped, audits).
-- **Later:** house style per proposal volume; a voice comparison
-  between two authors on the same proposal.
+- ~~**Later:** house style per proposal volume; a voice comparison
+  between two authors on the same proposal.~~ → Slice 3 below.
+
+**Slice 3 — house style per volume; two authors side by side (2026-10-04):**
+
+User request (2026-10-04): the "Work I can build next" list in order;
+voice follow-ups are fourth.
+
+- **House style by volume.** Migration `0110_house_style_by_volume.sql`
+  adds `organization.house_style_by_volume` (jsonb, `{ "<section kind>":
+  "<rules>" }`). A volume is a section kind (executive summary,
+  technical, management, past performance, price, compliance).
+  `voiceGuidanceForSection` now layers the team's house style, then the
+  section's volume rules (`volumeStyleGuidance`, pure), then the
+  author's own voice; `SectionVoice.volumeStyle` says when they apply.
+  **Settings → House style by volume** (`VolumeStylePanel`): pick a
+  volume, write its rules, see what the AI is told; tenant admins edit
+  (`updateVolumeStyleAction` → `updateVolumeStyle`, audited
+  `voice.volume_style.update`), everyone reads. No prompt-version bump —
+  the guidance block's template is unchanged, only its content.
+- **Voices tab** on every proposal (`/proposals/[id]/voices`):
+  `proposalVoices` measures each author from their own sections on that
+  proposal (not their whole profile): sections, words, sentence length,
+  passive share, long words, we / you per 1,000 and their plain traits.
+  **Compare two authors** lists where they differ enough for an
+  evaluator to notice the change of hands (`authorDifferences`, pure —
+  the draft-vs-profile thresholds, applied both ways) and points to the
+  house style to bring them together.
+- Tests: `tests/ai/voice-logic.test.ts` (volume rules, wording, author
+  differences both ways); `tests/isolation/voice.test.ts` (volume rules
+  reach only that volume's sections in the owning tenant, clear, audit;
+  Voices reads only the tenant's proposal and authors). Docs:
+  USER_MANUAL §6 (House style), ADMIN_MANUAL (Author voice).
 
 ### BL-FB-X-CRM — Customer relationship CRM
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 3 shipped (PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
@@ -5607,7 +5639,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 2 shipped (PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #327 · Slice 2 PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
