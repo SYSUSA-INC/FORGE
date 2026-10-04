@@ -4,7 +4,19 @@
  * different guidance; too little text produces no profile.
  */
 import { describe, expect, it } from "vitest";
-import { VOICE_LIMITS, analyzeVoice, describeVoice, sampleWordCount, voiceGuidance } from "@/lib/voice-logic";
+import {
+  VOICE_LIMITS,
+  analyzeVoice,
+  authoredSentences,
+  buildVoiceFixHint,
+  compareVoice,
+  describeVoice,
+  houseStyleGuidance,
+  measureVoice,
+  sampleWordCount,
+  voiceCheckSummary,
+  voiceGuidance,
+} from "@/lib/voice-logic";
 
 const PUNCHY = Array.from(
   { length: 14 },
@@ -68,5 +80,52 @@ describe("voice logic", () => {
     const traitsOnly = voiceGuidance({ authorName: "", metrics: null, traits: ["Plain words over jargon"] });
     expect(traitsOnly).toContain("Write in the author's voice");
     expect(traitsOnly).toContain("- Plain words over jargon.");
+  });
+
+  it("measures a short draft and finds where it departs from the author", () => {
+    expect(measureVoice("Too short to compare.")).toBeNull();
+    const profile = analyzeVoice([PUNCHY])!;
+    const formalDraft = measureVoice(FORMAL.split("\n\n").slice(0, 3).join("\n\n"))!;
+    expect(formalDraft).not.toBeNull();
+    const findings = compareVoice(formalDraft, profile);
+    const kinds = findings.map((f) => f.kind);
+    expect(kinds).toContain("sentence_length");
+    expect(kinds).toContain("passive");
+    expect(kinds).toContain("vocabulary");
+    expect(kinds).toContain("we");
+    expect(findings[0]!.severity).toBe("high");
+    expect(findings.find((f) => f.kind === "sentence_length")?.label).toBe("Sentences run long");
+    // The author's own prose reads like them.
+    const own = measureVoice(PUNCHY.split("\n\n").slice(0, 3).join("\n\n"))!;
+    expect(compareVoice(own, profile)).toEqual([]);
+
+    expect(voiceCheckSummary([], "Sarah Chen")).toBe("reads like Sarah Chen");
+    expect(voiceCheckSummary(findings, "Sarah Chen")).toMatch(/^\d+ differences from Sarah Chen's voice$/);
+    const hint = buildVoiceFixHint(findings, "Sarah Chen");
+    expect(hint.split("\n")[0]).toBe("Bring this draft into Sarah Chen's voice without changing its facts, structure or length:");
+    expect(hint).toContain("- Recast passive sentences in the active voice");
+    expect(hint).toMatch(/never what is said/);
+    expect(buildVoiceFixHint([], "x")).toBe("");
+  });
+
+  it("keeps only the sentences the author wrote, not the AI's that they kept", () => {
+    const draft = "Our team will modernize the help desk in three phases. Each phase ends with a measured cutover. The transition plan names every risk owner.";
+    const saved =
+      "Our team will modernize the help desk in three phases. We fix the backlog first, because nothing else matters until the queue is gone. Each phase ends with a measured cut-over. The transition plan names every risk owner and a date.";
+    expect(authoredSentences(saved, [draft])).toEqual([
+      "We fix the backlog first, because nothing else matters until the queue is gone.",
+      "The transition plan names every risk owner and a date.",
+    ]);
+    expect(authoredSentences(saved, [])).toHaveLength(4);
+    expect(authoredSentences("", [draft])).toEqual([]);
+  });
+
+  it("turns the team's rules into guidance, one rule per line", () => {
+    const g = houseStyleGuidance("Acme Federal", "- Never say leverage.\n\n2) Open with the customer's outcome.\n   \n   Name   the agency as the RFP does.");
+    const lines = g.split("\n");
+    expect(lines[0]).toBe("House style for Acme Federal — every section follows these rules, whoever the author is:");
+    expect(lines.slice(1, 4)).toEqual(["- Never say leverage.", "- Open with the customer's outcome.", "- Name the agency as the RFP does."]);
+    expect(lines[lines.length - 1]).toMatch(/^- House style governs how things are said, never what is said/);
+    expect(houseStyleGuidance("Acme", "  \n ")).toBe("");
   });
 });

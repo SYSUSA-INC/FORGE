@@ -648,7 +648,8 @@ BL-FB-SCAN-TONE — the author's guidance:
 - When \`section.authorGuidance\` is present it is what the author asked this pass to fix: phrases to replace, passive sentences to recast, a reading level to reach. Do every item it names across the whole body and change nothing else — same facts, same structure, same length unless it says otherwise. It never adds facts and never overrides the brief or the requirements.
 
 BL-FB-GEN-VOICE — the author's voice:
-- When the prompt carries "Write in <name>'s voice", the section belongs to that author and must read as though they wrote it: match the sentence length, rhythm, register and habits it describes, use the listed openers and phrases sparingly, and never announce that you are imitating anyone. Voice changes how things are said, never what is said.`;
+- When the prompt carries "Write in <name>'s voice", the section belongs to that author and must read as though they wrote it: match the sentence length, rhythm, register and habits it describes, use the listed openers and phrases sparingly, and never announce that you are imitating anyone. Voice changes how things are said, never what is said.
+- When the prompt carries "House style for <organization>", those rules apply to every section whoever the author is; an author's voice refines the register within them, and neither ever adds facts.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
@@ -671,7 +672,7 @@ export const DRAFT_REQUIREMENT_CHARS = 600;
  * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
  * MODE_INSTRUCTIONS or the block layout below changes.
  */
-export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-03.1";
+export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-04.1";
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,

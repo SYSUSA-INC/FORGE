@@ -207,15 +207,16 @@ export async function prepareSectionDraft(input: {
     patternIntel = undefined;
   }
 
-  // BL-FB-GEN-VOICE — the section author's own voice, when they have an
-  // enabled profile. Best-effort; a failure degrades to no block.
+  // BL-FB-GEN-VOICE — the team's house style and the section author's
+  // own voice, when they have an enabled profile (Slice 2: house style
+  // applies with or without an author). Best-effort; a failure degrades
+  // to no block.
   let authorVoice: SectionDraftSnapshot["authorVoice"];
-  if (row.section.authorUserId) {
-    try {
-      authorVoice = (await voiceGuidanceForSection({ organizationId, sectionId: input.sectionId })) ?? undefined;
-    } catch (err) {
-      log.warn("[prepareSectionDraft]", "author voice failed", { error: err });
-    }
+  try {
+    const voice = await voiceGuidanceForSection({ organizationId, sectionId: input.sectionId });
+    if (voice) authorVoice = { author: voice.author, guidance: voice.guidance };
+  } catch (err) {
+    log.warn("[prepareSectionDraft]", "author voice failed", { error: err });
   }
 
   // BL-FB-GEN-VOC — the customer's own phrases, when this section echoes

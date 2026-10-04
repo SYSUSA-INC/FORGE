@@ -840,6 +840,15 @@ export async function saveSectionAction(input: {
       } catch (err) {
         log.warn("[saveSectionAction]", "resolveDraftSignal failed", { error: err });
       }
+      // BL-FB-GEN-VOICE Slice 2 — the author's voice learns from what they
+      // kept and rewrote; at most once an hour. Best-effort — never blocks
+      // the save.
+      try {
+        const { refreshVoiceAfterSave } = await import("@/lib/voice");
+        await refreshVoiceAfterSave({ organizationId, sectionId: input.sectionId, userId: actor.id, actor: { userId: actor.id, email: actor.email } });
+      } catch (err) {
+        log.warn("[saveSectionAction]", "voice refresh failed", { error: err });
+      }
     }
 
     revalidatePath(`/proposals/${input.proposalId}/sections`);

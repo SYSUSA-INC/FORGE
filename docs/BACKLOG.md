@@ -1152,7 +1152,7 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   Hocuspocus layer is deployed, notes as optional model context.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #308)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (Slice 1 PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -1192,9 +1192,54 @@ they own, so Sarah's sections read like Sarah and Mike's like Mike.
   (`tests/isolation/voice.test.ts`: own sections and samples in the
   owning tenant only, guidance only for the author's own sections while
   enabled, samples and settings scoped, audits).
-- **Slice 2:** learn from accepted edits (`section_draft_signal`
-  before/after), an "in Sarah's voice" chip in the editor, a voice
-  comparison of a draft against the profile, team-wide house style.
+
+**Slice 2 — learn from edits, check a draft, house style:**
+
+- **The author's own words only.** The rebuild reads every AI draft
+  of the author's sections (`section_draft_signal`) and drops the
+  sentences they accepted verbatim or nearly so (`authoredSentences`,
+  pure: exact match or four words in five shared with a draft sentence
+  of similar length). What an author kept is the model's voice, not
+  theirs; the profile now measures what they wrote and rewrote. The
+  rebuild reports `aiWordsDropped`; the audit row carries it and the
+  `trigger`.
+- **Learns on save.** `refreshVoiceAfterSave` runs best-effort from
+  `saveSectionAction` when the saver is the section's author and has a
+  built profile more than an hour old: the profile is rebuilt with
+  `trigger: "save"`, so the voice follows the author without a trip to
+  Settings. Anyone else's save, or an unbuilt profile, changes nothing.
+- **"In Sarah's voice" chip.** The section header shows `✦ in Sarah's
+  voice` when the author has an enabled, built profile
+  (`voiceAuthorIds`), or `✦ house style` when only the team's rules
+  apply, so a writer knows what the drafter and chat will do before
+  they click.
+- **Voice check.** `VoiceCheckPanel` under the editor (beside the tone
+  check): the author's metrics are fetched once
+  (`voiceProfileForSection`), the draft is measured in the browser as
+  they type (`measureVoice`, 60+ words) and compared
+  (`compareVoice`): sentences running long or short, more passive than
+  they write, heavier or plainer vocabulary, fewer "we" / "you",
+  contractions where they use none, fewer numbers, missing lists —
+  each with the measurement behind it. **Rewrite in Sarah's voice**
+  opens Improve mode with the differences as guidance
+  (`buildVoiceFixHint`); the result arrives as tracked changes.
+- **House style.** `organization.house_style` (migration 0101): the
+  team's rules, one per line, edited by tenant admins under
+  **Settings → House style** (everyone can read them and see what the
+  AI is told; audited `voice.house_style.update`).
+  `voiceGuidanceForSection` now returns house style for every section,
+  with or without an author, and the author's own voice beneath it;
+  the drafter and chat gained a system rule for it
+  (`SECTION_DRAFT_PROMPT_VERSION` → `2026-10-04.1`).
+- Unit-tested (`tests/ai/voice-logic.test.ts`: a formal draft against a
+  punchy profile flags length, passive, vocabulary and "we"; the
+  author's own prose flags nothing; authored sentences; house-style
+  guidance); runtime-tested (`tests/isolation/voice.test.ts`: house
+  style per tenant and under the author's voice, AI sentences dropped
+  from the rebuild, save-time re-learn throttled and author-only, the
+  editor's profile read scoped, audits).
+- **Later:** house style per proposal volume; a voice comparison
+  between two authors on the same proposal.
 
 ### BL-FB-X-CRM — Customer relationship CRM
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #311 · Slice 1 PR #307)
@@ -5064,7 +5109,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #308) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (Slice 1 PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's

@@ -226,6 +226,11 @@ export const organizations = pgTable("organization", {
   // lifts.
   itarRestricted: boolean("itar_restricted").notNull().default(false),
 
+  // BL-FB-GEN-VOICE Slice 2 — team-wide writing rules (drizzle/0101) the
+  // drafter and chat receive for every section, under any author's own
+  // voice. Edited by tenant admins under Settings → House style.
+  houseStyle: text("house_style").notNull().default(""),
+
   // BL-AUTH-DOMAIN — the email domains this tenant owns (drizzle/0083).
   // By default a person may only join the tenant that owns their
   // domain; an invite from any other domain is held until a platform
