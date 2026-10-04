@@ -20,7 +20,7 @@ import {
   sanitizeAddonQuantity,
 } from "@/lib/addons-logic";
 
-const flags: TierFeatureFlags = { aiAutoDraft: true, winnerAnalysis: false, complianceMatrix: false, bulkExport: false, apiAccess: false, customTemplates: false };
+const flags: TierFeatureFlags = { aiAutoDraft: true, winnerAnalysis: false, complianceMatrix: false, bulkExport: false, apiAccess: false, customTemplates: false, advancedReporting: false };
 const quotas: TierQuotas = { aiRequestsPerMonth: 100, aiTokensPerMonth: 1_000_000, seatsIncluded: 5, storageGb: 10, proposalsPerMonth: 0 };
 
 describe("applyAddonEffects", () => {

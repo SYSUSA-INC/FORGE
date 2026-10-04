@@ -39,6 +39,7 @@ Effort key:
 | 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | ✅ shipped (PR #323) |
 | 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
 | 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | 🔄 in PR (PR #325) |
+| 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1338,6 +1339,35 @@ the add-on follow-ups are third, one invoice and proration first.
   unlimited, input rules, wording); `tests/isolation/addons.test.ts`
   (a seats grant lifts one tenant's seat limit past a full house and
   stops when ended). Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9.
+
+**Add-ons Slice 2c — Reports behind `advancedReporting` (2026-10-04)** 🔄 in progress:
+
+User decision (2026-10-04): "Build a new Reports page" — new value
+behind the unlock, nothing existing taken away.
+
+- **Flag.** `TierFeatureFlags.advancedReporting`; migration
+  `0109_advanced_reporting.sql` adds the key to existing tiers (on for
+  gold / platinum / custom, off for the rest; a tier that has it is left
+  alone). `getCurrentTier` now reads a tier's flags over an all-off
+  default, so a flag added after a tier was saved reads as off. The tier
+  editor, `/admin/tiers`, the pricing page and the add-on catalogue
+  (feature unlocks) all list it.
+- **Page.** `/reports` (Platform Intelligence → Reports): range 12 / 24
+  months / all (by creation date); header totals; win rate by agency,
+  NAICS and set-aside (won ÷ (won + lost), no-bids beside it, value
+  won); stage funnel with "reached" and conversion (lost = reached
+  Submitted, no-bid = left at Qualification — stages advance in order);
+  created vs won per month for 12 months. Thin single-hue bars inside
+  the tables (the tables are the accessible view), hover titles, legend
+  for the two-series month chart.
+- **CSV.** Each table downloads in the browser after
+  `recordReportExportAction` checks the plan and records
+  `report.export` (`recordRead`).
+- Pure arithmetic in `src/lib/reports-logic.ts`; data and gate in
+  `src/lib/reports.ts` (org-scoped). Tests:
+  `tests/ai/reports-logic.test.ts`; `tests/isolation/reports.test.ts`
+  (flag, override and feature add-on open it; reads stay in the
+  workspace). Docs: USER_MANUAL §5.6, ADMIN_MANUAL §6.2.
 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 

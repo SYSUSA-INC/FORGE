@@ -35,6 +35,7 @@ const TierFeatureFlagsSchema = z.object({
   bulkExport: z.boolean(),
   apiAccess: z.boolean(),
   customTemplates: z.boolean(),
+  advancedReporting: z.boolean(),
 }) satisfies z.ZodType<TierFeatureFlags>;
 
 const TierQuotasSchema = z.object({

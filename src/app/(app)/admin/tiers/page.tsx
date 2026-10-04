@@ -181,6 +181,7 @@ const FLAG_LABELS: Record<keyof TierFeatureFlags, string> = {
   bulkExport: "Bulk export",
   apiAccess: "API access",
   customTemplates: "Custom templates",
+  advancedReporting: "Advanced reporting",
 };
 
 function summarizeFlags(flags: TierFeatureFlags): string {

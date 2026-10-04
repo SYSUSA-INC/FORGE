@@ -166,6 +166,7 @@ export async function createTierAndSubscribe(opts: {
     bulkExport: false,
     apiAccess: false,
     customTemplates: false,
+    advancedReporting: false,
   };
   const defaultQuotas: import("@/db/schema").TierQuotas = {
     aiRequestsPerMonth: 0,

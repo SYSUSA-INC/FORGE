@@ -63,6 +63,7 @@ async function createTierAndSubscribe(opts: {
     bulkExport: false,
     apiAccess: false,
     customTemplates: false,
+    advancedReporting: false,
   };
   const defaultQuotas: TierQuotas = {
     aiRequestsPerMonth: 0,
