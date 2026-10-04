@@ -305,6 +305,8 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
   Lists take `limit` (1–100, default 50), `stage` (an opportunity or proposal stage), `updated_since` (an ISO 8601 date-time — handy for syncing only what changed) and `cursor`: each page returns `nextCursor`; pass it back to get the next page, until it is `null`. For example: `curl -H "Authorization: Bearer forge_…" "https://<your FORGE address>/api/v1/opportunities?updated_since=2026-10-01T00:00:00Z"`.
 - Each token can make 120 requests a minute. Answers: `401` missing, unknown, revoked or expired token; `403` the plan no longer includes API access, or the workspace is disabled; `404` no such record in your workspace; `429` too many requests (wait the seconds in `Retry-After`).
 - Every answered request is recorded in your **Audit Log** under the token's name.
+- **OpenAPI document.** `GET /api/v1/openapi.json` (no token needed) describes every endpoint, parameter and field in the OpenAPI 3.1 format. Import it into Postman or Insomnia, or feed it to a client generator. The quick reference on the page links to it.
+- **Revoked by FORGE support.** If FORGE support revokes a token (say, because it was reported leaked), the list shows "revoked by FORGE support" and your Audit Log records the reason. Make a new token for the integration.
 
 ---
 

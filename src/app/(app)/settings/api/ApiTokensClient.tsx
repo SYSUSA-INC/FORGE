@@ -144,6 +144,7 @@ export function ApiTokensClient({ tokens, canCreate }: { tokens: ApiTokenListRow
                   <td className="py-2 pr-3 font-mono text-[12px] text-muted">{t.expiresAt ? day(t.expiresAt) : "Never"}</td>
                   <td className="py-2 pr-3">
                     <span className={`rounded border px-2 py-0.5 font-mono text-[10px] uppercase ${STATE_CLASS[t.state]}`}>{t.state}</span>
+                    {t.revokedBy ? <span className="ml-1 font-mono text-[11px] text-muted">by {t.revokedBy}</span> : null}
                   </td>
                   <td className="py-2 text-right">
                     {t.state === "active" ? (
