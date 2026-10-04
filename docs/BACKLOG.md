@@ -30,7 +30,7 @@ Effort key:
 | 3b | **BL-PACKAGES Slice 2** — Migrate 7 lib-helper AI callers | P1 | M | ✅ shipped (PR #213) — 100% tenant AI paths token-capped |
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
-| 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | 🔄 in PR |
+| 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | 🔄 in PR (PR #317) |
 | 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ⏳ queued (written, parked until 1a merges) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -1048,7 +1048,7 @@ the dark block, no white-alpha utility anywhere in `src`).
 ---
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  🔄 add-ons Slice 1a in PR (Slice 1b queued)
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  🔄 add-ons Slice 1a in PR (PR #317; Slice 1b queued)
 
 Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
 
