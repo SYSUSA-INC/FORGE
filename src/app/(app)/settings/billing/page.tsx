@@ -138,6 +138,24 @@ export default async function BillingPage({
               })}
             </div>
           ) : null}
+          {/* BL-AUTH-ABUSE Slice 2a — where a trial stands */}
+          {tier?.trial.kind === "active" ? (
+            <div className="mt-3 font-body text-[12.5px] text-muted">
+              {tier.trial.endsAt ? (
+                <>
+                  Trial ends on{" "}
+                  <span className="text-text">{tier.trial.endsAt.toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" })}</span>
+                  {" "}({tier.trial.daysLeft} day{tier.trial.daysLeft === 1 ? "" : "s"} left). Pick a plan below to keep AI on afterwards; editing never stops.
+                </>
+              ) : (
+                "You're on a trial."
+              )}
+            </div>
+          ) : tier?.trial.kind === "expired" ? (
+            <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-body text-[12.5px] text-rose-300">
+              Your trial ended on {tier.trial.endedAt.toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" })}. Editing carries on as usual; AI features are paused until you choose a plan.
+            </div>
+          ) : null}
           {!isAdmin ? (
             <div className="mt-3 rounded-md border border-layer/10 bg-layer/[0.03] px-3 py-2 font-mono text-[10px] text-muted">
               Only org admins can change the plan. Ask your admin to upgrade.

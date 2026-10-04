@@ -29,6 +29,7 @@ import { db } from "@/db";
 import { subscriptionTiers, tenantSubscriptions } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
+import { TRIAL_DAYS, extendedTrialEnd, sanitizeTrialDays, trialEndFrom } from "@/lib/trial-logic";
 
 export const DEFAULT_TIER_SLUG = "platinum";
 
@@ -152,4 +153,103 @@ export async function assignTenantTier(input: {
     metadata: { fromTier: current, toTier, firstAssignment: !current },
   });
   return { ok: true, created: !current, fromTier: current, toTier };
+}
+
+// ── BL-AUTH-ABUSE Slice 2a — trials ──────────────────────────────────
+
+export type TrialResult = { ok: true; trialUntil: Date | null } | { ok: false; error: string };
+type Actor = { userId: string | null; email?: string | null };
+
+async function subscriptionRow(organizationId: string) {
+  const [row] = await db
+    .select({ status: tenantSubscriptions.status, trialUntil: tenantSubscriptions.trialUntil, stripeSubscriptionId: tenantSubscriptions.stripeSubscriptionId })
+    .from(tenantSubscriptions)
+    .where(eq(tenantSubscriptions.organizationId, organizationId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Put a workspace on a trial of `days` (default 14) from now. A workspace
+ * with no subscription row gets one on the default tier first. Refused
+ * for a workspace paying through Stripe and for one already on a trial
+ * (extend that instead). Audited tenant.trial_start.
+ */
+export async function startTenantTrial(input: { organizationId: string; actor: Actor; days?: number; now?: Date }): Promise<TrialResult> {
+  const { organizationId } = input;
+  const days = input.days === undefined ? TRIAL_DAYS : sanitizeTrialDays(input.days);
+  if (days === null) return { ok: false, error: "Trial length: a whole number of days from 1 to 90." };
+  let row = await subscriptionRow(organizationId);
+  if (!row) {
+    const ensured = await ensureTenantSubscription({ organizationId });
+    if (!ensured.tier) return { ok: false, error: "Assign a tier first — there is no active tier to start a trial on." };
+    row = await subscriptionRow(organizationId);
+    if (!row) return { ok: false, error: "Could not create the subscription row." };
+  }
+  if (row.stripeSubscriptionId) return { ok: false, error: "This workspace pays through Stripe; trials are for workspaces without a plan." };
+  if (row.status === "trial") return { ok: false, error: "Already on a trial — extend it instead." };
+  const trialUntil = trialEndFrom(input.now ?? new Date(), days);
+  await db
+    .update(tenantSubscriptions)
+    .set({ status: "trial", trialUntil, updatedAt: new Date() })
+    .where(eq(tenantSubscriptions.organizationId, organizationId));
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "tenant.trial_start",
+    resourceType: "tenant_subscription",
+    resourceId: organizationId,
+    metadata: { days, trialUntil: trialUntil.toISOString(), fromStatus: row.status },
+  });
+  return { ok: true, trialUntil };
+}
+
+/**
+ * Give a trial more time: `days` from the later of now and its current
+ * end, so an ended trial restarts AI from today. Audited tenant.trial_extend.
+ */
+export async function extendTenantTrial(input: { organizationId: string; actor: Actor; days: number; now?: Date }): Promise<TrialResult> {
+  const { organizationId } = input;
+  const days = sanitizeTrialDays(input.days);
+  if (days === null) return { ok: false, error: "Extension: a whole number of days from 1 to 90." };
+  const row = await subscriptionRow(organizationId);
+  if (!row || row.status !== "trial") return { ok: false, error: "This workspace is not on a trial." };
+  const trialUntil = extendedTrialEnd(row.trialUntil, days, input.now ?? new Date());
+  await db
+    .update(tenantSubscriptions)
+    .set({ trialUntil, updatedAt: new Date() })
+    .where(and(eq(tenantSubscriptions.organizationId, organizationId), eq(tenantSubscriptions.status, "trial")));
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "tenant.trial_extend",
+    resourceType: "tenant_subscription",
+    resourceId: organizationId,
+    metadata: { days, from: row.trialUntil?.toISOString() ?? null, to: trialUntil.toISOString() },
+  });
+  return { ok: true, trialUntil };
+}
+
+/**
+ * End a trial by converting it to full access on its current tier (a
+ * sales-led deal, or a plan arranged outside Stripe). A Stripe checkout
+ * does the same through the webhook. Audited tenant.trial_convert.
+ */
+export async function convertTenantTrial(input: { organizationId: string; actor: Actor }): Promise<TrialResult> {
+  const { organizationId } = input;
+  const row = await subscriptionRow(organizationId);
+  if (!row || row.status !== "trial") return { ok: false, error: "This workspace is not on a trial." };
+  await db
+    .update(tenantSubscriptions)
+    .set({ status: "active", trialUntil: null, updatedAt: new Date() })
+    .where(and(eq(tenantSubscriptions.organizationId, organizationId), eq(tenantSubscriptions.status, "trial")));
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "tenant.trial_convert",
+    resourceType: "tenant_subscription",
+    resourceId: organizationId,
+    metadata: { endedTrialUntil: row.trialUntil?.toISOString() ?? null },
+  });
+  return { ok: true, trialUntil: null };
 }

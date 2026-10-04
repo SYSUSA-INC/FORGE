@@ -15,6 +15,7 @@ import { activeAddonEffects } from "@/lib/addons";
 import { applyAddonEffects } from "@/lib/addons-logic";
 import { applyAiBudget, type AiBudget } from "@/lib/ai-control";
 import { log } from "@/lib/log";
+import { TRIAL_PAUSED_FLAGS, pauseAiFlags, trialExpiredMessage, trialState, type TrialState } from "@/lib/trial-logic";
 
 /**
  * BL-16 Phase B-1 — runtime feature gates.
@@ -48,11 +49,12 @@ export class FeatureGateError extends Error {
   readonly featureKey: keyof TierFeatureFlags;
   readonly tierName: string | null;
 
-  constructor(featureKey: keyof TierFeatureFlags, tierName: string | null) {
+  constructor(featureKey: keyof TierFeatureFlags, tierName: string | null, customMessage?: string) {
     super(
-      tierName
-        ? `Feature "${featureKey}" isn't included in the ${tierName} tier. Upgrade or contact support.`
-        : `Feature "${featureKey}" isn't enabled for this organization.`,
+      customMessage ??
+        (tierName
+          ? `Feature "${featureKey}" isn't included in the ${tierName} tier. Upgrade or contact support.`
+          : `Feature "${featureKey}" isn't enabled for this organization.`),
     );
     this.name = "FeatureGateError";
     this.featureKey = featureKey;
@@ -98,6 +100,13 @@ export type CurrentTier = {
    * the flags they turned on that the tier and overrides had off.
    */
   addons: { count: number; extraTokens: number; unlockedFlags: (keyof TierFeatureFlags)[] };
+  /**
+   * BL-AUTH-ABUSE Slice 2a — where the workspace stands on a trial. When a
+   * trial has ended, AI pauses (the AI feature flags are off and the AI
+   * quotas and gateway refuse with `trialExpiredMessage`); editing,
+   * creating, inviting, uploading and exporting carry on as before.
+   */
+  trial: TrialState;
 };
 
 /**
@@ -118,6 +127,7 @@ export async function getCurrentTier(
       tierFeatureFlags: subscriptionTiers.featureFlags,
       tierQuotas: subscriptionTiers.quotas,
       status: tenantSubscriptions.status,
+      trialUntil: tenantSubscriptions.trialUntil,
       overrides: tenantSubscriptions.customOverrides,
     })
     .from(tenantSubscriptions)
@@ -144,6 +154,7 @@ export async function getCurrentTier(
     aiBudget?: AiBudget;
   };
 
+  const trial = trialState(row.status, row.trialUntil);
   const baseFlags: TierFeatureFlags = row.tierActive
     ? mergeFlags(row.tierFeatureFlags, overrides.featureFlags)
     : DENY_ALL_FLAGS;
@@ -154,7 +165,8 @@ export async function getCurrentTier(
   const applied = row.tierActive
     ? applyAddonEffects({ quotas: baseQuotas, flags: baseFlags, effects: addonEffects })
     : { quotas: baseQuotas, flags: baseFlags, extraTokens: 0, unlockedFlags: [] as (keyof TierFeatureFlags)[] };
-  const effectiveFlags = applied.flags;
+  // BL-AUTH-ABUSE Slice 2a — an ended trial pauses the AI features only.
+  const effectiveFlags = trial.kind === "expired" ? pauseAiFlags(applied.flags) : applied.flags;
   const platformQuotas = applied.quotas;
   // BL-AIP-7c — the tenant's own budget can only lower the cap.
   const effectiveQuotas: TierQuotas = applyAiBudget(platformQuotas, overrides.aiBudget);
@@ -171,8 +183,16 @@ export async function getCurrentTier(
     platformQuotas,
     effectiveQuotas,
     addons: { count: addonEffects.length, extraTokens: applied.extraTokens, unlockedFlags: applied.unlockedFlags },
+    trial,
   };
 }
+
+/** The refusal an AI call gets in a workspace whose trial ended, or null. */
+export function trialRefusal(tier: Pick<CurrentTier, "trial"> | null): string | null {
+  return tier?.trial.kind === "expired" ? trialExpiredMessage(tier.trial.endedAt) : null;
+}
+
+const AI_QUOTA_KEYS: ReadonlySet<CounterQuotaKey> = new Set<CounterQuotaKey>(["aiRequestsPerMonth", "aiTokensPerMonth"]);
 
 /**
  * Throws `FeatureGateError` when the feature isn't enabled for the
@@ -187,6 +207,8 @@ export async function ensureFeature(
     if (!tier) {
       throw new FeatureGateError(key, null);
     }
+    const ended = (TRIAL_PAUSED_FLAGS as readonly string[]).includes(key) ? trialRefusal(tier) : null;
+    if (ended) throw new FeatureGateError(key, tier.tierName, ended);
     if (!tier.effectiveFlags[key]) {
       throw new FeatureGateError(key, tier.tierName);
     }
@@ -344,6 +366,9 @@ export async function enforceQuota(
     if (!tier) {
       throw new QuotaExceededError(key, 0, 0, null);
     }
+    // An ended trial pauses AI only; proposals and the rest stay open.
+    const ended = AI_QUOTA_KEYS.has(key) ? trialRefusal(tier) : null;
+    if (ended) throw new QuotaExceededError(key, 0, 0, tier.tierName, ended);
 
     const limit = tier.effectiveQuotas[key];
     // Quota = 0 means unlimited (Platinum semantics). Skip the
