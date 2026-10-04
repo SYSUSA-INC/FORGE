@@ -36,7 +36,8 @@ Effort key:
 | 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | ✅ shipped (PR #320) |
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
 | 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | ✅ shipped (PR #322) |
-| 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | 🔄 in PR (PR #323) |
+| 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | ✅ shipped (PR #323) |
+| 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1261,10 +1262,55 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
   quantity, an unknown subscription is not ours, cancellation ends the
   right grant with its paid period and audits in the tenant's log).
   Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9 "Bought by card". Shipped in PR #318.
-- **Later:** add-on items on the plan's own Stripe subscription (one
-  invoice), proration on quantity changes, add-ons on the public
-  pricing page, seats and storage as add-on kinds, advanced-reporting
-  features behind an unlock.
+- **Later:** ~~add-on items on the plan's own Stripe subscription (one
+  invoice), proration on quantity changes~~ (Slice 2a below), add-ons
+  on the public pricing page, seats and storage as add-on kinds,
+  advanced-reporting features behind an unlock.
+
+**Add-ons Slice 2a — one invoice and proration (2026-10-04)** 🔄 in progress:
+
+User request (2026-10-04): the "Work I can build next" list in order;
+the add-on follow-ups are third, one invoice and proration first.
+
+- **Buying on a card-paid plan.** `createAddonCheckoutSessionAction`
+  first tries the plan's own subscription: when the tenant has one, it
+  is `active` / `trialing` and the add-on's Stripe Price recurs on the
+  plan's interval (`canBillOnPlan`, pure — Stripe refuses mixed
+  intervals), the add-on becomes a subscription item on it
+  (`proration_behavior: create_prorations`), so it is charged for the
+  rest of the period on the next invoice and renews on the same one.
+  Buying a top-up again raises that item's quantity; a feature already
+  on the plan is refused. The grant is recorded at once
+  (`provisionStripeAddon`, now keyed by the subscription item when there
+  is one) and audited `subscription.addon_added_to_plan`. Otherwise —
+  no card plan yet, a yearly plan with a monthly add-on, a Stripe read
+  failure — it falls back to Slice 1b's separate Checkout.
+- **Changing and removing.** On `/settings/billing` each card-bought
+  add-on shows where it is billed ("On your plan's invoice" / "Own
+  subscription"). Org admins change a top-up's quantity
+  (`changeAddonQuantityAction` → `subscriptionItems.update` with
+  proration; `tenant.addon.quantity_change`) and remove an add-on
+  (`removeAddonAction`): one on the plan is removed now with the unused
+  time credited (`subscriptionItems.del`, `tenant.addon.removed`); one
+  with its own subscription is cancelled at period end
+  (`tenant.addon.cancel_requested`; the webhook ends it then). Granted
+  ("manual") add-ons are not changeable by the tenant.
+- **Webhook.** A subscription is recognised as the tenant's plan first
+  (`tenant_subscription.stripe_subscription_id`), because add-on items
+  share its id. The plan's tier now resolves from its plan item
+  (`splitSubscriptionItems`, pure: an item whose Price is an add-on's
+  is an add-on, the first other is the plan), not merely the first
+  item. `syncPlanAddonItems` lines the plan's add-on items up with the
+  grants (`reconcilePlanItems`, pure): new items recorded, quantities
+  follow Stripe, removed items end their grant. Deleting the plan ends
+  every add-on billed on it (`endPlanAddonGrants`). An add-on's own
+  subscription is handled as before.
+- No migration (`tenant_addon.stripe_subscription_item_id` exists since
+  0105). Tests: `tests/ai/addons-logic.test.ts` (split, interval rule,
+  reconcile); `tests/stripe/webhook.test.ts` (an add-on item before the
+  plan item still resolves the plan's tier and records the add-on;
+  quantity follows; removal ends it; deleting the plan ends both).
+  Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9.
 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 
@@ -3754,7 +3800,7 @@ nothing used it, because there was no API.
 (would also need `bulkExport`); webhooks out; platform-admin view and
 revoke of a tenant's tokens; an OpenAPI document.
 
-**customTemplates — the flag gates authoring, not use** 🔄 in PR (PR #323, 2026-10-04):
+**customTemplates — the flag gates authoring, not use** ✅ shipped (PR #323, 2026-10-04):
 
 User decision (2026-10-04), asked because Bronze and Silver have the
 flag off yet every workspace could build templates: **block authoring**.

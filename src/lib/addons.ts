@@ -9,17 +9,21 @@
  *                 gated call
  *   Stripe      — provisionStripeAddon / syncStripeAddonSubscription,
  *                 called by the webhook so a bought add-on appears and
- *                 disappears with its Stripe subscription
+ *                 disappears with its Stripe subscription;
+ *                 syncPlanAddonItems / endPlanAddonGrants for add-ons
+ *                 billed as items on the plan's own subscription
+ *                 (Slice 2a), and getTenantGrant / setGrantQuantity /
+ *                 endGrantNow for the tenant's own changes
  *
  * Server-only; callers own auth. Every tenant_addon write carries
  * organizationId.
  */
 import "server-only";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { tenantAddons, tierAddons } from "@/db/schema";
-import { addonIsLive, sanitizeAddonQuantity, type AddonCatalogRow, type AddonEffect, type AddonInput, type TenantAddonRow } from "@/lib/addons-logic";
+import { addonIsLive, reconcilePlanItems, sanitizeAddonQuantity, type AddonCatalogRow, type AddonEffect, type AddonInput, type TenantAddonRow } from "@/lib/addons-logic";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 
@@ -50,13 +54,6 @@ export async function listAddonCatalog(input?: { activeOnly?: boolean }): Promis
 
 export async function getAddonBySlug(slug: string): Promise<AddonCatalogRow | null> {
   const [row] = await db.select(catalogColumns).from(tierAddons).where(eq(tierAddons.slug, slug)).limit(1);
-  return row ?? null;
-}
-
-/** The catalogue entry sold under a Stripe Price, for the webhook. */
-export async function getAddonByStripePriceId(stripePriceId: string): Promise<AddonCatalogRow | null> {
-  if (!stripePriceId) return null;
-  const [row] = await db.select(catalogColumns).from(tierAddons).where(eq(tierAddons.stripePriceId, stripePriceId)).limit(1);
   return row ?? null;
 }
 
@@ -135,6 +132,7 @@ const grantColumns = {
   status: tenantAddons.status,
   source: tenantAddons.source,
   stripeSubscriptionId: tenantAddons.stripeSubscriptionId,
+  stripeSubscriptionItemId: tenantAddons.stripeSubscriptionItemId,
   note: tenantAddons.note,
   startsAt: tenantAddons.startsAt,
   endsAt: tenantAddons.endsAt,
@@ -164,6 +162,7 @@ export async function listTenantAddons(input: { organizationId: string; now?: Da
     status: r.status,
     source: r.source,
     stripeSubscriptionId: r.stripeSubscriptionId,
+    stripeSubscriptionItemId: r.stripeSubscriptionItemId,
     note: r.note,
     startsAt: r.startsAt.toISOString(),
     endsAt: r.endsAt?.toISOString() ?? null,
@@ -276,6 +275,7 @@ export async function provisionStripeAddon(input: {
   quantity: number;
   stripeSubscriptionId: string;
   stripeSubscriptionItemId?: string | null;
+  note?: string;
 }): Promise<{ ok: true; id: string; created: boolean } | { ok: false; error: string }> {
   const { organizationId } = input;
   const addon = await getAddonBySlug(input.addonSlug);
@@ -285,7 +285,16 @@ export async function provisionStripeAddon(input: {
   const [existing] = await db
     .select({ id: tenantAddons.id, organizationId: tenantAddons.organizationId })
     .from(tenantAddons)
-    .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.stripeSubscriptionId, input.stripeSubscriptionId)))
+    .where(
+      and(
+        eq(tenantAddons.organizationId, organizationId),
+        // An add-on billed on the plan's subscription shares that
+        // subscription with the plan and other add-ons: its item is the key.
+        input.stripeSubscriptionItemId
+          ? eq(tenantAddons.stripeSubscriptionItemId, input.stripeSubscriptionItemId)
+          : eq(tenantAddons.stripeSubscriptionId, input.stripeSubscriptionId),
+      ),
+    )
     .limit(1);
   if (existing) {
     await db
@@ -304,7 +313,7 @@ export async function provisionStripeAddon(input: {
       source: "stripe",
       stripeSubscriptionId: input.stripeSubscriptionId,
       stripeSubscriptionItemId: input.stripeSubscriptionItemId ?? null,
-      note: "Bought through Stripe Checkout.",
+      note: input.note ?? "Bought through Stripe Checkout.",
     })
     .returning({ id: tenantAddons.id });
   if (!row) return { ok: false, error: "Insert failed." };
@@ -364,4 +373,161 @@ export async function syncStripeAddonSubscription(input: {
     });
   }
   return { matched: true, organizationId, status };
+}
+
+// ── Slice 2a — add-ons billed on the plan's own subscription ──────────
+
+/**
+ * Bring the grants for add-ons billed as items on a tenant's plan
+ * subscription in line with that subscription's items: new items are
+ * recorded, quantity follows Stripe, items removed in Stripe (or by the
+ * tenant) end their grant now. Called by the webhook for the plan.
+ */
+export async function syncPlanAddonItems(input: {
+  organizationId: string;
+  stripeSubscriptionId: string;
+  items: { id: string; slug: string; quantity: number }[];
+}): Promise<{ added: number; ended: number; changed: number }> {
+  const { organizationId, stripeSubscriptionId } = input;
+  const grants = await db
+    .select({ id: tenantAddons.id, itemId: tenantAddons.stripeSubscriptionItemId, quantity: tenantAddons.quantity })
+    .from(tenantAddons)
+    .where(
+      and(
+        eq(tenantAddons.organizationId, organizationId),
+        eq(tenantAddons.stripeSubscriptionId, stripeSubscriptionId),
+        isNotNull(tenantAddons.stripeSubscriptionItemId),
+        eq(tenantAddons.status, "active"),
+      ),
+    );
+  const plan = reconcilePlanItems(
+    grants.map((g) => ({ id: g.id, itemId: g.itemId!, quantity: g.quantity })),
+    input.items.map((i) => ({ id: i.id, quantity: sanitizeAddonQuantity(i.quantity) ?? 1 })),
+  );
+  for (const itemId of plan.added) {
+    const item = input.items.find((i) => i.id === itemId)!;
+    const res = await provisionStripeAddon({
+      organizationId,
+      addonSlug: item.slug,
+      quantity: item.quantity,
+      stripeSubscriptionId,
+      stripeSubscriptionItemId: item.id,
+      note: "Billed on the plan's subscription.",
+    });
+    if (!res.ok) log.warn("[addons]", "plan add-on item not recorded", { organizationId, itemId, error: res.error });
+  }
+  for (const q of plan.quantity) await setGrantQuantity({ organizationId, tenantAddonId: q.grantId, quantity: q.quantity });
+  const now = new Date();
+  for (const id of plan.end) await endGrantNow({ organizationId, tenantAddonId: id, actor: { userId: null, email: "stripe-webhook" }, now });
+  return { added: plan.added.length, ended: plan.end.length, changed: plan.quantity.length };
+}
+
+/** The plan's subscription ended: every add-on billed on it ends with it. */
+export async function endPlanAddonGrants(input: { organizationId: string; stripeSubscriptionId: string; endsAt: Date }): Promise<number> {
+  const { organizationId } = input;
+  const ended = await db
+    .update(tenantAddons)
+    .set({ status: "canceled", canceledAt: new Date(), endsAt: input.endsAt, updatedAt: new Date() })
+    .where(
+      and(
+        eq(tenantAddons.organizationId, organizationId),
+        eq(tenantAddons.stripeSubscriptionId, input.stripeSubscriptionId),
+        isNotNull(tenantAddons.stripeSubscriptionItemId),
+        eq(tenantAddons.status, "active"),
+      ),
+    )
+    .returning({ id: tenantAddons.id });
+  for (const g of ended) {
+    await recordAudit({
+      organizationId,
+      actor: { userId: null, email: "stripe-webhook" },
+      action: "tenant.addon.cancelled",
+      resourceType: "tenant_addon",
+      resourceId: g.id,
+      metadata: { stripeSubscriptionId: input.stripeSubscriptionId, reason: "plan subscription ended" },
+    });
+  }
+  return ended.length;
+}
+
+export type TenantGrant = {
+  id: string;
+  slug: string;
+  kind: "ai_tokens" | "feature";
+  quantity: number;
+  status: "active" | "canceled";
+  source: "manual" | "stripe";
+  stripeSubscriptionId: string | null;
+  stripeSubscriptionItemId: string | null;
+};
+
+/** One of the tenant's grants, by id, or null when it isn't this tenant's. */
+export async function getTenantGrant(input: { organizationId: string; tenantAddonId: string }): Promise<TenantGrant | null> {
+  const { organizationId } = input;
+  const [row] = await db
+    .select({
+      id: tenantAddons.id,
+      slug: tierAddons.slug,
+      kind: tierAddons.kind,
+      quantity: tenantAddons.quantity,
+      status: tenantAddons.status,
+      source: tenantAddons.source,
+      stripeSubscriptionId: tenantAddons.stripeSubscriptionId,
+      stripeSubscriptionItemId: tenantAddons.stripeSubscriptionItemId,
+    })
+    .from(tenantAddons)
+    .innerJoin(tierAddons, eq(tierAddons.id, tenantAddons.addonId))
+    .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.id, input.tenantAddonId)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Record a grant's new quantity (after Stripe accepted it). Audited when a person made the change. */
+export async function setGrantQuantity(input: {
+  organizationId: string;
+  tenantAddonId: string;
+  quantity: number;
+  actor?: Actor;
+  stripeSubscriptionItemId?: string;
+}): Promise<void> {
+  const { organizationId } = input;
+  const quantity = sanitizeAddonQuantity(input.quantity) ?? 1;
+  await db
+    .update(tenantAddons)
+    .set({
+      quantity,
+      ...(input.stripeSubscriptionItemId ? { stripeSubscriptionItemId: input.stripeSubscriptionItemId } : {}),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.id, input.tenantAddonId)));
+  if (input.actor) {
+    await recordAudit({
+      organizationId,
+      actor: input.actor,
+      action: "tenant.addon.quantity_change",
+      resourceType: "tenant_addon",
+      resourceId: input.tenantAddonId,
+      metadata: { quantity },
+    });
+  }
+}
+
+/** End a grant now (its plan item was removed). Audited as tenant.addon.removed. */
+export async function endGrantNow(input: { organizationId: string; tenantAddonId: string; actor: Actor; now?: Date }): Promise<boolean> {
+  const { organizationId } = input;
+  const now = input.now ?? new Date();
+  const [row] = await db
+    .update(tenantAddons)
+    .set({ status: "canceled", canceledAt: now, endsAt: now, updatedAt: now })
+    .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.id, input.tenantAddonId), eq(tenantAddons.status, "active")))
+    .returning({ id: tenantAddons.id });
+  if (!row) return false;
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "tenant.addon.removed",
+    resourceType: "tenant_addon",
+    resourceId: row.id,
+  });
+  return true;
 }

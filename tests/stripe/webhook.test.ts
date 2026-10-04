@@ -26,13 +26,15 @@ import {
   it,
   vi,
 } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { db } from "@/db";
 import {
   paymentEvents,
   subscriptionTiers,
+  tenantAddons,
   tenantSubscriptions,
+  tierAddons,
 } from "@/db/schema";
 import {
   createTwoTenants,
@@ -340,5 +342,85 @@ describe("BL-17 — Stripe webhook receiver (runtime)", () => {
       .limit(1);
     expect(row!.handlerStatus).toBe("failed");
     expect(row!.handlerError).toBeTruthy();
+  });
+  // ── BL-PACKAGES add-ons Slice 2a — add-ons billed on the plan ───────
+
+  it("treats add-on items on the plan's subscription as add-ons and the plan as the plan", async () => {
+    const tag = customerId.slice(-8);
+    const planPrice = `price_plan_${tag}`;
+    const addonPrice = `price_tok_${tag}`;
+    const planSub = `sub_plan_${tag}`;
+    const [current] = await db.select({ tierId: tenantSubscriptions.tierId }).from(tenantSubscriptions).where(eq(tenantSubscriptions.organizationId, fx.orgA.organizationId));
+    await db.update(subscriptionTiers).set({ stripePriceIdMonthly: planPrice }).where(eq(subscriptionTiers.id, current!.tierId));
+    await db.update(tenantSubscriptions).set({ stripeSubscriptionId: planSub }).where(eq(tenantSubscriptions.organizationId, fx.orgA.organizationId));
+    const [addon] = await db
+      .insert(tierAddons)
+      .values({ slug: `tok-${tag}`, name: "Tokens", kind: "ai_tokens", aiTokensPerMonth: 1000, stripePriceId: addonPrice })
+      .returning({ id: tierAddons.id });
+
+    const now = Math.floor(Date.now() / 1000);
+    const planEvent = (type: string, items: { id: string; price: string; quantity: number }[]) => {
+      nextEventToReturn = {
+        id: uniqueEventId("plan"),
+        type,
+        data: {
+          object: {
+            id: planSub,
+            customer: customerId,
+            status: "active",
+            items: { data: items.map((i) => ({ id: i.id, quantity: i.quantity, price: { id: i.price, recurring: { interval: "month" } } })) },
+            current_period_start: now,
+            current_period_end: now + 30 * 86400,
+          },
+        },
+      };
+      return stripeWebhookPOST(makeWebhookRequest({}));
+    };
+    const grants = () =>
+      db
+        .select({ itemId: tenantAddons.stripeSubscriptionItemId, quantity: tenantAddons.quantity, status: tenantAddons.status, sub: tenantAddons.stripeSubscriptionId })
+        .from(tenantAddons)
+        .where(and(eq(tenantAddons.organizationId, fx.orgA.organizationId), eq(tenantAddons.addonId, addon!.id)));
+
+    try {
+      // The add-on item comes first; the plan still resolves from its own item.
+      await planEvent("customer.subscription.updated", [
+        { id: "si_tok", price: addonPrice, quantity: 2 },
+        { id: "si_plan", price: planPrice, quantity: 1 },
+      ]);
+      const [sub] = await db.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.organizationId, fx.orgA.organizationId));
+      expect(sub).toMatchObject({ status: "active", tierId: current!.tierId, stripeSubscriptionId: planSub });
+      expect(await grants()).toEqual([{ itemId: "si_tok", quantity: 2, status: "active", sub: planSub }]);
+
+      // Quantity follows Stripe; a replay doesn't duplicate.
+      await planEvent("customer.subscription.updated", [
+        { id: "si_plan", price: planPrice, quantity: 1 },
+        { id: "si_tok", price: addonPrice, quantity: 5 },
+      ]);
+      expect(await grants()).toEqual([{ itemId: "si_tok", quantity: 5, status: "active", sub: planSub }]);
+
+      // The item removed in Stripe ends the grant; the plan stays.
+      await planEvent("customer.subscription.updated", [{ id: "si_plan", price: planPrice, quantity: 1 }]);
+      expect((await grants())[0]).toMatchObject({ status: "canceled" });
+      const [still] = await db.select({ status: tenantSubscriptions.status }).from(tenantSubscriptions).where(eq(tenantSubscriptions.organizationId, fx.orgA.organizationId));
+      expect(still!.status).toBe("active");
+
+      // Added again, then the plan is cancelled: the add-on ends with it.
+      await planEvent("customer.subscription.updated", [
+        { id: "si_plan", price: planPrice, quantity: 1 },
+        { id: "si_tok2", price: addonPrice, quantity: 1 },
+      ]);
+      expect((await grants()).filter((g) => g.status === "active")).toEqual([{ itemId: "si_tok2", quantity: 1, status: "active", sub: planSub }]);
+      await planEvent("customer.subscription.deleted", [
+        { id: "si_plan", price: planPrice, quantity: 1 },
+        { id: "si_tok2", price: addonPrice, quantity: 1 },
+      ]);
+      const [cancelled] = await db.select({ status: tenantSubscriptions.status, subId: tenantSubscriptions.stripeSubscriptionId }).from(tenantSubscriptions).where(eq(tenantSubscriptions.organizationId, fx.orgA.organizationId));
+      expect(cancelled).toEqual({ status: "canceled", subId: null });
+      expect((await grants()).every((g) => g.status === "canceled")).toBe(true);
+    } finally {
+      await db.delete(tenantAddons).where(eq(tenantAddons.organizationId, fx.orgA.organizationId));
+      await db.delete(tierAddons).where(eq(tierAddons.id, addon!.id));
+    }
   });
 });
