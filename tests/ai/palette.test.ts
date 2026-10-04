@@ -46,7 +46,10 @@ describe("paletteCommands", () => {
     expect(paletteCommands(orgAdmin).find((c) => c.href === "/users")?.workspace).toBe("work");
 
     const s = hrefs(superWithTenant);
-    expect(s).toContain("/admin");
+    // The SuperAdmin portal's tabs are listed as the sidebar lists them.
+    expect(s).toContain("/admin?tab=overview");
+    expect(s).toContain("/admin?tab=organizations");
+    expect(s).toContain("/admin?tab=users");
     expect(s).toContain("/platform/audit-log");
     expect(new Set(s).size).toBe(s.length);
 
