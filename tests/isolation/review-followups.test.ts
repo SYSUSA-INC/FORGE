@@ -210,4 +210,25 @@ describe("BL-FB-X-COLOR-TEAM Slice 2 — round follow-ups", () => {
     expect(stampedB!.at).not.toBeNull();
     expect(await db.select({ id: notificationDeliveries.id }).from(notificationDeliveries).where(eq(notificationDeliveries.organizationId, fx.orgB.organizationId))).toEqual([]);
   });
+  it("Slice 4 — a round's own cadence wins over the team's, for that round only", async () => {
+    // Both rounds due in five days; the team default (the day before) reaches neither.
+    const inFiveDays = new Date(Date.now() + 5 * 86_400_000);
+    await db.update(proposalReviews).set({ dueDate: inFiveDays }).where(eq(proposalReviews.id, redA));
+    await db.update(proposalReviews).set({ dueDate: inFiveDays }).where(eq(proposalReviews.id, reviewB));
+    await dispatchReviewDueReminders();
+    const sent = async (id: string) => (await db.select({ at: proposalReviews.dueReminderSentAt }).from(proposalReviews).where(eq(proposalReviews.id, id)))[0]!.at;
+    expect(await sent(redA)).toBeNull();
+    expect(await sent(reviewB)).toBeNull();
+
+    // A's round asks for a week's notice: A's round is reminded, B's still waits on B's default.
+    await db.update(proposalReviews).set({ reminderDaysBefore: 7, reminderRepeatDays: 0 }).where(eq(proposalReviews.id, redA));
+    await dispatchReviewDueReminders();
+    expect(await sent(redA)).not.toBeNull();
+    expect(await sent(reviewB)).toBeNull();
+
+    // Half an override is no override: B with only days-before set follows B's team default.
+    await db.update(proposalReviews).set({ reminderDaysBefore: 7 }).where(eq(proposalReviews.id, reviewB));
+    await dispatchReviewDueReminders();
+    expect(await sent(reviewB)).toBeNull();
+  });
 });

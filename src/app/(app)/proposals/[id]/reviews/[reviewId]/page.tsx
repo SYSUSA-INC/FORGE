@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
+  organizations,
   proposalReviewAssignments,
   proposalReviewComments,
   proposalReviews,
@@ -22,7 +23,7 @@ import {
   computeOverallVerdict,
 } from "@/lib/review-types";
 import { getReviewWorkflow } from "@/lib/review-workflow";
-import { checklistProgress, consolidateComments, consolidatedReport } from "@/lib/review-workflow-logic";
+import { DEFAULT_REMINDER_CADENCE, checklistProgress, consolidateComments, consolidatedReport, sanitizeReminderCadence } from "@/lib/review-workflow-logic";
 import { ReviewerList } from "./ReviewerList";
 import { SubmitVerdictPanel } from "./SubmitVerdictPanel";
 import { CommentsPanel } from "./CommentsPanel";
@@ -31,6 +32,7 @@ import { ChecklistPanel } from "./ChecklistPanel";
 import { ConsolidatedReport } from "./ConsolidatedReport";
 import { CoveragePanel } from "./CoveragePanel";
 import { ReviewSummaryPanel } from "./ReviewSummaryPanel";
+import { ReminderPanel } from "./ReminderPanel";
 import { listOrgReviewers } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -114,6 +116,13 @@ export default async function ReviewDetailPage({
     : [];
 
   const reviewers = await listOrgReviewers();
+  // Slice 4 — the team's reminder cadence, for the round's Reminders panel.
+  const [org] = await db
+    .select({ daysBefore: organizations.reviewReminderDaysBefore, repeatDays: organizations.reviewReminderRepeatDays })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  const teamCadence = sanitizeReminderCadence({ daysBefore: org?.daysBefore, repeatDays: org?.repeatDays }) ?? DEFAULT_REMINDER_CADENCE;
   const actorAssignment = assignmentRows.find((a) => a.userId === actor.id);
   const canClose = r.status === "in_progress";
   const overallVerdict = computeOverallVerdict(
@@ -281,6 +290,20 @@ export default async function ReviewDetailPage({
               initialVerdict={actorAssignment.verdict ?? null}
               initialSummary={actorAssignment.summary ?? ""}
               alreadySubmitted={!!actorAssignment.submittedAt}
+            />
+          ) : null}
+
+          {canClose ? (
+            <ReminderPanel
+              reviewId={r.id}
+              dueDate={r.dueDate ? new Date(r.dueDate).toISOString() : null}
+              sentAt={r.dueReminderSentAt ? r.dueReminderSentAt.toISOString() : null}
+              team={teamCadence}
+              round={{ daysBefore: r.reminderDaysBefore, repeatDays: r.reminderRepeatDays }}
+              pendingNames={assignmentRows.filter((a) => !a.submittedAt).map((a) => a.name ?? a.email ?? "Reviewer")}
+              colorLabel={REVIEW_COLOR_LABELS[r.color]}
+              proposalTitle={review.proposal.title}
+              canEdit
             />
           ) : null}
 

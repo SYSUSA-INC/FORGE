@@ -13,6 +13,9 @@ import {
   dueReminderSubject,
   reviewReminderDue,
   sanitizeReminderCadence,
+  describeCadence,
+  nextReminderAt,
+  roundCadence,
   heuristicSummary,
   sanitizeSummary,
   summaryMarkdown,
@@ -247,5 +250,33 @@ describe("review workflow logic — Slice 2 follow-ups", () => {
     expect(sanitizeReminderCadence({ daysBefore: "2", repeatDays: 0 })).toBeNull();
     expect(sanitizeReminderCadence({ daysBefore: 1, repeatDays: -1 })).toBeNull();
     expect(sanitizeReminderCadence(null)).toBeNull();
+  });
+});
+
+describe("Slice 4 — a round's cadence and its next reminder", () => {
+  const team = { daysBefore: 1, repeatDays: 0 };
+  const D = 86_400_000;
+
+  it("uses the round's own cadence only when both values are set", () => {
+    expect(roundCadence({ daysBefore: 3, repeatDays: 2 }, team)).toEqual({ cadence: { daysBefore: 3, repeatDays: 2 }, own: true });
+    expect(roundCadence({ daysBefore: 3, repeatDays: null }, team)).toEqual({ cadence: team, own: false });
+    expect(roundCadence({ daysBefore: 99, repeatDays: 1 }, team)).toEqual({ cadence: team, own: false });
+    expect(describeCadence({ daysBefore: 1, repeatDays: 0 })).toBe("1 day before the due date, once");
+    expect(describeCadence({ daysBefore: 0, repeatDays: 2 })).toBe("on the due date, then every 2 days while overdue");
+  });
+
+  it("finds the next 08:00 UTC tick that reminds, or none", () => {
+    const now = new Date("2026-10-04T12:00:00Z");
+    const due = new Date("2026-10-10T17:00:00Z");
+    // A day before: the 10-09 tick is still more than a day out (31h), so 10-10 08:00.
+    expect(nextReminderAt(now, due, null, team)).toEqual(new Date("2026-10-10T08:00:00Z"));
+    expect(nextReminderAt(now, due, null, { daysBefore: 3, repeatDays: 0 })).toEqual(new Date("2026-10-08T08:00:00Z"));
+    // Already inside the window: the next tick.
+    expect(nextReminderAt(new Date("2026-10-10T09:00:00Z"), due, null, team)).toEqual(new Date("2026-10-11T08:00:00Z"));
+    // Sent and no repeat: none. Sent and repeating while overdue: every N days after the last.
+    const sent = new Date("2026-10-11T08:00:00Z");
+    expect(nextReminderAt(new Date("2026-10-11T09:00:00Z"), due, sent, team)).toBeNull();
+    expect(nextReminderAt(new Date("2026-10-11T09:00:00Z"), due, sent, { daysBefore: 1, repeatDays: 2 })).toEqual(new Date(sent.getTime() + 2 * D));
+    expect(nextReminderAt(now, null, null, team)).toBeNull();
   });
 });

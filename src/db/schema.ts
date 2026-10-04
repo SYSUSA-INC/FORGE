@@ -1452,6 +1452,9 @@ export const proposalReviews = pgTable("proposal_review", {
   aiSummaryAt: timestamp("ai_summary_at"),
   /** BL-FB-X-COLOR-TEAM Slice 2 — the once-only due-date reminder to unsubmitted reviewers. */
   dueReminderSentAt: timestamp("due_reminder_sent_at"),
+  /** BL-FB-X-COLOR-TEAM Slice 4 — this round's own reminder cadence (drizzle/0111); null = the tenant's. */
+  reminderDaysBefore: integer("reminder_days_before"),
+  reminderRepeatDays: integer("reminder_repeat_days"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
