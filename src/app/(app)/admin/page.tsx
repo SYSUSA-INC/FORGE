@@ -85,9 +85,16 @@ export default async function AdminPage({
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId));
 
+  // BL-AUTH-ABUSE — how many people (any status) each workspace has, so
+  // the delete dialog can name the workspaces only that person is in.
+  const totalMembersByOrg = new Map<string, number>();
+  for (const m of userMembershipRows) {
+    totalMembersByOrg.set(m.organizationId, (totalMembersByOrg.get(m.organizationId) ?? 0) + 1);
+  }
+
   const membershipsByUser = new Map<
     string,
-    { organizationId: string; organizationName: string; role: string; status: string }[]
+    { organizationId: string; organizationName: string; role: string; status: string; sole: boolean }[]
   >();
   for (const m of userMembershipRows) {
     const list = membershipsByUser.get(m.userId) ?? [];
@@ -96,6 +103,7 @@ export default async function AdminPage({
       organizationName: m.organizationName,
       role: m.role,
       status: m.status,
+      sole: (totalMembersByOrg.get(m.organizationId) ?? 0) <= 1,
     });
     membershipsByUser.set(m.userId, list);
   }

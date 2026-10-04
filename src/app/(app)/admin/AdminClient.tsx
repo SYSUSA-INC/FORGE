@@ -17,12 +17,17 @@ import {
 import {
   createOrganizationAction,
   deleteOrganizationAction,
+  deleteUserAction,
   forcePasswordResetAction,
+  previewUnverifiedPurgeAction,
+  purgeUnverifiedAccountsAction,
   resendOrgAdminInviteAction,
   setOrgDisabledAction,
   setUserDisabledAction,
   setUserSuperadminAction,
 } from "./actions";
+
+type PurgePreview = Awaited<ReturnType<typeof previewUnverifiedPurgeAction>>;
 
 const INVITE_ROLES: { value: string; label: string }[] = [
   { value: "admin", label: "Admin" },
@@ -57,8 +62,12 @@ type UserRow = {
     organizationName: string;
     role: string;
     status: string;
+    /** BL-AUTH-ABUSE — nobody else belongs to this workspace. */
+    sole: boolean;
   }[];
 };
+
+type UserFilter = "all" | "unverified" | "disabled" | "no-org";
 
 type Stats = {
   orgCount: number;
@@ -900,31 +909,50 @@ function UsersTab({
   currentUserId: string;
 }) {
   const [filter, setFilter] = useState("");
+  const [status, setStatus] = useState<UserFilter>("all");
 
   const filtered = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    if (!f) return users;
-    return users.filter(
-      (u) =>
+    return users.filter((u) => {
+      if (status === "unverified" && u.verified) return false;
+      if (status === "disabled" && !u.disabled) return false;
+      if (status === "no-org" && u.memberships.length > 0) return false;
+      if (!f) return true;
+      return (
         (u.name ?? "").toLowerCase().includes(f) ||
         u.email.toLowerCase().includes(f) ||
-        u.memberships.some((m) =>
-          m.organizationName.toLowerCase().includes(f),
-        ),
-    );
-  }, [users, filter]);
+        u.memberships.some((m) => m.organizationName.toLowerCase().includes(f))
+      );
+    });
+  }, [users, filter, status]);
 
   return (
+    <>
+    {/* BL-AUTH-ABUSE Slice 1 — bulk clean-up of unverified sign-ups */}
+    <UnverifiedPurgePanel />
     <Panel
       title="All platform users"
       eyebrow={`${filtered.length} of ${users.length}`}
       actions={
-        <input
-          className="aur-input w-56 text-[12px]"
-          placeholder="Search name, email, or org…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="aur-input w-40 text-[12px]"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as UserFilter)}
+            aria-label="Show"
+          >
+            <option value="all">Everyone</option>
+            <option value="unverified">Unverified</option>
+            <option value="disabled">Disabled</option>
+            <option value="no-org">No workspace</option>
+          </select>
+          <input
+            className="aur-input w-56 text-[12px]"
+            placeholder="Search name, email, or org…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        </div>
       }
     >
       {filtered.length === 0 ? (
@@ -936,6 +964,98 @@ function UsersTab({
           ))}
         </ul>
       )}
+    </Panel>
+    </>
+  );
+}
+
+/**
+ * BL-AUTH-ABUSE Slice 1 — remove unverified sign-ups in bulk: accounts
+ * that never verified their email, older than N days, alone in every
+ * workspace they hold. Preview first; the delete takes only what the
+ * preview listed and is still eligible.
+ */
+function UnverifiedPurgePanel() {
+  const router = useRouter();
+  const [days, setDays] = useState("7");
+  const [preview, setPreview] = useState<PurgePreview | null>(null);
+  const [previewDays, setPreviewDays] = useState(7);
+  const [pending, startTransition] = useTransition();
+  const [note, setNote] = useState<string | null>(null);
+
+  function runPreview() {
+    setNote(null);
+    const n = Math.round(Number(days));
+    const d = Number.isFinite(n) && n >= 1 && n <= 365 ? n : 7;
+    startTransition(async () => {
+      const res = await previewUnverifiedPurgeAction(d);
+      setPreview(res);
+      setPreviewDays(d);
+    });
+  }
+
+  function runPurge() {
+    if (!preview || preview.candidates.length === 0) return;
+    const n = preview.candidates.length;
+    const w = preview.candidates.reduce((s, c) => s + c.workspaces.length, 0);
+    if (!window.confirm(`Permanently delete ${n} unverified account${n === 1 ? "" : "s"}${w > 0 ? ` and ${w} workspace${w === 1 ? "" : "s"} only they belong to` : ""}? This cannot be undone.`)) return;
+    startTransition(async () => {
+      const res = await purgeUnverifiedAccountsAction({ olderThanDays: previewDays, userIds: preview.candidates.map((c) => c.id) });
+      setPreview(null);
+      setNote(
+        `Deleted ${res.deleted} account${res.deleted === 1 ? "" : "s"} and ${res.workspacesDeleted} workspace${res.workspacesDeleted === 1 ? "" : "s"}.${res.skipped > 0 ? ` ${res.skipped} skipped — verified or joined someone since the preview.` : ""}`,
+      );
+      router.refresh();
+    });
+  }
+
+  const shown = preview?.candidates.slice(0, 50) ?? [];
+
+  return (
+    <Panel title="Clean up unverified sign-ups" eyebrow="Bot and spam accounts" className="mb-4">
+      <p className="font-body text-[12px] leading-relaxed text-muted">
+        Removes accounts that never verified their email, are older than the number of days below, and are alone in every workspace they hold (the one sign-up created for them). Anyone sharing a workspace with another person is left alone. Preview first — nothing is deleted until you confirm.
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div>
+          <label className="aur-label">Unverified for at least (days)</label>
+          <input className="aur-input w-28" type="number" min={1} max={365} step={1} value={days} onChange={(e) => setDays(e.target.value)} disabled={pending} />
+        </div>
+        <button type="button" onClick={runPreview} disabled={pending} className="aur-btn aur-btn-ghost text-[11px]">
+          {pending && !preview ? "Looking…" : "Preview"}
+        </button>
+      </div>
+      {preview ? (
+        <div className="mt-3 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+          {preview.candidates.length === 0 ? (
+            <div className="font-mono text-[11px] text-muted">
+              Nothing to clean up for that age.{preview.sharedWorkspace > 0 ? ` ${preview.sharedWorkspace} unverified account(s) share a workspace with someone and were left out.` : ""}
+            </div>
+          ) : (
+            <>
+              <div className="font-mono text-[11px] text-text">
+                {preview.candidates.length} account{preview.candidates.length === 1 ? "" : "s"} would be deleted, with{" "}
+                {preview.candidates.reduce((s, c) => s + c.workspaces.length, 0)} workspace(s) only they belong to.
+                {preview.sharedWorkspace > 0 ? ` ${preview.sharedWorkspace} sharing a workspace left out.` : ""}
+              </div>
+              <ul className="mt-2 max-h-64 overflow-y-auto font-mono text-[11px] text-muted">
+                {shown.map((c) => (
+                  <li key={c.id} className="truncate py-0.5">
+                    <span className="text-text">{c.email}</span>
+                    {c.name ? ` · ${c.name}` : ""} · signed up {new Date(c.createdAt).toLocaleDateString("en-US", { dateStyle: "medium" })}
+                    {c.workspaces.length > 0 ? ` · ${c.workspaces.map((w) => w.name).join(", ")}` : " · no workspace"}
+                  </li>
+                ))}
+                {preview.candidates.length > shown.length ? <li className="py-0.5">…and {preview.candidates.length - shown.length} more</li> : null}
+              </ul>
+              <button type="button" onClick={runPurge} disabled={pending} className="aur-btn aur-btn-danger mt-3 text-[11px]">
+                {pending ? "Deleting…" : `Delete ${preview.candidates.length} account${preview.candidates.length === 1 ? "" : "s"}`}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+      {note ? <div className="mt-3 rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">{note}</div> : null}
     </Panel>
   );
 }
@@ -952,8 +1072,25 @@ function UserRowItem({
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [reset, setReset] = useState<Extract<ResetLinkResult, { ok: true }> | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteSole, setDeleteSole] = useState(true);
 
   const isSelf = u.id === currentUserId;
+  const soleWorkspaces = u.memberships.filter((m) => m.sole);
+
+  async function deleteAccount() {
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    const res = await deleteUserAction(u.id, { deleteSoleWorkspaces: deleteSole });
+    setBusy(false);
+    if (!res.ok) {
+      setErr(res.error);
+      return;
+    }
+    setConfirmDelete(false);
+    router.refresh();
+  }
 
   async function toggleDisabled() {
     setBusy(true);
@@ -996,7 +1133,7 @@ function UserRowItem({
 
   return (
     <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
-      <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">
+      <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-text">
             {u.name ?? u.email}
@@ -1054,7 +1191,46 @@ function UserRowItem({
         >
           {u.disabled ? "Enable" : "Disable"}
         </button>
+        <button
+          type="button"
+          className="aur-btn aur-btn-danger text-[11px]"
+          disabled={busy || isSelf || u.isSuperadmin}
+          title={isSelf ? "You cannot delete your own account." : u.isSuperadmin ? "Revoke superadmin first." : "Delete this account permanently"}
+          onClick={() => {
+            setErr(null);
+            setNote(null);
+            setConfirmDelete((v) => !v);
+          }}
+        >
+          Delete…
+        </button>
       </div>
+      {/* BL-AUTH-ABUSE Slice 1 — delete with the consequences spelled out */}
+      {confirmDelete ? (
+        <div className="mt-2 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-text">
+          <div>
+            Delete <span className="font-semibold">{u.email}</span> permanently? Their memberships, sessions and per-user settings are removed;
+            content they wrote stays, without their name. Recorded in the audit log. This cannot be undone.
+          </div>
+          {soleWorkspaces.length > 0 ? (
+            <label className="mt-2 flex items-start gap-2">
+              <input type="checkbox" checked={deleteSole} onChange={(e) => setDeleteSole(e.target.checked)} disabled={busy} />
+              <span>
+                Also delete the workspace{soleWorkspaces.length === 1 ? "" : "s"} only they belong to:{" "}
+                {soleWorkspaces.map((m) => m.organizationName).join(", ")}
+              </span>
+            </label>
+          ) : null}
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={busy} onClick={deleteAccount}>
+              {busy ? "Deleting…" : "Delete permanently"}
+            </button>
+            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={busy} onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
       {err ? (
         <div className="mt-2 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
           {err}

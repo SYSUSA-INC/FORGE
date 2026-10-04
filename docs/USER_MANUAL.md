@@ -40,8 +40,8 @@ Open **https://www.sysgov.com/sign-up**.
 ![Sign-up card](docs/images/sign-up.png)
 
 Fill in:
-- **Name** — how we'll display you in the app
-- **Work email** — used for verification and sign-in
+- **Name** — how we'll display you in the app: the name colleagues know you by, 2–80 characters of letters, spaces, hyphens and apostrophes (any alphabet; no numbers, links or email addresses)
+- **Work email** — used for verification and sign-in; throwaway inboxes (Mailinator, YOPmail and the like) are not accepted
 - **Password** — at least 10 characters, with an uppercase, a lowercase, and a digit
 - **Confirm password**
 
