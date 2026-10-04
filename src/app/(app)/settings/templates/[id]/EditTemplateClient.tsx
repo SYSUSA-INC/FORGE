@@ -53,9 +53,12 @@ type Initial = {
 export function EditTemplateClient({
   id,
   initial,
+  locked,
 }: {
   id: string;
   initial: Initial;
+  /** BL-16 customTemplates — why the plan refuses edits; null when allowed. */
+  locked: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -128,7 +131,11 @@ export function EditTemplateClient({
     setDocxNotice(null);
     setDocxWarnings([]);
     startUploading(async () => {
-      await clearTemplateDocxAction(id);
+      const res = await clearTemplateDocxAction(id);
+      if (!res.ok) {
+        setDocxError(res.error);
+        return;
+      }
       setDocxFileName("");
       setDocxFileSize(0);
       setDocxUploadedAt(null);
@@ -221,6 +228,11 @@ export function EditTemplateClient({
 
   return (
     <form className="grid gap-4 xl:grid-cols-[1.6fr_1fr]" onSubmit={save}>
+      {locked ? (
+        <div className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 font-mono text-[11px] text-gold xl:col-span-2">
+          {locked} You can still set this template as the default or archive it.
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4">
         <Panel
           title="Identity"
@@ -626,7 +638,7 @@ export function EditTemplateClient({
           </Link>
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || !!locked}
             className="aur-btn aur-btn-primary"
           >
             {pending ? "Saving…" : "Save template"}

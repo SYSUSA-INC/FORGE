@@ -36,6 +36,7 @@ Effort key:
 | 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | ✅ shipped (PR #320) |
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
 | 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | 🔄 in PR (PR #322) |
+| 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -3530,8 +3531,9 @@ Still ungated (deferred — flags exist but features aren't yet
 built or need design work):
 - ~~`apiAccess` — no token endpoint exists yet~~ → gated by the
   read-only API below (**apiAccess**, 2026-10-04)
-- `customTemplates` — gating semantics need design (view-only vs.
-  create-only)
+- ~~`customTemplates` — gating semantics need design (view-only vs.
+  create-only)~~ → authoring gated, use never (**customTemplates**,
+  2026-10-04)
 
 **Phase B-3a — Quota counter schema + helper** ✅ shipped:
 - Migration `0044_tenant_usage_counter.sql` adds the
@@ -3751,6 +3753,27 @@ nothing used it, because there was no API.
 **Later:** write endpoints (scoped tokens); section text and exports
 (would also need `bulkExport`); webhooks out; platform-admin view and
 revoke of a tenant's tokens; an OpenAPI document.
+
+**customTemplates — the flag gates authoring, not use** 🔄 in progress (2026-10-04):
+
+User decision (2026-10-04), asked because Bronze and Silver have the
+flag off yet every workspace could build templates: **block authoring**.
+Without `customTemplates`:
+- Refused with one plan message: `createTemplateAction`,
+  `updateTemplateAction`, `uploadTemplateDocxAction`,
+  `clearTemplateDocxAction`, `setTemplateKindAction`
+  (`src/lib/template-gate.ts` → `ensureFeature`).
+- Never gated: the templates a workspace already has on `/proposals/new`,
+  set as default, archive / unarchive, listing and viewing. Nothing
+  built is lost; turning the flag back on (tier, override or a feature
+  add-on) restores authoring at once.
+- UI: `/settings/templates` hides **+ New template** and explains with a
+  link to Billing; `/settings/templates/new` shows the note instead of
+  the form; the editor shows a banner and disables **Save template**.
+  The editor's "remove Word file" now surfaces a refusal instead of
+  reporting "Removed." regardless.
+- No migration. Test: `tests/isolation/custom-templates.test.ts`.
+  Docs: ADMIN_MANUAL §6.2, USER_MANUAL §4.14.
 
 **What ships in a later phase**: the actual redemption flow
 (applying a code to a `tenant_subscription` to discount the next

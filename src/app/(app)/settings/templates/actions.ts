@@ -14,6 +14,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { isLikelyDocx, scanDocxForVariables } from "@/lib/docx-template";
 import { STARTER_TEMPLATES } from "@/lib/template-types";
+import { templateAuthoringRefusal } from "@/lib/template-gate";
 import { log } from "@/lib/log";
 
 const DOCX_MAX_BYTES = 25 * 1024 * 1024;
@@ -95,6 +96,8 @@ export async function createTemplateAction(input: {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
+  const refusal = await templateAuthoringRefusal(organizationId);
+  if (refusal) return { ok: false, error: refusal };
 
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Name is required." };
@@ -180,6 +183,8 @@ export async function updateTemplateAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
+  const refusal = await templateAuthoringRefusal(organizationId);
+  if (refusal) return { ok: false, error: refusal };
 
   try {
     const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -355,6 +360,8 @@ export async function setTemplateKindAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
+  const refusal = await templateAuthoringRefusal(organizationId);
+  if (refusal) return { ok: false, error: refusal };
 
   await db
     .update(proposalTemplates)
@@ -404,6 +411,8 @@ export async function uploadTemplateDocxAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
+  const refusal = await templateAuthoringRefusal(organizationId);
+  if (refusal) return { ok: false, error: refusal };
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -512,6 +521,8 @@ export async function clearTemplateDocxAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
+  const refusal = await templateAuthoringRefusal(organizationId);
+  if (refusal) return { ok: false, error: refusal };
 
   await db
     .update(proposalTemplates)

@@ -268,6 +268,8 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 
 **Trials.** A workspace on a trial shows the days left in a line under the top bar and under **Current plan**. When the trial ends without a plan, nothing you have done is lost and **editing carries on as usual** — you can still write, create proposals, invite colleagues, upload and export. Only the AI features pause (drafting, chat, analyses and AI checks) until an admin chooses a plan here.
 
+**Templates on your plan.** Building your own proposal templates (Settings → Templates: new templates, editing, uploading a Word file) is part of some plans. On a plan without it, the templates you already have keep working: they still appear when you start a proposal, and an admin can still choose the default or archive one. Only creating and editing are paused; the page links to Billing.
+
 ### 4.15 API access (admins)
 
 **Settings → API access** lets an org admin connect FORGE to other systems — a CRM, a BI dashboard, an internal report — through a read-only API. It is part of some plans (or an add-on); without it the page says so and links to Billing.
