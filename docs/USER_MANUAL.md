@@ -301,6 +301,7 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 | `GET /api/v1/opportunities/{id}` | One opportunity, with its description |
 | `GET /api/v1/proposals` | Proposals, newest change first |
 | `GET /api/v1/proposals/{id}` | One proposal with its section outline (titles, status, word counts — not the text) |
+| `GET /api/v1/proposals/{id}/sections/{sectionId}` | One section with its text as plain text (`text`) and HTML (`html`), plus its Section L brief (`instructions`). The text is the final view your PDF and Word exports show: suggested insertions kept, suggested deletions dropped. `hasPendingChanges` is `true` while suggestions are still open |
 
   Lists take `limit` (1–100, default 50), `stage` (an opportunity or proposal stage), `updated_since` (an ISO 8601 date-time — handy for syncing only what changed) and `cursor`: each page returns `nextCursor`; pass it back to get the next page, until it is `null`. For example: `curl -H "Authorization: Bearer forge_…" "https://<your FORGE address>/api/v1/opportunities?updated_since=2026-10-01T00:00:00Z"`.
 - Each token can make 120 requests a minute. Answers: `401` missing, unknown, revoked or expired token; `403` the plan no longer includes API access, or the workspace is disabled; `404` no such record in your workspace; `429` too many requests (wait the seconds in `Retry-After`).

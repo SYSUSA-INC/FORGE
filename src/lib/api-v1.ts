@@ -14,6 +14,7 @@ import { opportunities, opportunityStageEnum, proposals, proposalSections, propo
 import { recordRead } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { authenticateApiRequest, type ApiCaller } from "@/lib/api-tokens";
+import { apiSectionBody } from "@/lib/api-section-body";
 import {
   apiOpportunity,
   apiProposal,
@@ -200,4 +201,39 @@ export async function apiGetProposal(organizationId: string, id: string): Promis
     .where(and(eq(proposalSections.proposalId, id), eq(proposals.organizationId, organizationId)))
     .orderBy(asc(proposalSections.ordering));
   return { status: 200, body: { data: { ...apiProposal(row), sections: sections.map(apiSection) } } };
+}
+
+/**
+ * BL-16 API Slice 2b — one section with its text (final view, plain and
+ * HTML) and its Section L brief. The section must belong to that proposal
+ * and the proposal to the token's workspace.
+ */
+export async function apiGetSection(organizationId: string, proposalId: string, sectionId: string): Promise<ApiV1Result> {
+  if (!isUuid(proposalId) || !isUuid(sectionId)) return notFound("section");
+  const [row] = await db
+    .select({
+      id: proposalSections.id,
+      proposalId: proposalSections.proposalId,
+      kind: proposalSections.kind,
+      title: proposalSections.title,
+      ordering: proposalSections.ordering,
+      status: proposalSections.status,
+      wordCount: proposalSections.wordCount,
+      pageLimit: proposalSections.pageLimit,
+      instructions: proposalSections.instructions,
+      content: proposalSections.content,
+      bodyDoc: proposalSections.bodyDoc,
+      updatedAt: proposalSections.updatedAt,
+    })
+    .from(proposalSections)
+    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+    .where(and(eq(proposalSections.id, sectionId), eq(proposalSections.proposalId, proposalId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  if (!row) return notFound("section");
+  return {
+    status: 200,
+    body: {
+      data: { ...apiSection(row), proposalId: row.proposalId, instructions: row.instructions, ...apiSectionBody(row.bodyDoc, row.content) },
+    },
+  };
 }

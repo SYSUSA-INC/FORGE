@@ -604,6 +604,7 @@ Migration 0107 adds `api_token` — sync it on `/admin/migrations` after deployi
 - Ending a trial pauses AI only, so a trial tenant's API keeps working if its tier includes it.
 - **Platform admins: a tenant's tokens.** `/admin/orgs/[id]` has an **API tokens** panel listing every token of that tenant (prefix, creator, last use, expiry, status). **Revoke** stops one token; **Revoke all active** stops every active one at once. Both need a reason, which is written to the tenant's audit log (`api_token.revoke` with `byPlatformAdmin` and `reason`, or one `api_token.revoke_all` row listing the prefixes). The tenant's Settings → API access then shows "revoked by FORGE support". Revoking is permanent; to pause a tenant's API without revoking, use the `apiAccess` override above instead.
 - **OpenAPI document:** `/api/v1/openapi.json` is public and token-free. It describes the endpoints and holds no tenant data.
+- **Section text** (`GET /api/v1/proposals/{id}/sections/{sectionId}`) needs `apiAccess` only, like the rest of the API. Each call is one `api.v1.read` row (`proposals.sections.get`), so a tenant pulling a whole proposal shows one row per section.
 
 ### 6.11 Operating practices
 

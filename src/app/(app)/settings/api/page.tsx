@@ -15,6 +15,7 @@ const ENDPOINTS: { path: string; what: string }[] = [
   { path: "GET /api/v1/opportunities/{id}", what: "One opportunity, with its description." },
   { path: "GET /api/v1/proposals", what: "Proposals, newest change first." },
   { path: "GET /api/v1/proposals/{id}", what: "One proposal with its section outline (titles, status, word counts)." },
+  { path: "GET /api/v1/proposals/{id}/sections/{sectionId}", what: "One section with its text, as plain text and HTML (the final view, as exports show it)." },
   { path: "GET /api/v1/openapi.json", what: "The OpenAPI 3.1 description of all of the above. No token needed." },
 ];
 

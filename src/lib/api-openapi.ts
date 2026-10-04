@@ -9,7 +9,7 @@
 
 import { API_PAGE_DEFAULT, API_PAGE_MAX, API_RATE_LIMIT, API_TOKEN_PREFIX } from "@/lib/api-tokens-logic";
 
-export const API_DOC_VERSION = "1.1.0";
+export const API_DOC_VERSION = "1.2.0";
 
 type Schema = Record<string, unknown>;
 
@@ -189,6 +189,23 @@ export function buildOpenApiDocument(input: OpenApiInput) {
           },
         },
       },
+      "/proposals/{id}/sections/{sectionId}": {
+        get: {
+          operationId: "getSection",
+          summary: "One section with its text, as plain text and HTML",
+          description:
+            "The text is the final view — pending tracked insertions kept, pending deletions dropped — the same one PDF and Word exports use. hasPendingChanges says whether suggestions are still open.",
+          parameters: [
+            idParam("proposal"),
+            { name: "sectionId", in: "path", required: true, description: "The section's id, from the proposal's outline.", schema: uuid },
+          ],
+          responses: {
+            "200": okResponse(object({ data: ref("SectionDetail") })),
+            "404": errorResponse("No such section on that proposal in this workspace."),
+            ...COMMON_ERRORS,
+          },
+        },
+      },
     },
     components: {
       securitySchemes: {
@@ -207,6 +224,14 @@ export function buildOpenApiDocument(input: OpenApiInput) {
         Proposal: object(proposal),
         ProposalDetail: object({ ...proposal, sections: { type: "array", items: ref("Section") } }),
         Section: object(section),
+        SectionDetail: object({
+          ...section,
+          proposalId: uuid,
+          instructions: str("What Section L says this section must contain, when known."),
+          text: str("The section's text, final view, paragraphs separated by a blank line."),
+          html: str("The same text as HTML (paragraphs, headings, lists, tables, links)."),
+          hasPendingChanges: { type: "boolean", description: "True while tracked suggestions are still pending." },
+        }),
       },
     },
   };
