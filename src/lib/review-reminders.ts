@@ -21,7 +21,7 @@ import { organizations, proposalReviewAssignments, proposalReviews, proposals } 
 import { log } from "@/lib/log";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { REVIEW_COLOR_LABELS } from "@/lib/review-types";
-import { DEFAULT_REMINDER_CADENCE, REMINDER_CADENCE_LIMITS, dueReminderSubject, reviewReminderDue, sanitizeReminderCadence } from "@/lib/review-workflow-logic";
+import { DEFAULT_REMINDER_CADENCE, REMINDER_CADENCE_LIMITS, dueReminderSubject, reviewReminderDue, roundCadence, sanitizeReminderCadence } from "@/lib/review-workflow-logic";
 
 export type ReviewReminderSummary = { reviewsDue: number; remindersDispatched: number; reviewersReminded: number; repeats: number; errors: number };
 
@@ -40,6 +40,8 @@ export async function dispatchReviewDueReminders(now: Date = new Date()): Promis
       sentAt: proposalReviews.dueReminderSentAt,
       daysBefore: organizations.reviewReminderDaysBefore,
       repeatDays: organizations.reviewReminderRepeatDays,
+      roundDaysBefore: proposalReviews.reminderDaysBefore,
+      roundRepeatDays: proposalReviews.reminderRepeatDays,
     })
     .from(proposalReviews)
     .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
@@ -55,7 +57,9 @@ export async function dispatchReviewDueReminders(now: Date = new Date()): Promis
 
   const summary: ReviewReminderSummary = { reviewsDue: 0, remindersDispatched: 0, reviewersReminded: 0, repeats: 0, errors: 0 };
   for (const row of rows) {
-    const cadence = sanitizeReminderCadence({ daysBefore: row.daysBefore, repeatDays: row.repeatDays }) ?? DEFAULT_REMINDER_CADENCE;
+    // Slice 4 — a round's own cadence wins over the tenant's.
+    const team = sanitizeReminderCadence({ daysBefore: row.daysBefore, repeatDays: row.repeatDays }) ?? DEFAULT_REMINDER_CADENCE;
+    const { cadence } = roundCadence({ daysBefore: row.roundDaysBefore, repeatDays: row.roundRepeatDays }, team);
     if (!reviewReminderDue(now, row.dueDate, row.sentAt, cadence)) continue;
     summary.reviewsDue += 1;
     const { organizationId } = row;

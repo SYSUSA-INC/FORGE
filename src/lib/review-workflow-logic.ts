@@ -373,3 +373,44 @@ export function dueReminderSubject(colorLabel: string, proposalTitle: string, du
           : `is due in ${days} days`;
   return `${colorLabel} review of ${proposalTitle} ${when} — your verdict is still open`;
 }
+
+// ── Slice 4 — a round's own cadence; when the next reminder goes ─────
+
+/** The daily tick that sends review reminders (the solicitation key-dates cron, 08:00 UTC). */
+export const REMINDER_TICK_HOUR_UTC = 8;
+
+/** The cadence a round follows: its own when both values are set, else the team's. */
+export function roundCadence(round: { daysBefore: number | null; repeatDays: number | null }, team: ReminderCadence): { cadence: ReminderCadence; own: boolean } {
+  const own = sanitizeReminderCadence({ daysBefore: round.daysBefore ?? undefined, repeatDays: round.repeatDays ?? undefined });
+  return own ? { cadence: own, own: true } : { cadence: team, own: false };
+}
+
+/**
+ * When the daily tick will next remind this round's reviewers, or null
+ * when it never will (no due date, or the one reminder went and the
+ * cadence doesn't repeat). Looks up to `horizonDays` ahead.
+ */
+export function nextReminderAt(
+  now: Date,
+  dueDate: Date | null | undefined,
+  sentAt: Date | null | undefined,
+  cadence: ReminderCadence,
+  opts: { tickHourUtc?: number; horizonDays?: number } = {},
+): Date | null {
+  if (!dueDate) return null;
+  if (sentAt && cadence.repeatDays <= 0) return null;
+  const hour = opts.tickHourUtc ?? REMINDER_TICK_HOUR_UTC;
+  let tick = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour));
+  if (tick.getTime() < now.getTime()) tick = new Date(tick.getTime() + DAY_MS);
+  for (let i = 0; i <= (opts.horizonDays ?? 60); i++) {
+    if (reviewReminderDue(tick, dueDate, sentAt, cadence)) return tick;
+    tick = new Date(tick.getTime() + DAY_MS);
+  }
+  return null;
+}
+
+/** "1 day before the due date, once" / "on the day, then every 2 days while overdue". */
+export function describeCadence(c: ReminderCadence): string {
+  const first = c.daysBefore === 0 ? "on the due date" : `${c.daysBefore} day${c.daysBefore === 1 ? "" : "s"} before the due date`;
+  return c.repeatDays > 0 ? `${first}, then every ${c.repeatDays} day${c.repeatDays === 1 ? "" : "s"} while overdue` : `${first}, once`;
+}

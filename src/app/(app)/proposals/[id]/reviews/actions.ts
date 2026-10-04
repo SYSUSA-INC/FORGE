@@ -24,7 +24,7 @@ import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { runReviewPreflight } from "@/lib/review-preflight";
 import { summarizeReview, type SummarizeReviewResult } from "@/lib/review-summary";
 import { carryOpenComments, setChecklistItem, setReviewerSections } from "@/lib/review-workflow";
-import { CHECKLIST_LIMITS, REVIEW_CHECKLIST_TEMPLATES, sanitizeChecklist } from "@/lib/review-workflow-logic";
+import { CHECKLIST_LIMITS, REVIEW_CHECKLIST_TEMPLATES, sanitizeChecklist, sanitizeReminderCadence } from "@/lib/review-workflow-logic";
 import { setReviewCommentResolved } from "@/lib/section-review-comments";
 import { log } from "@/lib/log";
 
@@ -835,4 +835,40 @@ export async function listReviewsForProposal(proposalId: string) {
           .where(inArray(proposalReviewAssignments.reviewId, reviewIds));
 
   return { reviews, assignments, openComments };
+}
+
+/**
+ * BL-FB-X-COLOR-TEAM Slice 4 — give this round its own reminder cadence,
+ * or (cadence null) hand it back to the team's. Anyone on the workspace
+ * who can open the round may set it, like assigning reviewers; audited.
+ */
+export async function setRoundReminderCadenceAction(input: {
+  reviewId: string;
+  cadence: { daysBefore: number; repeatDays: number } | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  if (!(await assertReviewOwned(input.reviewId, organizationId))) {
+    return { ok: false, error: "Review not found." };
+  }
+  const cadence = input.cadence === null ? null : sanitizeReminderCadence(input.cadence);
+  if (input.cadence !== null && !cadence) {
+    return { ok: false, error: "Days before and repeat days: whole numbers from 0 to 14." };
+  }
+  const [row] = await db
+    .update(proposalReviews)
+    .set({ reminderDaysBefore: cadence?.daysBefore ?? null, reminderRepeatDays: cadence?.repeatDays ?? null })
+    .where(eq(proposalReviews.id, input.reviewId))
+    .returning({ proposalId: proposalReviews.proposalId });
+  if (!row) return { ok: false, error: "Review not found." };
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "proposal.review.reminder_cadence",
+    resourceType: "proposal_review",
+    resourceId: input.reviewId,
+    metadata: cadence ? { ...cadence } : { teamDefault: true },
+  });
+  revalidatePath(`/proposals/${row.proposalId}/reviews/${input.reviewId}`);
+  return { ok: true };
 }
