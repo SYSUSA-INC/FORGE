@@ -16,11 +16,12 @@ import { agencyProcurementHistory, cachedAgencyHistory } from "@/lib/crm-history
 import { commitContactImport, previewContactImport } from "@/lib/crm-import";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
+// Ana is known by email; Dee is known by agency and name (no email on file); Bo is new.
 const CSV = [
   "Name,Agency,Office,Title,Email,Next touch",
   "Ana Rivera,Department of the Navy,NAVSEA,Contracting Officer,ANA@navy.mil,2026-12-01",
   "Bo Chen,Navy,,Deputy Director,bo.chen@navy.mil,",
-  "Ana  Rivera,U.S. Navy,,Program Manager,ana.other@navy.mil,",
+  "Dee  Park,U.S. Navy,PEO IWS,Program Manager,dee.park@navy.mil,",
 ].join("\n");
 
 const PAYLOAD: AgencyHistoryPayload = {
@@ -43,6 +44,7 @@ describe("BL-FB-X-CRM Slice 3 — import and history cache", () => {
     const created = await saveContact({ organizationId: fx.orgA.organizationId, input: { agency: "Navy", name: "Ana Rivera", email: "ana@navy.mil", role: "cor" }, actor: actorA });
     expect(created.ok).toBe(true);
     if (created.ok) anaA = created.id;
+    expect((await saveContact({ organizationId: fx.orgA.organizationId, input: { agency: "Department of the Navy", name: "Dee Park", role: "technical" }, actor: actorA })).ok).toBe(true);
   });
 
   afterEach(async () => {
@@ -59,7 +61,7 @@ describe("BL-FB-X-CRM Slice 3 — import and history cache", () => {
     expect(preview.rows.map((r) => [r.name, r.duplicate?.by ?? null])).toEqual([
       ["Ana Rivera", "email"],
       ["Bo Chen", null],
-      ["Ana Rivera", "name"],
+      ["Dee Park", "name"],
     ]);
     expect(preview.rows[0]!.duplicate?.existingId).toBe(anaA);
     // Tenant B has nobody yet: every row is new there.
@@ -69,24 +71,27 @@ describe("BL-FB-X-CRM Slice 3 — import and history cache", () => {
     const rows = preview.rows.map(({ duplicate: _d, ...r }) => r);
     expect(await commitContactImport({ organizationId: fx.orgA.organizationId, rows, duplicates: "skip", actor: actorA })).toEqual({ ok: true, created: 1, updated: 0, skipped: 2 });
     let listA = await listContacts({ organizationId: fx.orgA.organizationId });
-    expect(listA.map((c) => c.name).sort()).toEqual(["Ana Rivera", "Bo Chen"]);
+    expect(listA.map((c) => c.name).sort()).toEqual(["Ana Rivera", "Bo Chen", "Dee Park"]);
     expect(listA.find((c) => c.name === "Bo Chen")).toMatchObject({ agencyKey: "navy", role: "executive", email: "bo.chen@navy.mil" });
+    // Skipped means untouched: Dee still has no email.
+    expect(listA.find((c) => c.name === "Dee Park")).toMatchObject({ email: "", role: "technical" });
     expect(await listContacts({ organizationId: fx.orgB.organizationId })).toEqual([]);
 
     // Importing the same file again with "update": everyone is known now; the file fills what it has.
     expect(await commitContactImport({ organizationId: fx.orgA.organizationId, rows, duplicates: "update", actor: actorA })).toEqual({ ok: true, created: 0, updated: 3, skipped: 0 });
     listA = await listContacts({ organizationId: fx.orgA.organizationId });
-    expect(listA).toHaveLength(2);
+    expect(listA).toHaveLength(3);
+    expect(listA.find((c) => c.name === "Dee Park")).toMatchObject({ email: "dee.park@navy.mil", role: "program_manager", title: "Program Manager", office: "PEO IWS" });
     const [ana] = await db.select({ title: customerContacts.title, office: customerContacts.office, email: customerContacts.email, role: customerContacts.role, nextTouchAt: customerContacts.nextTouchAt }).from(customerContacts).where(and(eq(customerContacts.id, anaA), eq(customerContacts.organizationId, fx.orgA.organizationId)));
-    // Two rows matched Ana; the later one (by name) wrote last.
-    expect(ana).toMatchObject({ office: "NAVSEA", title: "Program Manager", email: "ana.other@navy.mil", role: "program_manager" });
+    expect(ana).toMatchObject({ office: "NAVSEA", title: "Contracting Officer", email: "ana@navy.mil", role: "contracting_officer" });
     expect(ana!.nextTouchAt?.toISOString().slice(0, 10)).toBe("2026-12-01");
 
     expect((await commitContactImport({ organizationId: fx.orgA.organizationId, rows: [{ name: "Nobody" }], duplicates: "skip", actor: actorA })).ok).toBe(false);
     const audits = await db.select({ action: auditLogs.action, metadata: auditLogs.metadata }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
-    const imports = audits.filter((a) => a.action === "crm.contact.import");
+    const imports = audits.filter((a) => a.action === "crm.contact.import").map((a) => a.metadata as Record<string, unknown>);
     expect(imports).toHaveLength(2);
-    expect(imports[0]!.metadata).toMatchObject({ rows: 3, created: 1, skipped: 2 });
+    expect(imports.some((m) => m.rows === 3 && m.created === 1 && m.skipped === 2)).toBe(true);
+    expect(imports.some((m) => m.rows === 3 && m.updated === 3 && m.duplicates === "update")).toBe(true);
   });
 
   it("serves the cached procurement history per tenant without asking USAspending, and flags a stale answer", async () => {
