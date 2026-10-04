@@ -11,7 +11,7 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { endGrantNow, getAddonBySlug, getTenantGrant, listAddonCatalog, provisionStripeAddon, setGrantQuantity, type AddonCatalogRow } from "@/lib/addons";
-import { ADDON_LIMITS, canBillOnPlan, sanitizeAddonQuantity, splitSubscriptionItems } from "@/lib/addons-logic";
+import { ADDON_LIMITS, addonStacks, canBillOnPlan, sanitizeAddonQuantity, splitSubscriptionItems } from "@/lib/addons-logic";
 import { getStripeClient } from "@/lib/stripe";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
@@ -247,7 +247,7 @@ async function addToPlanSubscription(input: {
   }
 
   const existing = items.find((i) => i.priceId === addon.stripePriceId);
-  if (existing && addon.kind !== "ai_tokens") return { ok: false, error: `You already have ${addon.name}.` };
+  if (existing && !addonStacks(addon.kind)) return { ok: false, error: `You already have ${addon.name}.` };
   try {
     const total = existing ? Math.min(ADDON_LIMITS.quantity.max, (existing.quantity ?? 1) + input.quantity) : input.quantity;
     const item = existing
@@ -317,7 +317,7 @@ export async function createAddonCheckoutSessionAction(input: {
       error: `"${addon.name}" isn't available for self-serve checkout. Contact sales@sysgov.com.`,
     };
   }
-  const quantity = addon.kind === "ai_tokens" ? sanitizeAddonQuantity(input.quantity) : 1;
+  const quantity = addonStacks(addon.kind) ? sanitizeAddonQuantity(input.quantity) : 1;
   if (quantity === null) {
     return { ok: false, error: "Quantity: a whole number from 1 to 100." };
   }
@@ -438,7 +438,7 @@ export async function changeAddonQuantityAction(input: {
   const grant = await getTenantGrant({ organizationId, tenantAddonId: input.tenantAddonId });
   if (!grant || grant.status !== "active") return { ok: false, error: "That add-on is no longer active." };
   if (grant.source !== "stripe") return { ok: false, error: "This add-on was granted by FORGE — contact us to change it." };
-  if (grant.kind !== "ai_tokens") return { ok: false, error: "Only token top-ups have a quantity." };
+  if (!addonStacks(grant.kind)) return { ok: false, error: "A feature unlock has no quantity." };
   if (quantity === grant.quantity) return { ok: true };
 
   try {

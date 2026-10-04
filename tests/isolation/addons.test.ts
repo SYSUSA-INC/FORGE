@@ -18,7 +18,7 @@ import {
   revokeTenantAddon,
   syncStripeAddonSubscription,
 } from "@/lib/addons";
-import { ensureFeature, getCurrentTier } from "@/lib/subscription-gates";
+import { enforceSeatsQuota, ensureFeature, getCurrentTier } from "@/lib/subscription-gates";
 import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 describe("BL-PACKAGES add-ons — grants on top of the tier", () => {
@@ -77,7 +77,7 @@ describe("BL-PACKAGES add-ons — grants on top of the tier", () => {
     expect(a.platformQuotas.aiTokensPerMonth).toBe(2_000_000);
     expect(a.effectiveQuotas.aiTokensPerMonth).toBe(2_000_000);
     expect(a.effectiveFlags.winnerAnalysis).toBe(true);
-    expect(a.addons).toEqual({ count: 2, extraTokens: 1_000_000, unlockedFlags: ["winnerAnalysis"] });
+    expect(a.addons).toEqual({ count: 2, extraTokens: 1_000_000, extraSeats: 0, extraStorageGb: 0, unlockedFlags: ["winnerAnalysis"] });
     await expect(ensureFeature(fx.orgA.organizationId, "winnerAnalysis")).resolves.toBeUndefined();
 
     // B is untouched.
@@ -142,5 +142,36 @@ describe("BL-PACKAGES add-ons — grants on top of the tier", () => {
     const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.organizationId, fx.orgA.organizationId));
     expect(audits.filter((x) => x.action === "tenant.addon.purchased")).toHaveLength(1);
     expect(audits.filter((x) => x.action === "tenant.addon.cancelled")).toHaveLength(1);
+  });
+  it("Slice 2b — a seats add-on raises only its tenant's seat limit, and stops with the grant", async () => {
+    const actor = { userId: fx.orgA.userId, email: "admin@test" };
+    const seatsTier = await createTierAndSubscribe({
+      organizationId: fx.orgA.organizationId,
+      slug: `ad-seats-${tag}`,
+      name: "Seats",
+      quotas: { seatsIncluded: 1 },
+    });
+    const [seats] = await db
+      .insert(tierAddons)
+      .values({ slug: `seats-${tag}`, name: "5 seats", kind: "seats", amountPerUnit: 5, priceMonthlyCents: 5000 })
+      .returning({ id: tierAddons.id });
+    try {
+      // The fixture's one member already fills the single seat.
+      await expect(enforceSeatsQuota(fx.orgA.organizationId)).rejects.toThrow();
+      const granted = await grantTenantAddon({ organizationId: fx.orgA.organizationId, addonId: seats!.id, quantity: 2, actor });
+      if (!granted.ok) throw new Error(granted.error);
+      const tier = await getCurrentTier(fx.orgA.organizationId);
+      expect(tier!.effectiveQuotas.seatsIncluded).toBe(11);
+      expect(tier!.addons).toMatchObject({ extraSeats: 10, extraStorageGb: 0 });
+      await expect(enforceSeatsQuota(fx.orgA.organizationId)).resolves.toEqual({ used: 1, limit: 11 });
+      expect((await getCurrentTier(fx.orgB.organizationId))!.addons.extraSeats).toBe(0);
+
+      expect(await revokeTenantAddon({ organizationId: fx.orgA.organizationId, tenantAddonId: granted.id, actor })).toMatchObject({ ok: true });
+      await expect(enforceSeatsQuota(fx.orgA.organizationId)).rejects.toThrow();
+    } finally {
+      await db.delete(tenantAddons).where(eq(tenantAddons.addonId, seats!.id));
+      await db.delete(tierAddons).where(eq(tierAddons.id, seats!.id));
+      await seatsTier.cleanup();
+    }
   });
 });

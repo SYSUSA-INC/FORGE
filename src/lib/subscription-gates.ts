@@ -99,7 +99,7 @@ export type CurrentTier = {
    * tokens added to the monthly cap (0 when the tier is unlimited) and
    * the flags they turned on that the tier and overrides had off.
    */
-  addons: { count: number; extraTokens: number; unlockedFlags: (keyof TierFeatureFlags)[] };
+  addons: { count: number; extraTokens: number; extraSeats: number; extraStorageGb: number; unlockedFlags: (keyof TierFeatureFlags)[] };
   /**
    * BL-AUTH-ABUSE Slice 2a — where the workspace stands on a trial. When a
    * trial has ended, AI pauses (the AI feature flags are off and the AI
@@ -164,7 +164,7 @@ export async function getCurrentTier(
   );
   const applied = row.tierActive
     ? applyAddonEffects({ quotas: baseQuotas, flags: baseFlags, effects: addonEffects })
-    : { quotas: baseQuotas, flags: baseFlags, extraTokens: 0, unlockedFlags: [] as (keyof TierFeatureFlags)[] };
+    : { quotas: baseQuotas, flags: baseFlags, extraTokens: 0, extraSeats: 0, extraStorageGb: 0, unlockedFlags: [] as (keyof TierFeatureFlags)[] };
   // BL-AUTH-ABUSE Slice 2a — an ended trial pauses the AI features only.
   const effectiveFlags = trial.kind === "expired" ? pauseAiFlags(applied.flags) : applied.flags;
   const platformQuotas = applied.quotas;
@@ -182,7 +182,13 @@ export async function getCurrentTier(
     effectiveFlags,
     platformQuotas,
     effectiveQuotas,
-    addons: { count: addonEffects.length, extraTokens: applied.extraTokens, unlockedFlags: applied.unlockedFlags },
+    addons: {
+      count: addonEffects.length,
+      extraTokens: applied.extraTokens,
+      extraSeats: applied.extraSeats,
+      extraStorageGb: applied.extraStorageGb,
+      unlockedFlags: applied.unlockedFlags,
+    },
     trial,
   };
 }

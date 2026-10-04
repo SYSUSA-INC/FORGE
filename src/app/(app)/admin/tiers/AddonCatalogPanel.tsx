@@ -82,6 +82,7 @@ function AddonForm({ initial, onDone }: { initial: AddonCatalogRow | null; onDon
   const [description, setDescription] = useState(initial?.description ?? "");
   const [kind, setKind] = useState<AddonKind>(initial?.kind ?? "ai_tokens");
   const [tokens, setTokens] = useState(String(initial?.aiTokensPerMonth ?? 500000));
+  const [amount, setAmount] = useState(String(initial?.amountPerUnit || 5));
   const [flag, setFlag] = useState<keyof TierFeatureFlags>(initial?.featureFlag ?? "winnerAnalysis");
   const [price, setPrice] = useState(((initial?.priceMonthlyCents ?? 0) / 100).toString());
   const [stripePriceId, setStripePriceId] = useState(initial?.stripePriceId ?? "");
@@ -99,6 +100,9 @@ function AddonForm({ initial, onDone }: { initial: AddonCatalogRow | null; onDon
     if (!Number.isFinite(dollars) || dollars < 0) return setError("Price must be a non-negative number of dollars.");
     if (!Number.isFinite(sort)) return setError("Sort order must be a whole number.");
     if (kind === "ai_tokens" && (!Number.isFinite(tok) || tok <= 0)) return setError("Tokens per month must be a positive whole number.");
+    const amt = Number(amount);
+    const sized = kind === "seats" || kind === "storage";
+    if (sized && (!Number.isInteger(amt) || amt <= 0)) return setError(`${kind === "seats" ? "Seats" : "GB"} per unit must be a positive whole number.`);
     const payload = {
       slug: slug.trim().toLowerCase(),
       name: name.trim(),
@@ -106,6 +110,7 @@ function AddonForm({ initial, onDone }: { initial: AddonCatalogRow | null; onDon
       kind,
       aiTokensPerMonth: kind === "ai_tokens" ? Math.round(tok) : 0,
       featureFlag: kind === "feature" ? flag : null,
+      amountPerUnit: sized ? amt : 0,
       priceMonthlyCents: Math.round(dollars * 100),
       stripePriceId: stripePriceId.trim(),
       sortOrder: Math.round(sort),
@@ -145,6 +150,11 @@ function AddonForm({ initial, onDone }: { initial: AddonCatalogRow | null; onDon
           <div>
             <label className="aur-label">Extra AI tokens / month (per unit)</label>
             <input className="aur-input" type="number" min={1} step={1} value={tokens} onChange={(e) => setTokens(e.target.value)} disabled={pending} />
+          </div>
+        ) : kind === "seats" || kind === "storage" ? (
+          <div>
+            <label className="aur-label">{kind === "seats" ? "Extra seats (per unit)" : "Extra storage, GB (per unit)"}</label>
+            <input className="aur-input" type="number" min={1} step={1} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={pending} />
           </div>
         ) : (
           <div>

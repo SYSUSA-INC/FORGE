@@ -37,7 +37,8 @@ Effort key:
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
 | 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | ✅ shipped (PR #322) |
 | 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | ✅ shipped (PR #323) |
-| 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | 🔄 in PR (PR #324) |
+| 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
+| 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | 🔄 in PR (PR #325) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1263,11 +1264,13 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
   right grant with its paid period and audits in the tenant's log).
   Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9 "Bought by card". Shipped in PR #318.
 - **Later:** ~~add-on items on the plan's own Stripe subscription (one
-  invoice), proration on quantity changes~~ (Slice 2a below), add-ons
-  on the public pricing page, seats and storage as add-on kinds,
-  advanced-reporting features behind an unlock.
+  invoice), proration on quantity changes~~ (Slice 2a below),
+  ~~add-ons on the public pricing page, seats and storage as add-on
+  kinds~~ (Slice 2b below), advanced-reporting features behind an
+  unlock (Slice 2c: a new Reports page behind a new `advancedReporting`
+  flag — user decision 2026-10-04, "Build a new Reports page").
 
-**Add-ons Slice 2a — one invoice and proration (2026-10-04)** 🔄 in PR (PR #324):
+**Add-ons Slice 2a — one invoice and proration (2026-10-04)** ✅ shipped (PR #324):
 
 User request (2026-10-04): the "Work I can build next" list in order;
 the add-on follow-ups are third, one invoice and proration first.
@@ -1311,6 +1314,30 @@ the add-on follow-ups are third, one invoice and proration first.
   plan item still resolves the plan's tier and records the add-on;
   quantity follows; removal ends it; deleting the plan ends both).
   Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9.
+
+**Add-ons Slice 2b — seats, storage and the pricing page (2026-10-04)** 🔄 in PR (PR #325):
+
+- **Kinds.** `tier_addon.kind` gains `seats` (extra seats per unit) and
+  `storage` (extra GB per unit); migration `0108_addon_units.sql` adds
+  `amount_per_unit` for them (kind is plain text — no enum change).
+  `applyAddonEffects` raises `seatsIncluded` / `storageGb` by
+  amount × quantity, never an unlimited (0) quota, and reports
+  `extraSeats` / `extraStorageGb`; `getCurrentTier().addons` carries
+  them, so `enforceSeatsQuota` / `enforceStorageQuota` count bought
+  seats and storage at once. Seats and storage stack like token
+  top-ups (`addonStacks`): quantity on purchase, **Update** and the
+  plan-item path from Slice 2a all apply.
+- **Admin.** The catalogue form on `/admin/tiers` offers the two kinds
+  with a per-unit amount; the tenant page's "Counting now" line lists
+  extra seats and storage.
+- **Tenant.** `/settings/billing` shows extra seats / storage from
+  add-ons next to the AI token cap.
+- **Pricing page.** `/pricing` lists the active catalogue under the
+  plans (name, what it adds, monthly price, or "Contact sales").
+- Tests: `tests/ai/addons-logic.test.ts` (effects, unlimited stays
+  unlimited, input rules, wording); `tests/isolation/addons.test.ts`
+  (a seats grant lifts one tenant's seat limit past a full house and
+  stops when ended). Docs: USER_MANUAL §4.14, ADMIN_MANUAL §6.9.
 
 Critical: token-cap enforcement happens server-side at the AI gateway, not on the client. Every AI call checks the tenant's remaining quota; over-quota → 402 Payment Required + in-app upgrade prompt.
 

@@ -1,6 +1,6 @@
 import { Panel } from "@/components/ui/Panel";
 import { listAddonCatalog, listTenantAddons } from "@/lib/addons";
-import { ADDON_FLAG_LABELS, describeAddon, formatMonthlyPrice, formatTokenCount } from "@/lib/addons-logic";
+import { ADDON_FLAG_LABELS, addonStacks, describeAddon, formatMonthlyPrice, formatTokenCount } from "@/lib/addons-logic";
 import type { CurrentTier } from "@/lib/subscription-gates";
 import { AddonCheckoutButton } from "./AddonCheckoutButton";
 import { AddonGrantControls } from "./AddonGrantControls";
@@ -48,6 +48,8 @@ export async function AddonsSection({
               ) : null}
             </>
           )}
+          {tier.addons.extraSeats > 0 ? <> · +{tier.addons.extraSeats.toLocaleString()} seats from add-ons</> : null}
+          {tier.addons.extraStorageGb > 0 ? <> · +{tier.addons.extraStorageGb.toLocaleString()} GB storage from add-ons</> : null}
           {tier.addons.unlockedFlags.length > 0 ? <> · add-ons unlock {tier.addons.unlockedFlags.map((f) => ADDON_FLAG_LABELS[f]).join(", ")}</> : null}
         </p>
       ) : null}
@@ -55,7 +57,7 @@ export async function AddonsSection({
       <div className="flex flex-col gap-3">
         {catalog.map((a) => {
           const held = liveByAddon.get(a.id) ?? 0;
-          const stackable = a.kind === "ai_tokens";
+          const stackable = addonStacks(a.kind);
           const bought = grants.filter((g) => g.live && g.addonId === a.id && g.source === "stripe" && g.status === "active");
           return (
             <div key={a.id} className={`rounded-lg border p-4 ${held > 0 ? "border-teal/40 bg-teal/[0.04]" : "border-layer/10 bg-layer/[0.02]"}`}>

@@ -39,6 +39,7 @@ const catalogColumns = {
   kind: tierAddons.kind,
   aiTokensPerMonth: tierAddons.aiTokensPerMonth,
   featureFlag: tierAddons.featureFlag,
+  amountPerUnit: tierAddons.amountPerUnit,
   priceMonthlyCents: tierAddons.priceMonthlyCents,
   stripePriceId: tierAddons.stripePriceId,
   sortOrder: tierAddons.sortOrder,
@@ -70,6 +71,7 @@ export async function createAddon(input: { value: AddonInput; actor: Actor & { o
       description: v.description,
       kind: v.kind,
       aiTokensPerMonth: v.aiTokensPerMonth,
+      amountPerUnit: v.amountPerUnit,
       featureFlag: v.featureFlag,
       priceMonthlyCents: v.priceMonthlyCents,
       stripePriceId: v.stripePriceId,
@@ -94,6 +96,7 @@ export async function updateAddon(input: { id: string; value: Omit<AddonInput, "
       description: v.description,
       kind: v.kind,
       aiTokensPerMonth: v.aiTokensPerMonth,
+      amountPerUnit: v.amountPerUnit,
       featureFlag: v.featureFlag,
       priceMonthlyCents: v.priceMonthlyCents,
       stripePriceId: v.stripePriceId,
@@ -126,6 +129,7 @@ const grantColumns = {
   kind: tierAddons.kind,
   aiTokensPerMonth: tierAddons.aiTokensPerMonth,
   featureFlag: tierAddons.featureFlag,
+  amountPerUnit: tierAddons.amountPerUnit,
   priceMonthlyCents: tierAddons.priceMonthlyCents,
   addonActive: tierAddons.active,
   quantity: tenantAddons.quantity,
@@ -157,6 +161,7 @@ export async function listTenantAddons(input: { organizationId: string; now?: Da
     kind: r.kind,
     aiTokensPerMonth: r.aiTokensPerMonth,
     featureFlag: r.featureFlag,
+    amountPerUnit: r.amountPerUnit,
     priceMonthlyCents: r.priceMonthlyCents,
     quantity: r.quantity,
     status: r.status,
@@ -180,6 +185,7 @@ export async function activeAddonEffects(input: { organizationId: string; now?: 
       kind: tierAddons.kind,
       aiTokensPerMonth: tierAddons.aiTokensPerMonth,
       featureFlag: tierAddons.featureFlag,
+      amountPerUnit: tierAddons.amountPerUnit,
       addonActive: tierAddons.active,
       quantity: tenantAddons.quantity,
       status: tenantAddons.status,
@@ -191,7 +197,7 @@ export async function activeAddonEffects(input: { organizationId: string; now?: 
     .where(and(eq(tenantAddons.organizationId, organizationId), eq(tenantAddons.status, "active")));
   return rows
     .filter((r) => addonIsLive({ status: r.status, startsAt: r.startsAt, endsAt: r.endsAt, addonActive: r.addonActive }, now))
-    .map((r) => ({ kind: r.kind, aiTokensPerMonth: r.aiTokensPerMonth, featureFlag: r.featureFlag, quantity: r.quantity }));
+    .map((r) => ({ kind: r.kind, aiTokensPerMonth: r.aiTokensPerMonth, featureFlag: r.featureFlag, amountPerUnit: r.amountPerUnit, quantity: r.quantity }));
 }
 
 /** A platform admin grants an add-on to a tenant. Audited as tenant.addon.grant in the tenant's log. */
@@ -453,7 +459,7 @@ export async function endPlanAddonGrants(input: { organizationId: string; stripe
 export type TenantGrant = {
   id: string;
   slug: string;
-  kind: "ai_tokens" | "feature";
+  kind: AddonCatalogRow["kind"];
   quantity: number;
   status: "active" | "canceled";
   source: "manual" | "stripe";
