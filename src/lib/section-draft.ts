@@ -39,6 +39,7 @@ import {
   type DraftSource,
 } from "@/lib/citations";
 import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
+import { voiceGuidanceForSection } from "@/lib/voice";
 import { log } from "@/lib/log";
 
 export const DRAFT_MODES: readonly SectionDraftMode[] = [
@@ -206,6 +207,17 @@ export async function prepareSectionDraft(input: {
     patternIntel = undefined;
   }
 
+  // BL-FB-GEN-VOICE — the section author's own voice, when they have an
+  // enabled profile. Best-effort; a failure degrades to no block.
+  let authorVoice: SectionDraftSnapshot["authorVoice"];
+  if (row.section.authorUserId) {
+    try {
+      authorVoice = (await voiceGuidanceForSection({ organizationId, sectionId: input.sectionId })) ?? undefined;
+    } catch (err) {
+      log.warn("[prepareSectionDraft]", "author voice failed", { error: err });
+    }
+  }
+
   // BL-FB-GEN-VOC — the customer's own phrases, when this section echoes
   // them. Best-effort; a failure degrades to no block.
   let customerVoice: SectionDraftSnapshot["customerVoice"];
@@ -259,6 +271,7 @@ export async function prepareSectionDraft(input: {
       statement: t.statement ?? "",
     })),
     ...(customerVoice ? { customerVoice } : {}),
+    ...(authorVoice ? { authorVoice } : {}),
   };
 
   // Improve / tighten require existing content to be useful.

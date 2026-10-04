@@ -601,6 +601,12 @@ export type SectionDraftSnapshot = {
     agency: string;
     phrases: { phrase: string; source: "evaluation" | "requirement" | "mission" }[];
   };
+  /**
+   * BL-FB-GEN-VOICE — how the section's author writes, measured from
+   * their own sections and samples (voice-logic.ts). Present only when
+   * the section has an author with an enabled profile.
+   */
+  authorVoice?: { author: string; guidance: string };
 };
 
 const SECTION_DRAFT_SYSTEM = `You are an embedded proposal writer inside FORGE — a federal proposal operations platform. You produce compliance-grade prose that reads like an experienced capture lead wrote it.
@@ -639,7 +645,10 @@ BL-FB-GEN-VOC — the customer's own language:
 - Never force a phrase into a paragraph about something else, never string several together, never quote more than a short phrase verbatim, and never say that you are mirroring the solicitation. The facts still come only from the snapshot.
 
 BL-FB-SCAN-TONE — the author's guidance:
-- When \`section.authorGuidance\` is present it is what the author asked this pass to fix: phrases to replace, passive sentences to recast, a reading level to reach. Do every item it names across the whole body and change nothing else — same facts, same structure, same length unless it says otherwise. It never adds facts and never overrides the brief or the requirements.`;
+- When \`section.authorGuidance\` is present it is what the author asked this pass to fix: phrases to replace, passive sentences to recast, a reading level to reach. Do every item it names across the whole body and change nothing else — same facts, same structure, same length unless it says otherwise. It never adds facts and never overrides the brief or the requirements.
+
+BL-FB-GEN-VOICE — the author's voice:
+- When the prompt carries "Write in <name>'s voice", the section belongs to that author and must read as though they wrote it: match the sentence length, rhythm, register and habits it describes, use the listed openers and phrases sparingly, and never announce that you are imitating anyone. Voice changes how things are said, never what is said.`;
 
 const MODE_INSTRUCTIONS: Record<SectionDraftMode, string> = {
   draft:
@@ -662,7 +671,7 @@ export const DRAFT_REQUIREMENT_CHARS = 600;
  * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
  * MODE_INSTRUCTIONS or the block layout below changes.
  */
-export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-01.2";
+export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-03.1";
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
@@ -756,20 +765,26 @@ export function buildSectionDraftPrompt(
         ].join("\n")
       : "";
 
+  // BL-FB-GEN-VOICE — the author's voice, after the customer's words:
+  // register and rhythm to hold while writing, never facts.
+  const authorVoiceBlock = snapshot.authorVoice?.guidance ? snapshot.authorVoice.guidance : "";
+
   // Pass the snapshot as JSON but omit the solicitation + winThemes +
-  // sources + customerVoice fields (formatted above) so we don't
-  // double-print large text.
+  // sources + customerVoice + authorVoice fields (formatted above) so
+  // we don't double-print large text.
   const {
     solicitation: _omitSol,
     winThemes: _omitThemes,
     sources: _omitSources,
     customerVoice: _omitVoice,
+    authorVoice: _omitAuthorVoice,
     ...snapshotForJson
   } = snapshot;
   void _omitSol;
   void _omitThemes;
   void _omitSources;
   void _omitVoice;
+  void _omitAuthorVoice;
 
   // BL-AIP-2 — `draft_alt` is a first draft too; it used to fall through
   // to the "tightened body" instruction, contaminating variant B of
@@ -789,6 +804,8 @@ export function buildSectionDraftPrompt(
     themesBlock ? `` : "",
     voiceBlock,
     voiceBlock ? `` : "",
+    authorVoiceBlock,
+    authorVoiceBlock ? `` : "",
     solicitationBlock,
     solicitationBlock ? `` : "",
     citationBlock,
