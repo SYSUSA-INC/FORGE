@@ -804,7 +804,7 @@ tenant portal into its own page with only platform-admin menu items,
 and give the company admin a separate page with only the items that
 role needs.
 
-Follow-up (2026-10-04): the SuperAdmin portal's menu group now reads
+Follow-up (2026-10-04, PR #315): the SuperAdmin portal's menu group now reads
 **Organizations & users** and lists the portal's tabs in the portal's
 own order and words — Overview, Organizations, Platform users — then
 Source requests. `/admin` opens on Overview (its first tab); a menu
