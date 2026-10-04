@@ -37,7 +37,7 @@ Effort key:
 | 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ✅ shipped (PR #321) |
 | 3j | **BL-16 apiAccess** — Workspace API tokens (Settings → API access) and the read-only `/api/v1` API (opportunities, proposals), gated by the `apiAccess` flag | P1 | M | ✅ shipped (PR #322) |
 | 3k | **BL-16 customTemplates** — The flag gates template authoring (create / edit / Word upload / mode switch); existing templates stay usable | P1 | S | ✅ shipped (PR #323) |
-| 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | 🔄 in PR (PR #324) |
+| 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
 | 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -1270,7 +1270,7 @@ Super-admin-configurable subscription packages with à la carte add-ons. Schema 
   unlock (Slice 2c: a new Reports page behind a new `advancedReporting`
   flag — user decision 2026-10-04, "Build a new Reports page").
 
-**Add-ons Slice 2a — one invoice and proration (2026-10-04)** 🔄 in PR (PR #324):
+**Add-ons Slice 2a — one invoice and proration (2026-10-04)** ✅ shipped (PR #324):
 
 User request (2026-10-04): the "Work I can build next" list in order;
 the add-on follow-ups are third, one invoice and proration first.
