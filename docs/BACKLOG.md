@@ -1275,7 +1275,7 @@ they own, so Sarah's sections read like Sarah and Mike's like Mike.
   between two authors on the same proposal.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (Slice 1 PR #307 · Slice 2 PR #311)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -5397,7 +5397,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
