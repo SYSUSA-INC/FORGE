@@ -8,6 +8,8 @@ import {
   tenantSubscriptions,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
+import { getAddonBySlug } from "@/lib/addons";
+import { sanitizeAddonQuantity } from "@/lib/addons-logic";
 import { getStripeClient } from "@/lib/stripe";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
@@ -188,6 +190,121 @@ export async function createCheckoutSessionAction(input: {
       ok: false,
       error: `Could not start checkout: ${message.slice(0, 200)}`,
     };
+  }
+}
+
+/**
+ * BL-PACKAGES add-ons Slice 1 — buy an add-on for the current tenant.
+ *
+ * A separate recurring Stripe subscription per add-on (quantity for
+ * token top-ups), so cancelling one never touches the plan. Both the
+ * session and the subscription carry our metadata; the webhook reads
+ * `forgeAddonSlug` to record the grant and keep it in step. Org admins
+ * only, like plan checkout.
+ */
+export async function createAddonCheckoutSessionAction(input: {
+  addonSlug: string;
+  quantity: number;
+}): Promise<CheckoutSessionResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const addon = await getAddonBySlug(input.addonSlug);
+  if (!addon || !addon.active) {
+    return { ok: false, error: "That add-on is no longer available." };
+  }
+  if (!addon.stripePriceId) {
+    return {
+      ok: false,
+      error: `"${addon.name}" isn't available for self-serve checkout. Contact sales@sysgov.com.`,
+    };
+  }
+  const quantity = addon.kind === "ai_tokens" ? sanitizeAddonQuantity(input.quantity) : 1;
+  if (quantity === null) {
+    return { ok: false, error: "Quantity: a whole number from 1 to 100." };
+  }
+
+  const [orgRow] = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!orgRow) {
+    return { ok: false, error: "Could not load your organization." };
+  }
+  const [subRow] = await db
+    .select({ stripeCustomerId: tenantSubscriptions.stripeCustomerId })
+    .from(tenantSubscriptions)
+    .where(eq(tenantSubscriptions.organizationId, organizationId))
+    .limit(1);
+
+  let stripe;
+  try {
+    stripe = getStripeClient();
+  } catch (err) {
+    log.error("[createAddonCheckoutSessionAction]", "stripe client unavailable", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      ok: false,
+      error:
+        "Checkout is not configured for this environment. Contact support if this is unexpected.",
+    };
+  }
+
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://app.forge.app"
+  ).replace(/\/$/, "");
+  const metadata = {
+    organizationId,
+    organizationName: orgRow.name,
+    kind: "addon",
+    addonSlug: addon.slug,
+    quantity: String(quantity),
+  };
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      ...(subRow?.stripeCustomerId
+        ? { customer: subRow.stripeCustomerId }
+        : {
+            customer_email: actor.email ?? undefined,
+            customer_creation: "always" as const,
+          }),
+      client_reference_id: organizationId,
+      line_items: [{ price: addon.stripePriceId, quantity }],
+      allow_promotion_codes: true,
+      billing_address_collection: "auto",
+      success_url: `${appUrl}/settings/billing?checkout=addon-success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/settings/billing?checkout=cancelled`,
+      metadata,
+      // The subscription itself carries the slug, so lifecycle events
+      // (updated / deleted) are recognised as this add-on's.
+      subscription_data: { metadata: { organizationId, forgeAddonSlug: addon.slug } },
+    });
+    if (!session.url) {
+      return { ok: false, error: "Stripe didn't return a checkout URL — try again." };
+    }
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "subscription.addon_checkout_started",
+      resourceType: "tenant_addon",
+      resourceId: addon.id,
+      metadata: { addonSlug: addon.slug, quantity, sessionId: session.id },
+    });
+    return { ok: true, url: session.url };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[createAddonCheckoutSessionAction]", "stripe session create failed", {
+      organizationId,
+      addonSlug: addon.slug,
+      error: message,
+    });
+    return { ok: false, error: `Could not start checkout: ${message.slice(0, 200)}` };
   }
 }
 

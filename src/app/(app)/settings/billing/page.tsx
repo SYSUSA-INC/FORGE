@@ -8,8 +8,10 @@ import {
   type TierQuotas,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { getCurrentTier } from "@/lib/subscription-gates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { AddonsSection } from "./AddonsSection";
 import { BillingActionsClient } from "./BillingActionsClient";
 import { ManagePortalButton } from "./ManagePortalButton";
 
@@ -81,6 +83,8 @@ export default async function BillingPage({
 
   const checkoutFlash = readFlash(searchParams);
   const isAdmin = user.role === "admin" || user.isSuperadmin;
+  // BL-PACKAGES add-ons — effective caps including live add-ons.
+  const tier = await getCurrentTier(organizationId);
 
   return (
     <>
@@ -266,6 +270,9 @@ export default async function BillingPage({
           )}
         </Panel>
       </div>
+
+      {/* BL-PACKAGES add-ons Slice 1 — à la carte on top of the plan */}
+      <AddonsSection organizationId={organizationId} isAdmin={isAdmin} tier={tier} />
     </>
   );
 }
@@ -278,6 +285,13 @@ function readFlash(
       tone: "ok",
       message:
         "Checkout complete — your plan will activate within a few seconds.",
+    };
+  }
+  if (searchParams.checkout === "addon-success") {
+    return {
+      tone: "ok",
+      message:
+        "Checkout complete — your add-on will show as active within a few seconds.",
     };
   }
   if (searchParams.checkout === "cancelled") {
