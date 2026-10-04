@@ -12,7 +12,7 @@ mechanisms for legitimately bypassing one.
 
 | Gate | What it catches |
 |---|---|
-| Type check | `tsc --noEmit` errors |
+| Type check + ESLint | `tsc --noEmit` errors, and the lint errors `tsc` doesn't catch (unused imports, exhaustive-deps, etc.). One job since BL-QC-combined-job: both steps always run, so a type error never hides the lint findings behind it, and the job names which failed. |
 | Next build | RSC boundary bugs, server/client import violations |
 | RSC boundary check | Server components importing non-component named exports from `"use client"` files |
 | Multi-tenant isolation check | Server actions touching tenant-scoped tables without an auth gate + `organizationId` scope (BL-19) |
@@ -29,7 +29,6 @@ mechanisms for legitimately bypassing one.
 
 | Gate | What it catches | Bypass |
 |---|---|---|
-| ESLint | Lint errors `tsc` doesn't catch (unused imports, exhaustive-deps, etc.) | None |
 | PR title format | Non-conventional commit titles | None |
 | Backlog hygiene | PRs that reference a `BL-N` but don't touch `docs/BACKLOG.md` | Remove the BL reference from title/body if it's incidental |
 | Schema / migration coupling | `src/db/*.ts` changes without a matching `drizzle/*.sql` | Label: `schema-no-migration` (type-only changes) |
@@ -75,6 +74,7 @@ No label exists for any other gate. If a check is genuinely wrong, fix the workf
 - ✅ Require pull request before merging
 - ✅ Require status checks to pass before merging
   - All Tier 0 + Tier 2 job names listed
+  - **BL-QC-combined-job:** the former **Type check** and **ESLint** checks are one job, **Type check + ESLint**. When that change lands, add the new name and remove the two old ones — a required check that no longer reports blocks every PR as "Expected — waiting for status".
   - **Create Neon branch** + **Delete Neon branch** added (once configured)
 - ✅ Require branches to be up to date before merging (combined with the diff-size guard, this disciplines parallel PRs)
 - ✅ Require conversation resolution before merging

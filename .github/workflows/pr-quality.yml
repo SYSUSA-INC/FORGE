@@ -8,8 +8,10 @@ name: PR quality gates
 # Pair with:
 #   - .github/CODEOWNERS — routes sensitive paths to a code-owner reviewer
 #   - docs/PR_QUALITY.md — describes each gate + how to (legitimately) bypass
-#   - .github/workflows/pr.yml — existing typecheck / build / RSC / isolation /
-#     fresh-DB checks (these remain the floor; the gates here are additive)
+#   - .github/workflows/pr.yml — existing typecheck + lint / build / RSC /
+#     isolation / fresh-DB checks (these remain the floor; the gates here
+#     are additive). BL-QC-combined-job moved ESLint there, into the same
+#     job as the type check, so the two share one checkout and `npm ci`.
 
 on:
   pull_request:
@@ -25,21 +27,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: ESLint
-    runs-on: ubuntu-latest
-    # BL-QC-lint: `npm run lint` (next lint) against the Next.js +
-    # TypeScript strict preset configured in .eslintrc.json. Catches
-    # unused imports, exhaustive-deps misses, and other style issues
-    # that tsc --noEmit doesn't enforce.
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run lint
+  # BL-QC-lint's ESLint job lives in pr.yml since BL-QC-combined-job, as
+  # the `Type check + ESLint` job: same `npm run lint`, same strict preset
+  # from .eslintrc.json, one install instead of two.
 
   pr-title-format:
     name: PR title format (conventional commits)

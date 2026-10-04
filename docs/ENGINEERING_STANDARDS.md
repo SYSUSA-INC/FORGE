@@ -393,7 +393,7 @@ Every PR clears four tiers before merge:
 
 | Gate | Catches |
 |---|---|
-| Type check | `tsc --noEmit` errors |
+| Type check + ESLint | `tsc --noEmit` errors and lint errors `tsc` doesn't catch (one job since BL-QC-combined-job; both always run) |
 | Next build | RSC boundary bugs, server/client import violations |
 | RSC boundary check | Server components importing non-component named exports from `"use client"` files |
 | Multi-tenant isolation check | Unscoped queries on tenant tables (see §1) |
@@ -410,7 +410,6 @@ Every PR clears four tiers before merge:
 
 | Gate | Bypass |
 |---|---|
-| ESLint | None |
 | PR title format | None |
 | Backlog hygiene | Remove incidental BL reference |
 | Schema / migration coupling | Label `schema-no-migration` (type-only) |
