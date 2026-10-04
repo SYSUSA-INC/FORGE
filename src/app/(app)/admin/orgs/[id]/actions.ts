@@ -13,7 +13,39 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { parseDomainList } from "@/lib/email-domain";
 import { log } from "@/lib/log";
-import { assignTenantTier } from "@/lib/tenant-subscription";
+import { assignTenantTier, convertTenantTrial, extendTenantTrial, startTenantTrial } from "@/lib/tenant-subscription";
+
+/**
+ * BL-AUTH-ABUSE Slice 2a — a platform admin starts, extends or converts a
+ * tenant's trial. Like changeTenantTierAction the target tenant is a
+ * parameter because the superadmin acts on another organization; all
+ * three open with requireSuperadmin() and are audited in that tenant's log.
+ */
+export async function trialAction(input: {
+  organizationId: string;
+  op: "start" | "extend" | "convert";
+  days?: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  const [org] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId ?? ""))
+    .limit(1);
+  if (!org) return { ok: false, error: "Organization not found." };
+  const who = { userId: actor.id, email: actor.email };
+  const res =
+    input.op === "start"
+      ? await startTenantTrial({ organizationId: org.id, actor: who })
+      : input.op === "extend"
+        ? await extendTenantTrial({ organizationId: org.id, actor: who, days: Number(input.days) })
+        : input.op === "convert"
+          ? await convertTenantTrial({ organizationId: org.id, actor: who })
+          : ({ ok: false, error: "Unknown trial action." } as const);
+  if (!res.ok) return res;
+  revalidatePath(`/admin/orgs/${org.id}`);
+  return { ok: true };
+}
 
 /**
  * BL-16 Phase C-2 — change a tenant's subscription tier.

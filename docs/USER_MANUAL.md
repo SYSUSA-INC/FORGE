@@ -262,6 +262,8 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 
 **Settings → Billing** shows your plan, when it renews, and the other plans you can move to. Below the plans, **Add-ons** lists what you can add on top of any plan à la carte: a **token top-up** raises this month's AI token cap by its amount (buy several to stack them; a plan with an unlimited cap needs none), and a **feature unlock** turns one feature on — for example Winner analysis on a plan that does not include it. The line above the list shows your AI token cap this month and how much of it comes from add-ons. An org admin adds one with **Add …**, which goes through the same card checkout as a plan; the add-on shows as **Active** within a few seconds of returning and counts immediately. Add-ons bought by card renew monthly with your plan and are cancelled from the billing portal; an add-on marked **Contact sales** is arranged with us and granted to your organization by hand. Everyone can see the list; only admins can buy.
 
+**Trials.** A workspace on a trial shows the days left in a line under the top bar and under **Current plan**. When the trial ends without a plan, nothing you have done is lost and **editing carries on as usual** — you can still write, create proposals, invite colleagues, upload and export. Only the AI features pause (drafting, chat, analyses and AI checks) until an admin chooses a plan here.
+
 ---
 
 ## 5. Opportunities

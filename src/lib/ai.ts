@@ -852,7 +852,7 @@ async function runTenantCompletion<T>(
   // Dynamic imports keep the AI gateway free of a hard dep on the
   // subscription-gates / telemetry modules — useful for the future
   // ingest / worker contexts that may use this file without them.
-  const { enforceQuota, getCurrentUsage, getCurrentTier, QuotaExceededError } =
+  const { enforceQuota, getCurrentUsage, getCurrentTier, QuotaExceededError, trialRefusal } =
     await import("@/lib/subscription-gates");
   const { recordAiCall } = await import("@/lib/ai-telemetry");
 
@@ -881,6 +881,14 @@ async function runTenantCompletion<T>(
     cacheSystem: rest.cacheSystem ?? false,
     hasDocuments: (rest.documents?.length ?? 0) > 0,
   };
+
+  // BL-AUTH-ABUSE Slice 2a — a workspace whose trial ended keeps editing
+  // but its AI pauses until a plan is chosen or the trial is extended.
+  const trialEnded = trialRefusal(tier);
+  if (tier && trialEnded) {
+    await recordAiCall({ ...telemetryBase, status: "quota_refused", latencyMs: 0, error: "trial ended" });
+    throw new QuotaExceededError("aiRequestsPerMonth", 0, 0, tier.tierName, trialEnded);
+  }
 
   // Pre-check: refuse before calling the provider when the tenant is
   // already over their token cap. The check is best-effort — a tenant

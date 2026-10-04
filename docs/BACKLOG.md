@@ -32,8 +32,9 @@ Effort key:
 | 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
 | 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | ✅ shipped (PR #317) |
 | 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ✅ shipped (PR #318) |
-| 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | 🔄 in PR (PR #319) |
-| 3h | **BL-AUTH-ABUSE Slice 2** — Request-a-trial queue, platform-admin approval into a trial workspace, trial expiry in the gate | P1 | M | ⏳ queued |
+| 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | ✅ shipped (PR #319) |
+| 3h | **BL-AUTH-ABUSE Slice 2a** — Trial mechanics: 14-day trial, AI pauses at expiry while editing carries on, banner, platform-admin start / extend / convert | P1 | S | 🔄 in PR |
+| 3i | **BL-AUTH-ABUSE Slice 2b** — Public Request-a-trial form, platform-admin approval into a trial workspace | P1 | M | ⏳ queued |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -937,7 +938,7 @@ expiry reminders; SSO domain auto-join.
 ---
 
 ### BL-AUTH-ABUSE — Bot and spam accounts: removal, sign-up hardening, trials
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 Slice 1 in PR (PR #319)  ·  Slice 2 queued
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ Slice 1 shipped (PR #319)  ·  🔄 Slice 2a in PR  ·  Slice 2b queued
 
 User request (2026-10-04): "we had some garbage accounts created by bots
 or spammers in our system, as a super admin I should be able to delete
@@ -1001,9 +1002,46 @@ platform-level `trial_request` queue.
   `tenant_subscription.status = 'trial'`.
 - **Length:** 14 days from approval (`trial_until`); a platform admin
   can extend a single trial.
-- **At expiry without a plan: read-only.** Members still sign in, read
-  and export; AI calls and gated features stop and a banner points to
-  Billing, until a plan is chosen or the trial is extended.
+- **At expiry without a plan: full editing, AI paused** (revised the
+  same day from "read-only" — the user wants full editing on the
+  platform). Members keep reading, writing, creating proposals,
+  inviting, uploading and exporting; AI calls and the AI-powered
+  features (auto-draft and chat, winner / protest analysis, compliance
+  preflight and auto-map) pause and a banner points to Billing, until a
+  plan is chosen or the trial is extended. Knowledge indexing
+  (embeddings) keeps running so uploads stay searchable.
+
+**Slice 2a — trial mechanics (2026-10-04):**
+
+- `src/lib/trial-logic.ts` (pure): `trialState(status, trialUntil)` →
+  none / active (days left) / expired; `TRIAL_DAYS = 14`;
+  `extendedTrialEnd` (from the later of now and the current end);
+  `TRIAL_PAUSED_FLAGS` = aiAutoDraft, winnerAnalysis, complianceMatrix
+  (every flag in use that gates an AI action); banner and refusal wording.
+- Gate: `getCurrentTier` carries `trial`; an ended trial switches off the
+  AI flags only (`pauseAiFlags`) — bulk export and the rest keep the
+  tier's value. `ensureFeature` refuses those flags and `enforceQuota`
+  refuses the AI request / token keys with the trial message;
+  proposals, seats and storage are not limited by trial expiry. The AI
+  gateway refuses before the provider call (`quota_refused`, "trial
+  ended"), which covers the streaming chat / draft routes too.
+  Embeddings (knowledge indexing) keep running.
+- `startTenantTrial` / `extendTenantTrial` / `convertTenantTrial`
+  (`src/lib/tenant-subscription.ts`; audited `tenant.trial_start` /
+  `_extend` / `_convert`; Stripe-paying workspaces refused) behind
+  `trialAction` and a **Trial** box on `/admin/orgs/[id]`.
+- `TrialBanner` under the top bar (days left; after expiry "editing
+  carries on; AI features are paused") and a trial line on
+  `/settings/billing`.
+- No migration (`status = 'trial'` and `trial_until` exist since BL-16).
+  Nothing changes for any workspace not on a trial; no code set
+  `trial_until` before this slice, and Stripe's own trialing customers
+  have no end date here, so they are never paused.
+- Tests: `tests/ai/trial-logic.test.ts`; `tests/isolation/trials.test.ts`
+  (start / refuse twice / Stripe refused; at expiry AI refused by flag,
+  quota and gateway with no provider call while proposals, seats,
+  storage and export pass; extend restores AI from today; convert;
+  tenant B untouched; audits in A only).
 
 ### BL-AUTH-DOMAIN — Domain-scoped tenant membership (platform-approved cross-domain access)
 **Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #276)

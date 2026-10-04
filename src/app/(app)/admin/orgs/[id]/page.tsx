@@ -28,6 +28,7 @@ import { IsolationCheckPanel } from "./IsolationCheckPanel";
 import { ItarRestrictedToggle } from "./ItarRestrictedToggle";
 import { TenantDomainsEditor } from "./TenantDomainsEditor";
 import { TenantAddonsSection } from "./TenantAddonsSection";
+import { TrialControls } from "./TrialControls";
 
 export const dynamic = "force-dynamic";
 
@@ -373,6 +374,17 @@ export default async function TenantDetailPage({
             per-tenant changes live in <code>tenant_subscription.custom_overrides</code>.
             Effective values shown above apply both layers.
           </p>
+          {/* BL-AUTH-ABUSE Slice 2a — start / extend / convert a trial */}
+          <TrialControls
+            organizationId={org.id}
+            state={
+              !currentTier || currentTier.trial.kind === "none"
+                ? { kind: "none" }
+                : currentTier.trial.kind === "expired"
+                  ? { kind: "expired", endedAt: currentTier.trial.endedAt.toISOString() }
+                  : { kind: "active", endsAt: currentTier.trial.endsAt?.toISOString() ?? null, daysLeft: currentTier.trial.daysLeft }
+            }
+          />
           {activeTiers.length > 0 ? (
             <TierAssignmentForm
               organizationId={org.id}

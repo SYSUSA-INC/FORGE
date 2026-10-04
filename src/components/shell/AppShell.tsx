@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
 import { NonProdBanner } from "@/components/shell/NonProdBanner";
 import { ImpersonationBanner } from "@/components/shell/ImpersonationBanner";
+import { TrialBanner } from "@/components/shell/TrialBanner";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -49,6 +50,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <NonProdBanner />
       {/* BL-15 Phase B-3b — visible when a super-admin is impersonating */}
       <ImpersonationBanner />
+      {/* BL-AUTH-ABUSE Slice 2a — days left on a trial; AI paused once it ends */}
+      <TrialBanner hasWorkspace={hasWorkspace} />
       <div className="flex min-h-screen text-text">
         <SideNav
         isOrgAdmin={isOrgAdmin}
