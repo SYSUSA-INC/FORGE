@@ -73,7 +73,7 @@ Practical guidance for assignments:
 
 ### 2.1 Access
 
-Sign in. Under the FORGE mark the sidebar shows the **Workspace** switcher (Workspace · Company admin; BL-NAV-WORKSPACES). As an org admin you can administer from either: the everyday **Workspace** tree carries an **Administration** group (Users & Roles, Billing, Templates, Notification rules, Audit Log) and the Admin guide that only admins see (BL-NAV-RESTORE), and **Company admin** is the same set as a console of its own: People (Users & Roles), Organization (Settings, Billing, Templates, Integrations, AI Engine), Governance (Notification rules, Audit Log) and the Admin guide. Members never see the Administration group or the console. The workspace you pick sticks while you open pages it lists; opening a page it does not list switches to the workspace that does.
+Sign in. Under the FORGE mark the sidebar shows the **Workspace** switcher (Workspace · Company admin; BL-NAV-WORKSPACES). As an org admin you can administer from either: the everyday **Workspace** tree carries an **Administration** group (Users & Roles, Billing, Templates, API access, Notification rules, Audit Log) and the Admin guide that only admins see (BL-NAV-RESTORE), and **Company admin** is the same set as a console of its own: People (Users & Roles), Organization (Settings, Billing, Templates, Integrations, AI Engine, API access), Governance (Notification rules, Audit Log) and the Admin guide. Members never see the Administration group or the console. The workspace you pick sticks while you open pages it lists; opening a page it does not list switches to the workspace that does.
 
 ![Users page](docs/images/users-page.png)
 
