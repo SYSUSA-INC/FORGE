@@ -28,6 +28,7 @@ import { KeyDateTimeline } from "./KeyDateTimeline";
 import { CustomerHistoryPanel } from "./CustomerHistoryPanel";
 import { QaPanel } from "./QaPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
+import { AgencyContactsPanel } from "@/components/crm/AgencyContactsPanel";
 import { listSolicitationQa } from "@/lib/solicitation-qa";
 import { normalizeRef } from "@/lib/solicitation-qa-logic";
 import { THEME } from "@/lib/theme-colors";
@@ -329,6 +330,9 @@ export default async function SolicitationDetail({
           linkedOpportunityId={s.opportunityId}
         />
       </div>
+
+      {/* BL-FB-X-CRM Slice 2 — who we know at this agency, before the bid decision */}
+      <AgencyContactsPanel organizationId={organizationId} agency={s.agency} className="mb-4" />
 
       <div className="mb-4">
         <AmendmentsPanel

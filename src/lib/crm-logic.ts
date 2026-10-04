@@ -169,3 +169,103 @@ export function contactsForAgency<T extends ContactLike>(contacts: readonly T[],
     .filter((c) => matchesAgency(c.agencyKey || c.agency, oppAgency))
     .sort((a, b) => warmthScore({ lastTouchAt: b.lastTouchAt, touchCount: b.touchCount, role: b.role, now }) - warmthScore({ lastTouchAt: a.lastTouchAt, touchCount: a.touchCount, role: a.role, now }) || a.name.localeCompare(b.name));
 }
+
+// ── Slice 2 — procurement history and follow-up reminders ───────────
+
+export type AwardLike = {
+  recipientName: string;
+  amount: number;
+  naicsCode: string;
+  endDate: string | null;
+  awardingSubAgency: string;
+};
+
+export type AgencyAwardsSummary = {
+  awards: number;
+  totalObligated: number;
+  topRecipients: { name: string; amount: number; awards: number }[];
+  naicsMix: { code: string; amount: number }[];
+  /** Awards whose period of performance ends within the next 12 months. */
+  endingWithinYear: number;
+  latestEndDate: string | null;
+  subAgencies: string[];
+};
+
+/** What an agency has been buying, in one glance: who wins, in which NAICS, what ends soon. */
+export function summarizeAgencyAwards(awards: readonly AwardLike[], now: Date = new Date()): AgencyAwardsSummary {
+  const recipients = new Map<string, { amount: number; awards: number }>();
+  const naics = new Map<string, number>();
+  const subs = new Map<string, number>();
+  let total = 0;
+  let endingSoon = 0;
+  let latest: string | null = null;
+  const horizon = new Date(now.getTime() + 365 * DAY_MS).toISOString().slice(0, 10);
+  const todayIso = now.toISOString().slice(0, 10);
+  for (const a of awards) {
+    const amount = Number.isFinite(a.amount) ? a.amount : 0;
+    total += amount;
+    const name = a.recipientName.trim() || "Unknown recipient";
+    const r = recipients.get(name) ?? { amount: 0, awards: 0 };
+    r.amount += amount;
+    r.awards += 1;
+    recipients.set(name, r);
+    if (a.naicsCode) naics.set(a.naicsCode, (naics.get(a.naicsCode) ?? 0) + amount);
+    if (a.awardingSubAgency.trim()) subs.set(a.awardingSubAgency.trim(), (subs.get(a.awardingSubAgency.trim()) ?? 0) + 1);
+    if (a.endDate) {
+      if (a.endDate >= todayIso && a.endDate <= horizon) endingSoon += 1;
+      if (!latest || a.endDate > latest) latest = a.endDate;
+    }
+  }
+  return {
+    awards: awards.length,
+    totalObligated: Math.round(total),
+    topRecipients: Array.from(recipients.entries())
+      .map(([name, v]) => ({ name, amount: Math.round(v.amount), awards: v.awards }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5),
+    naicsMix: Array.from(naics.entries())
+      .map(([code, amount]) => ({ code, amount: Math.round(amount) }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5),
+    endingWithinYear: endingSoon,
+    latestEndDate: latest,
+    subAgencies: Array.from(subs.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([s]) => s),
+  };
+}
+
+export type AgencyAwardAttempt = { awardingAgencyName?: string; awardingSubAgencyName?: string; naicsCodes?: string[] };
+
+/**
+ * How to ask USAspending about an agency we only know by name: as a
+ * sub-tier (most agency strings are, "Department of the Navy"), then as
+ * a top-tier department, then without our NAICS filter so an agency we
+ * have never sold to still shows what it buys. Stop at the first hit.
+ */
+export function agencyAwardAttempts(agency: string, naicsCodes: readonly string[]): AgencyAwardAttempt[] {
+  const name = agency.trim();
+  if (!name) return [];
+  const codes = naicsCodes.map((c) => c.trim()).filter(Boolean);
+  const attempts: AgencyAwardAttempt[] = [];
+  if (codes.length) {
+    attempts.push({ awardingSubAgencyName: name, naicsCodes: codes }, { awardingAgencyName: name, naicsCodes: codes });
+  }
+  attempts.push({ awardingSubAgencyName: name }, { awardingAgencyName: name });
+  return attempts;
+}
+
+export const TOUCH_REMINDER_HORIZON_MS = DAY_MS;
+
+/** A reminder is owed once per agreed date: within a day of it or past it, and not already sent for that date. */
+export function touchReminderDue(now: Date, nextTouchAt: Date | null | undefined, reminderFor: Date | null | undefined): boolean {
+  if (!nextTouchAt) return false;
+  if (reminderFor && reminderFor.getTime() === nextTouchAt.getTime()) return false;
+  return nextTouchAt.getTime() - now.getTime() <= TOUCH_REMINDER_HORIZON_MS;
+}
+
+export function touchReminderSubject(contactName: string, agency: string, nextTouchAt: Date, now: Date): string {
+  const overdue = nextTouchAt.getTime() < now.getTime();
+  return `Follow-up with ${contactName}${agency ? ` (${agency})` : ""} ${overdue ? "is overdue" : "is due tomorrow"}`;
+}

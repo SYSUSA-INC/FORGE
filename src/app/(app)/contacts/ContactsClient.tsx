@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { CONTACT_ROLES, CONTACT_ROLE_LABELS, agencyRollups, describeRecency, nextTouchStatus, normalizeRole, warmthScore } from "@/lib/crm-logic";
+import { AgencyHistoryPanel } from "./AgencyHistoryPanel";
 import { ContactForm, type OwnerOption } from "./ContactForm";
 import { WarmthChip } from "./WarmthChip";
 
@@ -142,6 +143,8 @@ export function ContactsClient({ contacts, owners, prefillAgency }: { contacts: 
                     </li>
                   ))}
               </ul>
+              {/* Slice 2 — what the agency has been buying, loaded on demand. */}
+              {r.agencyKey !== "unassigned" ? <AgencyHistoryPanel agency={r.agency} compact /> : null}
             </Panel>
           ))}
         </div>

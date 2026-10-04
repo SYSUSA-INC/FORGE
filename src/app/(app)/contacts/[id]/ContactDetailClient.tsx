@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { CONTACT_LIMITS, CONTACT_ROLE_LABELS, TOUCH_KINDS, TOUCH_KIND_LABELS, describeRecency, normalizeRole, normalizeTouchKind, warmthScore } from "@/lib/crm-logic";
 import { deleteContactAction, logTouchAction } from "../actions";
+import { AgencyHistoryPanel } from "../AgencyHistoryPanel";
 import { ContactForm, type OwnerOption } from "../ContactForm";
 import { NextTouchBadge } from "../ContactsClient";
 import { WarmthChip } from "../WarmthChip";
@@ -144,26 +145,32 @@ export function ContactDetailClient({ contact, touches, owners, opportunities }:
             )}
           </Panel>
         </div>
-        <Panel title="Details" eyebrow="Edit the contact" actions={<WarmthChip score={warmth} />}>
-          <ContactForm
-            contactId={contact.id}
-            owners={owners}
-            submitLabel="Save changes"
-            onSaved={() => router.refresh()}
-            initial={{
-              agency: contact.agency,
-              office: contact.office,
-              name: contact.name,
-              title: contact.title,
-              role,
-              email: contact.email,
-              phone: contact.phone,
-              ownerUserId: contact.ownerUserId ?? "",
-              nextTouchAt: contact.nextTouchAt ? contact.nextTouchAt.slice(0, 10) : "",
-              notes: contact.notes,
-            }}
-          />
-        </Panel>
+        <div className="flex flex-col gap-4">
+          <Panel title="Details" eyebrow="Edit the contact" actions={<WarmthChip score={warmth} />}>
+            <ContactForm
+              contactId={contact.id}
+              owners={owners}
+              submitLabel="Save changes"
+              onSaved={() => router.refresh()}
+              initial={{
+                agency: contact.agency,
+                office: contact.office,
+                name: contact.name,
+                title: contact.title,
+                role,
+                email: contact.email,
+                phone: contact.phone,
+                ownerUserId: contact.ownerUserId ?? "",
+                nextTouchAt: contact.nextTouchAt ? contact.nextTouchAt.slice(0, 10) : "",
+                notes: contact.notes,
+              }}
+            />
+          </Panel>
+          {/* Slice 2 — what this customer has been buying, from USAspending, on demand. */}
+          <Panel title="Procurement history" eyebrow="Recent awards by this agency">
+            <AgencyHistoryPanel agency={contact.agency} />
+          </Panel>
+        </div>
       </div>
     </>
   );

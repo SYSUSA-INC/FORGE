@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  agencyAwardAttempts,
   agencyKey,
   agencyRollups,
   contactsForAgency,
@@ -12,6 +13,9 @@ import {
   nextTouchStatus,
   normalizeRole,
   normalizeTouchKind,
+  summarizeAgencyAwards,
+  touchReminderDue,
+  touchReminderSubject,
   warmthLabel,
   warmthScore,
 } from "@/lib/crm-logic";
@@ -81,5 +85,54 @@ describe("crm logic", () => {
     expect(contactsForAgency(contacts, "U.S. Army", NOW).map((c) => c.id)).toEqual(["c"]);
     expect(contactsForAgency(contacts, "", NOW)).toEqual([]);
     expect(contactsForAgency(contacts, "NASA", NOW)).toEqual([]);
+  });
+
+  it("summarises an agency's awards: who wins, in which NAICS, what ends soon", () => {
+    const awards = [
+      { recipientName: "Acme Federal", amount: 5_000_000, naicsCode: "541512", endDate: "2027-03-31", awardingSubAgency: "NAVSEA" },
+      { recipientName: "Acme Federal", amount: 1_000_000.4, naicsCode: "541511", endDate: "2026-12-15", awardingSubAgency: "NAVSEA" },
+      { recipientName: "Beta LLC", amount: 2_500_000, naicsCode: "541512", endDate: "2028-09-30", awardingSubAgency: "NAVAIR" },
+      { recipientName: "  ", amount: Number.NaN, naicsCode: "", endDate: null, awardingSubAgency: " " },
+    ];
+    const s = summarizeAgencyAwards(awards, NOW);
+    expect(s.awards).toBe(4);
+    expect(s.totalObligated).toBe(8_500_000);
+    expect(s.topRecipients).toEqual([
+      { name: "Acme Federal", amount: 6_000_000, awards: 2 },
+      { name: "Beta LLC", amount: 2_500_000, awards: 1 },
+      { name: "Unknown recipient", amount: 0, awards: 1 },
+    ]);
+    expect(s.naicsMix).toEqual([
+      { code: "541512", amount: 7_500_000 },
+      { code: "541511", amount: 1_000_000 },
+    ]);
+    expect(s.endingWithinYear).toBe(2);
+    expect(s.latestEndDate).toBe("2028-09-30");
+    expect(s.subAgencies).toEqual(["NAVSEA", "NAVAIR"]);
+    expect(summarizeAgencyAwards([], NOW)).toMatchObject({ awards: 0, totalObligated: 0, topRecipients: [], naicsMix: [], endingWithinYear: 0, latestEndDate: null, subAgencies: [] });
+  });
+
+  it("asks USAspending about an agency as sub-tier then department, our NAICS first", () => {
+    expect(agencyAwardAttempts(" Department of the Navy ", ["541512", " ", "541511"])).toEqual([
+      { awardingSubAgencyName: "Department of the Navy", naicsCodes: ["541512", "541511"] },
+      { awardingAgencyName: "Department of the Navy", naicsCodes: ["541512", "541511"] },
+      { awardingSubAgencyName: "Department of the Navy" },
+      { awardingAgencyName: "Department of the Navy" },
+    ]);
+    expect(agencyAwardAttempts("NASA", [])).toEqual([{ awardingSubAgencyName: "NASA" }, { awardingAgencyName: "NASA" }]);
+    expect(agencyAwardAttempts("  ", ["541512"])).toEqual([]);
+  });
+
+  it("owes one follow-up reminder per agreed date", () => {
+    const tomorrow = new Date(NOW.getTime() + 20 * 3_600_000);
+    expect(touchReminderDue(NOW, null, null)).toBe(false);
+    expect(touchReminderDue(NOW, daysAhead(3), null)).toBe(false);
+    expect(touchReminderDue(NOW, tomorrow, null)).toBe(true);
+    expect(touchReminderDue(NOW, daysAgo(2), null)).toBe(true);
+    expect(touchReminderDue(NOW, tomorrow, tomorrow)).toBe(false);
+    // A new agreed date re-arms the reminder even though an older one was sent.
+    expect(touchReminderDue(NOW, tomorrow, daysAgo(10))).toBe(true);
+    expect(touchReminderSubject("Ana Rivera", "Navy", tomorrow, NOW)).toBe("Follow-up with Ana Rivera (Navy) is due tomorrow");
+    expect(touchReminderSubject("Ana Rivera", "", daysAgo(2), NOW)).toBe("Follow-up with Ana Rivera is overdue");
   });
 });

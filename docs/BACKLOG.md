@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #309)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #309)
 
 Capture manager, writer and AI in one thread, tied to the section
 instead of a Slack side-channel. BL-FB-CHAT-PERSIST already made the
@@ -1197,7 +1197,7 @@ they own, so Sarah's sections read like Sarah and Mike's like Mike.
   comparison of a draft against the profile, team-wide house style.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #307)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #311 · Slice 1 PR #307)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -1238,9 +1238,44 @@ lightweight CRM scoped to capture, under **Customer contacts**
   entry under Platform Intelligence. Unit-tested
   (`tests/ai/crm-logic.test.ts`); runtime-tested
   (`tests/isolation/crm.test.ts`).
-- **Slice 2:** procurement history per agency from USAspending joined
-  to the contacts, follow-up reminders through the rules engine,
-  contacts on the solicitation page, import from a vCard / CSV.
+
+**Slice 2 — what they buy, who owes a call, and the solicitation:**
+
+- **Procurement history per agency.** "What <agency> buys · USAspending"
+  on each agency card of `/contacts` and on the contact page: loaded on
+  demand (**Load awards**), never on render — the public API is slow and
+  rate-limited. `agencyProcurementHistory` (`src/lib/crm-history.ts`)
+  asks USAspending about the agency as a sub-tier, then a department,
+  with the tenant's NAICS first and then without (`agencyAwardAttempts`,
+  pure), takes the first non-empty answer (25 awards, largest first) and
+  summarises it (`summarizeAgencyAwards`): obligated total, who wins
+  there, the NAICS mix, offices seen, awards whose period of performance
+  ends within a year, the full award list with links. Gated behind
+  `AWARDS_INTEL_ENABLED=1` like the rest of the awards intelligence;
+  audited as a sensitive read `crm.agency.history`.
+- **Follow-up reminders.** New rules-engine trigger `contact_touch_due`
+  (enum value, migration 0099) with a seeded default rule per tenant
+  (migration 0100: in-app + email to the users named in the payload).
+  The daily cron (`/api/cron/solicitation-key-dates`) runs
+  `dispatchContactTouchReminders` (`src/lib/crm-reminders.ts`): every
+  contact whose agreed next touch is within a day or past, whose owner
+  has not been reminded for that date, notifies the relationship owner
+  ("Follow-up with Ana Rivera (Navy) is due tomorrow / is overdue",
+  link to the contact) and is stamped `touch_reminder_for` with that
+  date — a new agreed date re-arms it, the same date never fires twice
+  (`touchReminderDue`, pure). Contacts with no owner are counted in the
+  cron body as `unowned` and skipped.
+- **On the solicitation.** The generic `AgencyContactsPanel`
+  (`src/components/crm/`) — "Who we know at <agency>" with role,
+  recency, owner and follow-up state — now sits on the solicitation page
+  under Customer history, and the opportunity panel reuses it.
+  `contactsForAgencyName` matches a free-form agency inside the tenant.
+- Unit-tested (`tests/ai/crm-logic.test.ts`); runtime-tested
+  (`tests/isolation/crm-reminders.test.ts`: owner-only delivery, once
+  per date, re-arm, unowned skipped, other tenant untouched, agency
+  match scoped, lookup gated).
+- **Later:** import from a vCard / CSV; cache the agency history per
+  tenant for a day.
 
 ### BL-FB-X-COLOR-TEAM — Color-team review workflow
 **Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ shipped (Slice 1 PR #305 · Slice 2 PR #306)
@@ -3795,7 +3830,7 @@ sync). Nothing to configure. Vercel's build log will show Next's
 ---
 
 ### BL-QC-combined-job — Consolidate typecheck + lint
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** 🔄 in PR (PR #310)
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** ✅ shipped (PR #310)
 
 Cosmetic CI cleanup — combine the separate `typecheck` (in `pr.yml`)
 and `lint` (in `pr-quality.yml`) jobs into one job-run for slightly
@@ -5171,7 +5206,7 @@ telemetry, same posture as `section_draft_signal`; clearing a thread
 is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #309) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #309) — canonical entry under Active priorities
 
 Capture manager + writer + AI in the same thread; `@mention` a team
 member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces
@@ -5247,7 +5282,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #307) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #311 · Slice 1 PR #307) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
