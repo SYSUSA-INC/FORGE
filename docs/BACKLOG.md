@@ -41,7 +41,7 @@ Effort key:
 | 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | ✅ shipped (PR #325) |
 | 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | ✅ shipped (PR #326) |
 | 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | ✅ shipped (PR #327) |
-| 3p | **BL-FB-X-CRM Slice 4** — Nightly refresh of the agencies teams have contacts at; contact list CSV export | P3 | S | 🔄 in PR (PR #328) |
+| 3p | **BL-FB-X-CRM Slice 4** — Nightly refresh of the agencies teams have contacts at; contact list CSV export | P3 | S | ✅ shipped (PR #328) |
 | 3q | **BL-FB-X-COLOR-TEAM Slice 4** — A round's own reminder cadence; reminder preview on the review page | P3 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -1627,7 +1627,7 @@ voice follow-ups are fourth.
   USER_MANUAL §6 (House style), ADMIN_MANUAL (Author voice).
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in PR (PR #328 · Slice 3 PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 4 shipped (PR #328 · Slice 3 PR #314 · Slice 1 PR #307 · Slice 2 PR #311)
 
 "Who do we know at this customer, and when did we last talk?" — the
 pre-RFP question capture answers from memory and spreadsheets. A
@@ -5914,7 +5914,7 @@ parameter on purpose, because tens of outcomes cannot support more. The
 needs; revisit when an org has ~100 decided outcomes.
 
 ### BL-FB-X-CRM — Customer relationship CRM
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 4 in PR (PR #328 · Slice 3 PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 4 shipped (PR #328 · Slice 3 PR #314 · Slice 1 PR #307 · Slice 2 PR #311) — canonical entry under Active priorities
 
 Per-agency contact list with last-touch / next-touch fields,
 procurement history (joined to USAspending), and a relationship-warmth
