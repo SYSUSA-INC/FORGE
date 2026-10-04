@@ -46,7 +46,7 @@ Effort key:
 | 3r | **BL-FB-CHAT-MULTI Slice 3** — Presence: who else has a section open, in the section header | P3 | S | ✅ shipped (PR #330) |
 | 3s | **BL-21 help refresh (October 2026 pass)** — What's new in the user manual, FAQ for the new features, migrations 0104–0112 table in the admin manual | P3 | S | ✅ shipped (PR #331) |
 | 3t | **BL-16 API Slice 2a** — Platform admins view and revoke a tenant's API tokens (one or all, with a reason); OpenAPI 3.1 document at `/api/v1/openapi.json` | P2 | S | ✅ shipped (PR #333) |
-| 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | 🔄 in progress |
+| 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | 🔄 in PR (PR #334) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -4011,7 +4011,7 @@ section text, 2c outbound webhooks.
   document is served without a token).
 - Docs: USER_MANUAL §4.15, ADMIN_MANUAL §6.10.
 
-**API Slice 2b — section text** 🔄 in progress (2026-10-04):
+**API Slice 2b — section text** 🔄 in PR (PR #334, 2026-10-04):
 
 User decision (2026-10-04): section text needs `apiAccess` only — not
 `bulkExport` as the original "Later" note suggested.
