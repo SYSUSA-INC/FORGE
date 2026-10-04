@@ -13,6 +13,7 @@ import {
   CHAT_TEMPERATURE,
   findSectionForOrg,
   loadSectionChatModelHistory,
+  notifySectionChatMentions,
   prepareSectionChat,
 } from "@/lib/section-chat";
 import { encodeSseEvent, sseHeaders } from "@/lib/sse";
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
 
         if (reply) {
           try {
-            await appendSectionChatTurns({
+            const ids = await appendSectionChatTurns({
               organizationId,
               proposalId: prepared.proposalId,
               sectionId: body.sectionId,
@@ -153,6 +154,15 @@ export async function POST(req: NextRequest) {
               userMessage: body.message,
               assistantReply: reply,
               stubbed: ai.stubbed,
+            });
+            // BL-FB-CHAT-MULTI — teammates named in the question hear about it.
+            await notifySectionChatMentions({
+              organizationId,
+              proposalId: prepared.proposalId,
+              sectionId: body.sectionId,
+              messageId: ids.userMessageId,
+              actorUserId: user.id,
+              body: body.message,
             });
           } catch (err) {
             log.warn("[api/ai/chat]", "thread persist failed", { error: err });

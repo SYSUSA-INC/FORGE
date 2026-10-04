@@ -1110,8 +1110,49 @@ continuous always-on quality layer:
 Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
+### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR
+
+Capture manager, writer and AI in one thread, tied to the section
+instead of a Slack side-channel. BL-FB-CHAT-PERSIST already made the
+thread shared and attributed; Slice 1 makes it a place the team talks.
+
+- **Notes to the team.** A third message kind, `note`
+  (`section_chat_message.role`, type-only), is a teammate's message that
+  calls no model: **Note** beside **Send** posts it, the thread shows it
+  in its own colour with the author's name ("Ana · note to team"), and
+  the model's history (`loadSectionChatModelHistory`) leaves notes out —
+  they are for people. `appendSectionChatNote`
+  (`src/lib/section-chat.ts`), audited `section_chat.note`.
+- **@mentions.** Typing `@` in the chat box opens a teammate picker
+  (name or email, arrow keys / Tab / Enter; pure `mentionQuery`,
+  `insertMention`, `filterMembers` in `src/lib/chat-mentions.ts`); the
+  stored text carries the stable `@[user-id]` token the thread renders
+  as the person's name (`MentionText`) and the model reads as "@Name"
+  (`prepareSectionChat` resolves tokens through the member list).
+- **Pulled in.** A note or a question that names teammates notifies
+  them through the rules engine (`notifySectionChatMentions` →
+  `comment_mentioned`, recipients from the payload; active members
+  only, never the author) with the subject "Ana mentioned you in the
+  chat on 'Technical Approach'" and a link that opens the editor on
+  that section with the chat showing (`/proposals/[id]/sections?section=…&tab=chat`;
+  the page and `AiAssistantPanel` honour it). The kind's label becomes
+  "Mention in a review comment or section chat"; the seeded default
+  rule already delivers in-app and email.
+- `appendSectionChatTurns` returns the ids so the question's mentions
+  notify after the exchange persists (route and action alike). No
+  migration (type-only schema change).
+- Unit-tested (`tests/ai/chat-mentions.test.ts`); runtime-tested
+  (`tests/isolation/section-chat-multi.test.ts`: note on the owning
+  tenant's section only, seen by the team with its author, absent from
+  the model's history; a mention reaches the named active member only,
+  with the chat link; audits).
+- **Slice 2:** unread marker per section ("3 new since you looked"),
+  reply-to on a note, presence (who has the section open) once the
+  Hocuspocus layer is deployed, notes as optional model context.
+
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #308)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -4972,7 +5013,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR (PR #308) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** ✅ Slice 1 shipped (PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
@@ -5114,7 +5155,7 @@ telemetry, same posture as `section_draft_signal`; clearing a thread
 is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** ⏳ queued
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 1 in PR — canonical entry under Active priorities
 
 Capture manager + writer + AI in the same thread; `@mention` a team
 member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces

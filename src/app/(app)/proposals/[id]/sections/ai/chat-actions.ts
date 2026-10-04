@@ -14,6 +14,7 @@ import {
   type ChatAttachmentView,
 } from "@/lib/section-chat-attachments";
 import {
+  appendSectionChatNote,
   appendSectionChatTurns,
   CHAT_MAX_TOKENS,
   CHAT_RATE_LIMIT,
@@ -22,6 +23,7 @@ import {
   findSectionForOrg,
   loadSectionChatHistory,
   loadSectionChatModelHistory,
+  notifySectionChatMentions,
   prepareSectionChat,
   type SectionChatTurn,
 } from "@/lib/section-chat";
@@ -35,7 +37,8 @@ import {
 import { log } from "@/lib/log";
 
 export type ChatMessage = {
-  role: "user" | "assistant";
+  /** BL-FB-CHAT-MULTI — "note" is a teammate's message that called no model. */
+  role: "user" | "assistant" | "note";
   content: string;
   /** BL-FB-CHAT-PERSIST — author of a user turn when it is not the viewer. */
   authorName?: string;
@@ -189,7 +192,7 @@ export async function chatWithSectionAction(input: {
 
     if (reply) {
       try {
-        await appendSectionChatTurns({
+        const ids = await appendSectionChatTurns({
           organizationId,
           proposalId: prepared.proposalId,
           sectionId: input.sectionId,
@@ -197,6 +200,15 @@ export async function chatWithSectionAction(input: {
           userMessage: input.message,
           assistantReply: reply,
           stubbed: res.stubbed,
+        });
+        // BL-FB-CHAT-MULTI — teammates named in the question hear about it.
+        await notifySectionChatMentions({
+          organizationId,
+          proposalId: prepared.proposalId,
+          sectionId: input.sectionId,
+          messageId: ids.userMessageId,
+          actorUserId: user.id,
+          body: input.message,
         });
       } catch (err) {
         log.warn("[chatWithSectionAction]", "thread persist failed", { error: err });
@@ -212,6 +224,38 @@ export async function chatWithSectionAction(input: {
       error: err instanceof Error ? err.message : "Chat request failed.",
     };
   }
+}
+
+export type PostNoteResult = { ok: true; message: SectionChatTurn } | { ok: false; error: string };
+
+/**
+ * BL-FB-CHAT-MULTI — post a note to the team on this section's thread
+ * without asking the AI; anyone it @mentions is notified.
+ */
+export async function postSectionChatNoteAction(input: { sectionId: string; content: string }): Promise<PostNoteResult> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await appendSectionChatNote({
+    organizationId,
+    sectionId: String(input.sectionId ?? ""),
+    userId: user.id,
+    content: String(input.content ?? ""),
+    actor: { userId: user.id, email: user.email },
+  });
+  if (!res.ok) return res;
+  try {
+    await notifySectionChatMentions({
+      organizationId,
+      proposalId: res.proposalId,
+      sectionId: input.sectionId,
+      messageId: res.message.id,
+      actorUserId: user.id,
+      body: res.message.content,
+    });
+  } catch (err) {
+    log.warn("[postSectionChatNoteAction]", "mention notify failed", { error: err });
+  }
+  return { ok: true, message: res.message };
 }
 
 export type SectionChatHistoryResult =

@@ -21,8 +21,11 @@ export const dynamic = "force-dynamic";
 
 export default async function ProposalSectionsPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  /** BL-FB-CHAT-MULTI — a mention notification opens its section with the chat showing. */
+  searchParams?: { section?: string; tab?: string };
 }) {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -117,6 +120,8 @@ export default async function ProposalSectionsPage({
     >
       <SectionsClient
         proposalId={params.id}
+        initialSectionId={typeof searchParams?.section === "string" ? searchParams.section : null}
+        initialTab={searchParams?.tab === "chat" ? "chat" : null}
         sections={sectionRows.map((s) => {
           const issue = issueBySection.get(s.id);
           const coverage = coverageBySection.get(s.id);

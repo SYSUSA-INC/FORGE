@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { MentionText } from "@/components/mentions/MentionText";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import type { TipTapDoc } from "@/db/schema";
 import type { SectionDraftResult } from "./actions";
@@ -14,12 +15,14 @@ import {
   clearSectionChatAction,
   getSectionChatHistoryAction,
   listChatAttachmentsAction,
+  postSectionChatNoteAction,
   removeChatAttachmentAction,
   saveChatAttachmentToKnowledgeAction,
   type ChatAttachmentView,
   type ChatMessage,
 } from "./chat-actions";
 import { CHAT_ATTACHMENT_ACCEPT, describeChars } from "@/lib/chat-attachments-logic";
+import { filterMembers, insertMention, memberLabel, mentionQuery, mentionResolver, type MentionMemberLike } from "@/lib/chat-mentions";
 import { DICTATION_LIMITS, mergeTranscript } from "@/lib/dictation";
 import { useDictation } from "./useDictation";
 import {
@@ -172,6 +175,11 @@ type Props = {
    * show it as edits to the draft. null clears the preview.
    */
   onSuggestion?: (s: { text: string; streaming: boolean; explicit: boolean } | null) => void;
+  /** BL-FB-CHAT-MULTI — the team, for @mentions and for naming who wrote what. */
+  members?: MentionMemberLike[];
+  /** BL-FB-CHAT-MULTI — a mention notification opens the panel on its chat. */
+  initialTab?: ActiveTab;
+  initialOpen?: boolean;
 };
 
 /** The routes cap the live body at 60k characters. */
@@ -207,9 +215,12 @@ export function AiAssistantPanel({
   layout = "stacked",
   onLayoutChange,
   onSuggestion,
+  members = [],
+  initialTab,
+  initialOpen = false,
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
+  const [open, setOpen] = useState(initialOpen);
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab ?? "generate");
   // BL-FB-CHAT-SIDEBYSIDE — the left pane is always open, on the chat.
   const isOpen = open || layout === "side";
   useEffect(() => {
@@ -263,6 +274,11 @@ export function AiAssistantPanel({
   const chatBottomRef = useRef<HTMLDivElement>(null);
   // BL-FB-CHAT-SLASH — the highlighted row of the command popover.
   const [slashIndex, setSlashIndex] = useState(0);
+  // BL-FB-CHAT-MULTI — the caret (for the @mention picker) and its highlighted row.
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const [chatCaret, setChatCaret] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const resolver = useMemo(() => mentionResolver(members), [members]);
   // BL-FB-CHAT-VOICE — dictation lands in the chat box as prose.
   const dictation = useDictation((text) => setChatInput((v) => mergeTranscript(v, text)));
 
@@ -617,6 +633,55 @@ export function AiAssistantPanel({
     !chatPending &&
     slashOptions.length > 0 &&
     !(slashOptions.length === 1 && slashOptions[0]!.name === slashToken?.toLowerCase());
+  // BL-FB-CHAT-MULTI — "@" at the caret opens the teammate picker; a
+  // pick writes the stable `@[id]` token the server and the thread render
+  // as the person's name.
+  const mentionCtx = mentionQuery(chatInput, chatCaret);
+  const mentionOptions = mentionCtx ? filterMembers(members, mentionCtx.query) : [];
+  const mentionOpen = mentionOptions.length > 0 && !slashOpen;
+  function pickMention(m: MentionMemberLike) {
+    if (!mentionCtx) return;
+    const next = insertMention(chatInput, chatCaret, mentionCtx, m.id);
+    setChatInput(next.value);
+    setChatCaret(next.caret);
+    setMentionIndex(0);
+    requestAnimationFrame(() => {
+      const el = chatInputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(next.caret, next.caret);
+      }
+    });
+  }
+
+  // BL-FB-CHAT-MULTI — a note to the team on this thread: no model call.
+  async function postNote() {
+    const msg = chatInput.trim();
+    if (!msg || chatPending) return;
+    setChatInput("");
+    setChatError(null);
+    const prior = chatHistory;
+    setChatHistory([...prior, { role: "note", content: msg, isMine: true }]);
+    setChatPending(true);
+    try {
+      const res = await postSectionChatNoteAction({ sectionId, content: msg });
+      if (!res.ok) {
+        setChatError(res.error);
+        setChatHistory(prior);
+        setChatInput(msg);
+        return;
+      }
+      setChatHistory([...prior, { role: "note", content: res.message.content, isMine: true, authorName: res.message.authorName }]);
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Could not post the note.");
+      setChatHistory(prior);
+      setChatInput(msg);
+    } finally {
+      setChatPending(false);
+    }
+  }
+
   function pickCommand(c: ChatCommand) {
     setChatInput(c.takesArgs === "none" ? `/${c.name}` : `/${c.name} `);
     setSlashIndex(0);
@@ -985,20 +1050,20 @@ export function AiAssistantPanel({
               {chatHistory.map((msg, i) => (
                 <div
                   key={i}
-                  className={`flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
+                  className={`flex flex-col gap-1 ${msg.role !== "assistant" && msg.isMine !== false ? "items-end" : "items-start"}`}
                 >
                   <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
                     {msg.role === "assistant"
                       ? "AI"
-                      : msg.isMine === false && msg.authorName
-                        ? msg.authorName
-                        : "You"}
+                      : `${msg.isMine === false && msg.authorName ? msg.authorName : "You"}${msg.role === "note" ? " · note to team" : ""}`}
                   </span>
                   <div
                     className={`max-w-[90%] rounded-md px-3 py-2 font-body text-[12px] leading-relaxed ${
                       msg.role === "user"
                         ? "bg-teal/10 text-text"
-                        : "border border-layer/10 bg-layer/[0.03] text-foreground"
+                        : msg.role === "note"
+                          ? "border border-indigo-400/20 bg-indigo-400/5 text-text"
+                          : "border border-layer/10 bg-layer/[0.03] text-foreground"
                     }`}
                   >
                     {msg.role === "user" && describeSlashCommand(msg.content) ? (
@@ -1008,7 +1073,9 @@ export function AiAssistantPanel({
                         <span className="font-body text-[10px] text-muted">{describeSlashCommand(msg.content)}</span>
                       </div>
                     ) : (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                      <div className="whitespace-pre-wrap">
+                        <MentionText body={msg.content} resolver={resolver} />
+                      </div>
                     )}
                     {msg.role === "assistant" && msg.content ? (
                       <div className="mt-1.5 flex flex-wrap gap-3">
@@ -1132,15 +1199,58 @@ export function AiAssistantPanel({
             </ul>
           ) : null}
 
+          {/* BL-FB-CHAT-MULTI — teammate picker */}
+          {mentionOpen ? (
+            <ul role="listbox" aria-label="Mention a teammate" className="flex flex-col rounded-md border border-indigo-400/30 bg-canvas p-1">
+              {mentionOptions.map((m, i) => (
+                <li key={m.id} role="option" aria-selected={i === mentionIndex}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      pickMention(m);
+                    }}
+                    onMouseEnter={() => setMentionIndex(i)}
+                    className={`flex w-full items-baseline gap-3 rounded px-2 py-1 text-left ${i === mentionIndex ? "bg-indigo-400/15" : "hover:bg-layer/[0.05]"}`}
+                  >
+                    <span className="shrink-0 font-mono text-[11px] text-indigo-300">@{memberLabel(m)}</span>
+                    <span className="min-w-0 truncate font-body text-[11px] text-muted">{m.email}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
           {/* Input */}
           <div className="flex gap-2">
             <textarea
+              ref={chatInputRef}
               value={chatInput}
               onChange={(e) => {
                 setChatInput(e.target.value);
+                setChatCaret(e.target.selectionStart ?? e.target.value.length);
                 setSlashIndex(0);
+                setMentionIndex(0);
               }}
+              onSelect={(e) => setChatCaret(e.currentTarget.selectionStart ?? 0)}
               onKeyDown={(e) => {
+                if (mentionOpen) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setMentionIndex((i) => (i + 1) % mentionOptions.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setMentionIndex((i) => (i - 1 + mentionOptions.length) % mentionOptions.length);
+                    return;
+                  }
+                  if (e.key === "Tab" || e.key === "Enter") {
+                    e.preventDefault();
+                    pickMention(mentionOptions[Math.min(mentionIndex, mentionOptions.length - 1)]!);
+                    return;
+                  }
+                }
                 if (slashOpen) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
@@ -1163,7 +1273,7 @@ export function AiAssistantPanel({
                   sendChat();
                 }
               }}
-              placeholder="Ask about this section… (Enter to send, Shift+Enter for newline, / for commands)"
+              placeholder="Ask about this section… (Enter to send, Shift+Enter for newline, / for commands, @ to mention a teammate)"
               rows={2}
               className="flex-1 resize-none rounded-md border border-layer/10 bg-layer/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-muted/50 focus:border-teal/40 focus:outline-none"
             />
@@ -1186,6 +1296,16 @@ export function AiAssistantPanel({
               }`}
             >
               {dictation.status === "transcribing" ? "…" : dictation.status === "idle" ? "🎙" : "■"}
+            </button>
+            {/* BL-FB-CHAT-MULTI — post to the team without asking the AI */}
+            <button
+              type="button"
+              onClick={() => void postNote()}
+              disabled={chatPending || !chatInput.trim()}
+              className="aur-btn aur-btn-ghost shrink-0 self-end text-[11px] disabled:opacity-60"
+              title="Post this to the team on the section's thread without asking the AI (@ to mention someone)"
+            >
+              Note
             </button>
             <button
               type="button"
