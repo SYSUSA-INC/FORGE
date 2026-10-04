@@ -1111,7 +1111,7 @@ Result: scan results are always visible, always cheap to render,
 and stay fresh without burning AI quota on every keystroke.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (Slice 1 PR #309)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #313 · Slice 1 PR #309)
 
 Capture manager, writer and AI in one thread, tied to the section
 instead of a Slack side-channel. BL-FB-CHAT-PERSIST already made the
@@ -5284,7 +5284,7 @@ telemetry, same posture as `section_draft_signal`; clearing a thread
 is a user action and is audited.
 
 ### BL-FB-CHAT-MULTI — Multi-user chat with @mentions
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (Slice 1 PR #309) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 2 in PR (PR #313 · Slice 1 PR #309) — canonical entry under Active priorities
 
 Capture manager + writer + AI in the same thread; `@mention` a team
 member to pull them in. Builds on BL-FB-CHAT-PERSIST. Replaces
