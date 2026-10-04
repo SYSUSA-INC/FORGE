@@ -9,10 +9,12 @@
  *
  *   - chunkText: split a long document into overlapping windows the
  *     model can read in full, one call per window.
- *   - dedupeRequirements / jaccard: merge requirement lists from several
- *     windows (and several companion documents) without repeating the
- *     same clause. Moved here from the document actions so every merge
- *     uses one rule.
+ *   - dedupeRequirements / isSameRequirement: merge requirement lists
+ *     from several windows (and several companion documents) without
+ *     repeating the same clause — and without dropping one that differs
+ *     only by a number or a qualifier (BL-AIX Phase 0). Every merge and
+ *     the compliance seed use this one rule. `jaccard` stays for fuzzy
+ *     matching (Q&A answers to rows), never for dropping requirements.
  *   - categoryFromRef: map an RFP reference to a compliance category.
  *
  * Pure: no DB, no server-only, unit-tested.
@@ -89,8 +91,6 @@ function lastIndexOfAny(haystack: string, needles: string[]): number | null {
   return best >= 0 ? best : null;
 }
 
-const JACCARD_THRESHOLD = 0.6;
-
 function tokenize(text: string): Set<string> {
   return new Set(
     text
@@ -112,14 +112,69 @@ export function jaccard(a: string, b: string): number {
 }
 
 /**
- * Append `incoming` to `base`, dropping any candidate whose text is a
- * near-duplicate (Jaccard ≥ 0.6) of something already kept. Order is
+ * Words that change what a requirement asks for even when everything
+ * else matches: classification levels, cadences, negations, bounds.
+ */
+const DISCRIMINATORS = new Set([
+  "top", "secret", "confidential", "sci", "ts", "public", "trust",
+  "daily", "weekly", "biweekly", "monthly", "quarterly", "annually", "annual", "semiannual", "semiannually", "hourly",
+  "not", "no", "never", "none", "without", "except", "unless",
+  "minimum", "maximum", "least", "most", "exceed", "fewer", "more", "less",
+]);
+
+/** Articles, prepositions and modals: rewording these does not change the obligation. */
+const FILLER = new Set([
+  "a", "an", "the", "of", "to", "in", "on", "at", "by", "for", "with", "from", "as", "is", "are", "be", "been",
+  "will", "shall", "must", "should", "may", "its", "it", "their", "this", "that", "these", "those", "which", "who", "upon", "into", "per",
+]);
+
+/** Every token that can carry meaning — numbers and short labels ("30", "II", "TS") included. */
+function meaningTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 0 && !FILLER.has(t)),
+  );
+}
+
+const SAME_REQUIREMENT_THRESHOLD = 0.8;
+
+/**
+ * BL-AIX Phase 0 — is `b` the same obligation as `a`, seen twice (an
+ * overlapping window, a restating companion document)? Deliberately
+ * conservative: a duplicate row costs a click to delete, a dropped page
+ * limit costs a non-compliant proposal. Two texts are different when
+ *   - their numbers differ ("30 pages" / "15 pages"),
+ *   - each has a word the other lacks (a substitution: "Technical" /
+ *     "Management Volume", "Volume I" / "Volume II"),
+ *   - the extra words include a qualifier ("Secret" / "Top Secret",
+ *     "monthly" / "weekly", "not"),
+ * and otherwise the same only when nearly all their words are shared.
+ */
+export function isSameRequirement(a: string, b: string): boolean {
+  if (requirementKey(a) === requirementKey(b)) return true;
+  const ta = meaningTokens(a);
+  const tb = meaningTokens(b);
+  const onlyA = [...ta].filter((t) => !tb.has(t));
+  const onlyB = [...tb].filter((t) => !ta.has(t));
+  if (onlyA.length === 0 && onlyB.length === 0) return true;
+  if (onlyA.length > 0 && onlyB.length > 0) return false;
+  const extra = onlyA.length > 0 ? onlyA : onlyB;
+  if (extra.some((t) => /\d/.test(t) || DISCRIMINATORS.has(t))) return false;
+  const union = new Set([...ta, ...tb]).size;
+  return union > 0 && (union - extra.length) / union >= SAME_REQUIREMENT_THRESHOLD;
+}
+
+/**
+ * Append `incoming` to `base`, dropping any candidate that is the same
+ * obligation as something already kept (`isSameRequirement`). Order is
  * preserved so the first sighting of a clause wins.
  */
 export function dedupeRequirements<T extends { text: string }>(base: T[], incoming: T[]): T[] {
   const result = [...base];
   for (const candidate of incoming) {
-    const isDup = result.some((existing) => jaccard(existing.text, candidate.text) >= JACCARD_THRESHOLD);
+    const isDup = result.some((existing) => isSameRequirement(existing.text, candidate.text));
     if (!isDup) result.push(candidate);
   }
   return result;

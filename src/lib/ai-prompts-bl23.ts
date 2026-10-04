@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
+import { frontPassExcerpt } from "@/lib/solicitation-sections";
 
 // ────────────────────────────────────────────────────────────────────
 // 1. Solicitation review — full document read
@@ -74,18 +75,17 @@ export function buildSolicitationReviewPrompt(input: {
   fileName: string;
   rawText: string;
 }): { system: string; messages: AIMessage[] } {
-  const trimmed = input.rawText.slice(0, 100_000);
+  // BL-AIX Phase 0 — the beginning plus the located Sections L and M
+  // (they sit at the end of a long RFP), not just the first 100k characters.
+  const excerpt = frontPassExcerpt(input.rawText, 100_000);
   const userPrompt = [
     `Document title: ${input.title || "(untitled)"}`,
     `Source file: ${input.fileName || "(no file)"}`,
     ``,
-    `Full text:`,
+    excerpt.partial ? `Excerpts (the document is ${input.rawText.length.toLocaleString("en-US")} characters; each excerpt is labelled with its position):` : `Full text:`,
     "```",
-    trimmed,
+    excerpt.text,
     "```",
-    input.rawText.length > trimmed.length
-      ? `(Document was trimmed from ${input.rawText.length} chars to first ${trimmed.length}.)`
-      : "",
     ``,
     `Return strict JSON per the schema in the system prompt.`,
   ]

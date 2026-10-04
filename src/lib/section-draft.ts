@@ -13,7 +13,7 @@
  */
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   complianceItems,
@@ -158,6 +158,8 @@ export async function prepareSectionDraft(input: {
           and(
             eq(complianceItems.proposalSectionId, input.sectionId),
             eq(complianceItems.proposalId, row.proposal.id),
+            // BL-AIX Phase 0 — a row the team marked not applicable is not a "MUST address".
+            ne(complianceItems.status, "not_applicable"),
           ),
         )
         .orderBy(asc(complianceItems.ordering))

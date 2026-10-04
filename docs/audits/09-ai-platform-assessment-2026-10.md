@@ -403,12 +403,18 @@ Six properties. Each one is testable.
               └──────────────────────────────────────────────────────────┘
 ```
 
-**A design point unique to this domain:** solicitations are public
-documents. The extraction engine can therefore learn **across all
-tenants** from corrections to public RFP text without exposing any
-tenant's proprietary content. That is a shared accuracy flywheel no
-single-customer tool can match. Everything about a tenant's own writing,
-pricing and people stays strictly per tenant.
+**Isolation is absolute, including for learning** (owner decision,
+2026-10-04). Solicitations are public documents, so learning across
+tenants from corrections to public RFP text was considered. It was
+**rejected**: any path that moves learned signal between tenants opens
+a hole in the isolation boundary. Every learned artifact in the layers
+above (extraction corrections, preferences, examples, evaluator
+calibration, retrieval weights) is scoped to one organisation.
+
+The only cross-tenant asset is the extraction **gold set**. It is
+built by FORGE from public SAM.gov RFPs, drafted by AI and reviewed by
+the owner's proposal expert. It is used only to measure accuracy, is
+never trained on, and contains no tenant data.
 
 ## 8. "Proposals without human intervention": an honest position
 
@@ -492,8 +498,8 @@ regression blocks the merge.
 - An L↔M↔C crosswalk; conflict and ambiguity detection feeding drafted
   questions to the contracting officer.
 - A verify/edit/reject screen whose every correction is recorded as
-  labelled data, which feeds the shared extraction gold set (public
-  text only).
+  labelled data inside that tenant only. The corrections improve that
+  tenant's extraction, never another's.
 - Amendments diffed on the source text and carried into the matrix,
   re-opening affected rows.
 - Automatic import of SAM.gov attachment packages (ZIP included).
@@ -562,20 +568,23 @@ work).**
 
 ## 11. Decisions for the owner
 
-1. **Which response types reach autonomy first** (Rung A/B/C in §8)?
-   This sets the order inside Phases 3–5.
-2. **Who annotates the gold set?** 15–20 RFPs need about 2–3 SME-days
-   each. Without it, accuracy stays a claim, as it is for every
-   competitor.
-3. **Cross-tenant learning from public solicitations only**, opt-in or
-   on by default? Tenant content would never be shared.
+Decided on 2026-10-04:
+1. **Autonomy first for Rung A** — RFIs and sources-sought responses.
+2. **Gold set:** AI drafts the annotations of 15–20 public SAM.gov
+   RFPs; the owner's proposal expert reviews them (about half a day
+   per RFP).
+3. **No cross-tenant learning of any kind**, not even from public
+   solicitation text (see §7).
+6. **API Slice 2c (webhooks) is parked.** BL-AIX Phase 0 starts now.
+   Slice 2b shipped in PR #334.
+
+Still open:
+
 4. **Regulated customers:** do we serve CUI/ITAR tenants in the next 12
    months? If so, GovCloud routing and an inherited FedRAMP boundary
    move up.
-5. **Prompt/response logging** with consent, to make preference
-   training possible later?
-6. **API Slice 2c (outbound webhooks):** park it in favour of this
-   program? Slice 2b (section text) is already built and waiting.
+5. **Prompt/response logging** with consent, to make per-tenant
+   preference training possible later?
 
 ## Appendix — method and caveats
 
