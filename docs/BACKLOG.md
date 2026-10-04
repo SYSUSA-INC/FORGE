@@ -40,7 +40,7 @@ Effort key:
 | 3l | **BL-PACKAGES add-ons Slice 2a** — Add-ons billed on the plan's own Stripe subscription (one invoice), prorated quantity changes and removal | P1 | M | ✅ shipped (PR #324) |
 | 3m | **BL-PACKAGES add-ons Slice 2b** — Seats and storage as add-on kinds; add-ons on the public pricing page | P1 | S | ✅ shipped (PR #325) |
 | 3n | **BL-PACKAGES add-ons Slice 2c** — Reports page (win rates, stage funnel, monthly trend, CSV) behind a new `advancedReporting` flag | P1 | M | ✅ shipped (PR #326) |
-| 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | 🔄 in progress |
+| 3o | **BL-FB-GEN-VOICE Slice 3** — House style per proposal volume; Voices tab comparing two authors on a proposal | P3 | M | 🔄 in PR (PR #327) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -1504,7 +1504,7 @@ thread shared and attributed; Slice 1 makes it a place the team talks.
   section opts in, audits).
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in progress (Slice 2 PR #312 · Slice 1 PR #308)
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #327 · Slice 2 PR #312 · Slice 1 PR #308)
 
 "This reads like AI" is mostly a voice problem: every author's
 sections come back in one register. Slice 1 measures how each author
@@ -5639,7 +5639,7 @@ section by tag; each block stays version-controlled with a changelog.
 Replaces the org-wide "boilerplate.docx" everyone copies from.
 
 ### BL-FB-GEN-VOICE — Per-author voice training
-**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in progress (Slice 2 PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
+**Priority:** P3  ·  **Effort:** L  ·  **Status:** 🔄 Slice 3 in PR (PR #327 · Slice 2 PR #312 · Slice 1 PR #308) — canonical entry under Active priorities
 
 The AI learns each writer's voice from accepted past drafts (system
 prompt fragments captured per author). Generated content for "Sarah's
