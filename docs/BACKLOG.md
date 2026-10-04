@@ -3795,7 +3795,7 @@ sync). Nothing to configure. Vercel's build log will show Next's
 ---
 
 ### BL-QC-combined-job — Consolidate typecheck + lint
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** 🔄 in PR
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** BL-QC-lint  ·  **Status:** 🔄 in PR (PR #310)
 
 Cosmetic CI cleanup — combine the separate `typecheck` (in `pr.yml`)
 and `lint` (in `pr-quality.yml`) jobs into one job-run for slightly
