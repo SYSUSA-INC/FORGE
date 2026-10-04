@@ -417,6 +417,10 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
       // BL-FB-X-COLOR-TEAM Slice 2 — a nudge about a review the user
       // already holds; the inbox row reads as the assignment it refers to.
       return "review_assigned" as const;
+    case "contact_touch_due":
+      // BL-FB-X-CRM Slice 2 — a capture-side reminder, like the
+      // opportunity due-soon nudge; the subject carries the meaning.
+      return "opportunity_review_completed" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;

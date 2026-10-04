@@ -33,6 +33,7 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   review_completed: "Color-team review completed",
   review_assignment_added: "Color-team reviewer added late",
   review_due_soon: "Color-team review due soon",
+  contact_touch_due: "Customer contact follow-up due",
   compliance_overdue: "Compliance item overdue (not yet active)",
   audit_anomaly: "Audit anomaly detected (not yet active)",
   membership_invited: "Team member invited",

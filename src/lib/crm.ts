@@ -225,6 +225,18 @@ export async function logTouch(input: { organizationId: string; contactId: strin
 
 export type OpportunityContact = Awaited<ReturnType<typeof listContacts>>[number] & { warmth: number };
 
+/** BL-FB-X-CRM Slice 2 — the people we know at an agency named free-form (a solicitation's, an opportunity's), warmest first. */
+export async function contactsForAgencyName(input: { organizationId: string; agency: string }): Promise<OpportunityContact[]> {
+  const { organizationId } = input;
+  if (!input.agency.trim()) return [];
+  const all = await listContacts({ organizationId });
+  const matched = contactsForAgency(
+    all.map((c) => ({ ...c, role: normalizeRole(c.role) })),
+    input.agency,
+  );
+  return matched.map((c) => ({ ...c, warmth: warmthScore({ lastTouchAt: c.lastTouchAt, touchCount: c.touchCount, role: c.role }) }));
+}
+
 /** The people we know at an opportunity's agency, warmest first; empty when the agency is blank or unknown. */
 export async function contactsForOpportunity(input: { organizationId: string; opportunityId: string }): Promise<{ agency: string; contacts: OpportunityContact[] }> {
   const { organizationId } = input;
@@ -234,10 +246,5 @@ export async function contactsForOpportunity(input: { organizationId: string; op
     .where(and(eq(opportunities.id, input.opportunityId), eq(opportunities.organizationId, organizationId)))
     .limit(1);
   if (!opp || !opp.agency.trim()) return { agency: opp?.agency ?? "", contacts: [] };
-  const all = await listContacts({ organizationId });
-  const matched = contactsForAgency(
-    all.map((c) => ({ ...c, role: normalizeRole(c.role) })),
-    opp.agency,
-  );
-  return { agency: opp.agency, contacts: matched.map((c) => ({ ...c, warmth: warmthScore({ lastTouchAt: c.lastTouchAt, touchCount: c.touchCount, role: c.role }) })) };
+  return { agency: opp.agency, contacts: await contactsForAgencyName({ organizationId, agency: opp.agency }) };
 }

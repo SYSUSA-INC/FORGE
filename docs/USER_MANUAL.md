@@ -582,9 +582,11 @@ Edit any field, change relationship, add notes. **Sync from SAM.gov** button ref
 - **Warmth** — a 0–100 score from how recently and how often you have been in touch, weighted by the contact's role (hot ≥ 70, warm ≥ 40, cool ≥ 15). It is only as good as the touches you log.
 - **Log a touch** — on the contact page: meeting, call, email, industry day or note, with the date, what was said, the opportunity it served and the follow-up you agreed. The newest touch sets "last touch"; the agreed follow-up becomes the next touch and shows as **due** the week before and **overdue** after.
 - **Follow-up owed** — the page header counts overdue and due-this-week follow-ups; the filter shows only those.
-- **On the opportunity** — the overview's **Who we know at <agency>** panel lists the matched contacts warmest first, or offers to add the first one when nobody is known. Check it before a bid decision: a warm name is pre-RFP intelligence.
+- **On the opportunity and the solicitation** — the **Who we know at <agency>** panel on the opportunity overview and on the solicitation page lists the matched contacts warmest first with their owner and follow-up state, or offers to add the first one when nobody is known. Check it before a bid decision: a warm name is pre-RFP intelligence.
+- **What they buy** — each agency card and each contact page has **Load awards**: the agency's recent contract awards from USAspending (largest first), summarised as obligated total, who wins there, the NAICS mix, offices seen and how many awards end within a year, with the full list and links underneath. It loads only when you click, and your workspace's NAICS codes are tried first so you see the part of their spend you can compete for. If the button says awards intel is in preview, ask an admin to enable it.
+- **Follow-up reminders** — the morning before an agreed next touch (and again if a new date is agreed), the relationship owner gets a notification "Follow-up with <name> (<agency>) is due tomorrow" linking to the contact; an overdue date says so. The reminder goes through **Settings → Notification rules** (trigger "Customer contact follow-up due"), so admins can change channels or switch it off. Contacts with no owner are not reminded — set one.
 
-Every add, edit, delete and touch is recorded in the audit log.
+Every add, edit, delete and touch is recorded in the audit log; so is each procurement lookup.
 
 ## 8. Knowledge base
 

@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { memberships, opportunities, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { deleteContact, logTouch, saveContact, type ContactInput, type TouchInput } from "@/lib/crm";
+import { agencyProcurementHistory, type AgencyProcurementHistory } from "@/lib/crm-history";
 
 function revalidateCrm(contactId?: string | null) {
   revalidatePath("/contacts");
@@ -40,6 +41,13 @@ export async function logTouchAction(input: TouchInput & { contactId: string }):
   const res = await logTouch({ organizationId, contactId, input: rest, actor: { userId: actor.id, email: actor.email } });
   if (res.ok) revalidateCrm(contactId);
   return res;
+}
+
+/** BL-FB-X-CRM Slice 2 — what this agency has been buying, from USAspending, on demand. */
+export async function agencyHistoryAction(agency: string): Promise<AgencyProcurementHistory> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  return agencyProcurementHistory({ organizationId, agency, actor: { userId: actor.id, email: actor.email } });
 }
 
 /** Active members, for the relationship-owner picker. */

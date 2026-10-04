@@ -3,6 +3,7 @@ import { dispatchKeyDateReminders } from "@/lib/solicitation-key-date-cron";
 import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
 import { dispatchSolicitationQaPolls } from "@/lib/solicitation-qa";
 import { dispatchReviewDueReminders } from "@/lib/review-reminders";
+import { dispatchContactTouchReminders } from "@/lib/crm-reminders";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -55,15 +56,22 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon, qaPolls, reviewReminders] = await Promise.allSettled([
+  const [keyDates, dueSoon, qaPolls, reviewReminders, contactReminders] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
     dispatchSolicitationQaPolls(),
     // BL-FB-X-COLOR-TEAM Slice 2 — day-before nudge to unsubmitted reviewers.
     dispatchReviewDueReminders(),
+    // BL-FB-X-CRM Slice 2 — follow-up owed to a customer contact's owner.
+    dispatchContactTouchReminders(),
   ]);
 
   const failures: string[] = [];
+  if (contactReminders.status === "rejected") {
+    const message = contactReminders.reason instanceof Error ? contactReminders.reason.message : String(contactReminders.reason);
+    log.error("[solicitation-key-date-cron]", "contact reminders failed", { error: message });
+    failures.push(`contactReminders: ${message}`);
+  }
   if (reviewReminders.status === "rejected") {
     const message = reviewReminders.reason instanceof Error ? reviewReminders.reason.message : String(reviewReminders.reason);
     log.error("[solicitation-key-date-cron]", "review reminders failed", { error: message });
@@ -101,6 +109,7 @@ export async function GET(req: NextRequest) {
       dueSoon.status === "fulfilled" ? dueSoon.value : null,
     solicitationQa: qaPolls.status === "fulfilled" ? qaPolls.value : null,
     reviewReminders: reviewReminders.status === "fulfilled" ? reviewReminders.value : null,
+    contactReminders: contactReminders.status === "fulfilled" ? contactReminders.value : null,
   };
 
   if (failures.length > 0) {

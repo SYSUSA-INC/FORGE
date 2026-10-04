@@ -43,6 +43,7 @@ const TRIGGER_EVENT_KIND_VALUES: [
   "review_completed",
   "review_assignment_added",
   "review_due_soon",
+  "contact_touch_due",
   "compliance_overdue",
   "audit_anomaly",
   "membership_invited",

@@ -1169,6 +1169,8 @@ export const customerContacts = pgTable(
     lastTouchAt: timestamp("last_touch_at"),
     nextTouchAt: timestamp("next_touch_at"),
     touchCount: integer("touch_count").notNull().default(0),
+    /** BL-FB-X-CRM Slice 2 — the next-touch date the owner was last reminded about; a new date re-arms. */
+    touchReminderFor: timestamp("touch_reminder_for"),
     createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1670,6 +1672,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "proposal_section_assigned",
     // BL-FB-X-COLOR-TEAM Slice 2 — reviewer reminder before a round's due date (migration 0095).
     "review_due_soon",
+    // BL-FB-X-CRM Slice 2 — a customer contact's agreed next touch is due (migration 0099).
+    "contact_touch_due",
   ],
 );
 
