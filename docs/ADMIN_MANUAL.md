@@ -662,6 +662,22 @@ node scripts/apply-schema.mjs
 
 The script is idempotent — it skips anything already applied and only runs new migrations.
 
+From the app: **Platform admin → Operations → Database migrations** (`/admin/migrations`) lists what is pending on the connected database and syncs it, with the same idempotent runner. A page that fails with `relation … does not exist` or `column … does not exist` right after a deploy almost always means a migration below is still pending.
+
+Recent migrations and what each one backs:
+
+| Migration | Feature | Without it |
+|---|---|---|
+| `0104_review_reminder_cadence` | Team review-reminder cadence (Settings → Review reminders) | Settings page and reminder cron fail |
+| `0105_addons` | Add-on catalogue and grants (`tier_addon`, `tenant_addon`) | Billing, tiers and the subscription gate fail |
+| `0106_trial_requests` | Request-a-trial queue | `/request-trial` and `/admin/trial-requests` fail |
+| `0107_api_tokens` | API access tokens and `/api/v1` | Settings → API access and every API call fail |
+| `0108_addon_units` | Seats and storage add-ons | Add-on lists fail to load |
+| `0109_advanced_reporting` | `advancedReporting` on existing tiers (data) | Reports stays "not in your plan" for every tier |
+| `0110_house_style_by_volume` | House style by volume | Settings and voice guidance fail |
+| `0111_review_round_cadence` | A review round's own reminder cadence | Review pages and the reminder cron fail |
+| `0112_section_presence` | Who has a section open | Presence chip silently stays empty |
+
 ### 7.6 Rotating Neon password
 
 Vercel → `forge` → Storage → your Neon database → Settings → **Rotate Secrets**. Vercel auto-updates `DATABASE_URL` in env vars. Copy the new value into your local `.env.local` so migration scripts keep working.

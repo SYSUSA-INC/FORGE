@@ -31,6 +31,22 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 ---
 
+## What's new — October 2026
+
+A short tour of what arrived recently; each line points to the section that explains it.
+
+- **Request a trial** — anyone with a company email can ask for a 14-day trial workspace; editing never stops when a trial ends, only AI pauses (§1.0).
+- **API access** — admins create read-only API tokens to connect FORGE to a CRM or BI tool (§4.15).
+- **Add-ons on your plan's invoice** — token top-ups, extra seats, extra storage and feature unlocks, added, changed or removed with proration (§4.14).
+- **Templates on your plan** — building and editing proposal templates is part of some plans; existing templates always keep working (§4.14).
+- **Reports** — win rate by agency, NAICS and set-aside, the stage funnel and twelve months of created vs won, each downloadable as CSV (§5.6).
+- **House style by volume** and the **Voices** tab — volume-specific writing rules, and a side-by-side of how each author writes on a proposal (§6).
+- **Review reminders you can see** — each in-progress round shows when the next reminder goes out and to whom, and can keep its own pace (§6).
+- **Who's here** — a section's header shows which teammates have it open (§6).
+- **Contacts** — download the list as CSV; agency award history refreshed overnight (§7.5).
+
+---
+
 ## 1. Getting started
 
 ### 1.0 Request a trial
