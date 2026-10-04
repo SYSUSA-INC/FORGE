@@ -5,11 +5,13 @@ import { organizations } from "@/db/schema";
 import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { rowToOrgProfile } from "@/lib/org-types";
 import { getVoiceProfile } from "@/lib/voice";
+import { sanitizeVolumeStyles } from "@/lib/voice-logic";
 import { AuditRetentionPanel } from "./AuditRetentionPanel";
 import { HouseStylePanel } from "./HouseStylePanel";
 import { ReviewReminderPanel } from "./ReviewReminderPanel";
 import { SettingsClient } from "./SettingsClient";
 import { VoicePanel } from "./VoicePanel";
+import { VolumeStylePanel } from "./VolumeStylePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,8 @@ export default async function SettingsPage() {
         />
         {/* BL-FB-GEN-VOICE Slice 2 — the team's rules under every author's voice */}
         <HouseStylePanel initialText={org.houseStyle} orgName={org.name ?? ""} canEdit={canEdit} />
+        {/* BL-FB-GEN-VOICE Slice 3 — extra rules for one volume */}
+        <VolumeStylePanel initial={sanitizeVolumeStyles(org.houseStyleByVolume)} orgName={org.name ?? ""} canEdit={canEdit} />
         {/* BL-FB-X-COLOR-TEAM Slice 3 — how colour-team reviewers are reminded */}
         <ReviewReminderPanel initial={{ daysBefore: org.reviewReminderDaysBefore, repeatDays: org.reviewReminderRepeatDays }} canEdit={canEdit} />
       </div>

@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 import {
   VOICE_LIMITS,
   analyzeVoice,
+  authorComparisonSummary,
+  authorDifferences,
+  sanitizeVolumeStyles,
+  volumeStyleGuidance,
   authoredSentences,
   buildVoiceFixHint,
   compareVoice,
@@ -127,5 +131,41 @@ describe("voice logic", () => {
     expect(lines.slice(1, 4)).toEqual(["- Never say leverage.", "- Open with the customer's outcome.", "- Name the agency as the RFP does."]);
     expect(lines[lines.length - 1]).toMatch(/^- House style governs how things are said, never what is said/);
     expect(houseStyleGuidance("Acme", "  \n ")).toBe("");
+  });
+});
+
+describe("Slice 3 — house style per volume", () => {
+  it("keeps known volumes only, trimmed, and drops empty ones", () => {
+    expect(sanitizeVolumeStyles({ pricing: "  Firm prices.  ", technical: "", bogus: "x", management: 5 })).toEqual({ pricing: "Firm prices." });
+    expect(sanitizeVolumeStyles(null)).toEqual({});
+    expect(sanitizeVolumeStyles({ technical: "x".repeat(VOICE_LIMITS.maxHouseStyleChars + 50) }).technical).toHaveLength(VOICE_LIMITS.maxHouseStyleChars);
+  });
+
+  it("names the volume and lists its rules", () => {
+    const g = volumeStyleGuidance("Acme", "pricing", "- State firm prices.\n\n2) Never round rates.");
+    expect(g.split("\n")).toEqual([
+      "House style for Acme's Price volume — on top of the team rules, for sections in this volume:",
+      "- State firm prices.",
+      "- Never round rates.",
+    ]);
+    expect(volumeStyleGuidance("Acme", "technical", "  \n ")).toBe("");
+  });
+});
+
+describe("Slice 3 — two authors side by side", () => {
+  const base = analyzeVoice([Array.from({ length: 40 }, () => "We fix the backlog first and we measure every ticket.").join(" ")])!;
+
+  it("reads two alike authors as one voice", () => {
+    expect(authorDifferences(base, base)).toEqual([]);
+    expect(authorComparisonSummary("Ana", "Ben", [])).toBe("Ana and Ben read as one voice on this proposal.");
+  });
+
+  it("flags the measures an evaluator would notice, both ways round", () => {
+    const other = { ...base, avgSentenceLength: base.avgSentenceLength * 2, passiveRate: base.passiveRate + 0.3, wePerThousand: 0, contractionsPerThousand: 5 };
+    const diffs = authorDifferences(base, other);
+    expect(diffs.map((d) => d.kind)).toEqual(["sentence_length", "passive", "we", "contractions"]);
+    expect(authorDifferences(other, base).map((d) => d.kind)).toEqual(diffs.map((d) => d.kind));
+    expect(diffs[0]).toMatchObject({ label: "Sentence length", a: `${Math.round(base.avgSentenceLength)} words` });
+    expect(authorComparisonSummary("Ana", "Ben", diffs)).toBe("4 differences an evaluator may notice between Ana's and Ben's sections.");
   });
 });

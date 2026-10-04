@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
-import { addVoiceSample, rebuildVoiceProfile, removeVoiceSample, updateHouseStyle, updateVoiceSettings, type RebuildResult } from "@/lib/voice";
+import { addVoiceSample, rebuildVoiceProfile, removeVoiceSample, updateHouseStyle, updateVoiceSettings, updateVolumeStyle, type RebuildResult } from "@/lib/voice";
 
 /** BL-FB-GEN-VOICE — rebuild the signed-in author's voice from their sections and samples. */
 export async function rebuildMyVoiceAction(): Promise<RebuildResult> {
@@ -43,6 +43,21 @@ export async function updateMyVoiceSettingsAction(input: { enabled: boolean; cus
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const res = await updateVoiceSettings({ organizationId, userId: user.id, enabled: !!input.enabled, customGuidance: String(input.customGuidance ?? ""), actor: { userId: user.id, email: user.email } });
+  if (res.ok) revalidatePath("/settings");
+  return res;
+}
+
+/** BL-FB-GEN-VOICE Slice 3 — one volume's extra house-style rules. Org admins only. */
+export async function updateVolumeStyleAction(input: { volume: string; text: string }): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+  const res = await updateVolumeStyle({
+    organizationId,
+    volume: String(input.volume ?? ""),
+    text: String(input.text ?? ""),
+    actor: { userId: user.id, email: user.email },
+  });
   if (res.ok) revalidatePath("/settings");
   return res;
 }
