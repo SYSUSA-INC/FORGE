@@ -321,11 +321,24 @@ the phases below.
       - Tests: `tests/ai/extraction-coverage.test.ts` and
         `tests/isolation/compliance-dismissal.test.ts`.
 - **Phase 1 — measure and harden:**
+  - **1a** — Gateway resilience: 🔄 in progress.
+    - Every model call (Anthropic, streaming included, Azure OpenAI,
+      vLLM) and every embedding call now goes through `fetchWithRetry`
+      (`src/lib/http-retry.ts`).
+    - **A deadline for the response to start:** 150 s for a whole
+      generation, 60 s for a stream's first byte, 30 s for embeddings.
+      A hung call fails with a clear error that the gateway records
+      and callers refund, instead of being killed by the function limit
+      with no ledger row.
+    - **Retries:** up to 3 attempts on 408, 409, 425, 429, 5xx and 529
+      and on dropped connections, with full-jitter backoff that
+      honours `retry-after` (capped at 30 s), inside a 120 s budget. A
+      missed deadline is not retried.
+    - Tests: `tests/ai/http-retry.test.ts`.
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
   - a prompt version on every feature;
-  - gateway timeouts, retries, fallback and a per-model capability
-    table;
+  - provider fallback and a per-model capability table;
   - caching and batches.
 - **Phase 2 — Solicitation Intelligence Engine:**
   - structured Sections L, M and C;

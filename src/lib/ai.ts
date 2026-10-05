@@ -31,7 +31,17 @@
  */
 
 import { z } from "zod";
+import { fetchWithRetry } from "@/lib/http-retry";
 import { withUntrustedContentRule } from "@/lib/prompt-safety";
+
+/**
+ * BL-AIX Phase 1a — deadlines for the provider's response to start. A
+ * non-streaming answer arrives with its headers, so this bounds the whole
+ * generation (inside the 300-second function limit, leaving room for the
+ * caller's own work); a stream only has to start within the shorter one.
+ */
+const COMPLETION_DEADLINE_MS = 150_000;
+const STREAM_FIRST_BYTE_DEADLINE_MS = 60_000;
 import type { AiFeature } from "@/lib/ai-features";
 import {
   DEFAULT_ANTHROPIC_MODEL,
@@ -339,11 +349,11 @@ class AnthropicProvider implements AIProvider {
       return this.completeStreaming(opts.onDelta, model, body);
     }
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      "https://api.anthropic.com/v1/messages",
+      { method: "POST", headers: this.headers(), body: JSON.stringify(body) },
+      { label: "Anthropic", timeoutMs: COMPLETION_DEADLINE_MS },
+    );
     if (!res.ok) {
       const errBody = await res.text();
       throw new Error(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`);
@@ -361,11 +371,11 @@ class AnthropicProvider implements AIProvider {
     model: string,
     body: Record<string, unknown>,
   ): Promise<AICompleteResult> {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ ...body, stream: true }),
-    });
+    const res = await fetchWithRetry(
+      "https://api.anthropic.com/v1/messages",
+      { method: "POST", headers: this.headers(), body: JSON.stringify({ ...body, stream: true }) },
+      { label: "Anthropic", timeoutMs: STREAM_FIRST_BYTE_DEADLINE_MS },
+    );
     if (!res.ok) {
       const errBody = await res.text();
       throw new Error(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`);
@@ -500,11 +510,11 @@ class AzureOpenAIProvider implements AIProvider {
     // Azure deployments are model-pinned; the model is the deployment.
     const body = __buildOpenAiCompatBody(opts, true);
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", "api-key": this.apiKey },
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      url,
+      { method: "POST", headers: { "content-type": "application/json", "api-key": this.apiKey }, body: JSON.stringify(body) },
+      { label: "Azure OpenAI", timeoutMs: COMPLETION_DEADLINE_MS },
+    );
     if (!res.ok) {
       const errBody = await res.text();
       throw new Error(`Azure OpenAI ${res.status}: ${errBody.slice(0, 300)}`);
@@ -537,11 +547,11 @@ class VLLMProvider implements AIProvider {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (this.apiKey) headers["authorization"] = `Bearer ${this.apiKey}`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithRetry(
+      url,
+      { method: "POST", headers, body: JSON.stringify(body) },
+      { label: "vLLM", timeoutMs: COMPLETION_DEADLINE_MS },
+    );
     if (!res.ok) {
       const errBody = await res.text();
       throw new Error(`vLLM ${res.status}: ${errBody.slice(0, 300)}`);
