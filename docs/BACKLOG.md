@@ -53,7 +53,8 @@ Effort key:
 | 3y | **BL-AIX Phase 0c-1** — Background scans no longer stall behind proposals whose plan lacks the scan; the section draft becomes a library a background job can call | P0 | S | ✅ shipped (PR #337) |
 | 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | ✅ shipped (PR #338) |
 | 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | ✅ shipped (PR #339) |
-| 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | 🔄 in PR (PR #340) |
+| 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | ✅ shipped (PR #340) |
+| 3ac | **BL-AIX Phase 1a** — Provider calls get deadlines (150 s answer, 60 s first streamed byte, 30 s embeddings) and retries with backoff on 429 / 529 / 5xx and dropped connections | P0 | S | 🔄 in PR (PR #341) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -151,7 +152,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · 🔄 Phase 0d-2 in PR (PR #340)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · 🔄 Phase 1a in PR (PR #341)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -298,8 +299,8 @@ the phases below.
       - Tests: `tests/ai/prompt-safety.test.ts`, a gateway case in
         `tests/ai/gateway-streaming.test.ts`, and
         `tests/isolation/amendment-link.test.ts`.
-    - **0d-2** — What wasn't read; deleted rows stay deleted: 🔄 in
-      PR (PR #340).
+    - **0d-2** — What wasn't read; deleted rows stay deleted: ✅
+      shipped (PR #340).
       - **Sweep coverage.** Migration `0114` adds
         `extraction_coverage` to `solicitation` and
         `solicitation_document`. The parse records the characters the
@@ -321,11 +322,24 @@ the phases below.
       - Tests: `tests/ai/extraction-coverage.test.ts` and
         `tests/isolation/compliance-dismissal.test.ts`.
 - **Phase 1 — measure and harden:**
+  - **1a** — Gateway resilience: 🔄 in PR (PR #341).
+    - Every model call (Anthropic, streaming included, Azure OpenAI,
+      vLLM) and every embedding call now goes through `fetchWithRetry`
+      (`src/lib/http-retry.ts`).
+    - **A deadline for the response to start:** 150 s for a whole
+      generation, 60 s for a stream's first byte, 30 s for embeddings.
+      A hung call fails with a clear error that the gateway records
+      and callers refund, instead of being killed by the function limit
+      with no ledger row.
+    - **Retries:** up to 3 attempts on 408, 409, 425, 429, 5xx and 529
+      and on dropped connections, with full-jitter backoff that
+      honours `retry-after` (capped at 30 s), inside a 120 s budget. A
+      missed deadline is not retried.
+    - Tests: `tests/ai/http-retry.test.ts`.
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
   - a prompt version on every feature;
-  - gateway timeouts, retries, fallback and a per-model capability
-    table;
+  - provider fallback and a per-model capability table;
   - caching and batches.
 - **Phase 2 — Solicitation Intelligence Engine:**
   - structured Sections L, M and C;

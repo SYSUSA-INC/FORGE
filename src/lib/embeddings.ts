@@ -18,6 +18,7 @@
  * the one AI spend the ledger never saw.
  */
 import "server-only";
+import { fetchWithRetry } from "@/lib/http-retry";
 
 import { KNOWLEDGE_EMBEDDING_DIM } from "@/db/schema";
 
@@ -181,18 +182,23 @@ const OPENAI_MODEL =
 
 async function embedOpenAI(texts: string[]): Promise<EmbeddingResult> {
   const key = process.env.OPENAI_API_KEY!;
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${key}`,
+  // BL-AIX Phase 1a — a deadline and retries on rate limits / 5xx.
+  const res = await fetchWithRetry(
+    "https://api.openai.com/v1/embeddings",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        input: texts,
+        dimensions: KNOWLEDGE_EMBEDDING_DIM,
+      }),
     },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      input: texts,
-      dimensions: KNOWLEDGE_EMBEDDING_DIM,
-    }),
-  });
+    { label: "OpenAI embeddings", timeoutMs: 30_000, budgetMs: 60_000 },
+  );
   if (!res.ok) {
     const errBody = await res.text();
     throw new Error(`OpenAI embeddings ${res.status}: ${errBody.slice(0, 300)}`);
