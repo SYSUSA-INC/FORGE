@@ -53,7 +53,7 @@ Effort key:
 | 3y | **BL-AIX Phase 0c-1** — Background scans no longer stall behind proposals whose plan lacks the scan; the section draft becomes a library a background job can call | P0 | S | ✅ shipped (PR #337) |
 | 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | ✅ shipped (PR #338) |
 | 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | ✅ shipped (PR #339) |
-| 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | 🔄 in progress |
+| 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | 🔄 in PR (PR #340) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -151,7 +151,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · 🔄 Phase 0d-2 in progress
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · 🔄 Phase 0d-2 in PR (PR #340)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -299,7 +299,7 @@ the phases below.
         `tests/ai/gateway-streaming.test.ts`, and
         `tests/isolation/amendment-link.test.ts`.
     - **0d-2** — What wasn't read; deleted rows stay deleted: 🔄 in
-      progress.
+      PR (PR #340).
       - **Sweep coverage.** Migration `0114` adds
         `extraction_coverage` to `solicitation` and
         `solicitation_document`. The parse records the characters the
