@@ -52,7 +52,8 @@ Effort key:
 | 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | ✅ shipped (PR #336) |
 | 3y | **BL-AIX Phase 0c-1** — Background scans no longer stall behind proposals whose plan lacks the scan; the section draft becomes a library a background job can call | P0 | S | ✅ shipped (PR #337) |
 | 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | ✅ shipped (PR #338) |
-| 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | 🔄 in PR (PR #339) |
+| 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | ✅ shipped (PR #339) |
+| 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | 🔄 in PR (PR #340) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -150,7 +151,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · 🔄 Phase 0d-1 in PR (PR #339)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · 🔄 Phase 0d-2 in PR (PR #340)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -268,7 +269,7 @@ the phases below.
       - Tests: `tests/ai/auto-draft-logic.test.ts` and
         `tests/isolation/auto-draft.test.ts`.
   - **0d** — Trust, in two PRs:
-    - **0d-1** — Quoted material, Section M and amendments: 🔄 in PR
+    - **0d-1** — Quoted material, Section M and amendments: ✅ shipped
       (PR #339).
       - **The AI gateway appends `UNTRUSTED_CONTENT_RULE`** to every
         tenant call's system prompt, streaming included
@@ -297,10 +298,28 @@ the phases below.
       - Tests: `tests/ai/prompt-safety.test.ts`, a gateway case in
         `tests/ai/gateway-streaming.test.ts`, and
         `tests/isolation/amendment-link.test.ts`.
-    - **0d-2** — 🔄 next.
-      - Sweep coverage shown when a long document is cut short.
-      - A record of deleted seed rows so a re-seed doesn't bring them
-        back.
+    - **0d-2** — What wasn't read; deleted rows stay deleted: 🔄 in
+      PR (PR #340).
+      - **Sweep coverage.** Migration `0114` adds
+        `extraction_coverage` to `solicitation` and
+        `solicitation_document`. The parse records the characters the
+        windows covered, the total, failed windows, requirements found
+        and kept, or a scanned-document marker.
+      - **The coverage banner.** `describeCoverage`
+        (`src/lib/extraction-coverage.ts`) turns that into plain
+        sentences. The solicitation page shows a "Not everything was
+        read" banner above the requirement list, for the solicitation
+        and each companion document, that says to upload long parts as
+        companion documents.
+      - **Deleted rows stay deleted.** Migration `0114` also adds
+        `compliance_seed_dismissal`. Deleting a compliance row records
+        its normalized text for that proposal, and "Seed from
+        solicitation" skips it (exact text or `isSameRequirement`),
+        reporting how many it left out. Scoped to the organization and
+        proposal.
+      - `EXPECTED_LATEST_MIGRATION` is bumped.
+      - Tests: `tests/ai/extraction-coverage.test.ts` and
+        `tests/isolation/compliance-dismissal.test.ts`.
 - **Phase 1 — measure and harden:**
   - an extraction gold set in CI;
   - retrieval and draft evaluations;

@@ -681,6 +681,7 @@ Recent migrations and what each one backs:
 | `0111_review_round_cadence` | A review round's own reminder cadence | Review pages and the reminder cron fail |
 | `0112_section_presence` | Who has a section open | Presence chip silently stays empty |
 | `0113_section_auto_draft_job` | Server-side auto-draft (`section_auto_draft` background jobs) | "Auto-draft proposal" fails to start |
+| `0114_extraction_coverage_seed_dismissals` | Requirement-sweep coverage banner; deleted matrix rows not re-seeded | Solicitation parses and compliance deletes / seeds fail |
 
 ### 7.6 Rotating Neon password
 

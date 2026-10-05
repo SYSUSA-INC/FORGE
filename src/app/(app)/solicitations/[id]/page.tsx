@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { describeCoverage } from "@/lib/extraction-coverage";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -131,6 +132,10 @@ export default async function SolicitationDetail({
 
   // BL-FB-SOL-BUNDLE — load companion documents for the bundle panel.
   const companionDocs = await listSolicitationDocumentsAction(s.id);
+  const coverageNotes = [
+    ...(describeCoverage(s.extractionCoverage) ?? []),
+    ...companionDocs.flatMap((d) => (d.coverageWarnings ?? []).map((w) => `${d.fileName}: ${w}`)),
+  ];
 
   // BL-FB-SOL-QA — the contracting officer's answers and the requirement
   // references they refine (marked in the requirements list below).
@@ -414,6 +419,17 @@ export default async function SolicitationDetail({
             title="Requirements"
             eyebrow={`${s.extractedRequirements.length} extracted${companionDocs.length > 0 ? " (merged)" : ""}`}
           >
+            {/* BL-AIX Phase 0d — say plainly what the sweep didn't read. */}
+            {coverageNotes.length > 0 ? (
+              <div className="mb-3 rounded-md border border-gold/40 bg-gold/10 px-3 py-2">
+                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">Not everything was read</div>
+                <ul className="mt-1 flex flex-col gap-1 font-body text-[12px] leading-relaxed text-text">
+                  {coverageNotes.map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {s.extractedRequirements.length === 0 ? (
               <p className="font-body text-[13px] text-muted">
                 {s.parseStatus === "parsed"

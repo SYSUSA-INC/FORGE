@@ -22,6 +22,7 @@ import {
   type AIDocumentMedia,
 } from "@/lib/ai";
 import { isTruncatedStop } from "@/lib/ai-stop";
+import { coverageFromSweep, type ExtractionCoverage } from "@/lib/extraction-coverage";
 import {
   chunkText,
   mergeRequirementLists,
@@ -94,6 +95,10 @@ export type FullTextRequirementsResult = {
   requirements: RequirementLike[];
   chunks: number;
   failedChunks: number;
+  /** BL-AIX Phase 0d — what the windows covered, and requirements before the cap. */
+  readChars: number;
+  totalChars: number;
+  found: number;
   /** Windows that hit the output ceiling and were split and re-read. */
   splitChunks: number;
   stubbed: boolean;
@@ -192,8 +197,12 @@ export async function extractRequirementsFullText(
     }
   }
 
+  const merged = mergeRequirementLists(lists);
   return {
-    requirements: mergeRequirementLists(lists).slice(0, MAX_REQUIREMENTS_PER_DOCUMENT),
+    requirements: merged.slice(0, MAX_REQUIREMENTS_PER_DOCUMENT),
+    found: merged.length,
+    readChars: chunks.length > 0 ? chunks[chunks.length - 1]!.end : 0,
+    totalChars: rawText.length,
     chunks: chunks.length,
     failedChunks,
     splitChunks,
@@ -205,7 +214,10 @@ export async function aiExtractSolicitation(
   organizationId: string,
   rawText: string,
   options?: { documentLabel?: string },
-): Promise<{ ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean; coverage?: ExtractionCoverage }
+  | { ok: false; error: string }
+> {
   if (!rawText.trim()) return { ok: false, error: "No text extracted from the file." };
   try {
     const prompt = buildSolicitationExtractPrompt(rawText);
@@ -261,6 +273,7 @@ export async function aiExtractSolicitation(
     }
 
     const data = normalizeExtraction(ai.data);
+    let coverage: ExtractionCoverage | undefined;
 
     // BL-AIP-5 — the front-matter pass above sees the first 80k
     // characters and returns a ranked sample. The sweep reads every
@@ -272,6 +285,16 @@ export async function aiExtractSolicitation(
       });
       if (!sweep.stubbed && sweep.requirements.length >= data.requirements.length) {
         data.requirements = sweep.requirements;
+      }
+      if (!sweep.stubbed) {
+        coverage = coverageFromSweep({
+          totalChars: sweep.totalChars,
+          readChars: sweep.readChars,
+          windows: sweep.chunks,
+          failedWindows: sweep.failedChunks,
+          requirementsFound: sweep.found,
+          requirementsKept: data.requirements.length,
+        });
       }
       log.info("[aiExtractSolicitation]", "requirement sweep", {
         chunks: sweep.chunks,
@@ -292,6 +315,7 @@ export async function aiExtractSolicitation(
       model: ai.model,
       stubbed: false,
       data,
+      coverage,
     };
   } catch (err) {
     log.error("[aiExtractSolicitation]", "error", { error: err });

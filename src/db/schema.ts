@@ -1086,6 +1086,32 @@ export const proposalSectionSnapshots = pgTable(
 );
 
 /**
+ * BL-AIX Phase 0d — requirement text a team removed from a proposal's
+ * compliance matrix (drizzle/0114). "Seed from solicitation" skips it,
+ * so a row deleted as a false positive doesn't come back on the next
+ * seed. One row per (proposal, normalized text).
+ */
+export const complianceSeedDismissals = pgTable(
+  "compliance_seed_dismissal",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    requirementKey: text("requirement_key").notNull(),
+    requirementText: text("requirement_text").notNull().default(""),
+    dismissedByUserId: text("dismissed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.proposalId, t.requirementKey] }),
+    orgIdx: index("compliance_seed_dismissal_org_idx").on(t.organizationId, t.proposalId),
+  }),
+);
+
+/**
  * BL-9 Slice 7 — one row per accept / reject of a tracked change,
  * written by `recordChangeDecisionsAction` (drizzle/0078). The section
  * drafter reads the org's recent rows to learn what owners keep and
@@ -2417,6 +2443,12 @@ export const solicitations = pgTable("solicitation", {
   // new (drizzle/0093).
   qaCheckedAt: timestamp("qa_checked_at", { withTimezone: true }),
   qaSeenLinks: jsonb("qa_seen_links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  // BL-AIX Phase 0d — how much of the document the requirement sweep read
+  // (drizzle/0114); the solicitation page warns when it fell short.
+  extractionCoverage: jsonb("extraction_coverage")
+    .$type<import("@/lib/extraction-coverage").ExtractionCoverage>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2537,6 +2569,11 @@ export const solicitationDocuments = pgTable(
       .$type<SolicitationRequirement[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    // BL-AIX Phase 0d — how much of this document the sweep read (drizzle/0114).
+    extractionCoverage: jsonb("extraction_coverage")
+      .$type<import("@/lib/extraction-coverage").ExtractionCoverage>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     sortOrder: integer("sort_order").notNull().default(0),
     uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
       onDelete: "set null",

@@ -6,6 +6,7 @@ import { db } from "@/db";
 import {
   complianceItemEvidence,
   complianceItems,
+  complianceSeedDismissals,
   knowledgeEntries,
   organizations,
   proposalSections,
@@ -32,6 +33,7 @@ import {
   type AutoMapSuggestion,
 } from "@/lib/compliance-automap";
 import { seedComplianceItemsFromRequirements } from "@/lib/compliance-seed";
+import { requirementKey } from "@/lib/requirements-text";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   enforceQuota,
@@ -244,21 +246,37 @@ export async function deleteComplianceItemAction(
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
-  await db
+  const [deleted] = await db
     .delete(complianceItems)
     .where(
       and(
         eq(complianceItems.id, itemId),
         eq(complianceItems.proposalId, proposalId),
       ),
-    );
+    )
+    .returning({ requirementText: complianceItems.requirementText });
+  // BL-AIX Phase 0d — remember it, so "Seed from solicitation" doesn't
+  // bring a row the team removed back into the matrix.
+  const key = deleted ? requirementKey(deleted.requirementText) : "";
+  if (key) {
+    await db
+      .insert(complianceSeedDismissals)
+      .values({
+        organizationId,
+        proposalId,
+        requirementKey: key,
+        requirementText: deleted!.requirementText.slice(0, 4_000),
+        dismissedByUserId: actor.id,
+      })
+      .onConflictDoNothing();
+  }
   await recordAudit({
     organizationId,
     actor: { userId: actor.id, email: actor.email },
     action: "proposal.compliance.delete",
     resourceType: "compliance_item",
     resourceId: itemId,
-    metadata: { proposalId },
+    metadata: { proposalId, rememberedForSeed: !!key },
   });
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
@@ -850,6 +868,7 @@ export type SeedComplianceActionResult =
       ok: true;
       inserted: number;
       skippedDuplicates: number;
+      skippedDismissed: number;
       available: number;
       solicitationCount: number;
     }
