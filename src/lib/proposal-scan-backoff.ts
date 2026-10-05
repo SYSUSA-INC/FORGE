@@ -32,3 +32,21 @@ export function nextScanAttempt(
     nextAttemptAt: new Date(now.getTime() + scanBackoffMs(attempts)),
   };
 }
+
+/** How long a proposal over its AI quota waits before the cron looks again. */
+export const SCAN_QUOTA_RECHECK_MS = 6 * 60 * 60_000;
+
+/**
+ * BL-AIX Phase 0c — what the cron does with a proposal it may not scan.
+ * It used to skip such a row and leave it first in the queue, so five of
+ * them blocked background scans for every tenant. A plan without the
+ * feature clears the flag (the next save sets it again); a spent quota
+ * waits six hours before the cron looks again.
+ */
+export function gatedScanAction(
+  reason: "feature" | "quota",
+  now: Date = new Date(),
+): { clear: true } | { clear: false; nextAttemptAt: Date } {
+  if (reason === "feature") return { clear: true };
+  return { clear: false, nextAttemptAt: new Date(now.getTime() + SCAN_QUOTA_RECHECK_MS) };
+}

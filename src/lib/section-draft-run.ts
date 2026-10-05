@@ -1,0 +1,194 @@
+/**
+ * BL-AIX Phase 0c — one non-streaming section draft, outside any request:
+ * feature and quota gates, the prompt, the provider call, the citation
+ * verifier, truncation detection and the draft signal. The section AI
+ * panel's server action and the background auto-draft job both call it,
+ * so the two paths cannot drift. Callers authenticate; this takes the
+ * organization and user as given.
+ */
+import "server-only";
+
+import { completeForTenant } from "@/lib/ai";
+import {
+  enforceQuota,
+  ensureFeature,
+  FeatureGateError,
+  QuotaExceededError,
+  refundQuota,
+} from "@/lib/subscription-gates";
+import { SECTION_DRAFT_PROMPT_VERSION, type SectionDraftMode } from "@/lib/ai-prompts";
+import { isTruncatedStop } from "@/lib/ai-stop";
+import {
+  extractCitationStats,
+  type CitationStats,
+  type CitationVerification,
+  type DraftSource,
+} from "@/lib/citations";
+import { verifyDraftCitations } from "@/lib/citation-verify";
+import {
+  captureDraftSignal,
+  isDraftMode,
+  prepareSectionDraft,
+} from "@/lib/section-draft";
+import { fromPlainText } from "@/lib/tiptap-doc";
+import { log } from "@/lib/log";
+
+export type SectionDraftResult =
+  | {
+      ok: true;
+      mode: SectionDraftMode;
+      text: string;
+      bodyDoc: import("@/db/schema").TipTapDoc;
+      provider: string;
+      model: string;
+      stubbed: boolean;
+      inputTokens?: number;
+      outputTokens?: number;
+      generatedAt: string;
+      /** BL-11: id of the captured draft signal row, present for draft/draft_alt modes. */
+      signalId?: string;
+      /** BL-FB-GEN-CITE — present when the draft was generated in citation mode. */
+      sources?: DraftSource[];
+      citations?: CitationStats;
+      sourcesStubbed?: boolean;
+      /** BL-AIP-5 — the provider stopped at its output ceiling; the draft is cut short. */
+      truncated?: boolean;
+      /** BL-AIP-5 — what the verifier pass did (citation mode only). */
+      verification?: CitationVerification;
+    }
+  | {
+      ok: false;
+      error: string;
+      /** BL-AIX Phase 0c — "gated": the plan or quota refuses; retrying won't help. */
+      code?: "gated" | "invalid" | "empty" | "failed";
+    };
+
+export async function runSectionDraft(input: {
+  organizationId: string;
+  /** Who the draft signal is recorded against. */
+  userId: string;
+  sectionId: string;
+  mode: SectionDraftMode;
+  /** BL-11 A/B: caller-supplied UUID linking the two competing variants. */
+  abPairId?: string;
+  abVariant?: "a" | "b";
+  /**
+   * BL-FB-GEN-CITE — require inline citations against Brain sources.
+   * BL-AIP-5 — on by default; pass `false` to opt out.
+   */
+  cite?: boolean;
+}): Promise<SectionDraftResult> {
+  const { organizationId } = input;
+  const cite = input.cite ?? true;
+
+  // BL-16 Phase B-2 — gate AI section generation on `aiAutoDraft`.
+  // BL-16 Phase B-3b — also bump the AI-request counter for this month.
+  try {
+    await ensureFeature(organizationId, "aiAutoDraft");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
+  } catch (err) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
+      return { ok: false, error: err.message, code: "gated" };
+    }
+    throw err;
+  }
+
+  if (!isDraftMode(input.mode)) {
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return { ok: false, error: "Invalid mode.", code: "invalid" };
+  }
+
+  const prepared = await prepareSectionDraft({
+    organizationId,
+    sectionId: input.sectionId,
+    mode: input.mode,
+    cite,
+  });
+  if (!prepared.ok) {
+    // Nothing was generated — give the request slot back.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    return { ok: false, error: prepared.error, code: "invalid" };
+  }
+
+  try {
+    const ai = await completeForTenant({
+      organizationId,
+      feature: "section_draft",
+      variant: cite ? `${input.mode}+cite` : input.mode,
+      promptVersion: SECTION_DRAFT_PROMPT_VERSION,
+      system: prepared.prompt.system,
+      messages: prepared.prompt.messages,
+      maxTokens: prepared.maxTokens,
+      temperature: prepared.temperature,
+      cacheSystem: true,
+    });
+
+    let text = (ai.text ?? "").trim();
+    if (!text) {
+      // BL-16 Phase B-3d — AI returned nothing usable, refund the request slot.
+      await refundQuota(organizationId, "aiRequestsPerMonth");
+      return { ok: false, error: "AI returned an empty response.", code: "empty" };
+    }
+
+    // BL-AIP-5 — verifier pass: invented markers become [NEEDS CITATION]
+    // and every cited sentence is checked against its source excerpt.
+    let verification: CitationVerification | undefined;
+    if (cite && prepared.sources.length > 0 && !ai.stubbed) {
+      const verified = await verifyDraftCitations({
+        organizationId,
+        text,
+        sources: prepared.sources,
+      });
+      text = verified.text;
+      verification = verified.verification;
+    }
+    const truncated = isTruncatedStop(ai.stopReason);
+
+    const signalId = await captureDraftSignal({
+      organizationId,
+      proposalId: prepared.proposalId,
+      sectionId: input.sectionId,
+      createdByUserId: input.userId,
+      mode: input.mode,
+      sectionKind: prepared.sectionKind,
+      draftText: text,
+      stubbed: ai.stubbed,
+      abPairId: input.abPairId,
+      abVariant: input.abVariant,
+    });
+
+    return {
+      ok: true,
+      mode: input.mode,
+      text,
+      bodyDoc: fromPlainText(text),
+      provider: ai.provider,
+      model: ai.model,
+      stubbed: ai.stubbed,
+      inputTokens: ai.inputTokens,
+      outputTokens: ai.outputTokens,
+      generatedAt: new Date().toISOString(),
+      signalId,
+      truncated,
+      ...(cite
+        ? {
+            sources: prepared.sources,
+            citations: extractCitationStats(text),
+            sourcesStubbed: prepared.sourcesStubbed,
+            verification,
+          }
+        : {}),
+    };
+  } catch (err) {
+    // BL-16 Phase B-3d — AI call failed (network / provider error). Refund
+    // the request slot so the user isn't billed for an attempt that never
+    // produced output. Token cap is post-record so it never charged.
+    await refundQuota(organizationId, "aiRequestsPerMonth");
+    log.error("[runSectionDraft]", "error", { error: err });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "AI request failed.",
+      code: "failed",
+    };
+  }
+}

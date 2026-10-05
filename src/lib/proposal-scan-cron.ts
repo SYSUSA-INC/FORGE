@@ -29,7 +29,7 @@ import {
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { completeStructuredForTenant } from "@/lib/ai";
 import { proposalScanSchema } from "@/lib/ai-prompts";
-import { nextScanAttempt } from "@/lib/proposal-scan-backoff";
+import { gatedScanAction, nextScanAttempt } from "@/lib/proposal-scan-backoff";
 import {
   buildScanUserPrompt,
   SCAN_MAX_TOKENS,
@@ -99,25 +99,36 @@ export async function runStaleProposalScans(
   };
 
   for (const row of staleRows) {
-    // Feature + quota gates — skip silently, don't refund (nothing was charged yet).
-    let gated = false;
+    // Feature + quota gates — nothing was charged yet, so no refund. A
+    // gated row must leave the head of the queue (BL-AIX Phase 0c): it
+    // used to stay there and five of them stopped scans for every tenant.
+    let gated: "feature" | "quota" | null = null;
     try {
       await ensureFeature(row.organizationId, "aiAutoDraft");
       await enforceQuota(row.organizationId, "aiRequestsPerMonth");
     } catch (err) {
-      if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
-        gated = true;
-        log.info("[proposal-scan-cron]", "skipped (gate/quota)", {
-          proposalId: row.id,
-          reason: err instanceof Error ? err.message : String(err),
-        });
-      } else {
-        throw err;
-      }
+      if (err instanceof FeatureGateError) gated = "feature";
+      else if (err instanceof QuotaExceededError) gated = "quota";
+      else throw err;
+      log.info("[proposal-scan-cron]", "skipped (gate/quota)", {
+        proposalId: row.id,
+        reason: err instanceof Error ? err.message : String(err),
+      });
     }
 
     if (gated) {
       summary.skipped++;
+      const action = gatedScanAction(gated, new Date());
+      try {
+        if (action.clear) await clearScanState(row.id, row.organizationId);
+        else
+          await db
+            .update(proposals)
+            .set({ scanNextAttemptAt: action.nextAttemptAt })
+            .where(and(eq(proposals.id, row.id), eq(proposals.organizationId, row.organizationId)));
+      } catch (bookkeepingErr) {
+        log.error("[proposal-scan-cron]", "gated-row bookkeeping failed", { proposalId: row.id, error: bookkeepingErr });
+      }
       continue;
     }
 

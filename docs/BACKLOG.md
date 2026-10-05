@@ -228,10 +228,42 @@ the phases below.
     - Tests: `tests/ai/ai-acceptance.test.ts`; additions to
       `tests/ai/edit-feedback.test.ts` and
       `tests/isolation/voice.test.ts`.
-  - **0c** — Background reliability:
-    - the scan-cron stall (gated proposals block the batch);
-    - auto-draft as a resumable server job (snapshot, truncation check,
-      queue a scan).
+  - **0c** — Background reliability, in two PRs (the work exceeds the
+    1,500-line cap as one):
+    - **0c-1** — The scan stall and the draft library: 🔄 in progress.
+      - **The scan-cron stall.** A proposal whose plan lacks the scan
+        used to be skipped and left first in the queue; five of them
+        stopped background scans for every tenant. Now such a proposal
+        clears its flag (the next save sets it again), and one over
+        quota waits six hours (`gatedScanAction`).
+      - **`runSectionDraft`** (`src/lib/section-draft-run.ts`): the
+        non-streaming section draft moved out of the server action so a
+        background job can call it without a session. The action is now
+        a thin wrapper. Failures carry a `code` ("gated" for plan or
+        quota) so callers can tell retryable from final.
+      - Tests: additions to `tests/ai/proposal-scan-backoff.test.ts`;
+        `tests/isolation/proposal-scan-gating.test.ts`.
+    - **0c-2** — Auto-draft runs on the server: 🔄 next.
+      - One durable `section_auto_draft` background job per section
+        (migration `0113`; `EXPECTED_LATEST_MIGRATION` bumped). While
+        the dialog is open it polls, and that keeps the run moving; the
+        jobs cron finishes it otherwise. A second click reuses the open
+        jobs.
+      - **The handler** (`auto-draft-job.ts`):
+        - skips a section that gained text after the run was queued;
+        - enforces the organization's 200-drafts-a-day ceiling;
+        - drafts through `runSectionDraft` with citations;
+        - **never writes stub-mode text**;
+        - over existing text, snapshots it ("Before auto-draft") and
+          lands the draft as FORGE AI tracked changes;
+        - appends a [CONTINUE] marker to a draft cut off at the output
+          limit;
+        - queues a health scan and audits each section.
+      - Plan, quota and invalid-section failures fail a job at once; a
+        provider error retries with backoff.
+      - The browser loop and `autoDraftSingleSectionAction` are gone.
+      - Tests: `tests/ai/auto-draft-logic.test.ts` and
+        `tests/isolation/auto-draft.test.ts`.
   - **0d** — Trust:
     - a data-not-instructions wrapper on every prompt that embeds
       document text;

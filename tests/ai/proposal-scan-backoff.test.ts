@@ -7,6 +7,8 @@ import {
   SCAN_BASE_BACKOFF_MS,
   SCAN_MAX_ATTEMPTS,
   SCAN_MAX_BACKOFF_MS,
+  SCAN_QUOTA_RECHECK_MS,
+  gatedScanAction,
   nextScanAttempt,
   scanBackoffMs,
 } from "@/lib/proposal-scan-backoff";
@@ -40,5 +42,13 @@ describe("nextScanAttempt", () => {
     expect(nextScanAttempt(SCAN_MAX_ATTEMPTS, now)).toEqual({ giveUp: true, nextAttemptAt: null });
     expect(nextScanAttempt(SCAN_MAX_ATTEMPTS + 4, now).giveUp).toBe(true);
     expect(nextScanAttempt(SCAN_MAX_ATTEMPTS - 1, now).giveUp).toBe(false);
+  });
+});
+
+describe("BL-AIX Phase 0c — gatedScanAction", () => {
+  it("clears a proposal whose plan lacks the feature and defers one over quota", () => {
+    const now = new Date("2026-10-05T00:00:00Z");
+    expect(gatedScanAction("feature", now)).toEqual({ clear: true });
+    expect(gatedScanAction("quota", now)).toEqual({ clear: false, nextAttemptAt: new Date(now.getTime() + SCAN_QUOTA_RECHECK_MS) });
   });
 });
