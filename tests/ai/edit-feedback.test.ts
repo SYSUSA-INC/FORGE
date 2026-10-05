@@ -92,3 +92,48 @@ describe("edit-feedback summary", () => {
     expect(countWords("")).toBe(0);
   });
 });
+
+describe("BL-AIX Phase 0b — FORGE AI suggestions are judged, not imitated", () => {
+  const ai = (decision: EditDecisionInput["decision"], text: string, bulk = false): EditDecisionInput => ({
+    ...row("insert", decision, text),
+    fromAi: true,
+    bulk,
+    wordCount: countWords(text),
+  });
+
+  it("keeps FORGE AI's accepted text and accept-all decisions out of preferred phrasing", () => {
+    const s = summarizeEditDecisions([
+      ai("accept", "FORGE AI proposes a robust and scalable approach to delivery"),
+      { ...row("insert", "accept", "our team bulk-accepted this long suggested sentence"), bulk: true },
+      row("insert", "accept", "the transition plan retains all incumbent staff"),
+      ai("reject", "we are uniquely positioned to deliver world-class outcomes"),
+      row("delete", "accept", "as previously mentioned above in this section"),
+      { ...row("delete", "accept", "this padding was cut by an accept-all click"), bulk: true },
+    ])!;
+    expect(s.preferredPhrases).toEqual(["the transition plan retains all incumbent staff"]);
+    // Struck AI text is exactly what the drafter must not produce again.
+    expect(s.rejectedPhrases).toContain("we are uniquely positioned to deliver world-class outcomes");
+    expect(s.removedPhrases).toEqual(["as previously mentioned above in this section"]);
+    // Teammates' acceptance is measured on human suggestions only.
+    expect(s.insertAcceptRate).toBe(1);
+  });
+
+  it("weights AI acceptance by words, counting accept-all at half", () => {
+    const s = summarizeEditDecisions([
+      ai("accept", "one two three four"), // 4 words
+      ai("reject", "one two three four five six seven eight"), // 8 words
+      ai("accept", "one two three four", true), // 4 words × 0.5
+      row("insert", "accept", "the transition plan retains all incumbent staff"),
+      row("insert", "reject", "our robust best-in-class platform"),
+    ])!;
+    expect(s.aiDecisions).toBe(3);
+    expect(s.aiSuggestionAcceptRate).toBeCloseTo((4 + 2) / (4 + 8 + 2));
+    expect(s.insertAcceptRate).toBeCloseTo(1 / 2);
+  });
+
+  it("reports no AI rate when the sample has no AI decisions", () => {
+    const s = summarizeEditDecisions(Array.from({ length: 5 }, () => row("insert", "accept", "the transition plan retains all incumbent staff")))!;
+    expect(s.aiSuggestionAcceptRate).toBeNull();
+    expect(s.aiDecisions).toBe(0);
+  });
+});

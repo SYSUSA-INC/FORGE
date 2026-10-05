@@ -37,7 +37,9 @@ export async function DraftInsightsPanel({
   const result = await getDraftInsightsAction(proposalId);
   if (
     !result.ok ||
-    (result.data.totalDrafts === 0 && result.data.editDecisions.total === 0)
+    (result.data.totalDrafts === 0 &&
+      result.data.editDecisions.total === 0 &&
+      result.data.editDecisions.aiDecisions === 0)
   ) {
     return null;
   }
@@ -58,7 +60,7 @@ export async function DraftInsightsPanel({
           <div className="flex items-center gap-2">
             {fractionBadge(data.overallAvgFraction)}
             <span className="font-mono text-[10px] text-subtle">
-              avg across {data.resolvedDrafts} saved draft
+              avg across {data.resolvedDrafts} reviewed draft
               {data.resolvedDrafts !== 1 ? "s" : ""}
             </span>
           </div>
@@ -110,12 +112,27 @@ export async function DraftInsightsPanel({
           </div>
         ) : null}
 
+        {/* BL-AIX Phase 0b — how owners judge FORGE AI's own suggestions */}
+        {data.editDecisions.aiDecisions > 0 ? (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-indigo/20 bg-indigo/[0.03] px-3 py-2">
+            <span className="font-body text-[12px] text-muted">
+              FORGE AI suggestions accepted
+            </span>
+            <div className="flex items-center gap-2">
+              {fractionBadge(data.editDecisions.aiAcceptRate)}
+              <span className="font-mono text-[10px] text-subtle">
+                by words · {data.editDecisions.aiDecisions} decided
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         {/* BL-9 Slice 7 — track-changes decisions */}
         {data.editDecisions.total > 0 ? (
           <div className="flex flex-col gap-1.5 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="font-body text-[12px] text-muted">
-                Track-changes decisions
+                Teammates&apos; suggestions
               </span>
               <span className="font-mono text-[10px] text-subtle">
                 {data.editDecisions.total} resolved
@@ -143,9 +160,11 @@ export async function DraftInsightsPanel({
         ) : null}
 
         <p className="font-body text-[11px] leading-relaxed text-subtle">
-          Higher retention = AI drafts align more closely with your writing
-          style and submission requirements. Use the A/B Compare button in the
-          section editor to let the Brain compete with itself.
+          Retention is measured once a draft has been reviewed (no open
+          suggestions, at least 30 minutes after it was written) by how many of
+          its phrases survive. Accept-all counts at half weight. Use the A/B
+          Compare button in the section editor to let the Brain compete with
+          itself.
         </p>
       </div>
     </Panel>

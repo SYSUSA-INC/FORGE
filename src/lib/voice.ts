@@ -15,9 +15,10 @@ import "server-only";
 
 import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { authorVoiceProfiles, authorVoiceSamples, organizations, proposalSections, proposals, sectionDraftSignals, users, type TipTapDoc, type VoiceMetrics } from "@/db/schema";
+import { authorVoiceProfiles, authorVoiceSamples, organizations, proposalSections, proposals, sectionChangeDecisions, sectionDraftSignals, users, type TipTapDoc, type VoiceMetrics } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { projectToPlain } from "@/lib/tiptap-doc";
+import { FORGE_AI_AUTHOR } from "@/lib/tracked-diff";
 import {
   AUTO_REBUILD_MIN_INTERVAL_MS,
   VOICE_LIMITS,
@@ -98,6 +99,24 @@ export async function rebuildVoiceProfile(input: { organizationId: string; userI
       .orderBy(desc(sectionDraftSignals.createdAt))
       .limit(VOICE_LIMITS.maxSamples * 3);
     for (const s of signals) drafts.set(s.sectionId, [...(drafts.get(s.sectionId) ?? []), s.draftText]);
+    // BL-AIX Phase 0b — and what FORGE AI suggested that the owner accepted
+    // (Improve, Tighten, chat Apply, content blocks): once accepted it reads
+    // as the author's text, but it is still the model's voice.
+    const accepted = await db
+      .select({ sectionId: sectionChangeDecisions.sectionId, text: sectionChangeDecisions.changeText })
+      .from(sectionChangeDecisions)
+      .where(
+        and(
+          eq(sectionChangeDecisions.organizationId, organizationId),
+          inArray(sectionChangeDecisions.sectionId, sectionRows.map((r) => r.id)),
+          eq(sectionChangeDecisions.authorUserId, FORGE_AI_AUTHOR.id),
+          eq(sectionChangeDecisions.changeType, "insert"),
+          eq(sectionChangeDecisions.decision, "accept"),
+        ),
+      )
+      .orderBy(desc(sectionChangeDecisions.createdAt))
+      .limit(VOICE_LIMITS.maxSamples * 20);
+    for (const a of accepted) drafts.set(a.sectionId, [...(drafts.get(a.sectionId) ?? []), a.text]);
   }
   let aiWordsDropped = 0;
   const sectionTexts: string[] = [];

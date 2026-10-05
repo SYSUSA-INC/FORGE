@@ -7,19 +7,33 @@
  * lives in src/lib/edit-feedback.ts.
  *
  * What the drafter learns from it:
- *   - preferredPhrases — text a contributor added that the section
- *     owner kept. The register, specificity and claims to match.
- *   - rejectedPhrases  — insertions the owner struck. Do not reproduce.
- *   - removedPhrases   — existing text the owner agreed to cut. The
- *     padding a draft should not produce in the first place.
- *   - insert / delete acceptance rates — how strict this team is.
+ *   - preferredPhrases — text a human contributor added that the
+ *     section owner kept, one decision at a time. The register,
+ *     specificity and claims to match. FORGE AI's own accepted text and
+ *     accept-all decisions are left out (BL-AIX Phase 0b): copying them
+ *     back would teach the model its own phrasing as the team's taste.
+ *   - rejectedPhrases  — insertions the owner struck, human or FORGE AI.
+ *     Do not reproduce.
+ *   - removedPhrases   — existing text the owner agreed to cut, one
+ *     decision at a time. The padding a draft should not produce.
+ *   - insert / delete acceptance rates — how strict this team is with
+ *     each other's suggestions (human authors only).
+ *   - aiSuggestionAcceptRate — how much of FORGE AI's suggested text the
+ *     owners accepted, by words, accept-all counted at half weight.
  */
+
+import { aiSuggestionAcceptance } from "@/lib/ai-acceptance";
 
 export type EditDecisionInput = {
   changeType: "insert" | "delete";
   decision: "accept" | "reject";
   text: string;
   createdAt: Date | string;
+  /** The suggestion came from FORGE AI, not a person. */
+  fromAi?: boolean;
+  /** Resolved by accept-all / reject-all. */
+  bulk?: boolean;
+  wordCount?: number;
 };
 
 export type EditFeedbackSummary = {
@@ -34,6 +48,10 @@ export type EditFeedbackSummary = {
   preferredPhrases: string[];
   rejectedPhrases: string[];
   removedPhrases: string[];
+  /** Word-weighted share of FORGE AI's suggestions accepted; null with none decided. */
+  aiSuggestionAcceptRate: number | null;
+  /** FORGE AI suggestions decided in the sample. */
+  aiDecisions: number;
 };
 
 /** Below this many decisions the signal is noise; callers get null. */
@@ -108,14 +126,19 @@ export function summarizeEditDecisions(
   const opts = { ...DEFAULTS, ...options };
   const rows = [...input].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
 
+  const human = rows.filter((r) => !r.fromAi);
+  const ai = aiSuggestionAcceptance(
+    rows.filter((r) => r.fromAi).map((r) => ({ decision: r.decision, bulk: !!r.bulk, wordCount: r.wordCount ?? countWords(r.text) })),
+  );
+
   return {
     sampleSize: rows.length,
     windowDays: opts.windowDays,
-    insertAcceptRate: rate(rows, "insert"),
-    deleteAcceptRate: rate(rows, "delete"),
+    insertAcceptRate: rate(human, "insert"),
+    deleteAcceptRate: rate(human, "delete"),
     preferredPhrases: pickPhrases(
       rows,
-      (r) => r.changeType === "insert" && r.decision === "accept",
+      (r) => r.changeType === "insert" && r.decision === "accept" && !r.fromAi && !r.bulk,
       opts,
     ),
     rejectedPhrases: pickPhrases(
@@ -125,8 +148,10 @@ export function summarizeEditDecisions(
     ),
     removedPhrases: pickPhrases(
       rows,
-      (r) => r.changeType === "delete" && r.decision === "accept",
+      (r) => r.changeType === "delete" && r.decision === "accept" && !r.bulk,
       opts,
     ),
+    aiSuggestionAcceptRate: ai?.rate ?? null,
+    aiDecisions: ai?.decided ?? 0,
   };
 }

@@ -3,20 +3,10 @@ import "server-only";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { sectionDraftSignals } from "@/db/schema";
+import { shingleRetention, shouldResolveDraft } from "@/lib/ai-acceptance";
 
 function wordTokenize(text: string): string[] {
   return text.toLowerCase().match(/\b\w+\b/g) ?? [];
-}
-
-export function computeWordOverlap(
-  aiText: string,
-  savedText: string,
-): { fraction: number; acceptedWordCount: number } {
-  const aiWords = wordTokenize(aiText);
-  if (aiWords.length === 0) return { fraction: 0, acceptedWordCount: 0 };
-  const savedSet = new Set(wordTokenize(savedText));
-  const kept = aiWords.filter((w) => savedSet.has(w)).length;
-  return { fraction: kept / aiWords.length, acceptedWordCount: kept };
 }
 
 export async function recordDraftSignal(input: {
@@ -51,15 +41,25 @@ export async function recordDraftSignal(input: {
   return row.id;
 }
 
+/**
+ * BL-AIX Phase 0b — grade the newest pending AI draft against what was
+ * saved, by four-word runs kept (`shingleRetention`), once the owner has
+ * finished with it: no tracked suggestions still open and at least half
+ * an hour after it was produced. Until then the draft stays pending and
+ * a later save grades it.
+ */
 export async function resolveDraftSignal(input: {
   sectionId: string;
   organizationId: string;
   savedText: string;
+  savedHasPendingChanges: boolean;
+  now?: Date;
 }): Promise<void> {
   const [signal] = await db
     .select({
       id: sectionDraftSignals.id,
       draftText: sectionDraftSignals.draftText,
+      createdAt: sectionDraftSignals.createdAt,
     })
     .from(sectionDraftSignals)
     .where(
@@ -72,14 +72,13 @@ export async function resolveDraftSignal(input: {
     .orderBy(desc(sectionDraftSignals.createdAt))
     .limit(1);
   if (!signal) return;
+  const now = input.now ?? new Date();
+  if (!shouldResolveDraft({ draftCreatedAt: signal.createdAt, now, savedHasPendingChanges: input.savedHasPendingChanges })) return;
 
-  const { fraction, acceptedWordCount } = computeWordOverlap(
-    signal.draftText,
-    input.savedText,
-  );
+  const { fraction, keptWords } = shingleRetention(signal.draftText, input.savedText);
   await db
     .update(sectionDraftSignals)
-    .set({ acceptedFraction: fraction, acceptedWordCount, resolvedAt: new Date() })
+    .set({ acceptedFraction: fraction, acceptedWordCount: keptWords, resolvedAt: now })
     .where(and(eq(sectionDraftSignals.organizationId, input.organizationId), eq(sectionDraftSignals.id, signal.id)));
 }
 
