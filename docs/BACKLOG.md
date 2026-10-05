@@ -49,7 +49,8 @@ Effort key:
 | 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | ✅ shipped (PR #334) |
 | 3v | **BL-16 API Slice 2c** — Outbound webhooks (signed POSTs on opportunity / proposal events, delivery log, retries) | P2 | M | ⏸ parked (owner, 2026-10-04: BL-AIX first) |
 | 3w | **BL-AIX Phase 0a** — Requirement integrity: requirements differing by a number or qualifier are no longer merged away; Sections L / M located where they really are; not-applicable rows kept out of AI prompts. Ships the 2026-10 assessment and the BL-AIX program | P0 | M | ✅ shipped (PR #335) |
-| 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | 🔄 in PR (PR #336) |
+| 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | ✅ shipped (PR #336) |
+| 3y | **BL-AIX Phase 0c-1** — Background scans no longer stall behind proposals whose plan lacks the scan; the section draft becomes a library a background job can call | P0 | S | 🔄 in PR (PR #337) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -147,7 +148,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · 🔄 Phase 0b in PR (PR #336)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · 🔄 Phase 0c-1 in PR (PR #337)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -204,7 +205,7 @@ the phases below.
       the same locator.
     - **Rows the team marked not applicable** are no longer sent as
       "MUST address" to the drafter, section chat or AI pre-review.
-  - **0b** — Truth in the learning signals: 🔄 in PR (PR #336).
+  - **0b** — Truth in the learning signals: ✅ shipped (PR #336).
     - **Edit learning separates FORGE AI from people.** It reads each
       decision's author, `bulk` flag and word count. FORGE AI's
       accepted text and accept-all decisions no longer become
@@ -228,10 +229,42 @@ the phases below.
     - Tests: `tests/ai/ai-acceptance.test.ts`; additions to
       `tests/ai/edit-feedback.test.ts` and
       `tests/isolation/voice.test.ts`.
-  - **0c** — Background reliability:
-    - the scan-cron stall (gated proposals block the batch);
-    - auto-draft as a resumable server job (snapshot, truncation check,
-      queue a scan).
+  - **0c** — Background reliability, in two PRs (the work exceeds the
+    1,500-line cap as one):
+    - **0c-1** — The scan stall and the draft library: 🔄 in PR (PR #337).
+      - **The scan-cron stall.** A proposal whose plan lacks the scan
+        used to be skipped and left first in the queue; five of them
+        stopped background scans for every tenant. Now such a proposal
+        clears its flag (the next save sets it again), and one over
+        quota waits six hours (`gatedScanAction`).
+      - **`runSectionDraft`** (`src/lib/section-draft-run.ts`): the
+        non-streaming section draft moved out of the server action so a
+        background job can call it without a session. The action is now
+        a thin wrapper. Failures carry a `code` ("gated" for plan or
+        quota) so callers can tell retryable from final.
+      - Tests: additions to `tests/ai/proposal-scan-backoff.test.ts`;
+        `tests/isolation/proposal-scan-gating.test.ts`.
+    - **0c-2** — Auto-draft runs on the server: 🔄 next.
+      - One durable `section_auto_draft` background job per section
+        (migration `0113`; `EXPECTED_LATEST_MIGRATION` bumped). While
+        the dialog is open it polls, and that keeps the run moving; the
+        jobs cron finishes it otherwise. A second click reuses the open
+        jobs.
+      - **The handler** (`auto-draft-job.ts`):
+        - skips a section that gained text after the run was queued;
+        - enforces the organization's 200-drafts-a-day ceiling;
+        - drafts through `runSectionDraft` with citations;
+        - **never writes stub-mode text**;
+        - over existing text, snapshots it ("Before auto-draft") and
+          lands the draft as FORGE AI tracked changes;
+        - appends a [CONTINUE] marker to a draft cut off at the output
+          limit;
+        - queues a health scan and audits each section.
+      - Plan, quota and invalid-section failures fail a job at once; a
+        provider error retries with backoff.
+      - The browser loop and `autoDraftSingleSectionAction` are gone.
+      - Tests: `tests/ai/auto-draft-logic.test.ts` and
+        `tests/isolation/auto-draft.test.ts`.
   - **0d** — Trust:
     - a data-not-instructions wrapper on every prompt that embeds
       document text;

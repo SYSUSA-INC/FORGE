@@ -4,55 +4,11 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { completeForTenant } from "@/lib/ai";
-import {
-  enforceQuota,
-  ensureFeature,
-  FeatureGateError,
-  QuotaExceededError,
-  refundQuota,
-} from "@/lib/subscription-gates";
-import { SECTION_DRAFT_PROMPT_VERSION, type SectionDraftMode } from "@/lib/ai-prompts";
-import { isTruncatedStop } from "@/lib/ai-stop";
-import {
-  extractCitationStats,
-  type CitationStats,
-  type CitationVerification,
-  type DraftSource,
-} from "@/lib/citations";
-import { verifyDraftCitations } from "@/lib/citation-verify";
-import {
-  captureDraftSignal,
-  isDraftMode,
-  prepareSectionDraft,
-} from "@/lib/section-draft";
-import { fromPlainText, projectToPlain } from "@/lib/tiptap-doc";
-import { log } from "@/lib/log";
+import { type SectionDraftMode } from "@/lib/ai-prompts";
+import { projectToPlain } from "@/lib/tiptap-doc";
+import { runSectionDraft, type SectionDraftResult } from "@/lib/section-draft-run";
 
-export type SectionDraftResult =
-  | {
-      ok: true;
-      mode: SectionDraftMode;
-      text: string;
-      bodyDoc: import("@/db/schema").TipTapDoc;
-      provider: string;
-      model: string;
-      stubbed: boolean;
-      inputTokens?: number;
-      outputTokens?: number;
-      generatedAt: string;
-      /** BL-11: id of the captured draft signal row, present for draft/draft_alt modes. */
-      signalId?: string;
-      /** BL-FB-GEN-CITE — present when the draft was generated in citation mode. */
-      sources?: DraftSource[];
-      citations?: CitationStats;
-      sourcesStubbed?: boolean;
-      /** BL-AIP-5 — the provider stopped at its output ceiling; the draft is cut short. */
-      truncated?: boolean;
-      /** BL-AIP-5 — what the verifier pass did (citation mode only). */
-      verification?: CitationVerification;
-    }
-  | { ok: false; error: string };
+export type { SectionDraftResult };
 
 /**
  * Non-streaming section draft. Still the path for A/B comparison
@@ -75,117 +31,7 @@ export async function generateSectionDraftAction(input: {
 }): Promise<SectionDraftResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  const cite = input.cite ?? true;
-
-  // BL-16 Phase B-2 — gate AI section generation on `aiAutoDraft`.
-  // BL-16 Phase B-3b — also bump the AI-request counter for this month.
-  try {
-    await ensureFeature(organizationId, "aiAutoDraft");
-    await enforceQuota(organizationId, "aiRequestsPerMonth");
-  } catch (err) {
-    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
-      return { ok: false, error: err.message };
-    }
-    throw err;
-  }
-
-  if (!isDraftMode(input.mode)) {
-    await refundQuota(organizationId, "aiRequestsPerMonth");
-    return { ok: false, error: "Invalid mode." };
-  }
-
-  const prepared = await prepareSectionDraft({
-    organizationId,
-    sectionId: input.sectionId,
-    mode: input.mode,
-    cite,
-  });
-  if (!prepared.ok) {
-    // Nothing was generated — give the request slot back.
-    await refundQuota(organizationId, "aiRequestsPerMonth");
-    return { ok: false, error: prepared.error };
-  }
-
-  try {
-    const ai = await completeForTenant({
-      organizationId,
-      feature: "section_draft",
-      variant: cite ? `${input.mode}+cite` : input.mode,
-      promptVersion: SECTION_DRAFT_PROMPT_VERSION,
-      system: prepared.prompt.system,
-      messages: prepared.prompt.messages,
-      maxTokens: prepared.maxTokens,
-      temperature: prepared.temperature,
-      cacheSystem: true,
-    });
-
-    let text = (ai.text ?? "").trim();
-    if (!text) {
-      // BL-16 Phase B-3d — AI returned nothing usable, refund the request slot.
-      await refundQuota(organizationId, "aiRequestsPerMonth");
-      return { ok: false, error: "AI returned an empty response." };
-    }
-
-    // BL-AIP-5 — verifier pass: invented markers become [NEEDS CITATION]
-    // and every cited sentence is checked against its source excerpt.
-    let verification: CitationVerification | undefined;
-    if (cite && prepared.sources.length > 0 && !ai.stubbed) {
-      const verified = await verifyDraftCitations({
-        organizationId,
-        text,
-        sources: prepared.sources,
-      });
-      text = verified.text;
-      verification = verified.verification;
-    }
-    const truncated = isTruncatedStop(ai.stopReason);
-
-    const signalId = await captureDraftSignal({
-      organizationId,
-      proposalId: prepared.proposalId,
-      sectionId: input.sectionId,
-      createdByUserId: user.id,
-      mode: input.mode,
-      sectionKind: prepared.sectionKind,
-      draftText: text,
-      stubbed: ai.stubbed,
-      abPairId: input.abPairId,
-      abVariant: input.abVariant,
-    });
-
-    return {
-      ok: true,
-      mode: input.mode,
-      text,
-      bodyDoc: fromPlainText(text),
-      provider: ai.provider,
-      model: ai.model,
-      stubbed: ai.stubbed,
-      inputTokens: ai.inputTokens,
-      outputTokens: ai.outputTokens,
-      generatedAt: new Date().toISOString(),
-      signalId,
-      truncated,
-      ...(cite
-        ? {
-            sources: prepared.sources,
-            citations: extractCitationStats(text),
-            sourcesStubbed: prepared.sourcesStubbed,
-            verification,
-          }
-        : {}),
-    };
-  } catch (err) {
-    // BL-16 Phase B-3d — AI call failed (network / provider error). Refund
-    // the request slot so the user isn't billed for an attempt that never
-    // produced output. Token cap is post-record so it never charged.
-    await refundQuota(organizationId, "aiRequestsPerMonth");
-    log.error("[generateSectionDraftAction]", "error", { error: err });
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "AI request failed.",
-    };
-  }
+  return runSectionDraft({ ...input, organizationId, userId: user.id });
 }
 
 export async function getSectionPlainContent(
