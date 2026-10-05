@@ -1,161 +1,83 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { AutoDraftProgress } from "@/lib/auto-draft-logic";
 import {
-  autoDraftSingleSectionAction,
+  autoDraftProgressAction,
   listSectionsForAutoDraftAction,
+  startAutoDraftAction,
   type AutoDraftSection,
 } from "./auto-draft-actions";
 
-type RunState = "idle" | "running" | "done" | "error";
+type Progress = AutoDraftProgress & { titles: Record<string, string> };
 
-type SectionProgress = {
-  id: string;
-  title: string;
-  state: "pending" | "drafting" | "done" | "skipped" | "error";
-  message: string;
-};
+const POLL_MS = 5_000;
+
+const STATE_LABEL = { queued: "queued", running: "drafting…", done: "done", failed: "failed" } as const;
+const STATE_TONE = { queued: "text-muted", running: "text-teal", done: "text-emerald", failed: "text-rose" } as const;
 
 /**
- * Phase 14e — Auto-draft full proposal.
+ * Phase 14e → BL-AIX Phase 0c — auto-draft the whole proposal.
  *
- * Client-side orchestrator: pulls the section list, then iterates
- * one-section-at-a-time, calling autoDraftSingleSectionAction for
- * each. Each call is a server action so progress can be tracked
- * without holding a single 30+ second request open.
- *
- * Pattern intel from Phase 14d flows through automatically — the
- * underlying generateSectionDraftAction already wires it.
+ * The drafting runs on the server: one durable job per section, kept
+ * moving while this dialog polls and finished by the jobs cron if it
+ * closes. Sections that already have text are skipped unless
+ * "Overwrite" is ticked, and then the draft arrives as FORGE AI tracked
+ * changes on top of a snapshot of the old text.
  */
 export function AutoDraftButton({ proposalId }: { proposalId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [sections, setSections] = useState<AutoDraftSection[]>([]);
-  const [progress, setProgress] = useState<Record<string, SectionProgress>>({});
-  const [runState, setRunState] = useState<RunState>("idle");
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [overwrite, setOverwrite] = useState(false);
-  const [loadingSections, startLoadTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const cancelRef = useRef(false);
+  const [pending, startTransition] = useTransition();
 
-  function loadSections() {
+  const refresh = useCallback(async () => {
+    const res = await autoDraftProgressAction(proposalId);
+    if (res.ok) setProgress(res.progress);
+    else setError(res.error);
+    return res.ok ? res.progress : null;
+  }, [proposalId]);
+
+  useEffect(() => {
+    if (!open) return;
     setError(null);
-    startLoadTransition(async () => {
+    startTransition(async () => {
       const res = await listSectionsForAutoDraftAction(proposalId);
+      if (res.ok) setSections(res.sections);
+      else setError(res.error);
+      await refresh();
+    });
+  }, [open, proposalId, refresh]);
+
+  // Poll while a run is active; refresh the page once it settles.
+  const active = progress?.active ?? false;
+  useEffect(() => {
+    if (!open || !active) return;
+    const t = window.setInterval(async () => {
+      const next = await refresh();
+      if (next && !next.active) router.refresh();
+    }, POLL_MS);
+    return () => window.clearInterval(t);
+  }, [open, active, refresh, router]);
+
+  function start() {
+    setError(null);
+    startTransition(async () => {
+      const res = await startAutoDraftAction({ proposalId, overwrite });
       if (!res.ok) {
         setError(res.error);
         return;
       }
-      setSections(res.sections);
-      const initial: Record<string, SectionProgress> = {};
-      for (const s of res.sections) {
-        initial[s.id] = {
-          id: s.id,
-          title: s.title,
-          state: s.isEmpty ? "pending" : "skipped",
-          message: s.isEmpty
-            ? "queued"
-            : `${s.wordCount} words — won't overwrite`,
-        };
-      }
-      setProgress(initial);
-      setRunState("idle");
+      await refresh();
     });
   }
 
-  useEffect(() => {
-    if (open) loadSections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  async function runAll() {
-    setRunState("running");
-    cancelRef.current = false;
-    for (const s of sections) {
-      if (cancelRef.current) break;
-      const isEmpty = s.isEmpty;
-      // Skip non-empty sections unless overwrite is on.
-      if (!isEmpty && !overwrite) {
-        setProgress((p) => ({
-          ...p,
-          [s.id]: {
-            id: s.id,
-            title: s.title,
-            state: "skipped",
-            message: `${s.wordCount} words — skipped`,
-          },
-        }));
-        continue;
-      }
-
-      setProgress((p) => ({
-        ...p,
-        [s.id]: {
-          id: s.id,
-          title: s.title,
-          state: "drafting",
-          message: "drafting…",
-        },
-      }));
-
-      try {
-        const res = await autoDraftSingleSectionAction({
-          proposalId,
-          sectionId: s.id,
-          overwrite,
-        });
-        if (res.ok) {
-          setProgress((p) => ({
-            ...p,
-            [s.id]: {
-              id: s.id,
-              title: s.title,
-              state: "done",
-              message: `${res.wordCount} words${res.stubbed ? " (stub)" : ""}`,
-            },
-          }));
-        } else {
-          setProgress((p) => ({
-            ...p,
-            [s.id]: {
-              id: s.id,
-              title: s.title,
-              state: "error",
-              message: res.error,
-            },
-          }));
-        }
-      } catch (err) {
-        setProgress((p) => ({
-          ...p,
-          [s.id]: {
-            id: s.id,
-            title: s.title,
-            state: "error",
-            message: err instanceof Error ? err.message : "Failed.",
-          },
-        }));
-      }
-    }
-    setRunState("done");
-    router.refresh();
-  }
-
-  function close() {
-    if (runState === "running") {
-      cancelRef.current = true;
-    }
-    setOpen(false);
-  }
-
   const eligible = sections.filter((s) => s.isEmpty || overwrite);
-  const completed = Object.values(progress).filter(
-    (p) => p.state === "done",
-  ).length;
-  const failed = Object.values(progress).filter(
-    (p) => p.state === "error",
-  ).length;
+  const titleOf = (id: string) => progress?.titles[id] ?? sections.find((s) => s.id === id)?.title ?? "Section";
 
   return (
     <>
@@ -163,117 +85,74 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
         type="button"
         onClick={() => setOpen(true)}
         className="aur-btn aur-btn-primary text-[12px]"
-        title="Phase 14e — auto-draft every empty section using pattern intel from won proposals."
+        title="Auto-draft every empty section on the server, grounded in your won proposals."
       >
         Auto-draft proposal
       </button>
 
       {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={close}
-        >
-          <div
-            className="aur-card-elevated max-h-[90vh] w-full max-w-2xl overflow-y-auto px-5 py-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(false)}>
+          <div className="aur-card-elevated max-h-[90vh] w-full max-w-2xl overflow-y-auto px-5 py-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
-                  Phase 14e · Auto-draft
-                </div>
-                <h2 className="mt-1 font-display text-[18px] font-semibold text-foreground">
-                  Auto-draft full proposal
-                </h2>
+                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Auto-draft</div>
+                <h2 className="mt-1 font-display text-[18px] font-semibold text-foreground">Auto-draft full proposal</h2>
                 <p className="mt-1 font-body text-[13px] leading-relaxed text-muted">
-                  Drafts every empty section using pattern intel from your
-                  won proposals (Phase 14d). Sections with existing content
-                  are skipped unless you opt in to overwrite.
+                  Drafts every empty section on the server, with citations, grounded in your won proposals. You can close this
+                  window — the run carries on and the sections fill in as each draft lands.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={close}
-                className="aur-btn aur-btn-ghost text-[11px]"
-              >
+              <button type="button" onClick={() => setOpen(false)} className="aur-btn aur-btn-ghost text-[11px]">
                 Close
               </button>
             </div>
 
             {error ? (
-              <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
-                {error}
-              </div>
+              <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div>
             ) : null}
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 font-mono text-[11px] text-muted">
-                <input
-                  type="checkbox"
-                  checked={overwrite}
-                  disabled={runState === "running"}
-                  onChange={(e) => setOverwrite(e.target.checked)}
-                />
-                Overwrite sections that already have content
+                <input type="checkbox" checked={overwrite} disabled={active || pending} onChange={(e) => setOverwrite(e.target.checked)} />
+                Overwrite sections that already have text (as tracked suggestions)
               </label>
               <button
                 type="button"
-                onClick={runAll}
-                disabled={
-                  runState === "running" ||
-                  loadingSections ||
-                  eligible.length === 0
-                }
+                onClick={start}
+                disabled={active || pending || eligible.length === 0}
                 className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
               >
-                {runState === "running"
-                  ? "Drafting…"
-                  : runState === "done"
-                    ? "Run again"
-                    : `Draft ${eligible.length} section${eligible.length === 1 ? "" : "s"}`}
+                {active ? "Drafting…" : `Draft ${eligible.length} section${eligible.length === 1 ? "" : "s"}`}
               </button>
-              <span className="font-mono text-[11px] text-muted">
-                {completed} done · {failed} failed
-              </span>
+              {progress && progress.total > 0 ? (
+                <span className="font-mono text-[11px] text-muted">
+                  {progress.done} done · {progress.running + progress.queued} to go · {progress.failed} failed
+                </span>
+              ) : null}
             </div>
 
-            <ul className="mt-4 divide-y divide-layer/5">
-              {sections.map((s) => {
-                const p = progress[s.id];
-                const tone =
-                  p?.state === "done"
-                    ? "text-emerald-300"
-                    : p?.state === "drafting"
-                      ? "text-teal-300"
-                      : p?.state === "error"
-                        ? "text-rose"
-                        : p?.state === "skipped"
-                          ? "text-subtle"
-                          : "text-muted";
-                return (
-                  <li
-                    key={s.id}
-                    className="flex items-start justify-between gap-3 py-2"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-body text-[13px] text-foreground">
-                        {s.ordering}. {s.title}
-                      </div>
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-subtle">
-                        {s.kind.replace(/_/g, " ")}
-                      </div>
-                    </div>
-                    <div className={`font-mono text-[11px] ${tone}`}>
-                      {p?.message ?? "queued"}
+            {progress && progress.sections.length > 0 ? (
+              <ul className="mt-4 divide-y divide-layer/5">
+                {progress.sections.map((s) => (
+                  <li key={s.sectionId} className="flex items-start justify-between gap-3 py-2">
+                    <div className="min-w-0 flex-1 font-body text-[13px] text-foreground">{titleOf(s.sectionId)}</div>
+                    <div className={`max-w-[60%] text-right font-mono text-[11px] ${STATE_TONE[s.status]}`}>
+                      {s.note || STATE_LABEL[s.status]}
+                      {s.truncated ? <span className="ml-1 text-gold">· cut off at the length limit</span> : null}
                     </div>
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 font-body text-[12px] text-subtle">
+                {sections.length === 0 ? "Loading sections…" : `${eligible.length} of ${sections.length} sections would be drafted.`}
+              </p>
+            )}
 
             <div className="mt-4 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
-              Auto-drafts always land in <em>in_progress</em> status. Review
-              each section before sending to a color-team review.
+              Drafts land in <em>in progress</em> and queue a background health scan. Over existing text they arrive as FORGE AI
+              suggestions, with a snapshot of the old text kept in version history. A draft that stopped at the length limit ends
+              with a [CONTINUE] marker.
             </div>
           </div>
         </div>

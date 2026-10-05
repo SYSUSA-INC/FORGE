@@ -606,6 +606,13 @@ Section L/M traceability matrix. Every shall-statement from the RFP gets a row:
 
 **Requirements follow you into the editor.** The rows mapped to a section are handed to the AI drafter and the section chat verbatim as that section's contract ("address every one; reference its number inline"), ahead of the general requirement list, and the health scan judges compliance against the full list rather than a 20-clause sample.
 
+**Auto-draft the whole proposal.** **Auto-draft proposal** on the sections page drafts every empty section, with citations, on the server.
+- **It keeps running if you leave.** You can close the dialog or the page and the run carries on; reopen the dialog to see each section as queued, drafting, done or failed (with the reason).
+- **Sections that already have text are skipped** unless you tick **Overwrite**. Then FORGE keeps a snapshot of the old text in version history and lands the new draft as FORGE AI suggestions for you to accept or reject.
+- **A draft that stopped at the AI's length limit** ends with a [CONTINUE] marker so nobody mistakes it for finished.
+- **When AI is in stub mode, nothing is written.**
+- **Each drafted section queues a background health scan.**
+
 **Citations are on by default.** In the AI assistant, **Cite sources** is checked unless you turn it off, including Auto-draft. Supported claims carry `[S#]` markers; a verifier pass then checks every cited sentence against its source excerpt, turns any marker that names no listed source into `[NEEDS CITATION]`, and does the same to sentences the source does not support. A draft that hit the model's output limit is labelled as cut short so you tighten it rather than ship half a section.
 
 **The export gate is real.** Generate PDF / Word / Word→PDF refuses while any row is *Not addressed* or *Partial*, or while any section still contains `[NEEDS CITATION]` (the Export panel names the sections). There is no "force export" checkbox any more: an **org admin or the proposal manager** can override by writing a reason of at least ten characters, and the override is recorded in the audit log with the counts it waved through.

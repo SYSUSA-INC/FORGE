@@ -38,18 +38,19 @@ import {
 import { runInBackground } from "@/lib/background";
 import {
   JOB_MAX_ATTEMPTS,
+  JobPermanentError,
   jobIsStuck,
   nextJobAttempt,
   resolveStuckJob,
 } from "@/lib/jobs-policy";
 import { log } from "@/lib/log";
+import { handleSectionAutoDraft } from "@/lib/auto-draft-job";
 import { harvestProposal } from "@/lib/proposal-harvest";
 import { parseSolicitationDocumentFromBytes } from "@/lib/solicitation-document-parse";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
 import { getStorageProvider } from "@/lib/storage";
 
-/** Thrown by a handler when retrying cannot help; fails the job at once. */
-export class JobPermanentError extends Error {}
+export { JobPermanentError };
 
 export const BYTES_GONE_ERROR =
   "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)";
@@ -329,6 +330,7 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   solicitation_parse: handleSolicitationParse,
   solicitation_document_parse: handleSolicitationDocumentParse,
   proposal_harvest: handleProposalHarvest,
+  section_auto_draft: handleSectionAutoDraft,
 };
 
 async function loadBytes(
