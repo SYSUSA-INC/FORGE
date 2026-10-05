@@ -33,6 +33,7 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
+import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { projectToPlain } from "@/lib/tiptap-doc";
 import { log } from "@/lib/log";
 
@@ -76,7 +77,7 @@ export async function runReviewPreflight(input: {
   }
 
   const [review] = await db
-    .select({ id: proposalReviews.id, winThemes: proposals.winThemes })
+    .select({ id: proposalReviews.id, winThemes: proposals.winThemes, opportunityId: proposals.opportunityId })
     .from(proposalReviews)
     .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
     .where(
@@ -123,6 +124,22 @@ export async function runReviewPreflight(input: {
     list.push({ number: m.number, text: m.text });
     reqsBySection.set(m.sectionId, list);
   }
+  // BL-AIX Phase 0d — the prompt told the red team to score "against
+  // Section M" and never gave it Section M. Now it gets the solicitation's
+  // evaluation summary and the proposal's Section M matrix rows.
+  const [loaded, factorRows] = await Promise.all([
+    loadOpportunityRequirements({ organizationId, opportunityId: review.opportunityId }).catch(() => null),
+    db
+      .select({ number: complianceItems.number, text: complianceItems.requirementText })
+      .from(complianceItems)
+      .where(and(eq(complianceItems.proposalId, proposalId), eq(complianceItems.category, "section_m"), ne(complianceItems.status, "not_applicable")))
+      .orderBy(asc(complianceItems.ordering))
+      .limit(15),
+  ]);
+  const evaluation = {
+    summary: loaded?.sectionMSummary ?? "",
+    factors: factorRows.map((r) => (r.number ? `[${r.number}] ${r.text}` : r.text)),
+  };
   const winThemes = (review.winThemes ?? []).slice(0, 3).map((t) => ({
     title: t.title ?? "",
     statement: t.statement ?? "",
@@ -143,6 +160,7 @@ export async function runReviewPreflight(input: {
       body: s.body,
       requirements: reqsBySection.get(s.id) ?? [],
       winThemes,
+      evaluation,
     });
     try {
       const res = await completeStructuredForTenant({

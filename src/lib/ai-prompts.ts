@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { frontPassExcerpt } from "@/lib/solicitation-sections";
+import { fenced } from "@/lib/prompt-safety";
 import type { AIMessage } from "@/lib/ai";
 import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 
@@ -90,9 +91,7 @@ export function buildSolicitationExtractPrompt(
       : "",
     ``,
     `Raw text:`,
-    "```",
-    excerpt.text,
-    "```",
+    fenced(excerpt.text),
   ]
     .filter(Boolean)
     .join("\n");
@@ -153,9 +152,7 @@ export function buildRequirementsChunkPrompt(input: {
     `Window ${input.chunkIndex + 1} of ${input.chunkCount}.`,
     ``,
     `Text:`,
-    "```",
-    input.chunkText,
-    "```",
+    fenced(input.chunkText),
     ``,
     `List every requirement in this window.`,
   ].join("\n");
@@ -254,6 +251,7 @@ Output ONLY the tool call / JSON object:
 Rules:
 - At most 3 comments; the most consequential first. Quote or point at the passage. No compliments.
 - Judge against the mapped requirements and win themes provided. A requirement with no answer in the text is a high-severity comment.
+- When the Section M evaluation criteria are given, red team scores the section the way those evaluators would: name the factor a weakness costs points on. When they are missing, say in the summary that Section M wasn't available and judge against the requirements.
 - pass: an evaluator could score this as is; conditional: fixable gaps; fail: missing, off-target or non-compliant.
 - Plain prose. No markdown.`;
 
@@ -266,7 +264,12 @@ export function buildReviewPreflightPrompt(input: {
   body: string;
   requirements: { number: string; text: string }[];
   winThemes: { title: string; statement: string }[];
+  /** BL-AIX Phase 0d — Section M: the solicitation's evaluation summary and its evaluation-factor rows. */
+  evaluation?: { summary: string; factors: string[] };
 }): { system: string; messages: AIMessage[] } {
+  const evalSummary = input.evaluation?.summary.trim().slice(0, 2_000) ?? "";
+  const evalFactors = (input.evaluation?.factors ?? []).slice(0, 15).map((f, i) => `${i + 1}. ${f.slice(0, 400)}`).join("\n");
+  const evaluation = evalSummary || evalFactors ? fenced([evalSummary, evalFactors].filter(Boolean).join("\n\n")) : "";
   const reqs = input.requirements
     .slice(0, 15)
     .map((r, i) => `${i + 1}. [${r.number || "?"}] ${r.text.slice(0, 400)}`)
@@ -280,10 +283,9 @@ export function buildReviewPreflightPrompt(input: {
     `Section: "${input.sectionTitle}" (kind: ${input.sectionKind}${input.pageLimit ? `, page cap ${input.pageLimit}` : ""}, ${input.wordCount} words).`,
     reqs ? `\nRequirements mapped to this section:\n${reqs}` : "\nNo requirements are mapped to this section.",
     themes ? `\nWin themes:\n${themes}` : "",
+    evaluation ? `\nSection M — how the evaluators will score:\n${evaluation}` : "\nSection M evaluation criteria: not available.",
     `\nSection text:`,
-    "```",
-    input.body.slice(0, 12_000),
-    "```",
+    fenced(input.body.slice(0, 12_000)),
     `\nReturn the verdict and up to 3 comments.`,
   ]
     .filter(Boolean)
@@ -364,9 +366,7 @@ export function buildEbuyExtractPrompt(rawText: string): {
   const trimmed = rawText.slice(0, 30_000);
   const userPrompt = [
     `Extract structured facts from this eBuy RFQ text:`,
-    "```",
-    trimmed,
-    "```",
+    fenced(trimmed),
   ].join("\n");
   return {
     system: EBUY_EXTRACT_SYSTEM,
@@ -455,9 +455,7 @@ export function buildGsaExtractPrompt(rawText: string): {
     `Extract structured fields from the following forwarded GSA email.`,
     ``,
     `Email body:`,
-    "```",
-    trimmed,
-    "```",
+    fenced(trimmed),
     rawText.length > trimmed.length
       ? `(Email was trimmed from ${rawText.length} chars to first ${trimmed.length}.)`
       : "",
@@ -1123,7 +1121,7 @@ export function buildScoutTriagePrompt(
  * number, and says so when they do not answer the question. Bump the
  * version whenever the system prompt or the source layout changes.
  */
-export const BRAIN_ANSWER_PROMPT_VERSION = "2026-09-30.1";
+export const BRAIN_ANSWER_PROMPT_VERSION = "2026-10-05.1";
 
 export type BrainAnswerSourceInput = {
   n: number;
@@ -1171,7 +1169,7 @@ export function buildBrainAnswerPrompt(input: {
     `Question: ${input.question}`,
     ``,
     `Sources:`,
-    sources || "(none)",
+    sources ? fenced(sources) : "(none)",
     ``,
     `Record the answer with the record_brain_answer tool.`,
   ].join("\n");
@@ -1275,9 +1273,7 @@ export function buildGraphicsSuggestPrompt(input: {
     `Section: "${input.title}" (kind: ${input.kind})${input.agency ? ` for ${input.agency}` : ""}.`,
     ``,
     `Section text:`,
-    "```",
-    input.text,
-    "```",
+    fenced(input.text),
     ``,
     `Record the diagrams with the record_graphics tool.`,
   ].join("\n");
@@ -1312,9 +1308,7 @@ export const reviewSummarySchema = z.object({
 export function buildReviewSummaryPrompt(input: { report: string; uncheckedLabels: string[] }): { system: string; messages: AIMessage[] } {
   const userPrompt = [
     `Consolidated report:`,
-    "```",
-    input.report,
-    "```",
+    fenced(input.report),
     input.uncheckedLabels.length ? `\nChecklist lines not every reviewer has ticked:\n${input.uncheckedLabels.map((l) => `- ${l}`).join("\n")}` : "",
     ``,
     `Record the debrief with the record_summary tool.`,
@@ -1403,9 +1397,7 @@ export function buildKnowledgeExtractPrompt(input: {
     `- tags: ${input.artifactTags.length > 0 ? input.artifactTags.join(", ") : "(none)"}`,
     ``,
     `Artifact text:`,
-    "```",
-    trimmed,
-    "```",
+    fenced(trimmed),
     ``,
     input.rawText.length > trimmed.length
       ? `(Text was trimmed from ${input.rawText.length} chars to first ${trimmed.length}.)`
@@ -1517,9 +1509,7 @@ export function buildArtifactKindClassifyPrompt(input: {
     `- contentType: ${input.contentType || "unknown"}`,
     ``,
     `Extracted text (first ${trimmed.length} of ${input.rawText.length} chars):`,
-    "```",
-    trimmed,
-    "```",
+    fenced(trimmed),
     ``,
     `Return strict JSON: { "kind": "<one of the 15 enum values>", "confidence": <0..1 number>, "reasoning": "<one sentence>" }`,
   ].join("\n");

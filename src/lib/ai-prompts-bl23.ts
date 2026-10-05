@@ -9,6 +9,7 @@
 import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
 import { frontPassExcerpt } from "@/lib/solicitation-sections";
+import { fenced } from "@/lib/prompt-safety";
 
 // ────────────────────────────────────────────────────────────────────
 // 1. Solicitation review — full document read
@@ -83,9 +84,7 @@ export function buildSolicitationReviewPrompt(input: {
     `Source file: ${input.fileName || "(no file)"}`,
     ``,
     excerpt.partial ? `Excerpts (the document is ${input.rawText.length.toLocaleString("en-US")} characters; each excerpt is labelled with its position):` : `Full text:`,
-    "```",
-    excerpt.text,
-    "```",
+    fenced(excerpt.text),
     ``,
     `Return strict JSON per the schema in the system prompt.`,
   ]

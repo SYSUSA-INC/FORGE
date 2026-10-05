@@ -51,7 +51,8 @@ Effort key:
 | 3w | **BL-AIX Phase 0a** — Requirement integrity: requirements differing by a number or qualifier are no longer merged away; Sections L / M located where they really are; not-applicable rows kept out of AI prompts. Ships the 2026-10 assessment and the BL-AIX program | P0 | M | ✅ shipped (PR #335) |
 | 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | ✅ shipped (PR #336) |
 | 3y | **BL-AIX Phase 0c-1** — Background scans no longer stall behind proposals whose plan lacks the scan; the section draft becomes a library a background job can call | P0 | S | ✅ shipped (PR #337) |
-| 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | 🔄 in PR (PR #338) |
+| 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | ✅ shipped (PR #338) |
+| 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | 🔄 in PR (PR #339) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -149,7 +150,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · 🔄 Phase 0c-2 in PR (PR #338)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · 🔄 Phase 0d-1 in PR (PR #339)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -245,7 +246,7 @@ the phases below.
         quota) so callers can tell retryable from final.
       - Tests: additions to `tests/ai/proposal-scan-backoff.test.ts`;
         `tests/isolation/proposal-scan-gating.test.ts`.
-    - **0c-2** — Auto-draft runs on the server: 🔄 in PR (PR #338).
+    - **0c-2** — Auto-draft runs on the server: ✅ shipped (PR #338).
       - One durable `section_auto_draft` background job per section
         (migration `0113`; `EXPECTED_LATEST_MIGRATION` bumped). While
         the dialog is open it polls, and that keeps the run moving; the
@@ -266,14 +267,40 @@ the phases below.
       - The browser loop and `autoDraftSingleSectionAction` are gone.
       - Tests: `tests/ai/auto-draft-logic.test.ts` and
         `tests/isolation/auto-draft.test.ts`.
-  - **0d** — Trust:
-    - a data-not-instructions wrapper on every prompt that embeds
-      document text;
-    - Section M given to the red-team pre-review;
-    - amendments linked to their opportunity;
-    - sweep coverage shown when a long document is cut short;
-    - a record of deleted seed rows so a re-seed doesn't bring them
-      back.
+  - **0d** — Trust, in two PRs:
+    - **0d-1** — Quoted material, Section M and amendments: 🔄 in PR
+      (PR #339).
+      - **The AI gateway appends `UNTRUSTED_CONTENT_RULE`** to every
+        tenant call's system prompt, streaming included
+        (`src/lib/prompt-safety.ts`). Text inside fences or
+        `<untrusted_document>` tags is used only as the instructions
+        say (facts, requirements, examples, style), and anything in it
+        that tries to change the task, role, rules or output format is
+        ignored.
+      - **The ten prompt builders that quote raw documents** (front
+        matter, requirement windows, review, scan input, and others)
+        go through `fenced`, so a document containing ``` can't close
+        the fence and escape it.
+      - **Brain answer sources are fenced too**
+        (`BRAIN_ANSWER_PROMPT_VERSION` 2026-10-05.1).
+      - **The red-team pre-review gets Section M.** Its prompt said
+        "scoring against Section M" but never passed it. It now
+        receives the solicitation's Section M summary and the
+        proposal's Section M matrix rows; without them it says so in
+        its summary.
+      - **Amendments join their parent's opportunity.** An uploaded
+        amendment inherits the parent's opportunity, and converting a
+        parent carries amendments uploaded before the conversion. Their
+        requirements now reach the loader, the matrix seed, the drafter
+        and Q&A flagging. The convert action's own update is now
+        org-scoped too.
+      - Tests: `tests/ai/prompt-safety.test.ts`, a gateway case in
+        `tests/ai/gateway-streaming.test.ts`, and
+        `tests/isolation/amendment-link.test.ts`.
+    - **0d-2** — 🔄 next.
+      - Sweep coverage shown when a long document is cut short.
+      - A record of deleted seed rows so a re-seed doesn't bring them
+        back.
 - **Phase 1 — measure and harden:**
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
