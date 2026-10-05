@@ -3,21 +3,10 @@
 import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import {
-  proposalSections,
-  proposals,
-  type TipTapDoc,
-} from "@/db/schema";
-import { recordAudit } from "@/lib/audit-log";
+import { proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { enforceRateLimit } from "@/lib/rate-limit";
-import {
-  countWords as countTipTapWords,
-  fromPlainText,
-  projectToPlain,
-  validateDoc,
-} from "@/lib/tiptap-doc";
-import { generateSectionDraftAction } from "./actions";
+import { autoDraftProgress, continueAutoDraft, startAutoDraft } from "@/lib/auto-draft";
+import { EMPTY_WORD_THRESHOLD, type AutoDraftProgress } from "@/lib/auto-draft-logic";
 
 /**
  * Phase 14e — list every section in a proposal so the client
@@ -26,8 +15,6 @@ import { generateSectionDraftAction } from "./actions";
  * "Empty" here means word count below a threshold — sections seeded
  * with placeholder text from the lifecycle template count as empty.
  */
-const EMPTY_WORD_THRESHOLD = 30;
-
 export type AutoDraftSection = {
   id: string;
   title: string;
@@ -85,160 +72,45 @@ export async function listSectionsForAutoDraftAction(
   };
 }
 
-export type AutoDraftSectionResult =
-  | {
-      ok: true;
-      sectionId: string;
-      wordCount: number;
-      provider: string;
-      model: string;
-      stubbed: boolean;
-    }
-  | { ok: false; sectionId: string; error: string };
-
 /**
- * Phase 14e — draft a single section AND save the result. Drives
- * the client-side "Auto-draft all" loop. Each call goes through the
- * same generateSectionDraftAction we already use for the manual
- * draft button, so pattern intel (Phase 14d) flows through.
- *
- * Persists the result via direct UPDATE rather than going through
- * saveSectionAction — saves a round trip and lets us bump
- * status='draft_complete' atomically.
+ * BL-AIX Phase 0c — start a server-side auto-draft of this proposal. Each
+ * target section becomes a durable job; closing the dialog no longer
+ * stops the run.
  */
-export async function autoDraftSingleSectionAction(input: {
+export async function startAutoDraftAction(input: {
   proposalId: string;
-  sectionId: string;
-  /** Whether to overwrite an existing non-empty section. Defaults to false. */
   overwrite?: boolean;
-}): Promise<AutoDraftSectionResult> {
+}): Promise<{ ok: true; queued: number } | { ok: false; error: string }> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-
-  // Rate-limit AI draft calls. Two buckets: per-user (catches a user
-  // who scripts the action) and per-org (catches an org-wide runaway).
-  // Both must pass; whichever's tighter wins.
-  const userLimit = await enforceRateLimit({
-    key: `ai-draft:user:${user.id}`,
-    limit: 30,
-    windowSeconds: 3600,
-  });
-  if (!userLimit.ok) {
-    return {
-      ok: false,
-      sectionId: input.sectionId,
-      error: `You've hit the AI draft limit (30/hour). Retry in ${Math.ceil(userLimit.retryAfter / 60)} min.`,
-    };
-  }
-  const orgLimit = await enforceRateLimit({
-    key: `ai-draft:org:${organizationId}`,
-    limit: 200,
-    windowSeconds: 86400,
-  });
-  if (!orgLimit.ok) {
-    return {
-      ok: false,
-      sectionId: input.sectionId,
-      error: `Your org hit the daily AI draft limit (200/day). Retry tomorrow.`,
-    };
-  }
-
-  const [section] = await db
-    .select({
-      id: proposalSections.id,
-      wordCount: proposalSections.wordCount,
-      proposalId: proposalSections.proposalId,
-    })
-    .from(proposalSections)
-    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
-    .where(
-      and(
-        eq(proposalSections.id, input.sectionId),
-        eq(proposals.id, input.proposalId),
-        eq(proposals.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-  if (!section) {
-    return {
-      ok: false,
-      sectionId: input.sectionId,
-      error: "Section not found.",
-    };
-  }
-  if (
-    !input.overwrite &&
-    section.wordCount >= 30 // EMPTY_WORD_THRESHOLD
-  ) {
-    return {
-      ok: false,
-      sectionId: input.sectionId,
-      error: "Section already has content. Set overwrite=true to replace.",
-    };
-  }
-
-  // BL-AIP-5 — auto-draft used to be the one path that never cited;
-  // every unsupported claim now lands as [NEEDS CITATION] for the author.
-  const draft = await generateSectionDraftAction({
-    sectionId: input.sectionId,
-    mode: "draft",
-    cite: true,
-  });
-  if (!draft.ok) {
-    return {
-      ok: false,
-      sectionId: input.sectionId,
-      error: draft.error,
-    };
-  }
-
-  // Persist. Drafts always start in `in_progress` — auto-draft is a
-  // starting point, not a finished review-ready section.
-  const validated = validateDoc(draft.bodyDoc) ?? fromPlainText(draft.text);
-  const projected = projectToPlain(validated as TipTapDoc);
-  const wordCount = countTipTapWords(validated as TipTapDoc);
-
-  await db
-    .update(proposalSections)
-    .set({
-      bodyDoc: validated,
-      content: projected,
-      wordCount,
-      status: "in_progress",
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(proposalSections.id, input.sectionId),
-        eq(proposalSections.proposalId, input.proposalId),
-      ),
-    );
-
-  await recordAudit({
+  const res = await startAutoDraft({
     organizationId,
-    actor: { userId: user.id, email: user.email },
-    action: "proposal.section.auto_draft",
-    resourceType: "proposal_section",
-    resourceId: input.sectionId,
-    metadata: {
-      proposalId: input.proposalId,
-      wordCount,
-      provider: draft.provider,
-      model: draft.model,
-      stubbed: draft.stubbed,
-      overwrite: !!input.overwrite,
-    },
+    proposalId: input.proposalId,
+    userId: user.id,
+    email: user.email,
+    overwrite: !!input.overwrite,
   });
+  if (res.ok) revalidatePath(`/proposals/${input.proposalId}/sections`);
+  return res;
+}
 
-  revalidatePath(`/proposals/${input.proposalId}/sections`);
-  revalidatePath(`/proposals/${input.proposalId}`);
-
-  return {
-    ok: true,
-    sectionId: input.sectionId,
-    wordCount,
-    provider: draft.provider,
-    model: draft.model,
-    stubbed: draft.stubbed,
-  };
+/**
+ * The run's progress, newest job per section. While anything is queued
+ * this also keeps the run moving, so a watched run finishes quickly; an
+ * unwatched one is finished by the jobs cron.
+ */
+export async function autoDraftProgressAction(
+  proposalId: string,
+): Promise<{ ok: true; progress: AutoDraftProgress & { titles: Record<string, string> } } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const [p] = await db
+    .select({ id: proposals.id })
+    .from(proposals)
+    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  if (!p) return { ok: false, error: "Proposal not found." };
+  const progress = await autoDraftProgress({ organizationId, proposalId });
+  if (progress.queued > 0) await continueAutoDraft({ organizationId, proposalId });
+  return { ok: true, progress };
 }

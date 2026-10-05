@@ -9,6 +9,13 @@
  * off (1 → 5 → 15 minutes) until the cap. Pure; unit-tested.
  */
 
+/**
+ * Thrown by a handler when retrying cannot help; fails the job at once.
+ * Lives here (pure) so handlers in other modules can throw it without
+ * importing the jobs runner.
+ */
+export class JobPermanentError extends Error {}
+
 export const JOB_MAX_ATTEMPTS = 3;
 /** A run longer than this has died with its instance (Vercel caps at 5 min). */
 export const JOB_STUCK_AFTER_MS = 15 * 60_000;
