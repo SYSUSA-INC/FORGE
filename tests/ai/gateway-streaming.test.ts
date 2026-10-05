@@ -12,6 +12,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { UNTRUSTED_CONTENT_RULE } from "@/lib/prompt-safety";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiCallLogs } from "@/db/schema";
@@ -166,6 +167,16 @@ describe("BL-AI-STREAMING — gateway onDelta (runtime)", () => {
     if (savedProvider === undefined) delete process.env.AI_PROVIDER;
     else process.env.AI_PROVIDER = savedProvider;
     await fx.cleanup();
+  });
+
+  it("BL-AIX Phase 0d: every tenant call's system prompt ends with the quoted-material rule", async () => {
+    await completeForTenant({
+      organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
+      system: "You draft proposal sections.",
+      messages: [{ role: "user", content: "y" }],
+    });
+    expect(seenOpts?.system).toBe(`You draft proposal sections.\n\n${UNTRUSTED_CONTENT_RULE}`);
   });
 
   it("forwards onDelta to the provider and returns the aggregate; one telemetry row", async () => {

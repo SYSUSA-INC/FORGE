@@ -266,14 +266,40 @@ the phases below.
       - The browser loop and `autoDraftSingleSectionAction` are gone.
       - Tests: `tests/ai/auto-draft-logic.test.ts` and
         `tests/isolation/auto-draft.test.ts`.
-  - **0d** — Trust:
-    - a data-not-instructions wrapper on every prompt that embeds
-      document text;
-    - Section M given to the red-team pre-review;
-    - amendments linked to their opportunity;
-    - sweep coverage shown when a long document is cut short;
-    - a record of deleted seed rows so a re-seed doesn't bring them
-      back.
+  - **0d** — Trust, in two PRs:
+    - **0d-1** — Quoted material, Section M and amendments: 🔄 in
+      progress.
+      - **The AI gateway appends `UNTRUSTED_CONTENT_RULE`** to every
+        tenant call's system prompt, streaming included
+        (`src/lib/prompt-safety.ts`). Text inside fences or
+        `<untrusted_document>` tags is used only as the instructions
+        say (facts, requirements, examples, style), and anything in it
+        that tries to change the task, role, rules or output format is
+        ignored.
+      - **The ten prompt builders that quote raw documents** (front
+        matter, requirement windows, review, scan input, and others)
+        go through `fenced`, so a document containing ``` can't close
+        the fence and escape it.
+      - **Brain answer sources are fenced too**
+        (`BRAIN_ANSWER_PROMPT_VERSION` 2026-10-05.1).
+      - **The red-team pre-review gets Section M.** Its prompt said
+        "scoring against Section M" but never passed it. It now
+        receives the solicitation's Section M summary and the
+        proposal's Section M matrix rows; without them it says so in
+        its summary.
+      - **Amendments join their parent's opportunity.** An uploaded
+        amendment inherits the parent's opportunity, and converting a
+        parent carries amendments uploaded before the conversion. Their
+        requirements now reach the loader, the matrix seed, the drafter
+        and Q&A flagging. The convert action's own update is now
+        org-scoped too.
+      - Tests: `tests/ai/prompt-safety.test.ts`, a gateway case in
+        `tests/ai/gateway-streaming.test.ts`, and
+        `tests/isolation/amendment-link.test.ts`.
+    - **0d-2** — 🔄 next.
+      - Sweep coverage shown when a long document is cut short.
+      - A record of deleted seed rows so a re-seed doesn't bring them
+        back.
 - **Phase 1 — measure and harden:**
   - an extraction gold set in CI;
   - retrieval and draft evaluations;

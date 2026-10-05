@@ -31,6 +31,7 @@
  */
 
 import { z } from "zod";
+import { withUntrustedContentRule } from "@/lib/prompt-safety";
 import type { AiFeature } from "@/lib/ai-features";
 import {
   DEFAULT_ANTHROPIC_MODEL,
@@ -919,7 +920,8 @@ async function runTenantCompletion<T>(
   const providerStartedAt = Date.now();
   let result: AICompleteResult;
   try {
-    result = await _completeImpl(rest);
+    // BL-AIX Phase 0d — quoted documents are data, never instructions.
+    result = await _completeImpl({ ...rest, system: withUntrustedContentRule(rest.system) });
   } catch (err) {
     await recordAiCall({
       ...telemetryBase,

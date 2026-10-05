@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -66,9 +66,13 @@ export async function uploadSolicitationAction(
 
   // Verify the parent belongs to this org so a hand-typed UUID can't
   // attach an amendment to another tenant's solicitation.
+  // BL-AIX Phase 0d — an amendment joins its parent's opportunity, so its
+  // requirements reach the shared loader, the matrix seed, the drafter and
+  // Q&A flagging. Before, it got no opportunity and stood alone.
+  let parentOpportunityId: string | null = null;
   if (parentSolicitationId) {
     const [parentRow] = await db
-      .select({ id: solicitations.id })
+      .select({ id: solicitations.id, opportunityId: solicitations.opportunityId })
       .from(solicitations)
       .where(
         and(
@@ -83,6 +87,7 @@ export async function uploadSolicitationAction(
         error: "Parent solicitation not found in this organization.",
       };
     }
+    parentOpportunityId = parentRow.opportunityId;
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -104,6 +109,7 @@ export async function uploadSolicitationAction(
       source: "uploaded",
       parentSolicitationId,
       amendmentNumber,
+      opportunityId: parentOpportunityId,
     })
     .returning({ id: solicitations.id });
   if (!row) return { ok: false, error: "Could not record solicitation." };
@@ -314,7 +320,18 @@ export async function convertToOpportunityAction(
     await db
       .update(solicitations)
       .set({ opportunityId: opp.id, updatedAt: new Date() })
-      .where(eq(solicitations.id, solicitationId));
+      .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, solicitationId)));
+    // BL-AIX Phase 0d — amendments already uploaded follow their parent.
+    await db
+      .update(solicitations)
+      .set({ opportunityId: opp.id, updatedAt: new Date() })
+      .where(
+        and(
+          eq(solicitations.organizationId, organizationId),
+          eq(solicitations.parentSolicitationId, solicitationId),
+          isNull(solicitations.opportunityId),
+        ),
+      );
 
     // Drop a system activity entry on the opportunity so the trail is
     // explicit about where the metadata came from.
