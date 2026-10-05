@@ -45,6 +45,7 @@ import {
 import { completeStructuredForTenant } from "@/lib/ai";
 import {
   BRIEF_PROMPT_VERSION,
+  PIPELINE_BRIEF_PROMPT_VERSION,
   buildOpportunityBriefPrompt,
   buildPipelineBriefPrompt,
   pipelineBriefSchema,
@@ -496,7 +497,7 @@ async function buildPipelineSnapshot(
     pt: props.length,
     r: inActiveReviewRows.length,
     day: now.toISOString().slice(0, 10),
-    prompt: BRIEF_PROMPT_VERSION,
+    prompt: PIPELINE_BRIEF_PROMPT_VERSION,
   });
   return { snapshot, key };
 }
@@ -520,7 +521,7 @@ export async function generatePipelineBrief(input: {
   const res = await completeStructuredForTenant({
     organizationId,
     feature: "pipeline_brief",
-    promptVersion: BRIEF_PROMPT_VERSION,
+    promptVersion: PIPELINE_BRIEF_PROMPT_VERSION,
     schema: pipelineBriefSchema,
     toolName: "record_pipeline_brief",
     toolDescription: "Record the pipeline brief with its priorities and risks.",
@@ -540,7 +541,7 @@ export async function generatePipelineBrief(input: {
       organizationId,
       kind: "pipeline",
       opportunityId: null,
-      promptVersion: BRIEF_PROMPT_VERSION,
+      promptVersion: PIPELINE_BRIEF_PROMPT_VERSION,
       model: res.model,
       stubbed: res.stubbed,
       snapshotKey: built.key,
@@ -559,7 +560,7 @@ export async function generatePipelineBrief(input: {
     action: "pipeline.brief.generate",
     resourceType: "ai_brief",
     resourceId: row.id,
-    metadata: { stubbed: row.stubbed, promptVersion: BRIEF_PROMPT_VERSION },
+    metadata: { stubbed: row.stubbed, promptVersion: PIPELINE_BRIEF_PROMPT_VERSION },
   });
   return { ok: true, brief: toStoredBrief(row), reused: false, snapshot: built.snapshot };
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { frontPassExcerpt } from "@/lib/solicitation-sections";
 import { fenced } from "@/lib/prompt-safety";
+import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import type { AIMessage } from "@/lib/ai";
 import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 
@@ -667,12 +668,11 @@ export const DRAFT_GENERAL_REQUIREMENTS = 60;
 export const DRAFT_REQUIREMENT_CHARS = 600;
 
 /**
- * BL-AIP-5b — the drafter's prompt revision, stored on every
- * ai_call_log row and on golden eval runs so a prompt change is
- * comparable to the previous one. Bump it whenever SECTION_DRAFT_SYSTEM,
+ * BL-AIP-5b — the drafter's prompt revision, also stored on golden eval
+ * runs. Bump PROMPT_VERSIONS.section_draft whenever SECTION_DRAFT_SYSTEM,
  * MODE_INSTRUCTIONS or the block layout below changes.
  */
-export const SECTION_DRAFT_PROMPT_VERSION = "2026-10-04.2";
+export const SECTION_DRAFT_PROMPT_VERSION = PROMPT_VERSIONS.section_draft;
 
 export function buildSectionDraftPrompt(
   mode: SectionDraftMode,
@@ -989,8 +989,9 @@ export function buildOpportunityBriefPrompt(
   };
 }
 
-/** BL-AIP-7a — bump when either brief prompt or its grounding changes. */
-export const BRIEF_PROMPT_VERSION = "2026-09-28.1";
+/** BL-AIP-7a — stored on brief rows and in their cache keys. */
+export const BRIEF_PROMPT_VERSION = PROMPT_VERSIONS.opportunity_brief;
+export const PIPELINE_BRIEF_PROMPT_VERSION = PROMPT_VERSIONS.pipeline_brief;
 
 export const pursuitBriefSchema = z.object({
   brief: z.string(),
@@ -1074,8 +1075,8 @@ export type ScoutTriageSnapshot = {
   };
 };
 
-/** Bump when the scout prompt or its grounding changes. */
-export const SCOUT_TRIAGE_PROMPT_VERSION = "2026-09-29.1";
+/** Bump PROMPT_VERSIONS.opportunity_triage when the scout prompt or its grounding changes. */
+export const SCOUT_TRIAGE_PROMPT_VERSION = PROMPT_VERSIONS.opportunity_triage;
 
 const SCOUT_TRIAGE_SYSTEM = `You are the overnight scout inside FORGE — a federal proposal operations platform. Each morning a capture manager reads your triage of the notices that appeared overnight and decides which to import into the pipeline.
 
@@ -1121,7 +1122,7 @@ export function buildScoutTriagePrompt(
  * number, and says so when they do not answer the question. Bump the
  * version whenever the system prompt or the source layout changes.
  */
-export const BRAIN_ANSWER_PROMPT_VERSION = "2026-10-05.1";
+export const BRAIN_ANSWER_PROMPT_VERSION = PROMPT_VERSIONS.brain_answer;
 
 export type BrainAnswerSourceInput = {
   n: number;
@@ -1188,7 +1189,7 @@ export function buildBrainAnswerPrompt(input: {
  * target agencies; the admin edits everything before it is saved. Bump
  * the version whenever the system prompt or the input layout changes.
  */
-export const ONBOARDING_ASSIST_PROMPT_VERSION = "2026-10-01.1";
+export const ONBOARDING_ASSIST_PROMPT_VERSION = PROMPT_VERSIONS.onboarding_assist;
 
 export type OnboardingAssistInput = {
   name: string;
@@ -1240,7 +1241,7 @@ export function buildOnboardingAssistPrompt(
  * BL-FB-GEN-GRAPHICS — diagrams a section would benefit from, as small
  * node/edge specs drawn only from what the section already says.
  */
-export const GRAPHICS_SUGGEST_PROMPT_VERSION = "2026-10-03.1";
+export const GRAPHICS_SUGGEST_PROMPT_VERSION = PROMPT_VERSIONS.graphics_suggest;
 
 const GRAPHICS_SUGGEST_SYSTEM = `You are a proposal graphics lead inside FORGE — a federal proposal operations platform. Evaluators remember a good diagram longer than a paragraph. Read one proposal section and propose the diagrams it would benefit from, as small specs a renderer draws.
 
@@ -1284,7 +1285,7 @@ export function buildGraphicsSuggestPrompt(input: {
  * BL-FB-X-COLOR-TEAM Slice 2 — a colour-team round's consolidated
  * comments, verdicts and checklist, summarised for the writers.
  */
-export const REVIEW_SUMMARY_PROMPT_VERSION = "2026-10-03.1";
+export const REVIEW_SUMMARY_PROMPT_VERSION = PROMPT_VERSIONS.review_summary;
 
 const REVIEW_SUMMARY_SYSTEM = `You are the review lead inside FORGE — a federal proposal operations platform. A colour-team round has run; you read the consolidated report (every reviewer's comments by section, their verdicts, the checklist progress) and write the debrief the writers act on.
 
@@ -2179,7 +2180,7 @@ export const protestViabilitySchema = z.object({
 // BL-AIP-5b — proposal outline from Section L
 // ────────────────────────────────────────────────────────────────────
 
-export const PROPOSAL_BOOTSTRAP_PROMPT_VERSION = "2026-09-28.1";
+export const PROPOSAL_BOOTSTRAP_PROMPT_VERSION = PROMPT_VERSIONS.proposal_bootstrap;
 
 const PROPOSAL_BOOTSTRAP_SYSTEM = `You are a federal proposal manager inside FORGE. From a solicitation's instructions to offerors (Section L), its evaluation factors (Section M) and the extracted requirements, you produce the outline of the proposal the offeror must submit.
 
@@ -2271,3 +2272,38 @@ export const proposalBootstrapSchema = z.object({
   ),
   notes: z.string(),
 });
+
+// ────────────────────────────────────────────────────────────────────
+// BL-AIX Phase 1b — prompts that used to live beside their callers,
+// kept here so tests/ai/prompt-versions.test.ts can render them.
+// ────────────────────────────────────────────────────────────────────
+
+/** Section chat persona; prepareSectionChat appends the section's context block. */
+export const SECTION_CHAT_SYSTEM = `You are an expert federal proposal writer embedded inside FORGE. You are helping the proposal author work on a specific section of their in-progress government proposal. You have context about the opportunity, the organization, and the solicitation requirements.
+
+Your role:
+- Answer questions about how to approach, strengthen, or structure the section.
+- Suggest specific language or paragraphs on request.
+- Flag compliance issues or missing elements.
+- Be direct and specific — cite section references (e.g. [L.5.2.1]) when relevant.
+- Keep responses concise but actionable. No generic advice.
+- If you suggest replacement text, make it immediately usable.
+
+You are NOT a general assistant. Stay focused on improving this proposal section.`;
+
+const IMAGE_OCR_SYSTEM = `You are an OCR + transcription assistant. You receive a single image and return the textual content as plain prose, ready to be ingested into a corporate knowledge base.
+
+Rules:
+- Return PLAIN TEXT only. No markdown fences. No commentary.
+- Preserve paragraph breaks. Do not invent words. If unreadable, return an empty string.
+- If the image is a slide or marketing one-pager, transcribe each region in reading order: title, body, captions, footers.
+- If the image contains a table, render rows as tab-separated lines under a "Table:" header.
+- If the image is a photo of handwriting, transcribe what you can confidently read; leave [illegible] for sections you cannot.
+- Maximum 8000 characters output. Truncate gracefully if the image has more text than that.`;
+
+export function buildImageOcrPrompt(): { system: string; messages: AIMessage[] } {
+  return {
+    system: IMAGE_OCR_SYSTEM,
+    messages: [{ role: "user", content: "Transcribe the attached image. Return plain text only." }],
+  };
+}

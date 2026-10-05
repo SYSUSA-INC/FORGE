@@ -36,6 +36,7 @@ import {
 } from "../helpers/fixtures";
 import { QuotaExceededError } from "@/lib/subscription-gates";
 import { completeForTenant, __setCompleteImplForTest } from "@/lib/ai";
+import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import {
   getAiFeatureBreakdown,
   pruneAiCallLogs,
@@ -162,6 +163,20 @@ describe("BL-AI-TELEMETRY — completeForTenant writes ai_call_log (runtime)", (
     expect(row.stubbed).toBe(false);
     expect(row.error).toBeNull();
     expect(row.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  // BL-AIX Phase 1b — a caller that names no version gets the feature's.
+  it("stamps the feature's prompt version when the caller passes none", async () => {
+    await completeForTenant({
+      organizationId: fx.orgA.organizationId,
+      feature: "section_chat",
+      system: "x",
+      messages: [{ role: "user", content: "y" }],
+    });
+
+    const rows = await logsFor(fx.orgA.organizationId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.promptVersion).toBe(PROMPT_VERSIONS.section_chat);
   });
 
   it("records an error row (and still rethrows) when the provider fails", async () => {

@@ -43,6 +43,7 @@ import { withUntrustedContentRule } from "@/lib/prompt-safety";
 const COMPLETION_DEADLINE_MS = 150_000;
 const STREAM_FIRST_BYTE_DEADLINE_MS = 60_000;
 import type { AiFeature } from "@/lib/ai-features";
+import { promptVersionFor } from "@/lib/ai-prompt-versions";
 import {
   DEFAULT_ANTHROPIC_MODEL,
   DEFAULT_VLLM_MODEL,
@@ -839,7 +840,7 @@ export type AITenantCompleteOptions = AICompleteOptions & {
   feature: AiFeature;
   /** Optional sub-mode — draft mode, extraction path, review kind. */
   variant?: string;
-  /** Optional prompt revision tag so prompt changes are comparable. */
+  /** Prompt revision; defaults to the feature's entry in PROMPT_VERSIONS (src/lib/ai-prompt-versions.ts). */
   promptVersion?: string;
 };
 
@@ -859,7 +860,9 @@ async function runTenantCompletion<T>(
   opts: AITenantCompleteOptions,
   validate: ((result: AICompleteResult) => AIStructuredValidation<T>) | null,
 ): Promise<TenantRun<T>> {
-  const { organizationId, feature, variant, promptVersion, ...rest } = opts;
+  const { organizationId, feature, variant, promptVersion: requestedVersion, ...rest } = opts;
+  // BL-AIX Phase 1b — every row carries the prompt revision it ran on.
+  const promptVersion = requestedVersion || promptVersionFor(feature);
   // Dynamic imports keep the AI gateway free of a hard dep on the
   // subscription-gates / telemetry modules — useful for the future
   // ingest / worker contexts that may use this file without them.

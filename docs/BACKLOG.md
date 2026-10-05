@@ -336,9 +336,28 @@ the phases below.
       honours `retry-after` (capped at 30 s), inside a 120 s budget. A
       missed deadline is not retried.
     - Tests: `tests/ai/http-retry.test.ts`.
+  - **1b** — A prompt version on every feature: 🔄 in progress.
+    - `src/lib/ai-prompt-versions.ts` holds one version per feature that
+      sends a prompt. Before this, only 9 of 27 logged one. The gateway records
+      it on every `ai_call_log` row when the caller passes none. The old
+      per-feature constants are now aliases of this table. The pipeline
+      brief gets its own entry instead of borrowing the opportunity
+      brief's.
+    - `tests/ai/prompt-versions.test.ts` renders every feature's prompts
+      from fixed fixtures (`tests/ai/prompt-fixtures.ts`), including the
+      quoted-material rule the gateway appends and the output schemas of
+      structured calls. It hashes them and compares the result with
+      `tests/ai/prompt-versions.lock.json`. A changed hash under an
+      unchanged version fails. `UPDATE_PROMPT_LOCK=1` rewrites only the
+      entries whose version moved.
+    - The section-chat persona and the image-OCR prompt moved into
+      `ai-prompts.ts` so the test can render them. Not covered yet: the
+      chat's per-section context block, which `prepareSectionChat`
+      builds from the database.
+    - Tests: `tests/ai/prompt-versions.test.ts`, plus a gateway case in
+      `tests/ai/gateway-telemetry.test.ts`.
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
-  - a prompt version on every feature;
   - provider fallback and a per-model capability table;
   - caching and batches.
 - **Phase 2 — Solicitation Intelligence Engine:**
