@@ -49,7 +49,7 @@ Effort key:
 | 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | ✅ shipped (PR #334) |
 | 3v | **BL-16 API Slice 2c** — Outbound webhooks (signed POSTs on opportunity / proposal events, delivery log, retries) | P2 | M | ⏸ parked (owner, 2026-10-04: BL-AIX first) |
 | 3w | **BL-AIX Phase 0a** — Requirement integrity: requirements differing by a number or qualifier are no longer merged away; Sections L / M located where they really are; not-applicable rows kept out of AI prompts. Ships the 2026-10 assessment and the BL-AIX program | P0 | M | ✅ shipped (PR #335) |
-| 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | 🔄 in progress |
+| 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | 🔄 in PR (PR #336) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -147,7 +147,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · 🔄 Phase 0b in progress
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · 🔄 Phase 0b in PR (PR #336)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -204,7 +204,7 @@ the phases below.
       the same locator.
     - **Rows the team marked not applicable** are no longer sent as
       "MUST address" to the drafter, section chat or AI pre-review.
-  - **0b** — Truth in the learning signals: 🔄 in progress.
+  - **0b** — Truth in the learning signals: 🔄 in PR (PR #336).
     - **Edit learning separates FORGE AI from people.** It reads each
       decision's author, `bulk` flag and word count. FORGE AI's
       accepted text and accept-all decisions no longer become
