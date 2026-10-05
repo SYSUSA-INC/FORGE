@@ -51,7 +51,7 @@ Effort key:
 | 3w | **BL-AIX Phase 0a** — Requirement integrity: requirements differing by a number or qualifier are no longer merged away; Sections L / M located where they really are; not-applicable rows kept out of AI prompts. Ships the 2026-10 assessment and the BL-AIX program | P0 | M | ✅ shipped (PR #335) |
 | 3x | **BL-AIX Phase 0b** — Truth in the learning signals: FORGE AI's suggestions judged apart from people's (not imitated); word-weighted AI acceptance; draft retention by surviving phrases, graded after review; AI text kept out of voice profiles | P0 | M | ✅ shipped (PR #336) |
 | 3y | **BL-AIX Phase 0c-1** — Background scans no longer stall behind proposals whose plan lacks the scan; the section draft becomes a library a background job can call | P0 | S | ✅ shipped (PR #337) |
-| 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | 🔄 in progress |
+| 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | 🔄 in PR (PR #338) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -149,7 +149,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · 🔄 Phase 0c-2 in progress
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · 🔄 Phase 0c-2 in PR (PR #338)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -245,7 +245,7 @@ the phases below.
         quota) so callers can tell retryable from final.
       - Tests: additions to `tests/ai/proposal-scan-backoff.test.ts`;
         `tests/isolation/proposal-scan-gating.test.ts`.
-    - **0c-2** — Auto-draft runs on the server: 🔄 in progress.
+    - **0c-2** — Auto-draft runs on the server: 🔄 in PR (PR #338).
       - One durable `section_auto_draft` background job per section
         (migration `0113`; `EXPECTED_LATEST_MIGRATION` bumped). While
         the dialog is open it polls, and that keeps the run moving; the
