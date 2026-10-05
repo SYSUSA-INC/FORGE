@@ -604,6 +604,16 @@ Section L/M traceability matrix. Every shall-statement from the RFP gets a row:
 
 **The matrix starts full (BL-AIP-5).** When you create a proposal on an opportunity whose solicitation has been parsed, every requirement the intake pipeline extracted becomes a row automatically, categorised from its reference (`L.…` → Section L, `M-…` → Section M, `C.…` / `PWS` / `SOW` → Section C, `FAR …` → FAR clause), and the rows are mapped to your seeded sections in the background where the AI is confident. Intake itself now reads the **whole** document in windows rather than the first 80,000 characters and a "top 25" sample, and merges the clauses from companion PWS / SOW / attachment uploads, so a requirement on page 140 reaches the matrix. For proposals created before this, or when a solicitation was parsed later, click **Seed from solicitation** (it skips rows that already exist) and then **Auto-map**. Deleting a companion document removes its clauses on the next merge; re-parsing the main RFP keeps them.
 
+**Deleted rows stay deleted.** When you delete a matrix row, FORGE remembers its text for that proposal, so **Seed from solicitation** won't add it back; the result message says how many it left out.
+
+**When intake couldn't read everything.** Above the requirement list, the solicitation page shows a **Not everything was read** banner when:
+- a very long document was only partly read, with the share and character counts;
+- part of a document couldn't be read;
+- more requirements were found than the list keeps;
+- a scanned PDF could only be read by an image pass.
+
+It covers the main file and each companion document. The fix is usually to upload the long parts (the PWS, Sections L and M, attachments) as separate companion documents so each is read in full.
+
 **Parses finish, or say why not (BL-AIP-4c).** Each solicitation or companion-document parse (and each harvest of a submitted or won proposal into the Brain) is recorded as a background job the moment you upload. If the server instance running it dies mid-way, the platform retries it automatically within a few minutes from the stored file (up to three attempts); the solicitation page shows the state next to **Parse** — "retry at 14:05 UTC (attempt 2 of 3)", "stuck (awaiting recovery)", or "failed after 3 attempts" with the reason. **Re-parse** always starts a fresh job.
 
 **Requirements follow you into the editor.** The rows mapped to a section are handed to the AI drafter and the section chat verbatim as that section's contract ("address every one; reference its number inline"), ahead of the general requirement list, and the health scan judges compliance against the full list rather than a 20-clause sample.

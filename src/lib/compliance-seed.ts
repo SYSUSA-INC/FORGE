@@ -17,7 +17,7 @@ import "server-only";
 
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { complianceItems, proposals } from "@/db/schema";
+import { complianceItems, complianceSeedDismissals, proposals } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import {
   categoryFromRef,
@@ -32,6 +32,8 @@ export type SeedComplianceResult =
       ok: true;
       inserted: number;
       skippedDuplicates: number;
+      /** BL-AIX Phase 0d — requirements the team removed from this matrix before. */
+      skippedDismissed: number;
       available: number;
       solicitationCount: number;
     }
@@ -62,6 +64,7 @@ export async function seedComplianceItemsFromRequirements(input: {
       ok: true,
       inserted: 0,
       skippedDuplicates: 0,
+      skippedDismissed: 0,
       available: 0,
       solicitationCount: loaded.solicitationCount,
     };
@@ -76,6 +79,13 @@ export async function seedComplianceItemsFromRequirements(input: {
     .where(eq(complianceItems.proposalId, proposalId))
     .orderBy(desc(complianceItems.ordering));
 
+  const dismissed = await db
+    .select({ key: complianceSeedDismissals.requirementKey, text: complianceSeedDismissals.requirementText })
+    .from(complianceSeedDismissals)
+    .where(and(eq(complianceSeedDismissals.organizationId, organizationId), eq(complianceSeedDismissals.proposalId, proposalId)));
+  const dismissedKeys = new Set(dismissed.map((d) => d.key));
+  let skippedDismissed = 0;
+
   const seen = new Set(existing.map((e) => requirementKey(e.requirementText)));
   const existingTexts = existing.map((e) => e.requirementText);
   let ordering = (existing[0]?.ordering ?? 0) + 1;
@@ -86,6 +96,10 @@ export async function seedComplianceItemsFromRequirements(input: {
     if (values.length >= MAX_SEEDED_ITEMS) break;
     const key = requirementKey(r.text);
     if (!key) continue;
+    if (dismissedKeys.has(key) || dismissed.some((d) => isSameRequirement(d.text, r.text))) {
+      skippedDismissed += 1;
+      continue;
+    }
     if (seen.has(key) || existingTexts.some((t) => isSameRequirement(t, r.text))) {
       skippedDuplicates += 1;
       continue;
@@ -127,6 +141,7 @@ export async function seedComplianceItemsFromRequirements(input: {
       proposalId,
       inserted: values.length,
       skippedDuplicates,
+      skippedDismissed,
       available: loaded.requirements.length,
       solicitationCount: loaded.solicitationCount,
       primarySolicitationId: loaded.primarySolicitationId,
@@ -137,6 +152,7 @@ export async function seedComplianceItemsFromRequirements(input: {
     ok: true,
     inserted: values.length,
     skippedDuplicates,
+    skippedDismissed,
     available: loaded.requirements.length,
     solicitationCount: loaded.solicitationCount,
   };

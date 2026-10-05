@@ -176,6 +176,7 @@ export async function parseSolicitationFromBytes(
           "\n\n[Extracted via vision OCR — text layer was unreadable.]",
         sectionMSummary: d.sectionMSummary,
         extractedRequirements: d.requirements,
+        extractionCoverage: { vision: true },
         keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
@@ -247,6 +248,7 @@ export async function parseSolicitationFromBytes(
       sectionLSummary: d.sectionLSummary,
       sectionMSummary: d.sectionMSummary,
       extractedRequirements: d.requirements,
+      extractionCoverage: aiRes.coverage ?? {},
       keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
       updatedAt: new Date(),
     })

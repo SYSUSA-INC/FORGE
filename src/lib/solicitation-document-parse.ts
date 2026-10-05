@@ -79,6 +79,7 @@ export async function parseSolicitationDocumentFromBytes(
       sectionLSummary: visionRes.data.sectionLSummary + "\n\n[Extracted via vision OCR.]",
       sectionMSummary: visionRes.data.sectionMSummary,
       requirements: visionRes.data.requirements,
+      coverage: { vision: true },
     });
     return;
   }
@@ -93,6 +94,7 @@ export async function parseSolicitationDocumentFromBytes(
         "\n\n[Extracted via vision OCR — text layer was unreadable.]",
       sectionMSummary: visionRes.data.sectionMSummary,
       requirements: visionRes.data.requirements,
+      coverage: { vision: true },
     });
     return;
   }
@@ -112,6 +114,7 @@ export async function parseSolicitationDocumentFromBytes(
     sectionLSummary: aiRes.data.sectionLSummary,
     sectionMSummary: aiRes.data.sectionMSummary,
     requirements: aiRes.data.requirements,
+    coverage: aiRes.coverage ?? {},
   });
 }
 
@@ -124,6 +127,7 @@ async function applyExtraction(
     sectionLSummary: string;
     sectionMSummary: string;
     requirements: { kind: string; text: string; ref: string }[];
+    coverage: import("@/lib/extraction-coverage").ExtractionCoverage;
   },
 ): Promise<void> {
   const reqs: SolicitationRequirement[] = data.requirements.map((r) => ({
@@ -141,6 +145,7 @@ async function applyExtraction(
       sectionLSummary: data.sectionLSummary,
       sectionMSummary: data.sectionMSummary,
       extractedRequirements: reqs,
+      extractionCoverage: data.coverage,
       updatedAt: new Date(),
     })
     .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));

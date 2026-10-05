@@ -73,6 +73,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
           fileSize: file.size,
           parseStatus: "parsing",
           parseError: "",
+          coverageWarnings: null,
           requirementCount: 0,
           sortOrder: 0,
           createdAt: new Date().toISOString(),

@@ -297,10 +297,28 @@ the phases below.
       - Tests: `tests/ai/prompt-safety.test.ts`, a gateway case in
         `tests/ai/gateway-streaming.test.ts`, and
         `tests/isolation/amendment-link.test.ts`.
-    - **0d-2** — 🔄 next.
-      - Sweep coverage shown when a long document is cut short.
-      - A record of deleted seed rows so a re-seed doesn't bring them
-        back.
+    - **0d-2** — What wasn't read; deleted rows stay deleted: 🔄 in
+      progress.
+      - **Sweep coverage.** Migration `0114` adds
+        `extraction_coverage` to `solicitation` and
+        `solicitation_document`. The parse records the characters the
+        windows covered, the total, failed windows, requirements found
+        and kept, or a scanned-document marker.
+      - **The coverage banner.** `describeCoverage`
+        (`src/lib/extraction-coverage.ts`) turns that into plain
+        sentences. The solicitation page shows a "Not everything was
+        read" banner above the requirement list, for the solicitation
+        and each companion document, that says to upload long parts as
+        companion documents.
+      - **Deleted rows stay deleted.** Migration `0114` also adds
+        `compliance_seed_dismissal`. Deleting a compliance row records
+        its normalized text for that proposal, and "Seed from
+        solicitation" skips it (exact text or `isSameRequirement`),
+        reporting how many it left out. Scoped to the organization and
+        proposal.
+      - `EXPECTED_LATEST_MIGRATION` is bumped.
+      - Tests: `tests/ai/extraction-coverage.test.ts` and
+        `tests/isolation/compliance-dismissal.test.ts`.
 - **Phase 1 — measure and harden:**
   - an extraction gold set in CI;
   - retrieval and draft evaluations;

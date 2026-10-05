@@ -516,6 +516,7 @@ function SeedFromSolicitation({
       setNotice(
         `Added ${res.inserted} requirement${res.inserted === 1 ? "" : "s"} from ${res.solicitationCount} solicitation${res.solicitationCount === 1 ? "" : "s"}` +
           (res.skippedDuplicates > 0 ? ` (${res.skippedDuplicates} already in the matrix)` : "") +
+          (res.skippedDismissed > 0 ? `; ${res.skippedDismissed} you removed before were left out` : "") +
           (res.inserted > 0 ? ". Run Auto-map to place them." : "."),
       );
       router.refresh();

@@ -53,6 +53,7 @@ describe("BL-AIP-5 — seedComplianceItemsFromRequirements", () => {
       ok: true,
       inserted: 3,
       skippedDuplicates: 0,
+      skippedDismissed: 0,
       available: 3,
       solicitationCount: 1,
     });

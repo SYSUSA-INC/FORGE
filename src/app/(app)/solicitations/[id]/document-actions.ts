@@ -1,6 +1,7 @@
 "use server";
 
 import { and, asc, eq } from "drizzle-orm";
+import { describeCoverage } from "@/lib/extraction-coverage";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -30,6 +31,8 @@ export type SolicitationDocumentRow = {
   parseStatus: string;
   parseError: string;
   requirementCount: number;
+  /** BL-AIX Phase 0d — what the parse didn't read; null when read in full. */
+  coverageWarnings: string[] | null;
   sortOrder: number;
   createdAt: string;
 };
@@ -70,6 +73,7 @@ export async function listSolicitationDocumentsAction(
       parseStatus: solicitationDocuments.parseStatus,
       parseError: solicitationDocuments.parseError,
       extractedRequirements: solicitationDocuments.extractedRequirements,
+      extractionCoverage: solicitationDocuments.extractionCoverage,
       sortOrder: solicitationDocuments.sortOrder,
       createdAt: solicitationDocuments.createdAt,
     })
@@ -94,6 +98,7 @@ export async function listSolicitationDocumentsAction(
     parseStatus: r.parseStatus,
     parseError: r.parseError,
     requirementCount: (r.extractedRequirements ?? []).length,
+    coverageWarnings: describeCoverage(r.extractionCoverage),
     sortOrder: r.sortOrder,
     createdAt: r.createdAt.toISOString(),
   }));
