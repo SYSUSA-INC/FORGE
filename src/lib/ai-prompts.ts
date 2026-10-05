@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { frontPassExcerpt } from "@/lib/solicitation-sections";
 import type { AIMessage } from "@/lib/ai";
 import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 
@@ -78,20 +79,20 @@ Schema:
 export function buildSolicitationExtractPrompt(
   rawText: string,
 ): { system: string; messages: AIMessage[] } {
-  // Trim to a manageable size — first 80k chars covers the front matter
-  // (cover sheet + Section L + Section M) of nearly every RFP.
-  const trimmed = rawText.slice(0, 80_000);
+  // BL-AIX Phase 0 — Sections L and M sit at the END of a Uniform
+  // Contract Format RFP, so "the first 80k characters" missed them on
+  // long documents. Read the beginning plus the located L and M.
+  const excerpt = frontPassExcerpt(rawText);
   const userPrompt = [
     `Extract structured facts from the following solicitation text.`,
+    excerpt.partial
+      ? `The document is ${rawText.length.toLocaleString("en-US")} characters long; below are its beginning and, where they could be located, Sections L and M, each labelled with its position. Base the Section L and Section M summaries on those labelled excerpts.`
+      : "",
     ``,
     `Raw text:`,
     "```",
-    trimmed,
+    excerpt.text,
     "```",
-    ``,
-    rawText.length > trimmed.length
-      ? `(Text was trimmed from ${rawText.length} chars to first ${trimmed.length}.)`
-      : "",
   ]
     .filter(Boolean)
     .join("\n");

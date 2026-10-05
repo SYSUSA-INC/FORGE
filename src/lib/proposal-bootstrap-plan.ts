@@ -10,6 +10,7 @@
  * Pure; unit-tested.
  */
 import type { ProposalSectionKind } from "@/db/schema";
+import { locateSection } from "@/lib/solicitation-sections";
 
 export const BOOTSTRAP_MAX_SECTIONS = 20;
 export const BOOTSTRAP_MAX_THEMES = 3;
@@ -213,6 +214,10 @@ const SECTION_L_MARKERS =
 export function sectionLWindow(rawText: string, max = 14_000): string {
   if (!rawText) return "";
   const text = rawText.replace(/\r/g, "");
+  // BL-AIX Phase 0 — the Section L heading itself, when the document has
+  // one; the marker scan below is the fallback for non-UCF documents.
+  const located = locateSection(text, "L");
+  if (located !== null) return text.slice(located, located + max);
   let best = -1;
   let m: RegExpExecArray | null;
   SECTION_L_MARKERS.lastIndex = 0;

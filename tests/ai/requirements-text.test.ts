@@ -6,6 +6,7 @@ import {
   categoryFromRef,
   chunkText,
   dedupeRequirements,
+  isSameRequirement,
   jaccard,
   MAX_CHUNKS_PER_DOCUMENT,
   mergeRequirementLists,
@@ -61,6 +62,46 @@ describe("BL-AIP-5 — de-duplication", () => {
     expect(merged[0]!.ref).toBe("C.3");
     expect(merged[1]!.ref).toBe("L.5");
     expect(dedupeRequirements(merged, b)).toHaveLength(2);
+  });
+});
+
+describe("BL-AIX Phase 0 — isSameRequirement keeps requirements that differ in what they ask", () => {
+  const pairs: [string, string][] = [
+    ["The Technical Volume shall not exceed 30 pages.", "The Management Volume shall not exceed 15 pages."],
+    [
+      "The Technical Volume shall not exceed 30 pages, excluding the cover page, table of contents and acronym list.",
+      "The Management Volume shall not exceed 30 pages, excluding the cover page, table of contents and acronym list.",
+    ],
+    ["Volume I shall not exceed 25 pages.", "Volume II shall not exceed 25 pages."],
+    ["The contractor shall maintain a Secret facility clearance.", "The contractor shall maintain a Top Secret facility clearance."],
+    ["The contractor shall submit a monthly status report.", "The contractor shall submit a weekly status report."],
+    ["The contractor shall submit a status report.", "The contractor shall submit a monthly status report."],
+    ["Key personnel shall be available on site.", "Key personnel shall not be available on site."],
+    ["Deliver the transition plan within 30 days of award.", "Deliver the transition plan within 60 days of award."],
+  ];
+
+  it.each(pairs)("keeps both: %s | %s", (a, b) => {
+    expect(isSameRequirement(a, b)).toBe(false);
+    expect(dedupeRequirements([{ text: a }], [{ text: b }])).toHaveLength(2);
+  });
+
+  it("still merges the same clause seen twice or lightly reworded", () => {
+    expect(isSameRequirement("The offeror shall submit three volumes.", "the offeror  shall submit three volumes")).toBe(true);
+    expect(
+      isSameRequirement(
+        "The contractor shall provide monthly status reports to the COR.",
+        "Contractor must provide monthly status reports to the COR",
+      ),
+    ).toBe(true);
+    // One extra filler-ish word in a long clause is the same obligation…
+    expect(
+      isSameRequirement(
+        "The offeror shall describe its approach to recruiting, retaining and training qualified staff for every task area in the PWS.",
+        "The offeror shall describe its overall approach to recruiting, retaining and training qualified staff for every task area in the PWS.",
+      ),
+    ).toBe(true);
+    // …but one extra word in a short clause is not enough to merge.
+    expect(isSameRequirement("Submit the staffing plan.", "Submit the draft staffing plan.")).toBe(false);
   });
 });
 

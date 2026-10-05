@@ -128,6 +128,7 @@ export async function prepareSectionChat(input: {
           and(
             eq(complianceItems.proposalSectionId, input.sectionId),
             eq(complianceItems.proposalId, row.proposal.id),
+            ne(complianceItems.status, "not_applicable"),
           ),
         )
         .orderBy(asc(complianceItems.ordering))

@@ -21,7 +21,7 @@ import { complianceItems, proposals } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import {
   categoryFromRef,
-  jaccard,
+  isSameRequirement,
   requirementKey,
 } from "@/lib/requirements-text";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
@@ -86,7 +86,7 @@ export async function seedComplianceItemsFromRequirements(input: {
     if (values.length >= MAX_SEEDED_ITEMS) break;
     const key = requirementKey(r.text);
     if (!key) continue;
-    if (seen.has(key) || existingTexts.some((t) => jaccard(t, r.text) >= 0.6)) {
+    if (seen.has(key) || existingTexts.some((t) => isSameRequirement(t, r.text))) {
       skippedDuplicates += 1;
       continue;
     }

@@ -13,7 +13,7 @@
  */
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   complianceItems,
@@ -113,7 +113,8 @@ export async function runReviewPreflight(input: {
       text: complianceItems.requirementText,
     })
     .from(complianceItems)
-    .where(eq(complianceItems.proposalId, proposalId))
+    // BL-AIX Phase 0 — rows marked not applicable are not reviewed against.
+    .where(and(eq(complianceItems.proposalId, proposalId), ne(complianceItems.status, "not_applicable")))
     .orderBy(asc(complianceItems.ordering));
   const reqsBySection = new Map<string, { number: string; text: string }[]>();
   for (const m of mapped) {

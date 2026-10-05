@@ -46,7 +46,9 @@ Effort key:
 | 3r | **BL-FB-CHAT-MULTI Slice 3** — Presence: who else has a section open, in the section header | P3 | S | ✅ shipped (PR #330) |
 | 3s | **BL-21 help refresh (October 2026 pass)** — What's new in the user manual, FAQ for the new features, migrations 0104–0112 table in the admin manual | P3 | S | ✅ shipped (PR #331) |
 | 3t | **BL-16 API Slice 2a** — Platform admins view and revoke a tenant's API tokens (one or all, with a reason); OpenAPI 3.1 document at `/api/v1/openapi.json` | P2 | S | ✅ shipped (PR #333) |
-| 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | 🔄 in PR (PR #334) |
+| 3u | **BL-16 API Slice 2b** — Section text over the API: `GET /api/v1/proposals/{id}/sections/{sectionId}` (final view, plain + HTML) | P2 | S | ✅ shipped (PR #334) |
+| 3v | **BL-16 API Slice 2c** — Outbound webhooks (signed POSTs on opportunity / proposal events, delivery log, retries) | P2 | M | ⏸ parked (owner, 2026-10-04: BL-AIX first) |
+| 3w | **BL-AIX Phase 0a** — Requirement integrity: requirements differing by a number or qualifier are no longer merged away; Sections L / M located where they really are; not-applicable rows kept out of AI prompts. Ships the 2026-10 assessment and the BL-AIX program | P0 | M | 🔄 in PR (PR #335) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -143,6 +145,107 @@ diffs `pg_indexes` against both sources in CI.
   `tests/ai/schema-drift.test.ts`.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
+### BL-AIX — AI platform, next generation (2026-10-04)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** 🔄 Phase 0a in PR (PR #335)
+
+Owner's question (2026-10-04): is FORGE a true AI platform or an AI
+wrapper? The goal is a platform that reads a solicitation accurately,
+learns from every interaction for each organisation, outperforms
+anything comparable on the market, and eventually produces proposals
+without human intervention. The assessment,
+`docs/audits/09-ai-platform-assessment-2026-10.md`, found FORGE
+**not a wrapper, not yet a true AI platform**:
+- Solicitation understanding 2/5.
+- Proposal autonomy low 3/5.
+- Learning per tenant 2/5.
+- Foundations 2.5/5.
+- Measurement 1/5.
+- Trust and data governance 1.5/5.
+
+It lists 15 defects with file:line evidence, a target architecture and
+the phases below.
+
+**Owner decisions (2026-10-04):**
+- BL-AIX before webhooks: API Slice 2c is parked.
+- Autonomy comes first for **RFIs and sources-sought** responses.
+- **No learning across tenants of any kind**, not even from public
+  solicitation text. The isolation boundary is not opened for learning.
+  Each tenant's extraction learns only from its own corrections.
+- The extraction gold set is **drafted by AI from public SAM.gov RFPs
+  and reviewed by the owner's proposal expert**. It is a platform test
+  asset used only to measure accuracy. It is never trained on, and no
+  tenant data goes into it.
+- Still open:
+  - serving CUI/ITAR tenants in the next 12 months (sets when the
+    GovCloud routing in Phase 6 lands);
+  - consent-based prompt/response logging for later preference
+    training.
+
+**Phases:**
+- **Phase 0 — correctness** (defects 1–11 and 14 in §3 of the report):
+  - **0a** — Requirement integrity: 🔄 in PR (PR #335).
+    - **The duplicate filter no longer merges away distinct requirements.**
+      `isSameRequirement` in `requirements-text.ts` replaces the 0.6
+      Jaccard rule in every merge and in the compliance seed. Two texts
+      count as different when their numbers differ, when each has a
+      word the other lacks (a substitution: "Technical" / "Management
+      Volume", "Volume I" / "II"), or when the extra words include a
+      qualifier ("Top Secret", "weekly", "not"). Otherwise they count as
+      the same only when at least 80% of their meaningful words are
+      shared. Page limits and clearance levels were being dropped.
+    - **Sections L and M are located where they really start.**
+      `locateSection` in `solicitation-sections.ts` finds them in Part
+      IV of a long Uniform Contract Format RFP, skipping the table of
+      contents and cross-references. The front-matter pass (Section
+      L/M summaries, key dates) and the solicitation review read the
+      beginning plus the located L and M (`frontPassExcerpt`), not the
+      first 80k / 100k characters. The outline's Section L window uses
+      the same locator.
+    - **Rows the team marked not applicable** are no longer sent as
+      "MUST address" to the drafter, section chat or AI pre-review.
+  - **0b** — Truth in the learning signals:
+    - separate FORGE AI from human authors in edit learning;
+    - an AI-acceptance number that measures something;
+    - keep AI text out of voice profiles and preferred phrases.
+  - **0c** — Background reliability:
+    - the scan-cron stall (gated proposals block the batch);
+    - auto-draft as a resumable server job (snapshot, truncation check,
+      queue a scan).
+  - **0d** — Trust:
+    - a data-not-instructions wrapper on every prompt that embeds
+      document text;
+    - Section M given to the red-team pre-review;
+    - amendments linked to their opportunity;
+    - sweep coverage shown when a long document is cut short;
+    - a record of deleted seed rows so a re-seed doesn't bring them
+      back.
+- **Phase 1 — measure and harden:**
+  - an extraction gold set in CI;
+  - retrieval and draft evaluations;
+  - a prompt version on every feature;
+  - gateway timeouts, retries, fallback and a per-model capability
+    table;
+  - caching and batches.
+- **Phase 2 — Solicitation Intelligence Engine:**
+  - structured Sections L, M and C;
+  - requirements with page and offset provenance;
+  - an L↔M↔C crosswalk;
+  - a verify/correct screen whose corrections stay within the tenant;
+  - amendment propagation;
+  - automatic import of SAM.gov attachments.
+- **Phase 3 — Proposal Agent v1:** a durable plan → draft → verify →
+  score against Section M → revise → consistency → page-fit pipeline,
+  with human gates. Rung A first: RFIs and sources sought.
+- **Phase 4 — Tenant Knowledge Graph:** contracts and CPARS, people,
+  claims with evidence, themes with win rates, pricing history.
+- **Phase 5 — Learning layer v2, per tenant only:**
+  - preference memory learned from edits;
+  - examples chosen by outcome;
+  - an evaluator calibrated on debriefs;
+  - a bandit over prompts and models.
+- **Phase 6 — Governance and scale:** CUI/ITAR routing, documented
+  retention, fair parallel jobs, a FedRAMP path.
+
 ### BL-AIP — AI-platform assessment remediation (2026-09-24)
 **Priority:** P0  ·  **Effort:** L (phased, one PR per slice)  ·  **Status:** ✅ shipped — assessment report `docs/audits/08-ai-platform-assessment-2026-09.md` + BL-AIP-1 shipped (PR #269); BL-AIP-2 shipped (PR #270); BL-AIP-3 shipped (PR #271); BL-AIP-4 shipped (PR #275); BL-AIP-5 shipped (PR #277); BL-AIP-6 shipped (PR #278); BL-AIP-4b shipped (PR #279); BL-AIP-4c shipped (PR #280); BL-AIP-5b part i shipped (PR #281); BL-AIP-5b part ii shipped (PR #283); BL-AIP-7a shipped (PR #284); BL-AIP-7b shipped (PRs #288, #289, #291); BL-AIP-7c shipped (PR #292); BL-AIP-7d shipped (PRs #293, #294); BL-AIP-6b — the program's last slice — shipped (PR #295)
 
@@ -3975,7 +4078,8 @@ nothing used it, because there was no API.
 - Docs: USER_MANUAL §4.15, ADMIN_MANUAL §6.10.
 
 **Later:** write endpoints (scoped tokens); section text and exports
-(would also need `bulkExport`); webhooks out; ~~platform-admin view and
+(would also need `bulkExport`); webhooks out (Slice 2c — ⏸ parked by
+the owner on 2026-10-04 in favour of BL-AIX); ~~platform-admin view and
 revoke of a tenant's tokens; an OpenAPI document~~ → Slice 2a below.
 
 **API Slice 2a — platform-admin token view/revoke + OpenAPI document** ✅ shipped (PR #333, 2026-10-04):
@@ -4011,7 +4115,7 @@ section text, 2c outbound webhooks.
   document is served without a token).
 - Docs: USER_MANUAL §4.15, ADMIN_MANUAL §6.10.
 
-**API Slice 2b — section text** 🔄 in PR (PR #334, 2026-10-04):
+**API Slice 2b — section text** ✅ shipped (PR #334, 2026-10-04):
 
 User decision (2026-10-04): section text needs `apiAccess` only — not
 `bulkExport` as the original "Later" note suggested.
