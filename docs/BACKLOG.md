@@ -55,7 +55,8 @@ Effort key:
 | 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | ✅ shipped (PR #339) |
 | 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | ✅ shipped (PR #340) |
 | 3ac | **BL-AIX Phase 1a** — Provider calls get deadlines (150 s answer, 60 s first streamed byte, 30 s embeddings) and retries with backoff on 429 / 529 / 5xx and dropped connections | P0 | S | ✅ shipped (PR #341) |
-| 3ad | **BL-AIX Phase 1b** — A prompt version on every AI feature, recorded on every call; a hash-lock test fails when a prompt changes without its version | P0 | S | 🔄 in PR (PR #342) |
+| 3ad | **BL-AIX Phase 1b** — A prompt version on every AI feature, recorded on every call; a hash-lock test fails when a prompt changes without its version | P0 | S | ✅ shipped (PR #342) |
+| 3ae | **BL-AIX Phase 1c** — Golden-eval holdout: nothing from a case's own proposal reaches the drafter, copies of the winning text are dropped, and each case records how much still leaked | P0 | S | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -153,7 +154,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · 🔄 Phase 1b in PR (PR #342)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · 🔄 Phase 1c in progress
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -337,7 +338,7 @@ the phases below.
       honours `retry-after` (capped at 30 s), inside a 120 s budget. A
       missed deadline is not retried.
     - Tests: `tests/ai/http-retry.test.ts`.
-  - **1b** — A prompt version on every feature: 🔄 in PR (PR #342).
+  - **1b** — A prompt version on every feature: ✅ shipped (PR #342).
     - `src/lib/ai-prompt-versions.ts` holds one version per feature that
       sends a prompt. Before this, only 9 of 27 logged one. The gateway records
       it on every `ai_call_log` row when the caller passes none. The old
