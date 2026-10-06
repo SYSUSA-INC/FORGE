@@ -54,7 +54,8 @@ Effort key:
 | 3z | **BL-AIX Phase 0c-2** — Auto-draft runs on the server: durable job per section, survives closing the dialog, never writes stub text, snapshots and tracked suggestions over existing text, [CONTINUE] on a cut-off draft, queues a scan | P0 | M | ✅ shipped (PR #338) |
 | 3aa | **BL-AIX Phase 0d-1** — Quoted documents are data, never instructions (gateway rule + fence-safe quoting); Section M given to the red-team pre-review; amendments join their parent's opportunity | P0 | S | ✅ shipped (PR #339) |
 | 3ab | **BL-AIX Phase 0d-2** — "Not everything was read" banner when the requirement sweep fell short (migration 0114); compliance rows a team deletes aren't brought back by re-seeding | P0 | S | ✅ shipped (PR #340) |
-| 3ac | **BL-AIX Phase 1a** — Provider calls get deadlines (150 s answer, 60 s first streamed byte, 30 s embeddings) and retries with backoff on 429 / 529 / 5xx and dropped connections | P0 | S | 🔄 in PR (PR #341) |
+| 3ac | **BL-AIX Phase 1a** — Provider calls get deadlines (150 s answer, 60 s first streamed byte, 30 s embeddings) and retries with backoff on 429 / 529 / 5xx and dropped connections | P0 | S | ✅ shipped (PR #341) |
+| 3ad | **BL-AIX Phase 1b** — A prompt version on every AI feature, recorded on every call; a hash-lock test fails when a prompt changes without its version | P0 | S | 🔄 in PR (PR #342) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -152,7 +153,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · 🔄 Phase 1a in PR (PR #341)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · 🔄 Phase 1b in PR (PR #342)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -322,7 +323,7 @@ the phases below.
       - Tests: `tests/ai/extraction-coverage.test.ts` and
         `tests/isolation/compliance-dismissal.test.ts`.
 - **Phase 1 — measure and harden:**
-  - **1a** — Gateway resilience: 🔄 in PR (PR #341).
+  - **1a** — Gateway resilience: ✅ shipped (PR #341).
     - Every model call (Anthropic, streaming included, Azure OpenAI,
       vLLM) and every embedding call now goes through `fetchWithRetry`
       (`src/lib/http-retry.ts`).
@@ -336,9 +337,28 @@ the phases below.
       honours `retry-after` (capped at 30 s), inside a 120 s budget. A
       missed deadline is not retried.
     - Tests: `tests/ai/http-retry.test.ts`.
+  - **1b** — A prompt version on every feature: 🔄 in PR (PR #342).
+    - `src/lib/ai-prompt-versions.ts` holds one version per feature that
+      sends a prompt. Before this, only 9 of 27 logged one. The gateway records
+      it on every `ai_call_log` row when the caller passes none. The old
+      per-feature constants are now aliases of this table. The pipeline
+      brief gets its own entry instead of borrowing the opportunity
+      brief's.
+    - `tests/ai/prompt-versions.test.ts` renders every feature's prompts
+      from fixed fixtures (`tests/ai/prompt-fixtures.ts`), including the
+      quoted-material rule the gateway appends and the output schemas of
+      structured calls. It hashes them and compares the result with
+      `tests/ai/prompt-versions.lock.json`. A changed hash under an
+      unchanged version fails. `UPDATE_PROMPT_LOCK=1` rewrites only the
+      entries whose version moved.
+    - The section-chat persona and the image-OCR prompt moved into
+      `ai-prompts.ts` so the test can render them. Not covered yet: the
+      chat's per-section context block, which `prepareSectionChat`
+      builds from the database.
+    - Tests: `tests/ai/prompt-versions.test.ts`, plus a gateway case in
+      `tests/ai/gateway-telemetry.test.ts`.
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
-  - a prompt version on every feature;
   - provider fallback and a per-model capability table;
   - caching and batches.
 - **Phase 2 — Solicitation Intelligence Engine:**

@@ -341,6 +341,14 @@ src/
 - **Drizzle schema in `src/db/schema.ts`.** All tables in one file for
   greppability. Types are auto-exported via `$inferSelect` /
   `$inferInsert`.
+- **AI prompts live in `src/lib/ai-prompts*.ts` and carry a version.**
+  Changing what a model reads (a system prompt, an instruction, the
+  layout of its context, an output schema's fields or descriptions)
+  means bumping that feature's entry in `src/lib/ai-prompt-versions.ts`.
+  Then refresh the lock with
+  `UPDATE_PROMPT_LOCK=1 npx vitest run tests/ai/prompt-versions.test.ts`.
+  The test fails if a prompt changes and its version doesn't. A new
+  feature also needs a fixture in `tests/ai/prompt-fixtures.ts`.
 
 ---
 

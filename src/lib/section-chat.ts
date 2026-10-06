@@ -24,6 +24,7 @@ import {
   type SectionChatRole,
 } from "@/db/schema";
 import type { AIMessage } from "@/lib/ai";
+import { SECTION_CHAT_SYSTEM } from "@/lib/ai-prompts";
 import type { ChatHistoryMessage } from "@/lib/ai-stream-types";
 import { recordAudit } from "@/lib/audit-log";
 import { CHAT_NOTE_MAX_CHARS, CHAT_NOTES_TO_MODEL_MAX, memberLabel, mentionSubject, notesForModel, sectionChatLink } from "@/lib/chat-mentions";
@@ -41,17 +42,6 @@ import { gatherWritingSignals, renderWritingSignals } from "@/lib/writing-signal
 /** BL-AIP-5 — how many general requirements the chat sees (mapped rows always go in full). */
 const CHAT_GENERAL_REQUIREMENTS = 40;
 
-export const CHAT_SYSTEM = `You are an expert federal proposal writer embedded inside FORGE. You are helping the proposal author work on a specific section of their in-progress government proposal. You have context about the opportunity, the organization, and the solicitation requirements.
-
-Your role:
-- Answer questions about how to approach, strengthen, or structure the section.
-- Suggest specific language or paragraphs on request.
-- Flag compliance issues or missing elements.
-- Be direct and specific — cite section references (e.g. [L.5.2.1]) when relevant.
-- Keep responses concise but actionable. No generic advice.
-- If you suggest replacement text, make it immediately usable.
-
-You are NOT a general assistant. Stay focused on improving this proposal section.`;
 
 /** Per-section chat rate limit, shared by the action and the route. */
 export const CHAT_RATE_LIMIT = { limit: 30, windowSeconds: 3600 } as const;
@@ -285,7 +275,7 @@ export async function prepareSectionChat(input: {
 
   return {
     ok: true,
-    system: `${CHAT_SYSTEM}\n\n--- CONTEXT ---\n${contextBlock}`,
+    system: `${SECTION_CHAT_SYSTEM}\n\n--- CONTEXT ---\n${contextBlock}`,
     messages,
     proposalId: row.proposal.id,
   };

@@ -15,6 +15,7 @@ import {
   type KnowledgeKindEnumLike,
 } from "@/lib/ai-prompts";
 import { completeStructuredForTenant } from "@/lib/ai";
+import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import { log } from "@/lib/log";
 
 export type KnowledgeExtractOk = {
@@ -27,7 +28,7 @@ export type KnowledgeExtractOk = {
 };
 export type KnowledgeExtractErr = { ok: false; error: string };
 
-export const KNOWLEDGE_EXTRACT_PROMPT_VERSION = "kb-extract-v1";
+export const KNOWLEDGE_EXTRACT_PROMPT_VERSION = PROMPT_VERSIONS.knowledge_extract;
 
 const ALLOWED_KINDS: KnowledgeKindEnumLike[] = [
   "capability",

@@ -12,6 +12,7 @@
  * stub or non-Anthropic mode.
  */
 import { completeForTenant, getAIProviderStatus, type AIDocumentMedia } from "@/lib/ai";
+import { buildImageOcrPrompt } from "@/lib/ai-prompts";
 import { log } from "@/lib/log";
 
 export type ImageOcrResult =
@@ -23,16 +24,6 @@ export type ImageOcrResult =
       stubbed: boolean;
     }
   | { ok: false; error: string };
-
-const SYSTEM = `You are an OCR + transcription assistant. You receive a single image and return the textual content as plain prose, ready to be ingested into a corporate knowledge base.
-
-Rules:
-- Return PLAIN TEXT only. No markdown fences. No commentary.
-- Preserve paragraph breaks. Do not invent words. If unreadable, return an empty string.
-- If the image is a slide or marketing one-pager, transcribe each region in reading order: title, body, captions, footers.
-- If the image contains a table, render rows as tab-separated lines under a "Table:" header.
-- If the image is a photo of handwriting, transcribe what you can confidently read; leave [illegible] for sections you cannot.
-- Maximum 8000 characters output. Truncate gracefully if the image has more text than that.`;
 
 export async function extractTextFromImageViaVision(input: {
   organizationId: string;
@@ -64,13 +55,7 @@ export async function extractTextFromImageViaVision(input: {
     const ai = await completeForTenant({
       organizationId: input.organizationId,
       feature: "image_ocr",
-      system: SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: `Transcribe the attached image. Return plain text only.`,
-        },
-      ],
+      ...buildImageOcrPrompt(),
       maxTokens: 3000,
       temperature: 0.1,
       cacheSystem: true,
