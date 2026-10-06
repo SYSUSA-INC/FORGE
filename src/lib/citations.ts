@@ -122,6 +122,8 @@ export type CitationVerification = {
   unsupported: number;
   /** Markers that named no listed source (replaced before the model ran). */
   invalidMarkers: number;
+  /** BL-AIX Phase 1d — sentences stating an uncited hard figure, flagged [NEEDS CITATION] (src/lib/uncited-claims.ts). */
+  uncited: number;
   stubbed: boolean;
   /** Present when the model pass did not run or did not validate. */
   skipped?: string;

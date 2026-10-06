@@ -1034,6 +1034,9 @@ export function AiAssistantPanel({
                 {result.verification.invalidMarkers > 0
                   ? ` · ${result.verification.invalidMarkers} marker${result.verification.invalidMarkers === 1 ? "" : "s"} named no listed source → flagged`
                   : ""}
+                {result.verification.uncited > 0
+                  ? ` · ${result.verification.uncited} sentence${result.verification.uncited === 1 ? "" : "s"} stated a figure with no citation → flagged [NEEDS CITATION]`
+                  : ""}
                 {result.verification.skipped ? ` · check skipped (${result.verification.skipped})` : ""}
               </div>
             ) : null}

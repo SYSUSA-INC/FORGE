@@ -373,6 +373,18 @@ the phases below.
       four short recurring phrases.
     - Tests: `tests/ai/golden-holdout.test.ts` and
       `tests/isolation/golden-holdout.test.ts`.
+  - **1d** — Uncited claims: 🔄 in progress.
+    - The citation verifier now also flags sentences that state a hard
+      figure (money, percentage, year, a count of 10 or more, a
+      contract number, ISO / CMMI / SOC) and cite nothing. It is
+      deterministic (`src/lib/uncited-claims.ts`) and runs in citation
+      mode even with no sources.
+    - Not flagged: figures the drafter was given (`knownText` from
+      `prepareSectionDraft`: proposal setup, section brief and text,
+      solicitation context, win themes, customer phrases), bracketed
+      text, requirement numbers and commitments.
+    - The count reaches the panel as `verification.uncited`.
+    - Tests: `tests/ai/uncited-claims.test.ts`.
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
   - provider fallback and a per-model capability table;

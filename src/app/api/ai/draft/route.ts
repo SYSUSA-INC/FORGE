@@ -139,14 +139,16 @@ export async function POST(req: NextRequest) {
 
         // BL-AIP-5 — verifier pass after the stream: the `done` payload
         // carries the checked text (invented markers dropped, unsupported
-        // sentences flagged), which the panel renders in place of the
+        // sentences flagged, and, BL-AIX Phase 1d, uncited figures flagged
+        // even with no sources), which the panel renders in place of the
         // streamed preview.
         let verification: CitationVerification | undefined;
-        if (body.cite && prepared.sources.length > 0 && !ai.stubbed) {
+        if (body.cite && !ai.stubbed) {
           const verified = await verifyDraftCitations({
             organizationId,
             text,
             sources: prepared.sources,
+            knownText: prepared.knownText,
           });
           text = verified.text;
           verification = verified.verification;

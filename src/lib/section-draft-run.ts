@@ -132,12 +132,15 @@ export async function runSectionDraft(input: {
 
     // BL-AIP-5 — verifier pass: invented markers become [NEEDS CITATION]
     // and every cited sentence is checked against its source excerpt.
+    // BL-AIX Phase 1d — sentences stating a figure with no citation are
+    // flagged too, with or without sources.
     let verification: CitationVerification | undefined;
-    if (cite && prepared.sources.length > 0 && !ai.stubbed) {
+    if (cite && !ai.stubbed) {
       const verified = await verifyDraftCitations({
         organizationId,
         text,
         sources: prepared.sources,
+        knownText: prepared.knownText,
       });
       text = verified.text;
       verification = verified.verification;
