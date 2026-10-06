@@ -40,6 +40,7 @@ import {
 } from "@/lib/citations";
 import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
 import { voiceGuidanceForSection } from "@/lib/voice";
+import { goldenOf, screenPatternIntel } from "@/lib/golden-holdout";
 import { log } from "@/lib/log";
 
 export const DRAFT_MODES: readonly SectionDraftMode[] = [
@@ -73,6 +74,8 @@ export type PreparedSectionDraft =
       sources: DraftSource[];
       /** True when the embedding provider was the stub (sources are not meaningful). */
       sourcesStubbed: boolean;
+      /** BL-AIX Phase 1c — snippets dropped for copying a golden case's winning text. */
+      holdoutDropped: number;
     }
   | { ok: false; error: string };
 
@@ -93,6 +96,12 @@ export async function prepareSectionDraft(input: {
    * from the tone check). Reaches the prompt as `section.authorGuidance`.
    */
   hint?: string;
+  /**
+   * BL-AIX Phase 1c — a golden-eval case. Nothing derived from this
+   * proposal reaches the drafter, and any remaining snippet that copies
+   * the winning text is dropped (src/lib/golden-holdout.ts).
+   */
+  holdout?: { proposalId: string; goldenText: string };
 }): Promise<PreparedSectionDraft> {
   const { organizationId } = input;
   const authorGuidance = (input.hint ?? "").trim().slice(0, 2000);
@@ -203,10 +212,17 @@ export async function prepareSectionDraft(input: {
       agency: row.agency ?? "",
       naicsCode: row.naicsCode ?? "",
       opportunityDescription: row.opportunityDescription ?? "",
+      holdoutProposalId: input.holdout?.proposalId,
     });
   } catch (err) {
     log.warn("[prepareSectionDraft]", "pattern intel failed", { error: err });
     patternIntel = undefined;
+  }
+  let holdoutDropped = 0;
+  if (input.holdout && patternIntel) {
+    const screened = screenPatternIntel(patternIntel, goldenOf(input.holdout.goldenText));
+    patternIntel = screened.intel;
+    holdoutDropped = screened.dropped;
   }
 
   // BL-FB-GEN-VOICE — the team's house style and the section author's
@@ -328,6 +344,7 @@ export async function prepareSectionDraft(input: {
     temperature: draftTemperature(input.mode),
     sources,
     sourcesStubbed,
+    holdoutDropped,
   };
 }
 

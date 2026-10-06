@@ -10,7 +10,7 @@
  */
 import "server-only";
 
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { sectionChangeDecisions } from "@/db/schema";
 import {
@@ -30,6 +30,8 @@ const KIND_MIN_ROWS = 20;
 export async function gatherEditFeedbackForSection(input: {
   organizationId: string;
   sectionKind: string;
+  /** BL-AIX Phase 1c — a golden-eval case: its own proposal's decisions quote the winning text. */
+  excludeProposalId?: string;
 }): Promise<EditFeedbackSummary | null> {
   const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
   try {
@@ -37,11 +39,12 @@ export async function gatherEditFeedbackForSection(input: {
       organizationId: input.organizationId,
       since,
       sectionKind: input.sectionKind,
+      excludeProposalId: input.excludeProposalId,
     });
     const rows =
       byKind.length >= KIND_MIN_ROWS
         ? byKind
-        : await loadDecisions({ organizationId: input.organizationId, since });
+        : await loadDecisions({ organizationId: input.organizationId, since, excludeProposalId: input.excludeProposalId });
     if (rows.length < EDIT_FEEDBACK_MIN_SAMPLE) return null;
     return summarizeEditDecisions(rows, { windowDays: WINDOW_DAYS });
   } catch (err) {
@@ -54,8 +57,12 @@ async function loadDecisions(input: {
   organizationId: string;
   since: Date;
   sectionKind?: string;
+  excludeProposalId?: string;
 }): Promise<EditDecisionInput[]> {
-  const scope = eq(sectionChangeDecisions.organizationId, input.organizationId);
+  const scope = and(
+    eq(sectionChangeDecisions.organizationId, input.organizationId),
+    input.excludeProposalId ? ne(sectionChangeDecisions.proposalId, input.excludeProposalId) : undefined,
+  );
   const where = input.sectionKind
     ? and(
         scope,
