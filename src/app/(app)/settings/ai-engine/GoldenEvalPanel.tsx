@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
-import type { AiEvalCaseResult } from "@/db/schema";
+import type { GoldenCaseResult } from "@/lib/golden-holdout";
 import { runGoldenEvalAction } from "./actions";
 
 export type EvalRunRow = {
@@ -14,7 +14,7 @@ export type EvalRunRow = {
   meanScore: number;
   stubbed: boolean;
   createdAt: string;
-  results: AiEvalCaseResult[];
+  results: GoldenCaseResult[];
 };
 
 /**
@@ -74,8 +74,11 @@ export function GoldenEvalPanel({
       <p className="mb-3 font-mono text-[11px] text-muted">
         Each run re-drafts sections of proposals you won, with the saved text withheld, and scores
         the draft against what won: shared vocabulary (45%), length fit (20%), specificity (20%)
-        and placeholder-free prose (15%). Compare runs across prompt versions and models; the
-        absolute number is an upper bound because the Brain may already hold the winning text.
+        and placeholder-free prose (15%). Compare runs across prompt versions and models. Each case is
+        held out: nothing from its own proposal reaches the drafter, and anything else that copies the
+        winning text is dropped. &ldquo;Leak&rdquo; is how much of the winning text still reached the
+        prompt (quoted requirements account for some). Runs without the holdout mark scored against a
+        context that could contain the answer and are not comparable.
       </p>
       {note ? <p className="mb-3 font-mono text-[11px] text-text">{note}</p> : null}
       {runs.length === 0 ? (
@@ -111,7 +114,10 @@ function RunRow({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTog
     <>
       <tr className="cursor-pointer border-t border-layer/10 hover:bg-layer/[0.03]" onClick={onToggle}>
         <td className="py-1.5 text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
-        <td className="py-1.5 text-text">{run.promptVersion || "—"}</td>
+        <td className="py-1.5 text-text">
+          {run.promptVersion || "—"}
+          {run.results.some((c) => c.holdout) ? <span className="text-muted"> · holdout</span> : null}
+        </td>
         <td className="py-1.5 text-muted">
           {run.model || "—"}
           {run.stubbed ? " · stub" : ""}
@@ -132,7 +138,7 @@ function RunRow({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTog
                   <span className="tabular-nums">
                     {c.error
                       ? `error: ${c.error}`
-                      : `${pct(c.score)} · terms ${pct(c.termCoverage)} · length ${pct(c.lengthFit)} · specificity ${pct(c.specificity)} · placeholders ${c.placeholderRate}/100w${c.themeCoverage !== null ? ` · themes ${pct(c.themeCoverage)}` : ""} · ${c.draftWords}/${c.goldenWords} words`}
+                      : `${pct(c.score)} · terms ${pct(c.termCoverage)} · length ${pct(c.lengthFit)} · specificity ${pct(c.specificity)} · placeholders ${c.placeholderRate}/100w${c.themeCoverage !== null ? ` · themes ${pct(c.themeCoverage)}` : ""} · ${c.draftWords}/${c.goldenWords} words${c.holdout ? ` · leak ${pct(c.holdout.leak)}${c.holdout.dropped ? ` · ${c.holdout.dropped} copied snippet${c.holdout.dropped === 1 ? "" : "s"} dropped` : ""}` : ""}`}
                   </span>
                 </li>
               ))}

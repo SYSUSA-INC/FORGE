@@ -14,7 +14,7 @@
  */
 import "server-only";
 
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   opportunities,
@@ -44,11 +44,16 @@ export async function gatherWritingSignals(input: {
   sectionId: string;
   sectionKind: string;
   agency: string;
+  /**
+   * BL-AIX Phase 1c — a golden-eval case: comments on this section and
+   * the proposal's own debrief describe the winning text, so neither is read.
+   */
+  holdout?: boolean;
 }): Promise<WritingSignals> {
   const [draftAcceptance, reviewComments, debriefWeaknesses, winnerGaps] = await Promise.all([
     loadDraftAcceptance(input.organizationId, input.sectionKind),
-    loadReviewComments(input.organizationId, input.proposalId, input.sectionId),
-    loadDebriefWeaknesses(input.organizationId, input.agency),
+    input.holdout ? Promise.resolve([]) : loadReviewComments(input.organizationId, input.proposalId, input.sectionId),
+    loadDebriefWeaknesses(input.organizationId, input.agency, input.holdout ? input.proposalId : undefined),
     loadWinnerGaps(input.organizationId, input.agency),
   ]);
   return { draftAcceptance, reviewComments, debriefWeaknesses, winnerGaps };
@@ -130,6 +135,7 @@ async function loadReviewComments(
 async function loadDebriefWeaknesses(
   organizationId: string,
   agency: string,
+  excludeProposalId?: string,
 ): Promise<WritingSignals["debriefWeaknesses"]> {
   try {
     const rows = await db
@@ -146,6 +152,7 @@ async function loadDebriefWeaknesses(
         and(
           eq(proposalDebriefs.organizationId, organizationId),
           sql`length(${proposalDebriefs.weaknesses}) > 0`,
+          excludeProposalId ? ne(proposalDebriefs.proposalId, excludeProposalId) : undefined,
         ),
       )
       .orderBy(desc(proposalDebriefs.updatedAt))

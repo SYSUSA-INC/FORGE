@@ -10,10 +10,13 @@
  * by the drafter's prompt version and the model, so the next prompt
  * change is compared to the last one on the same cases.
  *
- * Known limit: the Brain may already hold the harvested winning text,
- * so pattern retrieval can show the drafter fragments of the answer.
- * Every prompt version faces the same corpus, which keeps runs
- * comparable; treat absolute scores as an upper bound.
+ * BL-AIX Phase 1c — each case is held out (src/lib/golden-holdout.ts).
+ * Nothing derived from its own proposal reaches the drafter: no harvested
+ * corpus chunks, no decisions, no debrief, and no review comments or
+ * pre-flight verdicts on the section. Any other snippet that copies the
+ * winning text is dropped too. Each case records how much of the winning
+ * text still reached the prompt (`holdout.leak`). Runs from before the
+ * holdout scored against a contaminated context and are not comparable.
  *
  * Every read and write carries organizationId. Server-only; callers
  * own auth, feature gating and quota (one draft call per case).
@@ -28,12 +31,12 @@ import {
   proposalOutcomes,
   proposalSections,
   proposals,
-  type AiEvalCaseResult,
   type AiEvalRun,
 } from "@/db/schema";
 import { completeForTenant } from "@/lib/ai";
 import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
+import { goldenOf, promptLeak, type GoldenCaseResult } from "@/lib/golden-holdout";
 import { meanScore, scoreDraftAgainstGolden } from "@/lib/golden-score";
 import { log } from "@/lib/log";
 import { prepareSectionDraft } from "@/lib/section-draft";
@@ -103,7 +106,7 @@ export async function runGoldenEval(input: {
     return { ok: false, error: "No won proposals with drafted sections yet — the golden set is empty." };
   }
 
-  const results: AiEvalCaseResult[] = [];
+  const results: GoldenCaseResult[] = [];
   let stubbed = false;
   let model = "";
 
@@ -135,8 +138,11 @@ export async function runGoldenEval(input: {
         mode: "draft",
         cite: false,
         currentBodyPlain: "",
+        holdout: { proposalId: c.proposalId, goldenText: row.content },
       });
       if (!prepared.ok) throw new Error(prepared.error);
+      const promptText = [prepared.prompt.system, ...prepared.prompt.messages.map((m) => m.content)].join("\n");
+      const holdout = { dropped: prepared.holdoutDropped, leak: promptLeak(promptText, goldenOf(row.content)) };
 
       const ai = await completeForTenant({
         organizationId,
@@ -167,6 +173,7 @@ export async function runGoldenEval(input: {
         specificity: score.specificity,
         placeholderRate: score.placeholderRate,
         themeCoverage: score.themeCoverage,
+        holdout,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -215,6 +222,8 @@ export async function runGoldenEval(input: {
       meanScore: run.meanScore,
       stubbed,
       failed: results.length - scored.length,
+      holdoutDropped: scored.reduce((n, r) => n + (r.holdout?.dropped ?? 0), 0),
+      maxLeak: Math.max(0, ...scored.map((r) => r.holdout?.leak ?? 0)),
     },
   });
   return { ok: true, run };

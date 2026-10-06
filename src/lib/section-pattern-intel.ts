@@ -24,6 +24,11 @@
  *
  * All five are best-effort. Any missing signal returns empty/null
  * and the drafter still works — pattern intel is additive context.
+ *
+ * BL-AIX Phase 1c — `holdoutProposalId` marks a golden-eval case: no
+ * corpus chunk harvested from that proposal, no decision or debrief
+ * recorded on it, and no review comment or pre-flight verdict on the
+ * section reaches the drafter, since all of them quote the winning text.
  */
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
@@ -56,7 +61,9 @@ export async function gatherPatternIntelForSection(input: {
   agency: string;
   naicsCode: string;
   opportunityDescription: string;
+  holdoutProposalId?: string;
 }): Promise<SectionDraftPatternIntel> {
+  const holdout = input.holdoutProposalId;
   // Compose a query string broadly equivalent to brain-suggest, but
   // weighted toward "what does a winning section of this kind look
   // like". We deliberately omit the reviewer's free text — this isn't
@@ -76,13 +83,15 @@ export async function gatherPatternIntelForSection(input: {
   // failures degrade silently to empty arrays / null.
   const [winningPatterns, lostPatterns, complianceGaps, sectionSignal, editFeedback, writingSignals] =
     await Promise.all([
-      retrieveCorpusByOutcome(input.organizationId, composed, "won", TOP_WIN),
-      retrieveCorpusByOutcome(input.organizationId, composed, "lost", TOP_LOSS),
-      gatherComplianceGapsForSection(input.organizationId, input.sectionId),
+      retrieveCorpusByOutcome(input.organizationId, composed, "won", TOP_WIN, holdout),
+      retrieveCorpusByOutcome(input.organizationId, composed, "lost", TOP_LOSS, holdout),
+      // A section that was never written has no pre-flight verdicts.
+      holdout ? Promise.resolve([]) : gatherComplianceGapsForSection(input.organizationId, input.sectionId),
       gatherSectionSignal(input.organizationId, input.sectionKind),
       gatherEditFeedbackForSection({
         organizationId: input.organizationId,
         sectionKind: input.sectionKind,
+        excludeProposalId: holdout,
       }),
       // BL-AIP-6 — draft acceptance, reviewer comments, debrief
       // weaknesses and winner gaps. Best-effort like the rest.
@@ -93,6 +102,7 @@ export async function gatherPatternIntelForSection(input: {
             sectionId: input.sectionId,
             sectionKind: input.sectionKind,
             agency: input.agency,
+            holdout: !!holdout,
           }).catch((err: unknown) => {
             log.warn("[14d]", "writing signals failed", { error: err });
             return null;
@@ -115,6 +125,7 @@ async function retrieveCorpusByOutcome(
   query: string,
   outcomeLabel: "won" | "lost",
   limit: number,
+  excludeProposalId?: string,
 ): Promise<{ excerpt: string; provenance: string }[]> {
   if (query.trim().length < 6) return [];
   let queryVec: number[];
@@ -140,6 +151,7 @@ async function retrieveCorpusByOutcome(
         AND a.archived_at IS NULL
         AND c.embedding IS NOT NULL
         AND a.outcome_label = ${outcomeLabel}
+        ${excludeProposalId ? sql`AND (a.metadata ->> 'proposalId') IS DISTINCT FROM ${excludeProposalId}` : sql``}
       ORDER BY c.embedding <=> ${literal}::vector
       LIMIT ${limit}
     `);

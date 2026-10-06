@@ -357,6 +357,21 @@ the phases below.
       builds from the database.
     - Tests: `tests/ai/prompt-versions.test.ts`, plus a gateway case in
       `tests/ai/gateway-telemetry.test.ts`.
+  - **1c** — Golden-eval decontamination: 🔄 in progress.
+    - Each case is held out (`src/lib/golden-holdout.ts`). By source, the
+      drafter skips anything derived from the case's own proposal:
+      harvested corpus chunks, tracked-change decisions, its debrief,
+      and the section's review comments and pre-flight verdicts.
+    - By content, any other excerpt, phrase, comment or debrief note
+      that copies the winning text is dropped (20% of its 8-word runs,
+      or a verbatim phrase of 4+ words).
+    - Each case stores `holdout.leak`, the share of the winner still in
+      the prompt, and how many snippets were dropped. The AI Engine
+      panel marks held-out runs and shows the leak per case.
+    - Not held out: the author's voice profile, which can quote up to
+      four short recurring phrases.
+    - Tests: `tests/ai/golden-holdout.test.ts` and
+      `tests/isolation/golden-holdout.test.ts`.
   - an extraction gold set in CI;
   - retrieval and draft evaluations;
   - provider fallback and a per-model capability table;
