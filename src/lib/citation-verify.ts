@@ -9,6 +9,11 @@
  * gain [NEEDS CITATION]. Best-effort: any failure returns the text as
  * it was, with `skipped` saying why.
  *
+ * BL-AIX Phase 1d — first, every sentence that states a hard figure the
+ * drafter was not given and cites nothing is flagged [NEEDS CITATION]
+ * (src/lib/uncited-claims.ts). It runs even when there is nothing for
+ * the model to check.
+ *
  * One extra call per cited draft, metered under section_draft / verify.
  * Server-only; the caller has already passed the feature and quota
  * gates for the draft itself.
@@ -30,6 +35,7 @@ import {
   type DraftSource,
 } from "@/lib/citations";
 import { log } from "@/lib/log";
+import { flagUncitedClaims } from "@/lib/uncited-claims";
 
 export type { CitationVerification } from "@/lib/citations";
 
@@ -39,12 +45,16 @@ export async function verifyDraftCitations(input: {
   organizationId: string;
   text: string;
   sources: DraftSource[];
+  /** What the drafter was handed as fact (solicitation, proposal setup, the section's own text). */
+  knownText: string;
 }): Promise<{ text: string; verification: CitationVerification }> {
-  const { text: cleaned, dropped } = dropInvalidMarkers(input.text, input.sources.length);
+  const { text: markersChecked, dropped } = dropInvalidMarkers(input.text, input.sources.length);
+  const { text: cleaned, flagged } = flagUncitedClaims(markersChecked, input.knownText);
   const base: CitationVerification = {
     checked: 0,
     unsupported: 0,
     invalidMarkers: dropped,
+    uncited: flagged,
     stubbed: false,
   };
 

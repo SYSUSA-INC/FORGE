@@ -76,6 +76,8 @@ export type PreparedSectionDraft =
       sourcesStubbed: boolean;
       /** BL-AIX Phase 1c — snippets dropped for copying a golden case's winning text. */
       holdoutDropped: number;
+      /** BL-AIX Phase 1d — what the drafter was handed as fact; its figures need no citation. */
+      knownText: string;
     }
   | { ok: false; error: string };
 
@@ -345,7 +347,31 @@ export async function prepareSectionDraft(input: {
     sources,
     sourcesStubbed,
     holdoutDropped,
+    knownText: knownFactsText(snapshot),
   };
+}
+
+/**
+ * BL-AIX Phase 1d — the snapshot's facts as plain text (not JSON, whose
+ * escapes glue words to numbers): the proposal setup, the section and its
+ * own text, the solicitation context, win themes and the customer's words.
+ */
+function knownFactsText(s: SectionDraftSnapshot): string {
+  const sol = s.solicitation;
+  return [
+    s.organizationName,
+    ...Object.values(s.proposal),
+    s.section.title,
+    s.section.pageLimit === null ? "" : `${s.section.pageLimit} pages`,
+    s.section.instructions ?? "",
+    s.section.currentBodyPlain,
+    sol?.sectionLSummary ?? "",
+    sol?.sectionMSummary ?? "",
+    ...(sol?.requirements ?? []).map((r) => `${r.ref} ${r.text}`),
+    ...(sol?.mappedRequirements ?? []).map((r) => `${r.number} ${r.text}`),
+    ...(s.winThemes ?? []).map((t) => `${t.title} ${t.statement}`),
+    ...(s.customerVoice?.phrases ?? []).map((p) => p.phrase),
+  ].join("\n");
 }
 
 /**
