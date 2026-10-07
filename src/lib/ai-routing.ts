@@ -89,6 +89,8 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   proposal_scan_background: "strong",
   winner_analysis: "strong",
   protest_viability: "strong",
+  // BL-AIX Phase 1e-2 — the yardstick for extraction accuracy; worth the best model.
+  gold_annotate: "strong",
 };
 
 /** Class → concrete model for a provider. `null` = leave the provider default. */

@@ -51,6 +51,9 @@ export const AI_FEATURES = {
   // from its own text as small node/edge specs.
   graphics_suggest: "Graphics suggestions",
   review_summary: "Colour-team round summary",
+  // BL-AIX Phase 1e-2 — drafts of a public RFP's gold-set annotations for
+  // the proposal expert to review (platform admins only).
+  gold_annotate: "Gold-set annotation drafts",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

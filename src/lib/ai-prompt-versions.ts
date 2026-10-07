@@ -49,6 +49,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   onboarding_assist: "2026-10-01.1",
   graphics_suggest: "2026-10-03.1",
   review_summary: "2026-10-03.1",
+  gold_annotate: "2026-10-07.1",
 };
 
 /** The version the gateway records for a feature; "" for one that sends no prompt. */
