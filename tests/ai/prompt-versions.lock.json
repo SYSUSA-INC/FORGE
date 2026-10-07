@@ -106,8 +106,8 @@
       "sha256": "05fc2e5c80120f79565c5a581c7e1fd3921a69013bc23b584fbb7ee32c039526"
     },
     "solicitation_extract": {
-      "version": "2026-10-05.1",
-      "sha256": "f295c43eb6b706c5d2ef8d8e283320fa2dc736072faaf38b1e0ce08531770797"
+      "version": "2026-10-07.3",
+      "sha256": "8362d3f12fa42158311274000aefedebd7b962bac68414cd5ae9745ca3c3f5d4"
     },
     "solicitation_review": {
       "version": "2026-10-05.1",

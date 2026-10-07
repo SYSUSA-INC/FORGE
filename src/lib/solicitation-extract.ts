@@ -24,11 +24,12 @@ import {
 import { isTruncatedStop } from "@/lib/ai-stop";
 import { coverageFromSweep, type ExtractionCoverage } from "@/lib/extraction-coverage";
 import {
-  chunkText,
   mergeRequirementLists,
   normalizeRequirementList,
   type RequirementLike,
 } from "@/lib/requirements-text";
+import { attachProvenance, pageStartsFromLengths } from "@/lib/requirement-provenance";
+import { planSweepWindows, segmentSolicitation } from "@/lib/solicitation-segments";
 import {
   detectFormat,
   extractTextFromDocx,
@@ -40,18 +41,56 @@ import {
 import { log } from "@/lib/log";
 
 export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
+  return (await extractPdfText(bytes)).text;
+}
+
+type PdfTextItem = { str: string; transform: number[] };
+type PdfPage = { pageNumber: number; getTextContent(options: object): Promise<{ items: PdfTextItem[] }> };
+type PdfParse = (b: Buffer, options?: { pagerender?: (page: PdfPage) => Promise<string> }) => Promise<{ text?: string; numrender?: number }>;
+
+/**
+ * pdf-parse's own page renderer, unchanged, so the text is exactly what
+ * it has always produced: items on one baseline joined, a new line when
+ * the baseline moves.
+ */
+async function renderPdfPage(page: PdfPage): Promise<string> {
+  const content = await page.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false });
+  let lastY: number | undefined;
+  let text = "";
+  for (const item of content.items) {
+    text += lastY === item.transform[5] || !lastY ? item.str : `\n${item.str}`;
+    lastY = item.transform[5];
+  }
+  return text;
+}
+
+/**
+ * BL-AIX Phase 2a — the PDF's text and where each page starts in it, so
+ * a requirement can be traced to its page. The text is unchanged.
+ */
+export async function extractPdfText(bytes: Uint8Array): Promise<{ text: string; pageStarts: number[] }> {
   // pdf-parse-fork is a CommonJS module that exports a function. Different
   // bundlers wrap it differently; pick the callable form regardless.
   const mod = (await import("pdf-parse-fork")) as unknown;
   const candidate =
     typeof mod === "function"
-      ? (mod as (b: Buffer) => Promise<{ text?: string }>)
-      : ((mod as { default?: (b: Buffer) => Promise<{ text?: string }> })
-          .default ??
-        ((mod as unknown) as (b: Buffer) => Promise<{ text?: string }>));
-  const buf = Buffer.from(bytes);
-  const result = await candidate(buf);
-  return (result?.text ?? "").trim();
+      ? (mod as PdfParse)
+      : ((mod as { default?: PdfParse }).default ?? ((mod as unknown) as PdfParse));
+  const lengths: number[] = [];
+  const result = await candidate(Buffer.from(bytes), {
+    pagerender: async (page) => {
+      const text = await renderPdfPage(page);
+      lengths[page.pageNumber - 1] = text.length;
+      return text;
+    },
+  });
+  const raw = result?.text ?? "";
+  const text = raw.trim();
+  const leadingTrim = raw.length - raw.trimStart().length;
+  // A page that failed to render contributes "" and never reached pagerender.
+  const pages = Array.from({ length: Math.max(result?.numrender ?? 0, lengths.length) }, (_, i) => lengths[i] ?? 0);
+  const pageStarts = pageStartsFromLengths(pages, leadingTrim).map((n) => Math.min(n, text.length));
+  return { text, pageStarts };
 }
 
 /**
@@ -63,13 +102,13 @@ export async function extractTextFromAny(
   bytes: Uint8Array,
   contentType: string,
   fileName: string,
-): Promise<{ format: ExtractFormat | null; text: string }> {
+): Promise<{ format: ExtractFormat | null; text: string; pageStarts?: number[] }> {
   const format = detectFormat(contentType, fileName);
   if (!format) return { format: null, text: "" };
 
   switch (format) {
     case "pdf":
-      return { format, text: await extractTextFromPdf(bytes) };
+      return { format, ...(await extractPdfText(bytes)) };
     case "docx":
       return { format, text: await extractTextFromDocx(bytes) };
     case "xlsx":
@@ -123,6 +162,8 @@ export async function readRequirementsWindow(input: {
   index: number;
   count: number;
   documentLabel: string;
+  /** BL-AIX Phase 2a — the part(s) of the document the window holds. */
+  partLabel?: string;
   depth?: number;
   /** BL-AIX Phase 1i-2 — pin a candidate model (eval runs); unset follows routing. */
   model?: string;
@@ -134,6 +175,7 @@ export async function readRequirementsWindow(input: {
     chunkIndex: index,
     chunkCount: count,
     documentLabel: input.documentLabel,
+    partLabel: input.partLabel,
   });
   const res = await completeStructuredForTenant({
     organizationId,
@@ -188,7 +230,8 @@ export async function extractRequirementsFullText(
   rawText: string,
   options?: { documentLabel?: string },
 ): Promise<FullTextRequirementsResult> {
-  const chunks = chunkText(rawText);
+  // BL-AIX Phase 2a — windows follow the document's parts and say which.
+  const chunks = planSweepWindows(rawText);
   const label = options?.documentLabel ?? "solicitation";
   const lists: RequirementLike[][] = [];
   let failedChunks = 0;
@@ -204,6 +247,7 @@ export async function extractRequirementsFullText(
         index: chunk.index,
         count: chunks.length,
         documentLabel: label,
+        partLabel: chunk.label,
       });
       stubbed = stubbed || read.stubbed;
       splitChunks += read.split;
@@ -231,7 +275,7 @@ export async function extractRequirementsFullText(
 export async function aiExtractSolicitation(
   organizationId: string,
   rawText: string,
-  options?: { documentLabel?: string },
+  options?: { documentLabel?: string; pageStarts?: number[] },
 ): Promise<
   | { ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean; coverage?: ExtractionCoverage }
   | { ok: false; error: string }
@@ -326,6 +370,17 @@ export async function aiExtractSolicitation(
         error: err,
       });
     }
+
+    // BL-AIX Phase 2a — find each requirement in the text: its page, part
+    // and paragraph, and whether the document says it word for word.
+    const segments = segmentSolicitation(rawText);
+    const located = attachProvenance(rawText, data.requirements, { pageStarts: options?.pageStarts, segments });
+    data.requirements = located.requirements;
+    coverage = {
+      ...(coverage ?? {}),
+      quotes: located.counts,
+      parts: segments.filter((g) => g.kind !== "front").map((g) => g.key),
+    };
 
     return {
       ok: true,

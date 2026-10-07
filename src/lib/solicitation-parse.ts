@@ -64,10 +64,13 @@ export async function parseSolicitationFromBytes(
   // Format-aware text extraction. PDF/DOCX/XLSX/PPTX/text get a cheap
   // local pass; images skip straight to vision.
   let rawText = "";
+  // BL-AIX Phase 2a — where each PDF page starts, for requirement provenance.
+  let pageStarts: number[] | undefined;
   let format: ReturnType<typeof detectFormat> = null;
   try {
     const res = await extractTextFromAny(bytes, contentType, fileName);
     rawText = res.text;
+    pageStarts = res.pageStarts;
     format = res.format;
   } catch (err) {
     log.warn(
@@ -211,6 +214,7 @@ export async function parseSolicitationFromBytes(
 
   const aiRes = await aiExtractSolicitation(organizationId, rawText, {
     documentLabel: fileName,
+    pageStarts,
   });
   if (!aiRes.ok) {
     await db

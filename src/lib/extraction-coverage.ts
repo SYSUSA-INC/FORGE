@@ -20,6 +20,10 @@ export type ExtractionCoverage = {
   requirementsKept?: number;
   /** Scanned document: one vision pass, no full-text sweep. */
   vision?: boolean;
+  /** BL-AIX Phase 2a — requirements found in the text word for word, in part, or not at all. */
+  quotes?: { exact: number; partial: number; none: number };
+  /** BL-AIX Phase 2a — the parts found by their headings ("B" … "M", "Attachment J-1"). */
+  parts?: string[];
 };
 
 export function coverageFromSweep(input: {

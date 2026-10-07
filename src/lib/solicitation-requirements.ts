@@ -127,13 +127,13 @@ export async function mergeSolicitationRequirements(
   const parentReqs = (parentRow.extractedRequirements ?? []) as SolicitationRequirement[];
   const ownReqs: SolicitationRequirement[] = parentReqs
     .filter((r) => !r.sourceDocId)
-    .map((r) => ({ kind: r.kind, text: r.text, ref: r.ref }));
+    .map((r) => ({ kind: r.kind, text: r.text, ref: r.ref, ...(r.source ? { source: r.source } : {}) }));
 
   const companionReqs: SolicitationRequirement[] = [];
   for (const doc of docRows) {
     if (doc.parseStatus !== "parsed") continue;
     for (const r of (doc.extractedRequirements ?? []) as SolicitationRequirement[]) {
-      companionReqs.push({ kind: r.kind, text: r.text, ref: r.ref, sourceDocId: doc.id });
+      companionReqs.push({ kind: r.kind, text: r.text, ref: r.ref, sourceDocId: doc.id, ...(r.source ? { source: r.source } : {}) });
     }
   }
 
