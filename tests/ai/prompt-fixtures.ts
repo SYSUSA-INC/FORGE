@@ -88,7 +88,7 @@ const REQUIREMENTS = [
   { kind: "shall", text: "Describe the migration approach in Volume I.", ref: "L.5.2.1" },
 ];
 
-const draftSnapshot: SectionDraftSnapshot = {
+export const draftSnapshot: SectionDraftSnapshot = {
   organizationName: "Acme Federal",
   proposal: {
     title: "Cloud migration support",

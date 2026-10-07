@@ -248,15 +248,21 @@ export async function prepareSectionChat(input: {
     notesBlock && `\n${notesBlock}`,
     signalsBlock && `\nWhat the team has learned (resolve reviewer comments in the text; answer past weaknesses with evidence; never cite them):\n${signalsBlock}`,
     `\nSection being worked: "${row.section.title}" (kind: ${row.section.kind}${row.section.pageLimit ? `, page cap: ${row.section.pageLimit}` : ""})`,
-    (liveBody || row.section.content?.trim()) &&
-      `\nCurrent draft (${
-        liveBody
-          ? liveBody.split(/\s+/g).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
-          : row.section.wordCount
-      } words):\n${(liveBody || row.section.content || "").slice(0, 3000)}`,
   ]
     .filter(Boolean)
     .join("\n");
+
+  // BL-AIX Phase 1g — the draft changes as the author edits, so it rides
+  // with the newest message. The context above stays word for word the
+  // same from turn to turn, and the gateway reads it from the prompt cache.
+  const draftBlock =
+    liveBody || row.section.content?.trim()
+      ? `Current draft (${
+          liveBody
+            ? liveBody.split(/\s+/g).filter((w) => /[\p{L}\p{N}]/u.test(w)).length
+            : row.section.wordCount
+        } words):\n${(liveBody || row.section.content || "").slice(0, 3000)}`
+      : "The section has no draft yet.";
 
   // BL-FB-CHAT-SLASH — the thread stores what the author typed
   // ("/shrink-by 30%"); the model reads the command's expansion, for the
@@ -270,7 +276,7 @@ export async function prepareSectionChat(input: {
       role: m.role,
       content: m.role === "user" ? forModel(m.content) : m.content,
     })),
-    { role: "user" as const, content: forModel(input.message) },
+    { role: "user" as const, content: `${draftBlock}\n\n--- MESSAGE ---\n${forModel(input.message)}` },
   ];
 
   return {

@@ -61,7 +61,8 @@ Effort key:
 | 3ag | **BL-AIX Phase 1e-1** — Extraction gold set: storage (migration 0115) and the `/admin` screens to add a public SAM.gov RFP by notice ID and review its requirements, page limits and Section M factors | P0 | M | ✅ shipped (PR #345) |
 | 3ah | **BL-AIX Phase 1e-2** — AI-drafted gold annotations: the whole RFP read in windows, findings proposed for the expert, duplicates and rejected items never re-proposed, resumable | P0 | M | ✅ shipped (PR #346) |
 | 3ai | **BL-AIX Phase 1e-3** — Extraction accuracy run: the live sweep and review over every approved gold document, scored for requirement recall and precision, page-limit capture and Section M factors and order, per prompt version | P0 | M | ✅ shipped (PR #347) |
-| 3aj | **BL-AIX Phase 1f** — Provider fallback: an outage on the active AI provider moves the call once to `AI_FALLBACK_PROVIDER`; a per-model capability table clamps output length and keeps attached documents away from providers that cannot read them | P0 | S | 🔄 in PR (PR #348) |
+| 3aj | **BL-AIX Phase 1f** — Provider fallback: an outage on the active AI provider moves the call once to `AI_FALLBACK_PROVIDER`; a per-model capability table clamps output length and keeps attached documents away from providers that cannot read them | P0 | S | ✅ shipped (PR #348) |
+| 3ak | **BL-AIX Phase 1g-1** — Prompt caching: the proposal-wide solicitation context leads every section draft as a cached prefix, the chat keeps its context cacheable from turn to turn, and `ai_call_log` records cache reads and writes (migration 0118) | P0 | S | 🔄 in PR (PR #349) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -159,7 +160,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · 🔄 Phase 1f in PR (PR #348)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · 🔄 Phase 1g-1 in PR (PR #349)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -464,7 +465,7 @@ the phases below.
         per-section page limits.
       - Tests: `tests/ai/extraction-eval-logic.test.ts` and
         `tests/isolation/extraction-eval.test.ts`.
-  - **1f — provider fallback and a per-model capability table:** 🔄 in PR (PR #348).
+  - **1f — provider fallback and a per-model capability table:** ✅ shipped (PR #348).
     - `AI_FALLBACK_PROVIDER` names a second configured provider
       (`anthropic`, `azure` or `vllm`). It must differ from the active
       one; Bedrock (a stub) and stub mode never count.
@@ -496,8 +497,38 @@ the phases below.
       Settings → AI Engine shows the fallback.
     - Tests: `tests/ai/ai-capabilities.test.ts` and
       `tests/ai/gateway-fallback.test.ts`.
-  - retrieval and draft evaluations;
-  - caching and batches.
+  - **1g — caching and batches** (owner's pick after 1f, 2026-10-07),
+    in two PRs:
+    - **1g-1 — prompt caching:** 🔄 in PR (PR #349).
+      - The gateway takes a `cachedPrefix` on a message: text other
+        calls repeat word for word. Anthropic receives it as its own
+        block with a cache marker (at most four breakpoints a request,
+        the latest prefixes keeping theirs). Other providers receive it
+        in front of the message, where their own prefix caching applies.
+      - Section drafts (prompt `2026-10-07.1`): the win themes, the
+        Section L / M summaries and the general requirement list are
+        the same for every section of a proposal, so they now lead the
+        prompt as the cached prefix. The section's brief follows: mode,
+        voice, mapped requirements, sources, snapshot. Auto-draft and
+        repeated drafts read up to ~9k tokens of shared context from the
+        cache.
+      - Section chat (prompt `2026-10-07.1`): the current draft moved
+        from the system prompt to the newest message. The context
+        (already marked for caching) now stays the same between turns
+        while the author edits.
+      - Telemetry: migration `0118` adds `ai_call_log.cache_read_tokens`
+        and `cache_write_tokens`. `input_tokens` now counts every prompt
+        token, cached or not; before, Anthropic's cached system prompt
+        was left out. Token caps therefore don't depend on cache hits.
+        `/admin/usage` shows the cached share per feature and prices
+        cache reads at a tenth and writes at 1.25x in its estimate.
+      - The golden eval's leak check reads the cached prefix too.
+      - Tests: `tests/ai/prompt-caching.test.ts`, plus additions to
+        `tests/ai/gateway-telemetry.test.ts`,
+        `tests/ai/citations.test.ts` and
+        `tests/isolation/section-chat-multi.test.ts`.
+    - **1g-2 — the Batches API for nightly work:** ⏳ next.
+  - retrieval and draft evaluations.
 - **Phase 2 — Solicitation Intelligence Engine:**
   - structured Sections L, M and C;
   - requirements with page and offset provenance;

@@ -94,12 +94,12 @@
       "sha256": "979a7d19ac842a72703beb2f3f61ab1103fca173344d24e453c19a33f3ff6a6a"
     },
     "section_chat": {
-      "version": "2026-10-05.1",
+      "version": "2026-10-07.1",
       "sha256": "d696b52435b39ab30ba340e2ea8c06e80dd6fe5c1e0ef6712c61279e554b4389"
     },
     "section_draft": {
-      "version": "2026-10-04.2",
-      "sha256": "1d0dbdcc20577170c97f61e82a1c830c8e3b8b269a67a696e3855dba26a53cc7"
+      "version": "2026-10-07.1",
+      "sha256": "05fc2e5c80120f79565c5a581c7e1fd3921a69013bc23b584fbb7ee32c039526"
     },
     "solicitation_extract": {
       "version": "2026-10-05.1",

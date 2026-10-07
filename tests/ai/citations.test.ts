@@ -105,7 +105,7 @@ describe("BL-AIP-5 — verifier helpers", () => {
 });
 
 describe("BL-AIP-5 — draft prompt requirements", () => {
-  it("lists mapped requirements verbatim before the general list and reports the count", () => {
+  it("lists mapped requirements verbatim in the section's brief, after the shared general list, and reports the count", () => {
     const { messages } = buildSectionDraftPrompt("draft", {
       ...baseSnapshot,
       solicitation: {
@@ -122,14 +122,17 @@ describe("BL-AIP-5 — draft prompt requirements", () => {
         ],
       },
     });
+    // BL-AIX Phase 1g — the general list is proposal-wide, so it leads as the
+    // cached prefix; the mapped requirements belong to this section's brief.
+    const shared = messages[0]!.cachedPrefix ?? "";
     const user = messages[0]!.content as string;
     expect(user).toContain("Requirements mapped to THIS section");
     expect(user).toContain("1. [L.5.2.1] (section_l) The offeror shall describe its staffing approach for all task areas, including surge.");
-    expect(user).toContain("All extracted requirements (60 of 90 shown");
-    expect(user).toContain("60. [C.60]");
-    expect(user).not.toContain("[C.61]");
-    // Mapped block comes before the general list.
-    expect(user.indexOf("Requirements mapped to THIS section")).toBeLessThan(user.indexOf("All extracted requirements"));
+    expect(shared).toContain("All extracted requirements (60 of 90 shown");
+    expect(shared).toContain("60. [C.60]");
+    expect(shared).not.toContain("[C.61]");
+    expect(shared).not.toContain("Requirements mapped to THIS section");
+    expect(user).not.toContain("All extracted requirements");
   });
 });
 

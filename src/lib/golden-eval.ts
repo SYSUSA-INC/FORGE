@@ -33,7 +33,7 @@ import {
   proposals,
   type AiEvalRun,
 } from "@/db/schema";
-import { completeForTenant } from "@/lib/ai";
+import { completeForTenant, messageText } from "@/lib/ai";
 import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
 import { goldenOf, promptLeak, type GoldenCaseResult } from "@/lib/golden-holdout";
@@ -141,7 +141,7 @@ export async function runGoldenEval(input: {
         holdout: { proposalId: c.proposalId, goldenText: row.content },
       });
       if (!prepared.ok) throw new Error(prepared.error);
-      const promptText = [prepared.prompt.system, ...prepared.prompt.messages.map((m) => m.content)].join("\n");
+      const promptText = [prepared.prompt.system, ...prepared.prompt.messages.map(messageText)].join("\n");
       const holdout = { dropped: prepared.holdoutDropped, leak: promptLeak(promptText, goldenOf(row.content)) };
 
       const ai = await completeForTenant({

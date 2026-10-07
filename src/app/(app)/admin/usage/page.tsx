@@ -410,6 +410,12 @@ export default async function AdminUsagePage() {
                     <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
                       Tokens in
                     </th>
+                    <th
+                      className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest"
+                      title="Share of input tokens read from the prompt cache (BL-AIX Phase 1g)"
+                    >
+                      Cached
+                    </th>
                     <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
                       Tokens out
                     </th>
@@ -429,9 +435,19 @@ export default async function AdminUsagePage() {
                 </thead>
                 <tbody>
                   {featureRows.map((f) => {
+                    // BL-AIX Phase 1g — cache reads bill at about a
+                    // tenth of input, cache writes at 1.25x.
                     const cost =
-                      ((f.inputTokens + f.outputTokens) / 1_000_000) *
+                      ((f.inputTokens -
+                        0.9 * f.cacheReadTokens +
+                        0.25 * f.cacheWriteTokens +
+                        f.outputTokens) /
+                        1_000_000) *
                       costPerMTok;
+                    const cachedShare =
+                      f.inputTokens > 0
+                        ? (f.cacheReadTokens / f.inputTokens) * 100
+                        : 0;
                     const errorRate =
                       f.calls > 0 ? (f.errors / f.calls) * 100 : 0;
                     const errorTone =
@@ -476,6 +492,11 @@ export default async function AdminUsagePage() {
                         <td className="px-2 py-1.5 text-right">
                           {f.inputTokens.toLocaleString()}
                         </td>
+                        <td className="px-2 py-1.5 text-right text-muted">
+                          {f.cacheReadTokens > 0
+                            ? `${cachedShare.toFixed(0)}%`
+                            : "—"}
+                        </td>
                         <td className="px-2 py-1.5 text-right">
                           {f.outputTokens.toLocaleString()}
                         </td>
@@ -503,7 +524,9 @@ export default async function AdminUsagePage() {
             Source: ai_call_log, one row per gateway call. Refused = blocked
             at the token-cap pre-check. Parse fail = the model&apos;s answer did
             not match the feature&apos;s schema. Via tool = answered through a
-            forced tool call rather than prose. Latency is provider
+            forced tool call rather than prose. Cached = share of input
+            tokens read from the prompt cache; the cost estimate prices
+            those at a tenth and cache writes at 1.25x. Latency is provider
             round-trip on successful calls. Rows are pruned after{" "}
             {retentionDays} days (AI_CALL_LOG_RETENTION_DAYS).
             {featureRefused > 0

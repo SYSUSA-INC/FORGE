@@ -167,6 +167,9 @@ describe("BL-FB-CHAT-MULTI — the team thread", () => {
     expect(before.ok).toBe(true);
     if (!before.ok) return;
     expect(before.system).not.toContain("Notes the team left");
+    // BL-AIX Phase 1g — the draft rides with the newest message, so the context stays cacheable.
+    expect(before.system).not.toContain("Current draft");
+    expect(before.messages.at(-1)?.content).toMatch(/--- MESSAGE ---\nWhere do we start\?$/);
     expect(await setSectionChatNotesToModel({ organizationId: fx.orgA.organizationId, sectionId: sectionA, enabled: true, actor })).toEqual({ ok: true, enabled: true });
     const after = await prepareSectionChat({ organizationId: fx.orgA.organizationId, sectionId: sectionA, history: [], message: "Where do we start?" });
     expect(after.ok).toBe(true);
