@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describeCoverage } from "@/lib/extraction-coverage";
-import { describeSource } from "@/lib/requirement-provenance";
+import { describeSource, type SourcedRequirement } from "@/lib/requirement-provenance";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -145,7 +145,8 @@ export default async function SolicitationDetail({
   });
   const qaRefs = new Set(qa.flatMap((q) => q.affectedRefs));
   // BL-AIX Phase 2a — how many requirements the documents say word for word.
-  const located = s.extractedRequirements.filter((r) => r.source);
+  const requirements = s.extractedRequirements as SourcedRequirement[];
+  const located = requirements.filter((r) => r.source);
   const verbatim = located.filter((r) => r.source!.quote === "exact").length;
 
   // BL-23: review + matrix + question state for the review panel.
@@ -446,7 +447,7 @@ export default async function SolicitationDetail({
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {s.extractedRequirements.map((r, i) => {
+                {requirements.map((r, i) => {
                   const color = KIND_COLOR[r.kind] ?? THEME.muted;
                   const sourceDoc = r.sourceDocId
                     ? companionDocs.find((d) => d.id === r.sourceDocId)

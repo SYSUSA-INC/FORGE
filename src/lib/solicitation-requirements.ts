@@ -20,6 +20,7 @@ import {
   type SolicitationRequirement,
 } from "@/db/schema";
 import { dedupeRequirements } from "@/lib/requirements-text";
+import type { SourcedRequirement } from "@/lib/requirement-provenance";
 
 export type OpportunityRequirements = {
   /** Union across every parsed solicitation on the opportunity, de-duplicated. */
@@ -124,15 +125,16 @@ export async function mergeSolicitationRequirements(
   // The parent's own clauses are the untagged entries. Tagged entries are
   // rebuilt from the documents that still exist, so a deleted document's
   // clauses fall out here instead of persisting for good.
-  const parentReqs = (parentRow.extractedRequirements ?? []) as SolicitationRequirement[];
-  const ownReqs: SolicitationRequirement[] = parentReqs
+  // BL-AIX Phase 2a — each entry keeps its provenance (`source`) through the merge.
+  const parentReqs = (parentRow.extractedRequirements ?? []) as SourcedRequirement[];
+  const ownReqs: SourcedRequirement[] = parentReqs
     .filter((r) => !r.sourceDocId)
     .map((r) => ({ kind: r.kind, text: r.text, ref: r.ref, ...(r.source ? { source: r.source } : {}) }));
 
-  const companionReqs: SolicitationRequirement[] = [];
+  const companionReqs: SourcedRequirement[] = [];
   for (const doc of docRows) {
     if (doc.parseStatus !== "parsed") continue;
-    for (const r of (doc.extractedRequirements ?? []) as SolicitationRequirement[]) {
+    for (const r of (doc.extractedRequirements ?? []) as SourcedRequirement[]) {
       companionReqs.push({ kind: r.kind, text: r.text, ref: r.ref, sourceDocId: doc.id, ...(r.source ? { source: r.source } : {}) });
     }
   }

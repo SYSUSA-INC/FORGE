@@ -17,8 +17,30 @@
  *
  * Pure: no DB, unit-tested.
  */
-import type { RequirementSource, SolicitationRequirement } from "@/db/schema";
+import type { SolicitationRequirement } from "@/db/schema";
 import { paragraphAt, paragraphMarks, segmentAt, segmentSolicitation, type Segment } from "@/lib/solicitation-segments";
+
+/**
+ * A requirement's place in the extracted text of its own document (the
+ * parent's, or the companion's named by sourceDocId). Stored as an
+ * optional `source` on each entry of the extracted_requirements JSON.
+ * quote: the whole clause was found word for word, only its opening or
+ * closing words, or nothing (paraphrased or misread: check it).
+ */
+export type RequirementSource = {
+  quote: "exact" | "partial" | "none";
+  /** Character offset in the document's extracted text. */
+  at?: number;
+  /** 1-based PDF page. */
+  page?: number;
+  /** UCF section letter ("C") or attachment ("Attachment J-1"). */
+  section?: string;
+  /** Numbered paragraph as written ("C.3.2", "3.2.1"). */
+  paragraph?: string;
+};
+
+/** A stored requirement that may carry its provenance (parsed since Phase 2a). */
+export type SourcedRequirement = SolicitationRequirement & { source?: RequirementSource };
 
 export type SourceIndex = {
   /** The source's letters and digits only, lower-cased. */
