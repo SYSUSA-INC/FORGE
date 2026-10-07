@@ -92,3 +92,62 @@ export function isFallbackEligible(err: unknown): boolean {
   if (err.name === "DeadlineError") return true;
   return /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|socket hang up|network/i.test(err.message);
 }
+
+/**
+ * BL-AIX Phase 1i — how a Claude model's request surface differs by
+ * generation. Newer models reject forced tool choice (Opus 5.5, Sonnet
+ * 5.5, Fable 5.1, Mythos 5.1), reject `temperature` (Opus 4.7+, Sonnet 5+,
+ * Fable, Mythos) and think by default (Opus 5+, Sonnet 5+, Fable, Mythos),
+ * with the thinking counted against `max_tokens`. An id this cannot read
+ * keeps today's request shape.
+ */
+export type ClaudeFamily = "opus" | "sonnet" | "haiku" | "fable" | "mythos";
+
+/** Family and version from an id such as "claude-opus-5-5", "claude-haiku-4-5-20251001", "anthropic.claude-sonnet-4-6" or "claude-3-5-sonnet-20241022". */
+export function claudeVersion(model: string): { family: ClaudeFamily; version: number } | null {
+  const m = model.toLowerCase();
+  const modern = /claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d{1,2}))?(?=-|$|@|:)/.exec(m);
+  if (modern) return { family: modern[1] as ClaudeFamily, version: Number(modern[2]) + (modern[3] ? Number(modern[3]) / 10 : 0) };
+  const legacy = /claude-(\d+)(?:-(\d))?-(opus|sonnet|haiku)/.exec(m);
+  if (legacy) return { family: legacy[3] as ClaudeFamily, version: Number(legacy[1]) + (legacy[2] ? Number(legacy[2]) / 10 : 0) };
+  return null;
+}
+
+export type ClaudeSurface = {
+  /** `tool_choice: {type: "tool"}` is accepted; otherwise the gateway asks for the tool in the prompt under `auto`. */
+  forcedToolChoice: boolean;
+  /** `temperature` is accepted; otherwise it is left out. */
+  sampling: boolean;
+  /** Thinks by default, so `max_tokens` needs room for the thinking as well as the answer. */
+  thinksByDefault: boolean;
+};
+
+const LEGACY_SURFACE: ClaudeSurface = { forcedToolChoice: true, sampling: true, thinksByDefault: false };
+
+export function claudeSurface(model: string): ClaudeSurface {
+  const v = claudeVersion(model);
+  if (!v) return LEGACY_SURFACE;
+  const { family, version } = v;
+  const newestLine = family === "fable" || family === "mythos";
+  return {
+    forcedToolChoice: !(
+      (family === "opus" && version >= 5.5) ||
+      (family === "sonnet" && version >= 5.5) ||
+      (newestLine && version >= 5.1)
+    ),
+    sampling: !((family === "opus" && version >= 4.7) || (family === "sonnet" && version >= 5) || newestLine),
+    thinksByDefault: (family === "opus" && version >= 5) || (family === "sonnet" && version >= 5) || newestLine,
+  };
+}
+
+/** Thinking room added on top of the answer's budget for a model that thinks by default. */
+export const THINKING_HEADROOM_MIN = 4_096;
+
+export function thinkingMaxTokens(requested: number, ceiling: number): number {
+  return Math.min(ceiling, requested + Math.max(THINKING_HEADROOM_MIN, requested));
+}
+
+/** Short and structured calls think briefly; longer prose keeps the model's default effort. */
+export function thinkingEffort(input: { tool: boolean; maxTokens: number }): "low" | undefined {
+  return input.tool || input.maxTokens <= 1_500 ? "low" : undefined;
+}
