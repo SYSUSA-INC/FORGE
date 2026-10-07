@@ -41,6 +41,20 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
           <div className="mt-1 font-mono text-[11px] text-muted">
             {status.active.reason}
           </div>
+          {status.active.name !== "stub" && (
+            <div className="mt-1 font-mono text-[11px] text-muted">
+              {status.fallback ? (
+                <>
+                  Fallback on outage:{" "}
+                  <span className="text-foreground">
+                    {PROVIDER_LABELS[status.fallback.name] ?? status.fallback.name}
+                  </span>
+                </>
+              ) : (
+                "No fallback provider (set AI_FALLBACK_PROVIDER to a second configured provider)."
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-4">

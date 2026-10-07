@@ -240,6 +240,8 @@ per class and per feature, is on `/admin/usage` under "Model routing".
 | `VLLM_MODEL_FAST` / `VLLM_MODEL` / `VLLM_MODEL_STRONG` | `VLLM_MODEL` | same three classes for a vLLM deployment |
 | `VLLM_SUPPORTS_TOOLS` | unset | set to `1` when the served model supports OpenAI-style tool calls (BL-AI-TOOLS) |
 | `AI_MODEL_ROUTING` | `on` | set to `off` to send every feature to the provider default |
+| `AI_FALLBACK_PROVIDER` | unset | a second configured provider (`anthropic`, `azure`, `vllm`) that takes a call once when the active one is down (BL-AIX Phase 1f) |
+| `AZURE_OPENAI_MAX_OUTPUT_TOKENS` / `VLLM_MAX_OUTPUT_TOKENS` | 16k (32k for gpt-4.1 / gpt-5 / o-series) / 8k | the deployment's output ceiling; longer requests are clamped to it |
 
 Azure OpenAI is deployment-pinned and is not routed. A tenant can be
 pinned to specific models with `customOverrides.aiModels` on its
