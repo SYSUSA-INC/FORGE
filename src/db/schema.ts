@@ -2498,6 +2498,11 @@ export const solicitations = pgTable("solicitation", {
     .$type<import("@/lib/extraction-coverage").ExtractionCoverage>()
     .notNull()
     .default(sql`'{}'::jsonb`),
+  // BL-AIX Phase 2b — Sections L and M as structured data (drizzle/0123).
+  lmStructure: jsonb("lm_structure")
+    .$type<import("@/lib/solicitation-lm").LmStructure>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -2621,6 +2626,11 @@ export const solicitationDocuments = pgTable(
     // BL-AIX Phase 0d — how much of this document the sweep read (drizzle/0114).
     extractionCoverage: jsonb("extraction_coverage")
       .$type<import("@/lib/extraction-coverage").ExtractionCoverage>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    // BL-AIX Phase 2b — Sections L and M as structured data (drizzle/0123).
+    lmStructure: jsonb("lm_structure")
+      .$type<import("@/lib/solicitation-lm").LmStructure>()
       .notNull()
       .default(sql`'{}'::jsonb`),
     sortOrder: integer("sort_order").notNull().default(0),

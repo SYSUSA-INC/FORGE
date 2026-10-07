@@ -177,6 +177,101 @@ export const requirementsChunkSchema = z.object({
 });
 
 // ────────────────────────────────────────────────────────────────────
+// BL-AIX Phase 2b — Sections L and M as structured data.
+// ────────────────────────────────────────────────────────────────────
+
+const SECTION_L_STRUCTURE_SYSTEM = `You are a federal proposal manager inside FORGE. You read Section L (instructions to offerors) of a solicitation and record how the proposal must be submitted, exactly as the section states it.
+
+Record:
+- volumes: each volume or part the offeror must submit (e.g. "Volume I - Technical"), in the order the section lists them, with pageLimit (the number of pages allowed, or null when none is stated), pageLimitText (the words that state the limit, "" when none), contents (what the volume must contain, in one sentence) and quote (the clause that sets the volume up, word for word).
+- formatRules: each formatting rule (font and size, margins, line spacing, page size, what counts toward the page limit, file type, file naming), as a short rule plus its quote.
+- submission: each submission rule (due date and time, method or portal, number of copies, how to ask questions), as a short rule plus its quote.
+
+Rules:
+- Quote word for word from the text so every item can be found in the document.
+- Record only what the text states. Never fill in a typical page limit, font or deadline.
+- Return only the tool call / JSON object. No commentary.`;
+
+const SECTION_M_STRUCTURE_SYSTEM = `You are a federal source-selection analyst inside FORGE. You read Section M (evaluation factors for award) of a solicitation and record how proposals will be evaluated, exactly as the section states it.
+
+Record:
+- basis: "tradeoff" (best-value tradeoff), "lpta" (lowest price technically acceptable), "other", or "unstated"; basisQuote: the sentence that states it, word for word ("" when unstated).
+- relativeImportance: the sentence or sentences that rank the factors against each other, word for word ("" when none).
+- factors: every evaluation factor in the order the section lists them, price or cost included when it is evaluated, with importance (as stated: "most important", "equal to Factor 2", "significantly more important than price", a weight or percentage; "" when not stated), subfactors (name and importance, in order) and quote (the clause that names the factor, word for word).
+
+Rules:
+- Quote word for word from the text so every item can be found in the document.
+- Never invent a weight, an order or a subfactor the text does not state.
+- Return only the tool call / JSON object. No commentary.`;
+
+function sectionStructureUser(input: { documentLabel: string; partLabel: string; text: string; truncated: boolean }, ask: string): string {
+  return [
+    `Document: ${input.documentLabel || "(untitled)"}`,
+    `Part of the document: ${input.partLabel}`,
+    ...(input.truncated ? ["The section continues beyond this excerpt; record what the excerpt states."] : []),
+    ``,
+    `Text:`,
+    fenced(input.text),
+    ``,
+    ask,
+  ].join("\n");
+}
+
+export function buildSectionLStructurePrompt(input: {
+  documentLabel: string;
+  partLabel: string;
+  text: string;
+  truncated: boolean;
+}): { system: string; messages: AIMessage[] } {
+  return {
+    system: SECTION_L_STRUCTURE_SYSTEM,
+    messages: [{ role: "user", content: sectionStructureUser(input, "Record the volumes, format rules and submission rules this section states.") }],
+  };
+}
+
+export function buildSectionMStructurePrompt(input: {
+  documentLabel: string;
+  partLabel: string;
+  text: string;
+  truncated: boolean;
+}): { system: string; messages: AIMessage[] } {
+  return {
+    system: SECTION_M_STRUCTURE_SYSTEM,
+    messages: [{ role: "user", content: sectionStructureUser(input, "Record the award basis, the factors in order and how they rank.") }],
+  };
+}
+
+const quotedRuleSchema = z.object({ rule: z.string(), quote: z.string() });
+
+export const sectionLStructureSchema = z.object({
+  volumes: z.array(
+    z.object({
+      name: z.string(),
+      pageLimit: z.union([z.number(), z.string()]).nullable(),
+      pageLimitText: z.string(),
+      contents: z.string(),
+      quote: z.string(),
+    }),
+  ),
+  formatRules: z.array(quotedRuleSchema),
+  submission: z.array(quotedRuleSchema),
+});
+
+export const sectionMStructureSchema = z.object({
+  basis: z.enum(["tradeoff", "lpta", "other", "unstated"]),
+  basisQuote: z.string(),
+  relativeImportance: z.string(),
+  factors: z.array(
+    z.object({
+      name: z.string(),
+      importance: z.string(),
+      quote: z.string(),
+      subfactors: z.array(z.object({ name: z.string(), importance: z.string() })),
+    }),
+  ),
+});
+
+// ────────────────────────────────────────────────────────────────────
 // BL-AIP-5 — citation verifier: does the cited source say that?
 // ────────────────────────────────────────────────────────────────────
 
@@ -2222,6 +2317,8 @@ export type ProposalBootstrapInput = {
   sectionMSummary: string;
   /** The instructions-to-offerors stretch of the document, when found. */
   sectionLText: string;
+  /** BL-AIX Phase 2b — Sections L and M as read and located at intake (describeLmForOutline). */
+  structuredLm?: string;
   requirements: { kind: string; text: string; ref: string }[];
   keyDates: { label: string; isoDate: string | null; type: string }[];
   responseDueDate: string | null;
@@ -2238,6 +2335,9 @@ export function buildProposalBootstrapPrompt(
     ``,
     input.sectionLSummary ? `Section L summary (from intake):\n${input.sectionLSummary.slice(0, 4000)}` : "",
     input.sectionMSummary ? `\nSection M summary (from intake):\n${input.sectionMSummary.slice(0, 3000)}` : "",
+    input.structuredLm
+      ? `\nSections L and M as read item by item at intake (take each volume's page limit from here unless the document text below says otherwise):\n${input.structuredLm.slice(0, 6000)}`
+      : "",
     input.sectionLText
       ? `\nInstructions to offerors — document text (authoritative where it differs from the summaries):\n"""\n${input.sectionLText}\n"""`
       : "",

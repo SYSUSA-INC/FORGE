@@ -70,8 +70,8 @@
       "sha256": "939e5db05a37f3c64ad1025bc1d39838df4f1b754ed18837d755863726080f4c"
     },
     "proposal_bootstrap": {
-      "version": "2026-09-28.1",
-      "sha256": "7fd036a9f2301ae8245f02a146fa74d386f75600ac4e88afce357e9793bc12a6"
+      "version": "2026-10-07.1",
+      "sha256": "6e92cdb14970d16c0a63947d20258344fed09130af365c4b8f29676b30faa996"
     },
     "proposal_scan": {
       "version": "2026-10-05.1",
@@ -112,6 +112,10 @@
     "solicitation_review": {
       "version": "2026-10-05.1",
       "sha256": "5288c92bb056addbe39fb65ed1d0dda3ae4028ee63ddc35122ef664ee3fa7dab"
+    },
+    "solicitation_structure": {
+      "version": "2026-10-07.1",
+      "sha256": "8752c725ed01ab35ef24691e2e4dcafc94319098347f4119473ed11fcc338f95"
     },
     "winner_analysis": {
       "version": "2026-10-05.1",

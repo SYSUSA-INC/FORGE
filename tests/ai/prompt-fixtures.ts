@@ -24,6 +24,8 @@ import {
   buildEbuyExtractPrompt,
   buildGraphicsSuggestPrompt,
   buildDraftJudgePrompt,
+  buildSectionLStructurePrompt,
+  buildSectionMStructurePrompt,
   buildGoldAnnotatePrompt,
   buildGsaExtractPrompt,
   buildImageOcrPrompt,
@@ -49,6 +51,8 @@ import {
   ebuyExtractionSchema,
   graphicsSuggestSchema,
   draftJudgeSchema,
+  sectionLStructureSchema,
+  sectionMStructureSchema,
   goldAnnotateSchema,
   gsaExtractionSchema,
   knowledgeExtractionSchema,
@@ -337,6 +341,7 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       sectionLSummary: "Volume I Technical, 25 pages.",
       sectionMSummary: "Technical approach is most important.",
       sectionLText: "L.5.2.1 Volume I Technical shall not exceed 25 pages.",
+      structuredLm: "Volumes Section L asks for:\n- Volume I - Technical: 25 pages (p. 42)\nEvaluation factors in Section M order (best-value tradeoff):\n1. Technical Approach (most important)",
       requirements: REQUIREMENTS,
       keyDates: [{ label: "Proposals due", isoDate: "2026-11-04", type: "response_due" }],
       responseDueDate: "2026-11-04",
@@ -403,6 +408,10 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       draft: "We migrate in three reversible waves, each with a tested rollback.",
     }),
   ],
+  solicitation_structure: () => [
+    buildSectionLStructurePrompt({ documentLabel: "RFP.pdf", partLabel: "Section L — Instructions, conditions and notices to offerors", text: RFP_TEXT, truncated: false }),
+    buildSectionMStructurePrompt({ documentLabel: "RFP.pdf", partLabel: "Section M — Evaluation factors for award", text: RFP_TEXT, truncated: true }),
+  ],
 };
 
 /** What structured calls hand the model as their output tool, per feature. */
@@ -436,6 +445,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   review_summary: [reviewSummarySchema],
   gold_annotate: [goldAnnotateSchema],
   draft_judge: [draftJudgeSchema],
+  solicitation_structure: [sectionLStructureSchema, sectionMStructureSchema],
 };
 
 function scanPrompt(): RenderedPrompt {

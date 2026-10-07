@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describeCoverage } from "@/lib/extraction-coverage";
 import { describeSource, type SourcedRequirement } from "@/lib/requirement-provenance";
+import { mergeLmStructures } from "@/lib/solicitation-lm";
+import { LmPanel } from "./LmPanel";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -133,6 +135,8 @@ export default async function SolicitationDetail({
 
   // BL-FB-SOL-BUNDLE — load companion documents for the bundle panel.
   const companionDocs = await listSolicitationDocumentsAction(s.id);
+  // BL-AIX Phase 2b — Sections L and M: the solicitation's own, else a companion document's.
+  const lm = mergeLmStructures([s.lmStructure, ...companionDocs.map((d) => d.lm)]);
   const coverageNotes = [
     ...(describeCoverage(s.extractionCoverage) ?? []),
     ...companionDocs.flatMap((d) => (d.coverageWarnings ?? []).map((w) => `${d.fileName}: ${w}`)),
@@ -419,6 +423,8 @@ export default async function SolicitationDetail({
               </p>
             </Panel>
           ) : null}
+
+          <LmPanel lm={lm} />
 
           <Panel
             title="Requirements"

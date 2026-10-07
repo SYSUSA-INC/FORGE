@@ -126,6 +126,7 @@ export async function parseSolicitationFromBytes(
           "\n\n[Extracted from image via vision OCR.]",
         sectionMSummary: d.sectionMSummary,
         extractedRequirements: d.requirements,
+        lmStructure: {},
         keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
@@ -180,6 +181,7 @@ export async function parseSolicitationFromBytes(
         sectionMSummary: d.sectionMSummary,
         extractedRequirements: d.requirements,
         extractionCoverage: { vision: true },
+        lmStructure: {},
         keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
         updatedAt: new Date(),
       })
@@ -253,6 +255,7 @@ export async function parseSolicitationFromBytes(
       sectionMSummary: d.sectionMSummary,
       extractedRequirements: d.requirements,
       extractionCoverage: aiRes.coverage ?? {},
+      lmStructure: aiRes.lm ?? {},
       keyDates: (d.keyDates ?? []) as SolicitationKeyDate[],
       updatedAt: new Date(),
     })

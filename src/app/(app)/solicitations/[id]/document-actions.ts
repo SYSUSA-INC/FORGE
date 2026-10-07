@@ -2,6 +2,7 @@
 
 import { and, asc, eq } from "drizzle-orm";
 import { describeCoverage } from "@/lib/extraction-coverage";
+import { hasLm, type LmStructure } from "@/lib/solicitation-lm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -33,6 +34,8 @@ export type SolicitationDocumentRow = {
   requirementCount: number;
   /** BL-AIX Phase 0d — what the parse didn't read; null when read in full. */
   coverageWarnings: string[] | null;
+  /** BL-AIX Phase 2b — the document's Sections L and M, when it has them. */
+  lm: LmStructure | null;
   sortOrder: number;
   createdAt: string;
 };
@@ -74,6 +77,7 @@ export async function listSolicitationDocumentsAction(
       parseError: solicitationDocuments.parseError,
       extractedRequirements: solicitationDocuments.extractedRequirements,
       extractionCoverage: solicitationDocuments.extractionCoverage,
+      lmStructure: solicitationDocuments.lmStructure,
       sortOrder: solicitationDocuments.sortOrder,
       createdAt: solicitationDocuments.createdAt,
     })
@@ -99,6 +103,7 @@ export async function listSolicitationDocumentsAction(
     parseError: r.parseError,
     requirementCount: (r.extractedRequirements ?? []).length,
     coverageWarnings: describeCoverage(r.extractionCoverage),
+    lm: hasLm(r.lmStructure) ? r.lmStructure : null,
     sortOrder: r.sortOrder,
     createdAt: r.createdAt.toISOString(),
   }));

@@ -93,6 +93,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   gold_annotate: "strong",
   // BL-AIX Phase 1h-2 — a judge should be at least as capable as the drafter it scores.
   draft_judge: "strong",
+  solicitation_structure: "standard",
 };
 
 /** Class → concrete model for a provider. `null` = leave the provider default. */

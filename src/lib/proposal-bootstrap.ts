@@ -29,6 +29,7 @@ import {
   organizations,
   proposalSections,
   proposals,
+  solicitationDocuments,
   solicitations,
   type ProposalBootstrapRecord,
 } from "@/db/schema";
@@ -48,6 +49,7 @@ import {
   type BootstrapPlan,
 } from "@/lib/proposal-bootstrap-plan";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
+import { describeLmForOutline, mergeLmStructures } from "@/lib/solicitation-lm";
 
 const BOOTSTRAP_MAX_TOKENS = 4000;
 
@@ -110,7 +112,9 @@ export async function planProposalFromSolicitation(input: {
 
   const sols = await db
     .select({
+      id: solicitations.id,
       rawText: solicitations.rawText,
+      lmStructure: solicitations.lmStructure,
       keyDates: solicitations.keyDates,
       responseDueDate: solicitations.responseDueDate,
     })
@@ -130,6 +134,27 @@ export async function planProposalFromSolicitation(input: {
     const win = sectionLWindow(s.rawText);
     if (win.length > sectionLText.length) sectionLText = win;
   }
+  // BL-AIX Phase 2b — Sections L and M as read at intake: the newest
+  // solicitation's own first, then its companion documents'.
+  const docLm =
+    sols.length === 0
+      ? []
+      : await db
+          .select({ lmStructure: solicitationDocuments.lmStructure })
+          .from(solicitationDocuments)
+          .where(
+            and(
+              eq(solicitationDocuments.organizationId, organizationId),
+              inArray(
+                solicitationDocuments.solicitationId,
+                sols.map((s) => s.id),
+              ),
+              eq(solicitationDocuments.parseStatus, "parsed"),
+            ),
+          );
+  const structuredLm = describeLmForOutline(
+    mergeLmStructures([...sols.map((s) => s.lmStructure), ...docLm.map((d) => d.lmStructure)]),
+  );
   const keyDates = sols
     .flatMap((s) => (s.keyDates ?? []).map((d) => ({ label: d.label, isoDate: d.isoDate ?? null, type: d.type })))
     .slice(0, 20);
@@ -138,7 +163,7 @@ export async function planProposalFromSolicitation(input: {
     sols.find((s) => s.responseDueDate)?.responseDueDate?.toISOString().slice(0, 10) ??
     null;
 
-  if (!loaded.sectionLSummary && !sectionLText && loaded.requirements.length === 0) {
+  if (!loaded.sectionLSummary && !sectionLText && !structuredLm && loaded.requirements.length === 0) {
     return {
       ok: false,
       error: "No parsed solicitation with instructions to offerors on this opportunity yet.",
@@ -157,6 +182,7 @@ export async function planProposalFromSolicitation(input: {
     sectionLSummary: loaded.sectionLSummary,
     sectionMSummary: loaded.sectionMSummary,
     sectionLText,
+    structuredLm,
     requirements: outlineRequirements(loaded.requirements),
     keyDates,
     responseDueDate,

@@ -74,6 +74,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
           parseStatus: "parsing",
           parseError: "",
           coverageWarnings: null,
+          lm: null,
           requirementCount: 0,
           sortOrder: 0,
           createdAt: new Date().toISOString(),

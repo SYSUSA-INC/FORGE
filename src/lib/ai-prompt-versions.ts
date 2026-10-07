@@ -43,7 +43,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   knowledge_extract: "kb-extract-v1",
   loss_intelligence: "2026-10-05.1",
   review_preflight: "2026-10-05.1",
-  proposal_bootstrap: "2026-09-28.1",
+  proposal_bootstrap: "2026-10-07.1",
   opportunity_triage: "2026-09-29.1",
   brain_answer: "2026-10-05.1",
   onboarding_assist: "2026-10-01.1",
@@ -51,6 +51,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   review_summary: "2026-10-03.1",
   gold_annotate: "2026-10-07.1",
   draft_judge: "2026-10-07.2",
+  solicitation_structure: "2026-10-07.1",
 };
 
 /** The version the gateway records for a feature; "" for one that sends no prompt. */
