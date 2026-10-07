@@ -64,7 +64,7 @@ Effort key:
 | 3aj | **BL-AIX Phase 1f** — Provider fallback: an outage on the active AI provider moves the call once to `AI_FALLBACK_PROVIDER`; a per-model capability table clamps output length and keeps attached documents away from providers that cannot read them | P0 | S | ✅ shipped (PR #348) |
 | 3ak | **BL-AIX Phase 1g-1** — Prompt caching: the proposal-wide solicitation context leads every section draft as a cached prefix, the chat keeps its context cacheable from turn to turn, and `ai_call_log` records cache reads and writes (migration 0118) | P0 | S | ✅ shipped (PR #349) |
 | 3al | **BL-AIX Phase 1g-2** — Nightly work at half price: the nightly scout's triage goes out as one Message Batch per tenant and the jobs cron applies the results, each request logged and metered like a live call (migration 0119) | P0 | M | ✅ shipped (PR #350) |
-| 3am | **BL-AIX Phase 1h-1** — Brain retrieval check: sections of a tenant's own won proposals searched the way the drafter searches (and by their mapped requirements), scored by whether their winning text comes back — recall @1/3/8 and MRR per ranking revision (migration 0120) | P0 | M | 🔄 in PR |
+| 3am | **BL-AIX Phase 1h-1** — Brain retrieval check: sections of a tenant's own won proposals searched the way the drafter searches (and by their mapped requirements), scored by whether their winning text comes back — recall @1/3/8 and MRR per ranking revision (migration 0120) | P0 | M | 🔄 in PR (PR #351) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -162,7 +162,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · 🔄 Phase 1h-1 in PR
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · 🔄 Phase 1h-1 in PR (PR #351)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -561,7 +561,7 @@ the phases below.
         candidate for a later slice.
   - **1h — retrieval and draft evaluations** (owner's pick after 1g,
     2026-10-07), in two PRs:
-    - **1h-1 — the Brain retrieval check:** 🔄 in PR.
+    - **1h-1 — the Brain retrieval check:** 🔄 in PR (PR #351).
       - Cases are up to 20 sections of the tenant's own won proposals
         already harvested into its Brain (80+ words, round-robin across
         proposals).
