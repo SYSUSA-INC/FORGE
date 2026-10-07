@@ -243,6 +243,7 @@ per class and per feature, is on `/admin/usage` under "Model routing".
 | `AI_FALLBACK_PROVIDER` | unset | a second configured provider (`anthropic`, `azure`, `vllm`) that takes a call once when the active one is down (BL-AIX Phase 1f) |
 | `AZURE_OPENAI_MAX_OUTPUT_TOKENS` / `VLLM_MAX_OUTPUT_TOKENS` | 16k (32k for gpt-4.1 / gpt-5 / o-series) / 8k | the deployment's output ceiling; longer requests are clamped to it |
 | `AI_BATCH_NIGHTLY` | on | set to `off` to triage the nightly scout live instead of as a half-price Message Batch (BL-AIX Phase 1g-2) |
+| any `ANTHROPIC_MODEL*` value | — | current Claude models (e.g. `claude-sonnet-5-5`, `claude-opus-5-5`) work as-is: the gateway drops forced tool calls and temperature where a model rejects them and makes room for thinking (BL-AIX Phase 1i-1); run the evals before switching |
 
 Azure OpenAI is deployment-pinned and is not routed. A tenant can be
 pinned to specific models with `customOverrides.aiModels` on its

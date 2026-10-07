@@ -52,7 +52,15 @@ import {
   resolveModelForFeature,
   routingEnabled,
 } from "@/lib/ai-routing";
-import { canServe, capabilitiesFor, clampMaxTokens, isFallbackEligible } from "@/lib/ai-capabilities";
+import {
+  canServe,
+  capabilitiesFor,
+  clampMaxTokens,
+  claudeSurface,
+  isFallbackEligible,
+  thinkingEffort,
+  thinkingMaxTokens,
+} from "@/lib/ai-capabilities";
 import { createSseParser } from "@/lib/sse";
 
 export type AIRole = "user" | "assistant";
@@ -242,22 +250,33 @@ export function __buildAnthropicBody(
     if (m.content || !m.cachedPrefix) blocks.push({ type: "text", text: m.content });
     return { role: m.role, content: blocks };
   });
+  // BL-AIX Phase 1i — newer models: no forced tool choice, no temperature,
+  // and thinking that needs room in max_tokens (see claudeSurface).
+  const surface = claudeSurface(model);
+  const requested = opts.maxTokens ?? 1024;
   const body: Record<string, unknown> = {
     model,
-    max_tokens: opts.maxTokens ?? 1024,
+    max_tokens: surface.thinksByDefault ? thinkingMaxTokens(requested, capabilitiesFor("anthropic", model).maxOutputTokens) : requested,
     messages,
   };
-  if (typeof opts.temperature === "number") body.temperature = opts.temperature;
-  if (opts.system) {
+  if (typeof opts.temperature === "number" && surface.sampling) body.temperature = opts.temperature;
+  if (surface.thinksByDefault) {
+    const effort = thinkingEffort({ tool: Boolean(opts.tool), maxTokens: requested });
+    if (effort) body.output_config = { effort };
+  }
+  const toolRule =
+    opts.tool && !surface.forcedToolChoice ? `Answer by calling the ${opts.tool.name} tool exactly once. Do not answer in prose.` : "";
+  const systemText = [opts.system, toolRule].filter(Boolean).join("\n\n");
+  if (systemText) {
     body.system = opts.cacheSystem
       ? [
           {
             type: "text",
-            text: opts.system,
+            text: systemText,
             cache_control: { type: "ephemeral" },
           },
         ]
-      : opts.system;
+      : systemText;
   }
   if (opts.tool) {
     body.tools = [
@@ -268,12 +287,11 @@ export function __buildAnthropicBody(
         input_schema: opts.tool.inputSchema,
       },
     ];
-    // Force exactly this tool, exactly once.
-    body.tool_choice = {
-      type: "tool",
-      name: opts.tool.name,
-      disable_parallel_tool_use: true,
-    };
+    // Force exactly this tool, exactly once; a model that refuses forced
+    // choice is asked for it in the system prompt and may call it at most once.
+    body.tool_choice = surface.forcedToolChoice
+      ? { type: "tool", name: opts.tool.name, disable_parallel_tool_use: true }
+      : { type: "auto", disable_parallel_tool_use: true };
   }
   return body;
 }
@@ -432,11 +450,11 @@ class AnthropicProvider implements AIProvider {
       throw new ProviderHttpError(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`, res.status);
     }
     const json = (await res.json()) as AnthropicResponse;
-    return {
+    return assertAnswered({
       ...__parseAnthropicResponse(json, model),
       provider: this.name,
       stubbed: false,
-    };
+    });
   }
 
   private async completeStreaming(
@@ -478,7 +496,7 @@ class AnthropicProvider implements AIProvider {
     apply(parser.push(decoder.decode()));
     apply(parser.flush());
 
-    return {
+    return assertAnswered({
       text: state.text.trim(),
       provider: this.name,
       model: state.model,
@@ -489,8 +507,20 @@ class AnthropicProvider implements AIProvider {
       stubbed: false,
       stopReason: state.stopReason,
       streamed: true,
-    };
+    });
   }
+}
+
+/**
+ * BL-AIX Phase 1i — a newer model's safety classifier can decline a
+ * request (`stop_reason: "refusal"`) with nothing to show for it. That is
+ * an error the caller can see and log, not an empty answer.
+ */
+export function assertAnswered(result: AICompleteResult): AICompleteResult {
+  if (result.stopReason === "refusal" && !result.text.trim() && result.structured === undefined) {
+    throw new Error("The model declined this request (refusal).");
+  }
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────
