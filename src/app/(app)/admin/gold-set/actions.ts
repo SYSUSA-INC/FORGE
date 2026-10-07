@@ -1,0 +1,152 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireSuperadmin } from "@/lib/auth-helpers";
+import { recordAudit } from "@/lib/audit-log";
+import {
+  addGoldItem,
+  appendGoldDocText,
+  createGoldDocFromNotice,
+  createGoldDocFromText,
+  decideGoldItem,
+  deleteGoldDoc,
+  searchGoldDocText,
+  setGoldDocApproved,
+  updateGoldItem,
+} from "@/lib/gold-set";
+import { isGoldItemStatus, type TextHit } from "@/lib/gold-set-logic";
+import { log } from "@/lib/log";
+
+/**
+ * BL-AIX Phase 1e — managing the extraction gold set. Platform admins
+ * only: the gold set is a platform asset (public RFPs, no tenant data).
+ * Each change is audited under the acting admin's own organisation when
+ * they have one, and logged otherwise (the promo-code pattern).
+ */
+
+type Actor = Awaited<ReturnType<typeof requireSuperadmin>>;
+type Done = { ok: true } | { ok: false; error: string };
+
+async function audit(actor: Actor, action: string, resourceId: string, metadata: Record<string, unknown> = {}) {
+  if (actor.organizationId) {
+    await recordAudit({
+      organizationId: actor.organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action,
+      resourceType: "extraction_gold_doc",
+      resourceId,
+      metadata,
+    });
+  } else {
+    log.info("[gold-set]", action, { actorUserId: actor.id, resourceId, ...metadata });
+  }
+}
+
+function refresh(docId?: string) {
+  revalidatePath("/admin/gold-set");
+  if (docId) revalidatePath(`/admin/gold-set/${docId}`);
+}
+
+export async function createGoldDocFromNoticeAction(noticeId: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  if (!noticeId.trim()) return { ok: false, error: "Enter a SAM.gov notice ID." };
+  const res = await createGoldDocFromNotice({ noticeId, userId: actor.id });
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.doc.create", res.id, { source: "samgov", noticeId: noticeId.trim(), files: res.files.length });
+  refresh();
+  return { ok: true, id: res.id };
+}
+
+export async function createGoldDocFromTextAction(input: {
+  title: string;
+  text: string;
+  noticeId?: string;
+  sourceUrl?: string;
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  const res = await createGoldDocFromText({ ...input, userId: actor.id });
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.doc.create", res.id, { source: "pasted", chars: input.text.length });
+  refresh();
+  return { ok: true, id: res.id };
+}
+
+export async function appendGoldDocTextAction(input: { docId: string; name: string; text: string }): Promise<Done> {
+  const actor = await requireSuperadmin();
+  const res = await appendGoldDocText(input);
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.doc.append_text", input.docId, { name: input.name, chars: res.chars });
+  refresh(input.docId);
+  return { ok: true };
+}
+
+export async function addGoldItemAction(input: {
+  docId: string;
+  kind: string;
+  ref: string;
+  text: string;
+  value: string;
+  position: number;
+}): Promise<Done> {
+  const actor = await requireSuperadmin();
+  const { docId, ...item } = input;
+  const res = await addGoldItem({ docId, item, userId: actor.id });
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.item.add", docId, { itemId: res.id, kind: item.kind });
+  refresh(docId);
+  return { ok: true };
+}
+
+export async function updateGoldItemAction(input: {
+  itemId: string;
+  kind: string;
+  ref: string;
+  text: string;
+  value: string;
+  position: number;
+}): Promise<Done> {
+  const actor = await requireSuperadmin();
+  const { itemId, ...item } = input;
+  const res = await updateGoldItem({ itemId, item, userId: actor.id });
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.item.edit", res.docId, { itemId, kind: item.kind });
+  refresh(res.docId);
+  return { ok: true };
+}
+
+export async function decideGoldItemAction(input: { itemId: string; status: string }): Promise<Done> {
+  const actor = await requireSuperadmin();
+  if (!isGoldItemStatus(input.status)) return { ok: false, error: "Unknown decision." };
+  const res = await decideGoldItem({ itemId: input.itemId, status: input.status, userId: actor.id });
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.item.decide", res.docId, { itemId: input.itemId, status: input.status });
+  refresh(res.docId);
+  return { ok: true };
+}
+
+export async function setGoldDocApprovedAction(input: { docId: string; approved: boolean }): Promise<Done> {
+  const actor = await requireSuperadmin();
+  const res = await setGoldDocApproved({ ...input, userId: actor.id });
+  if (!res.ok) return res;
+  await audit(actor, input.approved ? "gold_set.doc.approve" : "gold_set.doc.reopen", input.docId, {
+    approved: res.progress.approved,
+    rejected: res.progress.rejected,
+  });
+  refresh(input.docId);
+  return { ok: true };
+}
+
+export async function deleteGoldDocAction(docId: string): Promise<Done> {
+  const actor = await requireSuperadmin();
+  const res = await deleteGoldDoc(docId);
+  if (!res.ok) return res;
+  await audit(actor, "gold_set.doc.delete", docId, { title: res.title });
+  refresh();
+  return { ok: true };
+}
+
+/** Read-only: find where a phrase appears in the document's text. */
+export async function searchGoldDocTextAction(input: { docId: string; query: string }): Promise<TextHit[]> {
+  await requireSuperadmin();
+  return searchGoldDocText(input.docId, input.query);
+}
