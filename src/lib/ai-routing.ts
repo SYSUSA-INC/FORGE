@@ -91,6 +91,8 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   protest_viability: "strong",
   // BL-AIX Phase 1e-2 — the yardstick for extraction accuracy; worth the best model.
   gold_annotate: "strong",
+  // BL-AIX Phase 1h-2 — a judge should be at least as capable as the drafter it scores.
+  draft_judge: "strong",
 };
 
 /** Class → concrete model for a provider. `null` = leave the provider default. */

@@ -6,6 +6,9 @@ import { setAiBudget, setAiFeatureRouting, type AiControlResult } from "@/lib/ai
 import type { AiModelClass } from "@/lib/ai-routing";
 import { runGoldenEval } from "@/lib/golden-eval";
 import { runRetrievalEval } from "@/lib/retrieval-eval";
+import { recordAudit } from "@/lib/audit-log";
+import { rateGoldenDraft } from "@/lib/eval-ratings";
+import type { JudgeScores } from "@/lib/draft-judge-logic";
 import {
   enforceQuota,
   ensureFeature,
@@ -61,8 +64,9 @@ export async function setAiBudgetAction(input: {
 /**
  * BL-AIP-5b — run the golden eval for this org: re-draft up to
  * `maxCases` sections of won proposals and score each against the text
- * that won. Org admins only; one draft request per case against the
- * monthly AI quota.
+ * that won. Org admins only. Two requests per case against the monthly
+ * AI quota: the draft and (BL-AIX Phase 1h-2) the rubric judge; slots
+ * not used are refunded.
  */
 export async function runGoldenEvalAction(
   maxCases = 3,
@@ -78,7 +82,7 @@ export async function runGoldenEvalAction(
   let reserved = 0;
   try {
     await ensureFeature(organizationId, "aiAutoDraft");
-    for (let i = 0; i < cases; i++) {
+    for (let i = 0; i < cases * 2; i++) {
       await enforceQuota(organizationId, "aiRequestsPerMonth");
       reserved += 1;
     }
@@ -100,8 +104,8 @@ export async function runGoldenEvalAction(
       for (let i = 0; i < reserved; i++) await refundQuota(organizationId, "aiRequestsPerMonth");
       return res;
     }
-    // Cases that never reached the model give their slot back.
-    for (let i = res.run.caseCount; i < reserved; i++) {
+    // Drafts and judgements that never reached the model give their slot back.
+    for (let i = res.run.caseCount + res.judged; i < reserved; i++) {
       await refundQuota(organizationId, "aiRequestsPerMonth");
     }
     revalidatePath("/settings/ai-engine");
@@ -140,4 +144,31 @@ export async function runRetrievalEvalAction(): Promise<
     log.error("[runRetrievalEvalAction]", "error", { error: err });
     return { ok: false, error: err instanceof Error ? err.message : "Retrieval eval failed." };
   }
+}
+
+/**
+ * BL-AIX Phase 1h-2 — an expert rates one golden-eval draft on the
+ * judge's rubric; the judge is trusted once enough ratings agree with
+ * it. Any member of the organization may rate; the run must be its own.
+ */
+export async function rateGoldenDraftAction(input: {
+  runId: string;
+  sectionId: string;
+  scores: Partial<JudgeScores>;
+  note: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await rateGoldenDraft({ organizationId, raterUserId: actor.id, ...input });
+  if (!res.ok) return res;
+  await recordAudit({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "ai.eval.rate",
+    resourceType: "ai_eval_run",
+    resourceId: input.runId,
+    metadata: { sectionId: input.sectionId, overall: input.scores.overall },
+  });
+  revalidatePath("/settings/ai-engine");
+  return { ok: true };
 }

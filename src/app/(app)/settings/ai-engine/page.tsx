@@ -5,6 +5,8 @@ import { burnDown, featureRoutingRows } from "@/lib/ai-control";
 import { getAiControlState, getTenantAiUsage, type AiControlState, type TenantAiUsage } from "@/lib/ai-engine-control";
 import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { listEvalRuns, listGoldenCases } from "@/lib/golden-eval";
+import { loadRatingsAndCalibration, type JudgeCalibration } from "@/lib/eval-ratings";
+import { agreement } from "@/lib/draft-judge-logic";
 import { BRAIN_RETRIEVAL_VERSION } from "@/lib/brain-rank";
 import { listRetrievalEvalRuns } from "@/lib/retrieval-eval";
 import type { RetrievalCaseResult, RetrievalSummary } from "@/lib/retrieval-eval-logic";
@@ -12,7 +14,7 @@ import { safeQuery } from "@/lib/schema-resilience";
 import { getAIEngineStatus } from "@/lib/settings-status";
 import { AIEngineTab } from "../AIEngineTab";
 import { AiControlPanel } from "./AiControlPanel";
-import { GoldenEvalPanel } from "./GoldenEvalPanel";
+import { GoldenEvalPanel, type MyRatings } from "./GoldenEvalPanel";
 import { RetrievalEvalPanel } from "./RetrievalEvalPanel";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +58,16 @@ export default async function AiEnginePage() {
     safeQuery(() => listGoldenCases({ organizationId, limit: 50 }), [], { tag: "ai-engine.goldenCases" }),
     safeQuery(() => listRetrievalEvalRuns({ organizationId, limit: 8 }), [], { tag: "ai-engine.retrievalRuns" }),
   ]);
+
+  // BL-AIX Phase 1h-2 — expert ratings of the listed runs and the judge's calibration.
+  const rated = await safeQuery(
+    () => loadRatingsAndCalibration({ organizationId, runIds: runs.map((r) => r.id) }),
+    { ratings: [], calibration: { overall: agreement([]), perDimension: { compliance: null, evaluation: null, specificity: null, clarity: null }, ratings: 0 } as JudgeCalibration },
+    { tag: "ai-engine.ratings" },
+  );
+  const myRatings: MyRatings = Object.fromEntries(
+    rated.ratings.filter((r) => r.raterUserId === user.id).map((r) => [`${r.runId}:${r.sectionId}`, { ...r.scores, note: r.note }]),
+  );
 
   const monthLabel = monthStart.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -120,6 +132,8 @@ export default async function AiEnginePage() {
           goldenCases={cases.length}
           currentPromptVersion={SECTION_DRAFT_PROMPT_VERSION}
           isAdmin={isAdmin}
+          calibration={rated.calibration}
+          myRatings={myRatings}
         />
       </div>
       <div className="mt-4">

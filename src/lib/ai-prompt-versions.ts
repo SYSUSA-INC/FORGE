@@ -50,6 +50,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   graphics_suggest: "2026-10-03.1",
   review_summary: "2026-10-03.1",
   gold_annotate: "2026-10-07.1",
+  draft_judge: "2026-10-07.1",
 };
 
 /** The version the gateway records for a feature; "" for one that sends no prompt. */

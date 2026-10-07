@@ -4385,6 +4385,36 @@ export const aiEvalRuns = pgTable(
 export type AiEvalRun = typeof aiEvalRuns.$inferSelect;
 export type NewAiEvalRun = typeof aiEvalRuns.$inferInsert;
 
+// BL-AIX Phase 1h-2 — an expert's 1-5 rating of one golden-eval draft on
+// the judge's rubric; one per expert per draft. Calibrates the judge.
+export const aiEvalRatings = pgTable(
+  "ai_eval_rating",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => aiEvalRuns.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id").notNull(),
+    raterUserId: text("rater_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scores: jsonb("scores").$type<Record<string, number>>().notNull().default(sql`'{}'::jsonb`),
+    overall: integer("overall").notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgRunIdx: index("ai_eval_rating_org_run_idx").on(t.organizationId, t.runId),
+    oneRatingIdx: uniqueIndex("ai_eval_rating_run_section_rater_idx").on(t.runId, t.sectionId, t.raterUserId),
+  }),
+);
+
+export type AiEvalRating = typeof aiEvalRatings.$inferSelect;
+
 // BL-AIX Phase 1h-1 — one run of the Brain retrieval eval for a tenant:
 // sections of its own won proposals searched the way the drafter
 // searches, scored by whether their winning text comes back.

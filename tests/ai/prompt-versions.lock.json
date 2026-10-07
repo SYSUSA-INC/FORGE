@@ -17,6 +17,10 @@
       "version": "2026-10-05.1",
       "sha256": "c403ab03f596a74f89647c7d401c9780edc03b6424b275d916e6a8dfbdb07ce8"
     },
+    "draft_judge": {
+      "version": "2026-10-07.1",
+      "sha256": "af0be334483cc877a909f0c61e8980a3a4b9b8baf2c2c023b2ab0da6199470c2"
+    },
     "ebuy_extract": {
       "version": "2026-10-05.1",
       "sha256": "8a8f3bfe05a63470160e67b95dce590746c6546c403c7ce58ea98b495086522c"
