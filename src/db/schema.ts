@@ -4385,6 +4385,36 @@ export const aiEvalRuns = pgTable(
 export type AiEvalRun = typeof aiEvalRuns.$inferSelect;
 export type NewAiEvalRun = typeof aiEvalRuns.$inferInsert;
 
+// BL-AIX Phase 1h-1 — one run of the Brain retrieval eval for a tenant:
+// sections of its own won proposals searched the way the drafter
+// searches, scored by whether their winning text comes back.
+export const retrievalEvalRuns = pgTable(
+  "retrieval_eval_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** BRAIN_RETRIEVAL_VERSION at run time. */
+    retrievalVersion: text("retrieval_version").notNull().default(""),
+    embeddingProvider: text("embedding_provider").notNull().default(""),
+    caseCount: integer("case_count").notNull().default(0),
+    summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    results: jsonb("results").$type<Record<string, unknown>[]>().notNull().default(sql`'[]'::jsonb`),
+    /** Query embeddings were stubbed: only the full-text half ranked. */
+    stubbed: boolean("stubbed").notNull().default(false),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgCreatedIdx: index("retrieval_eval_run_org_created_idx").on(t.organizationId, t.createdAt),
+  }),
+);
+
+export type RetrievalEvalRun = typeof retrievalEvalRuns.$inferSelect;
+
 /**
  * BL-AIX Phase 1e — the extraction gold set (migration 0115). Public
  * SAM.gov RFPs annotated with what a correct extraction must find, the

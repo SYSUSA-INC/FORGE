@@ -112,6 +112,30 @@ export type DraftSource = {
 
 /** Cap on sources sent to the model; keeps the prompt bounded. */
 export const MAX_DRAFT_SOURCES = 10;
+
+/**
+ * The Brain query the drafter searches with for a section's sources.
+ * BL-AIX Phase 1h-1 — shared with the retrieval eval, so the eval
+ * measures exactly what the drafter sends.
+ */
+export function draftSourcesQuery(input: {
+  sectionTitle: string;
+  sectionKind: string;
+  agency: string;
+  naicsCode: string;
+  opportunityDescription: string;
+  currentBodyPlain: string;
+}): string {
+  return [
+    `Section: ${input.sectionTitle} (${input.sectionKind.replace(/_/g, " ")})`,
+    input.agency ? `Agency: ${input.agency}` : "",
+    input.naicsCode ? `NAICS ${input.naicsCode}` : "",
+    input.opportunityDescription ? `Opportunity: ${input.opportunityDescription.slice(0, 600)}` : "",
+    input.currentBodyPlain ? `Current draft: ${input.currentBodyPlain.slice(0, 600)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 export const SOURCE_EXCERPT_CHARS = 600;
 
 /** BL-AIP-5 — what the verifier pass did to a cited draft (pure shape; the pass itself is server-only). */

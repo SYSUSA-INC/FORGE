@@ -5,6 +5,7 @@ import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-help
 import { setAiBudget, setAiFeatureRouting, type AiControlResult } from "@/lib/ai-engine-control";
 import type { AiModelClass } from "@/lib/ai-routing";
 import { runGoldenEval } from "@/lib/golden-eval";
+import { runRetrievalEval } from "@/lib/retrieval-eval";
 import {
   enforceQuota,
   ensureFeature,
@@ -115,5 +116,28 @@ export async function runGoldenEvalAction(
     for (let i = 0; i < reserved; i++) await refundQuota(organizationId, "aiRequestsPerMonth");
     log.error("[runGoldenEvalAction]", "error", { error: err });
     return { ok: false, error: err instanceof Error ? err.message : "Eval failed." };
+  }
+}
+
+/**
+ * BL-AIX Phase 1h-1 — run the Brain retrieval eval for this org: search
+ * for sections of its own won proposals the way the drafter does and
+ * score whether their winning text comes back. Org admins only. No model
+ * call: one query embedding per search, metered like any search.
+ */
+export async function runRetrievalEvalAction(): Promise<
+  { ok: true; runId: string; caseCount: number } | { ok: false; error: string }
+> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+  try {
+    const res = await runRetrievalEval({ organizationId, actor: { userId: actor.id, email: actor.email } });
+    if (!res.ok) return res;
+    revalidatePath("/settings/ai-engine");
+    return { ok: true, runId: res.run.id, caseCount: res.run.caseCount };
+  } catch (err) {
+    log.error("[runRetrievalEvalAction]", "error", { error: err });
+    return { ok: false, error: err instanceof Error ? err.message : "Retrieval eval failed." };
   }
 }
