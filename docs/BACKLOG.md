@@ -585,7 +585,7 @@ the phases below.
         never found.
     - **1h-2 — a rubric judge for golden drafts, calibrated against
       expert ratings:** 🔄 in PR (PR #352).
-      - New `draft_judge` feature (strong class, prompt `2026-10-07.1`;
+      - New `draft_judge` feature (strong class, prompt `2026-10-07.2`;
         the prompt-version lock gains its entry). It scores a draft 1–5
         on compliance, evaluation fit, specificity and clarity, plus an
         overall score and a rationale.

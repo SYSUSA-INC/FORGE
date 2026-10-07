@@ -2394,7 +2394,8 @@ export function buildGoldAnnotatePrompt(input: {
 // the organization's experts rate the same drafts to calibrate it.
 // ────────────────────────────────────────────────────────────────────
 
-const score = z.number().int().min(1).max(5);
+// Whole numbers are asked for; a stray 3.5 is rounded by cleanScores rather than losing the judgement.
+const score = z.number().min(1).max(5);
 
 export const draftJudgeSchema = z.object({
   compliance: score,

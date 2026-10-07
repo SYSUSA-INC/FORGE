@@ -810,7 +810,7 @@ A cached block shorter than the model's minimum (about 1,000 tokens on Sonnet) i
 - **Cost and isolation.** No model is called, only one query embedding per search. Only the organization's own proposals and Brain are searched, and the run is stored and audited for it alone (`ai.retrieval_eval.run`).
 - **Reading it.** If the requirement query does markedly better than the drafter query, the drafter should search with the requirements too.
 
-**Draft judge and expert ratings (BL-AIX Phase 1h-2).** Migration 0121 adds `ai_eval_rating`; sync it after deploying. Each golden-eval case now also goes to a **rubric judge** (the new `draft_judge` feature, strong class, prompt `2026-10-07.1`).
+**Draft judge and expert ratings (BL-AIX Phase 1h-2).** Migration 0121 adds `ai_eval_rating`; sync it after deploying. Each golden-eval case now also goes to a **rubric judge** (the new `draft_judge` feature, strong class, prompt `2026-10-07.2`).
 - **The judge.** It scores the draft 1–5 the way a source-selection evaluator would: compliance with the section's mapped requirements, evaluation fit against Section M, specificity and clarity, plus an overall score with a short rationale. It never sees the winning text, so the same judge can later score drafts that have no winner to compare with.
 - **Cost.** An eval run now reserves two AI requests per case (the draft and the judgement); slots not used are refunded.
 - **Experts rate the same drafts.** The draft text is now kept on each case. Under **Draft quality vs. won proposals** any member can open **Read & rate** and score it on the same rubric. The judge's own scores stay hidden until they have rated, so the judge cannot anchor them. One rating per member per draft; re-rating replaces it. Audited as `ai.eval.rate`.

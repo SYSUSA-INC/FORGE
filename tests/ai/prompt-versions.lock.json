@@ -18,8 +18,8 @@
       "sha256": "c403ab03f596a74f89647c7d401c9780edc03b6424b275d916e6a8dfbdb07ce8"
     },
     "draft_judge": {
-      "version": "2026-10-07.1",
-      "sha256": "af0be334483cc877a909f0c61e8980a3a4b9b8baf2c2c023b2ab0da6199470c2"
+      "version": "2026-10-07.2",
+      "sha256": "fe26846d647965117787b3e059db3f222d14d13dacb6f058dcfae866d262ce9d"
     },
     "ebuy_extract": {
       "version": "2026-10-05.1",
