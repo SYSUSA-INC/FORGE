@@ -65,7 +65,7 @@ Effort key:
 | 3ak | **BL-AIX Phase 1g-1** — Prompt caching: the proposal-wide solicitation context leads every section draft as a cached prefix, the chat keeps its context cacheable from turn to turn, and `ai_call_log` records cache reads and writes (migration 0118) | P0 | S | ✅ shipped (PR #349) |
 | 3al | **BL-AIX Phase 1g-2** — Nightly work at half price: the nightly scout's triage goes out as one Message Batch per tenant and the jobs cron applies the results, each request logged and metered like a live call (migration 0119) | P0 | M | ✅ shipped (PR #350) |
 | 3am | **BL-AIX Phase 1h-1** — Brain retrieval check: sections of a tenant's own won proposals searched the way the drafter searches (and by their mapped requirements), scored by whether their winning text comes back — recall @1/3/8 and MRR per ranking revision (migration 0120) | P0 | M | ✅ shipped (PR #351) |
-| 3an | **BL-AIX Phase 1h-2** — Draft judge: a rubric judge scores every golden-eval draft 1–5 (compliance, evaluation fit, specificity, clarity, overall) without the winning text; the organization's experts rate the same drafts and the panel reports whether the judge agrees with them (migration 0121) | P0 | M | 🔄 in PR |
+| 3an | **BL-AIX Phase 1h-2** — Draft judge: a rubric judge scores every golden-eval draft 1–5 (compliance, evaluation fit, specificity, clarity, overall) without the winning text; the organization's experts rate the same drafts and the panel reports whether the judge agrees with them (migration 0121) | P0 | M | 🔄 in PR (PR #352) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -163,7 +163,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · 🔄 Phase 1h-2 in PR
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · 🔄 Phase 1h-2 in PR (PR #352)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -584,7 +584,7 @@ the phases below.
         proves a winning text held only in another tenant's Brain is
         never found.
     - **1h-2 — a rubric judge for golden drafts, calibrated against
-      expert ratings:** 🔄 in PR.
+      expert ratings:** 🔄 in PR (PR #352).
       - New `draft_judge` feature (strong class, prompt `2026-10-07.1`;
         the prompt-version lock gains its entry). It scores a draft 1–5
         on compliance, evaluation fit, specificity and clarity, plus an
