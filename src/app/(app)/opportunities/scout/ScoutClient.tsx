@@ -94,7 +94,7 @@ export function ScoutClient({
                     <span className="min-w-0 truncate font-display text-[13px] text-text">{c.title}</span>
                   )}
                   <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted">
-                    {c.recommendation ? `scout said ${SCOUT_RECOMMENDATION_LABELS[c.recommendation]}` : "not triaged"}
+                    {c.recommendation ? `scout said ${SCOUT_RECOMMENDATION_LABELS[c.recommendation]}` : c.triageQueued ? "triage queued" : "not triaged"}
                     {" · "}fit {c.fitScore}
                   </span>
                 </li>
@@ -264,7 +264,7 @@ function RecBadge({ candidate }: { candidate: ScoutCandidateView }) {
   if (!r) {
     return (
       <span className="rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
-        {candidate.stubbed ? "Scored (AI stub)" : "Scored · not triaged"}
+        {candidate.stubbed ? "Scored (AI stub)" : candidate.triageQueued ? "AI triage queued" : "Scored · not triaged"}
       </span>
     );
   }

@@ -436,12 +436,14 @@ export default async function AdminUsagePage() {
                 <tbody>
                   {featureRows.map((f) => {
                     // BL-AIX Phase 1g — cache reads bill at about a
-                    // tenth of input, cache writes at 1.25x.
+                    // tenth of input, cache writes at 1.25x, and batched
+                    // calls at half.
                     const cost =
                       ((f.inputTokens -
                         0.9 * f.cacheReadTokens +
                         0.25 * f.cacheWriteTokens +
-                        f.outputTokens) /
+                        f.outputTokens -
+                        0.5 * f.batchedTokens) /
                         1_000_000) *
                       costPerMTok;
                     const cachedShare =
@@ -526,8 +528,9 @@ export default async function AdminUsagePage() {
             not match the feature&apos;s schema. Via tool = answered through a
             forced tool call rather than prose. Cached = share of input
             tokens read from the prompt cache; the cost estimate prices
-            those at a tenth and cache writes at 1.25x. Latency is provider
-            round-trip on successful calls. Rows are pruned after{" "}
+            those at a tenth, cache writes at 1.25x and batched calls at
+            half. Latency is provider round-trip on successful live calls
+            (batched calls carry none). Rows are pruned after{" "}
             {retentionDays} days (AI_CALL_LOG_RETENTION_DAYS).
             {featureRefused > 0
               ? ` ${featureRefused.toLocaleString()} refusals in window — tenants are hitting caps.`

@@ -931,7 +931,7 @@ export function validateStructured<T>(
     : { data: null, parseError: describeIssues(parsed.error), viaTool: false };
 }
 
-function sanitizeToolName(name: string): string {
+export function sanitizeToolName(name: string): string {
   // Anthropic: ^[a-zA-Z0-9_-]{1,64}$. OpenAI is compatible with that.
   const cleaned = name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
   return cleaned || "result";
@@ -968,6 +968,63 @@ type TenantRun<T> = {
  * Validation happens here rather than in the caller so the parse outcome
  * lands on the same ai_call_log row as the call itself.
  */
+type TenantTier = Awaited<ReturnType<typeof import("@/lib/subscription-gates").getCurrentTier>>;
+
+/**
+ * BL-AI-ROUTING — the model for this feature unless the caller pinned
+ * one. Tenant overrides come from the subscription row; the provider
+ * table comes from env. Undefined leaves the provider default. Shared
+ * with the batch path (BL-AIX Phase 1g-2).
+ */
+export function tenantRoutedModel(feature: AiFeature, tier: TenantTier, pinned: string | undefined): string | undefined {
+  if (pinned || !routingEnabled()) return pinned;
+  const route = resolveModelForFeature({
+    feature,
+    provider: getAIProviderStatus().active.name,
+    tenantOverrides: tier?.overrides.aiModels ?? null,
+  });
+  return route.model ?? undefined;
+}
+
+/**
+ * Refuse before any provider call when the workspace's trial ended or it
+ * is already at its monthly token cap. `refuse` writes the quota_refused
+ * telemetry row; the error is then thrown. Shared with the batch path.
+ */
+export async function refuseIfOverCap(
+  organizationId: string,
+  tier: TenantTier,
+  refuse: (error: string) => Promise<void>,
+): Promise<void> {
+  const { getCurrentUsage, QuotaExceededError, trialRefusal } = await import("@/lib/subscription-gates");
+  // BL-AUTH-ABUSE Slice 2a — a workspace whose trial ended keeps editing
+  // but its AI pauses until a plan is chosen or the trial is extended.
+  const trialEnded = trialRefusal(tier);
+  if (tier && trialEnded) {
+    await refuse("trial ended");
+    throw new QuotaExceededError("aiRequestsPerMonth", 0, 0, tier.tierName, trialEnded);
+  }
+
+  // Pre-check: refuse before calling the provider when the tenant is
+  // already over their token cap. The check is best-effort — a tenant
+  // can sneak one final call through if multiple workers race past the
+  // threshold simultaneously; same advisory-ceiling semantics as the
+  // existing request-count quota.
+  if (tier && tier.effectiveQuotas.aiTokensPerMonth > 0) {
+    const used = await getCurrentUsage(organizationId, "aiTokensPerMonth");
+    if (used >= tier.effectiveQuotas.aiTokensPerMonth) {
+      // Refusals are demand we could not serve — worth counting.
+      await refuse(`aiTokensPerMonth cap ${tier.effectiveQuotas.aiTokensPerMonth} reached (${used} used)`);
+      throw new QuotaExceededError(
+        "aiTokensPerMonth",
+        tier.effectiveQuotas.aiTokensPerMonth,
+        used,
+        tier.tierName,
+      );
+    }
+  }
+}
+
 async function runTenantCompletion<T>(
   opts: AITenantCompleteOptions,
   validate: ((result: AICompleteResult) => AIStructuredValidation<T>) | null,
@@ -978,23 +1035,11 @@ async function runTenantCompletion<T>(
   // Dynamic imports keep the AI gateway free of a hard dep on the
   // subscription-gates / telemetry modules — useful for the future
   // ingest / worker contexts that may use this file without them.
-  const { enforceQuota, getCurrentUsage, getCurrentTier, QuotaExceededError, trialRefusal } =
-    await import("@/lib/subscription-gates");
+  const { enforceQuota, getCurrentTier } = await import("@/lib/subscription-gates");
   const { recordAiCall } = await import("@/lib/ai-telemetry");
 
   const tier = await getCurrentTier(organizationId);
-
-  // BL-AI-ROUTING — pick the model for this feature unless the caller
-  // pinned one. Tenant overrides come from the subscription row; the
-  // provider table comes from env. `null` leaves the provider default.
-  if (!rest.model && routingEnabled()) {
-    const route = resolveModelForFeature({
-      feature,
-      provider: getAIProviderStatus().active.name,
-      tenantOverrides: tier?.overrides.aiModels ?? null,
-    });
-    if (route.model) rest.model = route.model;
-  }
+  rest.model = tenantRoutedModel(feature, tier, rest.model);
 
   // BL-AI-TELEMETRY — fields common to every outcome row.
   const telemetryBase = {
@@ -1008,37 +1053,9 @@ async function runTenantCompletion<T>(
     hasDocuments: (rest.documents?.length ?? 0) > 0,
   };
 
-  // BL-AUTH-ABUSE Slice 2a — a workspace whose trial ended keeps editing
-  // but its AI pauses until a plan is chosen or the trial is extended.
-  const trialEnded = trialRefusal(tier);
-  if (tier && trialEnded) {
-    await recordAiCall({ ...telemetryBase, status: "quota_refused", latencyMs: 0, error: "trial ended" });
-    throw new QuotaExceededError("aiRequestsPerMonth", 0, 0, tier.tierName, trialEnded);
-  }
-
-  // Pre-check: refuse before calling the provider when the tenant is
-  // already over their token cap. The check is best-effort — a tenant
-  // can sneak one final call through if multiple workers race past the
-  // threshold simultaneously; same advisory-ceiling semantics as the
-  // existing request-count quota.
-  if (tier && tier.effectiveQuotas.aiTokensPerMonth > 0) {
-    const used = await getCurrentUsage(organizationId, "aiTokensPerMonth");
-    if (used >= tier.effectiveQuotas.aiTokensPerMonth) {
-      // Refusals are demand we could not serve — worth counting.
-      await recordAiCall({
-        ...telemetryBase,
-        status: "quota_refused",
-        latencyMs: 0,
-        error: `aiTokensPerMonth cap ${tier.effectiveQuotas.aiTokensPerMonth} reached (${used} used)`,
-      });
-      throw new QuotaExceededError(
-        "aiTokensPerMonth",
-        tier.effectiveQuotas.aiTokensPerMonth,
-        used,
-        tier.tierName,
-      );
-    }
-  }
+  await refuseIfOverCap(organizationId, tier, (error) =>
+    recordAiCall({ ...telemetryBase, status: "quota_refused", latencyMs: 0, error }),
+  );
 
   // BL-AIX Phase 1f — what the provider can do. A request with documents
   // never goes to a provider that would drop them, and maxTokens never

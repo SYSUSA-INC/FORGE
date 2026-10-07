@@ -43,6 +43,8 @@ export type AiCallRecord = {
   hasDocuments?: boolean;
   /** BL-AI-TOOLS — provider answered via the forced tool call. */
   viaTool?: boolean;
+  /** BL-AIX Phase 1g-2 — served through a Message Batch (half price, no latency figure). */
+  batched?: boolean;
   /** BL-AI-TOOLS — schema validation outcome; null when not applicable. */
   parseOk?: boolean | null;
   parseError?: string | null;
@@ -74,6 +76,7 @@ export async function recordAiCall(rec: AiCallRecord): Promise<void> {
       cacheSystem: rec.cacheSystem ?? false,
       hasDocuments: rec.hasDocuments ?? false,
       viaTool: rec.viaTool ?? false,
+      batched: rec.batched ?? false,
       parseOk: rec.parseOk ?? null,
       parseError: rec.parseError ? rec.parseError.slice(0, ERROR_CAP) : null,
     });
@@ -98,7 +101,9 @@ export type AiFeatureBreakdownRow = {
   /** BL-AIX Phase 1g — the part of inputTokens read from / written to the prompt cache. */
   cacheReadTokens: number;
   cacheWriteTokens: number;
-  /** Mean provider latency over ok calls, ms. */
+  /** BL-AIX Phase 1g-2 — tokens (in + out) of calls served through a batch, billed at half. */
+  batchedTokens: number;
+  /** Mean provider latency over ok live calls, ms. */
   avgLatencyMs: number;
   maxLatencyMs: number;
   tenants: number;
@@ -133,7 +138,8 @@ export async function getAiFeatureBreakdown(
       outputTokens: sql<string>`coalesce(sum(${aiCallLogs.outputTokens}), 0)`,
       cacheReadTokens: sql<string>`coalesce(sum(${aiCallLogs.cacheReadTokens}), 0)`,
       cacheWriteTokens: sql<string>`coalesce(sum(${aiCallLogs.cacheWriteTokens}), 0)`,
-      avgLatencyMs: sql<string>`coalesce(avg(${aiCallLogs.latencyMs}) filter (where ${aiCallLogs.status} = 'ok'), 0)`,
+      batchedTokens: sql<string>`coalesce(sum(${aiCallLogs.inputTokens} + ${aiCallLogs.outputTokens}) filter (where ${aiCallLogs.batched}), 0)`,
+      avgLatencyMs: sql<string>`coalesce(avg(${aiCallLogs.latencyMs}) filter (where ${aiCallLogs.status} = 'ok' and not ${aiCallLogs.batched}), 0)`,
       maxLatencyMs: sql<string>`coalesce(max(${aiCallLogs.latencyMs}), 0)`,
       tenants: sql<string>`count(distinct ${aiCallLogs.organizationId})`,
       viaTool: sql<string>`count(*) filter (where ${aiCallLogs.viaTool})`,
@@ -159,6 +165,7 @@ export async function getAiFeatureBreakdown(
     outputTokens: Number(r.outputTokens),
     cacheReadTokens: Number(r.cacheReadTokens),
     cacheWriteTokens: Number(r.cacheWriteTokens),
+    batchedTokens: Number(r.batchedTokens),
     avgLatencyMs: Math.round(Number(r.avgLatencyMs)),
     maxLatencyMs: Number(r.maxLatencyMs),
     tenants: Number(r.tenants),
