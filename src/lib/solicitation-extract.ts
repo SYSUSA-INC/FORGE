@@ -124,6 +124,8 @@ export async function readRequirementsWindow(input: {
   count: number;
   documentLabel: string;
   depth?: number;
+  /** BL-AIX Phase 1i-2 — pin a candidate model (eval runs); unset follows routing. */
+  model?: string;
 }): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number }> {
   const { organizationId, text, index, count } = input;
   const depth = input.depth ?? 0;
@@ -137,6 +139,7 @@ export async function readRequirementsWindow(input: {
     organizationId,
     feature: "solicitation_extract",
     variant: depth === 0 ? "requirements_chunk" : "requirements_chunk_split",
+    model: input.model || undefined,
     schema: requirementsChunkSchema,
     toolName: "record_requirements",
     toolDescription: "Record every requirement found in this window of the document.",

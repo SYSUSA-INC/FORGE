@@ -123,6 +123,7 @@ export default async function AiEnginePage() {
             id: r.id,
             promptVersion: r.promptVersion,
             model: r.model,
+            requestedModel: r.requestedModel,
             caseCount: r.caseCount,
             meanScore: r.meanScore,
             stubbed: r.stubbed,

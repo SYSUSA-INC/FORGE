@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import type { DocScore, RunSummary } from "@/lib/extraction-eval-logic";
+import { CANDIDATE_MODELS } from "@/lib/model-choice";
 import { runExtractionEvalAction } from "./actions";
 
 export type EvalRunRow = {
@@ -11,6 +12,7 @@ export type EvalRunRow = {
   status: string;
   createdAt: string;
   model: string;
+  requestedModel: string;
   promptVersions: Record<string, string>;
   docsTotal: number;
   results: DocScore[];
@@ -30,13 +32,14 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [candidate, setCandidate] = useState("");
   const running = runs.find((r) => r.status === "running");
 
   function run() {
     setNote(null);
     startTransition(async () => {
       for (;;) {
-        const res = await runExtractionEvalAction();
+        const res = await runExtractionEvalAction(candidate);
         if (!res.ok) {
           setNote(res.error);
           break;
@@ -53,15 +56,35 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
       title="Extraction accuracy"
       eyebrow={`${approvedDocs} approved document${approvedDocs === 1 ? "" : "s"}`}
       actions={
-        <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={pending || approvedDocs === 0} onClick={run}>
-          {pending ? "Running…" : running ? "Continue run" : "Run accuracy check"}
-        </button>
+        <span className="flex items-center gap-2">
+          {running ? null : (
+            <>
+              <input
+                list="accuracy-candidate-models"
+                value={candidate}
+                onChange={(e) => setCandidate(e.target.value)}
+                placeholder="Model: default"
+                aria-label="Candidate model for this run"
+                className="aur-input w-44 text-[11px]"
+              />
+              <datalist id="accuracy-candidate-models">
+                {CANDIDATE_MODELS.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </>
+          )}
+          <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={pending || approvedDocs === 0} onClick={run}>
+            {pending ? "Running…" : running ? "Continue run" : "Run accuracy check"}
+          </button>
+        </span>
       }
     >
       <p className="mb-3 font-mono text-[11px] text-muted">
         Reads every approved document exactly as intake reads a solicitation (the requirement sweep, then the AI review) and
         scores it against the expert&rsquo;s annotations: requirement recall (target 98%) and precision, page and format limits
-        captured (target 100%), and Section M factors found and kept in order. Compare runs across prompt versions and models.
+        captured (target 100%), and Section M factors found and kept in order. Compare runs across prompt versions and models:
+        name a candidate model to run the check on it without changing any default.
         Keep this page open while it runs; Continue picks up where it stopped. AI usage counts against your own organisation.
       </p>
       {note ? <p className="mb-3 font-mono text-[11px] text-text">{note}</p> : null}
@@ -100,7 +123,10 @@ function RunRows({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTo
         <td className="py-1.5 text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
         <td className="py-1.5 text-text">
           {run.promptVersions.solicitation_extract ?? "—"} / {run.promptVersions.solicitation_review ?? "—"}
-          <span className="text-muted"> · {run.model || "—"}</span>
+          <span className="text-muted">
+            {" "}· {run.model || "—"}
+            {run.requestedModel ? " (candidate)" : ""}
+          </span>
           {run.status !== "done" ? <span className={run.status === "failed" ? "text-rose" : "text-gold"}> · {run.status}</span> : null}
         </td>
         <td className="py-1.5 text-right tabular-nums">

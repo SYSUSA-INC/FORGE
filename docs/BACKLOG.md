@@ -66,7 +66,8 @@ Effort key:
 | 3al | **BL-AIX Phase 1g-2** — Nightly work at half price: the nightly scout's triage goes out as one Message Batch per tenant and the jobs cron applies the results, each request logged and metered like a live call (migration 0119) | P0 | M | ✅ shipped (PR #350) |
 | 3am | **BL-AIX Phase 1h-1** — Brain retrieval check: sections of a tenant's own won proposals searched the way the drafter searches (and by their mapped requirements), scored by whether their winning text comes back — recall @1/3/8 and MRR per ranking revision (migration 0120) | P0 | M | ✅ shipped (PR #351) |
 | 3an | **BL-AIX Phase 1h-2** — Draft judge: a rubric judge scores every golden-eval draft 1–5 (compliance, evaluation fit, specificity, clarity, overall) without the winning text; the organization's experts rate the same drafts and the panel reports whether the judge agrees with them (migration 0121) | P0 | M | ✅ shipped (PR #352) |
-| 3ao | **BL-AIX Phase 1i-1** — Current Claude models: the gateway sends each generation the request it accepts (no forced tool calls on Opus 5.5 / Sonnet 5.5 / Fable 5.1, no temperature where rejected, room for default thinking, refusals surfaced as errors); defaults unchanged until the evals decide | P0 | S | 🔄 in PR (PR #353) |
+| 3ao | **BL-AIX Phase 1i-1** — Current Claude models: the gateway sends each generation the request it accepts (no forced tool calls on Opus 5.5 / Sonnet 5.5 / Fable 5.1, no temperature where rejected, room for default thinking, refusals surfaced as errors); defaults unchanged until the evals decide | P0 | S | ✅ shipped (PR #353) |
+| 3ap | **BL-AIX Phase 1i-2** — Candidate-model eval runs: the extraction accuracy check (any model id, platform admins) and the golden eval (listed Claude models, org admins; drafter only, the judge held fixed) run on a chosen model without changing any default; the model is stored on the run (migration 0122) | P0 | S | 🔄 in PR |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -164,7 +165,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · 🔄 Phase 1i-1 in PR (PR #353)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · 🔄 Phase 1i-2 in PR
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -610,7 +611,7 @@ the phases below.
         `tests/isolation/eval-ratings.test.ts`.
   - **1i — current models behind the evals** (owner's pick after 1h,
     2026-10-07):
-    - **1i-1 — gateway compatibility:** 🔄 in PR (PR #353).
+    - **1i-1 — gateway compatibility:** ✅ shipped (PR #353).
       - `claudeSurface(model)` in `src/lib/ai-capabilities.ts` reads the
         Claude family and version from the model id. Requests change
         only for models that need it:
@@ -627,9 +628,26 @@ the phases below.
         instead of passing as an empty answer.
       - Batches use the same builder.
       - Tests: `tests/ai/claude-surface.test.ts`.
-    - **1i-2 — candidate-model eval runs:** ⏳ next. Run the extraction
-      accuracy check and the golden eval (drafter only; the judge held
-      fixed) on a chosen model without changing any default.
+    - **1i-2 — candidate-model eval runs:** 🔄 in PR.
+      - Migration 0122 adds `requested_model` ("" = routed default) to
+        `extraction_eval_run` and `ai_eval_run`.
+      - **Extraction accuracy (platform admins):** any well-formed model
+        id (`cleanModelChoice` in `src/lib/model-choice.ts`) is pinned on
+        both the requirement sweep and the review, for every resumed
+        step of the run.
+      - **Golden eval (org admins):** only the listed models
+        (`CANDIDATE_MODELS`), only on the Anthropic provider, and never
+        when a platform admin pinned the drafter's model or its class
+        (`goldenCandidateRefusal`). The candidate drafts; the rubric
+        judge keeps its own routing so its scores compare across runs.
+      - The judge's run average shows on the run row once the judge is
+        calibrated; before that it is not evidence and would anchor the
+        experts still rating.
+      - The requested model is in the audit metadata
+        (`gold_set.eval.start`, `ai.eval.run`).
+      - Tests: `tests/ai/model-choice.test.ts`,
+        `tests/isolation/extraction-eval.test.ts` and
+        `tests/isolation/golden-eval.test.ts`.
 - **Phase 2 — Solicitation Intelligence Engine:**
   - structured Sections L, M and C;
   - requirements with page and offset provenance;

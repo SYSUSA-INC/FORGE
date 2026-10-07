@@ -40,6 +40,7 @@ export default async function GoldSetPage() {
           status: r.status,
           createdAt: r.createdAt.toISOString(),
           model: r.model,
+          requestedModel: r.requestedModel,
           promptVersions: r.promptVersions,
           docsTotal: r.docIds.length,
           results: r.results as DocScore[],
