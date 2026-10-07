@@ -135,9 +135,9 @@ export type RequirementsChunkResult = {
 const REQUIREMENTS_CHUNK_SYSTEM = `You are a federal solicitation analyst inside FORGE. You read ONE window of a longer solicitation (RFP / RFQ / PWS / SOW / attachment) and list EVERY requirement it places on the offeror or the contractor. Nothing is "too minor": page limits, fonts, submission mechanics, key-personnel rules, certifications, reporting cadence, transition duties, security controls, evaluation factors — all of it. Downstream, each entry becomes a row in the proposal's compliance matrix, so a clause you skip is a clause the team never checks.
 
 Rules:
-- One entry per distinct obligation. Quote the clause closely (light trimming of boilerplate is fine); do not paraphrase into vagueness and do not merge separate obligations.
+- One entry per distinct obligation. Quote the clause word for word from the window, so it can be found in the document: you may leave out list numbering and stop where the obligation ends, but do not reword, summarise, correct or merge separate obligations.
 - kind: "shall" for mandatory (shall / must / will / required), "should" for desired, "may" for optional.
-- ref: the source reference as written (e.g. "L.5.2.1", "M-3", "C.3.4", "PWS 2.1.4", "FAR 52.204-21"); "" when the window shows none. Section letters from earlier in the document may not be visible in this window — never guess one.
+- ref: the source reference as written (e.g. "L.5.2.1", "M-3", "C.3.4", "PWS 2.1.4", "FAR 52.204-21"); "" when the window shows none. Section letters from earlier in the document may not be visible in this window — never guess one. When the window is labelled with its part of the document, use the label to understand the text, not to invent a reference.
 - Skip pure narrative, definitions, and government-side statements that oblige nobody.
 - The window may start or end mid-sentence; ignore fragments you cannot read whole.
 - Return only the tool call / JSON object. No commentary.`;
@@ -147,10 +147,13 @@ export function buildRequirementsChunkPrompt(input: {
   chunkIndex: number;
   chunkCount: number;
   documentLabel: string;
+  /** BL-AIX Phase 2a — the part(s) of the document this window holds, e.g. "Section C — Description/specifications/statement of work". */
+  partLabel?: string;
 }): { system: string; messages: AIMessage[] } {
   const userPrompt = [
     `Document: ${input.documentLabel || "(untitled)"}`,
     `Window ${input.chunkIndex + 1} of ${input.chunkCount}.`,
+    ...(input.partLabel ? [`Part of the document: ${input.partLabel}`] : []),
     ``,
     `Text:`,
     fenced(input.chunkText),

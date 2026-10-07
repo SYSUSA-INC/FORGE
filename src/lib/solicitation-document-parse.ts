@@ -56,10 +56,13 @@ export async function parseSolicitationDocumentFromBytes(
   };
 
   let rawText = "";
+  // BL-AIX Phase 2a — where each PDF page starts, for requirement provenance.
+  let pageStarts: number[] | undefined;
   let format: ReturnType<typeof detectFormat> = null;
   try {
     const res = await extractTextFromAny(bytes, contentType, fileName);
     rawText = res.text;
+    pageStarts = res.pageStarts;
     format = res.format;
   } catch {
     format = detectFormat(contentType, fileName);
@@ -106,7 +109,7 @@ export async function parseSolicitationDocumentFromBytes(
     return;
   }
 
-  const aiRes = await aiExtractSolicitation(organizationId, rawText);
+  const aiRes = await aiExtractSolicitation(organizationId, rawText, { pageStarts });
   if (!aiRes.ok) { await fail(aiRes.error, rawText); return; }
 
   await applyExtraction(documentId, solicitationId, organizationId, {

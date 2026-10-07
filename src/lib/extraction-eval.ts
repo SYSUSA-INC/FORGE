@@ -20,7 +20,9 @@ import { db } from "@/db";
 import { extractionEvalRuns, extractionGoldDocs, extractionGoldItems, type ExtractionEvalRun } from "@/db/schema";
 import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import { scoreDocument, stepsFor, summarizeRun, type DocScore } from "@/lib/extraction-eval-logic";
-import { chunkText, isSameRequirement, mergeRequirementLists, type RequirementLike } from "@/lib/requirements-text";
+import { isSameRequirement, mergeRequirementLists, type RequirementLike } from "@/lib/requirements-text";
+import { attachProvenance } from "@/lib/requirement-provenance";
+import { planSweepWindows } from "@/lib/solicitation-segments";
 import { aiRunSolicitationReview } from "@/lib/solicitation-ai-review";
 import { MAX_REQUIREMENTS_PER_DOCUMENT, readRequirementsWindow } from "@/lib/solicitation-extract";
 
@@ -131,8 +133,11 @@ export async function stepExtractionEval(input: {
       continue;
     }
 
-    const windows = chunkText(doc.rawText);
-    const step = stepsFor(windows.length)[cursor.step]!;
+    // BL-AIX Phase 2a — the same structure-aware windows intake reads.
+    const windows = planSweepWindows(doc.rawText);
+    // A run started under an older window plan may hold a step past the
+    // new plan's windows: it moves on to the review with what it has.
+    const step = stepsFor(windows.length)[cursor.step] ?? { kind: "review" as const };
     if (step.kind === "window") {
       const w = windows[step.index]!;
       const read = await readRequirementsWindow({
@@ -141,6 +146,7 @@ export async function stepExtractionEval(input: {
         index: w.index,
         count: windows.length,
         documentLabel: doc.title,
+        partLabel: w.label,
         model: run.requestedModel || undefined,
       });
       if (read.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
@@ -163,6 +169,7 @@ export async function stepExtractionEval(input: {
     });
     if (review.ok && review.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
     const extracted = mergeRequirementLists(cursor.lists).slice(0, MAX_REQUIREMENTS_PER_DOCUMENT);
+    const located = attachProvenance(doc.rawText, extracted);
     const score = scoreDocument(
       { docId, title: doc.title, windows: windows.length, windowsFailed: cursor.windowsFailed + (review.ok ? 0 : 1) },
       await goldFor(docId),
@@ -170,6 +177,7 @@ export async function stepExtractionEval(input: {
         requirements: extracted.map((r) => r.text),
         sectionL: review.ok ? review.data.sectionL : [],
         factors: review.ok ? review.data.evaluationFactors.map((f) => f.name) : [],
+        verbatim: located.counts.exact,
       },
       isSameRequirement,
     );

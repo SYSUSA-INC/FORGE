@@ -67,7 +67,8 @@ Effort key:
 | 3am | **BL-AIX Phase 1h-1** — Brain retrieval check: sections of a tenant's own won proposals searched the way the drafter searches (and by their mapped requirements), scored by whether their winning text comes back — recall @1/3/8 and MRR per ranking revision (migration 0120) | P0 | M | ✅ shipped (PR #351) |
 | 3an | **BL-AIX Phase 1h-2** — Draft judge: a rubric judge scores every golden-eval draft 1–5 (compliance, evaluation fit, specificity, clarity, overall) without the winning text; the organization's experts rate the same drafts and the panel reports whether the judge agrees with them (migration 0121) | P0 | M | ✅ shipped (PR #352) |
 | 3ao | **BL-AIX Phase 1i-1** — Current Claude models: the gateway sends each generation the request it accepts (no forced tool calls on Opus 5.5 / Sonnet 5.5 / Fable 5.1, no temperature where rejected, room for default thinking, refusals surfaced as errors); defaults unchanged until the evals decide | P0 | S | ✅ shipped (PR #353) |
-| 3ap | **BL-AIX Phase 1i-2** — Candidate-model eval runs: the extraction accuracy check (any model id, platform admins) and the golden eval (listed Claude models, org admins; drafter only, the judge held fixed) run on a chosen model without changing any default; the model is stored on the run (migration 0122) | P0 | S | 🔄 in PR (PR #354) |
+| 3ap | **BL-AIX Phase 1i-2** — Candidate-model eval runs: the extraction accuracy check (any model id, platform admins) and the golden eval (listed Claude models, org admins; drafter only, the judge held fixed) run on a chosen model without changing any default; the model is stored on the run (migration 0122) | P0 | S | ✅ shipped (PR #354) |
+| 3aq | **BL-AIX Phase 2a** — Solicitation structure and requirement provenance: the text is split by its headings (UCF Sections B–M, attachments, numbered paragraphs) before the sweep, windows follow the parts and say which, and every requirement records its page, part and paragraph and whether the document says it word for word; the accuracy check reports the word-for-word share | P0 | M | 🔄 in PR (PR #355) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -165,7 +166,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · 🔄 Phase 1i-2 in PR (PR #354)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · 🔄 Phase 2a in PR (PR #355)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -628,7 +629,7 @@ the phases below.
         instead of passing as an empty answer.
       - Batches use the same builder.
       - Tests: `tests/ai/claude-surface.test.ts`.
-    - **1i-2 — candidate-model eval runs:** 🔄 in PR (PR #354).
+    - **1i-2 — candidate-model eval runs:** ✅ shipped (PR #354).
       - Migration 0122 adds `requested_model` ("" = routed default) to
         `extraction_eval_run` and `ai_eval_run`.
       - **Extraction accuracy (platform admins):** any well-formed model
@@ -649,8 +650,38 @@ the phases below.
         `tests/isolation/extraction-eval.test.ts` and
         `tests/isolation/golden-eval.test.ts`.
 - **Phase 2 — Solicitation Intelligence Engine:**
+  - **2a — structure and provenance:** 🔄 in PR (PR #355) (owner's pick after
+    1i, 2026-10-07). No migration; requirements are JSON, so the new
+    fields ride on them.
+    - `src/lib/solicitation-segments.ts` (pure) finds the UCF sections
+      B–M, appended attachments and numbered paragraphs by rule. It
+      skips contents entries, attachment lists, running page headers
+      and sentences that merely begin "Section L …". A document
+      without that structure stays one segment and is read as before.
+    - `planSweepWindows` keeps a part that fits a window whole, packs
+      small parts together and labels each window ("Part of the
+      document: Section C — …"). When following the parts would need
+      more than the 12-window cap, it falls back to the plain cut, so
+      coverage never drops.
+    - `src/lib/requirement-provenance.ts` (pure) looks for each
+      requirement in the text (letters and digits only, so spacing,
+      hyphens and line breaks do not matter): `exact`, `partial` (only
+      its opening or closing 40 characters) or `none`. A located one
+      records its offset, PDF page (`extractPdfText` returns page
+      starts; the text is unchanged), part and paragraph.
+    - The window prompt now asks for word-for-word quotes
+      (`solicitation_extract` `2026-10-07.3`).
+    - The solicitation page shows "§C · p. 42 · C.3.2" on each
+      requirement, flags **not found in source**, and counts "N of M
+      word for word". Coverage stores the counts and the parts found.
+    - The accuracy check reads gold documents through the same windows
+      and adds a **Verbatim** column.
+    - Tests: `tests/ai/solicitation-segments.test.ts`,
+      `tests/ai/requirement-provenance.test.ts`,
+      `tests/isolation/solicitation-provenance.test.ts`,
+      `tests/ai/extraction-eval-logic.test.ts` and
+      `tests/isolation/extraction-eval.test.ts`.
   - structured Sections L, M and C;
-  - requirements with page and offset provenance;
   - an L↔M↔C crosswalk;
   - a verify/correct screen whose corrections stay within the tenant;
   - amendment propagation;

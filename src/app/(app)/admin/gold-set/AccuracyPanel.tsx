@@ -83,7 +83,8 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
       <p className="mb-3 font-mono text-[11px] text-muted">
         Reads every approved document exactly as intake reads a solicitation (the requirement sweep, then the AI review) and
         scores it against the expert&rsquo;s annotations: requirement recall (target 98%) and precision, page and format limits
-        captured (target 100%), and Section M factors found and kept in order. Compare runs across prompt versions and models:
+        captured (target 100%), Section M factors found and kept in order, and the share of extracted requirements the document
+        says word for word (the rest are paraphrased or misread). Compare runs across prompt versions and models:
         name a candidate model to run the check on it without changing any default.
         Keep this page open while it runs; Continue picks up where it stopped. AI usage counts against your own organisation.
       </p>
@@ -102,6 +103,7 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
               <th className="py-1 text-right">Limits</th>
               <th className="py-1 text-right">Factors</th>
               <th className="py-1 text-right">Order</th>
+              <th className="py-1 text-right" title="Extracted requirements found word for word in the document">Verbatim</th>
             </tr>
           </thead>
           <tbody>
@@ -137,10 +139,11 @@ function RunRows({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTo
         <td className="py-1.5 text-right tabular-nums text-text">{pct(s.pageLimitCapture)}</td>
         <td className="py-1.5 text-right tabular-nums text-text">{pct(s.factorRecall)}</td>
         <td className="py-1.5 text-right tabular-nums text-text">{pct(s.factorOrder)}</td>
+        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.verbatim)}</td>
       </tr>
       {open ? (
         <tr className="border-t border-layer/10">
-          <td colSpan={8} className="py-2">
+          <td colSpan={9} className="py-2">
             {run.error ? <p className="mb-2 text-rose">{run.error}</p> : null}
             <ul className="flex flex-col gap-3 text-muted">
               {run.results.map((d) => (
@@ -150,6 +153,7 @@ function RunRows({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTo
                     <span className="tabular-nums">
                       recall {pct(d.requirementRecall)} ({d.goldRequirements} gold) · precision {pct(d.requirementPrecision)} ({d.extractedRequirements}{" "}
                       extracted) · limits {pct(d.pageLimitCapture)} · factors {pct(d.factorRecall)} · order {pct(d.factorOrder)}
+                      {d.verbatim !== undefined ? ` · verbatim ${pct(d.verbatim)}` : ""}
                       {d.windowsFailed ? ` · ${d.windowsFailed} step${d.windowsFailed === 1 ? "" : "s"} failed` : ""}
                     </span>
                   </div>

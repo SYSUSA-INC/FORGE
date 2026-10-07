@@ -101,6 +101,9 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
     expect(scores[0]).toMatchObject({ goldRequirements: 2, extractedRequirements: 1, requirementRecall: 0.5, requirementPrecision: 1, pageLimitCapture: 1, factorRecall: 0.5 });
     expect(scores[0]!.missed.map((m) => m.text)).toEqual(["The contractor shall deliver a monthly status report.", "Past Performance"]);
     expect(run!.summary).toMatchObject({ docs: 2, requirementRecall: 0.5, requirementPrecision: 1, pageLimitCapture: 1, factorRecall: 0.5 });
+    // BL-AIX Phase 2a — the one extracted clause is in the document word for word.
+    expect(scores[0]!.verbatim).toBe(1);
+    expect(run!.summary).toMatchObject({ verbatim: 1 });
   });
 
   it("resumes across budgeted calls and returns the running run instead of starting another", async () => {

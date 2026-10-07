@@ -104,6 +104,8 @@ export type ExtractedForScoring = {
   sectionL: string[];
   /** In the order the review listed them. */
   factors: string[];
+  /** BL-AIX Phase 2a — how many extracted requirements the document says word for word. */
+  verbatim?: number;
 };
 
 export const MAX_MISSES_KEPT = 40;
@@ -124,6 +126,8 @@ export type DocScore = {
   missed: { kind: "requirement" | "page_limit" | "eval_factor"; text: string }[];
   windows: number;
   windowsFailed: number;
+  /** BL-AIX Phase 2a — share of extracted requirements found word for word in the document (absent on older runs). */
+  verbatim?: number | null;
 };
 
 export function scoreDocument(
@@ -158,6 +162,7 @@ export function scoreDocument(
     missed,
     windows: doc.windows,
     windowsFailed: doc.windowsFailed,
+    ...(got.verbatim !== undefined ? { verbatim: ratio(got.verbatim, got.requirements.length) } : {}),
   };
 }
 
@@ -168,6 +173,8 @@ export type RunSummary = {
   pageLimitCapture: number | null;
   factorRecall: number | null;
   factorOrder: number | null;
+  /** BL-AIX Phase 2a — pooled share of extracted requirements found word for word. */
+  verbatim?: number | null;
 };
 
 /**
@@ -188,6 +195,10 @@ export function summarizeRun(scores: DocScore[]): RunSummary {
     pageLimitCapture: pooled((s) => (s.pageLimitCapture ?? 0) * s.goldPageLimits, (s) => s.goldPageLimits),
     factorRecall: pooled((s) => (s.factorRecall ?? 0) * s.goldFactors, (s) => s.goldFactors),
     factorOrder: orders.length === 0 ? null : orders.reduce((a, b) => a + b, 0) / orders.length,
+    verbatim: pooled(
+      (s) => (s.verbatim ?? 0) * s.extractedRequirements,
+      (s) => (s.verbatim === undefined || s.verbatim === null ? 0 : s.extractedRequirements),
+    ),
   };
 }
 

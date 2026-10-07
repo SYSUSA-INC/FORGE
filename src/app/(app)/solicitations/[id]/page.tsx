@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describeCoverage } from "@/lib/extraction-coverage";
+import { describeSource, type SourcedRequirement } from "@/lib/requirement-provenance";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -143,6 +144,10 @@ export default async function SolicitationDetail({
     tag: "solicitationQa",
   });
   const qaRefs = new Set(qa.flatMap((q) => q.affectedRefs));
+  // BL-AIX Phase 2a — how many requirements the documents say word for word.
+  const requirements = s.extractedRequirements as SourcedRequirement[];
+  const located = requirements.filter((r) => r.source);
+  const verbatim = located.filter((r) => r.source!.quote === "exact").length;
 
   // BL-23: review + matrix + question state for the review panel.
   // Wrapped in safeQuery so a missing 0033 migration on a deployed
@@ -417,7 +422,9 @@ export default async function SolicitationDetail({
 
           <Panel
             title="Requirements"
-            eyebrow={`${s.extractedRequirements.length} extracted${companionDocs.length > 0 ? " (merged)" : ""}`}
+            eyebrow={`${s.extractedRequirements.length} extracted${companionDocs.length > 0 ? " (merged)" : ""}${
+              located.length > 0 ? ` · ${verbatim} of ${located.length} word for word` : ""
+            }`}
           >
             {/* BL-AIX Phase 0d — say plainly what the sweep didn't read. */}
             {coverageNotes.length > 0 ? (
@@ -440,11 +447,12 @@ export default async function SolicitationDetail({
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {s.extractedRequirements.map((r, i) => {
+                {requirements.map((r, i) => {
                   const color = KIND_COLOR[r.kind] ?? THEME.muted;
                   const sourceDoc = r.sourceDocId
                     ? companionDocs.find((d) => d.id === r.sourceDocId)
                     : null;
+                  const where = describeSource(r.source);
                   return (
                     <li
                       key={i}
@@ -468,6 +476,20 @@ export default async function SolicitationDetail({
                           {r.ref ? (
                             <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
                               {r.ref}
+                            </span>
+                          ) : null}
+                          {where ? (
+                            <span className="font-mono text-[10px] tracking-widest text-subtle" title="Where this sits in the document">
+                              {where}
+                            </span>
+                          ) : null}
+                          {r.source?.quote === "none" ? (
+                            /* BL-AIX Phase 2a — the document doesn't say this word for word */
+                            <span
+                              className="rounded border border-gold/40 bg-gold/10 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-gold"
+                              title="This wording was not found in the document. It may be paraphrased, merged from two clauses or misread; check it against the source."
+                            >
+                              not found in source
                             </span>
                           ) : null}
                           {r.ref && qaRefs.has(normalizeRef(r.ref)) ? (

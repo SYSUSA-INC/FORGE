@@ -1,0 +1,89 @@
+/**
+ * BL-AIX Phase 2a — intake end to end, with the model mocked: the sweep's
+ * windows follow the solicitation's parts and say which, and every kept
+ * requirement comes back with its page, part and paragraph, or flagged
+ * when the document does not say it. Runs against Postgres for the
+ * gateway's tenant checks.
+ */
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { __setCompleteImplForTest, type AICompleteOptions } from "@/lib/ai";
+import { aiExtractSolicitation } from "@/lib/solicitation-extract";
+import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { ucfSolicitation } from "../helpers/ucf-solicitation";
+
+const frontMatter = {
+  title: "Help Desk Support Services",
+  agency: "Department of Examples",
+  office: "",
+  solicitationNumber: "70-RFP-0042",
+  type: "rfp",
+  naicsCode: "541513",
+  setAside: "",
+  responseDueDate: null,
+  sectionLSummary: "Volume I is limited to 25 pages.",
+  sectionMSummary: "Technical approach is most important.",
+  requirements: [],
+  keyDates: [],
+};
+
+const swept = [
+  { kind: "shall", text: "The contractor shall complete transition within 30 days of award.", ref: "" },
+  { kind: "shall", text: "Volume I shall not exceed 25 pages in 12-point Times New Roman.", ref: "L.5" },
+  { kind: "shall", text: "The contractor shall keep every user happy at all times.", ref: "" },
+];
+
+describe("BL-AIX Phase 2a — solicitation intake with provenance (runtime)", () => {
+  let fx: TwoTenantFixture;
+  let windowPrompts: string[] = [];
+
+  beforeEach(async () => {
+    fx = await createTwoTenants("solicitation-provenance");
+    windowPrompts = [];
+    __setCompleteImplForTest(async (opts: AICompleteOptions) => {
+      const isWindow = opts.tool?.name === "record_requirements";
+      if (isWindow) windowPrompts.push(opts.messages.map((m) => m.content).join("\n"));
+      return {
+        text: "",
+        provider: "stub" as const,
+        model: "test-mock",
+        inputTokens: 5,
+        outputTokens: 5,
+        stubbed: false,
+        // The sweep finds the same clauses in whichever window it reads first; merging drops the repeats.
+        structured: isWindow ? { requirements: swept } : frontMatter,
+      };
+    });
+  });
+
+  afterEach(async () => {
+    __setCompleteImplForTest(null);
+    await fx.cleanup();
+  });
+
+  it("labels each window with its part and locates every requirement in the document", async () => {
+    const { text, pageStarts } = ucfSolicitation();
+    const res = await aiExtractSolicitation(fx.orgA.organizationId, text, { documentLabel: "rfp.pdf", pageStarts });
+    if (!res.ok) throw new Error(res.error);
+
+    expect(windowPrompts.length).toBeGreaterThan(0);
+    expect(windowPrompts[0]).toMatch(/Part of the document: /);
+
+    const [transition, volume, invented] = res.data.requirements as { source?: Record<string, unknown> }[];
+    expect(transition!.source).toMatchObject({ quote: "exact", page: 2, section: "C", paragraph: "3.2.1" });
+    expect(volume!.source).toMatchObject({ quote: "exact", page: 4, section: "L", paragraph: "L.5" });
+    expect(invented!.source).toEqual({ quote: "none" });
+    expect(res.coverage).toMatchObject({
+      quotes: { exact: 2, partial: 0, none: 1 },
+      parts: ["B", "C", "J", "L", "M", "Attachment J-1", "Attachment J-2"],
+    });
+  });
+
+  it("still locates requirements in a Word or text document, without pages", async () => {
+    const { text } = ucfSolicitation();
+    const res = await aiExtractSolicitation(fx.orgA.organizationId, text);
+    if (!res.ok) throw new Error(res.error);
+    const [transition] = res.data.requirements as { source?: Record<string, unknown> }[];
+    expect(transition!.source).toMatchObject({ quote: "exact", section: "C" });
+    expect(transition!.source!.page).toBeUndefined();
+  });
+});

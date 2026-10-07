@@ -84,7 +84,26 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy measures", () => {
       pageLimitCapture: 1,
       factorRecall: 2 / 3,
       factorOrder: 0,
+      verbatim: null,
     });
     expect(stepsFor(2)).toEqual([{ kind: "window", index: 0 }, { kind: "window", index: 1 }, { kind: "review" }]);
+  });
+
+  it("BL-AIX Phase 2a — reports the share found word for word, pooled over documents that measured it", () => {
+    const doc = (docId: string, requirements: string[], verbatim?: number) =>
+      scoreDocument(
+        { docId, title: docId, windows: 1, windowsFailed: 0 },
+        { requirements: [], pageLimits: [], factors: [] },
+        { requirements, sectionL: [], factors: [], ...(verbatim !== undefined ? { verbatim } : {}) },
+        isSameRequirement,
+      );
+    const a = doc("a", ["one", "two", "three", "four"], 3);
+    const b = doc("b", ["five"], 1);
+    const older = doc("old", ["six", "seven"]);
+    expect(a.verbatim).toBe(0.75);
+    expect(older.verbatim).toBeUndefined();
+    expect(doc("empty", [], 0).verbatim).toBeNull();
+    expect(summarizeRun([a, b, older]).verbatim).toBe(4 / 5);
+    expect(summarizeRun([older]).verbatim).toBeNull();
   });
 });
