@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describeCoverage } from "@/lib/extraction-coverage";
-import { describeSource, type SourcedRequirement } from "@/lib/requirement-provenance";
+import { describeSource } from "@/lib/requirement-provenance";
+import { activeRequirements, reviewCounts, type ReviewedRequirement } from "@/lib/requirement-review";
 import { mergeLmStructures } from "@/lib/solicitation-lm";
 import { LmPanel } from "./LmPanel";
 import { and, eq } from "drizzle-orm";
@@ -149,7 +150,10 @@ export default async function SolicitationDetail({
   });
   const qaRefs = new Set(qa.flatMap((q) => q.affectedRefs));
   // BL-AIX Phase 2a — how many requirements the documents say word for word.
-  const requirements = s.extractedRequirements as SourcedRequirement[];
+  // BL-AIX Phase 2c — the team's verdicts: rejected clauses are not listed.
+  const allRequirements = s.extractedRequirements as ReviewedRequirement[];
+  const requirements = activeRequirements(allRequirements);
+  const verdicts = reviewCounts(allRequirements);
   const located = requirements.filter((r) => r.source);
   const verbatim = located.filter((r) => r.source!.quote === "exact").length;
 
@@ -428,9 +432,20 @@ export default async function SolicitationDetail({
 
           <Panel
             title="Requirements"
-            eyebrow={`${s.extractedRequirements.length} extracted${companionDocs.length > 0 ? " (merged)" : ""}${
+            eyebrow={`${requirements.length} extracted${companionDocs.length > 0 ? " (merged)" : ""}${
               located.length > 0 ? ` · ${verbatim} of ${located.length} word for word` : ""
-            }`}
+            }${verdicts.rejected > 0 ? ` · ${verdicts.rejected} rejected` : ""}`}
+            actions={
+              allRequirements.length > 0 ? (
+                <Link
+                  href={`/solicitations/${s.id}/verify`}
+                  className="aur-btn aur-btn-ghost text-[11px]"
+                  title="Confirm, edit or reject each requirement against the document"
+                >
+                  Verify{verdicts.unreviewed > 0 ? ` (${verdicts.unreviewed} to review)` : ""}
+                </Link>
+              ) : null
+            }
           >
             {/* BL-AIX Phase 0d — say plainly what the sweep didn't read. */}
             {coverageNotes.length > 0 ? (
@@ -443,7 +458,7 @@ export default async function SolicitationDetail({
                 </ul>
               </div>
             ) : null}
-            {s.extractedRequirements.length === 0 ? (
+            {requirements.length === 0 ? (
               <p className="font-body text-[13px] text-muted">
                 {s.parseStatus === "parsed"
                   ? "No requirements extracted. The document may not have explicit shall/should/may language."
@@ -489,7 +504,12 @@ export default async function SolicitationDetail({
                               {where}
                             </span>
                           ) : null}
-                          {r.source?.quote === "none" ? (
+                          {r.review && r.review.status !== "confirmed" ? (
+                            <span className="font-mono text-[8px] uppercase tracking-widest text-emerald" title="Changed by your team on the verify screen">
+                              {r.review.status}
+                            </span>
+                          ) : null}
+                          {r.source?.quote === "none" && !r.review ? (
                             /* BL-AIX Phase 2a — the document doesn't say this word for word */
                             <span
                               className="rounded border border-gold/40 bg-gold/10 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-gold"

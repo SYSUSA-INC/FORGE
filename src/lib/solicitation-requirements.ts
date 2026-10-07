@@ -21,6 +21,8 @@ import {
 } from "@/db/schema";
 import { dedupeRequirements } from "@/lib/requirements-text";
 import type { SourcedRequirement } from "@/lib/requirement-provenance";
+import { activeRequirements, applyCorrections, type ReviewedRequirement } from "@/lib/requirement-review";
+import { requirementCorrections } from "@/db/schema";
 
 export type OpportunityRequirements = {
   /** Union across every parsed solicitation on the opportunity, de-duplicated. */
@@ -64,7 +66,8 @@ export async function loadOpportunityRequirements(input: {
   let sectionMSummary = "";
   let contributed = 0;
   for (const row of rows) {
-    const list = (row.extractedRequirements ?? []) as SolicitationRequirement[];
+    // BL-AIX Phase 2c — a requirement the team rejected reaches no reader.
+    const list = activeRequirements((row.extractedRequirements ?? []) as ReviewedRequirement[]);
     if (list.length === 0 && !row.sectionLSummary && !row.sectionMSummary) continue;
     contributed += 1;
     requirements = dedupeRequirements(requirements, list);
@@ -125,11 +128,18 @@ export async function mergeSolicitationRequirements(
   // The parent's own clauses are the untagged entries. Tagged entries are
   // rebuilt from the documents that still exist, so a deleted document's
   // clauses fall out here instead of persisting for good.
-  // BL-AIX Phase 2a — each entry keeps its provenance (`source`) through the merge.
-  const parentReqs = (parentRow.extractedRequirements ?? []) as SourcedRequirement[];
-  const ownReqs: SourcedRequirement[] = parentReqs
+  // BL-AIX Phase 2a — each entry keeps its provenance (`source`) through
+  // the merge; Phase 2c — and its review, so an edit can be matched again.
+  const parentReqs = (parentRow.extractedRequirements ?? []) as ReviewedRequirement[];
+  const ownReqs: ReviewedRequirement[] = parentReqs
     .filter((r) => !r.sourceDocId)
-    .map((r) => ({ kind: r.kind, text: r.text, ref: r.ref, ...(r.source ? { source: r.source } : {}) }));
+    .map((r) => ({
+      kind: r.kind,
+      text: r.text,
+      ref: r.ref,
+      ...(r.source ? { source: r.source } : {}),
+      ...(r.review ? { review: r.review } : {}),
+    }));
 
   const companionReqs: SourcedRequirement[] = [];
   for (const doc of docRows) {
@@ -139,7 +149,28 @@ export async function mergeSolicitationRequirements(
     }
   }
 
-  const merged = dedupeRequirements(ownReqs, companionReqs);
+  // BL-AIX Phase 2c — the team's verdicts, re-applied on every merge.
+  const corrections = await db
+    .select()
+    .from(requirementCorrections)
+    .where(
+      and(
+        eq(requirementCorrections.organizationId, organizationId),
+        eq(requirementCorrections.solicitationId, solicitationId),
+      ),
+    );
+  const merged = applyCorrections(
+    dedupeRequirements(ownReqs, companionReqs as ReviewedRequirement[]),
+    corrections.map((c) => ({
+      docKey: c.docKey,
+      originalKey: c.originalKey,
+      action: c.action,
+      corrected: c.corrected,
+      original: c.original,
+      userId: c.userId,
+      updatedAt: c.updatedAt,
+    })),
+  );
   await db
     .update(solicitations)
     .set({ extractedRequirements: merged, updatedAt: new Date() })
