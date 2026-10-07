@@ -111,6 +111,75 @@ export type FullTextRequirementsResult = {
  * split in two and re-read once; a window that still fails is counted
  * and skipped rather than failing the document.
  */
+/**
+ * BL-AIX Phase 1e-3 — one window of the requirement sweep, exported so the
+ * gold-set accuracy run reads a document exactly as intake does. A window
+ * whose answer hit the output ceiling or failed to validate is split in
+ * two and re-read once; `list` is null when it still fails.
+ */
+export async function readRequirementsWindow(input: {
+  organizationId: string;
+  text: string;
+  index: number;
+  count: number;
+  documentLabel: string;
+  depth?: number;
+}): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number }> {
+  const { organizationId, text, index, count } = input;
+  const depth = input.depth ?? 0;
+  const prompt = buildRequirementsChunkPrompt({
+    chunkText: text,
+    chunkIndex: index,
+    chunkCount: count,
+    documentLabel: input.documentLabel,
+  });
+  const res = await completeStructuredForTenant({
+    organizationId,
+    feature: "solicitation_extract",
+    variant: depth === 0 ? "requirements_chunk" : "requirements_chunk_split",
+    schema: requirementsChunkSchema,
+    toolName: "record_requirements",
+    toolDescription: "Record every requirement found in this window of the document.",
+    system: prompt.system,
+    messages: prompt.messages,
+    maxTokens: CHUNK_MAX_TOKENS,
+    temperature: 0,
+    cacheSystem: true,
+  });
+  if (res.stubbed) return { list: [], stubbed: true, split: 0 };
+  const truncated = isTruncatedStop(res.stopReason);
+  if (res.data && !truncated) {
+    return { list: normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK }), stubbed: false, split: 0 };
+  }
+  // Too much for one answer, or unparseable: halve the window and try
+  // each half once. Keep whatever validated from the long answer as a
+  // floor so a split that also fails still yields something.
+  let split = 0;
+  if (depth === 0 && text.length >= MIN_SPLIT_CHARS) {
+    split = 1;
+    const mid = Math.floor(text.length / 2);
+    const cut = text.lastIndexOf("\n", mid);
+    const at = cut > text.length * 0.3 ? cut : mid;
+    const [a, b] = await Promise.all([
+      readRequirementsWindow({ ...input, text: text.slice(0, at), depth: 1 }),
+      readRequirementsWindow({ ...input, text: text.slice(at), depth: 1 }),
+    ]);
+    const merged = mergeRequirementLists([a.list ?? [], b.list ?? []]);
+    if (merged.length > 0 || (a.list && b.list)) return { list: merged, stubbed: a.stubbed || b.stubbed, split };
+  }
+  if (res.data) {
+    // Truncated but parseable: partial list is better than none.
+    return { list: normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK }), stubbed: false, split };
+  }
+  log.warn("[extractRequirementsFullText]", "window failed", {
+    index,
+    depth,
+    parseError: res.parseError,
+    stopReason: res.stopReason,
+  });
+  return { list: null, stubbed: false, split };
+}
+
 export async function extractRequirementsFullText(
   organizationId: string,
   rawText: string,
@@ -123,74 +192,20 @@ export async function extractRequirementsFullText(
   let splitChunks = 0;
   let stubbed = false;
 
-  const readWindow = async (
-    text: string,
-    index: number,
-    count: number,
-    depth: number,
-  ): Promise<RequirementLike[] | null> => {
-    const prompt = buildRequirementsChunkPrompt({
-      chunkText: text,
-      chunkIndex: index,
-      chunkCount: count,
-      documentLabel: label,
-    });
-    const res = await completeStructuredForTenant({
-      organizationId,
-      feature: "solicitation_extract",
-      variant: depth === 0 ? "requirements_chunk" : "requirements_chunk_split",
-      schema: requirementsChunkSchema,
-      toolName: "record_requirements",
-      toolDescription: "Record every requirement found in this window of the document.",
-      system: prompt.system,
-      messages: prompt.messages,
-      maxTokens: CHUNK_MAX_TOKENS,
-      temperature: 0,
-      cacheSystem: true,
-    });
-    if (res.stubbed) {
-      stubbed = true;
-      return [];
-    }
-    const truncated = isTruncatedStop(res.stopReason);
-    if (res.data && !truncated) {
-      return normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK });
-    }
-    // Too much for one answer, or unparseable: halve the window and try
-    // each half once. Keep whatever validated from the long answer as a
-    // floor so a split that also fails still yields something.
-    if (depth === 0 && text.length >= MIN_SPLIT_CHARS) {
-      splitChunks += 1;
-      const mid = Math.floor(text.length / 2);
-      const cut = text.lastIndexOf("\n", mid);
-      const at = cut > text.length * 0.3 ? cut : mid;
-      const [a, b] = await Promise.all([
-        readWindow(text.slice(0, at), index, count, 1),
-        readWindow(text.slice(at), index, count, 1),
-      ]);
-      const parts = [a ?? [], b ?? []];
-      const merged = mergeRequirementLists(parts);
-      if (merged.length > 0 || (a && b)) return merged;
-    }
-    if (res.data) {
-      // Truncated but parseable: partial list is better than none.
-      return normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK });
-    }
-    log.warn("[extractRequirementsFullText]", "window failed", {
-      index,
-      depth,
-      parseError: res.parseError,
-      stopReason: res.stopReason,
-    });
-    return null;
-  };
-
   for (const chunk of chunks) {
     if (stubbed) break;
     try {
-      const list = await readWindow(chunk.text, chunk.index, chunks.length, 0);
-      if (list === null) failedChunks += 1;
-      else lists.push(list);
+      const read = await readRequirementsWindow({
+        organizationId,
+        text: chunk.text,
+        index: chunk.index,
+        count: chunks.length,
+        documentLabel: label,
+      });
+      stubbed = stubbed || read.stubbed;
+      splitChunks += read.split;
+      if (read.list === null) failedChunks += 1;
+      else if (!read.stubbed) lists.push(read.list);
     } catch (err) {
       failedChunks += 1;
       log.warn("[extractRequirementsFullText]", "window threw", { error: err, index: chunk.index });

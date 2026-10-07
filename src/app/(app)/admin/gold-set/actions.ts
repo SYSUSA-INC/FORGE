@@ -14,6 +14,7 @@ import {
   setGoldDocApproved,
   updateGoldItem,
 } from "@/lib/gold-set";
+import { startExtractionEval, stepExtractionEval } from "@/lib/extraction-eval";
 import { draftGoldAnnotations, resetGoldDraft } from "@/lib/gold-set-draft";
 import { isGoldItemStatus, type TextHit } from "@/lib/gold-set-logic";
 import { log } from "@/lib/log";
@@ -28,13 +29,19 @@ import { log } from "@/lib/log";
 type Actor = Awaited<ReturnType<typeof requireSuperadmin>>;
 type Done = { ok: true } | { ok: false; error: string };
 
-async function audit(actor: Actor, action: string, resourceId: string, metadata: Record<string, unknown> = {}) {
+async function audit(
+  actor: Actor,
+  action: string,
+  resourceId: string,
+  metadata: Record<string, unknown> = {},
+  resourceType = "extraction_gold_doc",
+) {
   if (actor.organizationId) {
     await recordAudit({
       organizationId: actor.organizationId,
       actor: { userId: actor.id, email: actor.email },
       action,
-      resourceType: "extraction_gold_doc",
+      resourceType,
       resourceId,
       metadata,
     });
@@ -192,4 +199,33 @@ export async function resetGoldDraftAction(docId: string): Promise<Done> {
   await audit(actor, "gold_set.ai_draft_reset", docId);
   refresh(docId);
   return { ok: true };
+}
+
+/**
+ * BL-AIX Phase 1e-3 — run the live extraction over the approved gold
+ * documents. Start (or resume the running run), then step until done;
+ * the page keeps calling. Metered to the acting admin's own organisation.
+ */
+export async function runExtractionEvalAction(): Promise<
+  { ok: true; done: boolean; docsDone: number; docsTotal: number } | { ok: false; error: string }
+> {
+  const actor = await requireSuperadmin();
+  if (!actor.organizationId) {
+    return { ok: false, error: "AI calls are metered to an organisation and your account has none. Use a platform admin account that belongs to one." };
+  }
+  const started = await startExtractionEval(actor.id);
+  if (!started.ok) return started;
+  if (!started.resumed) await audit(actor, "gold_set.eval.start", started.runId, {}, "extraction_eval_run");
+  try {
+    const res = await stepExtractionEval({ runId: started.runId, organizationId: actor.organizationId });
+    if (!res.ok) return res;
+    if (res.done && res.run.status === "done") {
+      await audit(actor, "gold_set.eval.finish", started.runId, { summary: res.run.summary, promptVersions: res.run.promptVersions, model: res.run.model }, "extraction_eval_run");
+    }
+    refresh();
+    return { ok: true, done: res.done, docsDone: res.docsDone, docsTotal: res.docsTotal };
+  } catch (err) {
+    log.warn("[runExtractionEvalAction]", "step failed", { runId: started.runId, error: err });
+    return { ok: false, error: `The run paused: ${err instanceof Error ? err.message : String(err)}. Progress is kept; run it again to continue.` };
+  }
 }
