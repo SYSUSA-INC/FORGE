@@ -23,6 +23,8 @@ import { scoreDocument, stepsFor, summarizeRun, type DocScore } from "@/lib/extr
 import { isSameRequirement, mergeRequirementLists, type RequirementLike } from "@/lib/requirements-text";
 import { attachProvenance } from "@/lib/requirement-provenance";
 import { planSweepWindows } from "@/lib/solicitation-segments";
+import { extractLmStructure } from "@/lib/solicitation-lm-extract";
+import { lmScoringInputs } from "@/lib/solicitation-lm";
 import { aiRunSolicitationReview } from "@/lib/solicitation-ai-review";
 import { MAX_REQUIREMENTS_PER_DOCUMENT, readRequirementsWindow } from "@/lib/solicitation-extract";
 
@@ -62,7 +64,11 @@ export async function startExtractionEval(
     .insert(extractionEvalRuns)
     .values({
       docIds: docs.map((d) => d.id),
-      promptVersions: { solicitation_extract: PROMPT_VERSIONS.solicitation_extract, solicitation_review: PROMPT_VERSIONS.solicitation_review },
+      promptVersions: {
+        solicitation_extract: PROMPT_VERSIONS.solicitation_extract,
+        solicitation_review: PROMPT_VERSIONS.solicitation_review,
+        solicitation_structure: PROMPT_VERSIONS.solicitation_structure,
+      },
       cursor: freshCursor(0),
       requestedModel: model,
       startedByUserId: userId,
@@ -168,6 +174,15 @@ export async function stepExtractionEval(input: {
       model: run.requestedModel || undefined,
     });
     if (review.ok && review.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
+    // BL-AIX Phase 2b — the dedicated Section L / M passes intake now runs:
+    // their factors (in order) are scored when found, the review's otherwise.
+    const lm = await extractLmStructure({
+      organizationId: input.organizationId,
+      rawText: doc.rawText,
+      documentLabel: doc.title,
+      model: run.requestedModel || undefined,
+    });
+    const fromLm = lmScoringInputs(lm.stubbed ? null : lm.structure);
     const extracted = mergeRequirementLists(cursor.lists).slice(0, MAX_REQUIREMENTS_PER_DOCUMENT);
     const located = attachProvenance(doc.rawText, extracted);
     const score = scoreDocument(
@@ -175,8 +190,8 @@ export async function stepExtractionEval(input: {
       await goldFor(docId),
       {
         requirements: extracted.map((r) => r.text),
-        sectionL: review.ok ? review.data.sectionL : [],
-        factors: review.ok ? review.data.evaluationFactors.map((f) => f.name) : [],
+        sectionL: [...(review.ok ? review.data.sectionL : []), ...fromLm.sectionL],
+        factors: fromLm.factors.length > 0 ? fromLm.factors : review.ok ? review.data.evaluationFactors.map((f) => f.name) : [],
         verbatim: located.counts.exact,
       },
       isSameRequirement,

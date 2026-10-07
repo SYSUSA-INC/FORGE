@@ -68,7 +68,8 @@ Effort key:
 | 3an | **BL-AIX Phase 1h-2** — Draft judge: a rubric judge scores every golden-eval draft 1–5 (compliance, evaluation fit, specificity, clarity, overall) without the winning text; the organization's experts rate the same drafts and the panel reports whether the judge agrees with them (migration 0121) | P0 | M | ✅ shipped (PR #352) |
 | 3ao | **BL-AIX Phase 1i-1** — Current Claude models: the gateway sends each generation the request it accepts (no forced tool calls on Opus 5.5 / Sonnet 5.5 / Fable 5.1, no temperature where rejected, room for default thinking, refusals surfaced as errors); defaults unchanged until the evals decide | P0 | S | ✅ shipped (PR #353) |
 | 3ap | **BL-AIX Phase 1i-2** — Candidate-model eval runs: the extraction accuracy check (any model id, platform admins) and the golden eval (listed Claude models, org admins; drafter only, the judge held fixed) run on a chosen model without changing any default; the model is stored on the run (migration 0122) | P0 | S | ✅ shipped (PR #354) |
-| 3aq | **BL-AIX Phase 2a** — Solicitation structure and requirement provenance: the text is split by its headings (UCF Sections B–M, attachments, numbered paragraphs) before the sweep, windows follow the parts and say which, and every requirement records its page, part and paragraph and whether the document says it word for word; the accuracy check reports the word-for-word share | P0 | M | 🔄 in PR (PR #355) |
+| 3aq | **BL-AIX Phase 2a** — Solicitation structure and requirement provenance: the text is split by its headings (UCF Sections B–M, attachments, numbered paragraphs) before the sweep, windows follow the parts and say which, and every requirement records its page, part and paragraph and whether the document says it word for word; the accuracy check reports the word-for-word share | P0 | M | ✅ shipped (PR #355) |
+| 3ar | **BL-AIX Phase 2b** — Sections L and M as structured data: dedicated passes read Section L (volumes with page limits, format and submission rules) and Section M (award basis, factors in order with importance and subfactors), each item quoted and located; shown on the solicitation page, fed to the outline bootstrap, scored by the accuracy check (migration 0123) | P0 | M | 🔄 in PR |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -166,7 +167,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · 🔄 Phase 2a in PR (PR #355)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · ✅ Phase 2a shipped (PR #355) · 🔄 Phase 2b in PR
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -650,7 +651,7 @@ the phases below.
         `tests/isolation/extraction-eval.test.ts` and
         `tests/isolation/golden-eval.test.ts`.
 - **Phase 2 — Solicitation Intelligence Engine:**
-  - **2a — structure and provenance:** 🔄 in PR (PR #355) (owner's pick after
+  - **2a — structure and provenance:** ✅ shipped (PR #355) (owner's pick after
     1i, 2026-10-07). No migration; requirements are JSON, so the new
     fields ride on them.
     - `src/lib/solicitation-segments.ts` (pure) finds the UCF sections
@@ -681,7 +682,37 @@ the phases below.
       `tests/isolation/solicitation-provenance.test.ts`,
       `tests/ai/extraction-eval-logic.test.ts` and
       `tests/isolation/extraction-eval.test.ts`.
-  - structured Sections L, M and C;
+  - **2b — Sections L and M as structured data:** 🔄 in PR (owner's
+    pick after 2a, 2026-10-07).
+    - New feature `solicitation_structure` (standard class, prompt
+      `2026-10-07.1`, variants `section_l` / `section_m`). At intake,
+      one call reads the located Section L and one reads Section M
+      (`lmExcerpt`: the 2a segment, else `locateSection`; 48k / 32k
+      characters), in parallel. A document without them costs nothing
+      extra, and a failed call never fails the parse.
+    - L: volumes (name, page limit, contents), format rules and
+      submission rules. M: award basis (tradeoff / LPTA), the factors in
+      Section M's order with their stated importance and subfactors, and
+      the ranking sentence. Every item quotes its clause and is located
+      with the 2a locator (`createLocator`): page, section, paragraph,
+      or **not found in source**.
+    - Stored as `lm_structure` on `solicitation` and
+      `solicitation_document` (migration 0123). The solicitation page
+      shows **Instructions and evaluation** (the solicitation's own,
+      else a companion document's).
+    - The outline bootstrap receives the volumes, page limits and
+      factor order (`describeLmForOutline`; `proposal_bootstrap`
+      `2026-10-07.1`), so section page caps, and with them the page
+      budget ring, come from located clauses.
+    - The accuracy check runs the same passes: Section M factors (in
+      order) are scored from them when found, and Section L volume and
+      format quotes count toward page-limit capture.
+    - Fixed in passing: companion documents now keep each
+      requirement's 2a provenance (their parse rebuilt the list without
+      it).
+    - Tests: `tests/ai/solicitation-lm.test.ts` and
+      `tests/isolation/solicitation-provenance.test.ts`.
+  - structured Section C;
   - an L↔M↔C crosswalk;
   - a verify/correct screen whose corrections stay within the tenant;
   - amendment propagation;

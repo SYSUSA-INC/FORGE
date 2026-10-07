@@ -57,6 +57,9 @@ export const AI_FEATURES = {
   // BL-AIX Phase 1h-2 — the golden eval's rubric judge, calibrated
   // against the organization's own experts.
   draft_judge: "Draft quality judge",
+  // BL-AIX Phase 2b — Sections L and M read into volumes, page limits,
+  // format rules, factors and their order.
+  solicitation_structure: "Sections L and M",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

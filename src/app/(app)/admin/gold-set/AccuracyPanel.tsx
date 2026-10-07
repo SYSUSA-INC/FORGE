@@ -83,7 +83,8 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
       <p className="mb-3 font-mono text-[11px] text-muted">
         Reads every approved document exactly as intake reads a solicitation (the requirement sweep, then the AI review) and
         scores it against the expert&rsquo;s annotations: requirement recall (target 98%) and precision, page and format limits
-        captured (target 100%), Section M factors found and kept in order, and the share of extracted requirements the document
+        captured (target 100%), Section M factors found and kept in order (from the dedicated Section L and M passes when the
+        document has those sections), and the share of extracted requirements the document
         says word for word (the rest are paraphrased or misread). Compare runs across prompt versions and models:
         name a candidate model to run the check on it without changing any default.
         Keep this page open while it runs; Continue picks up where it stopped. AI usage counts against your own organisation.
@@ -96,7 +97,7 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
           <thead className="text-[10px] uppercase tracking-[0.2em] text-subtle">
             <tr>
               <th className="py-1 text-left">When</th>
-              <th className="py-1 text-left">Prompts · model</th>
+              <th className="py-1 text-left" title="Requirement sweep / AI review / Sections L and M">Prompts · model</th>
               <th className="py-1 text-right">Docs</th>
               <th className="py-1 text-right">Recall</th>
               <th className="py-1 text-right">Precision</th>
@@ -125,6 +126,7 @@ function RunRows({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTo
         <td className="py-1.5 text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
         <td className="py-1.5 text-text">
           {run.promptVersions.solicitation_extract ?? "—"} / {run.promptVersions.solicitation_review ?? "—"}
+          {run.promptVersions.solicitation_structure ? ` / ${run.promptVersions.solicitation_structure}` : ""}
           <span className="text-muted">
             {" "}· {run.model || "—"}
             {run.requestedModel ? " (candidate)" : ""}

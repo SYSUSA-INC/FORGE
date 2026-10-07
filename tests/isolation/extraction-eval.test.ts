@@ -94,7 +94,11 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
 
     const [run] = await db.select().from(extractionEvalRuns).where(eq(extractionEvalRuns.id, started.runId));
     expect(run!.status).toBe("done");
-    expect(run!.promptVersions).toEqual({ solicitation_extract: PROMPT_VERSIONS.solicitation_extract, solicitation_review: PROMPT_VERSIONS.solicitation_review });
+    expect(run!.promptVersions).toEqual({
+      solicitation_extract: PROMPT_VERSIONS.solicitation_extract,
+      solicitation_review: PROMPT_VERSIONS.solicitation_review,
+      solicitation_structure: PROMPT_VERSIONS.solicitation_structure,
+    });
     expect(run!.model).toBe("test-mock");
     const scores = run!.results as DocScore[];
     expect(scores.map((s) => s.title)).toEqual(["RFP one", "RFP two"]);

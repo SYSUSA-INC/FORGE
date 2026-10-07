@@ -129,6 +129,32 @@ export function pageAt(pageStarts: number[] | undefined, at: number): number | u
 export type QuoteCounts = { exact: number; partial: number; none: number };
 
 /**
+ * A function that finds a quote in `rawText` and says where it sits:
+ * built once per document, called per requirement or per Section L / M
+ * item (Phase 2b).
+ */
+export function createLocator(
+  rawText: string,
+  options: { pageStarts?: number[]; segments?: Segment[] } = {},
+): (text: string) => RequirementSource {
+  const index = buildSourceIndex(rawText);
+  const segments = options.segments ?? segmentSolicitation(rawText);
+  const marks = paragraphMarks(rawText);
+  return (text) => {
+    const found = locateQuote(index, text);
+    if (found.at === undefined) return { quote: found.quote };
+    const segment = segmentAt(segments, found.at);
+    const source: RequirementSource = { quote: found.quote, at: found.at };
+    const page = pageAt(options.pageStarts, found.at);
+    if (page !== undefined) source.page = page;
+    if (segment && segment.kind !== "front") source.section = segment.key;
+    const paragraph = paragraphAt(marks, found.at, segment);
+    if (paragraph) source.paragraph = paragraph;
+    return source;
+  };
+}
+
+/**
  * Attach a `source` to every requirement located in `rawText`. Existing
  * fields are kept; a requirement from another document (`sourceDocId`
  * set) is left alone, since its offsets belong to that document.
@@ -138,22 +164,12 @@ export function attachProvenance<T extends SolicitationRequirement>(
   requirements: T[],
   options: { pageStarts?: number[]; segments?: Segment[] } = {},
 ): { requirements: (T & { source?: RequirementSource })[]; counts: QuoteCounts } {
-  const index = buildSourceIndex(rawText);
-  const segments = options.segments ?? segmentSolicitation(rawText);
-  const marks = paragraphMarks(rawText);
+  const locate = createLocator(rawText, options);
   const counts: QuoteCounts = { exact: 0, partial: 0, none: 0 };
   const out = requirements.map((r): T & { source?: RequirementSource } => {
     if (r.sourceDocId) return r;
-    const found = locateQuote(index, r.text);
-    counts[found.quote] += 1;
-    if (found.at === undefined) return { ...r, source: { quote: found.quote } };
-    const segment = segmentAt(segments, found.at);
-    const source: RequirementSource = { quote: found.quote, at: found.at };
-    const page = pageAt(options.pageStarts, found.at);
-    if (page !== undefined) source.page = page;
-    if (segment && segment.kind !== "front") source.section = segment.key;
-    const paragraph = paragraphAt(marks, found.at, segment);
-    if (paragraph) source.paragraph = paragraph;
+    const source = locate(r.text);
+    counts[source.quote] += 1;
     return { ...r, source };
   });
   return { requirements: out, counts };

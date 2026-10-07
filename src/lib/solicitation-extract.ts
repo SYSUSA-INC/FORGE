@@ -30,6 +30,8 @@ import {
 } from "@/lib/requirements-text";
 import { attachProvenance, pageStartsFromLengths } from "@/lib/requirement-provenance";
 import { planSweepWindows, segmentSolicitation } from "@/lib/solicitation-segments";
+import { extractLmStructure } from "@/lib/solicitation-lm-extract";
+import type { LmStructure } from "@/lib/solicitation-lm";
 import {
   detectFormat,
   extractTextFromDocx,
@@ -277,7 +279,16 @@ export async function aiExtractSolicitation(
   rawText: string,
   options?: { documentLabel?: string; pageStarts?: number[] },
 ): Promise<
-  | { ok: true; data: SolicitationExtractionResult; provider: string; model: string; stubbed: boolean; coverage?: ExtractionCoverage }
+  | {
+      ok: true;
+      data: SolicitationExtractionResult;
+      provider: string;
+      model: string;
+      stubbed: boolean;
+      coverage?: ExtractionCoverage;
+      /** BL-AIX Phase 2b — Sections L and M as structured data, when found. */
+      lm?: LmStructure;
+    }
   | { ok: false; error: string }
 > {
   if (!rawText.trim()) return { ok: false, error: "No text extracted from the file." };
@@ -382,6 +393,21 @@ export async function aiExtractSolicitation(
       parts: segments.filter((g) => g.kind !== "front").map((g) => g.key),
     };
 
+    // BL-AIX Phase 2b — Sections L and M, read on their own. Never fails the parse.
+    let lm: LmStructure | undefined;
+    try {
+      const read = await extractLmStructure({
+        organizationId,
+        rawText,
+        documentLabel: options?.documentLabel ?? data.title,
+        pageStarts: options?.pageStarts,
+        segments,
+      });
+      if (!read.stubbed) lm = read.structure;
+    } catch (err) {
+      log.warn("[aiExtractSolicitation]", "Section L/M pass failed", { error: err });
+    }
+
     return {
       ok: true,
       provider: ai.provider,
@@ -389,6 +415,7 @@ export async function aiExtractSolicitation(
       stubbed: false,
       data,
       coverage,
+      lm,
     };
   } catch (err) {
     log.error("[aiExtractSolicitation]", "error", { error: err });

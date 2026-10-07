@@ -23,6 +23,8 @@ import {
   aiExtractSolicitationFromPdf,
   extractTextFromAny,
 } from "@/lib/solicitation-extract";
+import type { RequirementSource, SourcedRequirement } from "@/lib/requirement-provenance";
+import type { LmStructure } from "@/lib/solicitation-lm";
 import { mergeSolicitationRequirements } from "@/lib/solicitation-requirements";
 import { detectFormat } from "@/lib/text-extract";
 
@@ -118,6 +120,7 @@ export async function parseSolicitationDocumentFromBytes(
     sectionMSummary: aiRes.data.sectionMSummary,
     requirements: aiRes.data.requirements,
     coverage: aiRes.coverage ?? {},
+    lm: aiRes.lm ?? {},
   });
 }
 
@@ -129,14 +132,18 @@ async function applyExtraction(
     rawText: string;
     sectionLSummary: string;
     sectionMSummary: string;
-    requirements: { kind: string; text: string; ref: string }[];
+    requirements: { kind: string; text: string; ref: string; source?: RequirementSource }[];
     coverage: import("@/lib/extraction-coverage").ExtractionCoverage;
+    /** BL-AIX Phase 2b — the scanned paths have none. */
+    lm?: LmStructure;
   },
 ): Promise<void> {
-  const reqs: SolicitationRequirement[] = data.requirements.map((r) => ({
+  // BL-AIX Phase 2a — keep each clause's place in this document.
+  const reqs: SourcedRequirement[] = data.requirements.map((r) => ({
     kind: r.kind as SolicitationRequirement["kind"],
     text: r.text,
     ref: r.ref,
+    ...(r.source ? { source: r.source } : {}),
   }));
 
   await db
@@ -149,6 +156,7 @@ async function applyExtraction(
       sectionMSummary: data.sectionMSummary,
       extractedRequirements: reqs,
       extractionCoverage: data.coverage,
+      lmStructure: data.lm ?? {},
       updatedAt: new Date(),
     })
     .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
