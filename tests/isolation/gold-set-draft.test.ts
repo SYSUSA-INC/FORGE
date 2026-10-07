@@ -61,7 +61,9 @@ describe("BL-AIX Phase 1e-2 — AI-drafted gold annotations (runtime)", () => {
   const items = () => db.select().from(extractionGoldItems).where(eq(extractionGoldItems.docId, docId));
 
   it("reads every window, proposes AI annotations once each, and meters the admin's organisation", async () => {
-    const windows = goldWindows(TEXT).length;
+    // The stored text carries a "Pasted text" header, so windows come from what was stored.
+    const [stored] = await db.select({ rawText: extractionGoldDocs.rawText }).from(extractionGoldDocs).where(eq(extractionGoldDocs.id, docId));
+    const windows = goldWindows(stored!.rawText).length;
     expect(windows).toBeGreaterThan(1);
     const res = await draftGoldAnnotations({ docId, organizationId: fx.orgA.organizationId, budgetMs: 600_000 });
     expect(res).toMatchObject({ ok: true, done: true, windowsThisRun: windows });
@@ -74,7 +76,7 @@ describe("BL-AIX Phase 1e-2 — AI-drafted gold annotations (runtime)", () => {
 
     const [doc] = await db.select().from(extractionGoldDocs).where(eq(extractionGoldDocs.id, docId));
     expect(doc!.status).toBe("in_review");
-    expect(doc!.aiDraft).toMatchObject({ doneChars: TEXT.length, windowsDone: windows, proposed: windows + 1, duplicates: windows - 1, model: "test-mock" });
+    expect(doc!.aiDraft).toMatchObject({ doneChars: stored!.rawText.length, windowsDone: windows, proposed: windows + 1, duplicates: windows - 1, model: "test-mock" });
 
     const logged = await db
       .select({ id: aiCallLogs.id })
