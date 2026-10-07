@@ -680,24 +680,29 @@ export function buildSectionDraftPrompt(
 ): { system: string; messages: AIMessage[] } {
   // Build a solicitation block when requirements are available so the
   // draft addresses real Section L/M language rather than generic prose.
-  // BL-AIP-5 — requirements mapped to this section come first and
-  // verbatim: they are the section's contract. The general list follows
-  // as context (60 entries, no 300-character cut) with an honest count.
+  // BL-AIP-5 — requirements mapped to this section go verbatim: they are
+  // the section's contract. The general list is context (60 entries, no
+  // 300-character cut) with an honest count.
+  //
+  // BL-AIX Phase 1g — the solicitation context and win themes are the same
+  // for every section of the proposal, so they lead the prompt as a cached
+  // prefix; the mapped requirements and everything else about THIS section
+  // follow it.
   const mapped = snapshot.solicitation?.mappedRequirements ?? [];
   const generalReqs = snapshot.solicitation?.requirements ?? [];
   const generalShown = generalReqs.slice(0, DRAFT_GENERAL_REQUIREMENTS);
   const generalTotal = snapshot.solicitation?.totalRequirements ?? generalReqs.length;
+  const mappedBlock =
+    mapped.length > 0
+      ? [
+          `Requirements mapped to THIS section — every one MUST be addressed in the draft; reference its number inline in [BRACKETS] (e.g. "[L.5.2.1]") so the reviewer can trace it:`,
+          ...mapped.map(
+            (r, i) => `${i + 1}. [${r.number || "?"}] (${r.category}) ${r.text}`,
+          ),
+        ].join("\n")
+      : "";
   const solicitationBlock = snapshot.solicitation
     ? [
-        mapped.length > 0
-          ? [
-              `Requirements mapped to THIS section — every one MUST be addressed in the draft; reference its number inline in [BRACKETS] (e.g. "[L.5.2.1]") so the reviewer can trace it:`,
-              ...mapped.map(
-                (r, i) => `${i + 1}. [${r.number || "?"}] (${r.category}) ${r.text}`,
-              ),
-              ``,
-            ].join("\n")
-          : "",
         `Solicitation context (write to these — use [ref] inline for traceability):`,
         snapshot.solicitation.sectionLSummary
           ? `Section L summary: ${snapshot.solicitation.sectionLSummary.slice(0, 800)}`
@@ -708,7 +713,7 @@ export function buildSectionDraftPrompt(
         generalShown.length > 0
           ? [
               generalTotal > generalShown.length
-                ? `All extracted requirements (${generalShown.length} of ${generalTotal} shown; the mapped list above is authoritative for this section):`
+                ? `All extracted requirements (${generalShown.length} of ${generalTotal} shown; the requirements mapped to this section, below, are authoritative for it):`
                 : `All extracted requirements (${generalShown.length}):`,
               ...generalShown.map(
                 (r, i) =>
@@ -797,18 +802,18 @@ export function buildSectionDraftPrompt(
         ? `Return the improved body. Output ONLY the body text — no diff, no commentary about what you changed.`
         : `Return the tightened body. Output ONLY the body text — no commentary about what you cut.`;
 
+  const sharedContext = [themesBlock, solicitationBlock].filter(Boolean).join("\n\n");
   const userPrompt = [
+    ...(sharedContext ? [`The brief for THIS section follows.`, ``] : []),
     `Mode: ${mode}.`,
     MODE_INSTRUCTIONS[mode],
     ``,
-    themesBlock,
-    themesBlock ? `` : "",
     voiceBlock,
     voiceBlock ? `` : "",
     authorVoiceBlock,
     authorVoiceBlock ? `` : "",
-    solicitationBlock,
-    solicitationBlock ? `` : "",
+    mappedBlock,
+    mappedBlock ? `` : "",
     citationBlock,
     citationBlock ? `` : "",
     `Section + proposal snapshot (JSON):`,
@@ -825,7 +830,13 @@ export function buildSectionDraftPrompt(
 
   return {
     system: SECTION_DRAFT_SYSTEM,
-    messages: [{ role: "user", content: userPrompt }],
+    messages: [
+      {
+        role: "user",
+        ...(sharedContext ? { cachedPrefix: `Proposal context shared by every section:\n\n${sharedContext}` } : {}),
+        content: userPrompt,
+      },
+    ],
   };
 }
 

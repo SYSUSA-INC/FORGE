@@ -764,6 +764,10 @@ export const aiCallLogs = pgTable(
     error: text("error"),
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
+    // BL-AIX Phase 1g — the part of input_tokens read from / written to the
+    // provider's prompt cache (input_tokens counts every prompt token).
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
     outputChars: integer("output_chars").notNull().default(0),
     maxTokens: integer("max_tokens"),
     latencyMs: integer("latency_ms").notNull().default(0),

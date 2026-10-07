@@ -101,7 +101,7 @@ function logsFor(organizationId: string) {
 let providerCallCount = 0;
 let providerShouldThrow: Error | null = null;
 let nextText = "hello world";
-let nextTokens = { inputTokens: 30, outputTokens: 70 };
+let nextTokens: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number } = { inputTokens: 30, outputTokens: 70 };
 
 describe("BL-AI-TELEMETRY — completeForTenant writes ai_call_log (runtime)", () => {
   let fx: TwoTenantFixture;
@@ -122,6 +122,8 @@ describe("BL-AI-TELEMETRY — completeForTenant writes ai_call_log (runtime)", (
         model: "test-mock",
         inputTokens: nextTokens.inputTokens,
         outputTokens: nextTokens.outputTokens,
+        cacheReadTokens: nextTokens.cacheReadTokens,
+        cacheWriteTokens: nextTokens.cacheWriteTokens,
         stubbed: false,
       };
     });
@@ -166,6 +168,31 @@ describe("BL-AI-TELEMETRY — completeForTenant writes ai_call_log (runtime)", (
   });
 
   // BL-AIX Phase 1b — a caller that names no version gets the feature's.
+  it("BL-AIX Phase 1g — records the cached part of the prompt beside the full input count", async () => {
+    nextTokens = { inputTokens: 9_200, outputTokens: 50, cacheReadTokens: 9_000 };
+    await completeForTenant({
+      organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
+      system: "x",
+      messages: [{ role: "user", cachedPrefix: "shared", content: "y" }],
+    });
+    nextTokens = { inputTokens: 4_100, outputTokens: 50, cacheWriteTokens: 4_000 };
+    await completeForTenant({
+      organizationId: fx.orgA.organizationId,
+      feature: "section_draft",
+      system: "x",
+      messages: [{ role: "user", content: "y" }],
+    });
+
+    const rows = await logsFor(fx.orgA.organizationId);
+    expect(rows.map((r) => [r.inputTokens, r.cacheReadTokens, r.cacheWriteTokens])).toEqual([
+      [9_200, 9_000, 0],
+      [4_100, 0, 4_000],
+    ]);
+    const [draft] = await getAiFeatureBreakdown(new Date(Date.now() - 60_000), fx.orgA.organizationId);
+    expect(draft).toMatchObject({ inputTokens: 13_300, cacheReadTokens: 9_000, cacheWriteTokens: 4_000 });
+  });
+
   it("stamps the feature's prompt version when the caller passes none", async () => {
     await completeForTenant({
       organizationId: fx.orgA.organizationId,

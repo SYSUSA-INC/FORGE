@@ -32,6 +32,9 @@ export type AiCallRecord = {
   error?: string | null;
   inputTokens?: number;
   outputTokens?: number;
+  /** BL-AIX Phase 1g — the part of inputTokens read from / written to the prompt cache. */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   outputChars?: number;
   maxTokens?: number | null;
   latencyMs: number;
@@ -62,6 +65,8 @@ export async function recordAiCall(rec: AiCallRecord): Promise<void> {
       error: rec.error ? rec.error.slice(0, ERROR_CAP) : null,
       inputTokens: rec.inputTokens ?? 0,
       outputTokens: rec.outputTokens ?? 0,
+      cacheReadTokens: rec.cacheReadTokens ?? 0,
+      cacheWriteTokens: rec.cacheWriteTokens ?? 0,
       outputChars: rec.outputChars ?? 0,
       maxTokens: rec.maxTokens ?? null,
       latencyMs: Math.max(0, Math.round(rec.latencyMs)),
@@ -90,6 +95,9 @@ export type AiFeatureBreakdownRow = {
   stubbed: number;
   inputTokens: number;
   outputTokens: number;
+  /** BL-AIX Phase 1g — the part of inputTokens read from / written to the prompt cache. */
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   /** Mean provider latency over ok calls, ms. */
   avgLatencyMs: number;
   maxLatencyMs: number;
@@ -123,6 +131,8 @@ export async function getAiFeatureBreakdown(
       stubbed: sql<string>`count(*) filter (where ${aiCallLogs.stubbed})`,
       inputTokens: sql<string>`coalesce(sum(${aiCallLogs.inputTokens}), 0)`,
       outputTokens: sql<string>`coalesce(sum(${aiCallLogs.outputTokens}), 0)`,
+      cacheReadTokens: sql<string>`coalesce(sum(${aiCallLogs.cacheReadTokens}), 0)`,
+      cacheWriteTokens: sql<string>`coalesce(sum(${aiCallLogs.cacheWriteTokens}), 0)`,
       avgLatencyMs: sql<string>`coalesce(avg(${aiCallLogs.latencyMs}) filter (where ${aiCallLogs.status} = 'ok'), 0)`,
       maxLatencyMs: sql<string>`coalesce(max(${aiCallLogs.latencyMs}), 0)`,
       tenants: sql<string>`count(distinct ${aiCallLogs.organizationId})`,
@@ -147,6 +157,8 @@ export async function getAiFeatureBreakdown(
     stubbed: Number(r.stubbed),
     inputTokens: Number(r.inputTokens),
     outputTokens: Number(r.outputTokens),
+    cacheReadTokens: Number(r.cacheReadTokens),
+    cacheWriteTokens: Number(r.cacheWriteTokens),
     avgLatencyMs: Math.round(Number(r.avgLatencyMs)),
     maxLatencyMs: Number(r.maxLatencyMs),
     tenants: Number(r.tenants),

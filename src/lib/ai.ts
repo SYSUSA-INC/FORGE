@@ -60,7 +60,25 @@ export type AIRole = "user" | "assistant";
 export type AIMessage = {
   role: AIRole;
   content: string;
+  /**
+   * BL-AIX Phase 1g — text at the start of this message that other calls
+   * repeat word for word (a proposal's shared solicitation context).
+   * Anthropic receives it as its own block with a cache marker, so a
+   * repeat within five minutes reads it at a tenth of the input price.
+   * Other providers receive it in front of `content`, where their own
+   * prefix caching can find it. Anything that changes from call to call
+   * belongs in `content`, or every call misses.
+   */
+  cachedPrefix?: string;
 };
+
+/** The text a model reads for one message: its cached prefix, then its content. */
+export function messageText(m: AIMessage): string {
+  return m.cachedPrefix ? `${m.cachedPrefix}\n\n${m.content}` : m.content;
+}
+
+/** Anthropic allows four cache breakpoints in one request. */
+const MAX_CACHE_BREAKPOINTS = 4;
 
 /**
  * A binary document attached to the user turn. Anthropic supports PDF
@@ -131,8 +149,13 @@ export type AICompleteResult = {
   text: string;
   provider: AIProviderName;
   model: string;
+  /** Every prompt token the model read, cached or not (BL-AIX Phase 1g). */
   inputTokens?: number;
   outputTokens?: number;
+  /** BL-AIX Phase 1g — prompt tokens read from the provider's cache (billed at about a tenth). */
+  cacheReadTokens?: number;
+  /** BL-AIX Phase 1g — prompt tokens written to the cache (Anthropic bills these at 1.25x). */
+  cacheWriteTokens?: number;
   /** True when the call used the StubProvider (no live AI). */
   stubbed: boolean;
   /** BL-AI-TOOLS — the tool input object when the provider answered via the forced tool. */
@@ -177,11 +200,17 @@ export function __buildAnthropicBody(
   model: string,
 ): Record<string, unknown> {
   const docs = opts.documents ?? [];
+  // BL-AIX Phase 1g — a breakpoint caches everything before it, so when
+  // there are more prefixes than breakpoints the latest ones keep theirs.
+  const prefixed = opts.messages.flatMap((m, i) => (m.cachedPrefix ? [i] : []));
+  const breakpoints = MAX_CACHE_BREAKPOINTS - (opts.system && opts.cacheSystem ? 1 : 0);
+  const marked = new Set(prefixed.slice(Math.max(0, prefixed.length - breakpoints)));
   let firstUserSeen = false;
-  const messages = opts.messages.map((m) => {
+  const messages = opts.messages.map((m, i) => {
+    const blocks: unknown[] = [];
     if (m.role === "user" && !firstUserSeen && docs.length > 0) {
       firstUserSeen = true;
-      const blocks: unknown[] = docs.map((d) => {
+      blocks.push(...docs.map((d) => {
         // Anthropic uses different block types for PDF vs image.
         // PDFs go through "document"; images through "image".
         if (d.mediaType === "application/pdf") {
@@ -203,11 +232,15 @@ export function __buildAnthropicBody(
             data: bytesToBase64(d.bytes),
           },
         };
-      });
-      blocks.push({ type: "text", text: m.content });
-      return { role: m.role, content: blocks };
+      }));
     }
-    return { role: m.role, content: m.content };
+    if (m.cachedPrefix) {
+      blocks.push({ type: "text", text: m.cachedPrefix, ...(marked.has(i) ? { cache_control: { type: "ephemeral" } } : {}) });
+    }
+    if (blocks.length === 0) return { role: m.role, content: m.content };
+    // An empty text block is refused; a prefix can stand alone.
+    if (m.content || !m.cachedPrefix) blocks.push({ type: "text", text: m.content });
+    return { role: m.role, content: blocks };
   });
   const body: Record<string, unknown> = {
     model,
@@ -245,9 +278,32 @@ export function __buildAnthropicBody(
   return body;
 }
 
+type AnthropicUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+};
+
+/**
+ * BL-AIX Phase 1g — Anthropic's `input_tokens` counts only the uncached
+ * part of the prompt. FORGE records every prompt token as input (so a
+ * tenant's token count does not depend on cache luck) and the cached
+ * share alongside.
+ */
+function anthropicPromptUsage(u: AnthropicUsage | undefined): Pick<AICompleteResult, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens"> {
+  const read = u?.cache_read_input_tokens ?? 0;
+  const write = u?.cache_creation_input_tokens ?? 0;
+  return {
+    inputTokens: typeof u?.input_tokens === "number" ? u.input_tokens + read + write : undefined,
+    ...(read > 0 ? { cacheReadTokens: read } : {}),
+    ...(write > 0 ? { cacheWriteTokens: write } : {}),
+  };
+}
+
 type AnthropicResponse = {
   content?: { type: string; text?: string; name?: string; input?: unknown }[];
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: AnthropicUsage;
   model?: string;
   stop_reason?: string;
 };
@@ -266,7 +322,7 @@ export function __parseAnthropicResponse(
   return {
     text,
     model: json.model ?? fallbackModel,
-    inputTokens: json.usage?.input_tokens,
+    ...anthropicPromptUsage(json.usage),
     outputTokens: json.usage?.output_tokens,
     structured: toolBlock ? toolBlock.input : undefined,
     stopReason: json.stop_reason,
@@ -287,12 +343,14 @@ export type AnthropicStreamState = {
   model: string;
   inputTokens?: number;
   outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   stopReason?: string;
 };
 
 type AnthropicStreamEvent = {
   type: string;
-  message?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number } };
+  message?: { model?: string; usage?: AnthropicUsage };
   delta?: { type?: string; text?: string; stop_reason?: string };
   usage?: { output_tokens?: number };
   error?: { type?: string; message?: string };
@@ -312,7 +370,7 @@ export function __applyAnthropicStreamEvent(
     case "message_start": {
       if (ev.message?.model) state.model = ev.message.model;
       if (typeof ev.message?.usage?.input_tokens === "number") {
-        state.inputTokens = ev.message.usage.input_tokens;
+        Object.assign(state, anthropicPromptUsage(ev.message.usage));
       }
       return;
     }
@@ -426,6 +484,8 @@ class AnthropicProvider implements AIProvider {
       model: state.model,
       inputTokens: state.inputTokens,
       outputTokens: state.outputTokens,
+      ...(state.cacheReadTokens ? { cacheReadTokens: state.cacheReadTokens } : {}),
+      ...(state.cacheWriteTokens ? { cacheWriteTokens: state.cacheWriteTokens } : {}),
       stubbed: false,
       stopReason: state.stopReason,
       streamed: true,
@@ -445,7 +505,7 @@ export function __buildOpenAiCompatBody(
 ): Record<string, unknown> {
   const messages: { role: string; content: string }[] = [];
   if (opts.system) messages.push({ role: "system", content: opts.system });
-  for (const m of opts.messages) messages.push({ role: m.role, content: m.content });
+  for (const m of opts.messages) messages.push({ role: m.role, content: messageText(m) });
 
   const body: Record<string, unknown> = {
     messages,
@@ -479,7 +539,8 @@ type OpenAiCompatResponse = {
     finish_reason?: string;
   }[];
   model?: string;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  /** `prompt_tokens` already includes the cached part (BL-AIX Phase 1g). */
+  usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
 };
 
 export function __parseOpenAiCompatResponse(
@@ -503,6 +564,7 @@ export function __parseOpenAiCompatResponse(
     model: json.model ?? fallbackModel,
     inputTokens: json.usage?.prompt_tokens,
     outputTokens: json.usage?.completion_tokens,
+    ...(json.usage?.prompt_tokens_details?.cached_tokens ? { cacheReadTokens: json.usage.prompt_tokens_details.cached_tokens } : {}),
     structured,
     stopReason: choice?.finish_reason,
   };
@@ -1062,6 +1124,8 @@ async function runTenantCompletion<T>(
     model: result.model,
     inputTokens: result.inputTokens ?? 0,
     outputTokens: result.outputTokens ?? 0,
+    cacheReadTokens: result.cacheReadTokens ?? 0,
+    cacheWriteTokens: result.cacheWriteTokens ?? 0,
     outputChars: result.text.length,
     stubbed: result.stubbed,
     viaTool: result.structured !== undefined,
