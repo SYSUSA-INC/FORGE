@@ -4365,6 +4365,8 @@ export const aiEvalRuns = pgTable(
     feature: text("feature").notNull().default("section_draft"),
     promptVersion: text("prompt_version").notNull().default(""),
     model: text("model").notNull().default(""),
+    /** BL-AIX Phase 1i-2 — the candidate model the drafter was asked to use; "" = the routed default. */
+    requestedModel: text("requested_model").notNull().default(""),
     caseCount: integer("case_count").notNull().default(0),
     meanScore: real("mean_score").notNull().default(0),
     results: jsonb("results")
@@ -4536,6 +4538,8 @@ export const extractionEvalRuns = pgTable(
     status: text("status").notNull().default("running"),
     promptVersions: jsonb("prompt_versions").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
     model: text("model").notNull().default(""),
+    /** BL-AIX Phase 1i-2 — the candidate model the run was asked to use; "" = the routed default. */
+    requestedModel: text("requested_model").notNull().default(""),
     docIds: jsonb("doc_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     cursor: jsonb("cursor").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     results: jsonb("results").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),

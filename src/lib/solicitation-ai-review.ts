@@ -36,6 +36,8 @@ export async function aiRunSolicitationReview(input: {
   title: string;
   fileName: string;
   rawText: string;
+  /** BL-AIX Phase 1i-2 — pin a candidate model (eval runs); unset follows routing. */
+  model?: string;
 }): Promise<Ok<SolicitationReviewVerdict> | Err> {
   if (!input.rawText.trim()) {
     return {
@@ -50,6 +52,7 @@ export async function aiRunSolicitationReview(input: {
     const ai = await completeStructuredForTenant({
       organizationId: input.organizationId,
       feature: "solicitation_review",
+      model: input.model || undefined,
       schema: solicitationReviewSchema,
       toolName: "record_solicitation_review",
       system: prompt.system,

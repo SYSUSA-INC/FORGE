@@ -3,7 +3,8 @@
  * the model mocked. Asserts: a run covers every approved gold document,
  * reads it through the requirement sweep and the review, scores it against
  * the approved annotations only, resumes across budgeted calls, records
- * the prompt versions, and refuses stub mode.
+ * the prompt versions, and refuses stub mode. BL-AIX Phase 1i-2 — a
+ * candidate model is stored on the run and pinned on every call it makes.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
@@ -39,6 +40,7 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
   let fx: TwoTenantFixture;
   const docs: string[] = [];
   let stubbed = false;
+  let seen: { tool: string | undefined; model: string | undefined }[] = [];
 
   beforeEach(async () => {
     fx = await createTwoTenants("extraction-eval");
@@ -59,18 +61,22 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
       ]);
       await setGoldDocApproved({ docId: res.id, approved: true, userId: fx.orgA.userId });
     }
-    __setCompleteImplForTest(async (opts) => ({
-      text: "",
-      provider: "stub" as const,
-      model: "test-mock",
-      inputTokens: 5,
-      outputTokens: 5,
-      stubbed,
-      structured:
-        opts.tool?.name === "record_solicitation_review"
-          ? review
-          : { requirements: [{ kind: "shall", text: "The contractor shall perform task number 1 in full.", ref: "C.1" }] },
-    }));
+    seen = [];
+    __setCompleteImplForTest(async (opts) => {
+      seen.push({ tool: opts.tool?.name, model: opts.model });
+      return {
+        text: "",
+        provider: "stub" as const,
+        model: "test-mock",
+        inputTokens: 5,
+        outputTokens: 5,
+        stubbed,
+        structured:
+          opts.tool?.name === "record_solicitation_review"
+            ? review
+            : { requirements: [{ kind: "shall", text: "The contractor shall perform task number 1 in full.", ref: "C.1" }] },
+      };
+    });
   });
 
   afterEach(async () => {
@@ -106,6 +112,27 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
     expect(await startExtractionEval(fx.orgA.userId)).toEqual({ ok: true, runId: started.runId, resumed: true });
     const rest = await stepExtractionEval({ runId: started.runId, organizationId: fx.orgA.organizationId, budgetMs: 600_000 });
     expect(rest).toMatchObject({ ok: true, done: true, docsDone: 2 });
+  });
+
+  it("pins a candidate model on the sweep and the review, and keeps it on the run", async () => {
+    const started = await startExtractionEval(fx.orgA.userId, "claude-sonnet-5-5");
+    if (!started.ok) throw new Error(started.error);
+    const res = await stepExtractionEval({ runId: started.runId, organizationId: fx.orgA.organizationId, budgetMs: 600_000 });
+    expect(res).toMatchObject({ ok: true, done: true, docsDone: 2 });
+    const [run] = await db.select().from(extractionEvalRuns).where(eq(extractionEvalRuns.id, started.runId));
+    expect(run!.requestedModel).toBe("claude-sonnet-5-5");
+    expect(new Set(seen.map((c) => c.tool))).toEqual(new Set(["record_requirements", "record_solicitation_review"]));
+    expect(seen.every((c) => c.model === "claude-sonnet-5-5")).toBe(true);
+  });
+
+  it("follows routing when no candidate is named", async () => {
+    const started = await startExtractionEval(fx.orgA.userId);
+    if (!started.ok) throw new Error(started.error);
+    await stepExtractionEval({ runId: started.runId, organizationId: fx.orgA.organizationId, budgetMs: 600_000 });
+    const [run] = await db.select().from(extractionEvalRuns).where(eq(extractionEvalRuns.id, started.runId));
+    expect(run!.requestedModel).toBe("");
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.some((c) => c.model === "claude-sonnet-5-5")).toBe(false);
   });
 
   it("fails the run in stub mode", async () => {

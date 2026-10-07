@@ -8,6 +8,7 @@ import { runGoldenEval } from "@/lib/golden-eval";
 import { runRetrievalEval } from "@/lib/retrieval-eval";
 import { recordAudit } from "@/lib/audit-log";
 import { rateGoldenDraft } from "@/lib/eval-ratings";
+import { cleanModelChoice } from "@/lib/model-choice";
 import type { JudgeScores } from "@/lib/draft-judge-logic";
 import {
   enforceQuota,
@@ -66,10 +67,12 @@ export async function setAiBudgetAction(input: {
  * `maxCases` sections of won proposals and score each against the text
  * that won. Org admins only. Two requests per case against the monthly
  * AI quota: the draft and (BL-AIX Phase 1h-2) the rubric judge; slots
- * not used are refunded.
+ * not used are refunded. BL-AIX Phase 1i-2 — `candidateModel` drafts this
+ * run on one of the listed models; the judge and every default stay put.
  */
 export async function runGoldenEvalAction(
   maxCases = 3,
+  candidateModel?: string,
 ): Promise<
   | { ok: true; runId: string; caseCount: number; meanScore: number; stubbed: boolean }
   | { ok: false; error: string }
@@ -78,6 +81,8 @@ export async function runGoldenEvalAction(
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
 
+  const model = cleanModelChoice(candidateModel);
+  if (model === null) return { ok: false, error: "That is not a model id." };
   const cases = Math.max(1, Math.min(5, Math.floor(maxCases)));
   let reserved = 0;
   try {
@@ -99,6 +104,7 @@ export async function runGoldenEvalAction(
       organizationId,
       actor: { userId: actor.id, email: actor.email },
       maxCases: cases,
+      model,
     });
     if (!res.ok) {
       for (let i = 0; i < reserved; i++) await refundQuota(organizationId, "aiRequestsPerMonth");

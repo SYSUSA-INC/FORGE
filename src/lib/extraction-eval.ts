@@ -39,8 +39,15 @@ export async function listEvalRuns(limit = 10): Promise<ExtractionEvalRun[]> {
   return db.select().from(extractionEvalRuns).orderBy(desc(extractionEvalRuns.createdAt)).limit(limit);
 }
 
-/** Start a run over every approved gold document, or return the one still running. */
-export async function startExtractionEval(userId: string): Promise<{ ok: true; runId: string; resumed: boolean } | { ok: false; error: string }> {
+/**
+ * Start a run over every approved gold document, or return the one still
+ * running. BL-AIX Phase 1i-2 — `model` pins a candidate model for the
+ * whole run ("" follows routing); a resumed run keeps its own.
+ */
+export async function startExtractionEval(
+  userId: string,
+  model = "",
+): Promise<{ ok: true; runId: string; resumed: boolean } | { ok: false; error: string }> {
   const [running] = await db.select({ id: extractionEvalRuns.id }).from(extractionEvalRuns).where(eq(extractionEvalRuns.status, "running")).limit(1);
   if (running) return { ok: true, runId: running.id, resumed: true };
   const docs = await db
@@ -55,6 +62,7 @@ export async function startExtractionEval(userId: string): Promise<{ ok: true; r
       docIds: docs.map((d) => d.id),
       promptVersions: { solicitation_extract: PROMPT_VERSIONS.solicitation_extract, solicitation_review: PROMPT_VERSIONS.solicitation_review },
       cursor: freshCursor(0),
+      requestedModel: model,
       startedByUserId: userId,
     })
     .returning({ id: extractionEvalRuns.id });
@@ -133,6 +141,7 @@ export async function stepExtractionEval(input: {
         index: w.index,
         count: windows.length,
         documentLabel: doc.title,
+        model: run.requestedModel || undefined,
       });
       if (read.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
       const next: Cursor = {
@@ -145,7 +154,13 @@ export async function stepExtractionEval(input: {
       continue;
     }
 
-    const review = await aiRunSolicitationReview({ organizationId: input.organizationId, title: doc.title, fileName: doc.title, rawText: doc.rawText });
+    const review = await aiRunSolicitationReview({
+      organizationId: input.organizationId,
+      title: doc.title,
+      fileName: doc.title,
+      rawText: doc.rawText,
+      model: run.requestedModel || undefined,
+    });
     if (review.ok && review.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
     const extracted = mergeRequirementLists(cursor.lists).slice(0, MAX_REQUIREMENTS_PER_DOCUMENT);
     const score = scoreDocument(

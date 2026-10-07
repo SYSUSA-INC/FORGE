@@ -6,6 +6,7 @@ import { Panel } from "@/components/ui/Panel";
 import type { JudgeScores } from "@/lib/draft-judge-logic";
 import type { GoldenCaseResult } from "@/lib/golden-holdout";
 import type { JudgeCalibration } from "@/lib/eval-ratings";
+import { CANDIDATE_MODELS } from "@/lib/model-choice";
 import { runGoldenEvalAction } from "./actions";
 import { RateDraft } from "./RateDraft";
 
@@ -16,6 +17,7 @@ export type EvalRunRow = {
   id: string;
   promptVersion: string;
   model: string;
+  requestedModel: string;
   caseCount: number;
   meanScore: number;
   stubbed: boolean;
@@ -46,11 +48,12 @@ export function GoldenEvalPanel({
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [candidate, setCandidate] = useState("");
 
   function run() {
     setNote("");
     startTransition(async () => {
-      const res = await runGoldenEvalAction(3);
+      const res = await runGoldenEvalAction(3, candidate);
       if (!res.ok) {
         setNote(res.error);
         return;
@@ -69,22 +72,39 @@ export function GoldenEvalPanel({
       eyebrow={`Golden set: ${goldenCases} section${goldenCases === 1 ? "" : "s"} from won proposals · drafter prompt ${currentPromptVersion}`}
       actions={
         isAdmin ? (
-          <button
-            type="button"
-            className="aur-btn aur-btn-ghost text-[11px]"
-            disabled={pending || goldenCases === 0}
-            onClick={run}
-            title="Re-draft up to three won sections from the solicitation context, score them against the text that won and have the rubric judge score them. Up to six AI requests."
-          >
-            {pending ? "Drafting…" : "Run eval (3 cases)"}
-          </button>
+          <span className="flex items-center gap-2">
+            <select
+              value={candidate}
+              onChange={(e) => setCandidate(e.target.value)}
+              aria-label="Model that drafts this run"
+              className="aur-input w-44 text-[11px]"
+            >
+              <option value="">Model: routed default</option>
+              {CANDIDATE_MODELS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="aur-btn aur-btn-ghost text-[11px]"
+              disabled={pending || goldenCases === 0}
+              onClick={run}
+              title="Re-draft up to three won sections from the solicitation context, score them against the text that won and have the rubric judge score them. Up to six AI requests."
+            >
+              {pending ? "Drafting…" : "Run eval (3 cases)"}
+            </button>
+          </span>
         ) : null
       }
     >
       <p className="mb-3 font-mono text-[11px] text-muted">
         Each run re-drafts sections of proposals you won, with the saved text withheld, and scores
         the draft against what won: shared vocabulary (45%), length fit (20%), specificity (20%)
-        and placeholder-free prose (15%). Compare runs across prompt versions and models. Each case is
+        and placeholder-free prose (15%). Compare runs across prompt versions and models: pick a model to
+        draft one run on it without changing your defaults (the judge stays on its own model, so its
+        average, shown once it is calibrated, compares across runs). Each case is
         held out: nothing from its own proposal reaches the drafter, and anything else that copies the
         winning text is dropped. &ldquo;Leak&rdquo; is how much of the winning text still reached the
         prompt (quoted requirements account for some). Runs without the holdout mark scored against a
@@ -107,11 +127,19 @@ export function GoldenEvalPanel({
               <th className="py-1 text-left">Model</th>
               <th className="py-1 text-right">Cases</th>
               <th className="py-1 text-right">Mean</th>
+              <th className="py-1 text-right">Judge</th>
             </tr>
           </thead>
           <tbody>
             {runs.map((r) => (
-              <RunRow key={r.id} run={r} open={open === r.id} onToggle={() => setOpen(open === r.id ? null : r.id)} myRatings={myRatings} />
+              <RunRow
+                key={r.id}
+                run={r}
+                open={open === r.id}
+                onToggle={() => setOpen(open === r.id ? null : r.id)}
+                myRatings={myRatings}
+                showJudge={calibration.overall.verdict === "calibrated"}
+              />
             ))}
           </tbody>
         </table>
@@ -147,7 +175,20 @@ function CalibrationLine({ calibration }: { calibration: JudgeCalibration }) {
   );
 }
 
-function RunRow({ run, open, onToggle, myRatings }: { run: EvalRunRow; open: boolean; onToggle: () => void; myRatings: MyRatings }) {
+function RunRow({
+  run,
+  open,
+  onToggle,
+  myRatings,
+  showJudge,
+}: {
+  run: EvalRunRow;
+  open: boolean;
+  onToggle: () => void;
+  myRatings: MyRatings;
+  showJudge: boolean;
+}) {
+  const judged = run.results.flatMap((c) => (c.judge ? [c.judge.scores.overall] : []));
   return (
     <>
       <tr className="cursor-pointer border-t border-layer/10 hover:bg-layer/[0.03]" onClick={onToggle}>
@@ -158,14 +199,23 @@ function RunRow({ run, open, onToggle, myRatings }: { run: EvalRunRow; open: boo
         </td>
         <td className="py-1.5 text-muted">
           {run.model || "—"}
+          {run.requestedModel ? " (candidate)" : ""}
           {run.stubbed ? " · stub" : ""}
         </td>
         <td className="py-1.5 text-right tabular-nums text-text">{run.caseCount}</td>
         <td className="py-1.5 text-right tabular-nums text-text">{pct(run.meanScore)}</td>
+        {/* BL-AIX Phase 1i-2 — the judge's run average shows once it is calibrated: before that it is not
+            evidence, and a one-case average would anchor the experts still rating. */}
+        <td
+          className="py-1.5 text-right tabular-nums text-text"
+          title={showJudge ? "Rubric judge, mean overall score" : "Shows once the judge is calibrated against your experts"}
+        >
+          {showJudge && judged.length ? `${(judged.reduce((a, b) => a + b, 0) / judged.length).toFixed(1)}/5` : "—"}
+        </td>
       </tr>
       {open ? (
         <tr className="border-t border-layer/10">
-          <td colSpan={5} className="py-2">
+          <td colSpan={6} className="py-2">
             <ul className="flex flex-col gap-1 text-muted">
               {run.results.map((c) => (
                 <li key={c.sectionId} className="flex flex-wrap justify-between gap-2">

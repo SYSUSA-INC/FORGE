@@ -17,6 +17,7 @@ import {
 import { startExtractionEval, stepExtractionEval } from "@/lib/extraction-eval";
 import { draftGoldAnnotations, resetGoldDraft } from "@/lib/gold-set-draft";
 import { isGoldItemStatus, type TextHit } from "@/lib/gold-set-logic";
+import { cleanModelChoice } from "@/lib/model-choice";
 import { log } from "@/lib/log";
 
 /**
@@ -206,16 +207,19 @@ export async function resetGoldDraftAction(docId: string): Promise<Done> {
  * documents. Start (or resume the running run), then step until done;
  * the page keeps calling. Metered to the acting admin's own organisation.
  */
-export async function runExtractionEvalAction(): Promise<
+export async function runExtractionEvalAction(candidateModel?: string): Promise<
   { ok: true; done: boolean; docsDone: number; docsTotal: number } | { ok: false; error: string }
 > {
   const actor = await requireSuperadmin();
   if (!actor.organizationId) {
     return { ok: false, error: "AI calls are metered to an organisation and your account has none. Use a platform admin account that belongs to one." };
   }
-  const started = await startExtractionEval(actor.id);
+  // BL-AIX Phase 1i-2 — a candidate model for this run only; defaults never change here.
+  const model = cleanModelChoice(candidateModel);
+  if (model === null) return { ok: false, error: "That is not a model id." };
+  const started = await startExtractionEval(actor.id, model);
   if (!started.ok) return started;
-  if (!started.resumed) await audit(actor, "gold_set.eval.start", started.runId, {}, "extraction_eval_run");
+  if (!started.resumed) await audit(actor, "gold_set.eval.start", started.runId, { requestedModel: model }, "extraction_eval_run");
   try {
     const res = await stepExtractionEval({ runId: started.runId, organizationId: actor.organizationId });
     if (!res.ok) return res;

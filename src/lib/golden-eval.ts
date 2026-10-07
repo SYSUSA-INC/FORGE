@@ -33,14 +33,16 @@ import {
   proposals,
   type AiEvalRun,
 } from "@/db/schema";
-import { completeForTenant, messageText } from "@/lib/ai";
+import { completeForTenant, getAIProviderStatus, messageText } from "@/lib/ai";
 import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
 import { judgeSectionDraft } from "@/lib/draft-judge";
 import { goldenOf, promptLeak, type GoldenCaseResult } from "@/lib/golden-holdout";
 import { meanScore, scoreDraftAgainstGolden } from "@/lib/golden-score";
 import { log } from "@/lib/log";
+import { goldenCandidateRefusal } from "@/lib/model-choice";
 import { prepareSectionDraft } from "@/lib/section-draft";
+import { getCurrentTier } from "@/lib/subscription-gates";
 
 export const GOLDEN_MIN_WORDS = 150;
 export const GOLDEN_MAX_CASES = 5;
@@ -102,8 +104,19 @@ export async function runGoldenEval(input: {
   organizationId: string;
   actor: { userId: string | null; email?: string | null };
   maxCases?: number;
+  /** BL-AIX Phase 1i-2 — draft with this candidate model; the judge keeps its own routing so runs stay comparable. */
+  model?: string;
 }): Promise<GoldenEvalResult> {
   const { organizationId } = input;
+  if (input.model) {
+    const tier = await getCurrentTier(organizationId);
+    const refusal = goldenCandidateRefusal({
+      model: input.model,
+      provider: getAIProviderStatus().active.name,
+      aiModels: tier?.overrides.aiModels,
+    });
+    if (refusal) return { ok: false, error: refusal };
+  }
   const maxCases = Math.max(1, Math.min(GOLDEN_MAX_CASES, input.maxCases ?? 3));
   const cases = await listGoldenCases({ organizationId, limit: maxCases });
   if (cases.length === 0) {
@@ -154,6 +167,7 @@ export async function runGoldenEval(input: {
         feature: "section_draft",
         variant: "golden_eval",
         promptVersion: SECTION_DRAFT_PROMPT_VERSION,
+        model: input.model || undefined,
         system: prepared.prompt.system,
         messages: prepared.prompt.messages,
         maxTokens: prepared.maxTokens,
@@ -218,6 +232,7 @@ export async function runGoldenEval(input: {
       feature: "section_draft",
       promptVersion: SECTION_DRAFT_PROMPT_VERSION,
       model,
+      requestedModel: input.model ?? "",
       caseCount: scored.length,
       meanScore: meanScore(scored),
       results,
@@ -236,6 +251,7 @@ export async function runGoldenEval(input: {
     metadata: {
       promptVersion: run.promptVersion,
       model,
+      requestedModel: input.model ?? "",
       caseCount: run.caseCount,
       meanScore: run.meanScore,
       stubbed,
