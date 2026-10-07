@@ -45,11 +45,14 @@ const STREAM_FIRST_BYTE_DEADLINE_MS = 60_000;
 import type { AiFeature } from "@/lib/ai-features";
 import { promptVersionFor } from "@/lib/ai-prompt-versions";
 import {
+  AI_FEATURE_MODEL_CLASS,
   DEFAULT_ANTHROPIC_MODEL,
   DEFAULT_VLLM_MODEL,
+  modelTableFor,
   resolveModelForFeature,
   routingEnabled,
 } from "@/lib/ai-routing";
+import { canServe, capabilitiesFor, clampMaxTokens, isFallbackEligible } from "@/lib/ai-capabilities";
 import { createSseParser } from "@/lib/sse";
 
 export type AIRole = "user" | "assistant";
@@ -151,6 +154,17 @@ export type AIProviderStatus = {
 export interface AIProvider {
   readonly name: AIProviderName;
   complete(opts: AICompleteOptions): Promise<AICompleteResult>;
+}
+
+/** BL-AIX Phase 1f — a provider's non-OK response, with its status so the gateway can tell an outage from a bad request. */
+export class ProviderHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ProviderHttpError";
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -357,7 +371,7 @@ class AnthropicProvider implements AIProvider {
     );
     if (!res.ok) {
       const errBody = await res.text();
-      throw new Error(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`);
+      throw new ProviderHttpError(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`, res.status);
     }
     const json = (await res.json()) as AnthropicResponse;
     return {
@@ -379,7 +393,7 @@ class AnthropicProvider implements AIProvider {
     );
     if (!res.ok) {
       const errBody = await res.text();
-      throw new Error(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`);
+      throw new ProviderHttpError(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`, res.status);
     }
     if (!res.body) throw new Error("Anthropic streaming response had no body.");
 
@@ -518,7 +532,7 @@ class AzureOpenAIProvider implements AIProvider {
     );
     if (!res.ok) {
       const errBody = await res.text();
-      throw new Error(`Azure OpenAI ${res.status}: ${errBody.slice(0, 300)}`);
+      throw new ProviderHttpError(`Azure OpenAI ${res.status}: ${errBody.slice(0, 300)}`, res.status);
     }
     const json = (await res.json()) as OpenAiCompatResponse;
     return {
@@ -555,7 +569,7 @@ class VLLMProvider implements AIProvider {
     );
     if (!res.ok) {
       const errBody = await res.text();
-      throw new Error(`vLLM ${res.status}: ${errBody.slice(0, 300)}`);
+      throw new ProviderHttpError(`vLLM ${res.status}: ${errBody.slice(0, 300)}`, res.status);
     }
     const json = (await res.json()) as OpenAiCompatResponse;
     return {
@@ -629,6 +643,8 @@ function bytesToBase64(bytes: Uint8Array): string {
 export function getAIProviderStatus(): {
   active: AIProviderStatus;
   all: AIProviderStatus[];
+  /** BL-AIX Phase 1f — the provider an outage falls back to (AI_FALLBACK_PROVIDER), when it is set, configured and not the active one. */
+  fallback: AIProviderStatus | null;
 } {
   const requested = (readEnv("AI_PROVIDER") ?? "anthropic").toLowerCase();
 
@@ -655,7 +671,14 @@ export function getAIProviderStatus(): {
     };
   }
 
-  return { active, all };
+  const fallbackName = (readEnv("AI_FALLBACK_PROVIDER") ?? "").toLowerCase();
+  const fallbackStatus = all.find((st) => st.name === fallbackName);
+  const fallback =
+    fallbackStatus?.configured && fallbackStatus.name !== active.name && active.name !== "stub" && fallbackStatus.name !== "bedrock"
+      ? fallbackStatus
+      : null;
+
+  return { active, all, fallback };
 }
 
 function statusFor(name: AIProviderName): AIProviderStatus {
@@ -699,6 +722,10 @@ function statusFor(name: AIProviderName): AIProviderStatus {
 
 export function getAIProvider(): AIProvider {
   const { active } = getAIProviderStatus();
+  return providerFor(active);
+}
+
+function providerFor(active: AIProviderStatus): AIProvider {
   switch (active.name) {
     case "anthropic":
       return new AnthropicProvider(
@@ -727,7 +754,30 @@ export function getAIProvider(): AIProvider {
   }
 }
 
-export async function complete(opts: AICompleteOptions): Promise<AICompleteResult> {
+/** The configured provider's default model name, for the capability table. */
+function defaultModelFor(name: AIProviderName): string {
+  switch (name) {
+    case "anthropic":
+      return readEnv("ANTHROPIC_MODEL") ?? DEFAULT_ANTHROPIC_MODEL;
+    case "azure":
+      return readEnv("AZURE_OPENAI_DEPLOYMENT") ?? "";
+    case "vllm":
+      return readEnv("VLLM_MODEL") ?? DEFAULT_VLLM_MODEL;
+    default:
+      return "";
+  }
+}
+
+/**
+ * `target: "fallback"` sends the call to the AI_FALLBACK_PROVIDER instead
+ * of the active one (BL-AIX Phase 1f); only the tenant gateway asks for it.
+ */
+export async function complete(opts: AICompleteOptions, target: "primary" | "fallback" = "primary"): Promise<AICompleteResult> {
+  if (target === "fallback") {
+    const { fallback } = getAIProviderStatus();
+    if (!fallback) throw new Error("No fallback AI provider is configured.");
+    return providerFor(fallback).complete(opts);
+  }
   return getAIProvider().complete(opts);
 }
 
@@ -928,21 +978,67 @@ async function runTenantCompletion<T>(
     }
   }
 
+  // BL-AIX Phase 1f — what the provider can do. A request with documents
+  // never goes to a provider that would drop them, and maxTokens never
+  // exceeds the model's ceiling.
+  const providers = getAIProviderStatus();
+  const request = { tool: Boolean(rest.tool), documents: (rest.documents?.length ?? 0) > 0 };
+  const primaryCaps = capabilitiesFor(providers.active.name, rest.model ?? defaultModelFor(providers.active.name), process.env);
+  if (request.documents && !primaryCaps.documents) {
+    const error = `The active AI provider (${providers.active.name}) cannot read attached documents; this needs Anthropic.`;
+    await recordAiCall({ ...telemetryBase, status: "error", latencyMs: 0, error });
+    throw new Error(error);
+  }
+  // BL-AIX Phase 0d — quoted documents are data, never instructions.
+  const callOpts: AICompleteOptions = { ...rest, maxTokens: clampMaxTokens(rest.maxTokens, primaryCaps), system: withUntrustedContentRule(rest.system) };
+  // Once text has streamed to the user, a retry elsewhere would repeat it.
+  let delivered = false;
+  if (rest.onDelta) {
+    const onDelta = rest.onDelta;
+    callOpts.onDelta = (text) => {
+      delivered = true;
+      onDelta(text);
+    };
+  }
+
   // Latency is measured around the provider call only, so the number
   // compares models rather than our own DB round-trips.
-  const providerStartedAt = Date.now();
+  let providerStartedAt = Date.now();
   let result: AICompleteResult;
   try {
-    // BL-AIX Phase 0d — quoted documents are data, never instructions.
-    result = await _completeImpl({ ...rest, system: withUntrustedContentRule(rest.system) });
+    result = await _completeImpl(callOpts);
   } catch (err) {
+    // BL-AIX Phase 1f — an outage that survived the provider's own retries
+    // moves the call once to the fallback provider, on its model for this
+    // feature's class, when it can serve the request.
+    const fallback = providers.fallback;
+    const fallbackModel =
+      fallback && routingEnabled() ? (modelTableFor(fallback.name)[AI_FEATURE_MODEL_CLASS[feature]] ?? undefined) : undefined;
+    const fallbackCaps = fallback ? capabilitiesFor(fallback.name, fallbackModel ?? defaultModelFor(fallback.name), process.env) : null;
+    const useFallback = Boolean(fallback && fallbackCaps && !delivered && isFallbackEligible(err) && canServe(fallbackCaps, request));
+    const message = err instanceof Error ? err.message : String(err);
     await recordAiCall({
       ...telemetryBase,
       status: "error",
       latencyMs: Date.now() - providerStartedAt,
-      error: err instanceof Error ? err.message : String(err),
+      error: useFallback ? `${message} (falling back to ${fallback!.name})` : message,
     });
-    throw err;
+    if (!useFallback) throw err;
+
+    telemetryBase.requestedModel = fallbackModel ?? "";
+    const fallbackStartedAt = Date.now();
+    providerStartedAt = fallbackStartedAt;
+    try {
+      result = await _completeImpl({ ...callOpts, model: fallbackModel, maxTokens: clampMaxTokens(rest.maxTokens, fallbackCaps!) }, "fallback");
+    } catch (fallbackErr) {
+      await recordAiCall({
+        ...telemetryBase,
+        status: "error",
+        latencyMs: Date.now() - fallbackStartedAt,
+        error: `fallback ${fallback!.name}: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
+      });
+      throw fallbackErr;
+    }
   }
 
   // BL-AI-STREAMING — providers that cannot stream return the whole

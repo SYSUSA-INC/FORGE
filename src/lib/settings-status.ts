@@ -233,13 +233,15 @@ export type AIFeatureStatus = {
 export type AIEngineStatus = {
   active: AIProviderStatus;
   providers: AIProviderStatus[];
+  /** BL-AIX Phase 1f — where a call goes when the active provider is down. */
+  fallback: AIProviderStatus | null;
   defaultModel: string;
   embeddingsConfigured: boolean;
   features: AIFeatureStatus[];
 };
 
 export function getAIEngineStatus(): AIEngineStatus {
-  const { active, all } = getAIProviderStatus();
+  const { active, all, fallback } = getAIProviderStatus();
   const anthropicLive = all.find((p) => p.name === "anthropic")?.configured === true;
   const embeddingsLive = envSet("OPENAI_API_KEY");
   const visionLive = anthropicLive; // vision is Anthropic-only
@@ -248,6 +250,7 @@ export function getAIEngineStatus(): AIEngineStatus {
   return {
     active,
     providers: all,
+    fallback,
     defaultModel: process.env.AI_DEFAULT_MODEL ?? "claude-sonnet-4-6",
     embeddingsConfigured: embeddingsLive,
     features: [
