@@ -59,7 +59,8 @@ Effort key:
 | 3ae | **BL-AIX Phase 1c** — Golden-eval holdout: nothing from a case's own proposal reaches the drafter, copies of the winning text are dropped, and each case records how much still leaked | P0 | S | ✅ shipped (PR #343) |
 | 3af | **BL-AIX Phase 1d** — Uncited claims: a sentence stating a hard figure the drafter wasn't given and citing nothing is flagged [NEEDS CITATION], with or without sources | P0 | S | ✅ shipped (PR #344) |
 | 3ag | **BL-AIX Phase 1e-1** — Extraction gold set: storage (migration 0115) and the `/admin` screens to add a public SAM.gov RFP by notice ID and review its requirements, page limits and Section M factors | P0 | M | ✅ shipped (PR #345) |
-| 3ah | **BL-AIX Phase 1e-2** — AI-drafted gold annotations: the whole RFP read in windows, findings proposed for the expert, duplicates and rejected items never re-proposed, resumable | P0 | M | 🔄 in PR (PR #346) |
+| 3ah | **BL-AIX Phase 1e-2** — AI-drafted gold annotations: the whole RFP read in windows, findings proposed for the expert, duplicates and rejected items never re-proposed, resumable | P0 | M | ✅ shipped (PR #346) |
+| 3ai | **BL-AIX Phase 1e-3** — Extraction accuracy run: the live sweep and review over every approved gold document, scored for requirement recall and precision, page-limit capture and Section M factors and order, per prompt version | P0 | M | 🔄 in progress |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -157,7 +158,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · 🔄 Phase 1e-2 in PR (PR #346)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · 🔄 Phase 1e-3 in progress
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -412,7 +413,7 @@ the phases below.
       - Audited as `gold_set.*` under the admin's own organisation.
       - Tests: `tests/ai/gold-set-logic.test.ts` and
         `tests/isolation/gold-set.test.ts`.
-    - **1e-2** — AI-drafted annotations: 🔄 in PR (PR #346).
+    - **1e-2** — AI-drafted annotations: ✅ shipped (PR #346).
       - "Draft annotations with AI" on a gold document reads the whole
         text in 40k-character windows, with no window ceiling (live
         extraction stops at 12). It uses the new `gold_annotate` feature
@@ -433,9 +434,35 @@ the phases below.
       - Audited as `gold_set.ai_draft` and `gold_set.ai_draft_reset`.
       - Tests: `tests/ai/gold-set-logic.test.ts` and
         `tests/isolation/gold-set-draft.test.ts`.
-    - **1e-3** — The accuracy run: requirement recall and precision,
-      page-limit accuracy and Section M factor and order accuracy,
-      recorded per prompt version.
+    - **1e-3** — The accuracy run: 🔄 in progress.
+      - **Extraction accuracy** on `/admin/gold-set` runs FORGE's live
+        extraction over every approved gold document, exactly as intake
+        reads one: the same windows through the same requirement-sweep
+        reader (`readRequirementsWindow`, now exported, behaviour
+        unchanged), then the solicitation AI review.
+      - It scores the result against the expert-approved annotations
+        only (`src/lib/extraction-eval-logic.ts`):
+        - requirement recall (target 98%) and precision, one-to-one;
+        - page and format limits captured by an extracted requirement
+          or Section L instruction with the same figures (target 100%);
+        - Section M factors found, and the share of found pairs kept in
+          the gold order.
+      - Results are pooled by item count across documents, with misses
+        listed per document.
+      - Migration `0117` adds `extraction_eval_run`, a platform table:
+        prompt versions (`solicitation_extract`, `solicitation_review`),
+        model, a resumable cursor, per-document results and a summary.
+        A run steps one window or review at a time inside a 120 s
+        budget; the page keeps calling, and Continue resumes.
+      - Metered to the acting admin's own organisation; stub mode fails
+        the run. Audited as `gold_set.eval.start` and
+        `gold_set.eval.finish`.
+      - Measures the full-text sweep, which intake keeps whenever it
+        finds at least as many requirements as the front pass. Not yet
+        scored: factor weights, and the proposal outline's
+        per-section page limits.
+      - Tests: `tests/ai/extraction-eval-logic.test.ts` and
+        `tests/isolation/extraction-eval.test.ts`.
   - retrieval and draft evaluations;
   - provider fallback and a per-model capability table;
   - caching and batches.

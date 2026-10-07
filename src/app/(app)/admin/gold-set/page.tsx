@@ -2,7 +2,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { listEvalRuns } from "@/lib/extraction-eval";
+import type { DocScore, RunSummary } from "@/lib/extraction-eval-logic";
 import { listGoldDocs } from "@/lib/gold-set";
+import { AccuracyPanel } from "./AccuracyPanel";
 import { AddGoldDocForm } from "./AddGoldDocForm";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +23,7 @@ const STATUS_TONE: Record<string, string> = {
  */
 export default async function GoldSetPage() {
   await requireSuperadmin();
-  const docs = await listGoldDocs();
+  const [docs, runs] = await Promise.all([listGoldDocs(), listEvalRuns()]);
   const approved = docs.filter((d) => d.status === "approved").length;
 
   return (
@@ -30,6 +33,21 @@ export default async function GoldSetPage() {
         title="Extraction gold set"
         subtitle={`Public RFPs annotated with every requirement, page limit and Section M factor a correct extraction must find. ${approved} of ${docs.length} document${docs.length === 1 ? "" : "s"} approved (the plan is 15–20, including 200-page packages, scans and multi-attachment notices).`}
       />
+      <AccuracyPanel
+        approvedDocs={approved}
+        runs={runs.map((r) => ({
+          id: r.id,
+          status: r.status,
+          createdAt: r.createdAt.toISOString(),
+          model: r.model,
+          promptVersions: r.promptVersions,
+          docsTotal: r.docIds.length,
+          results: r.results as DocScore[],
+          summary: r.summary as Partial<RunSummary>,
+          error: r.error,
+        }))}
+      />
+      <div className="mt-4" />
       <Panel title="Add an RFP" eyebrow="From a SAM.gov notice ID, or pasted text">
         <AddGoldDocForm />
       </Panel>

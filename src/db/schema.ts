@@ -4415,6 +4415,35 @@ export type ExtractionGoldDoc = typeof extractionGoldDocs.$inferSelect;
 export type ExtractionGoldItem = typeof extractionGoldItems.$inferSelect;
 
 /**
+ * BL-AIX Phase 1e-3 — one run of the live extraction over the approved
+ * gold documents (migration 0117). Shapes of `cursor`, `results` and
+ * `summary` live in src/lib/extraction-eval-logic.ts.
+ */
+export const extractionEvalRuns = pgTable(
+  "extraction_eval_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** running → done | failed. */
+    status: text("status").notNull().default("running"),
+    promptVersions: jsonb("prompt_versions").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
+    model: text("model").notNull().default(""),
+    docIds: jsonb("doc_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    cursor: jsonb("cursor").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    results: jsonb("results").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    error: text("error").notNull().default(""),
+    startedByUserId: text("started_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => ({
+    createdIdx: index("extraction_eval_run_created_idx").on(t.createdAt),
+  }),
+);
+
+export type ExtractionEvalRun = typeof extractionEvalRuns.$inferSelect;
+
+/**
  * BL-AIP-7a — stored, grounded, graded briefs. One row per generated
  * pursuit or pipeline brief: the snapshot it was written from, the
  * model's structured take, the reader's feedback and, once the
