@@ -622,6 +622,16 @@ It covers the main file and each companion document. The fix is usually to uploa
 
 Each item shows where it sits in the document, or **not found in source** when its wording couldn't be found. **Outline from Section L** on a proposal uses these page limits and this factor order. Re-parse an older solicitation to fill the panel.
 
+**Verify the requirements (BL-AIX Phase 2c).** **Verify** on the requirement list opens a page listing every extracted requirement, with the document text around each one, so you can check it quickly. Requirements most likely to be wrong come first: those not found in the document, then those found only in part.
+- **Confirm** marks a requirement as checked.
+- **Edit** fixes its wording, kind or reference. The extracted wording stays visible beneath the edit.
+- **Reject** removes a requirement that isn't one. It then stays out of the compliance matrix seed, the drafter and the health scan. Rows already in a matrix are not changed.
+- **Undo** reverses any of these.
+- **Confirm all found word for word** checks off, in one click, every requirement the document states exactly.
+- **Add a requirement** at the bottom records one the extraction missed.
+
+Your team's verdicts are kept if the solicitation is re-parsed.
+
 **Parses finish, or say why not (BL-AIP-4c).** Each solicitation or companion-document parse (and each harvest of a submitted or won proposal into the Brain) is recorded as a background job the moment you upload. If the server instance running it dies mid-way, the platform retries it automatically within a few minutes from the stored file (up to three attempts); the solicitation page shows the state next to **Parse** — "retry at 14:05 UTC (attempt 2 of 3)", "stuck (awaiting recovery)", or "failed after 3 attempts" with the reason. **Re-parse** always starts a fresh job.
 
 **Requirements follow you into the editor.** The rows mapped to a section are handed to the AI drafter and the section chat verbatim as that section's contract ("address every one; reference its number inline"), ahead of the general requirement list, and the health scan judges compliance against the full list rather than a 20-clause sample.

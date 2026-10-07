@@ -10,6 +10,7 @@
  * dispatcher is a cron worker and reads across tenants by design, like
  * the key-date reminders in this folder.
  */
+import { activeRequirements, type ReviewedRequirement } from "@/lib/requirement-review";
 import "server-only";
 
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
@@ -283,7 +284,8 @@ async function storePairs(input: {
   addedByUserId: string | null;
 }): Promise<{ added: number; duplicates: number; flagged: number }> {
   const { organizationId } = input;
-  const requirements = input.sol.extractedRequirements.map((r) => ({ ref: r.ref ?? "", text: r.text }));
+  // BL-AIX Phase 2c — answers are matched to the clauses the team kept.
+  const requirements = activeRequirements(input.sol.extractedRequirements as ReviewedRequirement[]).map((r) => ({ ref: r.ref ?? "", text: r.text }));
   const matches = matchQaToRequirements(input.pairs, requirements);
   let added = 0;
   let duplicates = 0;

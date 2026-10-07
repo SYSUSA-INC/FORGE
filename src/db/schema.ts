@@ -4427,6 +4427,37 @@ export const aiEvalRatings = pgTable(
 
 export type AiEvalRating = typeof aiEvalRatings.$inferSelect;
 
+// BL-AIX Phase 2c — a person's verdict on an extracted requirement,
+// keyed by the wording intake produced so it survives a re-parse, and
+// kept as labelled data for this organization only (drizzle/0124).
+export const requirementCorrections = pgTable(
+  "requirement_correction",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    solicitationId: uuid("solicitation_id")
+      .notNull()
+      .references(() => solicitations.id, { onDelete: "cascade" }),
+    /** "" for the solicitation's own clauses, else the companion document's id. */
+    docKey: text("doc_key").notNull().default(""),
+    originalKey: text("original_key").notNull(),
+    action: text("action").$type<import("@/lib/requirement-review").ReviewAction>().notNull(),
+    original: jsonb("original").$type<Partial<Pick<SolicitationRequirement, "kind" | "text" | "ref">>>().notNull().default(sql`'{}'::jsonb`),
+    corrected: jsonb("corrected").$type<Partial<Pick<SolicitationRequirement, "kind" | "text" | "ref">>>().notNull().default(sql`'{}'::jsonb`),
+    promptVersion: text("prompt_version").notNull().default(""),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    oneVerdictIdx: uniqueIndex("requirement_correction_org_sol_doc_key_idx").on(t.organizationId, t.solicitationId, t.docKey, t.originalKey),
+  }),
+);
+
+export type RequirementCorrection = typeof requirementCorrections.$inferSelect;
+
 // BL-AIX Phase 1h-1 — one run of the Brain retrieval eval for a tenant:
 // sections of its own won proposals searched the way the drafter
 // searches, scored by whether their winning text comes back.
