@@ -5,11 +5,15 @@ import { burnDown, featureRoutingRows } from "@/lib/ai-control";
 import { getAiControlState, getTenantAiUsage, type AiControlState, type TenantAiUsage } from "@/lib/ai-engine-control";
 import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { listEvalRuns, listGoldenCases } from "@/lib/golden-eval";
+import { BRAIN_RETRIEVAL_VERSION } from "@/lib/brain-rank";
+import { listRetrievalEvalRuns } from "@/lib/retrieval-eval";
+import type { RetrievalCaseResult, RetrievalSummary } from "@/lib/retrieval-eval-logic";
 import { safeQuery } from "@/lib/schema-resilience";
 import { getAIEngineStatus } from "@/lib/settings-status";
 import { AIEngineTab } from "../AIEngineTab";
 import { AiControlPanel } from "./AiControlPanel";
 import { GoldenEvalPanel } from "./GoldenEvalPanel";
+import { RetrievalEvalPanel } from "./RetrievalEvalPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +45,7 @@ export default async function AiEnginePage() {
 
   // BL-AIP-7c — the control panel's state and this month's usage;
   // BL-AIP-5b — golden eval history and the size of the golden set.
-  const [state, usage, runs, cases] = await Promise.all([
+  const [state, usage, runs, cases, retrievalRuns] = await Promise.all([
     safeQuery<AiControlState>(() => getAiControlState({ organizationId }), EMPTY_STATE, { tag: "ai-engine.state" }),
     safeQuery<TenantAiUsage>(
       () => getTenantAiUsage({ organizationId, since: monthStart }),
@@ -50,6 +54,7 @@ export default async function AiEnginePage() {
     ),
     safeQuery(() => listEvalRuns({ organizationId, limit: 12 }), [], { tag: "ai-engine.evalRuns" }),
     safeQuery(() => listGoldenCases({ organizationId, limit: 50 }), [], { tag: "ai-engine.goldenCases" }),
+    safeQuery(() => listRetrievalEvalRuns({ organizationId, limit: 8 }), [], { tag: "ai-engine.retrievalRuns" }),
   ]);
 
   const monthLabel = monthStart.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -114,6 +119,22 @@ export default async function AiEnginePage() {
           }))}
           goldenCases={cases.length}
           currentPromptVersion={SECTION_DRAFT_PROMPT_VERSION}
+          isAdmin={isAdmin}
+        />
+      </div>
+      <div className="mt-4">
+        <RetrievalEvalPanel
+          runs={retrievalRuns.map((r) => ({
+            id: r.id,
+            retrievalVersion: r.retrievalVersion,
+            embeddingProvider: r.embeddingProvider,
+            caseCount: r.caseCount,
+            stubbed: r.stubbed,
+            createdAt: r.createdAt.toISOString(),
+            summary: r.summary as RetrievalSummary,
+            results: r.results as RetrievalCaseResult[],
+          }))}
+          currentVersion={BRAIN_RETRIEVAL_VERSION}
           isAdmin={isAdmin}
         />
       </div>

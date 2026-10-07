@@ -34,6 +34,7 @@ import { searchBrain } from "@/lib/brain-retrieval";
 import { voiceGuidance } from "@/lib/customer-voice";
 import { getCustomerVoice } from "@/lib/customer-voice-signals";
 import {
+  draftSourcesQuery,
   MAX_DRAFT_SOURCES,
   SOURCE_EXCERPT_CHARS,
   type DraftSource,
@@ -389,17 +390,7 @@ export async function gatherDraftSources(input: {
   currentBodyPlain: string;
   pastPerformance: { customer: string; contract: string; description: string }[];
 }): Promise<{ sources: DraftSource[]; stubbed: boolean }> {
-  const query = [
-    `Section: ${input.sectionTitle} (${input.sectionKind.replace(/_/g, " ")})`,
-    input.agency ? `Agency: ${input.agency}` : "",
-    input.naicsCode ? `NAICS ${input.naicsCode}` : "",
-    input.opportunityDescription
-      ? `Opportunity: ${input.opportunityDescription.slice(0, 600)}`
-      : "",
-    input.currentBodyPlain ? `Current draft: ${input.currentBodyPlain.slice(0, 600)}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const query = draftSourcesQuery(input);
 
   const sources: DraftSource[] = [];
   let stubbed = false;

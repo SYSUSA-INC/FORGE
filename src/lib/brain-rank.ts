@@ -87,6 +87,14 @@ export function rankBoost(input: RankInput, now: Date = new Date()): number {
 export const RRF_K = 60;
 
 /**
+ * BL-AIX Phase 1h-1 — the revision of Brain ranking (the RRF fusion, the
+ * boosts and their weights, the candidate limits). Stored on every
+ * retrieval eval run so recall can be compared across ranking changes.
+ * Bump it whenever any of those change.
+ */
+export const BRAIN_RETRIEVAL_VERSION = "2026-10-07.1";
+
+/**
  * Reciprocal rank fusion. Each list is ordered best-first; an id's fused
  * score is the sum over the lists it appears in of 1 / (k + rank). Ids
  * that both signals like rise above ids only one signal likes, without
