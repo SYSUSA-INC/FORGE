@@ -256,6 +256,7 @@ const PLATFORM_NAV: WorkspaceNavGroup[] = [
       { href: "/admin/errors", label: "Production errors" },
       { href: "/admin/migrations", label: "Database migrations" },
       { href: "/admin/sba-8a", label: "SBA 8(a) registry" },
+      { href: "/admin/gold-set", label: "Extraction gold set" },
       { href: "/platform/audit-log", label: "Audit Log" },
     ],
   },

@@ -4337,6 +4337,71 @@ export type AiEvalRun = typeof aiEvalRuns.$inferSelect;
 export type NewAiEvalRun = typeof aiEvalRuns.$inferInsert;
 
 /**
+ * BL-AIX Phase 1e — the extraction gold set (migration 0115). Public
+ * SAM.gov RFPs annotated with what a correct extraction must find, the
+ * annotations reviewed by the owner's proposal expert. A platform asset
+ * managed under /admin: no organization_id, no tenant data, used only to
+ * measure extraction accuracy and never trained on.
+ */
+export type GoldDocFile = { name: string; chars: number; note?: string };
+
+export const extractionGoldDocs = pgTable(
+  "extraction_gold_doc",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    noticeId: text("notice_id").notNull().default(""),
+    solicitationNumber: text("solicitation_number").notNull().default(""),
+    sourceUrl: text("source_url").notNull().default(""),
+    files: jsonb("files").$type<GoldDocFile[]>().notNull().default(sql`'[]'::jsonb`),
+    rawText: text("raw_text").notNull().default(""),
+    /** draft → in_review → approved. */
+    status: text("status").notNull().default("draft"),
+    notes: text("notes").notNull().default(""),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    approvedByUserId: text("approved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    noticeIdx: uniqueIndex("extraction_gold_doc_notice_idx").on(t.noticeId).where(sql`${t.noticeId} <> ''`),
+  }),
+);
+
+export const extractionGoldItems = pgTable(
+  "extraction_gold_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docId: uuid("doc_id")
+      .notNull()
+      .references(() => extractionGoldDocs.id, { onDelete: "cascade" }),
+    /** requirement | page_limit | eval_factor. */
+    kind: text("kind").notNull(),
+    ref: text("ref").notNull().default(""),
+    text: text("text").notNull(),
+    /** A page limit's number and format, or an evaluation factor's relative importance. */
+    value: text("value").notNull().default(""),
+    /** Order of evaluation factors (1 = most important); 0 elsewhere. */
+    position: integer("position").notNull().default(0),
+    /** ai | expert. */
+    origin: text("origin").notNull().default("expert"),
+    /** proposed | approved | rejected. */
+    status: text("status").notNull().default("proposed"),
+    reviewedByUserId: text("reviewed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    docIdx: index("extraction_gold_item_doc_idx").on(t.docId, t.kind, t.position),
+  }),
+);
+
+export type ExtractionGoldDoc = typeof extractionGoldDocs.$inferSelect;
+export type ExtractionGoldItem = typeof extractionGoldItems.$inferSelect;
+
+/**
  * BL-AIP-7a — stored, grounded, graded briefs. One row per generated
  * pursuit or pipeline brief: the snapshot it was written from, the
  * model's structured take, the reader's feedback and, once the
