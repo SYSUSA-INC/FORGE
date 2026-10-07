@@ -4345,6 +4345,18 @@ export type NewAiEvalRun = typeof aiEvalRuns.$inferInsert;
  */
 export type GoldDocFile = { name: string; chars: number; note?: string };
 
+/** BL-AIX Phase 1e-2 — progress of the AI draft of a document's annotations (migration 0116). */
+export type GoldAiDraftState = {
+  doneChars?: number;
+  windowsDone?: number;
+  windowsFailed?: number;
+  proposed?: number;
+  duplicates?: number;
+  model?: string;
+  promptVersion?: string;
+  updatedAt?: string;
+};
+
 export const extractionGoldDocs = pgTable(
   "extraction_gold_doc",
   {
@@ -4358,6 +4370,7 @@ export const extractionGoldDocs = pgTable(
     /** draft → in_review → approved. */
     status: text("status").notNull().default("draft"),
     notes: text("notes").notNull().default(""),
+    aiDraft: jsonb("ai_draft").$type<GoldAiDraftState>().notNull().default(sql`'{}'::jsonb`),
     createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
     approvedByUserId: text("approved_by_user_id").references(() => users.id, { onDelete: "set null" }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),

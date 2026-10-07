@@ -4,7 +4,18 @@
  * attachments and searching the text.
  */
 import { describe, expect, it } from "vitest";
-import { canApproveGoldDoc, cleanGoldItem, findInText, goldProgress, joinGoldFiles, GOLD_MAX_TEXT_CHARS } from "@/lib/gold-set-logic";
+import {
+  canApproveGoldDoc,
+  cleanGoldItem,
+  findInText,
+  goldProgress,
+  goldWindows,
+  joinGoldFiles,
+  mergeDraftedItems,
+  nextGoldWindow,
+  GOLD_MAX_TEXT_CHARS,
+  GOLD_WINDOW_CHARS,
+} from "@/lib/gold-set-logic";
 
 describe("BL-AIX Phase 1e — gold set rules", () => {
   it("cleans an annotation and refuses unusable ones", () => {
@@ -60,5 +71,66 @@ describe("BL-AIX Phase 1e — gold set rules", () => {
     expect(hits.map((h) => h.at)).toEqual([9, 46]);
     expect(hits[0]!.snippet).toBe("…olume I shall not exceed 25 page…");
     expect(findInText(text, "ab")).toEqual([]);
+  });
+});
+
+describe("BL-AIX Phase 1e-2 — drafting windows and merging", () => {
+  const para = (i: number) => `Paragraph ${i}. The contractor shall do task ${i}.\n\n`;
+
+  it("covers the whole text in overlapping windows ending on breaks, with no ceiling", () => {
+    const text = Array.from({ length: 30_000 }, (_, i) => para(i)).join("");
+    const w = goldWindows(text);
+    expect(w.length).toBeGreaterThan(12);
+    expect(w[0]!.start).toBe(0);
+    expect(w[w.length - 1]!.end).toBe(text.length);
+    for (let i = 1; i < w.length; i++) {
+      expect(w[i]!.start).toBeLessThan(w[i - 1]!.end);
+      expect(w[i - 1]!.end - w[i - 1]!.start).toBeLessThanOrEqual(GOLD_WINDOW_CHARS);
+      expect(text[w[i - 1]!.end - 1]).toMatch(/\n|\./);
+    }
+    expect(goldWindows("short")).toEqual([{ index: 0, start: 0, end: 5 }]);
+    expect(goldWindows("")).toEqual([]);
+  });
+
+  it("picks the next window by characters done, so appended text is drafted too", () => {
+    const text = Array.from({ length: 3_000 }, (_, i) => para(i)).join("");
+    const all = goldWindows(text);
+    expect(nextGoldWindow(text, 0)?.window).toEqual(all[0]);
+    expect(nextGoldWindow(text, all[0]!.end)?.window).toEqual(all[1]);
+    expect(nextGoldWindow(text, text.length)).toBeNull();
+    const grown = `${text}\n\n===== Q&A =====\nOfferors shall submit resumes.`;
+    expect(nextGoldWindow(grown, text.length)?.window.end).toBe(grown.length);
+  });
+
+  it("drops duplicates of existing annotations (rejected ones too) and within the batch, and numbers factors after existing ones", () => {
+    const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+    const { items, duplicates } = mergeDraftedItems(
+      {
+        requirements: [
+          { ref: "C.1", text: "The contractor shall migrate 40 applications." },
+          { ref: "C.2", text: "The contractor shall provide 24x7 support." },
+          { ref: "", text: "THE CONTRACTOR SHALL PROVIDE 24X7 SUPPORT." },
+          { ref: "", text: "  " },
+        ],
+        pageLimits: [{ ref: "L.5", text: "Volume I shall not exceed 25 pages.", value: "25 pages" }],
+        evalFactors: [
+          { ref: "M.2", name: "Past performance", importance: "less important", order: 2 },
+          { ref: "M.1", name: "Management approach", importance: "most important", order: 1 },
+        ],
+      },
+      [
+        { kind: "requirement", text: "The contractor shall migrate 40 applications.", position: 0 },
+        { kind: "eval_factor", text: "Technical approach", position: 1 },
+      ],
+      same,
+    );
+    expect(duplicates).toBe(2);
+    expect(items.map((i) => [i.kind, i.text, i.position])).toEqual([
+      ["requirement", "The contractor shall provide 24x7 support.", 0],
+      ["page_limit", "Volume I shall not exceed 25 pages.", 0],
+      ["eval_factor", "Management approach", 2],
+      ["eval_factor", "Past performance", 3],
+    ]);
+    expect(items.find((i) => i.kind === "page_limit")?.value).toBe("25 pages");
   });
 });

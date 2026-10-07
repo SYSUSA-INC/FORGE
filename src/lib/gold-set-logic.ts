@@ -128,3 +128,85 @@ export function findInText(text: string, query: string, limit = 25, context = 16
   }
   return hits;
 }
+
+// ── BL-AIX Phase 1e-2 — AI-drafted annotations ────────────────────────
+
+/** Window size for drafting; small enough that the model lists everything in it. */
+export const GOLD_WINDOW_CHARS = 40_000;
+export const GOLD_WINDOW_OVERLAP = 1_500;
+
+export type GoldWindow = { index: number; start: number; end: number };
+
+/**
+ * Windows over the whole text, each ending on a paragraph or sentence
+ * break where one is near. Unlike live extraction there is no ceiling on
+ * the count: a gold document is read end to end.
+ */
+export function goldWindows(text: string): GoldWindow[] {
+  const out: GoldWindow[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(text.length, start + GOLD_WINDOW_CHARS);
+    if (end < text.length) {
+      const tail = text.slice(start + Math.floor(GOLD_WINDOW_CHARS * 0.85), end);
+      const cut = Math.max(tail.lastIndexOf("\n\n"), tail.lastIndexOf("\n"), tail.lastIndexOf(". "));
+      if (cut >= 0) end = start + Math.floor(GOLD_WINDOW_CHARS * 0.85) + cut + 1;
+    }
+    out.push({ index: out.length, start, end });
+    if (end >= text.length) break;
+    start = Math.max(end - GOLD_WINDOW_OVERLAP, start + 1);
+  }
+  return out;
+}
+
+/** The first window that ends after `doneChars`: the next one to draft, or null when the whole text is done. */
+export function nextGoldWindow(text: string, doneChars: number): { window: GoldWindow; count: number } | null {
+  const all = goldWindows(text);
+  const next = all.find((w) => w.end > doneChars);
+  return next ? { window: next, count: all.length } : null;
+}
+
+export type DraftedItem = { kind: GoldKind; ref: string; text: string; value: string; position: number };
+export type ExistingItem = { kind: string; text: string; position: number };
+
+/**
+ * Turn one window's model output into new proposed annotations: cleaned,
+ * minus anything that matches an annotation the document already has (any
+ * origin or status, so a rejected one is never proposed again) or an
+ * earlier one in the same batch. Evaluation factors keep the window's order
+ * and are numbered after the document's existing factors.
+ */
+export function mergeDraftedItems(
+  output: {
+    requirements: { ref: string; text: string }[];
+    pageLimits: { ref: string; text: string; value: string }[];
+    evalFactors: { ref: string; name: string; importance: string; order: number }[];
+  },
+  existing: ExistingItem[],
+  isSame: (a: string, b: string) => boolean,
+): { items: DraftedItem[]; duplicates: number } {
+  const seen: ExistingItem[] = [...existing];
+  const items: DraftedItem[] = [];
+  let duplicates = 0;
+  let nextFactor = Math.max(0, ...existing.filter((e) => e.kind === "eval_factor").map((e) => e.position)) + 1;
+
+  const take = (raw: { kind: GoldKind; ref?: string; text: string; value?: string; position?: number }) => {
+    const clean = cleanGoldItem(raw);
+    if (!clean.ok) return;
+    const { item } = clean;
+    if (seen.some((e) => e.kind === item.kind && isSame(e.text, item.text))) {
+      duplicates += 1;
+      return;
+    }
+    if (item.kind === "eval_factor") item.position = nextFactor++;
+    seen.push(item);
+    items.push(item);
+  };
+
+  for (const r of output.requirements) take({ kind: "requirement", ref: r.ref, text: r.text });
+  for (const p of output.pageLimits) take({ kind: "page_limit", ref: p.ref, text: p.text, value: p.value });
+  for (const f of [...output.evalFactors].sort((a, b) => a.order - b.order)) {
+    take({ kind: "eval_factor", ref: f.ref, text: f.name, value: f.importance });
+  }
+  return { items, duplicates };
+}

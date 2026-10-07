@@ -23,6 +23,7 @@ import {
   buildCompliancePreflightPrompt,
   buildEbuyExtractPrompt,
   buildGraphicsSuggestPrompt,
+  buildGoldAnnotatePrompt,
   buildGsaExtractPrompt,
   buildImageOcrPrompt,
   buildKnowledgeExtractPrompt,
@@ -46,6 +47,7 @@ import {
   compliancePreflightResponseSchema,
   ebuyExtractionSchema,
   graphicsSuggestSchema,
+  goldAnnotateSchema,
   gsaExtractionSchema,
   knowledgeExtractionSchema,
   onboardingAssistSchema,
@@ -388,6 +390,7 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
     buildGraphicsSuggestPrompt({ title: "Technical Approach", kind: "technical", agency: "GSA", text: "Wave 1 assesses, wave 2 migrates, wave 3 decommissions." }),
   ],
   review_summary: () => [buildReviewSummaryPrompt({ report: "Pink team: 4 comments on Technical Approach.", uncheckedLabels: ["Page limits checked"] })],
+  gold_annotate: () => [buildGoldAnnotatePrompt({ title: "Cloud migration support", windowText: RFP_TEXT, windowIndex: 0, windowCount: 3 })],
 };
 
 /** What structured calls hand the model as their output tool, per feature. */
@@ -419,6 +422,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   onboarding_assist: [onboardingAssistSchema],
   graphics_suggest: [graphicsSuggestSchema],
   review_summary: [reviewSummarySchema],
+  gold_annotate: [goldAnnotateSchema],
 };
 
 function scanPrompt(): RenderedPrompt {

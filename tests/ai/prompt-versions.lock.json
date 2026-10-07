@@ -21,6 +21,10 @@
       "version": "2026-10-05.1",
       "sha256": "8a8f3bfe05a63470160e67b95dce590746c6546c403c7ce58ea98b495086522c"
     },
+    "gold_annotate": {
+      "version": "2026-10-07.1",
+      "sha256": "eb0d5443323fdc4b510bb5897226b6491785b11b7b2dcdc00d8f4bb43d1ca4d5"
+    },
     "graphics_suggest": {
       "version": "2026-10-03.1",
       "sha256": "c10dfcdaab3996f941f9e4c6609531cdf4f4f449e69b56891ddda7e26f0d6e35"

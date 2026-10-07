@@ -14,6 +14,7 @@ import {
   setGoldDocApproved,
   updateGoldItem,
 } from "@/lib/gold-set";
+import { draftGoldAnnotations, resetGoldDraft } from "@/lib/gold-set-draft";
 import { isGoldItemStatus, type TextHit } from "@/lib/gold-set-logic";
 import { log } from "@/lib/log";
 
@@ -149,4 +150,46 @@ export async function deleteGoldDocAction(docId: string): Promise<Done> {
 export async function searchGoldDocTextAction(input: { docId: string; query: string }): Promise<TextHit[]> {
   await requireSuperadmin();
   return searchGoldDocText(input.docId, input.query);
+}
+
+/**
+ * BL-AIX Phase 1e-2 — draft annotations with AI for as long as one call's
+ * budget allows; the page calls again until the whole text is read. Usage
+ * is metered to the acting admin's own organisation.
+ */
+export async function draftGoldAnnotationsAction(docId: string): Promise<
+  { ok: true; done: boolean; windowsDone: number; totalWindows: number; proposed: number } | { ok: false; error: string }
+> {
+  const actor = await requireSuperadmin();
+  if (!actor.organizationId) {
+    return { ok: false, error: "AI calls are metered to an organisation and your account has none. Use a platform admin account that belongs to one." };
+  }
+  try {
+    const res = await draftGoldAnnotations({ docId, organizationId: actor.organizationId });
+    if (!res.ok) return res;
+    if (res.windowsThisRun > 0) {
+      await audit(actor, "gold_set.ai_draft", docId, {
+        windows: res.windowsThisRun,
+        windowsDone: res.state.windowsDone,
+        totalWindows: res.totalWindows,
+        proposed: res.state.proposed,
+        model: res.state.model,
+        promptVersion: res.state.promptVersion,
+      });
+    }
+    refresh(docId);
+    return { ok: true, done: res.done, windowsDone: res.state.windowsDone ?? 0, totalWindows: res.totalWindows, proposed: res.state.proposed ?? 0 };
+  } catch (err) {
+    log.warn("[draftGoldAnnotationsAction]", "draft failed", { docId, error: err });
+    refresh(docId);
+    return { ok: false, error: `The AI draft stopped: ${err instanceof Error ? err.message : String(err)}. Progress so far is kept; try again.` };
+  }
+}
+
+export async function resetGoldDraftAction(docId: string): Promise<Done> {
+  const actor = await requireSuperadmin();
+  await resetGoldDraft(docId);
+  await audit(actor, "gold_set.ai_draft_reset", docId);
+  refresh(docId);
+  return { ok: true };
 }

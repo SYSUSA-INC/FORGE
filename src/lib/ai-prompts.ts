@@ -2307,3 +2307,71 @@ export function buildImageOcrPrompt(): { system: string; messages: AIMessage[] }
     messages: [{ role: "user", content: "Transcribe the attached image. Return plain text only." }],
   };
 }
+
+// ────────────────────────────────────────────────────────────────────
+// BL-AIX Phase 1e-2 — drafts of a gold-set document's annotations
+// ────────────────────────────────────────────────────────────────────
+
+export const goldAnnotateSchema = z.object({
+  requirements: z
+    .array(z.object({ ref: z.string().describe("Paragraph number as printed, e.g. L.5.2.1 or C.3.4; empty if none."), text: z.string().describe("The obligation, quoted from the document.") }))
+    .describe("Every obligation on the offeror or contractor in this window."),
+  pageLimits: z
+    .array(
+      z.object({
+        ref: z.string(),
+        text: z.string().describe("The limit as the document states it, quoted."),
+        value: z.string().describe("The limit in short form, e.g. '25 pages', '12 pt Times New Roman', 'PDF only'."),
+      }),
+    )
+    .describe("Every page, length, font, margin, file-format or submission-format limit in this window."),
+  evalFactors: z
+    .array(
+      z.object({
+        ref: z.string(),
+        name: z.string().describe("The factor or subfactor name as printed."),
+        importance: z.string().describe("Its relative importance as the document states it, e.g. 'most important', 'equal to Factor 2', '40%'; empty if not stated."),
+        order: z.number().describe("1 for the first factor listed in this window, 2 for the next, and so on."),
+      }),
+    )
+    .describe("Section M (or equivalent) evaluation factors and subfactors in this window, in the order the document lists them."),
+});
+
+export type GoldAnnotateOutput = z.infer<typeof goldAnnotateSchema>;
+
+const GOLD_ANNOTATE_SYSTEM = `You are a senior federal proposal compliance analyst building a reference ("gold") annotation of a public solicitation. Your annotations will be checked by a proposal expert and then used to measure how accurately software reads solicitations, so completeness and fidelity matter more than brevity.
+
+You read one window of the solicitation at a time. Record everything in this window that falls into the three lists, and nothing else:
+
+1. requirements — every obligation the solicitation places on the offeror or the contractor: "shall", "must", "will", "is required to", "is responsible for", "the offeror's proposal shall include". This covers Section L instructions (what the proposal must contain), the statement or performance work statement (what the contractor must do), required certifications and representations, and clauses that require the offeror to act. One entry per distinct obligation; split a sentence that imposes several. Do not include descriptions of the Government's own actions, background, or definitions.
+2. pageLimits — every page, length, font, margin, spacing, file-format, file-size or submission-format limit, with the short value.
+3. evalFactors — the evaluation factors and subfactors, in the order listed, with their relative importance exactly as stated (order of importance, weights, "equal", adjectival scales).
+
+Rules:
+- Quote the solicitation's own words. Do not paraphrase, summarise, merge across paragraphs or invent anything.
+- Give the paragraph reference exactly as printed, or leave it empty.
+- A window may start or end mid-sentence: skip a fragment you cannot read in full; the neighbouring window covers it.
+- Tables of contents, headers and footers are not requirements.
+- If the window holds nothing for a list, return it empty.`;
+
+export function buildGoldAnnotatePrompt(input: {
+  title: string;
+  windowText: string;
+  windowIndex: number;
+  windowCount: number;
+}): { system: string; messages: AIMessage[] } {
+  return {
+    system: GOLD_ANNOTATE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: [
+          `Solicitation: ${input.title}`,
+          `Window ${input.windowIndex + 1} of ${input.windowCount}:`,
+          fenced(input.windowText),
+          "Record every requirement, page or format limit and evaluation factor in this window.",
+        ].join("\n\n"),
+      },
+    ],
+  };
+}

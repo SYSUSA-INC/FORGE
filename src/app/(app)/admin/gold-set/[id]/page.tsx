@@ -5,6 +5,7 @@ import { Panel } from "@/components/ui/Panel";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { getGoldDoc } from "@/lib/gold-set";
 import { canApproveGoldDoc } from "@/lib/gold-set-logic";
+import { AiDraftPanel } from "./AiDraftPanel";
 import { GoldReviewClient } from "./GoldReviewClient";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,9 @@ export default async function GoldDocPage({ params }: { params: { id: string } }
         </ul>
         {doc.notes ? <p className="mt-2 font-mono text-[11px] text-gold">{doc.notes}</p> : null}
       </Panel>
+      <div className="mt-4">
+        <AiDraftPanel docId={doc.id} state={doc.aiDraft} approved={doc.status === "approved"} />
+      </div>
       <div className="mt-4">
         <GoldReviewClient
           docId={doc.id}
