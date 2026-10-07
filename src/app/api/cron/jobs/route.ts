@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { collectAiBatches } from "@/lib/ai-batch-queue";
 import { runJobsCron } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
@@ -15,7 +16,8 @@ export const maxDuration = 300;
  * failed once their attempts are spent) and runs due `queued` rows —
  * solicitation parses, companion-document parses and proposal harvests
  * — from the stored file bytes, three per tick inside a time budget.
- * See `runJobsCron`.
+ * See `runJobsCron`. First it reads any finished AI batches (BL-AIX
+ * Phase 1g-2, `collectAiBatches`), inside a minute of its own.
  *
  * Auth: Bearer ${CRON_SECRET} — same pattern as all other cron routes.
  */
@@ -39,9 +41,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await runJobsCron();
-    log.info("[jobs-cron]", "tick complete", result);
-    return NextResponse.json({ ok: true, ...result });
+    const batches = await collectAiBatches({ budgetMs: 60_000 }).catch((err) => {
+      log.error("[jobs-cron]", "AI batch collection failed", { error: err });
+      return null;
+    });
+    const result = await runJobsCron({ budgetMs: 180_000 });
+    log.info("[jobs-cron]", "tick complete", { ...result, batches });
+    return NextResponse.json({ ok: true, ...result, batches });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.error("[jobs-cron]", "cron run failed", { error: message });

@@ -34,6 +34,8 @@ export type ScoutCandidateView = {
   fitScore: number;
   signals: string[];
   recommendation: ScoutRecommendation | null;
+  /** BL-AIX Phase 1g-2 — its triage is waiting on a batch. */
+  triageQueued: boolean;
   confidence: number | null;
   rationale: string;
   nextActions: string[];

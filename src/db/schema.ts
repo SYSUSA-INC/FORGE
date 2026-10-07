@@ -780,6 +780,9 @@ export const aiCallLogs = pgTable(
     viaTool: boolean("via_tool").notNull().default(false),
     parseOk: boolean("parse_ok"),
     parseError: text("parse_error"),
+    // BL-AIX Phase 1g-2 — served through a Message Batch (half price;
+    // latency_ms is 0 because queue time is not provider latency).
+    batched: boolean("batched").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -798,6 +801,48 @@ export const aiCallLogs = pgTable(
 
 export type AiCallLog = typeof aiCallLogs.$inferSelect;
 export type NewAiCallLog = typeof aiCallLogs.$inferInsert;
+
+// BL-AIX Phase 1g-2 — one tenant's requests sent to the provider as a
+// single Message Batch (half price, results within 24 hours). `requests`
+// keeps what the collector needs to log each outcome like a live call;
+// `context` is the feature's own (the scout run it came from).
+export type AiBatchStatus = "submitted" | "processing" | "processed" | "failed";
+export type AiBatchRequestMeta = {
+  customId: string;
+  requestedModel: string;
+  maxTokens: number | null;
+  cacheSystem: boolean;
+  hasDocuments: boolean;
+};
+
+export const aiBatches = pgTable(
+  "ai_batch",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    promptVersion: text("prompt_version").notNull().default(""),
+    provider: text("provider").notNull().default("anthropic"),
+    externalId: text("external_id").notNull(),
+    status: text("status").$type<AiBatchStatus>().notNull().default("submitted"),
+    requests: jsonb("requests").$type<AiBatchRequestMeta[]>().notNull().default(sql`'[]'::jsonb`),
+    context: jsonb("context").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    succeeded: integer("succeeded").notNull().default(0),
+    failed: integer("failed").notNull().default(0),
+    error: text("error"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => ({
+    orgSubmittedIdx: index("ai_batch_org_submitted_idx").on(t.organizationId, t.submittedAt),
+    statusCheckedIdx: index("ai_batch_status_checked_idx").on(t.status, t.checkedAt),
+  }),
+);
+
+export type AiBatch = typeof aiBatches.$inferSelect;
 
 // BL-FB-CHAT-PERSIST — one row per turn of the AI-assist chat on a
 // proposal section. The server reads the last N turns as model context
@@ -4608,6 +4653,8 @@ export const scoutCandidates = pgTable(
     promptVersion: text("prompt_version").notNull().default(""),
     model: text("model").notNull().default(""),
     stubbed: boolean("stubbed").notNull().default(false),
+    /** BL-AIX Phase 1g-2 — the batch its triage is waiting on; null once read or when triaged live. */
+    triageBatchId: uuid("triage_batch_id").references(() => aiBatches.id, { onDelete: "set null" }),
     /** correct | wrong | inconclusive, set by the human decision. */
     grade: text("grade"),
     decidedByUserId: text("decided_by_user_id").references(() => users.id, {

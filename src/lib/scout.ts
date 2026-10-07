@@ -31,7 +31,8 @@
  */
 import "server-only";
 
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import type { z } from "zod";
 import { db } from "@/db";
 import {
   bdWatchlistItems,
@@ -44,7 +45,9 @@ import {
   type ScoutCandidate,
   type ScoutCandidateSource,
 } from "@/db/schema";
-import { completeStructuredForTenant, getAIProviderStatus } from "@/lib/ai";
+import { completeStructuredForTenant, getAIProviderStatus, zodToToolSchema } from "@/lib/ai";
+import { batchingAvailable, type BatchRequest } from "@/lib/ai-batch";
+import { queueAiBatch, type BatchHandler } from "@/lib/ai-batch-queue";
 import {
   buildScoutTriagePrompt,
   SCOUT_TRIAGE_PROMPT_VERSION,
@@ -532,7 +535,18 @@ export async function runScoutForOrganization(input: {
     const queue = [...inserted].sort((a, b) => b.fitScore - a.fitScore).slice(0, maxTriage);
     const history = await learningHistory(organizationId);
     const track = await getScoutTrack({ organizationId });
-    for (const row of queue) {
+    const snapshotOf = (row: ScoutCandidate) => {
+      const s = byNotice.get(row.noticeId);
+      return buildSnapshot(org.name, org.primaryNaics, org.naicsList, org.socio, profile, row, s?.flag ?? null, s?.customer ?? null, history, track, now);
+    };
+    // BL-AIX Phase 1g-2 — the nightly run sends its triage as one batch
+    // (half price, read by the jobs cron); a manual run, another provider
+    // or a failed submit triages live as before.
+    const live =
+      input.trigger === "cron" && batchingAvailable() && queue.length > 0
+        ? await queueTriageBatch({ organizationId, runId: run?.id ?? null, queue, snapshotOf, summary, notes })
+        : queue;
+    for (const row of live) {
       try {
         await ensureFeature(organizationId, "aiAutoDraft");
         await enforceQuota(organizationId, "aiRequestsPerMonth");
@@ -544,10 +558,8 @@ export async function runScoutForOrganization(input: {
         }
         throw err;
       }
-      const s = byNotice.get(row.noticeId);
-      const snapshot = buildSnapshot(org.name, org.primaryNaics, org.naicsList, org.socio, profile, row, s?.flag ?? null, s?.customer ?? null, history, track, now);
       try {
-        const prompt = buildScoutTriagePrompt(snapshot);
+        const prompt = buildScoutTriagePrompt(snapshotOf(row));
         const res = await completeStructuredForTenant({
           organizationId,
           feature: "opportunity_triage",
@@ -593,6 +605,130 @@ export async function runScoutForOrganization(input: {
   await finishRun(organizationId, run?.id ?? null, summary, notes, now);
   return summary;
 }
+
+const TRIAGE_TOOL = { name: "record_scout_triage", description: "Record the scout's triage of this candidate." };
+
+/**
+ * BL-AIX Phase 1g-2 — gate each candidate like a live call (feature flag,
+ * request quota), then submit the lot as one batch and mark the
+ * candidates as waiting on it. Returns the candidates still to triage
+ * live: none when the batch went out, all of them when the submit failed
+ * (their quota is refunded first, and the live loop gates them again).
+ */
+async function queueTriageBatch(input: {
+  organizationId: string;
+  runId: string | null;
+  queue: ScoutCandidate[];
+  snapshotOf: (row: ScoutCandidate) => ScoutTriageSnapshot;
+  summary: ScoutRunSummary;
+  notes: string[];
+}): Promise<ScoutCandidate[]> {
+  const { organizationId, summary, notes } = input;
+  const gated: ScoutCandidate[] = [];
+  for (const row of input.queue) {
+    try {
+      await ensureFeature(organizationId, "aiAutoDraft");
+      await enforceQuota(organizationId, "aiRequestsPerMonth");
+    } catch (err) {
+      if (err instanceof FeatureGateError || err instanceof QuotaExceededError) {
+        summary.skippedGated += input.queue.length - gated.length;
+        notes.push(`Triage stopped: ${err.message}`);
+        break;
+      }
+      throw err;
+    }
+    gated.push(row);
+  }
+  if (gated.length === 0) return [];
+
+  const inputSchema = zodToToolSchema(scoutTriageSchema);
+  const requests: BatchRequest[] = gated.map((row) => {
+    const prompt = buildScoutTriagePrompt(input.snapshotOf(row));
+    return {
+      customId: row.id,
+      opts: {
+        system: prompt.system,
+        messages: prompt.messages,
+        tool: { ...TRIAGE_TOOL, inputSchema },
+        maxTokens: 600,
+        temperature: 0.2,
+        cacheSystem: true,
+      },
+    };
+  });
+  try {
+    const { batchId } = await queueAiBatch({
+      organizationId,
+      feature: "opportunity_triage",
+      promptVersion: SCOUT_TRIAGE_PROMPT_VERSION,
+      context: { runId: input.runId },
+      requests,
+    });
+    await db
+      .update(scoutCandidates)
+      .set({ triageBatchId: batchId, updatedAt: new Date() })
+      .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(scoutCandidates.id, gated.map((r) => r.id))));
+    notes.push(`Triage of ${gated.length} candidate${gated.length === 1 ? "" : "s"} went out as a batch at half price; results arrive within the hour.`);
+    return [];
+  } catch (err) {
+    await refundQuota(organizationId, "aiRequestsPerMonth", gated.length).catch(() => undefined);
+    // Over the token cap or past the trial: a live call would be refused too.
+    if (err instanceof QuotaExceededError) {
+      summary.skippedGated += gated.length;
+      notes.push(`Triage stopped: ${err.message}`);
+      return [];
+    }
+    log.warn("[scout]", "triage batch submit failed; triaging live", { organizationId, error: err });
+    notes.push("The triage batch could not be sent, so the scout triaged live.");
+    return gated;
+  }
+}
+
+/**
+ * BL-AIX Phase 1g-2 — applying a batched triage, under the batch's own
+ * organization and only to candidates still waiting on that batch.
+ */
+export const scoutTriageBatchHandler: BatchHandler<z.infer<typeof scoutTriageSchema>> = {
+  schema: scoutTriageSchema,
+  async apply({ organizationId, batchId, customId, data, model, promptVersion }) {
+    if (!isScoutRecommendation(data.recommendation)) return false;
+    const updated = await db
+      .update(scoutCandidates)
+      .set({
+        recommendation: data.recommendation,
+        confidence: clampConfidence(data.confidence),
+        rationale: data.rationale.trim().slice(0, 2_000),
+        nextActions: cleanList(data.nextActions, 3),
+        promptVersion,
+        model,
+        stubbed: false,
+        triageBatchId: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(scoutCandidates.id, customId), eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.triageBatchId, batchId)))
+      .returning({ id: scoutCandidates.id });
+    return updated.length > 0;
+  },
+  async fail({ organizationId, batchId, customId }) {
+    await refundQuota(organizationId, "aiRequestsPerMonth").catch(() => undefined);
+    await db
+      .update(scoutCandidates)
+      .set({ triageBatchId: null, updatedAt: new Date() })
+      .where(and(eq(scoutCandidates.id, customId), eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.triageBatchId, batchId)));
+  },
+  async finish({ organizationId, context }) {
+    const runId = typeof context.runId === "string" ? context.runId : null;
+    if (!runId) return;
+    const [row] = await db
+      .select({ n: count() })
+      .from(scoutCandidates)
+      .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.runId, runId), isNotNull(scoutCandidates.recommendation)));
+    await db
+      .update(scoutRuns)
+      .set({ triaged: Number(row?.n ?? 0) })
+      .where(and(eq(scoutRuns.id, runId), eq(scoutRuns.organizationId, organizationId)));
+  },
+};
 
 function buildSnapshot(
   organizationName: string,
@@ -777,6 +913,7 @@ function toView(row: ScoutCandidate, now: Date): ScoutCandidateView {
     fitScore: row.fitScore,
     signals: row.signals ?? [],
     recommendation: isScoutRecommendation(row.recommendation) ? row.recommendation : null,
+    triageQueued: !row.recommendation && row.triageBatchId !== null,
     confidence: row.confidence,
     rationale: row.rationale,
     nextActions: row.nextActions ?? [],
