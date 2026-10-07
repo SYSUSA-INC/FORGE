@@ -3,6 +3,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { describeCoverage } from "@/lib/extraction-coverage";
 import { hasLm, type LmStructure } from "@/lib/solicitation-lm";
+import { activeRequirements, type ReviewedRequirement } from "@/lib/requirement-review";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -384,6 +385,7 @@ export async function mergeSolicitationDocumentsAction(
   revalidatePath(`/solicitations/${solicitationId}`);
   return {
     ok: true,
-    mergedCount: (updated?.extractedRequirements ?? []).length,
+    // BL-AIX Phase 2c — the same count the requirement list shows (rejected left out).
+    mergedCount: activeRequirements((updated?.extractedRequirements ?? []) as ReviewedRequirement[]).length,
   };
 }

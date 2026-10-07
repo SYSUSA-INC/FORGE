@@ -19,7 +19,7 @@
  */
 import type { SolicitationRequirement } from "@/db/schema";
 import type { SourcedRequirement } from "@/lib/requirement-provenance";
-import { requirementKey } from "@/lib/requirements-text";
+import { dedupeRequirements, requirementKey } from "@/lib/requirements-text";
 
 export type ReviewAction = "confirmed" | "edited" | "rejected" | "added";
 export const REVIEW_ACTIONS: readonly ReviewAction[] = ["confirmed", "edited", "rejected", "added"];
@@ -98,6 +98,10 @@ export function applyCorrections<T extends ReviewedRequirement>(list: T[], corre
       out.push({ ...base, ...c.corrected, review: { ...review, original } });
     } else if (c.action === "rejected") {
       out.push({ ...base, review: { ...review, original } });
+    } else if (c.action === "added" && r.review?.status !== "added") {
+      // Extraction now finds the clause a person added: it stays extracted,
+      // vouched for, so removing the addition never removes the clause.
+      out.push({ ...base, review: { ...review, status: "confirmed" } });
     } else {
       out.push({ ...base, review });
     }
@@ -113,6 +117,72 @@ export function applyCorrections<T extends ReviewedRequirement>(list: T[], corre
     } as T);
   }
   return out;
+}
+
+/** A requirement as intake extracted it: its original wording and provenance, no verdict. */
+function asExtracted<T extends ReviewedRequirement>(r: T): T {
+  const { review: _review, ...rest } = r;
+  return { ...rest, ...originalOf(r) } as T;
+}
+
+/**
+ * The solicitation's list from what intake extracted and the team's
+ * verdicts: each document's verdicts are applied to that document's own
+ * clauses, then clauses repeated across documents are merged on their
+ * extracted wording (the solicitation's own first, then the companion
+ * documents in a fixed order). So an edit never lets a companion's copy
+ * of the old wording back in, and undoing an addition never removes a
+ * clause another document states.
+ */
+export function mergeWithCorrections(input: {
+  /** The solicitation's stored list; its own entries are those without `sourceDocId`. */
+  own: ReviewedRequirement[];
+  /** Each parsed companion document's extracted clauses, in a fixed order. */
+  docs: { id: string; requirements: SourcedRequirement[] }[];
+  corrections: Correction[];
+}): ReviewedRequirement[] {
+  const forDoc = (docKey: string) => input.corrections.filter((c) => c.docKey === docKey);
+  const own = applyCorrections(
+    input.own.filter((r) => !r.sourceDocId && r.review?.status !== "added").map(asExtracted),
+    forDoc(""),
+  );
+  const companions = input.docs.flatMap((d) =>
+    applyCorrections(
+      d.requirements.map((r) => ({ ...asExtracted(r as ReviewedRequirement), sourceDocId: d.id })),
+      forDoc(d.id),
+    ),
+  );
+  const wrap = (r: ReviewedRequirement) => ({ text: originalOf(r).text, item: r });
+  return dedupeRequirements(own.map(wrap), companions.map(wrap)).map((w) => w.item);
+}
+
+/**
+ * Verdicts across an opportunity's solicitations (newest first): a clause
+ * the team rejected or edited on one solicitation is treated the same way
+ * where another (an amendment repeating it) states it unreviewed. Matched
+ * on the extracted wording.
+ */
+export function applyOpportunityVerdicts(lists: ReviewedRequirement[][]): ReviewedRequirement[][] {
+  const verdicts = new Map<string, ReviewedRequirement>();
+  for (const list of lists) {
+    for (const r of list) {
+      if (r.review?.status !== "rejected" && r.review?.status !== "edited") continue;
+      const key = reviewKeyOf(r);
+      if (!verdicts.has(key)) verdicts.set(key, r);
+    }
+  }
+  if (verdicts.size === 0) return lists;
+  return lists.map((list) =>
+    list.map((r) => {
+      if (r.review) return r;
+      const v = verdicts.get(requirementKey(r.text));
+      if (!v) return r;
+      const original = originalOf(r);
+      return v.review!.status === "rejected"
+        ? { ...r, review: { ...v.review!, original } }
+        : { ...r, kind: v.kind, text: v.text, ref: v.ref, review: { ...v.review!, original } };
+    }),
+  );
 }
 
 /** What the matrix seed, the drafter and the scan should use: everything not rejected. */

@@ -136,6 +136,13 @@ export async function parseSolicitationFromBytes(
         eq(solicitations.id, solicitationId),
       ),
     );
+    // BL-AIX Phase 2c — re-apply the team's verdicts and roll companion
+    // documents back in, as the text path does below.
+    try {
+      await mergeSolicitationRequirements(solicitationId, organizationId);
+    } catch (err) {
+      log.warn("[parseSolicitationFromBytes]", "merge after vision parse failed", { error: err });
+    }
     revalidatePath(`/solicitations/${solicitationId}`);
     return;
   }
@@ -191,6 +198,13 @@ export async function parseSolicitationFromBytes(
         eq(solicitations.id, solicitationId),
       ),
     );
+    // BL-AIX Phase 2c — re-apply the team's verdicts and roll companion
+    // documents back in, as the text path does below.
+    try {
+      await mergeSolicitationRequirements(solicitationId, organizationId);
+    } catch (err) {
+      log.warn("[parseSolicitationFromBytes]", "merge after vision parse failed", { error: err });
+    }
     revalidatePath(`/solicitations/${solicitationId}`);
     return;
   }

@@ -12,7 +12,7 @@
  */
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   solicitationDocuments,
@@ -21,7 +21,12 @@ import {
 } from "@/db/schema";
 import { dedupeRequirements } from "@/lib/requirements-text";
 import type { SourcedRequirement } from "@/lib/requirement-provenance";
-import { activeRequirements, applyCorrections, type ReviewedRequirement } from "@/lib/requirement-review";
+import {
+  activeRequirements,
+  applyOpportunityVerdicts,
+  mergeWithCorrections,
+  type ReviewedRequirement,
+} from "@/lib/requirement-review";
 import { requirementCorrections } from "@/db/schema";
 
 export type OpportunityRequirements = {
@@ -65,9 +70,11 @@ export async function loadOpportunityRequirements(input: {
   let sectionLSummary = "";
   let sectionMSummary = "";
   let contributed = 0;
-  for (const row of rows) {
-    // BL-AIX Phase 2c — a requirement the team rejected reaches no reader.
-    const list = activeRequirements((row.extractedRequirements ?? []) as ReviewedRequirement[]);
+  // BL-AIX Phase 2c — a requirement the team rejected reaches no reader,
+  // even where an amendment on the same opportunity repeats it.
+  const lists = applyOpportunityVerdicts(rows.map((row) => (row.extractedRequirements ?? []) as ReviewedRequirement[]));
+  for (const [i, row] of rows.entries()) {
+    const list = activeRequirements(lists[i]!);
     if (list.length === 0 && !row.sectionLSummary && !row.sectionMSummary) continue;
     contributed += 1;
     requirements = dedupeRequirements(requirements, list);
@@ -124,32 +131,15 @@ export async function mergeSolicitationRequirements(
         eq(solicitationDocuments.solicitationId, solicitationId),
         eq(solicitationDocuments.organizationId, organizationId),
       ),
-    );
+    )
+    // A fixed order, so the same document's copy of a shared clause wins every merge.
+    .orderBy(asc(solicitationDocuments.createdAt), asc(solicitationDocuments.id));
   // The parent's own clauses are the untagged entries. Tagged entries are
   // rebuilt from the documents that still exist, so a deleted document's
   // clauses fall out here instead of persisting for good.
-  // BL-AIX Phase 2a — each entry keeps its provenance (`source`) through
-  // the merge; Phase 2c — and its review, so an edit can be matched again.
-  const parentReqs = (parentRow.extractedRequirements ?? []) as ReviewedRequirement[];
-  const ownReqs: ReviewedRequirement[] = parentReqs
-    .filter((r) => !r.sourceDocId)
-    .map((r) => ({
-      kind: r.kind,
-      text: r.text,
-      ref: r.ref,
-      ...(r.source ? { source: r.source } : {}),
-      ...(r.review ? { review: r.review } : {}),
-    }));
-
-  const companionReqs: SourcedRequirement[] = [];
-  for (const doc of docRows) {
-    if (doc.parseStatus !== "parsed") continue;
-    for (const r of (doc.extractedRequirements ?? []) as SourcedRequirement[]) {
-      companionReqs.push({ kind: r.kind, text: r.text, ref: r.ref, sourceDocId: doc.id, ...(r.source ? { source: r.source } : {}) });
-    }
-  }
-
-  // BL-AIX Phase 2c — the team's verdicts, re-applied on every merge.
+  // BL-AIX Phase 2a — each entry keeps its provenance (`source`); Phase
+  // 2c — the team's verdicts are applied to each document's own clauses
+  // before clauses repeated across documents are merged.
   const corrections = await db
     .select()
     .from(requirementCorrections)
@@ -159,9 +149,12 @@ export async function mergeSolicitationRequirements(
         eq(requirementCorrections.solicitationId, solicitationId),
       ),
     );
-  const merged = applyCorrections(
-    dedupeRequirements(ownReqs, companionReqs as ReviewedRequirement[]),
-    corrections.map((c) => ({
+  const merged = mergeWithCorrections({
+    own: (parentRow.extractedRequirements ?? []) as ReviewedRequirement[],
+    docs: docRows
+      .filter((d) => d.parseStatus === "parsed")
+      .map((d) => ({ id: d.id, requirements: (d.extractedRequirements ?? []) as SourcedRequirement[] })),
+    corrections: corrections.map((c) => ({
       docKey: c.docKey,
       originalKey: c.originalKey,
       action: c.action,
@@ -170,7 +163,7 @@ export async function mergeSolicitationRequirements(
       userId: c.userId,
       updatedAt: c.updatedAt,
     })),
-  );
+  });
   await db
     .update(solicitations)
     .set({ extractedRequirements: merged, updatedAt: new Date() })

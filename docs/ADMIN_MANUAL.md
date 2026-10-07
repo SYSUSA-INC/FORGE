@@ -848,7 +848,8 @@ A cached block shorter than the model's minimum (about 1,000 tokens on Sonnet) i
 **Verify and correct (BL-AIX Phase 2c-1).** Migration 0124 adds `requirement_correction`; sync it after deploying.
 - **The screen.** **Verify** on a solicitation's requirement list opens `/solicitations/[id]/verify`. Any member can confirm, edit or reject an extracted requirement against the document text around it, add one the extraction missed, or undo a verdict.
 - **Where verdicts go.** A rejected requirement no longer reaches the compliance matrix seed, the drafter, the chat, the health scan, the outline or Q&A matching, and an edit replaces the wording for all of them. Matrix rows already created are not changed.
-- **Re-parsing.** Verdicts are keyed by the wording intake produced and are applied again whenever the solicitation or a companion document is re-parsed.
+- **Re-parsing.** Verdicts are keyed by the wording intake produced and are applied again whenever the solicitation or a companion document is re-parsed, scanned and image documents included.
+- **Amendments.** A verdict carries to the other solicitations on the same opportunity: an amendment that repeats a rejected clause word for word does not bring it back, and repeats an edited one as edited. The amendment diff compares what each document says and leaves rejected clauses out.
 - **Data.** Each verdict is one row per solicitation, document and extracted wording, holding the original and corrected clause and the extraction prompt version. It is this organization's labelled data only.
 - **Audit.** `solicitation.requirement.review` (with `bulk` for "confirm all found word for word"), `solicitation.requirement.add` and `solicitation.requirement.review_undo`.
 

@@ -53,13 +53,15 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
   const [filter, setFilter] = useState<Filter>("todo");
   const [note, setNote] = useState<string | null>(null);
 
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
+  const run: Run = (fn, done, onSuccess) => {
     setNote(null);
     start(async () => {
       const res = await fn();
       if (!res.ok) setNote(res.error ?? "That didn't work.");
       else {
-        if (done) setNote(done);
+        const message = typeof done === "function" ? done(res) : done;
+        if (message) setNote(message);
+        onSuccess?.();
         router.refresh();
       }
     });
@@ -94,10 +96,10 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
             disabled={pending}
             className="aur-btn aur-btn-ghost ml-auto text-[11px] disabled:opacity-60"
             onClick={() =>
-              run(async () => {
-                const res = await confirmVerbatimRequirementsAction(solicitationId);
-                return res.ok ? { ok: true } : res;
-              }, `Confirmed ${verbatimToConfirm} found word for word.`)
+              run(
+                () => confirmVerbatimRequirementsAction(solicitationId),
+                (res) => `Confirmed ${res.confirmed ?? 0} found word for word.`,
+              )
             }
             title="Confirm every requirement not yet reviewed that the document states word for word"
           >
@@ -111,8 +113,9 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
         <p className="font-body text-[13px] text-muted">{filter === "todo" ? "Nothing left to review." : "None."}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {shown.map((item) => (
-            <Row key={`${item.docKey}:${item.originalKey}`} item={item} pending={pending} solicitationId={solicitationId} run={run} />
+          {shown.map((item, i) => (
+            // A scanned document can list the same clause twice: the index keeps keys unique.
+            <Row key={`${item.docKey}:${item.originalKey}:${i}`} item={item} pending={pending} solicitationId={solicitationId} run={run} />
           ))}
         </ul>
       )}
@@ -122,7 +125,8 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
   );
 }
 
-type Run = (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => void;
+type ActionResult = { ok: boolean; error?: string; confirmed?: number };
+type Run = (fn: () => Promise<ActionResult>, done?: string | ((res: ActionResult) => string), onSuccess?: () => void) => void;
 
 function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending: boolean; solicitationId: string; run: Run }) {
   const [editing, setEditing] = useState(false);
@@ -190,7 +194,18 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
             <button type="button" disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" onClick={() => run(() => reviewRequirementAction({ ...ids, action: "confirmed" }))}>
               Confirm
             </button>
-            <button type="button" disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" onClick={() => setEditing(true)}>
+            <button
+              type="button"
+              disabled={pending}
+              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+              onClick={() => {
+                // Start from the requirement as it is now, not as it was when the row first rendered.
+                setKind(item.kind);
+                setText(item.text);
+                setRef(item.ref);
+                setEditing(true);
+              }}
+            >
               Edit
             </button>
             <button type="button" disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" onClick={() => run(() => reviewRequirementAction({ ...ids, action: "rejected" }))}>
@@ -226,11 +241,12 @@ function AddForm({ solicitationId, pending, run }: { solicitationId: string; pen
           type="button"
           disabled={pending || !text.trim()}
           className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
-          onClick={() => {
-            run(() => addRequirementAction({ solicitationId, kind, text, ref }), "Requirement added.");
-            setText("");
-            setRef("");
-          }}
+          onClick={() =>
+            run(() => addRequirementAction({ solicitationId, kind, text, ref }), "Requirement added.", () => {
+              setText("");
+              setRef("");
+            })
+          }
         >
           Add
         </button>

@@ -436,13 +436,14 @@ export default async function SolicitationDetail({
               located.length > 0 ? ` · ${verbatim} of ${located.length} word for word` : ""
             }${verdicts.rejected > 0 ? ` · ${verdicts.rejected} rejected` : ""}`}
             actions={
-              allRequirements.length > 0 ? (
+              // BL-AIX Phase 2c — also when nothing was extracted, to add what the extraction missed.
+              allRequirements.length > 0 || s.parseStatus === "parsed" ? (
                 <Link
                   href={`/solicitations/${s.id}/verify`}
                   className="aur-btn aur-btn-ghost text-[11px]"
                   title="Confirm, edit or reject each requirement against the document"
                 >
-                  Verify{verdicts.unreviewed > 0 ? ` (${verdicts.unreviewed} to review)` : ""}
+                  {allRequirements.length === 0 ? "Add requirements" : `Verify${verdicts.unreviewed > 0 ? ` (${verdicts.unreviewed} to review)` : ""}`}
                 </Link>
               ) : null
             }
@@ -460,7 +461,9 @@ export default async function SolicitationDetail({
             ) : null}
             {requirements.length === 0 ? (
               <p className="font-body text-[13px] text-muted">
-                {s.parseStatus === "parsed"
+                {allRequirements.length > 0
+                  ? `All ${allRequirements.length} extracted requirements were rejected on the verify screen.`
+                  : s.parseStatus === "parsed"
                   ? "No requirements extracted. The document may not have explicit shall/should/may language."
                   : s.parseStatus === "failed"
                     ? "Parsing failed — see error above."

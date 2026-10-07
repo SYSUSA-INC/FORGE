@@ -40,6 +40,8 @@ function requirementsText(reqs: unknown): string {
   if (!Array.isArray(reqs)) return "";
   const texts: string[] = [];
   for (const r of reqs) {
+    // BL-AIX Phase 2c — a clause the team rejected is not part of the scope.
+    if ((r as { review?: { status?: string } })?.review?.status === "rejected") continue;
     const t = (r as { text?: unknown })?.text;
     if (typeof t === "string" && t.trim()) texts.push(t.trim());
     if (texts.length >= 80) break;
