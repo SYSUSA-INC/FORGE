@@ -59,7 +59,7 @@ Effort key:
 | 3ae | **BL-AIX Phase 1c** — Golden-eval holdout: nothing from a case's own proposal reaches the drafter, copies of the winning text are dropped, and each case records how much still leaked | P0 | S | ✅ shipped (PR #343) |
 | 3af | **BL-AIX Phase 1d** — Uncited claims: a sentence stating a hard figure the drafter wasn't given and citing nothing is flagged [NEEDS CITATION], with or without sources | P0 | S | ✅ shipped (PR #344) |
 | 3ag | **BL-AIX Phase 1e-1** — Extraction gold set: storage (migration 0115) and the `/admin` screens to add a public SAM.gov RFP by notice ID and review its requirements, page limits and Section M factors | P0 | M | ✅ shipped (PR #345) |
-| 3ah | **BL-AIX Phase 1e-2** — AI-drafted gold annotations: the whole RFP read in windows, findings proposed for the expert, duplicates and rejected items never re-proposed, resumable | P0 | M | 🔄 in progress |
+| 3ah | **BL-AIX Phase 1e-2** — AI-drafted gold annotations: the whole RFP read in windows, findings proposed for the expert, duplicates and rejected items never re-proposed, resumable | P0 | M | 🔄 in PR (PR #346) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -157,7 +157,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · 🔄 Phase 1e-2 in progress
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · 🔄 Phase 1e-2 in PR (PR #346)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -412,7 +412,7 @@ the phases below.
       - Audited as `gold_set.*` under the admin's own organisation.
       - Tests: `tests/ai/gold-set-logic.test.ts` and
         `tests/isolation/gold-set.test.ts`.
-    - **1e-2** — AI-drafted annotations: 🔄 in progress.
+    - **1e-2** — AI-drafted annotations: 🔄 in PR (PR #346).
       - "Draft annotations with AI" on a gold document reads the whole
         text in 40k-character windows, with no window ceiling (live
         extraction stops at 12). It uses the new `gold_annotate` feature
