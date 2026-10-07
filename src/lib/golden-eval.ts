@@ -36,6 +36,7 @@ import {
 import { completeForTenant, messageText } from "@/lib/ai";
 import { SECTION_DRAFT_PROMPT_VERSION } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
+import { judgeSectionDraft } from "@/lib/draft-judge";
 import { goldenOf, promptLeak, type GoldenCaseResult } from "@/lib/golden-holdout";
 import { meanScore, scoreDraftAgainstGolden } from "@/lib/golden-score";
 import { log } from "@/lib/log";
@@ -90,8 +91,11 @@ export async function listGoldenCases(input: {
 }
 
 export type GoldenEvalResult =
-  | { ok: true; run: AiEvalRun }
+  | { ok: true; run: AiEvalRun; judged: number }
   | { ok: false; error: string };
+
+/** Draft text kept on a case for the experts who rate it. */
+const STORED_DRAFT_CHARS = 20_000;
 
 /** Re-draft up to `maxCases` golden sections and store the scored run. */
 export async function runGoldenEval(input: {
@@ -109,6 +113,7 @@ export async function runGoldenEval(input: {
   const results: GoldenCaseResult[] = [];
   let stubbed = false;
   let model = "";
+  let judged = 0;
 
   for (const c of cases) {
     const base = {
@@ -163,6 +168,17 @@ export async function runGoldenEval(input: {
         golden: row.content,
         themes: row.winThemes ?? [],
       });
+      // BL-AIX Phase 1h-2 — the rubric judge scores the same draft without
+      // the winning text; a judge failure leaves the case scored.
+      let judge: GoldenCaseResult["judge"] = null;
+      if (!ai.stubbed && (ai.text ?? "").trim()) {
+        try {
+          judge = await judgeSectionDraft({ organizationId, sectionId: c.sectionId, draft: ai.text });
+          judged += 1;
+        } catch (err) {
+          log.warn("[runGoldenEval]", "judge failed", { sectionId: c.sectionId, error: err });
+        }
+      }
       results.push({
         ...base,
         goldenWords: score.goldenWords,
@@ -174,6 +190,8 @@ export async function runGoldenEval(input: {
         placeholderRate: score.placeholderRate,
         themeCoverage: score.themeCoverage,
         holdout,
+        draft: (ai.text ?? "").slice(0, STORED_DRAFT_CHARS),
+        judge,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -226,7 +244,7 @@ export async function runGoldenEval(input: {
       maxLeak: Math.max(0, ...scored.map((r) => r.holdout?.leak ?? 0)),
     },
   });
-  return { ok: true, run };
+  return { ok: true, run, judged };
 }
 
 export async function listEvalRuns(input: {

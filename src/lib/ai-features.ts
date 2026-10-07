@@ -54,6 +54,9 @@ export const AI_FEATURES = {
   // BL-AIX Phase 1e-2 — drafts of a public RFP's gold-set annotations for
   // the proposal expert to review (platform admins only).
   gold_annotate: "Gold-set annotation drafts",
+  // BL-AIX Phase 1h-2 — the golden eval's rubric judge, calibrated
+  // against the organization's own experts.
+  draft_judge: "Draft quality judge",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

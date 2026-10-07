@@ -23,6 +23,7 @@ import {
   buildCompliancePreflightPrompt,
   buildEbuyExtractPrompt,
   buildGraphicsSuggestPrompt,
+  buildDraftJudgePrompt,
   buildGoldAnnotatePrompt,
   buildGsaExtractPrompt,
   buildImageOcrPrompt,
@@ -47,6 +48,7 @@ import {
   compliancePreflightResponseSchema,
   ebuyExtractionSchema,
   graphicsSuggestSchema,
+  draftJudgeSchema,
   goldAnnotateSchema,
   gsaExtractionSchema,
   knowledgeExtractionSchema,
@@ -391,6 +393,16 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
   ],
   review_summary: () => [buildReviewSummaryPrompt({ report: "Pink team: 4 comments on Technical Approach.", uncheckedLabels: ["Page limits checked"] })],
   gold_annotate: () => [buildGoldAnnotatePrompt({ title: "Cloud migration support", windowText: RFP_TEXT, windowIndex: 0, windowCount: 3 })],
+  draft_judge: () => [
+    buildDraftJudgePrompt({
+      sectionTitle: "Technical Approach",
+      sectionKind: "technical",
+      instructions: "Describe the migration approach and its risk controls.",
+      requirements: ["Describe the migration approach.", "Describe rollback."],
+      sectionM: "Technical approach is most important.",
+      draft: "We migrate in three reversible waves, each with a tested rollback.",
+    }),
+  ],
 };
 
 /** What structured calls hand the model as their output tool, per feature. */
@@ -423,6 +435,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   graphics_suggest: [graphicsSuggestSchema],
   review_summary: [reviewSummarySchema],
   gold_annotate: [goldAnnotateSchema],
+  draft_judge: [draftJudgeSchema],
 };
 
 function scanPrompt(): RenderedPrompt {

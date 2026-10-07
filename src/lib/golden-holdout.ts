@@ -22,6 +22,7 @@
  */
 import type { AiEvalCaseResult } from "@/db/schema";
 import type { SectionDraftPatternIntel } from "@/lib/ai-prompts";
+import type { JudgeScores } from "@/lib/draft-judge-logic";
 
 /** Words per run when comparing text with the winning section. */
 export const HOLDOUT_SHINGLE = 8;
@@ -37,8 +38,16 @@ export type HoldoutReport = {
   leak: number;
 };
 
-/** A stored case result; runs before Phase 1c carry no `holdout`. */
-export type GoldenCaseResult = AiEvalCaseResult & { holdout?: HoldoutReport };
+/**
+ * A stored case result; runs before Phase 1c carry no `holdout`, and runs
+ * before Phase 1h-2 no `draft` (kept so experts can read and rate it) or
+ * `judge` (the rubric judge's scores; null when it could not score).
+ */
+export type GoldenCaseResult = AiEvalCaseResult & {
+  holdout?: HoldoutReport;
+  draft?: string;
+  judge?: { scores: JudgeScores; rationale: string; model: string } | null;
+};
 
 export function words(text: string): string[] {
   return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
