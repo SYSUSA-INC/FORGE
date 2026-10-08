@@ -74,7 +74,7 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b in PR) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b in PR #364; 2c in PR) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
@@ -348,7 +348,7 @@ mind. Bandage will come off but a true fix will stay."
         could not read storage's answer (real uploads would fail), and
         names the CORS rule instead.
     - **2b — the upload ledger** (dark launch: nothing calls it yet).
-      🔄 in PR.
+      ✅ shipped (PR #364).
       - Migration 0125 `file_upload` (tenant-scoped; five indexes, one
         partial for the sweeper), mirrored in `schema.ts`.
       - `upload-policy.ts` (pure, browser-safe): purposes and their
@@ -375,8 +375,34 @@ mind. Bandage will come off but a true fix will stay."
         out, cancel, reserved bytes).
     - **2c — new solicitations and amendments upload straight to
       storage** (the owner's main path), with per-file progress, retry
-      and cancel. Merges only after the readiness check is green on
-      production, staging and a preview.
+      and cancel. 🔄 in PR. Merge only after the readiness check is
+      green on production, staging and a preview.
+      - Browser: `uploadFile` (link → PUT with progress, retry with
+        backoff, one link renewal, check), `useUploadQueue` (several at
+        a time, retry, cancel, a leave-page warning) and `UploadQueue`
+        (progress bar, speed, time left).
+      - Server: `createSolicitationFromUploadAction` replaces the
+        multipart `uploadSolicitationAction` (parent checked before the
+        claim; record id from the claim; a repeat files nothing new;
+        audit carries the upload id); the parse reads from storage.
+        Re-parse checks the file with a HEAD instead of downloading it.
+      - Parse jobs read through `loadUploadBytes`: the key must be the
+        job's organization's, the size is checked against the format's
+        read budget before any download (`parseBudgetBytes`,
+        `UPLOAD_PARSE_SCALE`), the file must match its check (size and
+        ETag, `getVerifiedObject`), and an older binary Office file gets
+        a clear message. Companion-document parses use it too.
+      - `PUT /api/uploads/[uploadId]`: uploads through the app for the
+        memory fallback and the `UPLOAD_TRANSPORT=proxy` lever (type and
+        length checked before the body is read).
+      - `maxDuration = 300` on the new-solicitation and solicitation
+        pages. The amendments panel's status colours moved to theme
+        tokens.
+      - Tests: `tests/ai/upload-policy.test.ts` (read budgets, pickers)
+        and `tests/isolation/uploads-solicitation.test.ts` (filed once
+        and parsed from storage; amendment parent checks; a changed,
+        oversize or foreign file refused at parse; through-the-app
+        checks before reading).
     - **2d — companion documents and GSA attachments; abandoned uploads
       cleaned up by the jobs cron.**
     - **2e — knowledge corpus; extraction as a durable job; one storage

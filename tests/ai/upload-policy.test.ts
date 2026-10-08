@@ -3,7 +3,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  acceptFor,
   canonicalContentType,
+  parseBudgetBytes,
+  tooLargeToReadMessage,
   expirySecondsFor,
   formatFromName,
   HARD_MAX_BYTES,
@@ -63,6 +66,24 @@ describe("formats and limits", () => {
     expect(expirySecondsFor(0)).toBe(900);
     expect(expirySecondsFor(100 * 1024 * 1024)).toBe(900 + 400);
     expect(expirySecondsFor(10 * 1024 ** 3)).toBe(3600);
+  });
+});
+
+describe("read budgets and pickers", () => {
+  it("cap what FORGE reads automatically per format, scaled by environment but never for images", () => {
+    const MiB = 1024 * 1024;
+    expect(parseBudgetBytes("pdf")).toBe(150 * MiB);
+    expect(parseBudgetBytes("xlsx")).toBe(40 * MiB);
+    expect(parseBudgetBytes("pdf", { UPLOAD_PARSE_SCALE: "2" })).toBe(300 * MiB);
+    expect(parseBudgetBytes("pdf", { UPLOAD_PARSE_SCALE: "100" })).toBe(600 * MiB);
+    expect(parseBudgetBytes("image", { UPLOAD_PARSE_SCALE: "4" })).toBe(5 * MiB);
+    expect(tooLargeToReadMessage(412 * MiB, 150 * MiB)).toMatch(/^Stored \(412 MB\)\. FORGE reads files of this type up to 150 MB automatically/);
+  });
+
+  it("offer only what each purpose accepts", () => {
+    expect(acceptFor("template_docx")).toBe(".docx");
+    expect(acceptFor("document")).toContain(".csv");
+    expect(acceptFor("chat_attachment")).not.toContain(".png");
   });
 });
 
