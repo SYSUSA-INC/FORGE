@@ -8,6 +8,7 @@ import { promotionCodes } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
+import { describeZodIssue } from "@/lib/zod-issues";
 
 /**
  * BL-16 Phase C-4 — promo code CRUD.
@@ -55,7 +56,7 @@ export async function createPromoCodeAction(
     return {
       ok: false,
       error: first
-        ? `${first.path.join(".")}: ${first.message}`
+        ? describeZodIssue(first, raw)
         : "Invalid input.",
     };
   }
@@ -129,7 +130,7 @@ export async function updatePromoCodeAction(
     return {
       ok: false,
       error: first
-        ? `${first.path.join(".")}: ${first.message}`
+        ? describeZodIssue(first, raw)
         : "Invalid input.",
     };
   }

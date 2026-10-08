@@ -62,6 +62,7 @@ import {
   thinkingMaxTokens,
 } from "@/lib/ai-capabilities";
 import { createSseParser } from "@/lib/sse";
+import { describeZodIssues } from "@/lib/zod-issues";
 
 export type AIRole = "user" | "assistant";
 
@@ -915,31 +916,128 @@ export type AIStructuredValidation<T> = {
   parseError: string | null;
   /** True when the payload came from the provider's tool-call path. */
   viaTool: boolean;
+  /** Paths where a list or object arrived as JSON text and was decoded (see `decodeNestedJson`). */
+  repaired?: string[];
 };
 
-function describeIssues(err: z.ZodError): string {
-  const issues = err.issues
-    .slice(0, 3)
-    .map((i) => `${i.path.map(String).join(".") || "(root)"}: ${i.message}`)
-    .join("; ");
-  return `AI response didn't match the expected shape (${issues}).`;
+function describeIssues(err: z.ZodError, input: unknown): string {
+  return `AI response didn't match the expected shape (${describeZodIssues(err, input)}).`;
+}
+
+/** The subset of JSON Schema the decoder walks. */
+type JsonSchemaNode = {
+  type?: string | string[];
+  properties?: Record<string, JsonSchemaNode>;
+  items?: JsonSchemaNode;
+  anyOf?: JsonSchemaNode[];
+  oneOf?: JsonSchemaNode[];
+};
+
+function allowsType(node: JsonSchemaNode | undefined, kind: string): JsonSchemaNode | undefined {
+  if (!node) return undefined;
+  const types = Array.isArray(node.type) ? node.type : node.type ? [node.type] : [];
+  if (types.includes(kind)) return node;
+  for (const branch of [...(node.anyOf ?? []), ...(node.oneOf ?? [])]) {
+    const hit = allowsType(branch, kind);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Models answering through a tool sometimes send a nested list or object
+ * as a JSON-encoded string (`"requirements": "[{...}]"`) — the content is
+ * all there, only wrapped as text. Walk the payload against the tool's
+ * JSON Schema (what the model was shown) and decode such a string where
+ * the schema expects a list or an object and has no string branch, so
+ * free text is never touched. Every decoded path is listed in `repaired`.
+ */
+export function decodeNestedJson(node: JsonSchemaNode | undefined, value: unknown, repaired: string[] = [], path = ""): unknown {
+  if (!node) return value;
+  if (typeof value === "string") {
+    if (allowsType(node, "string")) return value;
+    const text = value.trim();
+    const kind = text.startsWith("[") ? "array" : text.startsWith("{") ? "object" : null;
+    const target = kind ? allowsType(node, kind) : undefined;
+    if (!target) return value;
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(text);
+    } catch {
+      return value;
+    }
+    if (kind === "array" ? !Array.isArray(decoded) : !isPlainObject(decoded)) return value;
+    repaired.push(path || "(root)");
+    return decodeNestedJson(target, decoded, repaired, path);
+  }
+  if (Array.isArray(value)) {
+    const items = allowsType(node, "array")?.items;
+    if (!items) return value;
+    let changed = false;
+    const out = value.map((v, i) => {
+      const next = decodeNestedJson(items, v, repaired, path ? `${path}.${i}` : String(i));
+      changed ||= next !== v;
+      return next;
+    });
+    return changed ? out : value;
+  }
+  if (isPlainObject(value)) {
+    const properties = allowsType(node, "object")?.properties;
+    if (!properties) return value;
+    let out = value;
+    for (const [key, child] of Object.entries(properties)) {
+      if (!(key in value)) continue;
+      const next = decodeNestedJson(child, value[key], repaired, path ? `${path}.${key}` : key);
+      if (next !== value[key]) {
+        if (out === value) out = { ...value };
+        out[key] = next;
+      }
+    }
+    return out;
+  }
+  return value;
+}
+
+const jsonSchemaCache = new WeakMap<z.ZodType, JsonSchemaNode | null>();
+
+/** The JSON Schema the model is shown for `schema`; null when it cannot be expressed. */
+function jsonSchemaOf(schema: z.ZodType): JsonSchemaNode | null {
+  if (jsonSchemaCache.has(schema)) return jsonSchemaCache.get(schema)!;
+  let json: JsonSchemaNode | null;
+  try {
+    json = z.toJSONSchema(schema, { io: "input", unrepresentable: "any" }) as JsonSchemaNode;
+  } catch {
+    json = null;
+  }
+  jsonSchemaCache.set(schema, json);
+  return json;
+}
+
+function validatePayload<T>(schema: z.ZodType<T>, payload: unknown, viaTool: boolean): AIStructuredValidation<T> {
+  const repaired: string[] = [];
+  const input = decodeNestedJson(jsonSchemaOf(schema) ?? undefined, payload, repaired);
+  const parsed = schema.safeParse(input);
+  const extra = repaired.length > 0 ? { repaired } : {};
+  return parsed.success
+    ? { data: parsed.data, parseError: null, viaTool, ...extra }
+    : { data: null, parseError: describeIssues(parsed.error, input), viaTool, ...extra };
 }
 
 /**
  * Validate a completion against a schema. Prefers the tool-call payload;
  * falls back to extracting the outermost JSON object from the text for
- * providers that answered in prose.
+ * providers that answered in prose. Nested JSON sent as text is decoded
+ * first (`decodeNestedJson`).
  */
 export function validateStructured<T>(
   schema: z.ZodType<T>,
   result: AICompleteResult,
 ): AIStructuredValidation<T> {
-  if (result.structured !== undefined) {
-    const parsed = schema.safeParse(result.structured);
-    return parsed.success
-      ? { data: parsed.data, parseError: null, viaTool: true }
-      : { data: null, parseError: describeIssues(parsed.error), viaTool: true };
-  }
+  if (result.structured !== undefined) return validatePayload(schema, result.structured, true);
 
   const raw = result.text ?? "";
   const start = raw.indexOf("{");
@@ -955,10 +1053,7 @@ export function validateStructured<T>(
       viaTool: false,
     };
   }
-  const parsed = schema.safeParse(json);
-  return parsed.success
-    ? { data: parsed.data, parseError: null, viaTool: false }
-    : { data: null, parseError: describeIssues(parsed.error), viaTool: false };
+  return validatePayload(schema, json, false);
 }
 
 export function sanitizeToolName(name: string): string {
@@ -1162,6 +1257,15 @@ async function runTenantCompletion<T>(
   }
 
   const validation = validate ? validate(result) : null;
+  if (validation?.repaired?.length) {
+    const { log } = await import("@/lib/log");
+    log.warn("[completeStructuredForTenant]", "decoded nested JSON the model sent as text", {
+      feature,
+      variant,
+      model: result.model,
+      paths: validation.repaired.slice(0, 10),
+    });
+  }
 
   await recordAiCall({
     ...telemetryBase,

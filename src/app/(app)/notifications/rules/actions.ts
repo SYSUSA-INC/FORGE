@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
+import { describeZodIssue } from "@/lib/zod-issues";
 import {
   RuleInputSchema,
   type RuleInput,
@@ -174,7 +175,7 @@ export async function createNotificationRuleAction(
     const first = parsed.error.issues[0];
     return {
       ok: false,
-      error: first ? `${first.path.join(".")}: ${first.message}` : "Invalid rule.",
+      error: first ? describeZodIssue(first, raw) : "Invalid rule.",
     };
   }
 
@@ -228,7 +229,7 @@ export async function updateNotificationRuleAction(
     const first = parsed.error.issues[0];
     return {
       ok: false,
-      error: first ? `${first.path.join(".")}: ${first.message}` : "Invalid rule.",
+      error: first ? describeZodIssue(first, raw) : "Invalid rule.",
     };
   }
 

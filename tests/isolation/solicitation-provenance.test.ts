@@ -138,6 +138,67 @@ describe("BL-AIX Phase 2a — solicitation intake with provenance (runtime)", ()
     expect(res.lm).toEqual({});
   });
 
+  it("parses when the model sends lists as JSON text, never asks the front matter for requirements, and keeps key dates (production failure)", async () => {
+    let frontMatterFields: string[] = [];
+    __setCompleteImplForTest(async (opts: AICompleteOptions) => {
+      const tool = opts.tool?.name;
+      if (tool === "record_solicitation") {
+        frontMatterFields = Object.keys((opts.tool?.inputSchema.properties ?? {}) as Record<string, unknown>);
+      }
+      return {
+        text: "",
+        provider: "stub" as const,
+        model: "test-mock",
+        inputTokens: 5,
+        outputTokens: 5,
+        stubbed: false,
+        structured:
+          tool === "record_requirements"
+            ? { requirements: JSON.stringify(swept) }
+            : tool === "record_solicitation"
+              ? {
+                  ...frontMatter,
+                  // The shape that failed the OED RFP: a list sent as text.
+                  requirements: JSON.stringify(swept.slice(0, 1)),
+                  keyDates: JSON.stringify([
+                    { label: "Questions due", isoDate: "2026-10-20", type: "qa_cutoff" },
+                    { isoDate: "2026-11-01", type: "proposal_due" },
+                  ]),
+                  naicsCode: 541513,
+                }
+              : null,
+      };
+    });
+    const { text } = ucfSolicitation();
+    const res = await aiExtractSolicitation(fx.orgA.organizationId, text, { documentLabel: "OED RFP.docx" });
+    if (!res.ok) throw new Error(res.error);
+    expect(frontMatterFields).not.toContain("requirements");
+    expect(frontMatterFields).toContain("keyDates");
+    expect(res.data.title).toBe("Help Desk Support Services");
+    expect(res.data.requirements.map((r) => r.text)).toEqual(swept.map((r) => r.text));
+    // An entry without a label is dropped; a malformed field falls back on its own.
+    expect(res.data.keyDates).toEqual([{ label: "Questions due", isoDate: "2026-10-20", type: "qa_cutoff" }]);
+    expect(res.data.naicsCode).toBe("");
+  });
+
+  it("fails the parse, with the reason, when no part of the document could be read for requirements", async () => {
+    __setCompleteImplForTest(async (opts: AICompleteOptions) => ({
+      text: "",
+      provider: "stub" as const,
+      model: "test-mock",
+      inputTokens: 5,
+      outputTokens: 5,
+      stubbed: false,
+      structured: opts.tool?.name === "record_solicitation" ? frontMatter : opts.tool?.name === "record_requirements" ? { requirements: 42 } : null,
+    }));
+    const { text } = ucfSolicitation();
+    const res = await aiExtractSolicitation(fx.orgA.organizationId, text, { documentLabel: "rfp.docx" });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error).toMatch(/Couldn't read the requirements from any part of the document/);
+    expect(res.error).toMatch(/requirements: .*expected array/);
+  });
+
   it("still locates requirements in a Word or text document, without pages", async () => {
     const { text } = ucfSolicitation();
     const res = await aiExtractSolicitation(fx.orgA.organizationId, text);

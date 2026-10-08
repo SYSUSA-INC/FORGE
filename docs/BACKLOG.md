@@ -71,7 +71,15 @@ Effort key:
 | 3aq | **BL-AIX Phase 2a** — Solicitation structure and requirement provenance: the text is split by its headings (UCF Sections B–M, attachments, numbered paragraphs) before the sweep, windows follow the parts and say which, and every requirement records its page, part and paragraph and whether the document says it word for word; the accuracy check reports the word-for-word share | P0 | M | ✅ shipped (PR #355) |
 | 3ar | **BL-AIX Phase 2b** — Sections L and M as structured data: dedicated passes read Section L (volumes with page limits, format and submission rules) and Section M (award basis, factors in order with importance and subfactors), each item quoted and located; shown on the solicitation page, fed to the outline bootstrap, scored by the accuracy check (migration 0123) | P0 | M | ✅ shipped (PR #356) |
 | 3as | **BL-AIX Phase 2c-1** — Verify and correct: a screen per solicitation where the team confirms, edits or rejects each extracted requirement against the document text around it, or adds one the extraction missed; verdicts are kept as tenant-only labelled data, re-applied on re-parse, and a rejected clause reaches no reader (migration 0124) | P0 | M | ✅ shipped (PR #357) |
-| 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | 🔄 in PR (PR #358) |
+| 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
+| 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | 🔄 in PR |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every solicitation upload path | P0 | M | ⏳ queued |
+| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
+| 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
+| 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
+| 3az | **BL-STAB-6** — Several companion documents uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
+| 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
+| 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -168,8 +176,148 @@ diffs `pg_indexes` against both sources in CI.
   `tests/ai/schema-drift.test.ts`.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
+### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
+**Priority:** P0  ·  **Effort:** L (one PR per issue)  ·  **Status:** 🔄 BL-STAB-1 in PR · ⏳ BL-STAB-2 to 7 queued
+
+The owner began testing the shipped features end to end (2026-10-08):
+"here are some initial problems that we need to address before we move
+forward, put everything else in backlog for now. Lets get what we have
+working first before we advance more." And on how: "I don't want you
+[to] bandage them but actually address them with long term use in
+mind. Bandage will come off but a true fix will stay."
+
+**Rules for this list:**
+- New development (BL-AIX 2c-2 onward, BL-16 API Slice 2c) waits until
+  this list is done. New issues the owner reports are added here.
+- Each issue is fixed at its root cause, which the entry records.
+  Workarounds that hide a failure are not accepted.
+- One PR per issue, in the order below unless the owner reorders.
+
+**Issues:**
+
+- **BL-STAB-1 — A solicitation parse fails.** 🔄 in PR.
+  - **Symptom:** The OED RFP (.docx) showed "Failed · failed after 1
+    attempt". The parse error was "AI response didn't match the
+    expected shape (requirements: Invalid input)."
+  - **Root causes:**
+    1. **A redundant list.** The text front-matter call also asked
+       for a ranked list of up to 50 requirements, though the full-text
+       sweep reads every window for them and replaces that list. A long
+       nested list is the part of a tool answer a model most often
+       returns malformed; here it came back as JSON text instead of a
+       list.
+    2. **All-or-nothing validation.** One bad field failed the whole
+       parse.
+    3. **A useless error.** zod's English messages live in a module
+       its package marks as free of side effects, so production
+       bundles drop it. Every validation error in production read just
+       "Invalid input", with no expected or received type.
+    4. **Key dates never saved.** They were not in the schema, so
+       validation stripped them and no text parse ever saved key dates.
+  - **Fix:**
+    - **Gateway, every structured AI feature** (`decodeNestedJson` in
+      `src/lib/ai.ts`):
+      - A list or object sent as JSON text is decoded against the tool
+        schema the model was shown, before validation.
+      - It is decoded only where the schema expects a list or object
+        and allows no string, so free text is never touched.
+      - Decoded paths are logged with the feature and model.
+    - **Text parses:** the front matter (`solicitationFrontMatterSchema`)
+      asks for metadata, Section L/M summaries and key dates only. The
+      requirements come from the sweep alone. If every sweep window
+      fails, the parse fails with the reason; it is not saved as a
+      document with no requirements.
+    - **Field-by-field fallback.** Each field degrades on its own: a
+      missing or malformed value becomes empty, null or "other". Key
+      dates and vision-read requirements drop only the entries that
+      cannot be read. The tool schema still shows the model every
+      field's type and allowed values.
+    - **Key dates are saved** from text parses.
+    - **Error text that survives production** (`src/lib/zod-issues.ts`):
+      when zod's message is the bare fallback, the issue is described
+      from its own fields ("requirements: expected array, received
+      string"). Used by the gateway, `parseAiJson`, and the
+      notification-rule, promo-code and tier forms.
+    - `solicitation_extract` prompt version 2026-10-08.1.
+  - **Tests:**
+    - `tests/ai/structured-repair.test.ts`: decoding, free text left
+      alone, the OED shape, prose answers, field fallbacks, the tool
+      schema the model sees, and issue descriptions without zod's
+      messages.
+    - `tests/isolation/solicitation-provenance.test.ts`: the production
+      answer shape end to end, front matter without requirements, key
+      dates kept, and a sweep with every window failing.
+- **BL-STAB-2 — Attachments capped at 1 MB.** ⏳ queued.
+  - **Symptom:** Larger files are refused. The owner: "we cannot have
+    the 1MB cap on any attachments, as some can be much larger".
+  - **Root cause:** Files are posted through a server action. Next.js
+    limits a server action's body to 1 MB by default, and Vercel limits
+    a function's request body to about 4.5 MB. Raising the setting would
+    only move the cap to 4.5 MB.
+  - **Fix:**
+    - The browser uploads straight to storage (R2) with a short-lived
+      presigned URL scoped to the tenant and an object key the server
+      issues.
+    - The server then records the file and parses it from storage.
+    - The limit becomes policy (per file and per tenant), not a
+      transport ceiling.
+    - Covers every solicitation upload path: new solicitation,
+      amendments, companion documents, Q&A. Shared with BL-STAB-3 to 6.
+- **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
+  nowhere to set one.** ⏳ queued.
+  - **Symptom:** Settings → SAM.gov sync (UEI) shows "SAM.gov 401:
+    `<html><body><h1>API_KEY_INVALID</h1>…`". The owner: "there has to
+    be a place where the company admin can update their API key".
+  - **Root cause:** The SAM.gov key is a single platform-wide
+    environment variable, `SAMGOV_API_KEY`, read in `samgov.ts`,
+    `scout.ts`, `solicitation-qa.ts`, the 8(a) admin, onboarding and
+    the health route. No company can supply its own, and SAM.gov's HTML
+    error body is shown raw.
+  - **Fix:**
+    - A company admin sets the company's own SAM.gov key under
+      company settings. It is encrypted at rest, masked when shown,
+      checked with a live test call on save, and audited.
+    - Every SAM.gov call for that company uses it, falling back to the
+      platform key.
+    - 401, 403 and 429 responses become plain messages that say what
+      to do.
+- **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
+  BL-STAB-2.
+  - **Ask:** Upload several files at once; FORGE decides what each is
+    and how to file it.
+  - **Fix:**
+    - Multi-file upload.
+    - A classification pass labels each file: base solicitation,
+      amendment, Q&A, PWS/SOW or other attachment, pricing sheet, form.
+      The label comes with a confidence and the evidence for it.
+    - The user confirms or changes the labels, then each file is filed
+      and parsed on its own path.
+- **BL-STAB-4 — Amendments one at a time.** ⏳ queued, after
+  BL-STAB-2.
+  - **Ask:** Upload several amendments in one go.
+  - **Fix:** Each amendment is parsed, ordered by its amendment number
+    and date, and diffed against the one before it.
+- **BL-STAB-6 — Companion documents one at a time.** ⏳ queued, after
+  BL-STAB-2.
+  - **Ask:** Upload several companion documents in one go, to compare
+    against.
+  - **Fix:** Multi-file upload, each document typed and parsed, with
+    its requirements merged as today.
+- **BL-STAB-5 — Q&A in the format the contracting officer released
+  it.** ⏳ queued, after BL-STAB-2.
+  - **Ask:** Accept Word, Excel, PDF or text. FORGE should make sense
+    of it and give suggestions based on the Q&A.
+  - **Fix:**
+    - Text is read from any of those formats; spreadsheets are read
+      row by row.
+    - Question/answer pairs are found by layout and by an AI pass.
+    - Each answer is matched to the requirements it changes, and
+      compliance rows are flagged (as BL-FB-SOL-QA does today).
+    - Suggestions say what the response should change because of each
+      answer.
+
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · ✅ Phase 2a shipped (PR #355) · ✅ Phase 2b shipped (PR #356) · ✅ Phase 2c-1 shipped (PR #357) · 🔄 2c-1 review fixes in PR (PR #358)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · ✅ Phase 2a shipped (PR #355) · ✅ Phase 2b shipped (PR #356) · ✅ Phase 2c-1 shipped (PR #357) · ✅ 2c-1 review fixes shipped (PR #358) · ⏸ the rest parked (owner, 2026-10-08: stabilization first — see BL-STAB)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -741,7 +889,7 @@ the phases below.
         `solicitation.requirement.review_undo`.
       - Tests: `tests/ai/requirement-review.test.ts` and
         `tests/isolation/requirement-corrections.test.ts`.
-    - **2c-1 review fixes:** 🔄 in PR (PR #358). Two adversarial rounds: a review of
+    - **2c-1 review fixes:** ✅ shipped (PR #358). Two adversarial rounds: a review of
       PR #357 (six dimensions, three skeptics per finding; 24 of 25
       upheld, eight distinct defects), then a review of the fix itself
       (12 of 15 upheld). Resulting design:
@@ -778,7 +926,7 @@ the phases below.
         re-parse through `parseSolicitationFromBytes` asserting the
         vision write, a companion copy after an edit, an amendment
         repeating a rejected clause, an amendment's bulk confirm).
-    - **2c-2 — next:** the same for Section L/M items, and the
+    - **2c-2 — parked** (owner, 2026-10-08: BL-STAB first): the same for Section L/M items, and the
       organization's own corrections used to improve its own
       extraction (never another tenant's).
   - structured Section C;

@@ -14,6 +14,8 @@ import {
   buildSolicitationVisionPrompt,
   requirementsChunkSchema,
   solicitationExtractionSchema,
+  solicitationFrontMatterSchema,
+  type SolicitationExtractionAnswer,
   type SolicitationExtractionResult,
 } from "@/lib/ai-prompts";
 import {
@@ -143,6 +145,8 @@ export type FullTextRequirementsResult = {
   /** Windows that hit the output ceiling and were split and re-read. */
   splitChunks: number;
   stubbed: boolean;
+  /** Why the last failed window failed, when one did. */
+  lastError?: string;
 };
 
 /**
@@ -169,7 +173,7 @@ export async function readRequirementsWindow(input: {
   depth?: number;
   /** BL-AIX Phase 1i-2 — pin a candidate model (eval runs); unset follows routing. */
   model?: string;
-}): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number }> {
+}): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number; error?: string }> {
   const { organizationId, text, index, count } = input;
   const depth = input.depth ?? 0;
   const prompt = buildRequirementsChunkPrompt({
@@ -224,7 +228,7 @@ export async function readRequirementsWindow(input: {
     parseError: res.parseError,
     stopReason: res.stopReason,
   });
-  return { list: null, stubbed: false, split };
+  return { list: null, stubbed: false, split, error: res.parseError ?? `stopped: ${res.stopReason ?? "unknown"}` };
 }
 
 export async function extractRequirementsFullText(
@@ -239,6 +243,7 @@ export async function extractRequirementsFullText(
   let failedChunks = 0;
   let splitChunks = 0;
   let stubbed = false;
+  let lastError: string | undefined;
 
   for (const chunk of chunks) {
     if (stubbed) break;
@@ -253,10 +258,13 @@ export async function extractRequirementsFullText(
       });
       stubbed = stubbed || read.stubbed;
       splitChunks += read.split;
-      if (read.list === null) failedChunks += 1;
-      else if (!read.stubbed) lists.push(read.list);
+      if (read.list === null) {
+        failedChunks += 1;
+        lastError = read.error;
+      } else if (!read.stubbed) lists.push(read.list);
     } catch (err) {
       failedChunks += 1;
+      lastError = err instanceof Error ? err.message : String(err);
       log.warn("[extractRequirementsFullText]", "window threw", { error: err, index: chunk.index });
     }
   }
@@ -271,6 +279,7 @@ export async function extractRequirementsFullText(
     failedChunks,
     splitChunks,
     stubbed,
+    ...(lastError ? { lastError } : {}),
   };
 }
 
@@ -298,7 +307,7 @@ export async function aiExtractSolicitation(
       organizationId,
       feature: "solicitation_extract",
       variant: "text",
-      schema: solicitationExtractionSchema,
+      schema: solicitationFrontMatterSchema,
       toolName: "record_solicitation",
       system: prompt.system,
       messages: prompt.messages,
@@ -335,10 +344,6 @@ export async function aiExtractSolicitation(
     }
 
     if (!ai.data) {
-      log.error("[aiExtractSolicitation]", "parse", {
-        error: ai.parseError,
-        viaTool: ai.viaTool,
-      });
       return {
         ok: false,
         error: ai.parseError ?? "AI response did not match the expected shape.",
@@ -346,41 +351,40 @@ export async function aiExtractSolicitation(
     }
 
     const data = normalizeExtraction(ai.data);
-    let coverage: ExtractionCoverage | undefined;
 
-    // BL-AIP-5 — the front-matter pass above sees the first 80k
-    // characters and returns a ranked sample. The sweep reads every
-    // window of the document; its list replaces the sample whenever it
-    // found at least as much, so a PWS on page 140 reaches the matrix.
-    try {
-      const sweep = await extractRequirementsFullText(organizationId, rawText, {
-        documentLabel: options?.documentLabel ?? data.title,
-      });
-      if (!sweep.stubbed && sweep.requirements.length >= data.requirements.length) {
-        data.requirements = sweep.requirements;
+    // BL-AIP-5 / BL-STAB-1 — the requirements come from the sweep alone:
+    // it reads every window of the document (the front matter above sees
+    // the first 80k characters), and a window that fails is split and
+    // re-read on its own instead of sinking the whole parse.
+    const sweep = await extractRequirementsFullText(organizationId, rawText, {
+      documentLabel: options?.documentLabel ?? data.title,
+    });
+    let coverage: ExtractionCoverage | undefined;
+    if (!sweep.stubbed) {
+      // Every window failing is a failed read, not a document without
+      // requirements; say so rather than store an empty list as parsed.
+      if (sweep.chunks > 0 && sweep.failedChunks === sweep.chunks) {
+        return {
+          ok: false,
+          error: `Couldn't read the requirements from any part of the document${sweep.lastError ? ` (${sweep.lastError})` : ""}. Re-parse to try again.`,
+        };
       }
-      if (!sweep.stubbed) {
-        coverage = coverageFromSweep({
-          totalChars: sweep.totalChars,
-          readChars: sweep.readChars,
-          windows: sweep.chunks,
-          failedWindows: sweep.failedChunks,
-          requirementsFound: sweep.found,
-          requirementsKept: data.requirements.length,
-        });
-      }
-      log.info("[aiExtractSolicitation]", "requirement sweep", {
-        chunks: sweep.chunks,
-        failedChunks: sweep.failedChunks,
-        splitChunks: sweep.splitChunks,
-        fromSweep: sweep.requirements.length,
-        kept: data.requirements.length,
-      });
-    } catch (err) {
-      log.warn("[aiExtractSolicitation]", "requirement sweep failed; keeping front-matter list", {
-        error: err,
+      data.requirements = sweep.requirements;
+      coverage = coverageFromSweep({
+        totalChars: sweep.totalChars,
+        readChars: sweep.readChars,
+        windows: sweep.chunks,
+        failedWindows: sweep.failedChunks,
+        requirementsFound: sweep.found,
+        requirementsKept: data.requirements.length,
       });
     }
+    log.info("[aiExtractSolicitation]", "requirement sweep", {
+      chunks: sweep.chunks,
+      failedChunks: sweep.failedChunks,
+      splitChunks: sweep.splitChunks,
+      kept: data.requirements.length,
+    });
 
     // BL-AIX Phase 2a — find each requirement in the text: its page, part
     // and paragraph, and whether the document says it word for word.
@@ -484,10 +488,6 @@ export async function aiExtractSolicitationFromPdf(
       return { ok: false, error: "AI provider unexpectedly returned stub mode." };
     }
     if (!ai.data) {
-      log.error("[aiExtractSolicitationFromPdf]", "parse", {
-        error: ai.parseError,
-        viaTool: ai.viaTool,
-      });
       return {
         ok: false,
         error: ai.parseError ?? "AI response did not match the expected shape.",
@@ -562,10 +562,6 @@ export async function aiExtractSolicitationFromImage(
       return { ok: false, error: "AI provider unexpectedly returned stub mode." };
     }
     if (!ai.data) {
-      log.error("[aiExtractSolicitationVision]", "parse", {
-        error: ai.parseError,
-        viaTool: ai.viaTool,
-      });
       return {
         ok: false,
         error: ai.parseError ?? "AI response did not match the expected shape.",
@@ -587,78 +583,35 @@ export async function aiExtractSolicitationFromImage(
   }
 }
 
-function normalizeExtraction(
-  raw: Partial<SolicitationExtractionResult>,
-): SolicitationExtractionResult {
-  const allowedTypes = ["rfp", "rfi", "rfq", "sources_sought", "other"] as const;
-  const allowedKinds = ["shall", "should", "may"] as const;
-  const type = allowedTypes.includes(raw.type as (typeof allowedTypes)[number])
-    ? (raw.type as (typeof allowedTypes)[number])
-    : "other";
-  const requirements = Array.isArray(raw.requirements)
-    ? raw.requirements
-        .filter((r) => r && typeof r === "object")
-        .map((r) => ({
-          kind: allowedKinds.includes(r.kind as (typeof allowedKinds)[number])
-            ? (r.kind as (typeof allowedKinds)[number])
-            : "shall",
-          text: typeof r.text === "string" ? r.text.slice(0, 500) : "",
-          ref: typeof r.ref === "string" ? r.ref.slice(0, 64) : "",
-        }))
-        .filter((r) => r.text.trim().length > 0)
-        .slice(0, MAX_REQUIREMENTS_PER_DOCUMENT)
-    : [];
-  const allowedKeyDateTypes = [
-    "qa_cutoff",
-    "site_visit",
-    "final_rfp",
-    "proposal_due",
-    "oral_presentation",
-    "expected_award",
-    "debrief_window",
-    "protest_window",
-    "other",
-  ] as const;
-  const keyDates = Array.isArray(raw.keyDates)
-    ? raw.keyDates
-        .filter((kd) => kd && typeof kd === "object" && typeof kd.label === "string")
-        .map((kd) => ({
-          label: (kd.label as string).slice(0, 128),
-          isoDate:
-            typeof kd.isoDate === "string" && kd.isoDate.match(/^\d{4}-\d{2}-\d{2}/)
-              ? kd.isoDate.slice(0, 10)
-              : null,
-          type: allowedKeyDateTypes.includes(kd.type as (typeof allowedKeyDateTypes)[number])
-            ? (kd.type as (typeof allowedKeyDateTypes)[number])
-            : "other",
-        }))
-        .filter((kd) => kd.label.trim().length > 0)
-        .slice(0, 20)
-    : [];
+/**
+ * Clamp a validated answer to the lengths the columns hold, keep dates
+ * that are real YYYY-MM-DD dates, and drop the entries the schema could
+ * not read (null) or that came back empty.
+ */
+function normalizeExtraction(raw: SolicitationExtractionAnswer | Omit<SolicitationExtractionAnswer, "requirements">): SolicitationExtractionResult {
+  const isoDay = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
+  const requirements = ("requirements" in raw ? raw.requirements : [])
+    .filter((r) => r !== null)
+    .map((r) => ({ kind: r.kind, text: r.text.slice(0, 500), ref: r.ref.slice(0, 64) }))
+    .filter((r) => r.text.trim().length > 0)
+    .slice(0, MAX_REQUIREMENTS_PER_DOCUMENT);
+  const keyDates = raw.keyDates
+    .filter((kd) => kd !== null)
+    .map((kd) => ({ label: kd.label.slice(0, 128), isoDate: isoDay(kd.isoDate), type: kd.type }))
+    .filter((kd) => kd.label.trim().length > 0)
+    .slice(0, 20);
 
   return {
-    title: typeof raw.title === "string" ? raw.title.slice(0, 256) : "",
-    agency: typeof raw.agency === "string" ? raw.agency.slice(0, 256) : "",
-    office: typeof raw.office === "string" ? raw.office.slice(0, 256) : "",
-    solicitationNumber:
-      typeof raw.solicitationNumber === "string"
-        ? raw.solicitationNumber.slice(0, 128)
-        : "",
-    type,
-    naicsCode: typeof raw.naicsCode === "string" ? raw.naicsCode.slice(0, 16) : "",
-    setAside: typeof raw.setAside === "string" ? raw.setAside.slice(0, 64) : "",
-    responseDueDate:
-      typeof raw.responseDueDate === "string" && raw.responseDueDate.match(/^\d{4}-\d{2}-\d{2}/)
-        ? raw.responseDueDate.slice(0, 10)
-        : null,
-    sectionLSummary:
-      typeof raw.sectionLSummary === "string"
-        ? raw.sectionLSummary.slice(0, 2000)
-        : "",
-    sectionMSummary:
-      typeof raw.sectionMSummary === "string"
-        ? raw.sectionMSummary.slice(0, 2000)
-        : "",
+    title: raw.title.slice(0, 256),
+    agency: raw.agency.slice(0, 256),
+    office: raw.office.slice(0, 256),
+    solicitationNumber: raw.solicitationNumber.slice(0, 128),
+    type: raw.type,
+    naicsCode: raw.naicsCode.slice(0, 16),
+    setAside: raw.setAside.slice(0, 64),
+    responseDueDate: isoDay(raw.responseDueDate),
+    sectionLSummary: raw.sectionLSummary.slice(0, 2000),
+    sectionMSummary: raw.sectionMSummary.slice(0, 2000),
     requirements,
     keyDates,
   };
