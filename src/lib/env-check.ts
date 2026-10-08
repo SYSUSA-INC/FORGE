@@ -1,3 +1,4 @@
+import { resolveEnvLabel } from "@/lib/env-label";
 import { log } from "@/lib/log";
 
 /**
@@ -57,7 +58,7 @@ const OPTIONAL: EnvSpec[] = [
   },
   {
     name: "R2_ACCOUNT_ID",
-    purpose: "Cloudflare R2 — render storage (falls back to in-memory)",
+    purpose: "Cloudflare R2 — every uploaded file and rendered export (falls back to in-memory, not allowed in production or staging)",
   },
   {
     name: "SAMGOV_API_KEY",
@@ -110,6 +111,16 @@ export function validateEnvOrWarn(): void {
     }
     log.warn("[env-check]", "required environment variables are missing", {
       missing: missingRequired.map((s) => s.name),
+    });
+  }
+
+  // BL-STAB-2 — files kept in memory vanish on redeploy; production and
+  // staging refuse uploads in that state, so say so loudly at boot.
+  const label = resolveEnvLabel();
+  const missingR2 = ["R2_ACCOUNT_ID", "R2_BUCKET", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"].filter((n) => !(process.env[n] ?? "").trim());
+  if ((label === "production" || label === "staging") && (missingR2.length > 0 || process.env.STORAGE_PROVIDER === "memory")) {
+    log.error("[env-check]", `file storage is the in-memory fallback in ${label}; uploads are refused until the R2 variables are set`, {
+      missing: missingR2,
     });
   }
 

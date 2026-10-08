@@ -57,6 +57,42 @@ describe("BL-AIP-4b — SigV4", () => {
     expect(presigned.headers).toEqual({});
   });
 
+  it("BL-STAB-2 — an R2 upload link matches an independent SigV4 implementation, and every signed part matters", () => {
+    const r2 = {
+      method: "PUT" as const,
+      host: "0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com",
+      path: "/forge-uploads/org/11111111-1111-4111-8111-111111111111/uploads/22222222-2222-4222-8222-222222222222",
+      headers: { "content-type": "application/pdf", "content-length": "1048576" },
+      region: "auto",
+      service: "s3",
+      accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+      secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      now: new Date("2026-10-08T12:00:00Z"),
+      expiresSeconds: 900,
+    };
+    const signed = presignUrl(r2);
+    expect(sha256Hex(signed.canonicalRequest)).toBe("2edab4a409a483209d3ed366b4f6d5c32087b880d61f7565b4476f4ef177d6c6");
+    expect(signed.signature).toBe("1b059663382ac6037ea15a587a33992d57a870c277f368806bc8a420ec8dfcc3");
+    expect(signed.url).toBe(
+      "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/forge-uploads/org/11111111-1111-4111-8111-111111111111/uploads/22222222-2222-4222-8222-222222222222?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20261008%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261008T120000Z&X-Amz-Expires=900&X-Amz-SignedHeaders=content-length%3Bcontent-type%3Bhost&X-Amz-Signature=1b059663382ac6037ea15a587a33992d57a870c277f368806bc8a420ec8dfcc3",
+    );
+    // Type only (UPLOAD_SIGN_CONTENT_LENGTH=0).
+    expect(presignUrl({ ...r2, headers: { "content-type": "application/pdf" } }).signature).toBe(
+      "6f736194cd0438f39df4c688f49ed5f9e29cba7c912b7cba76a014aed65ce0ee",
+    );
+    const variants = [
+      { ...r2, headers: { ...r2.headers, "content-length": "1048575" } },
+      { ...r2, headers: { ...r2.headers, "content-length": "1048577" } },
+      { ...r2, headers: { ...r2.headers, "content-type": "text/html" } },
+      { ...r2, path: r2.path.replace("22222222-2222", "33333333-3333") },
+      { ...r2, expiresSeconds: 901 },
+      { ...r2, now: new Date("2026-10-08T12:00:01Z") },
+      { ...r2, method: "GET" as const },
+    ];
+    for (const v of variants) expect(presignUrl(v).signature).not.toBe(signed.signature);
+    expect(Object.keys(signed.headers)).not.toContain("host");
+  });
+
   it("BL-STAB-2 — signs the headers a presigned PUT must send, and refuses an out-of-range expiry", () => {
     const presigned = presignUrl({
       method: "PUT",

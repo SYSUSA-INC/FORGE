@@ -18,12 +18,18 @@
  * change to the route handler.
  */
 
+import "server-only";
+
+import { createHash } from "node:crypto";
 import { EMPTY_PAYLOAD_SHA256, presignUrl, sha256Hex, signRequest, uriEncodePath } from "@/lib/aws-sigv4";
+import { resolveEnvLabel } from "@/lib/env-label";
 
 export type StoredObject = {
   storagePath: string;
   byteSize: number;
   contentType: string;
+  /** BL-STAB-2 — the object's entity tag, to tell later whether it changed. */
+  etag: string;
 };
 
 export type StorageProviderName = "r2" | "memory";
@@ -50,9 +56,11 @@ export interface StorageProvider {
     bytes: Uint8Array;
     contentType: string;
   }): Promise<StoredObject>;
-  get(key: string): Promise<{ bytes: Uint8Array; contentType: string } | null>;
-  /** BL-STAB-2 — an object's size and type without reading it; null when absent. */
-  head(key: string): Promise<{ byteSize: number; contentType: string } | null>;
+  get(key: string): Promise<{ bytes: Uint8Array; contentType: string; etag: string } | null>;
+  /** BL-STAB-2 — an object's size, type and entity tag without reading it; null when absent. */
+  head(key: string): Promise<{ byteSize: number; contentType: string; etag: string } | null>;
+  /** BL-STAB-2 — bytes `start` to `endInclusive` of an object (fewer at its end); null when absent. */
+  getRange(key: string, start: number, endInclusive: number): Promise<Uint8Array | null>;
   /** BL-STAB-2 — remove an object; removing one that is absent is not an error. */
   delete(key: string): Promise<void>;
   /**
@@ -64,43 +72,62 @@ export interface StorageProvider {
   presignPut(opts: { key: string; contentType: string; byteSize: number; expiresSeconds: number }): DirectUpload | null;
 }
 
-class MemoryStorage implements StorageProvider {
+/**
+ * BL-STAB-2 — how long one storage request may take, body included:
+ * 30 s plus 2 s per MiB, at most 4 minutes.
+ */
+export function storageTimeoutMs(bytes: number): number {
+  const mib = Math.max(0, bytes) / (1024 * 1024);
+  return Math.min(240_000, Math.round(30_000 + 2_000 * mib));
+}
+
+type MemoryEntry = { bytes: Uint8Array; contentType: string; etag: string };
+
+/**
+ * The memory cache lives on `globalThis`: Next builds route handlers and
+ * server actions as separate module copies, and a static field would give
+ * each its own cache, so a file one stored would be missing for the other.
+ */
+function memoryCache(): Map<string, MemoryEntry> {
+  const g = globalThis as typeof globalThis & { __forgeMemoryStorage?: Map<string, MemoryEntry> };
+  g.__forgeMemoryStorage ??= new Map();
+  return g.__forgeMemoryStorage;
+}
+
+export class MemoryStorage implements StorageProvider {
   readonly name = "memory" as const;
-  /** Module-scoped cache keyed by storage path. */
-  private static cache = new Map<
-    string,
-    { bytes: Uint8Array; contentType: string }
-  >();
 
   async put(opts: {
     key: string;
     bytes: Uint8Array;
     contentType: string;
   }): Promise<StoredObject> {
-    MemoryStorage.cache.set(opts.key, {
-      bytes: opts.bytes,
-      contentType: opts.contentType,
-    });
+    const etag = createHash("md5").update(opts.bytes).digest("hex");
+    memoryCache().set(opts.key, { bytes: opts.bytes, contentType: opts.contentType, etag });
     return {
       storagePath: opts.key,
       byteSize: opts.bytes.byteLength,
       contentType: opts.contentType,
+      etag,
     };
   }
 
-  async get(
-    key: string,
-  ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
-    return MemoryStorage.cache.get(key) ?? null;
+  async get(key: string): Promise<{ bytes: Uint8Array; contentType: string; etag: string } | null> {
+    return memoryCache().get(key) ?? null;
   }
 
-  async head(key: string): Promise<{ byteSize: number; contentType: string } | null> {
-    const hit = MemoryStorage.cache.get(key);
-    return hit ? { byteSize: hit.bytes.byteLength, contentType: hit.contentType } : null;
+  async head(key: string): Promise<{ byteSize: number; contentType: string; etag: string } | null> {
+    const hit = memoryCache().get(key);
+    return hit ? { byteSize: hit.bytes.byteLength, contentType: hit.contentType, etag: hit.etag } : null;
+  }
+
+  async getRange(key: string, start: number, endInclusive: number): Promise<Uint8Array | null> {
+    const hit = memoryCache().get(key);
+    return hit ? hit.bytes.subarray(start, endInclusive + 1) : null;
   }
 
   async delete(key: string): Promise<void> {
-    MemoryStorage.cache.delete(key);
+    memoryCache().delete(key);
   }
 
   presignPut(): DirectUpload | null {
@@ -108,17 +135,21 @@ class MemoryStorage implements StorageProvider {
   }
 }
 
+/** An entity tag without its quotes (R2 returns `"abc…"`). */
+function cleanEtag(raw: string | null): string {
+  return (raw ?? "").replace(/^W\//, "").replace(/"/g, "");
+}
+
 /**
  * BL-AIP-4b — Cloudflare R2 through its S3-compatible API, signed with
- * SigV4 by hand (src/lib/aws-sigv4.ts) so no SDK is needed for PUT and
- * GET. Keys are stored as given; the object's content type rides on the
- * object metadata so `get` can return it. A missing object is `null`;
- * every other failure throws with the HTTP status so the caller's
- * existing error paths report it.
+ * SigV4 by hand (src/lib/aws-sigv4.ts) so no SDK is needed. Keys are
+ * stored as given; the object's content type rides on the object
+ * metadata so `get` can return it. A missing object is `null`; every
+ * other failure throws with the HTTP status so the caller's existing
+ * error paths report it.
  */
-class R2Storage implements StorageProvider {
+export class R2Storage implements StorageProvider {
   readonly name = "r2" as const;
-  private static readonly TIMEOUT_MS = 30_000;
 
   constructor(
     private accountId: string,
@@ -135,12 +166,18 @@ class R2Storage implements StorageProvider {
     return uriEncodePath(`/${this.bucket}/${key.replace(/^\/+/, "")}`);
   }
 
+  /**
+   * Send one signed request. The deadline is left running for the caller
+   * to read the body under (BL-STAB-2: it used to be cleared once the
+   * headers arrived, so a stalled body read of a large file never ended);
+   * `done()` clears it, and `extend(bytes)` re-arms it for the body's size.
+   */
   private async send(
     method: "GET" | "PUT" | "HEAD" | "DELETE",
     key: string,
     body: Uint8Array | null,
     extraHeaders: Record<string, string>,
-  ): Promise<Response> {
+  ): Promise<{ res: Response; extend(bytes: number): void; done(): void }> {
     const path = this.path(key);
     const payloadHash = body ? sha256Hex(body) : EMPTY_PAYLOAD_SHA256;
     const signed = signRequest({
@@ -156,16 +193,23 @@ class R2Storage implements StorageProvider {
       now: new Date(),
     });
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), R2Storage.TIMEOUT_MS);
+    let timer = setTimeout(() => controller.abort(), storageTimeoutMs(body?.byteLength ?? 0));
+    const done = () => clearTimeout(timer);
+    const extend = (bytes: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => controller.abort(), storageTimeoutMs(bytes));
+    };
     try {
-      return await fetch(`https://${this.host}${path}`, {
+      const res = await fetch(`https://${this.host}${path}`, {
         method,
         headers: signed.headers,
         body: body ? Buffer.from(body) : undefined,
         signal: controller.signal,
       });
-    } finally {
-      clearTimeout(timer);
+      return { res, extend, done };
+    } catch (err) {
+      done();
+      throw err;
     }
   }
 
@@ -174,65 +218,106 @@ class R2Storage implements StorageProvider {
     bytes: Uint8Array;
     contentType: string;
   }): Promise<StoredObject> {
-    const res = await this.send("PUT", opts.key, opts.bytes, {
+    const { res, done } = await this.send("PUT", opts.key, opts.bytes, {
       "content-type": opts.contentType || "application/octet-stream",
     });
-    if (!res.ok) {
-      const detail = (await res.text().catch(() => "")).slice(0, 300);
-      throw new Error(`R2 put failed (${res.status}) for ${opts.key}: ${detail}`);
+    try {
+      if (!res.ok) {
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        throw new Error(`R2 put failed (${res.status}) for ${opts.key}: ${detail}`);
+      }
+      return {
+        storagePath: opts.key,
+        byteSize: opts.bytes.byteLength,
+        contentType: opts.contentType,
+        etag: cleanEtag(res.headers.get("etag")),
+      };
+    } finally {
+      done();
     }
-    return {
-      storagePath: opts.key,
-      byteSize: opts.bytes.byteLength,
-      contentType: opts.contentType,
-    };
   }
 
-  async get(
-    key: string,
-  ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
-    const res = await this.send("GET", key, null, {});
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      const detail = (await res.text().catch(() => "")).slice(0, 300);
-      throw new Error(`R2 get failed (${res.status}) for ${key}: ${detail}`);
+  async get(key: string): Promise<{ bytes: Uint8Array; contentType: string; etag: string } | null> {
+    const { res, extend, done } = await this.send("GET", key, null, {});
+    try {
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        throw new Error(`R2 get failed (${res.status}) for ${key}: ${detail}`);
+      }
+      extend(Number(res.headers.get("content-length") ?? "0"));
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      return {
+        bytes,
+        contentType: res.headers.get("content-type") || "application/octet-stream",
+        etag: cleanEtag(res.headers.get("etag")),
+      };
+    } finally {
+      done();
     }
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    return {
-      bytes,
-      contentType: res.headers.get("content-type") || "application/octet-stream",
-    };
   }
 
-  async head(key: string): Promise<{ byteSize: number; contentType: string } | null> {
-    const res = await this.send("HEAD", key, null, {});
+  async head(key: string): Promise<{ byteSize: number; contentType: string; etag: string } | null> {
+    const { res, done } = await this.send("HEAD", key, null, {});
+    done();
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`R2 head failed (${res.status}) for ${key}`);
     return {
       byteSize: Number(res.headers.get("content-length") ?? "0"),
       contentType: res.headers.get("content-type") || "application/octet-stream",
+      etag: cleanEtag(res.headers.get("etag")),
     };
   }
 
+  async getRange(key: string, start: number, endInclusive: number): Promise<Uint8Array | null> {
+    const { res, extend, done } = await this.send("GET", key, null, { range: `bytes=${start}-${endInclusive}` });
+    try {
+      if (res.status === 404) return null;
+      // 416: the range starts past the end of the object.
+      if (res.status === 416) return new Uint8Array(0);
+      if (res.status !== 206 && res.status !== 200) {
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        throw new Error(`R2 ranged get failed (${res.status}) for ${key}: ${detail}`);
+      }
+      extend(endInclusive - start + 1);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      // A 200 is the whole object: keep only the bytes asked for.
+      return res.status === 200 ? bytes.subarray(start, endInclusive + 1) : bytes;
+    } finally {
+      done();
+    }
+  }
+
   async delete(key: string): Promise<void> {
-    const res = await this.send("DELETE", key, null, {});
-    if (!res.ok && res.status !== 404) {
-      const detail = (await res.text().catch(() => "")).slice(0, 300);
-      throw new Error(`R2 delete failed (${res.status}) for ${key}: ${detail}`);
+    const { res, done } = await this.send("DELETE", key, null, {});
+    try {
+      if (!res.ok && res.status !== 404) {
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        throw new Error(`R2 delete failed (${res.status}) for ${key}: ${detail}`);
+      }
+    } finally {
+      done();
     }
   }
 
   /**
-   * The type and exact size are signed, so R2 refuses a PUT of any other
-   * type or length; the server still checks the stored object afterwards.
+   * The type is signed, and the exact length too unless
+   * `UPLOAD_SIGN_CONTENT_LENGTH=0`. Whether R2 enforces a signed length is
+   * recorded by the storage check on Admin → Jobs; either way the server
+   * checks the stored object's size and type after the upload, which is
+   * the control that counts.
    */
   presignPut(opts: { key: string; contentType: string; byteSize: number; expiresSeconds: number }): DirectUpload {
     const now = new Date();
+    const signLength = readEnv("UPLOAD_SIGN_CONTENT_LENGTH") !== "0";
     const presigned = presignUrl({
       method: "PUT",
       host: this.host,
       path: this.path(opts.key),
-      headers: { "content-type": opts.contentType, "content-length": String(opts.byteSize) },
+      headers: {
+        "content-type": opts.contentType,
+        ...(signLength ? { "content-length": String(opts.byteSize) } : {}),
+      },
       region: "auto",
       service: "s3",
       accessKeyId: this.accessKeyId,
@@ -307,4 +392,24 @@ export function getStorageProvider(): StorageProvider {
     cached = new MemoryStorage();
   }
   return cached;
+}
+
+/**
+ * BL-STAB-2 — how a browser upload reaches storage: `direct` (a presigned
+ * PUT to R2) or `proxy` (through the app, limited by the host's request
+ * body cap). Proxy when storage is the memory fallback, or when the
+ * operator sets `UPLOAD_TRANSPORT=proxy`.
+ */
+export function uploadTransport(env: Record<string, string | undefined> = process.env): "direct" | "proxy" {
+  if (getStorageProviderStatus().active.name === "memory") return "proxy";
+  return (env.UPLOAD_TRANSPORT || "").trim().toLowerCase() === "proxy" ? "proxy" : "direct";
+}
+
+/**
+ * BL-STAB-2 — production and staging must not keep files in memory: they
+ * would vanish on the next deploy or land on another server instance.
+ */
+export function memoryStorageRefused(env: Record<string, string | undefined> = process.env): boolean {
+  const label = resolveEnvLabel(env);
+  return getStorageProviderStatus().active.name === "memory" && (label === "production" || label === "staging");
 }
