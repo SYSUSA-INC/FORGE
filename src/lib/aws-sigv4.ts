@@ -85,13 +85,96 @@ export function signRequest(input: SignInput): SignedRequest {
 
   const scope = `${dateStamp}/${input.region}/${input.service}/aws4_request`;
   const stringToSign = ["AWS4-HMAC-SHA256", date, scope, sha256Hex(canonicalRequest)].join("\n");
+  const signature = sign(input, dateStamp, stringToSign);
 
+  headers.authorization = `AWS4-HMAC-SHA256 Credential=${input.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  return { headers, canonicalRequest, stringToSign, signature };
+}
+
+function sign(
+  input: { secretAccessKey: string; region: string; service: string },
+  dateStamp: string,
+  stringToSign: string,
+): string {
   const kDate = hmac(`AWS4${input.secretAccessKey}`, dateStamp);
   const kRegion = hmac(kDate, input.region);
   const kService = hmac(kRegion, input.service);
   const kSigning = hmac(kService, "aws4_request");
-  const signature = createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
+  return createHmac("sha256", kSigning).update(stringToSign, "utf8").digest("hex");
+}
 
-  headers.authorization = `AWS4-HMAC-SHA256 Credential=${input.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  return { headers, canonicalRequest, stringToSign, signature };
+/** RFC 3986 encoding of a query-string key or value (`/` encoded too). */
+function uriEncodeQuery(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+export type PresignInput = {
+  method: "GET" | "PUT";
+  host: string;
+  /** Already-encoded path starting with "/". */
+  path: string;
+  /**
+   * Headers the request must send with exactly these values (lower-cased
+   * names), e.g. `content-type`, `content-length`. They are signed, so a
+   * request with different values is refused. `host` is added.
+   */
+  headers?: Record<string, string>;
+  region: string;
+  service: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  now: Date;
+  /** How long the URL works, in seconds (1 to 604,800). */
+  expiresSeconds: number;
+};
+
+export type PresignedUrl = {
+  url: string;
+  /** The headers the request must carry (minus `host`, which the client sets). */
+  headers: Record<string, string>;
+  canonicalRequest: string;
+  signature: string;
+};
+
+/**
+ * BL-STAB-2 — a SigV4 presigned URL (query-string authentication): anyone
+ * holding it can make exactly this request, with exactly the signed
+ * headers, until it expires. The payload is not signed (`UNSIGNED-PAYLOAD`),
+ * as a browser cannot hash a large file before sending it.
+ */
+export function presignUrl(input: PresignInput): PresignedUrl {
+  if (!(input.expiresSeconds >= 1 && input.expiresSeconds <= 604_800)) {
+    throw new Error("presignUrl: expiresSeconds must be between 1 and 604800");
+  }
+  const { amzDate: date, dateStamp } = amzDate(input.now);
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(input.headers ?? {})) headers[k.toLowerCase()] = v.trim();
+  headers.host = input.host;
+  const signedHeaderNames = Object.keys(headers).sort();
+  const signedHeaders = signedHeaderNames.join(";");
+  const scope = `${dateStamp}/${input.region}/${input.service}/aws4_request`;
+
+  const query: Record<string, string> = {
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${input.accessKeyId}/${scope}`,
+    "X-Amz-Date": date,
+    "X-Amz-Expires": String(Math.floor(input.expiresSeconds)),
+    "X-Amz-SignedHeaders": signedHeaders,
+  };
+  const canonicalQuery = Object.keys(query)
+    .sort()
+    .map((k) => `${uriEncodeQuery(k)}=${uriEncodeQuery(query[k]!)}`)
+    .join("&");
+  const canonicalHeaders = signedHeaderNames.map((k) => `${k}:${headers[k]!.replace(/\s+/g, " ")}\n`).join("");
+  const canonicalRequest = [input.method, input.path, canonicalQuery, canonicalHeaders, signedHeaders, "UNSIGNED-PAYLOAD"].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", date, scope, sha256Hex(canonicalRequest)].join("\n");
+  const signature = sign(input, dateStamp, stringToSign);
+
+  const { host: _host, ...required } = headers;
+  return {
+    url: `https://${input.host}${input.path}?${canonicalQuery}&X-Amz-Signature=${signature}`,
+    headers: required,
+    canonicalRequest,
+    signature,
+  };
 }

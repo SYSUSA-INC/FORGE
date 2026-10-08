@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   amzDate,
   EMPTY_PAYLOAD_SHA256,
+  presignUrl,
   sha256Hex,
   signRequest,
   uriEncodePath,
@@ -37,6 +38,45 @@ describe("BL-AIP-4b — SigV4", () => {
     expect(signed.headers["x-amz-date"]).toBe("20130524T000000Z");
   });
 
+  it("BL-STAB-2 — reproduces the AWS presigned-URL example (query-string authentication)", () => {
+    const presigned = presignUrl({
+      method: "GET",
+      host: "examplebucket.s3.amazonaws.com",
+      path: "/test.txt",
+      region: "us-east-1",
+      service: "s3",
+      accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+      secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      now: new Date("2013-05-24T00:00:00Z"),
+      expiresSeconds: 86400,
+    });
+    expect(presigned.signature).toBe("aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
+    expect(presigned.url).toBe(
+      "https://examplebucket.s3.amazonaws.com/test.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20130524T000000Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404",
+    );
+    expect(presigned.headers).toEqual({});
+  });
+
+  it("BL-STAB-2 — signs the headers a presigned PUT must send, and refuses an out-of-range expiry", () => {
+    const presigned = presignUrl({
+      method: "PUT",
+      host: "acct.r2.cloudflarestorage.com",
+      path: "/bucket/org/1/upload/abc",
+      headers: { "Content-Type": "application/pdf", "content-length": "1048576" },
+      region: "auto",
+      service: "s3",
+      accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+      secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      now: new Date("2026-10-08T00:00:00Z"),
+      expiresSeconds: 900,
+    });
+    expect(presigned.url).toContain("X-Amz-SignedHeaders=content-length%3Bcontent-type%3Bhost");
+    expect(presigned.headers).toEqual({ "content-type": "application/pdf", "content-length": "1048576" });
+    expect(presigned.canonicalRequest.endsWith("UNSIGNED-PAYLOAD")).toBe(true);
+    expect(() => presignUrl({ ...presignedInputFor(0) })).toThrow(/expiresSeconds/);
+    expect(() => presignUrl({ ...presignedInputFor(604_801) })).toThrow(/expiresSeconds/);
+  });
+
   it("encodes object keys segment by segment and formats dates", () => {
     expect(uriEncodePath("/bucket/org 1/file (v2)*.pdf")).toBe("/bucket/org%201/file%20%28v2%29%2A.pdf");
     expect(amzDate(new Date("2026-09-28T14:05:09.123Z"))).toEqual({
@@ -46,3 +86,17 @@ describe("BL-AIP-4b — SigV4", () => {
     expect(sha256Hex("")).toBe(EMPTY_PAYLOAD_SHA256);
   });
 });
+
+function presignedInputFor(expiresSeconds: number) {
+  return {
+    method: "PUT" as const,
+    host: "h",
+    path: "/k",
+    region: "auto",
+    service: "s3",
+    accessKeyId: "a",
+    secretAccessKey: "s",
+    now: new Date("2026-10-08T00:00:00Z"),
+    expiresSeconds,
+  };
+}

@@ -18,7 +18,7 @@
  * change to the route handler.
  */
 
-import { EMPTY_PAYLOAD_SHA256, sha256Hex, signRequest, uriEncodePath } from "@/lib/aws-sigv4";
+import { EMPTY_PAYLOAD_SHA256, presignUrl, sha256Hex, signRequest, uriEncodePath } from "@/lib/aws-sigv4";
 
 export type StoredObject = {
   storagePath: string;
@@ -34,6 +34,15 @@ export type StorageProviderStatus = {
   reason: string;
 };
 
+/** BL-STAB-2 — a URL the browser sends one file to, straight to storage. */
+export type DirectUpload = {
+  url: string;
+  method: "PUT";
+  /** Headers the browser must send with exactly these values. */
+  headers: Record<string, string>;
+  expiresAt: Date;
+};
+
 export interface StorageProvider {
   readonly name: StorageProviderName;
   put(opts: {
@@ -42,6 +51,17 @@ export interface StorageProvider {
     contentType: string;
   }): Promise<StoredObject>;
   get(key: string): Promise<{ bytes: Uint8Array; contentType: string } | null>;
+  /** BL-STAB-2 — an object's size and type without reading it; null when absent. */
+  head(key: string): Promise<{ byteSize: number; contentType: string } | null>;
+  /** BL-STAB-2 — remove an object; removing one that is absent is not an error. */
+  delete(key: string): Promise<void>;
+  /**
+   * BL-STAB-2 — a short-lived URL for the browser to PUT exactly one file
+   * of this type and size to `key`. Null when the provider has no URL a
+   * browser can reach (the memory fallback), so the caller uploads through
+   * the app instead.
+   */
+  presignPut(opts: { key: string; contentType: string; byteSize: number; expiresSeconds: number }): DirectUpload | null;
 }
 
 class MemoryStorage implements StorageProvider {
@@ -73,6 +93,19 @@ class MemoryStorage implements StorageProvider {
   ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
     return MemoryStorage.cache.get(key) ?? null;
   }
+
+  async head(key: string): Promise<{ byteSize: number; contentType: string } | null> {
+    const hit = MemoryStorage.cache.get(key);
+    return hit ? { byteSize: hit.bytes.byteLength, contentType: hit.contentType } : null;
+  }
+
+  async delete(key: string): Promise<void> {
+    MemoryStorage.cache.delete(key);
+  }
+
+  presignPut(): DirectUpload | null {
+    return null;
+  }
 }
 
 /**
@@ -103,7 +136,7 @@ class R2Storage implements StorageProvider {
   }
 
   private async send(
-    method: "GET" | "PUT",
+    method: "GET" | "PUT" | "HEAD" | "DELETE",
     key: string,
     body: Uint8Array | null,
     extraHeaders: Record<string, string>,
@@ -168,6 +201,51 @@ class R2Storage implements StorageProvider {
     return {
       bytes,
       contentType: res.headers.get("content-type") || "application/octet-stream",
+    };
+  }
+
+  async head(key: string): Promise<{ byteSize: number; contentType: string } | null> {
+    const res = await this.send("HEAD", key, null, {});
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`R2 head failed (${res.status}) for ${key}`);
+    return {
+      byteSize: Number(res.headers.get("content-length") ?? "0"),
+      contentType: res.headers.get("content-type") || "application/octet-stream",
+    };
+  }
+
+  async delete(key: string): Promise<void> {
+    const res = await this.send("DELETE", key, null, {});
+    if (!res.ok && res.status !== 404) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      throw new Error(`R2 delete failed (${res.status}) for ${key}: ${detail}`);
+    }
+  }
+
+  /**
+   * The type and exact size are signed, so R2 refuses a PUT of any other
+   * type or length; the server still checks the stored object afterwards.
+   */
+  presignPut(opts: { key: string; contentType: string; byteSize: number; expiresSeconds: number }): DirectUpload {
+    const now = new Date();
+    const presigned = presignUrl({
+      method: "PUT",
+      host: this.host,
+      path: this.path(opts.key),
+      headers: { "content-type": opts.contentType, "content-length": String(opts.byteSize) },
+      region: "auto",
+      service: "s3",
+      accessKeyId: this.accessKeyId,
+      secretAccessKey: this.secretAccessKey,
+      now,
+      expiresSeconds: opts.expiresSeconds,
+    });
+    return {
+      url: presigned.url,
+      method: "PUT",
+      // Browsers set content-length themselves from the file; only the type is theirs to send.
+      headers: { "content-type": opts.contentType },
+      expiresAt: new Date(now.getTime() + opts.expiresSeconds * 1000),
     };
   }
 }

@@ -73,8 +73,8 @@ Effort key:
 | 3as | **BL-AIX Phase 2c-1** — Verify and correct: a screen per solicitation where the team confirms, edits or rejects each extracted requirement against the document text around it, or adds one the extraction missed; verdicts are kept as tenant-only labelled data, re-applied on re-parse, and a rejected clause reaches no reader (migration 0124) | P0 | M | ✅ shipped (PR #357) |
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
-| 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | 🔄 in PR |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every solicitation upload path | P0 | M | ⏳ queued |
+| 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | M | 🔄 in progress (draft PR) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
@@ -178,7 +178,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** L (one PR per issue)  ·  **Status:** 🔄 BL-STAB-1 in PR · ⏳ BL-STAB-2 to 7 queued
+**Priority:** P0  ·  **Effort:** L (one PR per issue)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress · ⏳ BL-STAB-3 to 7 queued
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -197,7 +197,7 @@ mind. Bandage will come off but a true fix will stay."
 **Issues:**
 
 - **BL-STAB-1 — A solicitation parse fails.** ✅ shipped (PR #359);
-  review fixes 🔄 in PR.
+  review fixes ✅ shipped (PR #360).
   - **Symptom:** The OED RFP (.docx) showed "Failed · failed after 1
     attempt". The parse error was "AI response didn't match the
     expected shape (requirements: Invalid input)."
@@ -251,7 +251,7 @@ mind. Bandage will come off but a true fix will stay."
       dates kept, and a sweep with every window failing.
   - **Review fixes** (an adversarial review of PR #359: three reviewers,
     each finding put to a skeptic; four upheld, two refuted but fixed
-    as cheap hardening). 🔄 in PR.
+    as cheap hardening). ✅ shipped (PR #360).
     - **The sweep reads each requirement on its own.** Since the sweep
       is now the only source of a text document's requirements, its
       schema got the same treatment as the front matter: one entry with
@@ -279,7 +279,11 @@ mind. Bandage will come off but a true fix will stay."
       `tests/isolation/solicitation-provenance.test.ts` (a one-window
       RFQ with odd entries parses; a short window's unreadable first
       answer is read again).
-- **BL-STAB-2 — Attachments capped at 1 MB.** ⏳ queued.
+- **BL-STAB-2 — Attachments capped at 1 MB.** 🔄 in progress (draft PR).
+  - **Progress:** SigV4 presigned URLs (`presignUrl` in
+    `aws-sigv4.ts`, checked against the AWS query-string example) and
+    storage `head` / `delete` / `presignPut` (R2 signs the type and
+    exact size; the memory fallback has no browser URL).
   - **Symptom:** Larger files are refused. The owner: "we cannot have
     the 1MB cap on any attachments, as some can be much larger".
   - **Root cause:** Files are posted through a server action. Next.js
