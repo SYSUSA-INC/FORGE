@@ -68,11 +68,17 @@ export function describeZodIssue(issue: Issue, ...input: [unknown?]): string {
   return describe(issue, input.length > 0 ? input[0] : NO_INPUT);
 }
 
-/** The first few issues, joined with "; ". Pass the validated input as in `describeZodIssue`. */
+/**
+ * The first few issues, joined with "; ", then how many more there were
+ * and where (BL-STAB-9: three issues alone read as if every other field
+ * passed). Pass the validated input as in `describeZodIssue`.
+ */
 export function describeZodIssues(error: z.ZodError, ...input: [unknown?]): string {
   const value = input.length > 0 ? input[0] : NO_INPUT;
-  return error.issues
-    .slice(0, 3)
-    .map((i) => describe(i, value))
-    .join("; ");
+  const shown = error.issues.slice(0, 3).map((i) => describe(i, value));
+  const rest = error.issues.slice(3);
+  if (rest.length === 0) return shown.join("; ");
+  const where = [...new Set(rest.map((i) => i.path.map(String).join(".") || "(root)"))];
+  const names = where.length > 5 ? `${where.slice(0, 5).join(", ")}, …` : where.join(", ");
+  return `${shown.join("; ")}; and ${rest.length} more (${names})`;
 }

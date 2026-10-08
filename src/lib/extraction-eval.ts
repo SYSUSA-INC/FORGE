@@ -3,10 +3,11 @@
  * documents and score it (src/lib/extraction-eval-logic.ts).
  *
  * Each document is read exactly as intake reads a solicitation: the same
- * windows through the same requirement-sweep reader, then the solicitation
- * AI review for Section L instructions and Section M factors. A run moves
- * one step (one window, or the review) at a time and saves after each, so
- * a call works inside its time budget and the next call carries on.
+ * windows through the same requirement-sweep reader, then the Section L
+ * and M passes (BL-AIX 2b) for Section L instructions and Section M
+ * factors. A run moves one step (one window, or the L/M step) at a time
+ * and saves after each, so a call works inside its time budget and the
+ * next call carries on.
  *
  * Measures the full-text sweep, which is where intake takes a text
  * document's requirements from (the front pass reads only metadata,
@@ -26,7 +27,6 @@ import { attachProvenance } from "@/lib/requirement-provenance";
 import { planSweepWindows } from "@/lib/solicitation-segments";
 import { extractLmStructure } from "@/lib/solicitation-lm-extract";
 import { lmScoringInputs } from "@/lib/solicitation-lm";
-import { aiRunSolicitationReview } from "@/lib/solicitation-ai-review";
 import { MAX_REQUIREMENTS_PER_DOCUMENT, readRequirementsWindow } from "@/lib/solicitation-extract";
 
 export const EVAL_STEP_BUDGET_MS = 120_000;
@@ -67,7 +67,6 @@ export async function startExtractionEval(
       docIds: docs.map((d) => d.id),
       promptVersions: {
         solicitation_extract: PROMPT_VERSIONS.solicitation_extract,
-        solicitation_review: PROMPT_VERSIONS.solicitation_review,
         solicitation_structure: PROMPT_VERSIONS.solicitation_structure,
       },
       cursor: freshCursor(0),
@@ -143,7 +142,8 @@ export async function stepExtractionEval(input: {
     // BL-AIX Phase 2a — the same structure-aware windows intake reads.
     const windows = planSweepWindows(doc.rawText);
     // A run started under an older window plan may hold a step past the
-    // new plan's windows: it moves on to the review with what it has.
+    // new plan's windows: it moves on to the last step (named "review"
+    // before BL-STAB-9; now the Section L/M passes) with what it has.
     const step = stepsFor(windows.length)[cursor.step] ?? { kind: "review" as const };
     if (step.kind === "window") {
       const w = windows[step.index]!;
@@ -163,43 +163,38 @@ export async function stepExtractionEval(input: {
         lists: read.list ? [...cursor.lists, read.list] : cursor.lists,
         windowsFailed: cursor.windowsFailed + (read.list ? 0 : 1),
       };
-      await db.update(extractionEvalRuns).set({ cursor: next }).where(eq(extractionEvalRuns.id, run.id));
+      // The model that served the read, as the run's model.
+      await db.update(extractionEvalRuns).set({ cursor: next, ...(read.model ? { model: read.model } : {}) }).where(eq(extractionEvalRuns.id, run.id));
       continue;
     }
 
-    const review = await aiRunSolicitationReview({
-      organizationId: input.organizationId,
-      title: doc.title,
-      fileName: doc.title,
-      rawText: doc.rawText,
-      model: run.requestedModel || undefined,
-    });
-    if (review.ok && review.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
-    // BL-AIX Phase 2b — the dedicated Section L / M passes intake now runs:
-    // their factors (in order) are scored when found, the review's otherwise.
+    // BL-AIX Phase 2b — the dedicated Section L / M passes intake runs.
+    // BL-STAB-9 — the AI document review is not part of intake any more
+    // (it builds on the parse), so only what intake stores is scored.
     const lm = await extractLmStructure({
       organizationId: input.organizationId,
       rawText: doc.rawText,
       documentLabel: doc.title,
       model: run.requestedModel || undefined,
     });
+    if (lm.stubbed) return fail("AI is in stub mode, so nothing can be measured. Configure a provider first.");
     const fromLm = lmScoringInputs(lm.stubbed ? null : lm.structure);
     const extracted = mergeRequirementLists(cursor.lists).slice(0, MAX_REQUIREMENTS_PER_DOCUMENT);
     const located = attachProvenance(doc.rawText, extracted);
     const score = scoreDocument(
-      { docId, title: doc.title, windows: windows.length, windowsFailed: cursor.windowsFailed + (review.ok ? 0 : 1) },
+      { docId, title: doc.title, windows: windows.length, windowsFailed: cursor.windowsFailed },
       await goldFor(docId),
       {
         requirements: extracted.map((r) => r.text),
-        sectionL: [...(review.ok ? review.data.sectionL : []), ...fromLm.sectionL],
-        factors: fromLm.factors.length > 0 ? fromLm.factors : review.ok ? review.data.evaluationFactors.map((f) => f.name) : [],
+        sectionL: fromLm.sectionL,
+        factors: fromLm.factors,
         verbatim: located.counts.exact,
       },
       isSameRequirement,
     );
     await db
       .update(extractionEvalRuns)
-      .set({ results: [...results, score], cursor: freshCursor(cursor.doc + 1), ...(review.ok ? { model: review.model } : {}) })
+      .set({ results: [...results, score], cursor: freshCursor(cursor.doc + 1) })
       .where(eq(extractionEvalRuns.id, run.id));
   }
 }

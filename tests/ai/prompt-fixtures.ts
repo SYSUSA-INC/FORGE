@@ -71,9 +71,9 @@ import {
   solicitationFrontMatterSchema,
   winnerAnalysisSchema,
   type SectionDraftSnapshot,
-  type SolicitationReviewVerdict,
 } from "@/lib/ai-prompts";
 import { capabilityMatrixSchema, questionSetSchema, solicitationReviewSchema } from "@/lib/ai-prompts-bl23";
+import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
 import { buildScanUserPrompt, SCAN_SYSTEM } from "@/lib/proposal-scan-input";
 import { fromPlainText } from "@/lib/tiptap-doc";
@@ -155,7 +155,7 @@ export const draftSnapshot: SectionDraftSnapshot = {
   authorVoice: { author: "Pat", guidance: "Short declarative sentences; numbers first." },
 };
 
-const reviewVerdictRequirements: SolicitationReviewVerdict["requirements"] = [
+const reviewVerdictRequirements: SolicitationReviewResult["requirements"] = [
   { id: "R1", kind: "shall", text: "Migrate 40 legacy applications.", sectionRef: "C.1", capabilityArea: "Cloud Migration" },
 ];
 
@@ -278,7 +278,14 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
     buildSolicitationVisionPrompt(),
     buildRequirementsChunkPrompt({ chunkText: RFP_TEXT, chunkIndex: 0, chunkCount: 2, documentLabel: "RFP.pdf" }),
   ],
-  solicitation_review: () => [buildSolicitationReviewPrompt({ title: "Cloud migration support", fileName: "RFP.pdf", rawText: RFP_TEXT })],
+  solicitation_review: () => [
+    buildSolicitationReviewPrompt({
+      title: "Cloud migration support",
+      fileName: "RFP.pdf",
+      rawText: RFP_TEXT,
+      basis: { requirementCount: 1, factors: ["Technical approach", "Price"] },
+    }),
+  ],
   capability_matrix: () => [
     buildCapabilityMatrixPrompt({
       solicitationTitle: "Cloud migration support",

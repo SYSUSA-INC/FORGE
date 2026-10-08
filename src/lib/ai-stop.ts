@@ -13,6 +13,16 @@ export function isTruncatedStop(stopReason: string | null | undefined): boolean 
   return s === "max_tokens" || s === "length" || s === "max_output_tokens";
 }
 
+/**
+ * BL-STAB-9 — why a structured answer that hit the output ceiling is not
+ * used. Said instead of a shape error: a cut-off answer is missing its
+ * last fields, which reads as if the model had sent the wrong shape.
+ */
+export function truncatedAnswerMessage(maxTokens: number | null | undefined): string {
+  const limit = maxTokens && maxTokens > 0 ? `${maxTokens.toLocaleString("en-US")}-token ` : "";
+  return `The AI's answer was cut off at its ${limit}output limit before it finished.`;
+}
+
 /** What the author sees when a draft hit the output ceiling. */
 export const TRUNCATED_DRAFT_NOTE =
   "The model hit its output limit before finishing, so this draft is cut short. Accept it as a start, then use Tighten, or split the section.";

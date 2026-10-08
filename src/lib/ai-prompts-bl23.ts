@@ -5,76 +5,47 @@
  * because that file is already 750+ lines and these three prompts
  * are tightly coupled — they only make sense as a triad. Re-exported
  * from ai-prompts.ts so call sites import from one place.
+ *
+ * BL-STAB-9 — the review no longer re-extracts the requirements,
+ * Sections L and M or the evaluation factors (they come from the parse,
+ * `review-basis.ts`); it asks for judgement only, sized to fit its
+ * output limit whatever the size of the RFP, with fields that fall back
+ * one by one. The tool schema is the only schema it shows the model.
  */
 import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
+import type { SolicitationReviewResult } from "@/db/schema";
 import { frontPassExcerpt } from "@/lib/solicitation-sections";
 import { fenced } from "@/lib/prompt-safety";
+import { tolerant, tolerantList } from "@/lib/zod-tolerant";
+
+type ReviewRequirement = SolicitationReviewResult["requirements"][number];
+type ReviewFactor = SolicitationReviewResult["evaluationFactors"][number];
 
 // ────────────────────────────────────────────────────────────────────
-// 1. Solicitation review — full document read
+// 1. Solicitation review — the judgement the parse does not make
 // ────────────────────────────────────────────────────────────────────
 
-export type SolicitationReviewVerdict = {
-  summary: string;
-  sectionL: string[];
-  sectionM: string[];
-  requirements: {
-    id: string;
-    kind: "shall" | "should" | "may";
-    text: string;
-    sectionRef: string;
-    capabilityArea: string;
-  }[];
-  capabilityAreas: string[];
-  evaluationFactors: { name: string; weight: string; notes: string }[];
-  periodOfPerformance: string;
-  placeOfPerformance: string;
-  setAside: string;
-  mandatoryCertifications: string[];
-  flaggedQuestions: string[];
-};
+const SOLICITATION_REVIEW_SYSTEM = `You are a senior federal capture analyst inside FORGE, a proposal operations platform, reviewing an RFP / RFI / Sources Sought / RFQ document. FORGE has already extracted the document's requirements and its Sections L and M; you are given how many requirements it found and the evaluation factors, for context. Your answer is the capture team's first read of the opportunity.
 
-const SOLICITATION_REVIEW_SYSTEM = `You are a senior federal capture analyst inside FORGE — a proposal operations platform — performing a deep review of an RFP / RFI / Sources Sought / RFQ document. Your output drives decision-grade capture analysis: a Capability Matrix that scores the company against the requirements, and a Question Generator that produces clarification questions for the contracting officer.
-
-Output ONLY a single JSON object matching the schema below. No commentary, no markdown fences.
+Record:
+- summary: 1-2 paragraphs of plain prose (at most about 1,200 characters): what the agency is buying, the scale and shape of the work, and what will decide the award. No marketing tone.
+- periodOfPerformance: as stated (e.g. "One 12-month base year and four 12-month option years"); "" when not stated.
+- placeOfPerformance: as stated; "" when not stated.
+- setAside: the set-aside as stated (e.g. "Total Small Business", "8(a) competitive"); "" when none.
+- mandatoryCertifications: certifications, clearances or accreditations an offeror must hold (e.g. "FedRAMP High", "CMMC Level 2", "Facility clearance: Secret"); at most 12; [] when none.
+- flaggedQuestions: up to 10 ambiguities a capture team should raise with the contracting office, one sentence each, each tied to something the document says. A dedicated question generator goes deeper later; list only the most consequential.
 
 Rules:
-- "id" on each requirement must be a stable short slug (e.g. "req_l5_2_1", "req_m_eval_3"); these IDs are referenced by the matrix and questions later, so they must be deterministic from your reading of the doc.
-- "kind" follows FAR convention: "shall" for mandatory, "should" for desired, "may" for optional.
-- "sectionRef" is the source-document reference where the requirement comes from (e.g. "L.5.2.1", "M-3", "C.3", "PWS 2.1.4").
-- "capabilityArea" is a short tag bucket (1-3 words) — these become the rows of the capability matrix downstream. Use consistent tags across requirements where possible (e.g. "Cloud Migration", "Zero Trust", "Past Performance — Federal IT", "FedRAMP Compliance").
-- Cap the requirements list at 50 — focus on shall/should statements that drive evaluation.
-- "summary" is 1-2 paragraphs of plain prose, no marketing tone.
-- "sectionL" and "sectionM" are bullet-style strings (4-10 each); preserve any page-cap or formatting constraints from L; preserve evaluation factor weights from M when stated.
-- "evaluationFactors": each entry { name: short label, weight: stated weight or "" if none, notes: 1 sentence }.
-- "mandatoryCertifications": e.g. ["FedRAMP High", "CMMC Level 2", "Section 508 ICT accessibility"]. Empty array if none.
-- "flaggedQuestions": ambiguities you noticed during the review that the company should ask the contracting office about. The dedicated Question Generator runs separately and goes deeper, but include the most obvious ones here.
-- If the document is clearly NOT a solicitation, return mostly empty fields with summary explaining why.
-
-Schema:
-{
-  "summary": string,
-  "sectionL": string[],
-  "sectionM": string[],
-  "requirements": [
-    { "id": string, "kind": "shall" | "should" | "may", "text": string, "sectionRef": string, "capabilityArea": string }
-  ],
-  "capabilityAreas": string[],
-  "evaluationFactors": [
-    { "name": string, "weight": string, "notes": string }
-  ],
-  "periodOfPerformance": string,
-  "placeOfPerformance": string,
-  "setAside": string,
-  "mandatoryCertifications": string[],
-  "flaggedQuestions": string[]
-}`;
+- Record only what the document states. Never invent a period, place, set-aside or certification.
+- If the document is clearly not a solicitation, say so in the summary and leave the other fields empty.`;
 
 export function buildSolicitationReviewPrompt(input: {
   title: string;
   fileName: string;
   rawText: string;
+  /** What the parse already holds, given as context (BL-STAB-9). */
+  basis?: { requirementCount: number; factors: string[] };
 }): { system: string; messages: AIMessage[] } {
   // BL-AIX Phase 0 — the beginning plus the located Sections L and M
   // (they sit at the end of a long RFP), not just the first 100k characters.
@@ -82,14 +53,18 @@ export function buildSolicitationReviewPrompt(input: {
   const userPrompt = [
     `Document title: ${input.title || "(untitled)"}`,
     `Source file: ${input.fileName || "(no file)"}`,
+    ...(input.basis
+      ? [
+          `Requirements FORGE extracted from the whole document: ${input.basis.requirementCount}`,
+          `Evaluation factors: ${input.basis.factors.length > 0 ? input.basis.factors.join("; ") : "(none structured)"}`,
+        ]
+      : []),
     ``,
     excerpt.partial ? `Excerpts (the document is ${input.rawText.length.toLocaleString("en-US")} characters; each excerpt is labelled with its position):` : `Full text:`,
     fenced(excerpt.text),
     ``,
-    `Return strict JSON per the schema in the system prompt.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    `Record the review with the tool.`,
+  ].join("\n");
 
   return {
     system: SOLICITATION_REVIEW_SYSTEM,
@@ -98,32 +73,15 @@ export function buildSolicitationReviewPrompt(input: {
 }
 
 export const solicitationReviewSchema = z.object({
-  summary: z.string(),
-  sectionL: z.array(z.string()),
-  sectionM: z.array(z.string()),
-  requirements: z.array(
-    z.object({
-      id: z.string(),
-      kind: z.enum(["shall", "should", "may"]),
-      text: z.string(),
-      sectionRef: z.string(),
-      capabilityArea: z.string(),
-    }),
-  ),
-  capabilityAreas: z.array(z.string()),
-  evaluationFactors: z.array(
-    z.object({
-      name: z.string(),
-      weight: z.string(),
-      notes: z.string(),
-    }),
-  ),
-  periodOfPerformance: z.string(),
-  placeOfPerformance: z.string(),
-  setAside: z.string(),
-  mandatoryCertifications: z.array(z.string()),
-  flaggedQuestions: z.array(z.string()),
+  summary: tolerant(z.string(), ""),
+  periodOfPerformance: tolerant(z.string(), ""),
+  placeOfPerformance: tolerant(z.string(), ""),
+  setAside: tolerant(z.string(), ""),
+  mandatoryCertifications: tolerantList(z.string(), 12),
+  flaggedQuestions: tolerantList(z.string(), 10),
 });
+
+export type SolicitationReviewVerdict = z.output<typeof solicitationReviewSchema>;
 
 // ────────────────────────────────────────────────────────────────────
 // 2. Capability Matrix — review × knowledge entries
@@ -192,7 +150,7 @@ export function buildCapabilityMatrixPrompt(input: {
   solicitationTitle: string;
   agency: string;
   setAside: string;
-  requirements: SolicitationReviewVerdict["requirements"];
+  requirements: ReviewRequirement[];
   knowledgeEntries: {
     id: string;
     kind: string;
@@ -313,8 +271,8 @@ export function buildQuestionGeneratorPrompt(input: {
   reviewSummary: string;
   sectionL: string[];
   sectionM: string[];
-  requirements: SolicitationReviewVerdict["requirements"];
-  evaluationFactors: SolicitationReviewVerdict["evaluationFactors"];
+  requirements: ReviewRequirement[];
+  evaluationFactors: ReviewFactor[];
   flaggedQuestions: string[];
 }): { system: string; messages: AIMessage[] } {
   const reqs = input.requirements

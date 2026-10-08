@@ -781,6 +781,9 @@ export const aiCallLogs = pgTable(
     viaTool: boolean("via_tool").notNull().default(false),
     parseOk: boolean("parse_ok"),
     parseError: text("parse_error"),
+    // BL-STAB-9 — why the provider stopped ("max_tokens" / "length" means
+    // the answer was cut off at the output ceiling). Null before 0126.
+    stopReason: text("stop_reason"),
     // BL-AIX Phase 1g-2 — served through a Message Batch (half price;
     // latency_ms is 0 because queue time is not provider latency).
     batched: boolean("batched").notNull().default(false),
@@ -3279,6 +3282,13 @@ export type SolicitationReviewResult = {
   mandatoryCertifications: string[];
   /** Questions the model itself flagged during the review (separate from the question generator output). */
   flaggedQuestions: string[];
+  /**
+   * BL-STAB-9 — set when the requirements, Sections L/M and evaluation
+   * factors were taken from the parse (`review-basis.ts`) rather than
+   * re-extracted by the review. `hash` tells a stale review apart.
+   * Absent on reviews made before.
+   */
+  basis?: { source: "parse"; hash: string; requirementCount: number };
 };
 
 export const solicitationReviews = pgTable(

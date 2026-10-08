@@ -75,7 +75,7 @@ Effort key:
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365) |
-| 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined" | P0 | M | 🔄 root cause under investigation (owner, 2026-10-08) |
+| 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | 🔄 9a in PR #366; 9b (matrix, questions) next |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
@@ -180,7 +180,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365) · 🔄 BL-STAB-9 being root-caused · ⏳ BL-STAB-3 to 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365) · 🔄 BL-STAB-9 in PR #366 · ⏳ BL-STAB-3 to 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -413,22 +413,78 @@ mind. Bandage will come off but a true fix will stay."
       from storage when their record is deleted; a test that keeps any
       file out of a server action.**
 - **BL-STAB-9 — The AI document review fails on a real
-  solicitation.** 🔄 root cause under investigation.
+  solicitation.** 🔄 in PR #366.
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI
     document review" → Initiate review shows "Review failed: AI
     response didn't match the expected shape (requirements: expected
     array, received undefined; capabilityAreas: expected array,
     received undefined; evaluationFactors: expected array, received
-    undefined)". Every other field of the answer passed, so the answer
-    came back without exactly those three lists.
-  - **Where:** `aiRunSolicitationReview` in
-    `src/lib/solicitation-ai-review.ts` asks one call (4,000 output
-    tokens, a 100,000-character excerpt) to list up to 50 requirements,
-    the capability areas and the evaluation factors, all required by a
-    strict schema in `src/lib/ai-prompts-bl23.ts`. The solicitation
-    parse already sweeps the whole document for requirements
-    (BL-STAB-1) and structures Sections L and M (BL-AIX 2b).
-  - **Root cause and fix:** recorded here once proven.
+    undefined)". (An earlier note here read this as "every other field
+    passed"; it did not: the message showed only the first three of
+    eight problems.)
+  - **Root cause (reproduced byte for byte through the real gateway
+    with a mocked provider):**
+    - `aiRunSolicitationReview` asked one answer, capped at 4,000 output
+      tokens, to re-extract up to 50 requirements (five fields each),
+      Sections L and M, the evaluation factors and five more fields
+      from a 100,000-character excerpt. A real RFP's full answer is
+      about 5,000-6,000 tokens; the requirement list alone is about
+      four-fifths of it. The answer was cut off while writing the
+      requirement list, after the summary and Sections L and M.
+    - The gateway never read the provider's stop reason on structured
+      answers, so a cut-off answer was validated as if finished and
+      failed as a "shape" error. `ai_call_log` had no stop reason, so
+      it could not be seen afterwards.
+    - `describeZodIssues` showed only the first three problems, which
+      made eight missing fields look like three.
+    - The review re-extracted what the parse already holds: the
+      whole-document requirement sweep (BL-STAB-1), the structured
+      Sections L and M (BL-AIX 2b) and the team's verdicts (2c-1). The
+      capability matrix (50 cells in 4,000 tokens) and the question
+      generator (25 questions in 3,000) had the same limit coming.
+  - **Fix:**
+    - **Every AI feature:** a structured answer that stopped at its
+      output limit fails with "The AI's answer was cut off at its N-token
+      output limit before it finished" (`applyStopReason` in `ai.ts`),
+      unless the caller handles partial answers (`acceptTruncated`: the
+      parse's requirement sweep, which splits the window, and its front
+      matter, whose fields fall back one by one). Every call logs its
+      stop reason (`ai_call_log.stop_reason`, migration 0126). Shape
+      errors say how many more problems there were.
+    - **The review builds on the parse** (`review-basis.ts`): the
+      verified requirement list (rejected clauses left out), the
+      structured Sections L and M and factors (else the parse's L/M
+      summaries). Requirement ids come from the extracted wording, so a
+      clause keeps its id across a re-parse or a reorder. The model is
+      asked only for a summary, period and place of performance,
+      set-aside, certifications and flagged questions, in 2,000 tokens,
+      with fields that fall back one by one. The review waits for a
+      finished parse. The panel says when a review no longer matches the
+      parse (stale) or predates this change (legacy).
+    - The extraction accuracy run scores the Section L/M passes intake
+      stores instead of calling the review.
+    - Tests: `tests/ai/review-basis.test.ts` (pure) and
+      `tests/isolation/solicitation-review.test.ts` (Postgres, mocked
+      provider: the owner's failure now reads "cut off" and is logged
+      with its stop reason; the review is built on the parse and waits
+      for it; another organization's solicitation is refused).
+  - **Phases:**
+    - **9a — the gateway and the review** (above). 🔄 in PR #366.
+    - **9b — the capability matrix and the question generator.** ⏳ next.
+      The matrix still asks one 4,000-token answer for every cell, and
+      the review now hands it the whole verified list (up to 400), so a
+      long RFP's matrix stops with the "cut off" message until then. The
+      fix: score 20 requirements per answer (four at once after the
+      first, which warms the prompt cache with the knowledge corpus),
+      split a cut-off window in two, ask for PWin in its own small
+      answer, start windows for 170 seconds and finish the rest with
+      **Score remaining** (cells kept by requirement id, which the
+      review now keeps stable, so re-running the review keeps the
+      matrix); the question generator reads at most 60 requirements,
+      mandatory first, with 6,000 output tokens for its 25 questions,
+      dropping a malformed question rather than the set. Built and
+      tested alongside 9a; it ships as its own PR to keep each under
+      1,500 lines.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
   nowhere to set one.** ⏳ queued.
   - **Symptom:** Settings → SAM.gov sync (UEI) shows "SAM.gov 401:

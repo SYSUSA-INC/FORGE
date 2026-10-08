@@ -1,7 +1,8 @@
 /**
  * BL-AIX Phase 1e-3 — the extraction accuracy run against Postgres, with
  * the model mocked. Asserts: a run covers every approved gold document,
- * reads it through the requirement sweep and the review, scores it against
+ * reads it through the requirement sweep and the Section L/M passes (the
+ * review since BL-STAB-9 builds on the parse, so it is not run), scores it against
  * the approved annotations only, resumes across budgeted calls, records
  * the prompt versions, and refuses stub mode. BL-AIX Phase 1i-2 — a
  * candidate model is stored on the run and pinned on every call it makes.
@@ -17,23 +18,26 @@ import type { DocScore } from "@/lib/extraction-eval-logic";
 import { createGoldDocFromText, setGoldDocApproved } from "@/lib/gold-set";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
-const RFP = Array.from({ length: 60 }, (_, i) => `C.${i} The contractor shall perform task number ${i} in full.\n\n`).join("");
+const RFP = [
+  "SECTION C - DESCRIPTION/SPECIFICATIONS/STATEMENT OF WORK\n\n",
+  ...Array.from({ length: 60 }, (_, i) => `C.${i} The contractor shall perform task number ${i} in full.\n\n`),
+  "SECTION L - INSTRUCTIONS, CONDITIONS, AND NOTICES TO OFFERORS\n\nL.1 Volume I shall not exceed 25 pages.\n\n",
+  "SECTION M - EVALUATION FACTORS FOR AWARD\n\nM.1 Technical Approach is the most important factor, followed by Price.\n\n",
+].join("");
 
-const review = {
-  summary: "",
-  sectionL: ["Volume I shall not exceed 25 pages."],
-  sectionM: [],
-  requirements: [],
-  capabilityAreas: [],
-  evaluationFactors: [
-    { name: "Technical Approach", weight: "most important", notes: "" },
-    { name: "Price", weight: "", notes: "" },
+const sectionL = {
+  volumes: [{ name: "Volume I", pageLimit: 25, pageLimitText: "shall not exceed 25 pages", contents: "", quote: "Volume I shall not exceed 25 pages." }],
+  formatRules: [],
+  submission: [],
+};
+const sectionM = {
+  basis: "tradeoff",
+  basisQuote: "",
+  relativeImportance: "",
+  factors: [
+    { name: "Technical Approach", importance: "most important", quote: "Technical Approach is the most important factor", subfactors: [] },
+    { name: "Price", importance: "", quote: "", subfactors: [] },
   ],
-  periodOfPerformance: "",
-  placeOfPerformance: "",
-  setAside: "",
-  mandatoryCertifications: [],
-  flaggedQuestions: [],
 };
 
 describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
@@ -72,9 +76,11 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
         outputTokens: 5,
         stubbed,
         structured:
-          opts.tool?.name === "record_solicitation_review"
-            ? review
-            : { requirements: [{ kind: "shall", text: "The contractor shall perform task number 1 in full.", ref: "C.1" }] },
+          opts.tool?.name === "record_section_l"
+            ? sectionL
+            : opts.tool?.name === "record_section_m"
+              ? sectionM
+              : { requirements: [{ kind: "shall", text: "The contractor shall perform task number 1 in full.", ref: "C.1" }] },
       };
     });
   });
@@ -96,7 +102,6 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
     expect(run!.status).toBe("done");
     expect(run!.promptVersions).toEqual({
       solicitation_extract: PROMPT_VERSIONS.solicitation_extract,
-      solicitation_review: PROMPT_VERSIONS.solicitation_review,
       solicitation_structure: PROMPT_VERSIONS.solicitation_structure,
     });
     expect(run!.model).toBe("test-mock");
@@ -121,14 +126,14 @@ describe("BL-AIX Phase 1e-3 — extraction accuracy run (runtime)", () => {
     expect(rest).toMatchObject({ ok: true, done: true, docsDone: 2 });
   });
 
-  it("pins a candidate model on the sweep and the review, and keeps it on the run", async () => {
+  it("pins a candidate model on the sweep and the Section L/M passes, and keeps it on the run", async () => {
     const started = await startExtractionEval(fx.orgA.userId, "claude-sonnet-5-5");
     if (!started.ok) throw new Error(started.error);
     const res = await stepExtractionEval({ runId: started.runId, organizationId: fx.orgA.organizationId, budgetMs: 600_000 });
     expect(res).toMatchObject({ ok: true, done: true, docsDone: 2 });
     const [run] = await db.select().from(extractionEvalRuns).where(eq(extractionEvalRuns.id, started.runId));
     expect(run!.requestedModel).toBe("claude-sonnet-5-5");
-    expect(new Set(seen.map((c) => c.tool))).toEqual(new Set(["record_requirements", "record_solicitation_review"]));
+    expect(new Set(seen.map((c) => c.tool))).toEqual(new Set(["record_requirements", "record_section_l", "record_section_m"]));
     expect(seen.every((c) => c.model === "claude-sonnet-5-5")).toBe(true);
   });
 

@@ -95,6 +95,8 @@ export function SolicitationReviewPanel({
   initialQuestions,
   knowledgeIndex,
   hasRawText,
+  parsed,
+  freshness,
 }: {
   solicitationId: string;
   initialReview: ReviewState;
@@ -104,6 +106,10 @@ export function SolicitationReviewPanel({
   knowledgeIndex: KnowledgeIndexEntry[];
   /** Whether the underlying solicitation has parsed text yet. */
   hasRawText: boolean;
+  /** BL-STAB-9 — the parse finished; the review builds on it. */
+  parsed: boolean;
+  /** BL-STAB-9 — whether the stored review still matches the parse (null: no review). */
+  freshness: "current" | "stale" | "legacy" | null;
 }) {
   const router = useRouter();
   const [review, setReview] = useState<ReviewState>(initialReview);
@@ -175,7 +181,7 @@ export function SolicitationReviewPanel({
     });
   }
 
-  const canReview = hasRawText && !reviewing;
+  const canReview = hasRawText && parsed && !reviewing;
 
   return (
     <Panel
@@ -204,8 +210,8 @@ export function SolicitationReviewPanel({
             disabled={!canReview}
             className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
             title={
-              !hasRawText
-                ? "Solicitation hasn't been parsed yet. Wait for the upload pipeline to finish, or re-upload the file."
+              !hasRawText || !parsed
+                ? "The review builds on the parsed requirements. Wait for the parse to finish, or re-parse."
                 : reviewing
                   ? "Running…"
                   : reviewComplete
@@ -259,10 +265,25 @@ export function SolicitationReviewPanel({
           </button>
         </div>
 
-        {!hasRawText ? (
+        {!hasRawText || !parsed ? (
           <div className="rounded-md border border-amber-400/40 bg-amber-400/[0.06] px-3 py-2 font-mono text-[11px] text-amber-200">
-            Waiting on the parse pipeline — once the document text is
-            extracted the review buttons become available.
+            Waiting on the parse — the review builds on the requirements and
+            Sections L and M it extracts, so it becomes available once the
+            parse finishes.
+          </div>
+        ) : null}
+
+        {reviewComplete && freshness === "stale" ? (
+          <div className="rounded-md border border-amber-400/40 bg-amber-400/[0.06] px-3 py-2 font-mono text-[11px] text-amber-200">
+            The requirements or evaluation factors changed since this review
+            (a re-parse, an amendment or a verdict). Re-run the review to
+            bring them in.
+          </div>
+        ) : null}
+        {reviewComplete && freshness === "legacy" ? (
+          <div className="rounded-md border border-amber-400/40 bg-amber-400/[0.06] px-3 py-2 font-mono text-[11px] text-amber-200">
+            This review was made before reviews were built on the parse. Re-run
+            it to use the full, verified requirement list and Sections L and M.
           </div>
         ) : null}
 
@@ -292,7 +313,7 @@ export function SolicitationReviewPanel({
         <div className="mt-5 flex flex-col gap-2">
           <Section
             title="Review output"
-            eyebrow={`${review.result.requirements.length} requirements · model ${review.model || "(unknown)"}`}
+            eyebrow={`${review.result.requirements.length} requirements${review.result.basis ? " from the parse" : ""} · model ${review.model || "(unknown)"}`}
             open={openSection === "review"}
             onToggle={() =>
               setOpenSection((cur) => (cur === "review" ? null : "review"))

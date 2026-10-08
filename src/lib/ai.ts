@@ -63,6 +63,7 @@ import {
 } from "@/lib/ai-capabilities";
 import { createSseParser } from "@/lib/sse";
 import { describeZodIssues } from "@/lib/zod-issues";
+import { isTruncatedStop, truncatedAnswerMessage } from "@/lib/ai-stop";
 
 export type AIRole = "user" | "assistant";
 
@@ -918,7 +919,28 @@ export type AIStructuredValidation<T> = {
   viaTool: boolean;
   /** Paths where a list or object arrived as JSON text and was decoded (see `decodeNestedJson`). */
   repaired?: string[];
+  /** BL-STAB-9 — the answer stopped at the output ceiling. */
+  truncated?: boolean;
 };
+
+/**
+ * BL-STAB-9 — a structured answer that stopped at the output ceiling is
+ * not a finished answer, even when what arrived validates (tolerant
+ * fields fill the missing ones with defaults). It fails with a message
+ * that says it was cut off, unless the caller takes partial answers
+ * (`acceptTruncated`) and handles them itself.
+ */
+export function applyStopReason<T>(
+  validation: AIStructuredValidation<T>,
+  stopReason: string | undefined,
+  opts: { acceptTruncated?: boolean; maxTokens?: number },
+): AIStructuredValidation<T> {
+  if (!isTruncatedStop(stopReason)) return validation;
+  const cut = truncatedAnswerMessage(opts.maxTokens);
+  if (!opts.acceptTruncated) return { ...validation, data: null, parseError: cut, truncated: true };
+  if (validation.data !== null) return { ...validation, truncated: true };
+  return { ...validation, parseError: `${cut} ${validation.parseError ?? ""}`.trim(), truncated: true };
+}
 
 function describeIssues(err: z.ZodError, input: unknown): string {
   return `AI response didn't match the expected shape (${describeZodIssues(err, input)}).`;
@@ -1297,6 +1319,8 @@ async function runTenantCompletion<T>(
     // Stub prose can never validate; don't count it as a parse failure.
     parseOk: validation && !result.stubbed ? validation.parseError === null : null,
     parseError: validation?.parseError ?? null,
+    // BL-STAB-9 — why the provider stopped, so a cut-off answer is visible.
+    stopReason: result.stopReason ?? null,
   });
 
   // Post-record: atomically add this call's actual token usage. The
@@ -1376,6 +1400,13 @@ export type AIStructuredOptions<T> = AITenantCompleteOptions & {
   toolName?: string;
   /** One line telling the model what the tool records. */
   toolDescription?: string;
+  /**
+   * BL-STAB-9 — keep an answer that stopped at the output ceiling when what
+   * arrived validates (`truncated` is set). Only for callers that handle a
+   * partial answer themselves, such as the requirement sweep that splits
+   * its window; otherwise a cut-off answer fails.
+   */
+  acceptTruncated?: boolean;
 };
 
 export type AIStructuredResult<T> = AICompleteResult & AIStructuredValidation<T>;
@@ -1392,7 +1423,7 @@ export type AIStructuredResult<T> = AICompleteResult & AIStructuredValidation<T>
 export async function completeStructuredForTenant<T>(
   opts: AIStructuredOptions<T>,
 ): Promise<AIStructuredResult<T>> {
-  const { schema, toolName, toolDescription, ...rest } = opts;
+  const { schema, toolName, toolDescription, acceptTruncated, ...rest } = opts;
   const tool: AIToolSpec = {
     name: sanitizeToolName(toolName ?? `${rest.feature}_result`),
     description:
@@ -1402,7 +1433,7 @@ export async function completeStructuredForTenant<T>(
   };
   const { result, validation } = await runTenantCompletion<T>(
     { ...rest, tool },
-    (r) => validateStructured(schema, r),
+    (r) => applyStopReason(validateStructured(schema, r), r.stopReason, { acceptTruncated, maxTokens: rest.maxTokens }),
   );
   const v = validation ?? { data: null, parseError: "No validation ran.", viaTool: false };
   return { ...result, ...v };
