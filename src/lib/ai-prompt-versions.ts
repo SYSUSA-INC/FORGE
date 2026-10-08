@@ -32,7 +32,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   compliance_automap: "2026-10-05.1",
   winner_analysis: "2026-10-05.1",
   protest_viability: "2026-10-05.1",
-  solicitation_extract: "2026-10-07.3",
+  solicitation_extract: "2026-10-08.1",
   solicitation_review: "2026-10-05.1",
   capability_matrix: "2026-10-05.1",
   question_generator: "2026-10-05.1",

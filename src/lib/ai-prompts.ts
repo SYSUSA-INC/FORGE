@@ -2,6 +2,7 @@ import { z } from "zod";
 import { frontPassExcerpt } from "@/lib/solicitation-sections";
 import { fenced } from "@/lib/prompt-safety";
 import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
+import { describeZodIssues } from "@/lib/zod-issues";
 import type { AIMessage } from "@/lib/ai";
 import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 
@@ -78,6 +79,34 @@ Schema:
   "keyDates": [{ "label": string, "isoDate": "YYYY-MM-DD" | null, "type": "qa_cutoff" | "site_visit" | "final_rfp" | "proposal_due" | "oral_presentation" | "expected_award" | "debrief_window" | "protest_window" | "other" }]
 }`;
 
+const SOLICITATION_FRONT_MATTER_SYSTEM = `You are a federal solicitation analyst inside FORGE — a proposal operations platform. You read raw RFP/RFI/RFQ/SS text and return structured facts as strict JSON.
+
+Rules:
+- Return ONLY a single JSON object matching the schema below. No commentary, no markdown fences.
+- Use empty string "" for any field you cannot find. Use null for missing dates.
+- Date format: YYYY-MM-DD. Convert any encountered date format to that.
+- Type must be one of: rfp, rfi, rfq, sources_sought, other.
+- Do not list requirements: a separate full-text pass reads every clause of the document.
+- Section L summary: 2–4 sentences describing what offerors must submit, page caps, and format requirements you found.
+- Section M summary: 2–4 sentences describing evaluation factors and weights you found.
+- If the document is clearly not a federal solicitation, set title to "" and return mostly empty fields.
+- keyDates: extract ALL explicitly-stated milestone dates. Include the proposal due date as type="proposal_due". Never fabricate dates — only include dates literally present in the document. Use null for isoDate if the date is mentioned but not specific (e.g., "TBD"). Max 20 entries.
+
+Schema:
+{
+  "title": string,
+  "agency": string,
+  "office": string,
+  "solicitationNumber": string,
+  "type": "rfp" | "rfi" | "rfq" | "sources_sought" | "other",
+  "naicsCode": string,
+  "setAside": string,
+  "responseDueDate": string | null,
+  "sectionLSummary": string,
+  "sectionMSummary": string,
+  "keyDates": [{ "label": string, "isoDate": "YYYY-MM-DD" | null, "type": "qa_cutoff" | "site_visit" | "final_rfp" | "proposal_due" | "oral_presentation" | "expected_award" | "debrief_window" | "protest_window" | "other" }]
+}`;
+
 export function buildSolicitationExtractPrompt(
   rawText: string,
 ): { system: string; messages: AIMessage[] } {
@@ -97,7 +126,7 @@ export function buildSolicitationExtractPrompt(
     .filter(Boolean)
     .join("\n");
   return {
-    system: SOLICITATION_EXTRACT_SYSTEM,
+    system: SOLICITATION_FRONT_MATTER_SYSTEM,
     messages: [{ role: "user", content: userPrompt }],
   };
 }
@@ -1848,25 +1877,82 @@ export function buildCompliancePreflightPrompt(
 // throw, or `.safeParse()` to branch.
 // ────────────────────────────────────────────────────────────────────
 
-export const solicitationExtractionSchema = z.object({
-  title: z.string(),
-  agency: z.string(),
-  office: z.string(),
-  solicitationNumber: z.string(),
-  type: z.enum(["rfp", "rfi", "rfq", "sources_sought", "other"]),
-  naicsCode: z.string(),
-  setAside: z.string(),
-  responseDueDate: z.string().nullable(),
-  sectionLSummary: z.string(),
-  sectionMSummary: z.string(),
-  requirements: z.array(
-    z.object({
-      kind: z.enum(["shall", "should", "may"]),
-      text: z.string(),
-      ref: z.string(),
-    }),
+/**
+ * A field that degrades on its own: a missing or malformed value becomes
+ * the fallback instead of failing the whole answer. The tool schema still
+ * shows the model the field's type and allowed values.
+ */
+function tolerant<T extends z.ZodType>(schema: T, fallback: z.output<T>) {
+  return schema.default(fallback as never).catch(fallback as never);
+}
+
+const KEY_DATE_TYPES = [
+  "qa_cutoff",
+  "site_visit",
+  "final_rfp",
+  "proposal_due",
+  "oral_presentation",
+  "expected_award",
+  "debrief_window",
+  "protest_window",
+  "other",
+] as const;
+
+/** One key date; an unreadable entry becomes null and is dropped by the caller. */
+const keyDateSchema = z
+  .object({
+    label: z.string(),
+    isoDate: tolerant(z.string().nullable(), null),
+    type: tolerant(z.enum(KEY_DATE_TYPES), "other"),
+  })
+  .nullable()
+  .catch(null);
+
+/**
+ * The front matter of a text solicitation: metadata, Section L/M
+ * summaries and key dates. Requirements are not asked for here: the
+ * full-text sweep reads every window for them (and its windows are split
+ * and retried on their own), so a list here was redundant, and a large
+ * nested list was the part of this answer most likely to come back
+ * malformed and sink the whole parse.
+ */
+export const solicitationFrontMatterSchema = z.object({
+  title: tolerant(z.string(), ""),
+  agency: tolerant(z.string(), ""),
+  office: tolerant(z.string(), ""),
+  solicitationNumber: tolerant(z.string(), ""),
+  type: tolerant(z.enum(["rfp", "rfi", "rfq", "sources_sought", "other"]), "other"),
+  naicsCode: tolerant(z.string(), ""),
+  setAside: tolerant(z.string(), ""),
+  responseDueDate: tolerant(z.string().nullable(), null),
+  sectionLSummary: tolerant(z.string(), ""),
+  sectionMSummary: tolerant(z.string(), ""),
+  keyDates: tolerant(z.array(keyDateSchema), []),
+});
+
+/**
+ * A scanned document read in one vision pass: the front matter plus the
+ * requirements, since there is no text for a sweep. An unreadable
+ * requirement becomes null and is dropped by the caller.
+ */
+export const solicitationExtractionSchema = solicitationFrontMatterSchema.extend({
+  requirements: tolerant(
+    z.array(
+      z
+        .object({
+          kind: tolerant(z.enum(["shall", "should", "may"]), "shall"),
+          text: z.string(),
+          ref: tolerant(z.string(), ""),
+        })
+        .nullable()
+        .catch(null),
+    ),
+    [],
   ),
 });
+
+/** What the vision passes return once validated: unreadable entries are null. */
+export type SolicitationExtractionAnswer = z.output<typeof solicitationExtractionSchema>;
 
 export const ebuyExtractionSchema = z.object({
   title: z.string(),
@@ -2080,13 +2166,9 @@ export function parseAiJson<T>(
 
   const parsed = schema.safeParse(json);
   if (!parsed.success) {
-    const issues = parsed.error.issues
-      .slice(0, 3)
-      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-      .join("; ");
     return {
       ok: false,
-      error: `AI response didn't match the expected shape (${issues}).`,
+      error: `AI response didn't match the expected shape (${describeZodIssues(parsed.error, json)}).`,
     };
   }
   return { ok: true, data: parsed.data };

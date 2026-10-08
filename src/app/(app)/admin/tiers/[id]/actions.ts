@@ -13,6 +13,7 @@ import {
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
+import { describeZodIssue } from "@/lib/zod-issues";
 
 /**
  * BL-16 Phase C-3 — edit a `subscription_tier` row.
@@ -81,7 +82,7 @@ export async function updateTierAction(
     return {
       ok: false,
       error: first
-        ? `${first.path.join(".")}: ${first.message}`
+        ? describeZodIssue(first, raw)
         : "Invalid input.",
     };
   }
