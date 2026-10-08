@@ -189,6 +189,16 @@ export function mergeRequirementLists<T extends { text: string }>(lists: T[][]):
 
 const KINDS: readonly RequirementKind[] = ["shall", "should", "may"];
 
+/**
+ * The kind a model wrote, in any case or wording ("Shall", "MUST", "will"),
+ * as one of shall / should / may. Anything unrecognised is a "shall": a
+ * requirement is safer over-weighted than dropped.
+ */
+export function requirementKindOf(raw: unknown): RequirementKind {
+  const word = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return (KINDS as readonly string[]).includes(word) ? (word as RequirementKind) : "shall";
+}
+
 /** Coerce a model-returned requirement list into the stored shape; drops empties and caps length. */
 export function normalizeRequirementList(
   raw: unknown,
@@ -202,14 +212,8 @@ export function normalizeRequirementList(
     const rec = r as Record<string, unknown>;
     const text = typeof rec.text === "string" ? rec.text.replace(/\s+/g, " ").trim().slice(0, maxText) : "";
     if (!text) continue;
-    const kindRaw = typeof rec.kind === "string" ? rec.kind.toLowerCase() : "";
-    const kind = (KINDS as readonly string[]).includes(kindRaw)
-      ? (kindRaw as RequirementKind)
-      : kindRaw === "must" || kindRaw === "will"
-        ? "shall"
-        : "shall";
     const ref = typeof rec.ref === "string" ? rec.ref.trim().slice(0, 64) : "";
-    out.push({ kind, text, ref });
+    out.push({ kind: requirementKindOf(rec.kind), text, ref });
     if (out.length >= limits.maxItems) break;
   }
   return out;

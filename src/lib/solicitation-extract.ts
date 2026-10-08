@@ -12,7 +12,10 @@ import {
   buildRequirementsChunkPrompt,
   buildSolicitationExtractPrompt,
   buildSolicitationVisionPrompt,
+  choiceOf,
+  KEY_DATE_TYPES,
   requirementsChunkSchema,
+  SOLICITATION_TYPES,
   solicitationExtractionSchema,
   solicitationFrontMatterSchema,
   type SolicitationExtractionAnswer,
@@ -28,6 +31,7 @@ import { coverageFromSweep, type ExtractionCoverage } from "@/lib/extraction-cov
 import {
   mergeRequirementLists,
   normalizeRequirementList,
+  requirementKindOf,
   type RequirementLike,
 } from "@/lib/requirements-text";
 import { attachProvenance, pageStartsFromLengths } from "@/lib/requirement-provenance";
@@ -153,14 +157,16 @@ export type FullTextRequirementsResult = {
  * BL-AIP-5 — read the WHOLE document for requirements, one window at a
  * time, and merge the windows' lists without duplicates. A window whose
  * answer hit the output ceiling (`stopReason`) or failed to validate is
- * split in two and re-read once; a window that still fails is counted
- * and skipped rather than failing the document.
+ * split in two and re-read once (or, when too short to split, read once
+ * more); a window that still fails is counted and skipped rather than
+ * failing the document.
  */
 /**
  * BL-AIX Phase 1e-3 — one window of the requirement sweep, exported so the
  * gold-set accuracy run reads a document exactly as intake does. A window
  * whose answer hit the output ceiling or failed to validate is split in
- * two and re-read once; `list` is null when it still fails.
+ * two and re-read once, or read once more when shorter than
+ * MIN_SPLIT_CHARS; `list` is null when it still fails.
  */
 export async function readRequirementsWindow(input: {
   organizationId: string;
@@ -173,6 +179,8 @@ export async function readRequirementsWindow(input: {
   depth?: number;
   /** BL-AIX Phase 1i-2 — pin a candidate model (eval runs); unset follows routing. */
   model?: string;
+  /** BL-STAB-1 — this is the second read of a window too short to split. */
+  retry?: boolean;
 }): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number; error?: string }> {
   const { organizationId, text, index, count } = input;
   const depth = input.depth ?? 0;
@@ -186,7 +194,7 @@ export async function readRequirementsWindow(input: {
   const res = await completeStructuredForTenant({
     organizationId,
     feature: "solicitation_extract",
-    variant: depth === 0 ? "requirements_chunk" : "requirements_chunk_split",
+    variant: input.retry ? "requirements_chunk_retry" : depth === 0 ? "requirements_chunk" : "requirements_chunk_split",
     model: input.model || undefined,
     schema: requirementsChunkSchema,
     toolName: "record_requirements",
@@ -221,6 +229,12 @@ export async function readRequirementsWindow(input: {
   if (res.data) {
     // Truncated but parseable: partial list is better than none.
     return { list: normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK }), stubbed: false, split };
+  }
+  // BL-STAB-1 — a window too short to split is read once more: an
+  // unreadable answer is usually a one-off, and for a short document this
+  // window is all the sweep has.
+  if (depth === 0 && !input.retry && text.length < MIN_SPLIT_CHARS) {
+    return readRequirementsWindow({ ...input, retry: true });
   }
   log.warn("[extractRequirementsFullText]", "window failed", {
     index,
@@ -584,20 +598,21 @@ export async function aiExtractSolicitationFromImage(
 }
 
 /**
- * Clamp a validated answer to the lengths the columns hold, keep dates
- * that are real YYYY-MM-DD dates, and drop the entries the schema could
- * not read (null) or that came back empty.
+ * Clamp a validated answer to the lengths the columns hold, map the kinds
+ * and types the model wrote in its own words to the allowed values, keep
+ * dates that are real YYYY-MM-DD dates, and drop the entries the schema
+ * could not read (null) or that came back empty.
  */
 function normalizeExtraction(raw: SolicitationExtractionAnswer | Omit<SolicitationExtractionAnswer, "requirements">): SolicitationExtractionResult {
   const isoDay = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
   const requirements = ("requirements" in raw ? raw.requirements : [])
     .filter((r) => r !== null)
-    .map((r) => ({ kind: r.kind, text: r.text.slice(0, 500), ref: r.ref.slice(0, 64) }))
+    .map((r) => ({ kind: requirementKindOf(r.kind), text: r.text.slice(0, 500), ref: r.ref.slice(0, 64) }))
     .filter((r) => r.text.trim().length > 0)
     .slice(0, MAX_REQUIREMENTS_PER_DOCUMENT);
   const keyDates = raw.keyDates
     .filter((kd) => kd !== null)
-    .map((kd) => ({ label: kd.label.slice(0, 128), isoDate: isoDay(kd.isoDate), type: kd.type }))
+    .map((kd) => ({ label: kd.label.slice(0, 128), isoDate: isoDay(kd.isoDate), type: choiceOf(KEY_DATE_TYPES, kd.type, "other") }))
     .filter((kd) => kd.label.trim().length > 0)
     .slice(0, 20);
 
@@ -606,7 +621,7 @@ function normalizeExtraction(raw: SolicitationExtractionAnswer | Omit<Solicitati
     agency: raw.agency.slice(0, 256),
     office: raw.office.slice(0, 256),
     solicitationNumber: raw.solicitationNumber.slice(0, 128),
-    type: raw.type,
+    type: choiceOf(SOLICITATION_TYPES, raw.type, "other"),
     naicsCode: raw.naicsCode.slice(0, 16),
     setAside: raw.setAside.slice(0, 64),
     responseDueDate: isoDay(raw.responseDueDate),

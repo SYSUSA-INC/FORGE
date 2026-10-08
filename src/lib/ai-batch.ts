@@ -22,6 +22,7 @@ import {
   getAIProviderStatus,
   refuseIfOverCap,
   tenantRoutedModel,
+  logRepairs,
   validateStructured,
   type AICompleteOptions,
   type AICompleteResult,
@@ -199,6 +200,7 @@ export async function recordBatchOutcome<T>(input: {
   const parsed = __parseAnthropicResponse(input.line.message as Parameters<typeof __parseAnthropicResponse>[0], input.meta.requestedModel);
   const result: AICompleteResult = { ...parsed, provider: "anthropic", stubbed: false };
   const validation = input.schema ? validateStructured(input.schema, result) : null;
+  await logRepairs(validation, { feature: input.feature, variant: "batch", model: result.model });
   await recordAiCall({
     ...base,
     status: "ok",
