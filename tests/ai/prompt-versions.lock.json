@@ -6,8 +6,8 @@
       "sha256": "5bf7f2d78ae8f4ea8ede1b8c533dd5c45329c385a5de0dc9d5a3658aac728fa2"
     },
     "capability_matrix": {
-      "version": "2026-10-05.1",
-      "sha256": "8f105cd0c652e1146ab0353ffff7830bed568561c45c05da14290d8abf65a385"
+      "version": "2026-10-08.1",
+      "sha256": "edc29ffaf0a2146db754d41fc9ad6ff5e998b4fb4666e39e49546246e23af91f"
     },
     "compliance_automap": {
       "version": "2026-10-05.1",
@@ -86,8 +86,8 @@
       "sha256": "47c3031bfd8b8484c12df2ca8e3d8f452b3b61e5529e85ad4394cd8a2a409992"
     },
     "question_generator": {
-      "version": "2026-10-05.1",
-      "sha256": "e105622a90297a809ea3990164f2554231216b8a15a57e9a0787fc98e6963607"
+      "version": "2026-10-08.1",
+      "sha256": "63f8c4a3b49c54b4e6b8f218683d9de38aa3088060d48e7f5440d5f0069334be"
     },
     "review_preflight": {
       "version": "2026-10-05.1",

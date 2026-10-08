@@ -6,18 +6,20 @@
  * are tightly coupled — they only make sense as a triad. Re-exported
  * from ai-prompts.ts so call sites import from one place.
  *
- * BL-STAB-9 — the review no longer re-extracts the requirements,
+ * BL-STAB-9 — each answer is sized to fit its output limit whatever the
+ * size of the RFP. The review no longer re-extracts the requirements,
  * Sections L and M or the evaluation factors (they come from the parse,
- * `review-basis.ts`); it asks for judgement only, sized to fit its
- * output limit whatever the size of the RFP, with fields that fall back
- * one by one. The tool schema is the only schema it shows the model.
+ * `review-basis.ts`); the matrix scores the requirements a window at a
+ * time and judges PWin in its own small answer; every list is read entry
+ * by entry, so one bad entry is dropped instead of failing the answer.
+ * The tool schema is the only schema the model sees.
  */
 import { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
 import type { SolicitationReviewResult } from "@/db/schema";
 import { frontPassExcerpt } from "@/lib/solicitation-sections";
 import { fenced } from "@/lib/prompt-safety";
-import { tolerant, tolerantList } from "@/lib/zod-tolerant";
+import { choice, tolerant, tolerantList } from "@/lib/zod-tolerant";
 
 type ReviewRequirement = SolicitationReviewResult["requirements"][number];
 type ReviewFactor = SolicitationReviewResult["evaluationFactors"][number];
@@ -84,14 +86,17 @@ export const solicitationReviewSchema = z.object({
 export type SolicitationReviewVerdict = z.output<typeof solicitationReviewSchema>;
 
 // ────────────────────────────────────────────────────────────────────
-// 2. Capability Matrix — review × knowledge entries
+// 2. Capability Matrix — requirements × knowledge entries, a window at a time
 // ────────────────────────────────────────────────────────────────────
+
+export const MATRIX_CELL_STATUSES = ["strong", "partial", "gap", "not_addressed"] as const;
+export type MatrixCellStatus = (typeof MATRIX_CELL_STATUSES)[number];
 
 export type CapabilityMatrixVerdict = {
   cells: {
     requirementId: string;
     capabilityRef: string;
-    status: "strong" | "partial" | "gap" | "not_addressed";
+    status: MatrixCellStatus;
     citation: string;
     narrative: string;
   }[];
@@ -100,170 +105,170 @@ export type CapabilityMatrixVerdict = {
   pwinRationale: string;
 };
 
+type MatrixKnowledgeEntry = { id: string; kind: string; title: string; body: string; tags: string[] };
+
 const CAPABILITY_MATRIX_SYSTEM = `You are a capture analyst inside FORGE judging how well the company's documented capabilities and past performance address the requirements of a specific solicitation.
 
-You receive:
-  - A list of requirements from the solicitation review (with id, text, sectionRef, capabilityArea, kind).
-  - A corpus of "knowledge entries" the company has captured — capabilities, past performance citations, key personnel, boilerplate. Each has an id, kind, title, body, and tags.
+You receive a part of the solicitation's requirements (each with id, kind, reference, area and text). The company's knowledge corpus is below: capabilities, past performance citations, key personnel and boilerplate, each with an id, kind, title, tags and body.
 
-Your job: produce a cell for every requirement. Score how strongly the corpus supports that requirement, cite the supporting entry, and give a 1-2 sentence narrative of the fit.
-
-Output ONLY a single JSON object matching the schema below.
+Record one cell for every requirement you are given:
+- requirementId: the id of the requirement, exactly as given.
+- capabilityRef: "knowledge:<entry id>" of the strongest supporting entry, or "" when no entry meaningfully supports the requirement.
+- status: "strong" (the corpus shows the company has done this, with details), "partial" (adjacent capability or thin past performance), "gap" (nothing relevant in the corpus), or "not_addressed" (the corpus is empty or nothing comes close).
+- citation: a verbatim slice of the supporting entry's body, at most 160 characters; "" when there is no support.
+- narrative: one sentence, at most 200 characters, on why the corpus supports the requirement or what is missing. Plain prose.
 
 Rules:
-- One cell per input requirement. Don't skip any.
-- "requirementId" must match the id of the input requirement.
-- "capabilityRef": "knowledge:<entry_id>" of the strongest supporting entry, or "" if no entry meaningfully supports the requirement.
-- "status":
-    * "strong"        — corpus has clear evidence the company has done this (past performance with details, capability with depth).
-    * "partial"       — adjacent capability or thin past performance; might cover the requirement with framing.
-    * "gap"           — corpus has nothing relevant; the company would have to pitch capability they haven't built yet.
-    * "not_addressed" — same as gap; use when the corpus is empty or the requirement is so out-of-scope no entry was even close.
-- "citation": a verbatim slice from the supporting knowledge entry's body (≤ 240 chars). Empty string if no support.
-- "narrative": 1-2 sentences explaining either why the corpus supports the requirement (for strong/partial) or what's missing (for gap/not_addressed). Plain prose, no marketing tone.
+- One cell per requirement given, none skipped, none added.
+- Never invent capabilities or past performance the corpus does not show. An empty corpus means "gap" or "not_addressed" cells.
+- Do not gloss gaps with framing; capture managers need an honest read.`;
 
-After scoring all cells, give a PWin recommendation:
-- "pwinRecommendationLow" / "pwinRecommendationHigh": integer percentage (0-100). The range expresses uncertainty — narrow when coverage is decisive (e.g. 65-75), wide when patchy (e.g. 30-55).
-- "pwinRationale": 2-4 sentences explaining the recommendation, with reference to the dominant strong cells and the most consequential gaps.
+function corpusBlock(entries: MatrixKnowledgeEntry[]): string {
+  const shown = entries
+    .slice(0, 60)
+    .map(
+      (e) =>
+        `- id=${e.id} | kind=${e.kind} | tags=${e.tags.join(",") || "(none)"} | title="${e.title}"\n  body: ${e.body.replace(/\n/g, " ").slice(0, 800)}`,
+    )
+    .join("\n");
+  return `Knowledge corpus (${entries.length} entries; ${entries.length > 60 ? "top 60 shown" : "all shown"}):\n${shown ? fenced(shown) : "(empty corpus)"}`;
+}
 
-Hard rules:
-- Do not invent capabilities or past performance the corpus doesn't show. Empty corpus → mostly "gap" / "not_addressed" cells, low PWin.
-- Do not gloss gaps with framing — capture managers need an honest read.
-
-Schema:
-{
-  "cells": [
-    {
-      "requirementId": string,
-      "capabilityRef": string,
-      "status": "strong" | "partial" | "gap" | "not_addressed",
-      "citation": string,
-      "narrative": string
-    }
-  ],
-  "pwinRecommendationLow": number,
-  "pwinRecommendationHigh": number,
-  "pwinRationale": string
-}`;
-
+/**
+ * One window of the matrix. The corpus sits in the system prompt, which
+ * is cached, so every window after the first reads it from the cache.
+ */
 export function buildCapabilityMatrixPrompt(input: {
   solicitationTitle: string;
   agency: string;
   setAside: string;
   requirements: ReviewRequirement[];
-  knowledgeEntries: {
-    id: string;
-    kind: string;
-    title: string;
-    body: string;
-    tags: string[];
-  }[];
+  knowledgeEntries: MatrixKnowledgeEntry[];
 }): { system: string; messages: AIMessage[] } {
   const reqs = input.requirements
-    .map(
-      (r) =>
-        `  - id=${r.id} | ${r.kind} | ref=${r.sectionRef} | area=${r.capabilityArea} | text="${r.text.replace(/"/g, '\\"').slice(0, 600)}"`,
-    )
+    .map((r) => `- id=${r.id} | ${r.kind} | ref=${r.sectionRef || "(none)"} | area=${r.capabilityArea || "(none)"} | text="${r.text.replace(/"/g, '\\"').slice(0, 600)}"`)
     .join("\n");
-
-  // Body trimmed per entry; corpus capped overall.
-  const entries = input.knowledgeEntries
-    .slice(0, 60)
-    .map(
-      (e) =>
-        `  - id=${e.id} | kind=${e.kind} | tags=${e.tags.join(",") || "(none)"} | title="${e.title}"\n    body: ${e.body.replace(/\n/g, " ").slice(0, 800)}`,
-    )
-    .join("\n");
-
   const userPrompt = [
     `Solicitation: ${input.solicitationTitle}`,
     `Agency: ${input.agency || "(unknown)"}`,
     `Set-aside: ${input.setAside || "(none)"}`,
     ``,
-    `Requirements (${input.requirements.length}):`,
-    reqs || "(none)",
+    `Requirements to score (${input.requirements.length}):`,
+    fenced(reqs || "(none)"),
     ``,
-    `Knowledge corpus (${input.knowledgeEntries.length} entries; ${input.knowledgeEntries.length > 60 ? `top 60 shown` : "all shown"}):`,
-    entries || "(empty corpus)",
-    ``,
-    `Score each requirement against the corpus. Return strict JSON per the schema in the system prompt.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
+    `Record one cell per requirement with the tool.`,
+  ].join("\n");
   return {
-    system: CAPABILITY_MATRIX_SYSTEM,
+    system: `${CAPABILITY_MATRIX_SYSTEM}\n\n${corpusBlock(input.knowledgeEntries)}`,
     messages: [{ role: "user", content: userPrompt }],
   };
 }
 
+const matrixCellSchema = z.object({
+  requirementId: z.string(),
+  capabilityRef: tolerant(z.string(), ""),
+  status: choice(MATRIX_CELL_STATUSES, "not_addressed"),
+  citation: tolerant(z.string(), ""),
+  narrative: tolerant(z.string(), ""),
+});
+
 export const capabilityMatrixSchema = z.object({
-  cells: z.array(
-    z.object({
-      requirementId: z.string(),
-      capabilityRef: z.string(),
-      status: z.enum(["strong", "partial", "gap", "not_addressed"]),
-      citation: z.string(),
-      narrative: z.string(),
-    }),
-  ),
-  pwinRecommendationLow: z.number(),
-  pwinRecommendationHigh: z.number(),
-  pwinRationale: z.string(),
+  cells: tolerantList(matrixCellSchema, 60),
+});
+
+const CAPABILITY_PWIN_SYSTEM = `You are a capture analyst inside FORGE giving a probability-of-win recommendation for a solicitation from a scored capability matrix: how strongly the company's documented capabilities and past performance cover each requirement.
+
+Record:
+- pwinRecommendationLow and pwinRecommendationHigh: integer percentages (0-100). The range expresses uncertainty: narrow when coverage is decisive (e.g. 65-75), wide when it is patchy (e.g. 30-55).
+- pwinRationale: 2-4 sentences naming the strongest coverage and the most consequential gaps, weighed against the evaluation factors.
+
+Rules:
+- Judge only from the matrix and factors given. Mostly gaps means a low PWin.`;
+
+export function buildCapabilityPwinPrompt(input: {
+  solicitationTitle: string;
+  agency: string;
+  setAside: string;
+  counts: Record<MatrixCellStatus, number>;
+  strong: string[];
+  gaps: string[];
+  factors: ReviewFactor[];
+}): { system: string; messages: AIMessage[] } {
+  const total = MATRIX_CELL_STATUSES.reduce((n, s) => n + input.counts[s], 0);
+  const userPrompt = [
+    `Solicitation: ${input.solicitationTitle}`,
+    `Agency: ${input.agency || "(unknown)"}`,
+    `Set-aside: ${input.setAside || "(none)"}`,
+    ``,
+    `Requirements scored: ${total} — strong ${input.counts.strong}, partial ${input.counts.partial}, gap ${input.counts.gap}, not addressed ${input.counts.not_addressed}.`,
+    ``,
+    `Evaluation factors:`,
+    input.factors.map((f) => `- ${f.name}${f.weight ? ` (${f.weight})` : ""}`).join("\n") || "(none structured)",
+    ``,
+    `Strongest coverage:`,
+    fenced(input.strong.join("\n") || "(none)"),
+    ``,
+    `Most consequential gaps:`,
+    fenced(input.gaps.join("\n") || "(none)"),
+    ``,
+    `Record the PWin recommendation with the tool.`,
+  ].join("\n");
+  return {
+    system: CAPABILITY_PWIN_SYSTEM,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
+export const capabilityPwinSchema = z.object({
+  pwinRecommendationLow: tolerant(z.number(), 0),
+  pwinRecommendationHigh: tolerant(z.number(), 0),
+  pwinRationale: tolerant(z.string(), ""),
 });
 
 // ────────────────────────────────────────────────────────────────────
 // 3. Question Generator — clarifications for the contracting office
 // ────────────────────────────────────────────────────────────────────
 
+export const QUESTION_CATEGORIES = [
+  "scope_ambiguity",
+  "evaluation_criteria",
+  "submission_logistics",
+  "technical_constraints",
+  "security_clearance",
+  "subcontracting",
+] as const;
+export type QuestionCategory = (typeof QUESTION_CATEGORIES)[number];
+
 export type QuestionSetVerdict = {
   questions: {
     id: string;
-    category:
-      | "scope_ambiguity"
-      | "evaluation_criteria"
-      | "submission_logistics"
-      | "technical_constraints"
-      | "security_clearance"
-      | "subcontracting";
+    category: QuestionCategory;
     text: string;
     rationale: string;
     sectionRef: string;
   }[];
 };
 
-const QUESTION_GENERATOR_SYSTEM = `You are a senior capture analyst inside FORGE generating clarification questions for the contracting officer (CO) on a federal solicitation. Your goal is the list of questions a competent capture team would actually ask — precise, professional, and tied to specific points in the document.
+const QUESTION_GENERATOR_SYSTEM = `You are a senior capture analyst inside FORGE generating clarification questions for the contracting officer (CO) on a federal solicitation. Your goal is the list of questions a competent capture team would actually ask: precise, professional, and tied to specific points in the document.
 
-Output ONLY a single JSON object matching the schema below. No commentary, no markdown fences.
+Categories:
+  - scope_ambiguity: the work itself is unclear or contradictory
+  - evaluation_criteria: Section M is ambiguous, weights conflict, or factor wording is vague
+  - submission_logistics: page caps, font requirements, file format, due date, Q&A deadline, portal mechanics
+  - technical_constraints: performance specs, integration requirements, data formats, system constraints
+  - security_clearance: clearance level, facility clearance, CMMC / NIST 800-171 / FedRAMP applicability
+  - subcontracting: small-business participation, set-aside applicability, OEM partnerships, joint venture rules
 
-Categories (use exactly these strings):
-  - scope_ambiguity         — the work itself is unclear or contradictory
-  - evaluation_criteria     — Section M is ambiguous, weights conflict, or factor wording is vague
-  - submission_logistics    — page caps, font requirements, file format, due date, Q&A deadline, portal mechanics
-  - technical_constraints   — performance specs, integration requirements, data formats, system constraints
-  - security_clearance      — clearance level, facility clearance, CMMC / NIST 800-171 / FedRAMP applicability
-  - subcontracting          — small-business participation, set-aside applicability, OEM partnerships, joint venture rules
+Record 8-25 questions, each with:
+- id: a short slug (e.g. "q_scope_1"), numbered within its category.
+- category: one of the categories above.
+- text: the question, phrased professionally and addressed to the CO, at most 2 sentences. No leading questions.
+- rationale: one sentence for the capture team (not the CO) on the risk it surfaces or the decision it unblocks.
+- sectionRef: the reference that prompted the question (e.g. "L.5.2.1", "M-3", "C.3"); "" when none applies.
 
 Rules:
-- "id" is a stable short slug (e.g. "q_scope_1", "q_eval_3"). Use sequential numbers within a category.
-- "text" is the actual question phrased professionally. Address the CO directly. Avoid leading questions.
-- "rationale" is 1-2 sentences explaining why this question matters — what risk it surfaces or what decision it unblocks. NOT for the CO; for the capture team.
-- "sectionRef" is the source-document reference that prompted the question (e.g. "L.5.2.1", "M-3", "C.3"). Use "" if none directly applicable.
-- Generate 8-25 questions total. Quality > quantity. If the doc is well-written and there's nothing to clarify, return a short list with high-confidence items rather than padding.
-- Don't repeat questions across categories. Don't generate generic questions ("Could you clarify the period of performance?") — anchor every question in the doc.
-
-Schema:
-{
-  "questions": [
-    {
-      "id": string,
-      "category": "scope_ambiguity" | "evaluation_criteria" | "submission_logistics" | "technical_constraints" | "security_clearance" | "subcontracting",
-      "text": string,
-      "rationale": string,
-      "sectionRef": string
-    }
-  ]
-}`;
+- Quality over quantity: if the document is clear, record a short list of high-confidence questions rather than padding.
+- Don't repeat a question across categories. Anchor every question in the document; no generic questions.`;
 
 export function buildQuestionGeneratorPrompt(input: {
   solicitationTitle: string;
@@ -276,46 +281,35 @@ export function buildQuestionGeneratorPrompt(input: {
   flaggedQuestions: string[];
 }): { system: string; messages: AIMessage[] } {
   const reqs = input.requirements
-    .slice(0, 50)
-    .map(
-      (r) =>
-        `  - ${r.kind.toUpperCase()} | ref=${r.sectionRef} | "${r.text.replace(/"/g, '\\"').slice(0, 400)}"`,
-    )
+    .slice(0, 60)
+    .map((r) => `- ${r.kind.toUpperCase()} | ref=${r.sectionRef || "(none)"} | "${r.text.replace(/"/g, '\\"').slice(0, 400)}"`)
     .join("\n");
-
-  const evals = input.evaluationFactors
-    .map(
-      (f) =>
-        `  - ${f.name} | weight=${f.weight || "(unstated)"} | ${f.notes}`,
-    )
-    .join("\n");
+  const evals = input.evaluationFactors.map((f) => `- ${f.name} | weight=${f.weight || "(unstated)"}${f.notes ? ` | ${f.notes}` : ""}`).join("\n");
 
   const userPrompt = [
     `Solicitation: ${input.solicitationTitle}`,
     `Agency: ${input.agency || "(unknown)"}`,
     ``,
     `Review summary:`,
-    input.reviewSummary || "(none)",
+    fenced(input.reviewSummary || "(none)"),
     ``,
     `Section L (instructions):`,
-    input.sectionL.map((b) => `  - ${b}`).join("\n") || "(none)",
+    fenced(input.sectionL.map((b) => `- ${b}`).join("\n") || "(none)"),
     ``,
-    `Section M (evaluation factors):`,
-    input.sectionM.map((b) => `  - ${b}`).join("\n") || "(none)",
+    `Section M (evaluation):`,
+    fenced(input.sectionM.map((b) => `- ${b}`).join("\n") || "(none)"),
     ``,
     `Evaluation factors:`,
-    evals || "(none)",
+    fenced(evals || "(none)"),
     ``,
-    `Requirements:`,
-    reqs || "(none)",
+    `Requirements (${Math.min(60, input.requirements.length)} of ${input.requirements.length}, mandatory first):`,
+    fenced(reqs || "(none)"),
     ``,
     `Items the review already flagged:`,
-    input.flaggedQuestions.map((f) => `  - ${f}`).join("\n") || "(none)",
+    fenced(input.flaggedQuestions.map((f) => `- ${f}`).join("\n") || "(none)"),
     ``,
-    `Generate 8-25 categorized clarification questions. Return strict JSON per the schema in the system prompt.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    `Record 8-25 categorized clarification questions with the tool.`,
+  ].join("\n");
 
   return {
     system: QUESTION_GENERATOR_SYSTEM,
@@ -323,21 +317,14 @@ export function buildQuestionGeneratorPrompt(input: {
   };
 }
 
+const questionSchema = z.object({
+  id: tolerant(z.string(), ""),
+  category: choice(QUESTION_CATEGORIES, "scope_ambiguity"),
+  text: z.string().min(1),
+  rationale: tolerant(z.string(), ""),
+  sectionRef: tolerant(z.string(), ""),
+});
+
 export const questionSetSchema = z.object({
-  questions: z.array(
-    z.object({
-      id: z.string(),
-      category: z.enum([
-        "scope_ambiguity",
-        "evaluation_criteria",
-        "submission_logistics",
-        "technical_constraints",
-        "security_clearance",
-        "subcontracting",
-      ]),
-      text: z.string(),
-      rationale: z.string(),
-      sectionRef: z.string(),
-    }),
-  ),
+  questions: tolerantList(questionSchema, 25),
 });

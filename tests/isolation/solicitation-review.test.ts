@@ -5,13 +5,14 @@
  * evaluationFactors: expected array, received undefined": one 4,000-token
  * answer was asked to re-extract every requirement and was cut off. Now
  * the review builds on the parse, a cut-off answer says it was cut off
- * (and the call log records why the provider stopped). Postgres; the AI provider
+ * (and the call log records why the provider stopped), and the matrix
+ * scores the requirements a window at a time. Postgres; the AI provider
  * is a mocked Anthropic API, so the real gateway runs end to end.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { aiCallLogs, solicitationReviews, solicitations } from "@/db/schema";
+import { aiCallLogs, solicitationCapabilityMatrices, solicitationReviews, solicitations } from "@/db/schema";
 import type { ReviewedRequirement } from "@/lib/requirement-review";
 import { buildReviewBasis, reviewFreshness } from "@/lib/review-basis";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
@@ -32,6 +33,12 @@ vi.mock("@/lib/auth-helpers", () => ({
   requireOrgAdmin: async () => sessionUserStub,
   getSessionUser: async () => sessionUserStub,
 }));
+vi.mock("@/lib/matrix-knowledge", () => ({
+  selectKnowledgeForMatrix: async () => ({
+    entries: [{ id: "k1", kind: "past_performance", title: "DHS help desk", body: "Ran a 40-seat Tier 1-3 help desk for DHS for five years.", tags: ["help desk"] }],
+  }),
+}));
+
 import { runCapabilityMatrixAction, runSolicitationReviewAction } from "@/app/(app)/solicitations/[id]/review-actions";
 
 const ENV_KEYS = ["AI_PROVIDER", "AI_FALLBACK_PROVIDER", "AI_MODEL_ROUTING", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"] as const;
@@ -61,15 +68,19 @@ const LM = {
   },
 };
 
-type Call = { tool: string; body: Record<string, unknown> };
+type Call = { tool: string; ids: string[]; body: Record<string, unknown> };
 
 describe("BL-STAB-9 — the AI document review on a real-size RFP (runtime)", () => {
   let fx: TwoTenantFixture;
   let saved: Record<string, string | undefined>;
   let calls: Call[];
+  /** Ids whose matrix window comes back cut off while the window is bigger than this. */
+  let cutWhenLarger: { id: string; above: number } | null;
+  /** A matrix window holding this id gets a provider error. */
+  let errorFor: string | null;
   let reviewCutOff: boolean;
 
-  function respond(tool: string) {
+  function respond(tool: string, ids: string[]) {
     const tool_use = (input: unknown, stop = "tool_use") => ({
       id: "msg_test",
       type: "message",
@@ -91,6 +102,17 @@ describe("BL-STAB-9 — the AI document review on a real-size RFP (runtime)", ()
             flaggedQuestions: ["Do resumes count toward the 25-page limit?"],
           });
     }
+    if (tool === "record_capability_cells") {
+      if (cutWhenLarger && ids.includes(cutWhenLarger.id) && ids.length > cutWhenLarger.above) {
+        return tool_use({ cells: ids.slice(0, 2).map((id) => ({ requirementId: id, status: "partial" })) }, "max_tokens");
+      }
+      return tool_use({
+        cells: ids.map((id, i) => ({ requirementId: id, capabilityRef: "knowledge:k1", status: i % 2 ? "Strong" : "gap", citation: "Ran a 40-seat help desk", narrative: "Fits." })),
+      });
+    }
+    if (tool === "record_pwin_recommendation") {
+      return tool_use({ pwinRecommendationLow: 40, pwinRecommendationHigh: 55, pwinRationale: "Mixed coverage." });
+    }
     throw new Error(`unexpected tool ${tool}`);
   }
 
@@ -104,14 +126,21 @@ describe("BL-STAB-9 — the AI document review on a real-size RFP (runtime)", ()
     sessionUserStub.id = fx.orgA.userId;
     sessionUserStub.organizationId = fx.orgA.organizationId;
     calls = [];
+    cutWhenLarger = null;
+    errorFor = null;
     reviewCutOff = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init: RequestInit) => {
-        const body = JSON.parse(String(init.body)) as { tool_choice?: { name?: string }; tools?: { name: string }[] };
+        const body = JSON.parse(String(init.body)) as { tool_choice?: { name?: string }; tools?: { name: string }[]; messages: { content: unknown }[] };
         const tool = body.tool_choice?.name ?? body.tools?.[0]?.name ?? "";
-        calls.push({ tool, body });
-        return new Response(JSON.stringify(respond(tool)), { status: 200, headers: { "content-type": "application/json" } });
+        const text = JSON.stringify(body.messages);
+        const ids = [...new Set([...text.matchAll(/id=(req_[0-9a-f_]+)/g)].map((m) => m[1]!))];
+        calls.push({ tool, ids, body });
+        if (errorFor && tool === "record_capability_cells" && ids.includes(errorFor)) {
+          return new Response(JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: "bad request" } }), { status: 400, headers: { "content-type": "application/json" } });
+        }
+        return new Response(JSON.stringify(respond(tool, ids)), { status: 200, headers: { "content-type": "application/json" } });
       }),
     );
   });
@@ -194,6 +223,65 @@ describe("BL-STAB-9 — the AI document review on a real-size RFP (runtime)", ()
     const res = await runSolicitationReviewAction(id);
     expect(res).toMatchObject({ ok: false });
     expect(calls).toHaveLength(0);
+  });
+
+  it("scores every requirement a window at a time, re-reading a cut-off window in halves", async () => {
+    const id = await parsedSolicitation();
+    await runSolicitationReviewAction(id);
+    const [review] = await db.select().from(solicitationReviews).where(and(eq(solicitationReviews.organizationId, fx.orgA.organizationId), eq(solicitationReviews.solicitationId, id)));
+    const ids = review!.result.requirements.map((r) => r.id);
+    calls = [];
+    cutWhenLarger = { id: ids[2]!, above: 10 }; // the first window (20) is cut off; its halves (10) are not
+
+    const res = await runCapabilityMatrixAction(id);
+    expect(res).toMatchObject({ ok: true, cellCount: 45, unscoredCount: 0, pwinLow: 40, pwinHigh: 55 });
+    const cellCalls = calls.filter((c) => c.tool === "record_capability_cells");
+    expect(cellCalls.map((c) => c.ids.length)).toEqual(expect.arrayContaining([20, 10, 10, 20, 5]));
+    expect(cellCalls).toHaveLength(5);
+    expect(calls.filter((c) => c.tool === "record_pwin_recommendation")).toHaveLength(1);
+
+    const [matrix] = await db.select().from(solicitationCapabilityMatrices).where(and(eq(solicitationCapabilityMatrices.organizationId, fx.orgA.organizationId), eq(solicitationCapabilityMatrices.solicitationId, id)));
+    expect(matrix!.cells.map((c) => c.requirementId)).toEqual(ids); // in the review's order
+    expect(new Set(matrix!.cells.map((c) => c.status))).toEqual(new Set(["gap", "strong"]));
+  });
+
+  it("leaves a window that fails twice for Score remaining, which scores only what is missing", async () => {
+    const id = await parsedSolicitation();
+    await runSolicitationReviewAction(id);
+    const [review] = await db.select().from(solicitationReviews).where(and(eq(solicitationReviews.organizationId, fx.orgA.organizationId), eq(solicitationReviews.solicitationId, id)));
+    const ids = review!.result.requirements.map((r) => r.id);
+    cutWhenLarger = { id: ids[25]!, above: 1 }; // second window: cut off whole and in halves
+
+    const first = await runCapabilityMatrixAction(id);
+    expect(first).toMatchObject({ ok: true, cellCount: 35, unscoredCount: 10 });
+
+    calls = [];
+    cutWhenLarger = null;
+    const rest = await runCapabilityMatrixAction(id);
+    expect(rest).toMatchObject({ ok: true, cellCount: 45, unscoredCount: 0 });
+    const cellCalls = calls.filter((c) => c.tool === "record_capability_cells");
+    expect(cellCalls).toHaveLength(1);
+    expect(cellCalls[0]!.ids).toHaveLength(10);
+    expect(cellCalls[0]!.ids).toContain(ids[25]);
+
+    // Re-running the review keeps the matrix: the ids are the same.
+    await runSolicitationReviewAction(id);
+    const [matrix] = await db.select().from(solicitationCapabilityMatrices).where(and(eq(solicitationCapabilityMatrices.organizationId, fx.orgA.organizationId), eq(solicitationCapabilityMatrices.solicitationId, id)));
+    expect(matrix!.cells).toHaveLength(45);
+  });
+
+  it("counts a window whose call errors as unscored and still scores the rest", async () => {
+    const id = await parsedSolicitation();
+    await runSolicitationReviewAction(id);
+    const [review] = await db.select().from(solicitationReviews).where(and(eq(solicitationReviews.organizationId, fx.orgA.organizationId), eq(solicitationReviews.solicitationId, id)));
+    const ids = review!.result.requirements.map((r) => r.id);
+    errorFor = ids[44]!; // the last window (5 requirements), whole and in halves
+
+    const res = await runCapabilityMatrixAction(id);
+    expect(res).toMatchObject({ ok: true, cellCount: 40 });
+    expect((res as { unscoredCount: number }).unscoredCount).toBeGreaterThan(0);
+    expect((res as { unscoredCount: number }).unscoredCount).toBeLessThanOrEqual(5);
+    expect(calls.filter((c) => c.tool === "record_pwin_recommendation")).toHaveLength(1);
   });
 
   it("keeps another organization's solicitation out of reach", async () => {
