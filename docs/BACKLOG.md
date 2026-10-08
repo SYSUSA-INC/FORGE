@@ -78,7 +78,7 @@ Effort key:
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | 🔄 9a shipped (PR #366); 9b (matrix, questions) in PR #367 |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
-| 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) in PR; 4b (each diffed against the one before) queued |
+| 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) in PR #368; 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued, right after BL-STAB-2c (owner, 2026-10-08) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
@@ -405,7 +405,7 @@ mind. Bandage will come off but a true fix will stay."
         and parsed from storage; amendment parent checks; a changed,
         oversize or foreign file refused at parse; through-the-app
         checks before reading).
-    - **2c follow-ups (post-merge review, 2026-10-08).** 🔄 in PR (with
+    - **2c follow-ups (post-merge review, 2026-10-08).** 🔄 in PR #368 (with
       BL-STAB-4a); every item below is fixed there, with tests. A review of PR #365 found these; each was verified by
       tracing the code:
       - **The upload queue gets stuck when a server action throws.**
@@ -612,9 +612,9 @@ mind. Bandage will come off but a true fix will stay."
       The label comes with a confidence and the evidence for it.
     - The user confirms or changes the labels, then each file is filed
       and parsed on its own path.
-- **BL-STAB-4 — Amendments one at a time.** 🔄 4a in PR.
+- **BL-STAB-4 — Amendments one at a time.** 🔄 4a in PR #368.
   - **Ask:** Upload several amendments in one go.
-  - **4a — several at once (in PR):** Add amendment takes several files;
+  - **4a — several at once (in PR #368):** Add amendment takes several files;
     each row reads its amendment number from the file name
     (`amendment-name.ts`: "Amendment 0003", "Amd 02", "Mod 2", "A0002",
     "P00003"), editable before upload; they upload two at a time and
