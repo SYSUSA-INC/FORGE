@@ -405,6 +405,46 @@ mind. Bandage will come off but a true fix will stay."
         and parsed from storage; amendment parent checks; a changed,
         oversize or foreign file refused at parse; through-the-app
         checks before reading).
+    - **2c follow-ups (post-merge review, 2026-10-08).** ⏳ queued, after
+      BL-STAB-9b. A review of PR #365 found these; each was verified by
+      tracing the code:
+      - **The upload queue gets stuck when a server action throws.**
+        `useUploadQueue.run` has no try/finally, so the item stays in
+        "uploading"/"saving", its concurrency slot is never freed (New
+        Solicitation runs one at a time, so every later file waits), and
+        leaving the page keeps warning. Fix: try/finally; a thrown action
+        becomes a failed row with Retry.
+      - **Retry after a filing failure uploads the file again** under a
+        new upload, leaving the checked one unused. Fix: retry re-files
+        the stored upload (the claim is idempotent).
+      - **Cancel during "Checking" or "Saving" does nothing**; the record
+        is still created. Fix: honour the signal before the check and the
+        filing; no Cancel once filing has started.
+      - **Leaving the page inside the app** gives no warning, and the
+        upload's `router.push` later pulls the user back. Fix: no
+        navigation after the form unmounts.
+      - **Memory storage on a Vercel preview without R2:** the upload is
+        accepted, then the filing (another instance) finds no bytes and
+        the parse fails with a misleading "re-upload". Fix: refuse uploads
+        with memory storage on any Vercel deployment, with a message that
+        names the missing R2 setup.
+      - **Proxy mode, a lost PUT response:** the retried PUT gets 409 and
+        the client cancels (deletes) the upload it had stored. Fix: on 409
+        ask for the upload's state (complete is idempotent).
+      - **Re-parse reports any storage error as "no longer in storage".**
+        Fix: tell "not found" from "storage unreachable".
+      - **The parse reads the whole object before comparing its size and
+        ETag** with the ledger. Fix: HEAD first.
+      - **Smaller:** the browser size check and the "up to" label ignore
+        `UPLOAD_MAX_FILE_MB` (and the label shows 524.3 MB for 500 MiB);
+        the new-solicitation page still says "25 MB cap per PDF in v1";
+        a file dropped while an upload runs is discarded silently;
+        AmendmentsPanel's per-file number map; the "too large to read"
+        wording near the budget and for images; legacy keys with a
+        backslash in the file name; the progress bar's accessible value;
+        two docs claims (who can open File storage; `UPLOAD_PARSE_SCALE`
+        and images); two tests that would pass if the ETag or
+        size-before-download guard broke.
     - **2d — companion documents and GSA attachments; abandoned uploads
       cleaned up by the jobs cron.**
     - **2e — knowledge corpus; extraction as a durable job; one storage
