@@ -74,12 +74,12 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a part 1 shipped in PR #361, part 2 in PR) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361 and #362; follow-ups in PR) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued (added 2026-10-08) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued, right after BL-STAB-2c (owner, 2026-10-08) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -179,7 +179,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a part 1 shipped, PR #361) · ⏳ BL-STAB-3 to 8 queued
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped, PR #361 and #362) · ⏳ BL-STAB-3 to 8 queued (BL-STAB-8 right after 2c)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -312,7 +312,7 @@ mind. Bandage will come off but a true fix will stay."
       - ✅ Part 1 shipped (PR #361): SigV4 presigned URLs
         (`presignUrl`, checked against the AWS query-string example) and
         storage `head` / `delete` / `presignPut`.
-      - 🔄 Part 2 in PR: `storage.ts` is server-only; every read and
+      - ✅ Part 2 shipped (PR #362): `storage.ts` is server-only; every read and
         write carries the object's ETag; ranged reads (`getRange`); a
         deadline that also covers reading the body (30 s + 2 s per MB,
         at most 4 min; it used to end when the headers arrived); the
@@ -336,6 +336,14 @@ mind. Bandage will come off but a true fix will stay."
         implementation) and tamper cases, the R2 adapter against a
         mocked fetch (including a stalled body hitting its deadline),
         the client logic, the probe in memory mode.
+      - 🔄 Follow-ups in PR: the adversarial review of PR #362 could not
+        run (the reviewers hit the account's weekly spend limit, which
+        resets 2026-10-10), so the PR was reviewed by hand. Two fixes:
+        a download without a `content-length` now gets the longest
+        deadline instead of the shortest; and the browser self-test no
+        longer reports success when the file arrived but the browser
+        could not read storage's answer (real uploads would fail), and
+        names the CORS rule instead.
     - **2b — the upload ledger:** migration, policy, intents,
       verification, claims (dark launch, tested against Postgres).
     - **2c — new solicitations and amendments upload straight to
@@ -408,10 +416,19 @@ mind. Bandage will come off but a true fix will stay."
       client IP taken from Cloudflare only behind it; security headers
       (HSTS, a Content-Security-Policy that includes the R2 upload host,
       frame-ancestors).
-  - **Needs from the owner:** the SMS provider (for example Twilio
-    Verify), access to the Cloudflare account and the site's DNS, and
-    whether SMS may also serve as a second factor (weaker than an
-    authenticator app or a passkey).
+  - **Owner decisions (2026-10-08):**
+    - **Order:** right after BL-STAB-2c (the main upload path), before
+      the remaining upload phases.
+    - **Second factors:** authenticator app (TOTP with recovery codes),
+      passkeys / security keys (WebAuthn), and SMS codes to the
+      verified mobile.
+    - **SMS provider:** decided later. 8c captures and validates the
+      number (E.164) now; the SMS step plugs in once a provider is
+      chosen, and SMS as a second factor waits for it.
+    - **Cloudflare:** an account exists, but sysgov.com's DNS is
+      elsewhere; moving the nameservers to Cloudflare is an operator
+      step. The code side (Turnstile, origin lock, headers) is built
+      meanwhile.
 - **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
   BL-STAB-2.
   - **Ask:** Upload several files at once; FORGE decides what each is

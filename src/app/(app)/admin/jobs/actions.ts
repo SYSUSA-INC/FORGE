@@ -111,8 +111,16 @@ export async function finishStorageSelfTestAction(input: { key: string; putStatu
   const head = await storage.head(input.key).catch(() => null);
   await storage.delete(input.key).catch(() => undefined);
   let result: { ok: true; detail: string } | { ok: false; error: string; cors?: CorsProbe };
-  if (head && head.byteSize === SELF_TEST_BYTES) {
+  const answered = input.putStatus >= 200 && input.putStatus < 300;
+  if (head && head.byteSize === SELF_TEST_BYTES && answered) {
     result = { ok: true, detail: "This browser uploaded straight to storage, and the file arrived whole." };
+  } else if (head && head.byteSize === SELF_TEST_BYTES) {
+    // Stored, but the browser could not read storage's answer: real uploads
+    // would report a failure. The CORS rule must apply to the PUT's response too.
+    result = {
+      ok: false,
+      error: `The file arrived, but this browser could not read storage's answer (status ${input.putStatus}). Check the bucket's CORS rule lists this site's origin and the PUT method.`,
+    };
   } else if (input.putStatus === 0) {
     const origin = requestOrigin();
     const cors = origin ? await probeCorsForOrigin(origin) : undefined;

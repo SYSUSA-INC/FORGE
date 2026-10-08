@@ -90,10 +90,34 @@ describe("R2Storage", () => {
     expect(r2().presignPut({ key: "k", contentType: "text/plain", byteSize: 5, expiresSeconds: 60 }).url).toContain("X-Amz-SignedHeaders=content-type%3Bhost");
   });
 
-  it("storageTimeoutMs grows with size and is capped", () => {
+  it("storageTimeoutMs grows with size and is capped; an unknown size gets the longest deadline", () => {
     expect(storageTimeoutMs(0)).toBe(30_000);
     expect(storageTimeoutMs(10 * 1024 * 1024)).toBe(50_000);
     expect(storageTimeoutMs(10 * 1024 * 1024 * 1024)).toBe(240_000);
+    expect(storageTimeoutMs(Number.POSITIVE_INFINITY)).toBe(240_000);
+  });
+
+  it("a body without a content-length is read under the longest deadline, not the shortest", async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    respond = (call) =>
+      ({
+        status: 200,
+        ok: true,
+        headers: new Headers({}),
+        arrayBuffer: () =>
+          new Promise<ArrayBuffer>((resolve, reject) => {
+            call.init.signal!.addEventListener("abort", () => {
+              aborted = true;
+              reject(new Error("aborted"));
+            });
+            setTimeout(() => resolve(new ArrayBuffer(4)), 60_000);
+          }),
+      }) as unknown as Response;
+    const pending = r2().get("chunked");
+    await vi.advanceTimersByTimeAsync(60_001);
+    expect((await pending)?.bytes.byteLength).toBe(4);
+    expect(aborted).toBe(false);
   });
 });
 

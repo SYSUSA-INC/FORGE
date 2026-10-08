@@ -78,7 +78,7 @@ export interface StorageProvider {
  */
 export function storageTimeoutMs(bytes: number): number {
   const mib = Math.max(0, bytes) / (1024 * 1024);
-  return Math.min(240_000, Math.round(30_000 + 2_000 * mib));
+  return Number.isFinite(mib) ? Math.min(240_000, Math.round(30_000 + 2_000 * mib)) : 240_000;
 }
 
 type MemoryEntry = { bytes: Uint8Array; contentType: string; etag: string };
@@ -245,7 +245,9 @@ export class R2Storage implements StorageProvider {
         const detail = (await res.text().catch(() => "")).slice(0, 300);
         throw new Error(`R2 get failed (${res.status}) for ${key}: ${detail}`);
       }
-      extend(Number(res.headers.get("content-length") ?? "0"));
+      // Size unknown (no content-length): allow the longest deadline rather than the shortest.
+      const length = res.headers.get("content-length");
+      extend(length ? Number(length) : Number.POSITIVE_INFINITY);
       const bytes = new Uint8Array(await res.arrayBuffer());
       return {
         bytes,
