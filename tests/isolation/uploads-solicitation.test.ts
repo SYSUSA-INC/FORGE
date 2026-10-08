@@ -34,7 +34,7 @@ vi.mock("@/lib/auth-helpers", () => ({
 // The parse is run by hand below, from storage, as the jobs cron would.
 vi.mock("@/lib/background", () => ({ runInBackground: () => undefined, backgroundIsDurable: () => false }));
 
-import { createSolicitationFromUploadAction } from "@/app/(app)/solicitations/actions";
+import { createSolicitationFromUploadAction, reparseSolicitationAction } from "@/app/(app)/solicitations/actions";
 
 const RFP = new TextEncoder().encode(
   [
@@ -117,15 +117,26 @@ describe("BL-STAB-2c — solicitations from direct uploads (runtime)", () => {
     const a = await createSolicitationFromUploadAction({ uploadId: changed.uploadId });
     if (!a.ok) throw new Error(a.error);
     await getStorageProvider().put({ key: changed.key, bytes: new TextEncoder().encode("swapped after the check ".repeat(20)), contentType: "text/plain" });
+    // The change is caught from the object's size and ETag before any download.
+    const getChanged = vi.spyOn(getStorageProvider(), "get");
     expect(await runParse(a.id)).toMatchObject({ parseStatus: "failed", parseError: "The stored file changed after it was uploaded; upload it again." });
+    expect(getChanged).not.toHaveBeenCalled();
+    getChanged.mockRestore();
 
     const big = await storedUpload("big.txt");
     const b = await createSolicitationFromUploadAction({ uploadId: big.uploadId });
     if (!b.ok) throw new Error(b.error);
     await db.update(solicitations).set({ fileSize: 200 * 1024 * 1024 }).where(and(eq(solicitations.organizationId, fx.orgA.organizationId), eq(solicitations.id, b.id)));
+    // Over its read budget: refused before storage is even asked.
+    const head = vi.spyOn(getStorageProvider(), "head");
+    const get = vi.spyOn(getStorageProvider(), "get");
     const bigRow = await runParse(b.id);
     expect(bigRow.parseStatus).toBe("failed");
-    expect(bigRow.parseError).toMatch(/reads files of this type up to 25 MB automatically/);
+    expect(bigRow.parseError).toMatch(/reads files of this type up to 25 MB automatically; split it/);
+    expect(head).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    get.mockRestore();
+    head.mockRestore();
 
     const foreign = await storedUpload("foreign.txt");
     const c = await createSolicitationFromUploadAction({ uploadId: foreign.uploadId });
@@ -135,6 +146,30 @@ describe("BL-STAB-2c — solicitations from direct uploads (runtime)", () => {
       .set({ storagePath: `org/${fx.orgB.organizationId}/uploads/${foreign.uploadId}` })
       .where(and(eq(solicitations.organizationId, fx.orgA.organizationId), eq(solicitations.id, c.id)));
     expect(await runParse(c.id)).toMatchObject({ parseStatus: "failed", parseError: "The stored file could not be read." });
+  });
+
+  it("refuses uploads with the in-memory store on any Vercel deployment, naming the setup", async () => {
+    const saved = process.env.VERCEL;
+    process.env.VERCEL = "1";
+    try {
+      const refused = await createUploadIntent({ organizationId: fx.orgA.organizationId, actor: actorA(), purpose: "document", fileName: "RFP.txt", size: RFP.byteLength, origin: "" });
+      expect(refused).toMatchObject({ ok: false, code: "storage_unconfigured" });
+      expect((refused as { error: string }).error).toMatch(/Cloudflare R2.*Admin → Jobs → File storage/);
+    } finally {
+      if (saved === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = saved;
+    }
+  });
+
+  it("Re-parse tells storage that can't be reached from a file that is gone", async () => {
+    const up = await storedUpload("reparse.txt");
+    const filed = await createSolicitationFromUploadAction({ uploadId: up.uploadId });
+    if (!filed.ok) throw new Error(filed.error);
+    const head = vi.spyOn(getStorageProvider(), "head").mockRejectedValueOnce(new Error("timed out"));
+    expect(await reparseSolicitationAction(filed.id)).toEqual({ ok: false, error: "File storage could not be reached just now. Try Re-parse again in a minute." });
+    head.mockResolvedValueOnce(null);
+    expect(await reparseSolicitationAction(filed.id)).toMatchObject({ ok: false, error: expect.stringMatching(/no longer in storage/) });
+    head.mockRestore();
   });
 
   it("through the app: checks type and length before reading, then stores and verifies", async () => {

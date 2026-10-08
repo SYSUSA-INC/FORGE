@@ -131,7 +131,12 @@ export async function createUploadIntent(i: {
   if (typeof i.fileName !== "string" || i.fileName.length > 1024) return { ok: false, code: "bad_name", error: "That file name is not accepted." };
   if (memoryStorageRefused()) {
     log.error("[uploads]", "upload refused: production or staging is on memory storage", { organizationId });
-    return { ok: false, code: "storage_unconfigured", error: "File storage is not configured on this site yet. Ask a platform admin to set it up." };
+    return {
+      ok: false,
+      code: "storage_unconfigured",
+      error:
+        "File storage isn't set up on this site, so files can't be uploaded yet. A FORGE platform admin connects Cloudflare R2 (four settings on Vercel) and checks it on Admin → Jobs → File storage.",
+    };
   }
   const check = validateUploadRequest({ purpose: i.purpose, fileName: i.fileName, size: i.size, env: process.env });
   if (!check.ok) return check;
@@ -547,13 +552,16 @@ export async function getVerifiedObject(i: {
     .from(fileUploads)
     .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.storageKey, i.storagePath)))
     .limit(1);
+  const changed = (size: number, etag: string) =>
+    Boolean(ledger && ((ledger.storedSize !== null && size !== ledger.storedSize) || (ledger.etag && etag && ledger.etag !== etag)));
+  // Compare before downloading, so a replaced (perhaps much larger) object
+  // is never read into memory; then again on what was read.
+  const head = await getStorageProvider().head(i.storagePath);
+  if (!head) return { ok: false, reason: "gone" };
+  if (changed(head.byteSize, head.etag)) return { ok: false, reason: "changed" };
   const obj = await getStorageProvider().get(i.storagePath);
   if (!obj) return { ok: false, reason: "gone" };
-  if (ledger) {
-    const sizeChanged = ledger.storedSize !== null && obj.bytes.byteLength !== ledger.storedSize;
-    const tagChanged = Boolean(ledger.etag && obj.etag && ledger.etag !== obj.etag);
-    if (sizeChanged || tagChanged) return { ok: false, reason: "changed" };
-  }
+  if (changed(obj.bytes.byteLength, obj.etag)) return { ok: false, reason: "changed" };
   return { ok: true, bytes: obj.bytes, contentType: obj.contentType };
 }
 

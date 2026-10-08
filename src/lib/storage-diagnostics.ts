@@ -228,7 +228,7 @@ export async function probeStorage(i: { origins: string[] }): Promise<StoragePro
       name: "Uploads straight to storage",
       ok: memoryStorageRefused() ? false : null,
       detail: memoryStorageRefused()
-        ? `This is ${environment}, but storage is the in-memory fallback: files would vanish on the next deploy. Set the R2 variables (${status.reason}).`
+        ? `This is ${environment} on Vercel, but storage is the in-memory fallback: files would vanish on the next deploy, or be filed on another server instance than the one that received them, so uploads are refused. Set the R2 variables (${status.reason}).`
         : "Storage is the in-memory fallback: browsers upload through the app, limited to about 4 MB on Vercel. Set the R2 variables for full-size uploads.",
     });
   }

@@ -356,7 +356,7 @@ async function loadUploadBytes(
   const format = detectFormat(row.contentType, row.fileName);
   if (format) {
     const budget = parseBudgetBytes(format, process.env);
-    if (row.fileSize > budget) return { ok: false, message: tooLargeToReadMessage(row.fileSize, budget) };
+    if (row.fileSize > budget) return { ok: false, message: tooLargeToReadMessage(row.fileSize, budget, format) };
   }
   let bytes = inline;
   if (!bytes) {

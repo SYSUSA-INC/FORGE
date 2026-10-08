@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { UploadQueue } from "@/components/uploads/UploadQueue";
 import { useUploadQueue } from "@/components/uploads/useUploadQueue";
-import { formatBytes } from "@/lib/upload-client-logic";
-import { acceptFor, resolvePolicy } from "@/lib/upload-policy";
+import { acceptFor, formatLimit } from "@/lib/upload-policy";
 import { createSolicitationFromUploadAction } from "../actions";
 
 /**
@@ -14,13 +13,15 @@ import { createSolicitationFromUploadAction } from "../actions";
  * request-size cap), the server checks it, and it is filed as a new
  * solicitation whose parse then runs in the background.
  */
-export function UploadSolicitationForm() {
+export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
   const router = useRouter();
   const [dragOver, setDragOver] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const queue = useUploadQueue<string>({
     purpose: "document",
     concurrency: 1,
+    maxBytes,
     claim: async ({ uploadId }) => {
       const res = await createSolicitationFromUploadAction({ uploadId });
       return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
@@ -29,20 +30,32 @@ export function UploadSolicitationForm() {
       if (item.phase === "done" && item.result) router.push(`/solicitations/${item.result}`);
     },
   });
-  const limit = formatBytes(resolvePolicy("document").maxBytes);
+  const limit = formatLimit(maxBytes);
 
   function take(files: FileList | null | undefined) {
     const file = files?.[0];
-    if (!file || queue.busy) return;
+    if (!file) return;
+    if (queue.busy) {
+      setNotice("One upload at a time here: wait for this one to finish.");
+      return;
+    }
+    setNotice(
+      (files?.length ?? 0) > 1
+        ? `Uploading "${file.name}" as the solicitation. Several files at once, sorted automatically, is coming next; until then add attachments from the solicitation's page.`
+        : null,
+    );
     queue.clear();
-    queue.add([file]);
+    queue.add([{ file, meta: undefined }]);
+  }
+  function browse() {
+    if (!queue.busy) inputRef.current?.click();
   }
 
   return (
     <Panel title="Upload" eyebrow={`PDF · DOCX · XLSX · PPTX · TXT · CSV · Image · up to ${limit}`}>
       <div className="flex flex-col gap-3">
         <div
-          onClick={() => inputRef.current?.click()}
+          onClick={browse}
           onDragEnter={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -68,7 +81,7 @@ export function UploadSolicitationForm() {
             disabled={queue.busy}
             onClick={(e) => {
               e.stopPropagation();
-              inputRef.current?.click();
+              browse();
             }}
             className="aur-btn aur-btn-primary mt-4 disabled:opacity-50"
           >
@@ -85,6 +98,8 @@ export function UploadSolicitationForm() {
             }}
           />
         </div>
+
+        {notice ? <div className="rounded-md border border-layer/15 bg-layer/[0.04] px-3 py-2 font-mono text-[11px] text-muted">{notice}</div> : null}
 
         <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
 

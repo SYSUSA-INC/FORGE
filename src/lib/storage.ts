@@ -410,8 +410,12 @@ export function uploadTransport(env: Record<string, string | undefined> = proces
 /**
  * BL-STAB-2 — production and staging must not keep files in memory: they
  * would vanish on the next deploy or land on another server instance.
+ * Neither may any Vercel deployment (a preview included): the request
+ * that files an upload can run on another instance than the one that
+ * received it, so its parse would find no bytes.
  */
 export function memoryStorageRefused(env: Record<string, string | undefined> = process.env): boolean {
+  if (getStorageProviderStatus().active.name !== "memory") return false;
   const label = resolveEnvLabel(env);
-  return getStorageProviderStatus().active.name === "memory" && (label === "production" || label === "staging");
+  return label === "production" || label === "staging" || (env.VERCEL ?? "").trim() === "1";
 }

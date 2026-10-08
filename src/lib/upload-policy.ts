@@ -174,8 +174,11 @@ export function validateUploadRequest(input: {
   fileName: string;
   size: number;
   env?: Record<string, string | undefined>;
+  /** The server's limit, handed to the browser (which has no env) so its pre-check agrees. */
+  maxBytes?: number;
 }): UploadRequestCheck {
-  const policy = resolvePolicy(input.purpose, input.env);
+  const resolved = resolvePolicy(input.purpose, input.env);
+  const policy = input.maxBytes && input.maxBytes > 0 ? { ...resolved, maxBytes: input.maxBytes } : resolved;
   const displayName = sanitizeDisplayName(input.fileName);
   const kind = formatFromName(displayName);
   if (!kind.ok) {
@@ -213,10 +216,13 @@ export function uploadKeyFor(organizationId: string, uploadId: string, transient
  * BL-STAB-2 (`org/{org}/solicitation/{id}/{name}`) pass too.
  */
 export function isKeyInOrg(organizationId: string, key: string): boolean {
-  if (!organizationId || !key || key.includes("\\")) return false;
+  if (!organizationId || !key) return false;
   const segments = key.split("/");
   if (segments.length < 3) return false;
   if (segments.some((s) => s === "" || s === "." || s === "..")) return false;
+  // A backslash may appear in a file name kept from before BL-STAB-2 (the
+  // last segment), never in the path to it.
+  if (segments.slice(0, -1).some((s) => s.includes("\\"))) return false;
   return (segments[0] === "org" || segments[0] === "tmp") && segments[1] === organizationId;
 }
 
@@ -238,9 +244,20 @@ export function parseBudgetBytes(format: UploadFormat, env: Record<string, strin
   return Math.floor(PARSE_BUDGET_MIB[format] * scale * MiB);
 }
 
-export function tooLargeToReadMessage(bytes: number, budget: number): string {
-  const mb = (n: number) => `${Math.round(n / MiB)} MB`;
-  return `Stored (${mb(bytes)}). FORGE reads files of this type up to ${mb(budget)} automatically; split it (for example by volume) and upload the parts to have it read.`;
+export function tooLargeToReadMessage(bytes: number, budget: number, format?: UploadFormat): string {
+  // One decimal when whole megabytes would make the two look equal.
+  const digits = Math.round(bytes / MiB) === Math.round(budget / MiB) ? 1 : 0;
+  const mb = (n: number) => `${(n / MiB).toFixed(digits)} MB`;
+  const advice =
+    format === "image"
+      ? "save it smaller (a lower resolution or a JPEG) and upload that to have it read"
+      : "split it (for example by volume) and upload the parts to have it read";
+  return `Stored (${mb(bytes)}). FORGE reads files of this type up to ${mb(budget)} automatically; ${advice}.`;
+}
+
+/** A size limit as the upload errors state it ("500 MB"), for labels. */
+export function formatLimit(bytes: number): string {
+  return mb(bytes);
 }
 
 /** The file picker's `accept` list for a purpose. */
