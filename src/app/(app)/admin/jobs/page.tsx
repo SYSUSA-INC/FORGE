@@ -6,7 +6,9 @@ import { db } from "@/db";
 import { backgroundJobs, organizations } from "@/db/schema";
 import { requireSuperadmin } from "@/lib/auth-helpers";
 import { describeJobStatus } from "@/lib/jobs-policy";
+import { getStorageProviderStatus, uploadTransport } from "@/lib/storage";
 import { RunJobsNowButton } from "./RunJobsNowButton";
+import { StorageCheck } from "./StorageCheck";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +82,8 @@ export default async function BackgroundJobsPage({
 
   const now = new Date();
   const n = (v: number | string | null | undefined) => Number(v ?? 0);
+  const storage = getStorageProviderStatus();
+  const transport = uploadTransport();
 
   return (
     <>
@@ -134,6 +138,15 @@ export default async function BackgroundJobsPage({
           </Link>
         ))}
       </div>
+
+      <Panel title="File storage" eyebrow="Uploads go from the browser straight to storage">
+        <p className="mb-3 font-body text-[12px] leading-relaxed text-muted">
+          {storage.active.name === "r2" ? "Cloudflare R2" : "In-memory fallback"} ({storage.active.reason}) · transport {transport}.
+          Browser uploads need the bucket&apos;s CORS rule to allow this site (admin manual, File storage). Check here after any
+          change to the R2 variables or the bucket, and test from a browser on each environment.
+        </p>
+        <StorageCheck />
+      </Panel>
 
       <Panel title={`Jobs (${rows.length}${rows.length === 200 ? "+" : ""})`}>
         {rows.length === 0 ? (

@@ -74,11 +74,12 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | M | 🔄 in progress (draft PR) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a part 1 shipped in PR #361, part 2 in PR) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued (added 2026-10-08) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -178,7 +179,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** L (one PR per issue)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress · ⏳ BL-STAB-3 to 7 queued
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a part 1 shipped, PR #361) · ⏳ BL-STAB-3 to 8 queued
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -279,26 +280,75 @@ mind. Bandage will come off but a true fix will stay."
       `tests/isolation/solicitation-provenance.test.ts` (a one-window
       RFQ with odd entries parses; a short window's unreadable first
       answer is read again).
-- **BL-STAB-2 — Attachments capped at 1 MB.** 🔄 in progress (draft PR).
-  - **Progress:** SigV4 presigned URLs (`presignUrl` in
-    `aws-sigv4.ts`, checked against the AWS query-string example) and
-    storage `head` / `delete` / `presignPut` (R2 signs the type and
-    exact size; the memory fallback has no browser URL).
+- **BL-STAB-2 — Attachments capped at 1 MB.** 🔄 in progress (phases
+  below).
   - **Symptom:** Larger files are refused. The owner: "we cannot have
     the 1MB cap on any attachments, as some can be much larger".
-  - **Root cause:** Files are posted through a server action. Next.js
-    limits a server action's body to 1 MB by default, and Vercel limits
-    a function's request body to about 4.5 MB. Raising the setting would
-    only move the cap to 4.5 MB.
-  - **Fix:**
-    - The browser uploads straight to storage (R2) with a short-lived
-      presigned URL scoped to the tenant and an object key the server
-      issues.
-    - The server then records the file and parses it from storage.
-    - The limit becomes policy (per file and per tenant), not a
-      transport ceiling.
-    - Covers every solicitation upload path: new solicitation,
-      amendments, companion documents, Q&A. Shared with BL-STAB-3 to 6.
+  - **Root cause (corrected after reading Next 14.2's action handler):**
+    every upload is posted through a server action. Next applies its
+    1 MB `bodySizeLimit` to a multipart action only as the size of each
+    text field, so files are really capped by Vercel's request body
+    limit, about 4.5 MB; the 1 MB limit stops non-file action bodies
+    such as the contacts import text. Raising either setting would only
+    move the cap, never remove it.
+  - **Fix (designed by three independent proposals — security-first,
+    simplicity-first, operability-first — scored by two judges; the
+    operability design won, with grafts from the other two):**
+    - The browser uploads straight to R2 with a short-lived presigned
+      PUT, signed with a server-chosen type and the declared size, to a
+      key the server builds from the organisation and a random id.
+    - A tenant-scoped upload ledger (`file_upload`) records every key
+      the server signs; the server checks each stored file (size, type,
+      the first bytes) before a typed action claims it, crash-safe
+      without transactions; parses read from storage through the
+      existing durable jobs.
+    - Limits become policy: a per-file cap (500 MB default), per-tenant
+      storage and daily ingress, and per-format read budgets (a file
+      too big to read is kept and says so).
+    - Covers every upload path; dictation stays a deliberate exception
+      (4 MB audio, never stored).
+  - **Phases** (one PR each, in order):
+    - **2a — storage verbs and a readiness check.**
+      - ✅ Part 1 shipped (PR #361): SigV4 presigned URLs
+        (`presignUrl`, checked against the AWS query-string example) and
+        storage `head` / `delete` / `presignPut`.
+      - 🔄 Part 2 in PR: `storage.ts` is server-only; every read and
+        write carries the object's ETag; ranged reads (`getRange`); a
+        deadline that also covers reading the body (30 s + 2 s per MB,
+        at most 4 min; it used to end when the headers arrived); the
+        memory cache on `globalThis` (route handlers and server actions
+        are separate module copies); `UPLOAD_SIGN_CONTENT_LENGTH=0`
+        lever; `uploadTransport` and `memoryStorageRefused`.
+      - `storage-diagnostics.ts` and **Admin → Jobs → File storage**:
+        a server probe (credentials, presigned upload, whether R2
+        enforces the signed size and type, the bucket's CORS rule per
+        origin) and a browser self-test that uploads 1 KB exactly as a
+        user's file will travel. Audited `admin.storage.probe` /
+        `admin.storage.self_test`.
+      - Browser helpers: `putWithProgress` (XHR with progress) and
+        `upload-client-logic.ts` (failure classes, backoff, smoothed
+        progress, messages).
+      - Settings → Integrations shows File storage; the boot check logs
+        an error when production or staging run on memory storage.
+      - Admin manual: per-environment buckets, the CORS rule, the
+        lifecycle rule, the egress host, the check.
+      - Tests: the R2 upload-link vectors (from an independent SigV4
+        implementation) and tamper cases, the R2 adapter against a
+        mocked fetch (including a stalled body hitting its deadline),
+        the client logic, the probe in memory mode.
+    - **2b — the upload ledger:** migration, policy, intents,
+      verification, claims (dark launch, tested against Postgres).
+    - **2c — new solicitations and amendments upload straight to
+      storage** (the owner's main path), with per-file progress, retry
+      and cancel. Merges only after the readiness check is green on
+      production, staging and a preview.
+    - **2d — companion documents and GSA attachments; abandoned uploads
+      cleaned up by the jobs cron.**
+    - **2e — knowledge corpus; extraction as a durable job; one storage
+      meter across every file type; Office zip checks.**
+    - **2f — templates, chat attachments and contacts; files removed
+      from storage when their record is deleted; a test that keeps any
+      file out of a server action.**
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
   nowhere to set one.** ⏳ queued.
   - **Symptom:** Settings → SAM.gov sync (UEI) shows "SAM.gov 401:
@@ -319,6 +369,49 @@ mind. Bandage will come off but a true fix will stay."
       falling back to the platform key.
     - 401, 403 and 429 responses become plain messages that say what
       to do.
+- **BL-STAB-8 — Security gates for a platform holding sensitive
+  data.** ⏳ queued (added 2026-10-08).
+  - **Ask (owner):** "We need to enforce some security gates for
+    signup, MFA mandatory, Email validation, mobile phone validation,
+    and Cloudflare implementation to ensure we are protecting the
+    platform as sensitive data is going to be hosted".
+  - **Today:**
+    - **Email:** self sign-up sends a verification link, and password
+      sign-in refuses an unverified account (`src/auth.ts`). Invites
+      and trial approvals mark the address verified when the emailed
+      link is used. Sign-up already has bot checks (honeypot, fill
+      time, disposable-domain block; BL-AUTH-ABUSE Slice 1) and
+      domain-scoped membership (BL-AUTH-DOMAIN).
+    - **MFA:** none.
+    - **Mobile phone:** users have no phone number at all (only the
+      organisation record has one).
+    - **Cloudflare:** the site is served by Vercel directly; nothing
+      sits in front of it.
+  - **Plan (one PR per slice; design reviewed before building):**
+    - **8a — mandatory MFA:** an authenticator-app code (TOTP, RFC
+      6238) with one-time recovery codes, enrolled at first sign-in and
+      required on every sign-in for every user; the session carries the
+      MFA result and nothing in the app opens until it is done; passkeys
+      as a stronger option; an admin reset that is audited.
+    - **8b — email validation everywhere:** a verified address required
+      on every way in (sign-up, invite, trial approval), re-verification
+      when an address changes, and a deliverability check (the domain
+      receives mail) at sign-up.
+    - **8c — mobile phone validation:** a required mobile number in
+      E.164 form, verified by a one-time SMS code through an SMS
+      provider, re-verified when changed, and used for account recovery.
+    - **8d — Cloudflare in front of the platform:** proxied DNS for the
+      site; WAF managed rules; rate limits on sign-in, sign-up, password
+      reset and trial requests; bot management; Turnstile on the public
+      forms, checked on the server; the Vercel origin accepts only
+      Cloudflare's traffic (a secret header checked in middleware); the
+      client IP taken from Cloudflare only behind it; security headers
+      (HSTS, a Content-Security-Policy that includes the R2 upload host,
+      frame-ancestors).
+  - **Needs from the owner:** the SMS provider (for example Twilio
+    Verify), access to the Cloudflare account and the site's DNS, and
+    whether SMS may also serve as a second factor (weaker than an
+    authenticator app or a passkey).
 - **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
   BL-STAB-2.
   - **Ask:** Upload several files at once; FORGE decides what each is

@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { memberships, users, type Role } from "@/db/schema";
 import { getAIProviderStatus, type AIProviderStatus } from "@/lib/ai";
 import { parseTranscriptionEnv } from "@/lib/transcription-config";
+import { getStorageProviderStatus, uploadTransport } from "@/lib/storage";
 
 // ────────────────────────────────────────────────────────────────────
 // Members summary (Users & Roles tab)
@@ -200,6 +201,19 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
       detail: envSet("CLOUDCONVERT_API_KEY")
         ? "CLOUDCONVERT_API_KEY is set."
         : "Set CLOUDCONVERT_API_KEY on Vercel. Without it, DOCX-template PDFs are unavailable.",
+    },
+    {
+      // BL-STAB-2 — every upload lands here; browsers send files straight to R2.
+      key: "storage",
+      name: "File storage (Cloudflare R2)",
+      category: "output",
+      configured: getStorageProviderStatus().active.name === "r2",
+      powers:
+        "Every uploaded file (solicitations, documents, templates, knowledge) and every rendered export. Browsers upload straight to storage.",
+      detail:
+        getStorageProviderStatus().active.name === "r2"
+          ? `R2 is set (transport ${uploadTransport()}). Browser uploads also need the bucket's CORS rule; a platform admin can check it on Admin → Jobs → File storage.`
+          : "Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY on Vercel. Without them files are kept in memory: lost on redeploy and limited to about 4 MB per upload.",
     },
     {
       key: "resend",
