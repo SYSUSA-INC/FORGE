@@ -8,8 +8,9 @@
  * one step (one window, or the review) at a time and saves after each, so
  * a call works inside its time budget and the next call carries on.
  *
- * Measures the full-text sweep, which is what intake keeps whenever it
- * finds at least as many requirements as the front pass. The gold set is
+ * Measures the full-text sweep, which is where intake takes a text
+ * document's requirements from (the front pass reads only metadata,
+ * summaries and key dates since BL-STAB-1). The gold set is
  * a platform asset; the calls are metered to the acting admin's own
  * organisation. Server-only; callers have checked requireSuperadmin().
  */

@@ -199,6 +199,49 @@ describe("BL-AIX Phase 2a — solicitation intake with provenance (runtime)", ()
     expect(res.error).toMatch(/requirements: .*expected array/);
   });
 
+  it("parses a one-window RFQ whose answer has odd entries, and reads an unreadable short window again (review fixes)", async () => {
+    const rfq = [
+      "REQUEST FOR QUOTE 26-Q-0007",
+      "1. The contractor shall deliver 10 laptops within 30 days.",
+      "2. Quotes must be received by 5pm on 1 November 2026.",
+    ].join("\n");
+    let windowCalls = 0;
+    __setCompleteImplForTest(async (opts: AICompleteOptions) => {
+      const tool = opts.tool?.name;
+      if (tool === "record_requirements") windowCalls += 1;
+      return {
+        text: "",
+        provider: "stub" as const,
+        model: "test-mock",
+        inputTokens: 5,
+        outputTokens: 5,
+        stubbed: false,
+        structured:
+          tool === "record_requirements"
+            ? windowCalls === 1
+              ? { requirements: 42 }
+              : {
+                  requirements: [
+                    { kind: "Shall", text: "The contractor shall deliver 10 laptops within 30 days.", ref: "1" },
+                    { kind: "Must", text: "Quotes must be received by 5pm on 1 November 2026.", ref: null },
+                    { kind: "shall", ref: "3" },
+                  ],
+                }
+            : tool === "record_solicitation"
+              ? { ...frontMatter, type: "RFQ" }
+              : null,
+      };
+    });
+    const res = await aiExtractSolicitation(fx.orgA.organizationId, rfq, { documentLabel: "rfq.docx" });
+    if (!res.ok) throw new Error(res.error);
+    expect(windowCalls).toBe(2);
+    expect(res.data.type).toBe("rfq");
+    expect(res.data.requirements.map((r) => ({ kind: r.kind, text: r.text, ref: r.ref }))).toEqual([
+      { kind: "shall", text: "The contractor shall deliver 10 laptops within 30 days.", ref: "1" },
+      { kind: "shall", text: "Quotes must be received by 5pm on 1 November 2026.", ref: "" },
+    ]);
+  });
+
   it("still locates requirements in a Word or text document, without pages", async () => {
     const { text } = ucfSolicitation();
     const res = await aiExtractSolicitation(fx.orgA.organizationId, text);

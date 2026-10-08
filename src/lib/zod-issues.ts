@@ -54,17 +54,25 @@ function detail(issue: Issue, input: unknown): string {
   }
 }
 
-/** One issue as `path: what was wrong`. Pass the validated input to name the type received. */
-export function describeZodIssue(issue: Issue, input: unknown = NO_INPUT): string {
+function describe(issue: Issue, input: unknown): string {
   const where = issue.path.map(String).join(".") || "(root)";
   const message = issue.message && issue.message !== GENERIC ? issue.message : detail(issue, input);
   return `${where}: ${message}`;
 }
 
-/** The first few issues, joined with "; ". */
-export function describeZodIssues(error: z.ZodError, input: unknown = NO_INPUT, max = 3): string {
+/**
+ * One issue as `path: what was wrong`. Pass the validated input (even
+ * `undefined`) to name the type received; leave it out when unknown.
+ */
+export function describeZodIssue(issue: Issue, ...input: [unknown?]): string {
+  return describe(issue, input.length > 0 ? input[0] : NO_INPUT);
+}
+
+/** The first few issues, joined with "; ". Pass the validated input as in `describeZodIssue`. */
+export function describeZodIssues(error: z.ZodError, ...input: [unknown?]): string {
+  const value = input.length > 0 ? input[0] : NO_INPUT;
   return error.issues
-    .slice(0, max)
-    .map((i) => describeZodIssue(i, input))
+    .slice(0, 3)
+    .map((i) => describe(i, value))
     .join("; ");
 }

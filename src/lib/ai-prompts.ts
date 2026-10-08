@@ -195,14 +195,57 @@ export function buildRequirementsChunkPrompt(input: {
   };
 }
 
+// ────────────────────────────────────────────────────────────────────
+// BL-STAB-1 — lenient structured answers. One odd field or entry no
+// longer rejects a whole answer: each field degrades on its own, and
+// enumerated fields are shown to the model as their allowed values but
+// read in any wording and mapped by the caller.
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * A field that degrades on its own: a missing or malformed value becomes
+ * the fallback instead of failing the whole answer. The tool schema still
+ * shows the model the field's type.
+ */
+function tolerant<T extends z.ZodType>(schema: T, fallback: z.output<T>) {
+  return schema.default(fallback as never).catch(fallback as never);
+}
+
+/**
+ * A field the model is shown as a fixed set of values. Any text is
+ * accepted ("RFP", "Shall") and the caller maps it with `choiceOf`; a
+ * missing value becomes the fallback.
+ */
+function choice(values: readonly string[], fallback: string) {
+  return tolerant(z.string().meta({ enum: [...values] }), fallback);
+}
+
+/**
+ * One of `values` for what a model wrote, ignoring case, spaces and
+ * hyphens ("Sources Sought" → "sources_sought"); the fallback otherwise.
+ */
+export function choiceOf<T extends string>(values: readonly T[], raw: unknown, fallback: T): T {
+  const word = typeof raw === "string" ? raw.trim().toLowerCase().replace(/[\s-]+/g, "_") : "";
+  return (values as readonly string[]).includes(word) ? (word as T) : fallback;
+}
+
+/**
+ * One requirement as a model wrote it. Its kind is read in any wording
+ * and mapped by `requirementKindOf` ("Must", "Shall"); a missing or odd
+ * ref becomes ""; an entry without text is null and dropped. One odd
+ * entry no longer rejects the rest of the list.
+ */
+const requirementItemSchema = z
+  .object({
+    kind: choice(["shall", "should", "may"], "shall"),
+    text: z.string(),
+    ref: tolerant(z.string(), ""),
+  })
+  .nullable()
+  .catch(null);
+
 export const requirementsChunkSchema = z.object({
-  requirements: z.array(
-    z.object({
-      kind: z.enum(["shall", "should", "may"]),
-      text: z.string(),
-      ref: z.string(),
-    }),
-  ),
+  requirements: z.array(requirementItemSchema),
 });
 
 // ────────────────────────────────────────────────────────────────────
@@ -1877,16 +1920,9 @@ export function buildCompliancePreflightPrompt(
 // throw, or `.safeParse()` to branch.
 // ────────────────────────────────────────────────────────────────────
 
-/**
- * A field that degrades on its own: a missing or malformed value becomes
- * the fallback instead of failing the whole answer. The tool schema still
- * shows the model the field's type and allowed values.
- */
-function tolerant<T extends z.ZodType>(schema: T, fallback: z.output<T>) {
-  return schema.default(fallback as never).catch(fallback as never);
-}
+export const SOLICITATION_TYPES = ["rfp", "rfi", "rfq", "sources_sought", "other"] as const;
 
-const KEY_DATE_TYPES = [
+export const KEY_DATE_TYPES = [
   "qa_cutoff",
   "site_visit",
   "final_rfp",
@@ -1903,7 +1939,7 @@ const keyDateSchema = z
   .object({
     label: z.string(),
     isoDate: tolerant(z.string().nullable(), null),
-    type: tolerant(z.enum(KEY_DATE_TYPES), "other"),
+    type: choice(KEY_DATE_TYPES, "other"),
   })
   .nullable()
   .catch(null);
@@ -1911,17 +1947,17 @@ const keyDateSchema = z
 /**
  * The front matter of a text solicitation: metadata, Section L/M
  * summaries and key dates. Requirements are not asked for here: the
- * full-text sweep reads every window for them (and its windows are split
- * and retried on their own), so a list here was redundant, and a large
- * nested list was the part of this answer most likely to come back
- * malformed and sink the whole parse.
+ * full-text sweep reads every window for them (a window that fails is
+ * split and re-read, or read again when too short to split), so a list
+ * here was redundant, and a large nested list was the part of this
+ * answer most likely to come back malformed and sink the whole parse.
  */
 export const solicitationFrontMatterSchema = z.object({
   title: tolerant(z.string(), ""),
   agency: tolerant(z.string(), ""),
   office: tolerant(z.string(), ""),
   solicitationNumber: tolerant(z.string(), ""),
-  type: tolerant(z.enum(["rfp", "rfi", "rfq", "sources_sought", "other"]), "other"),
+  type: choice(SOLICITATION_TYPES, "other"),
   naicsCode: tolerant(z.string(), ""),
   setAside: tolerant(z.string(), ""),
   responseDueDate: tolerant(z.string().nullable(), null),
@@ -1936,19 +1972,7 @@ export const solicitationFrontMatterSchema = z.object({
  * requirement becomes null and is dropped by the caller.
  */
 export const solicitationExtractionSchema = solicitationFrontMatterSchema.extend({
-  requirements: tolerant(
-    z.array(
-      z
-        .object({
-          kind: tolerant(z.enum(["shall", "should", "may"]), "shall"),
-          text: z.string(),
-          ref: tolerant(z.string(), ""),
-        })
-        .nullable()
-        .catch(null),
-    ),
-    [],
-  ),
+  requirements: tolerant(z.array(requirementItemSchema), []),
 });
 
 /** What the vision passes return once validated: unreadable entries are null. */

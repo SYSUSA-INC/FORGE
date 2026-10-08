@@ -933,15 +933,21 @@ type JsonSchemaNode = {
   oneOf?: JsonSchemaNode[];
 };
 
-function allowsType(node: JsonSchemaNode | undefined, kind: string): JsonSchemaNode | undefined {
-  if (!node) return undefined;
+/** Every branch of `node` (itself included) that takes a value of `kind`. */
+function branchesOf(node: JsonSchemaNode | undefined, kind: string): JsonSchemaNode[] {
+  if (!node) return [];
   const types = Array.isArray(node.type) ? node.type : node.type ? [node.type] : [];
-  if (types.includes(kind)) return node;
-  for (const branch of [...(node.anyOf ?? []), ...(node.oneOf ?? [])]) {
-    const hit = allowsType(branch, kind);
-    if (hit) return hit;
-  }
-  return undefined;
+  const own = types.includes(kind) ? [node] : [];
+  return [...own, ...[...(node.anyOf ?? []), ...(node.oneOf ?? [])].flatMap((b) => branchesOf(b, kind))];
+}
+
+/**
+ * The one branch of `node` that takes a value of `kind`. None when several
+ * do (a union of objects): which one the model meant would be a guess.
+ */
+function onlyBranch(node: JsonSchemaNode | undefined, kind: string): JsonSchemaNode | undefined {
+  const branches = branchesOf(node, kind);
+  return branches.length === 1 ? branches[0] : undefined;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -954,15 +960,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * all there, only wrapped as text. Walk the payload against the tool's
  * JSON Schema (what the model was shown) and decode such a string where
  * the schema expects a list or an object and has no string branch, so
- * free text is never touched. Every decoded path is listed in `repaired`.
+ * free text is never touched. Where a union has several list or object
+ * branches the value is left alone rather than guessed at. Every decoded
+ * path is listed in `repaired`.
  */
 export function decodeNestedJson(node: JsonSchemaNode | undefined, value: unknown, repaired: string[] = [], path = ""): unknown {
   if (!node) return value;
   if (typeof value === "string") {
-    if (allowsType(node, "string")) return value;
+    if (branchesOf(node, "string").length > 0) return value;
     const text = value.trim();
     const kind = text.startsWith("[") ? "array" : text.startsWith("{") ? "object" : null;
-    const target = kind ? allowsType(node, kind) : undefined;
+    const target = kind ? onlyBranch(node, kind) : undefined;
     if (!target) return value;
     let decoded: unknown;
     try {
@@ -975,7 +983,7 @@ export function decodeNestedJson(node: JsonSchemaNode | undefined, value: unknow
     return decodeNestedJson(target, decoded, repaired, path);
   }
   if (Array.isArray(value)) {
-    const items = allowsType(node, "array")?.items;
+    const items = onlyBranch(node, "array")?.items;
     if (!items) return value;
     let changed = false;
     const out = value.map((v, i) => {
@@ -986,7 +994,7 @@ export function decodeNestedJson(node: JsonSchemaNode | undefined, value: unknow
     return changed ? out : value;
   }
   if (isPlainObject(value)) {
-    const properties = allowsType(node, "object")?.properties;
+    const properties = onlyBranch(node, "object")?.properties;
     if (!properties) return value;
     let out = value;
     for (const [key, child] of Object.entries(properties)) {
@@ -1025,6 +1033,20 @@ function validatePayload<T>(schema: z.ZodType<T>, payload: unknown, viaTool: boo
   return parsed.success
     ? { data: parsed.data, parseError: null, viaTool, ...extra }
     : { data: null, parseError: describeIssues(parsed.error, input), viaTool, ...extra };
+}
+
+/**
+ * Log the paths a structured answer had decoded (`decodeNestedJson`), so
+ * how often each feature and model needs it can be watched. Used by the
+ * live gateway and the Batches API path alike.
+ */
+export async function logRepairs(
+  validation: Pick<AIStructuredValidation<unknown>, "repaired"> | null,
+  context: { feature: string; variant?: string; model: string },
+): Promise<void> {
+  if (!validation?.repaired?.length) return;
+  const { log } = await import("@/lib/log");
+  log.warn("[ai]", "decoded nested JSON the model sent as text", { ...context, paths: validation.repaired.slice(0, 10) });
 }
 
 /**
@@ -1257,15 +1279,7 @@ async function runTenantCompletion<T>(
   }
 
   const validation = validate ? validate(result) : null;
-  if (validation?.repaired?.length) {
-    const { log } = await import("@/lib/log");
-    log.warn("[completeStructuredForTenant]", "decoded nested JSON the model sent as text", {
-      feature,
-      variant,
-      model: result.model,
-      paths: validation.repaired.slice(0, 10),
-    });
-  }
+  await logRepairs(validation, { feature, variant, model: result.model });
 
   await recordAiCall({
     ...telemetryBase,

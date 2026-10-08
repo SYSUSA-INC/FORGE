@@ -72,7 +72,8 @@ Effort key:
 | 3ar | **BL-AIX Phase 2b** — Sections L and M as structured data: dedicated passes read Section L (volumes with page limits, format and submission rules) and Section M (award basis, factors in order with importance and subfactors), each item quoted and located; shown on the solicitation page, fed to the outline bootstrap, scored by the accuracy check (migration 0123) | P0 | M | ✅ shipped (PR #356) |
 | 3as | **BL-AIX Phase 2c-1** — Verify and correct: a screen per solicitation where the team confirms, edits or rejects each extracted requirement against the document text around it, or adds one the extraction missed; verdicts are kept as tenant-only labelled data, re-applied on re-parse, and a rejected clause reaches no reader (migration 0124) | P0 | M | ✅ shipped (PR #357) |
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
-| 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | 🔄 in PR |
+| 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
+| 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | 🔄 in PR |
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every solicitation upload path | P0 | M | ⏳ queued |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
@@ -195,7 +196,8 @@ mind. Bandage will come off but a true fix will stay."
 
 **Issues:**
 
-- **BL-STAB-1 — A solicitation parse fails.** 🔄 in PR.
+- **BL-STAB-1 — A solicitation parse fails.** ✅ shipped (PR #359);
+  review fixes 🔄 in PR.
   - **Symptom:** The OED RFP (.docx) showed "Failed · failed after 1
     attempt". The parse error was "AI response didn't match the
     expected shape (requirements: Invalid input)."
@@ -247,6 +249,36 @@ mind. Bandage will come off but a true fix will stay."
     - `tests/isolation/solicitation-provenance.test.ts`: the production
       answer shape end to end, front matter without requirements, key
       dates kept, and a sweep with every window failing.
+  - **Review fixes** (an adversarial review of PR #359: three reviewers,
+    each finding put to a skeptic; four upheld, two refuted but fixed
+    as cheap hardening). 🔄 in PR.
+    - **The sweep reads each requirement on its own.** Since the sweep
+      is now the only source of a text document's requirements, its
+      schema got the same treatment as the front matter: one entry with
+      `"kind": "Must"` or `"ref": null` no longer rejects the window
+      (and, for a one-window document, the parse). Kinds and the
+      document and key-date types are shown to the model as their
+      allowed values but read in any wording and mapped in code
+      (`requirementKindOf`, `choiceOf`); an entry without text is
+      dropped on its own.
+    - **A window too short to split** (under 8,000 characters, so every
+      short RFQ, amendment and companion document) is read once more
+      when its answer is unreadable, as a longer window is split and
+      re-read.
+    - Decoding repairs on the Batches API path (nightly scout triage)
+      are logged like live ones (`logRepairs`).
+    - Decoding leaves a value alone where a union has several list or
+      object branches, rather than guessing which one the model meant.
+    - `describeZodIssue(issue, undefined)` now reports "received
+      undefined" (an explicit `undefined` used to read as "no input").
+    - The admin manual and `extraction-eval.ts` no longer say intake
+      keeps the sweep only when it beats the front pass.
+    - `solicitation_extract` prompt version 2026-10-08.2.
+    - Tests: `tests/ai/structured-repair.test.ts` (lenient entries and
+      types, union branches, explicit undefined) and
+      `tests/isolation/solicitation-provenance.test.ts` (a one-window
+      RFQ with odd entries parses; a short window's unreadable first
+      answer is read again).
 - **BL-STAB-2 — Attachments capped at 1 MB.** ⏳ queued.
   - **Symptom:** Larger files are refused. The owner: "we cannot have
     the 1MB cap on any attachments, as some can be much larger".
@@ -269,16 +301,18 @@ mind. Bandage will come off but a true fix will stay."
     `<html><body><h1>API_KEY_INVALID</h1>…`". The owner: "there has to
     be a place where the company admin can update their API key".
   - **Root cause:** The SAM.gov key is a single platform-wide
-    environment variable, `SAMGOV_API_KEY`, read in `samgov.ts`,
-    `scout.ts`, `solicitation-qa.ts`, the 8(a) admin, onboarding and
-    the health route. No company can supply its own, and SAM.gov's HTML
-    error body is shown raw.
+    environment variable, `SAMGOV_API_KEY`. It is read for calls in
+    `samgov.ts`, `scout.ts`, `solicitation-qa.ts`, `sba-8a.ts` and the
+    8(a) admin, and the health route. It is checked for presence in
+    onboarding, the solicitation page's Q&A panel (`hasSamKey`),
+    `settings-status.ts` and `env-check.ts`. No company can supply its
+    own, and SAM.gov's HTML error body is shown raw.
   - **Fix:**
     - A company admin sets the company's own SAM.gov key under
       company settings. It is encrypted at rest, masked when shown,
       checked with a live test call on save, and audited.
-    - Every SAM.gov call for that company uses it, falling back to the
-      platform key.
+    - Every SAM.gov call and presence check for that company uses it,
+      falling back to the platform key.
     - 401, 403 and 429 responses become plain messages that say what
       to do.
 - **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
@@ -616,8 +650,10 @@ the phases below.
       - Metered to the acting admin's own organisation; stub mode fails
         the run. Audited as `gold_set.eval.start` and
         `gold_set.eval.finish`.
-      - Measures the full-text sweep, which intake keeps whenever it
-        finds at least as many requirements as the front pass. Not yet
+      - Measures the full-text sweep, which intake then kept whenever
+        it found at least as many requirements as the front pass (since
+        BL-STAB-1, intake takes every text document's requirements from
+        the sweep). Not yet
         scored: factor weights, and the proposal outline's
         per-section page limits.
       - Tests: `tests/ai/extraction-eval-logic.test.ts` and
