@@ -110,8 +110,8 @@
       "sha256": "f27d1e69c02e3cccaa9afd843f3dc12f7d863132bef7a9a4f8da2a1cd252ecb6"
     },
     "solicitation_review": {
-      "version": "2026-10-05.1",
-      "sha256": "5288c92bb056addbe39fb65ed1d0dda3ae4028ee63ddc35122ef664ee3fa7dab"
+      "version": "2026-10-08.1",
+      "sha256": "e4838e650c05a07aee47f17a3278cdbed03f4a915b63b21ea5dc34b3d929a237"
     },
     "solicitation_structure": {
       "version": "2026-10-07.1",

@@ -48,6 +48,8 @@ export type AiCallRecord = {
   /** BL-AI-TOOLS — schema validation outcome; null when not applicable. */
   parseOk?: boolean | null;
   parseError?: string | null;
+  /** BL-STAB-9 — the provider's stop reason ("end_turn", "tool_use", "max_tokens", "length"…). */
+  stopReason?: string | null;
 };
 
 const ERROR_CAP = 500;
@@ -79,6 +81,7 @@ export async function recordAiCall(rec: AiCallRecord): Promise<void> {
       batched: rec.batched ?? false,
       parseOk: rec.parseOk ?? null,
       parseError: rec.parseError ? rec.parseError.slice(0, ERROR_CAP) : null,
+      stopReason: rec.stopReason ? rec.stopReason.slice(0, 64) : null,
     });
   } catch (err) {
     log.warn("[ai-telemetry]", "record failed", {

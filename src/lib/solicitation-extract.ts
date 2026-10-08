@@ -181,7 +181,7 @@ export async function readRequirementsWindow(input: {
   model?: string;
   /** BL-STAB-1 — this is the second read of a window too short to split. */
   retry?: boolean;
-}): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number; error?: string }> {
+}): Promise<{ list: RequirementLike[] | null; stubbed: boolean; split: number; error?: string; model?: string }> {
   const { organizationId, text, index, count } = input;
   const depth = input.depth ?? 0;
   const prompt = buildRequirementsChunkPrompt({
@@ -204,11 +204,13 @@ export async function readRequirementsWindow(input: {
     maxTokens: CHUNK_MAX_TOKENS,
     temperature: 0,
     cacheSystem: true,
+    // BL-STAB-9 — a cut-off window is split and re-read below.
+    acceptTruncated: true,
   });
   if (res.stubbed) return { list: [], stubbed: true, split: 0 };
   const truncated = isTruncatedStop(res.stopReason);
   if (res.data && !truncated) {
-    return { list: normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK }), stubbed: false, split: 0 };
+    return { list: normalizeRequirementList(res.data.requirements, { maxItems: REQUIREMENTS_PER_CHUNK }), stubbed: false, split: 0, model: res.model };
   }
   // Too much for one answer, or unparseable: halve the window and try
   // each half once. Keep whatever validated from the long answer as a
@@ -328,6 +330,9 @@ export async function aiExtractSolicitation(
       maxTokens: 2400,
       temperature: 0.1,
       cacheSystem: true,
+      // BL-STAB-9 — every front-matter field falls back on its own, so a
+      // cut-off answer still yields the fields that arrived (logged).
+      acceptTruncated: true,
     });
 
     if (ai.stubbed) {
@@ -364,6 +369,7 @@ export async function aiExtractSolicitation(
       };
     }
 
+    if (ai.truncated) log.warn("[aiExtractSolicitation]", "front matter cut off at the output limit", { variant: "text" });
     const data = normalizeExtraction(ai.data);
 
     // BL-AIP-5 / BL-STAB-1 — the requirements come from the sweep alone:
@@ -493,6 +499,9 @@ export async function aiExtractSolicitationFromPdf(
       maxTokens: 2400,
       temperature: 0.1,
       cacheSystem: true,
+      // BL-STAB-9 — every front-matter field falls back on its own, so a
+      // cut-off answer still yields the fields that arrived (logged).
+      acceptTruncated: true,
       documents: [
         { name: fileName, mediaType: "application/pdf", bytes },
       ],
@@ -570,6 +579,9 @@ export async function aiExtractSolicitationFromImage(
       maxTokens: 2400,
       temperature: 0.1,
       cacheSystem: true,
+      // BL-STAB-9 — every front-matter field falls back on its own, so a
+      // cut-off answer still yields the fields that arrived (logged).
+      acceptTruncated: true,
       documents: [{ name: fileName, mediaType, bytes }],
     });
     if (ai.stubbed) {

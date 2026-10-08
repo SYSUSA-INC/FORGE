@@ -894,6 +894,21 @@ R2 requests now carry a deadline that covers reading the whole file (30 s plus 2
 - Per user: 10 uploads in progress at once, 200 checked but not yet filed, 300 started per hour.
 - Uploads are refused while a platform admin is viewing as another organization, and in production or staging while storage is the in-memory fallback.
 
+**Cut-off AI answers and the document review (BL-STAB-9).** Migration 0126 adds `ai_call_log.stop_reason`; sync it on `/admin/migrations` after deploying.
+- **Stop reasons.** Every AI call now records why the provider stopped (`end_turn`, `tool_use`, `max_tokens`, `length`…).
+- **Cut-off answers.** A structured answer that stopped at its output limit (`max_tokens` / `length`) fails with "The AI's answer was cut off at its N-token output limit before it finished" instead of a misleading shape error. The solicitation parse is the exception: its requirement sweep splits a cut-off window and re-reads it, and its front matter keeps the fields that arrived.
+- **Shape errors.** They now say how many more issues there were ("…; and 5 more (…)").
+- **Finding cut-off answers.**
+
+  ```sql
+  select created_at, feature, variant, model, max_tokens, output_tokens, stop_reason
+  from ai_call_log where stop_reason in ('max_tokens', 'length')
+  order by created_at desc;
+  ```
+
+- **The BL-23 review.** It no longer re-extracts requirements: it reads the parse's requirements and Sections L/M and asks the model only for judgement (prompt `solicitation_review` 2026-10-08.1, 2,000 output tokens). The capability matrix and question generator move to windowed, bounded answers in BL-STAB-9b.
+- **Extraction accuracy run.** It no longer calls the review; it scores the Section L/M passes intake stores.
+
 **New solicitations and amendments upload straight to storage (BL-STAB-2c).** Before deploying this to an environment, run **Check storage** and **Test from this browser** on Admin → Jobs → File storage there: with storage on R2, the browser must be able to PUT to the bucket (the CORS rule above), or uploads on these two screens fail with "The file did not reach storage". If an environment can't be fixed at once, `UPLOAD_TRANSPORT=proxy` sends uploads through the app instead (`PUT /api/uploads/{id}`, limited to about 4 MB on Vercel). Parsing reads the file from storage: the key must belong to the solicitation's organization, the file must be the one checked at upload (size and ETag), and a file over its format's read budget (PDF and PowerPoint 150 MB, Word 100 MB, Excel 40 MB, text 25 MB, images 5 MB; `UPLOAD_PARSE_SCALE` multiplies them, 0.25 to 4) is kept but not read, with a message asking to split it. The two pages allow 300 seconds per request. Other upload screens move over in the next phases.
 
 **Brain search is hybrid.** Every Brain lookup (Suggest from Brain, the drafter's sources, the research rail) runs a full-text query beside the vector query and fuses the two rankings, so an exact contract number, certification or acronym surfaces even when the embedding would miss it, and tenants without an embedding key still get ranked results. The full-text indexes ship in migration 0084; sync it on `/admin/migrations` after deploying.

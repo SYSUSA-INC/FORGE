@@ -1,10 +1,11 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   solicitationCapabilityMatrices,
+  solicitationDocuments,
   solicitationQuestionSets,
   solicitationReviews,
   solicitations,
@@ -17,6 +18,9 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { selectKnowledgeForMatrix } from "@/lib/matrix-knowledge";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import type { ReviewedRequirement } from "@/lib/requirement-review";
+import { buildReviewBasis } from "@/lib/review-basis";
+import { mergeLmStructures } from "@/lib/solicitation-lm";
 import {
   aiRunCapabilityMatrix,
   aiRunQuestionGenerator,
@@ -165,7 +169,7 @@ export async function runSolicitationReviewAction(
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  // Tenant boundary check + load doc text.
+  // Tenant boundary check + load the parse the review builds on.
   const [doc] = await db
     .select({
       id: solicitations.id,
@@ -173,6 +177,11 @@ export async function runSolicitationReviewAction(
       fileName: solicitations.fileName,
       rawText: solicitations.rawText,
       parseStatus: solicitations.parseStatus,
+      setAside: solicitations.setAside,
+      extractedRequirements: solicitations.extractedRequirements,
+      lmStructure: solicitations.lmStructure,
+      sectionLSummary: solicitations.sectionLSummary,
+      sectionMSummary: solicitations.sectionMSummary,
     })
     .from(solicitations)
     .where(
@@ -184,13 +193,31 @@ export async function runSolicitationReviewAction(
     .limit(1);
   if (!doc) return { ok: false, error: "Solicitation not found." };
 
-  if (!doc.rawText.trim()) {
+  // BL-STAB-9 — the review builds on the parse's requirements and
+  // Sections L and M, so it waits for a finished parse.
+  if (doc.parseStatus !== "parsed" || !doc.rawText.trim()) {
     return {
       ok: false,
       error:
-        "Solicitation hasn't been parsed yet. Wait for the upload pipeline to finish, or re-upload the file.",
+        doc.parseStatus === "failed"
+          ? "The document's parse failed, and the review builds on it. Fix the parse (Re-parse) first."
+          : "The document is still being parsed. The review builds on the parsed requirements; try again when the parse finishes.",
     };
   }
+
+  // Sections L and M: the solicitation's own, else a companion document's
+  // (the same merge the solicitation page shows).
+  const companionLm = await db
+    .select({ lm: solicitationDocuments.lmStructure })
+    .from(solicitationDocuments)
+    .where(and(eq(solicitationDocuments.solicitationId, solicitationId), eq(solicitationDocuments.organizationId, organizationId)))
+    .orderBy(asc(solicitationDocuments.sortOrder), asc(solicitationDocuments.createdAt));
+  const basis = buildReviewBasis({
+    requirements: doc.extractedRequirements as ReviewedRequirement[],
+    lm: mergeLmStructures([doc.lmStructure, ...companionLm.map((d) => d.lm)]),
+    sectionLSummary: doc.sectionLSummary,
+    sectionMSummary: doc.sectionMSummary,
+  });
 
   const limit = await enforceRateLimit({
     key: `solicitation-review:${solicitationId}`,
@@ -244,6 +271,7 @@ export async function runSolicitationReviewAction(
     title: doc.title,
     fileName: doc.fileName,
     rawText: doc.rawText,
+    basis: { requirementCount: basis.requirements.length, factors: basis.evaluationFactors.map((f) => f.name) },
   });
 
   const completedAt = new Date();
@@ -267,18 +295,21 @@ export async function runSolicitationReviewAction(
     return { ok: false, error: result.error };
   }
 
+  // BL-STAB-9 — the requirements, Sections L/M and evaluation factors are
+  // the parse's; the AI contributed the judgement.
   const persistedResult: SolicitationReviewResult = {
     summary: result.data.summary,
-    sectionL: result.data.sectionL,
-    sectionM: result.data.sectionM,
-    requirements: result.data.requirements,
-    capabilityAreas: result.data.capabilityAreas,
-    evaluationFactors: result.data.evaluationFactors,
+    sectionL: basis.sectionL,
+    sectionM: basis.sectionM,
+    requirements: basis.requirements,
+    capabilityAreas: basis.capabilityAreas,
+    evaluationFactors: basis.evaluationFactors,
     periodOfPerformance: result.data.periodOfPerformance,
     placeOfPerformance: result.data.placeOfPerformance,
-    setAside: result.data.setAside,
+    setAside: result.data.setAside || doc.setAside,
     mandatoryCertifications: result.data.mandatoryCertifications,
     flaggedQuestions: result.data.flaggedQuestions,
+    basis: { source: "parse", hash: basis.hash, requirementCount: basis.requirements.length },
   };
 
   await db
@@ -345,7 +376,8 @@ export async function runSolicitationReviewAction(
     resourceId: solicitationId,
     metadata: {
       reviewId: row!.id,
-      requirementCount: result.data.requirements.length,
+      requirementCount: basis.requirements.length,
+      basisHash: basis.hash,
       stubbed: result.stubbed,
     },
   });
@@ -353,7 +385,7 @@ export async function runSolicitationReviewAction(
   revalidatePath(`/solicitations/${solicitationId}`);
   log.info("[runSolicitationReviewAction]", "complete", {
     solicitationId,
-    requirementCount: result.data.requirements.length,
+    requirementCount: basis.requirements.length,
     stubbed: result.stubbed,
   });
 
@@ -362,7 +394,7 @@ export async function runSolicitationReviewAction(
     reviewId: row!.id,
     stubbed: result.stubbed,
     model: `${result.provider}:${result.model}`,
-    requirementCount: result.data.requirements.length,
+    requirementCount: basis.requirements.length,
   };
 }
 

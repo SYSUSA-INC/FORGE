@@ -4,6 +4,7 @@ import { describeCoverage } from "@/lib/extraction-coverage";
 import { describeSource } from "@/lib/requirement-provenance";
 import { activeRequirements, reviewCounts, type ReviewedRequirement } from "@/lib/requirement-review";
 import { mergeLmStructures } from "@/lib/solicitation-lm";
+import { buildReviewBasis, reviewFreshness } from "@/lib/review-basis";
 import { LmPanel } from "./LmPanel";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -225,6 +226,13 @@ export default async function SolicitationDetail({
         .where(eq(knowledgeEntries.organizationId, organizationId)),
     ]);
 
+  // BL-STAB-9 — the review is built on this parse; say when it no longer matches.
+  const freshness = reviewRow?.status === "complete"
+    ? reviewFreshness(
+        reviewRow.result,
+        buildReviewBasis({ requirements: allRequirements, lm, sectionLSummary: s.sectionLSummary, sectionMSummary: s.sectionMSummary }).hash,
+      )
+    : null;
   const reviewState = {
     status: reviewRow?.status ?? ("none" as const),
     result: reviewRow?.result ?? null,
@@ -389,6 +397,8 @@ export default async function SolicitationDetail({
           initialQuestions={questionState}
           knowledgeIndex={knowledgeRows}
           hasRawText={!!s.rawText && s.rawText.trim().length > 0}
+          parsed={s.parseStatus === "parsed"}
+          freshness={freshness}
         />
       </div>
 

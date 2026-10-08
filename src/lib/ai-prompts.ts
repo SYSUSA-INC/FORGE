@@ -3,6 +3,7 @@ import { frontPassExcerpt } from "@/lib/solicitation-sections";
 import { fenced } from "@/lib/prompt-safety";
 import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import { describeZodIssues } from "@/lib/zod-issues";
+import { choice, choiceOf, tolerant } from "@/lib/zod-tolerant";
 import type { AIMessage } from "@/lib/ai";
 import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 
@@ -202,32 +203,9 @@ export function buildRequirementsChunkPrompt(input: {
 // read in any wording and mapped by the caller.
 // ────────────────────────────────────────────────────────────────────
 
-/**
- * A field that degrades on its own: a missing or malformed value becomes
- * the fallback instead of failing the whole answer. The tool schema still
- * shows the model the field's type.
- */
-function tolerant<T extends z.ZodType>(schema: T, fallback: z.output<T>) {
-  return schema.default(fallback as never).catch(fallback as never);
-}
-
-/**
- * A field the model is shown as a fixed set of values. Any text is
- * accepted ("RFP", "Shall") and the caller maps it with `choiceOf`; a
- * missing value becomes the fallback.
- */
-function choice(values: readonly string[], fallback: string) {
-  return tolerant(z.string().meta({ enum: [...values] }), fallback);
-}
-
-/**
- * One of `values` for what a model wrote, ignoring case, spaces and
- * hyphens ("Sources Sought" → "sources_sought"); the fallback otherwise.
- */
-export function choiceOf<T extends string>(values: readonly T[], raw: unknown, fallback: T): T {
-  const word = typeof raw === "string" ? raw.trim().toLowerCase().replace(/[\s-]+/g, "_") : "";
-  return (values as readonly string[]).includes(word) ? (word as T) : fallback;
-}
+// `tolerant`, `choice` and `choiceOf` live in `zod-tolerant.ts` so the
+// BL-23 prompts can use them too.
+export { choiceOf };
 
 /**
  * One requirement as a model wrote it. Its kind is read in any wording

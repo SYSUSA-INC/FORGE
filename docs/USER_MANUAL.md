@@ -637,6 +637,14 @@ Your team's verdicts are kept if the solicitation is re-parsed, and an amendment
 - *"Stored (412 MB). FORGE reads files of this type up to 150 MB automatically…"*: the file is kept but too large to read automatically; split it (for example by volume) and upload the parts.
 - *"The file did not reach storage…"*: your network, or the storage setup, blocked the upload; your administrator can check it on Admin → Jobs → File storage.
 
+**The AI document review works on any size of RFP (BL-STAB-9).** On a solicitation page, **AI document review → Initiate review** now builds on what the parse found:
+- **What comes from the parse.** The requirements are the full, whole-document list in the Requirements panel, with your team's verdicts applied (a rejected clause is left out, an edit is used as edited). Sections L and M and the evaluation factors come from the structured Sections L and M.
+- **What the AI adds.** A summary, the period and place of performance, the set-aside, mandatory certifications and the questions it would raise.
+- **Waits for the parse.** The review is available once the parse has finished.
+- **When the review is out of date.** If the requirements or factors change afterwards (a re-parse, an amendment, a verdict), the panel says the review is out of date; re-run it. A review made before this change asks to be re-run once.
+- **Capability matrix.** Scoring a long RFP's full requirement list, a window at a time, follows in the next update (BL-STAB-9b); until then a matrix over a very long list may stop with the "cut off" message below.
+- **If the AI's answer is cut off,** the message now says so ("The AI's answer was cut off at its output limit…") instead of a list of missing fields.
+
 **Parses finish, or say why not (BL-AIP-4c).** Each solicitation or companion-document parse (and each harvest of a submitted or won proposal into the Brain) is recorded as a background job the moment you upload. If the server instance running it dies mid-way, the platform retries it automatically within a few minutes from the stored file (up to three attempts); the solicitation page shows the state next to **Parse** — "retry at 14:05 UTC (attempt 2 of 3)", "stuck (awaiting recovery)", or "failed after 3 attempts" with the reason. **Re-parse** always starts a fresh job.
 
 **Requirements follow you into the editor.** The rows mapped to a section are handed to the AI drafter and the section chat verbatim as that section's contract ("address every one; reference its number inline"), ahead of the general requirement list, and the health scan judges compliance against the full list rather than a 20-clause sample.

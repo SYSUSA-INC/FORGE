@@ -3,6 +3,9 @@
  * generator. Each is a thin wrapper around the AI gateway with stub-
  * mode handling and zod validation, mirroring the pattern from
  * `solicitation-extract.ts` and `ebuy-extract.ts`.
+ *
+ * BL-STAB-9 — the review asks only for judgement; its requirements and
+ * Sections L/M come from the parse (`review-basis.ts`).
  */
 import { completeStructuredForTenant } from "@/lib/ai";
 import {
@@ -16,6 +19,7 @@ import {
   type QuestionSetVerdict,
   type SolicitationReviewVerdict,
 } from "@/lib/ai-prompts-bl23";
+import type { SolicitationReviewResult } from "@/db/schema";
 import { log } from "@/lib/log";
 
 type Ok<T> = {
@@ -27,6 +31,9 @@ type Ok<T> = {
 };
 type Err = { ok: false; error: string };
 
+type ReviewRequirement = SolicitationReviewResult["requirements"][number];
+type ReviewFactor = SolicitationReviewResult["evaluationFactors"][number];
+
 // ────────────────────────────────────────────────────────────────────
 // 1. Solicitation review
 // ────────────────────────────────────────────────────────────────────
@@ -36,6 +43,8 @@ export async function aiRunSolicitationReview(input: {
   title: string;
   fileName: string;
   rawText: string;
+  /** What the parse already holds, given to the model as context. */
+  basis?: { requirementCount: number; factors: string[] };
   /** BL-AIX Phase 1i-2 — pin a candidate model (eval runs); unset follows routing. */
   model?: string;
 }): Promise<Ok<SolicitationReviewVerdict> | Err> {
@@ -57,39 +66,22 @@ export async function aiRunSolicitationReview(input: {
       toolName: "record_solicitation_review",
       system: prompt.system,
       messages: prompt.messages,
-      maxTokens: 4000,
+      // A summary, four short fields and two short lists: about 600 tokens.
+      maxTokens: 2000,
       temperature: 0.1,
       cacheSystem: true,
     });
 
     if (ai.stubbed) {
-      return {
-        ok: true,
-        provider: ai.provider,
-        model: ai.model,
-        stubbed: true,
-        data: stubReviewVerdict(input.title),
-      };
+      return { ok: true, provider: ai.provider, model: ai.model, stubbed: true, data: stubReviewVerdict() };
     }
 
     if (!ai.data) {
-      log.error("[aiRunSolicitationReview]", "parse", {
-        error: ai.parseError,
-        viaTool: ai.viaTool,
-      });
-      return {
-        ok: false,
-        error: ai.parseError ?? "AI response did not match the expected shape.",
-      };
+      log.error("[aiRunSolicitationReview]", "parse", { error: ai.parseError, viaTool: ai.viaTool, stopReason: ai.stopReason });
+      return { ok: false, error: ai.parseError ?? "AI response did not match the expected shape." };
     }
 
-    return {
-      ok: true,
-      provider: ai.provider,
-      model: ai.model,
-      stubbed: false,
-      data: ai.data,
-    };
+    return { ok: true, provider: ai.provider, model: ai.model, stubbed: false, data: ai.data };
   } catch (err) {
     log.error("[aiRunSolicitationReview]", "error", { error: err });
     return {
@@ -108,7 +100,7 @@ export async function aiRunCapabilityMatrix(input: {
   solicitationTitle: string;
   agency: string;
   setAside: string;
-  requirements: SolicitationReviewVerdict["requirements"];
+  requirements: ReviewRequirement[];
   knowledgeEntries: {
     id: string;
     kind: string;
@@ -187,8 +179,8 @@ export async function aiRunQuestionGenerator(input: {
   reviewSummary: string;
   sectionL: string[];
   sectionM: string[];
-  requirements: SolicitationReviewVerdict["requirements"];
-  evaluationFactors: SolicitationReviewVerdict["evaluationFactors"];
+  requirements: ReviewRequirement[];
+  evaluationFactors: ReviewFactor[];
   flaggedQuestions: string[];
 }): Promise<Ok<QuestionSetVerdict> | Err> {
   try {
@@ -248,56 +240,20 @@ export async function aiRunQuestionGenerator(input: {
 // without an Anthropic key configured.
 // ────────────────────────────────────────────────────────────────────
 
-function stubReviewVerdict(_title: string): SolicitationReviewVerdict {
+function stubReviewVerdict(): SolicitationReviewVerdict {
   return {
     summary:
-      "AI document review is in stub mode. Set ANTHROPIC_API_KEY on Vercel to enable a real review against your uploaded RFP. The shape below is illustrative.",
-    sectionL: [
-      "Submission limited to 30 pages, 11pt Times New Roman.",
-      "Volumes I (Technical), II (Management), III (Past Performance), IV (Pricing).",
-      "Q&A deadline 7 calendar days before due date.",
-    ],
-    sectionM: [
-      "Factor 1: Technical Approach (40%).",
-      "Factor 2: Management Approach (25%).",
-      "Factor 3: Past Performance (20%).",
-      "Factor 4: Price (15%).",
-    ],
-    requirements: [
-      {
-        id: "req_stub_1",
-        kind: "shall",
-        text: "Provide a written technical approach addressing all PWS tasks.",
-        sectionRef: "L.5.2.1",
-        capabilityArea: "Technical Approach",
-      },
-      {
-        id: "req_stub_2",
-        kind: "shall",
-        text: "Demonstrate two relevant past performance citations within the last 5 years.",
-        sectionRef: "L.5.2.3",
-        capabilityArea: "Past Performance",
-      },
-    ],
-    capabilityAreas: ["Technical Approach", "Past Performance"],
-    evaluationFactors: [
-      { name: "Technical Approach", weight: "40%", notes: "Highest-weighted factor." },
-      { name: "Management Approach", weight: "25%", notes: "" },
-      { name: "Past Performance", weight: "20%", notes: "" },
-      { name: "Price", weight: "15%", notes: "" },
-    ],
-    periodOfPerformance: "Base + 4 option years",
-    placeOfPerformance: "Contractor site with quarterly on-site reviews",
-    setAside: "Total Small Business",
-    mandatoryCertifications: ["FedRAMP Moderate"],
-    flaggedQuestions: [
-      "Are subcontractor past performance citations evaluated equally to prime?",
-    ],
+      "AI document review is in stub mode. Set ANTHROPIC_API_KEY on Vercel to enable a real review against your uploaded RFP. The requirements, Sections L and M and evaluation factors below come from the parse.",
+    periodOfPerformance: "",
+    placeOfPerformance: "",
+    setAside: "",
+    mandatoryCertifications: [],
+    flaggedQuestions: [],
   };
 }
 
 function stubMatrixVerdict(
-  requirements: SolicitationReviewVerdict["requirements"],
+  requirements: ReviewRequirement[],
 ): CapabilityMatrixVerdict {
   return {
     cells: requirements.map((r) => ({
