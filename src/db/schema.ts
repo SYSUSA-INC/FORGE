@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   customType,
   index,
@@ -4788,3 +4789,60 @@ export type ScoutCandidate = typeof scoutCandidates.$inferSelect;
 export type NewScoutCandidate = typeof scoutCandidates.$inferInsert;
 export type ScoutCandidateStatus = (typeof scoutCandidateStatusEnum.enumValues)[number];
 export type ScoutCandidateSource = (typeof scoutCandidateSourceEnum.enumValues)[number];
+
+// BL-STAB-2b — the upload ledger: every object key the server signs for a
+// browser upload straight to storage. Mirrors drizzle/0125_file_upload.sql.
+export const fileUploads = pgTable(
+  "file_upload",
+  {
+    /** crypto.randomUUID() in code; also the last segment of the storage key. */
+    id: uuid("id").primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Only this user may complete, claim or cancel the upload. */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    purpose: text("purpose").$type<import("@/lib/upload-policy").UploadPurpose>().notNull(),
+    status: text("status").$type<import("@/lib/upload-policy").UploadStatus>().notNull().default("pending"),
+    transport: text("transport").$type<"direct" | "proxy">().notNull().default("direct"),
+    storageKey: text("storage_key").notNull(),
+    /** Sanitised display name; never part of a key. */
+    fileName: text("file_name").notNull(),
+    declaredFormat: text("declared_format").$type<import("@/lib/upload-policy").UploadFormat>().notNull(),
+    detectedFormat: text("detected_format").notNull().default(""),
+    /** The content type the upload link was signed with (an image's subtype from its bytes once verified). */
+    contentType: text("content_type").notNull(),
+    declaredSize: bigint("declared_size", { mode: "number" }).notNull(),
+    storedSize: bigint("stored_size", { mode: "number" }),
+    etag: text("etag").notNull().default(""),
+    /** The browser's Origin at intent, for diagnosing CORS. */
+    origin: text("origin").notNull().default(""),
+    resourceType: text("resource_type").$type<import("@/lib/upload-policy").UploadResourceType | "">().notNull().default(""),
+    /** Allocated at claim, so a repeated claim reuses the same record id. */
+    resourceId: uuid("resource_id"),
+    failureReason: text("failure_reason").notNull().default(""),
+    failureDetail: text("failure_detail").notNull().default(""),
+    putAttempts: integer("put_attempts").notNull().default(0),
+    purgeAttempts: integer("purge_attempts").notNull().default(0),
+    urlExpiresAt: timestamp("url_expires_at", { withTimezone: true }).notNull(),
+    /** When the object is due to be deleted; null while a record keeps it. */
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
+    storedAt: timestamp("stored_at", { withTimezone: true }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    storageKeyIdx: uniqueIndex("file_upload_storage_key_idx").on(t.storageKey),
+    orgCreatedIdx: index("file_upload_org_created_idx").on(t.organizationId, t.createdAt),
+    orgUserStatusIdx: index("file_upload_org_user_status_idx").on(t.organizationId, t.userId, t.status),
+    orgResourceIdx: index("file_upload_org_resource_idx").on(t.organizationId, t.resourceType, t.resourceId),
+    purgeIdx: index("file_upload_purge_idx")
+      .on(t.purgeAfter)
+      .where(sql`"purge_after" IS NOT NULL AND "purged_at" IS NULL`),
+  }),
+);
+
+export type FileUpload = typeof fileUploads.$inferSelect;
+export type NewFileUpload = typeof fileUploads.$inferInsert;

@@ -74,7 +74,7 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361 and #362; follow-ups in PR) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b in PR) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
@@ -339,7 +339,7 @@ mind. Bandage will come off but a true fix will stay."
         implementation) and tamper cases, the R2 adapter against a
         mocked fetch (including a stalled body hitting its deadline),
         the client logic, the probe in memory mode.
-      - 🔄 Follow-ups in PR: the adversarial review of PR #362 could not
+      - ✅ Follow-ups shipped (PR #363): the adversarial review of PR #362 could not
         run (the reviewers hit the account's weekly spend limit, which
         resets 2026-10-10), so the PR was reviewed by hand. Two fixes:
         a download without a `content-length` now gets the longest
@@ -347,8 +347,32 @@ mind. Bandage will come off but a true fix will stay."
         longer reports success when the file arrived but the browser
         could not read storage's answer (real uploads would fail), and
         names the CORS rule instead.
-    - **2b — the upload ledger:** migration, policy, intents,
-      verification, claims (dark launch, tested against Postgres).
+    - **2b — the upload ledger** (dark launch: nothing calls it yet).
+      🔄 in PR.
+      - Migration 0125 `file_upload` (tenant-scoped; five indexes, one
+        partial for the sweeper), mirrored in `schema.ts`.
+      - `upload-policy.ts` (pure, browser-safe): purposes and their
+        formats, per-file limits (`UPLOAD_MAX_FILE_MB`), transient vs kept,
+        what each may be filed as; display-name sanitising (control and
+        text-direction characters, separators, leading dots, 255 bytes);
+        server-chosen content types; server-built keys and
+        `isKeyInOrg`; link lifetimes.
+      - `upload-verify.ts` (pure): what the first bytes show (PDF, zip,
+        images, text; programs, HTML, SVG, older Office files refused).
+      - `uploads.ts`: intent (environment, file, rate, per-user caps,
+        daily volume per organization, signed link), complete (exact
+        size, signed type, first bytes; rejects delete the object),
+        claim / finish / release / fail (one conditional UPDATE each, the
+        record id allocated up front so a retried claim reuses it, a
+        claim stuck over 2 minutes taken over), peek for batches,
+        cancel, reserved bytes. Audited.
+      - `uploads/actions.ts`: request (refused while impersonating;
+        templates need an org admin and the feature; diagnostics need a
+        platform admin), complete, cancel.
+      - Tests: `tests/ai/upload-policy.test.ts` (pure) and
+        `tests/isolation/uploads.test.ts` (Postgres: the full path, each
+        refusal, concurrent claims, another organization or user locked
+        out, cancel, reserved bytes).
     - **2c — new solicitations and amendments upload straight to
       storage** (the owner's main path), with per-file progress, retry
       and cancel. Merges only after the readiness check is green on
