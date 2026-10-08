@@ -888,4 +888,12 @@ Optional variables:
 
 R2 requests now carry a deadline that covers reading the whole file (30 s plus 2 s per MB, at most 4 minutes); before, a stalled download of a large file could hang until the function timed out.
 
+**The upload ledger (BL-STAB-2b).** Migration 0125 adds `file_upload`; sync it on `/admin/migrations` after deploying. Every upload link the server signs gets a row there: the organization and user, why (`document`, `template_docx`, `chat_attachment`, `diagnostic`), the declared name, type and size, and what storage actually holds. A file is only usable once the server has checked it in storage: exact size, the type the link was signed for, and that its first bytes really are that kind of file (programs, web pages, drawings and older binary Office files are refused, whatever they are called). It can then be filed on a record once, within 24 hours. Audited as `file_upload.intent`, `file_upload.verified`, `file_upload.reject` and `file_upload.cancel`; the file name and the signed link never go into audit rows or logs. Limits:
+- `UPLOAD_MAX_FILE_MB` (default 500, at most 1024): the per-file limit for documents. Templates and chat attachments are limited to 50 MB.
+- `UPLOAD_DAILY_GB_PER_ORG` (default 50; 0 for no limit): the volume one organization may start uploading in 24 hours.
+- Per user: 10 uploads in progress at once, 200 checked but not yet filed, 300 started per hour.
+- Uploads are refused while a platform admin is viewing as another organization, and in production or staging while storage is the in-memory fallback.
+
+The upload screens move onto this in the next phases; until then nothing calls it.
+
 **Brain search is hybrid.** Every Brain lookup (Suggest from Brain, the drafter's sources, the research rail) runs a full-text query beside the vector query and fuses the two rankings, so an exact contract number, certification or acronym surfaces even when the embedding would miss it, and tenants without an embedding key still get ranked results. The full-text indexes ship in migration 0084; sync it on `/admin/migrations` after deploying.
