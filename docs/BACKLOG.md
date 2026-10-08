@@ -307,6 +307,9 @@ mind. Bandage will come off but a true fix will stay."
       too big to read is kept and says so).
     - Covers every upload path; dictation stays a deliberate exception
       (4 MB audio, never stored).
+  - **Design of record:** `docs/design/BL-STAB-2_DIRECT_UPLOADS.md`
+    (data model, every file and signature, security checks in order,
+    per-path conversion, limits, operator steps, tests, phasing).
   - **Phases** (one PR each, in order):
     - **2a — storage verbs and a readiness check.**
       - ✅ Part 1 shipped (PR #361): SigV4 presigned URLs
