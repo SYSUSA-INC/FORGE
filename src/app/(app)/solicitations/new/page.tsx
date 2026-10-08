@@ -5,6 +5,8 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { UploadSolicitationForm } from "./UploadSolicitationForm";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-2c — room for filing an upload and starting its parse from this page.
+export const maxDuration = 300;
 
 export default async function NewSolicitationPage() {
   await requireAuth();

@@ -632,6 +632,11 @@ Each item shows where it sits in the document, or **not found in source** when i
 
 Your team's verdicts are kept if the solicitation is re-parsed, and an amendment that repeats a rejected or edited clause is treated the same way. When intake found nothing, **Add requirements** on the solicitation opens the same page.
 
+**Large solicitations and amendments upload (BL-STAB-2c).** On **New solicitation** and **Add amendment**, the file now goes from your browser straight to FORGE's secure storage, so a file is no longer refused for size: documents up to 500 MB are accepted (PDF, Word, Excel, PowerPoint, text, CSV and images). Each upload shows its progress, speed and time left, with **Cancel** while it runs and **Retry** if it fails; keep the page open until it finishes. FORGE then checks the file (that it arrived whole and is the kind of file its name says) before creating the solicitation and starting the parse. Some messages you may see:
+- *"This is an older Office format…"*: save the file as .docx, .xlsx or .pptx and upload that.
+- *"Stored (412 MB). FORGE reads files of this type up to 150 MB automatically…"*: the file is kept but too large to read automatically; split it (for example by volume) and upload the parts.
+- *"The file did not reach storage…"*: your network, or the storage setup, blocked the upload; your administrator can check it on Admin → Jobs → File storage.
+
 **Parses finish, or say why not (BL-AIP-4c).** Each solicitation or companion-document parse (and each harvest of a submitted or won proposal into the Brain) is recorded as a background job the moment you upload. If the server instance running it dies mid-way, the platform retries it automatically within a few minutes from the stored file (up to three attempts); the solicitation page shows the state next to **Parse** — "retry at 14:05 UTC (attempt 2 of 3)", "stuck (awaiting recovery)", or "failed after 3 attempts" with the reason. **Re-parse** always starts a fresh job.
 
 **Requirements follow you into the editor.** The rows mapped to a section are handed to the AI drafter and the section chat verbatim as that section's contract ("address every one; reference its number inline"), ahead of the general requirement list, and the health scan judges compliance against the full list rather than a 20-clause sample.

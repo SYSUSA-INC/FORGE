@@ -48,7 +48,10 @@ import { handleSectionAutoDraft } from "@/lib/auto-draft-job";
 import { harvestProposal } from "@/lib/proposal-harvest";
 import { parseSolicitationDocumentFromBytes } from "@/lib/solicitation-document-parse";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
-import { getStorageProvider } from "@/lib/storage";
+import { detectFormat } from "@/lib/text-extract";
+import { isKeyInOrg, parseBudgetBytes, tooLargeToReadMessage } from "@/lib/upload-policy";
+import { sniffFormat } from "@/lib/upload-verify";
+import { getVerifiedObject } from "@/lib/uploads";
 
 export { JobPermanentError };
 
@@ -333,35 +336,70 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   section_auto_draft: handleSectionAutoDraft,
 };
 
-async function loadBytes(
-  storagePath: string,
+/**
+ * BL-STAB-2c — the bytes a parse job reads. The key must be this
+ * organization's; a file over its format's read budget is refused before
+ * any download (kept, but the person is told to split it); a file that
+ * changed after its upload was checked is refused; an older binary Office
+ * file inside a new name gets a clear message.
+ */
+async function loadUploadBytes(
+  job: BackgroundJob,
+  row: { storagePath: string; fileSize: number; fileName: string; contentType: string },
   inline: Uint8Array | undefined,
-): Promise<Uint8Array | null> {
-  if (inline) return inline;
-  if (!storagePath) return null;
-  const obj = await getStorageProvider().get(storagePath);
-  return obj?.bytes ?? null;
+): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; message: string }> {
+  if (!row.storagePath) return inline ? { ok: true, bytes: inline } : { ok: false, message: BYTES_GONE_ERROR };
+  if (!isKeyInOrg(job.organizationId, row.storagePath)) {
+    log.error("[jobs]", "stored file key is outside the job's organization", { jobId: job.id, organizationId: job.organizationId });
+    return { ok: false, message: "The stored file could not be read." };
+  }
+  const format = detectFormat(row.contentType, row.fileName);
+  if (format) {
+    const budget = parseBudgetBytes(format, process.env);
+    if (row.fileSize > budget) return { ok: false, message: tooLargeToReadMessage(row.fileSize, budget) };
+  }
+  let bytes = inline;
+  if (!bytes) {
+    const got = await getVerifiedObject({ organizationId: job.organizationId, storagePath: row.storagePath });
+    if (!got.ok) {
+      return {
+        ok: false,
+        message: got.reason === "changed" ? "The stored file changed after it was uploaded; upload it again." : BYTES_GONE_ERROR,
+      };
+    }
+    bytes = got.bytes;
+  }
+  if (sniffFormat(bytes.subarray(0, 8192)).family === "ole2") {
+    return { ok: false, message: "This is an older Office format inside. Save it as .docx, .xlsx or .pptx and upload that." };
+  }
+  return { ok: true, bytes };
 }
 
 async function handleSolicitationParse(job: BackgroundJob, ctx: JobContext): Promise<void> {
   const organizationId = job.organizationId;
   const [row] = await db
-    .select({ id: solicitations.id, storagePath: solicitations.storagePath })
+    .select({
+      id: solicitations.id,
+      storagePath: solicitations.storagePath,
+      fileSize: solicitations.fileSize,
+      fileName: solicitations.fileName,
+      contentType: solicitations.contentType,
+    })
     .from(solicitations)
     .where(and(eq(solicitations.id, job.resourceId), eq(solicitations.organizationId, organizationId)))
     .limit(1);
   if (!row) throw new JobPermanentError("Solicitation no longer exists.");
 
-  const bytes = await loadBytes(row.storagePath, ctx.bytes);
-  if (!bytes) {
+  const loaded = await loadUploadBytes(job, row, ctx.bytes);
+  if (!loaded.ok) {
     await db
       .update(solicitations)
-      .set({ parseStatus: "failed", parseError: BYTES_GONE_ERROR, updatedAt: new Date() })
+      .set({ parseStatus: "failed", parseError: loaded.message, updatedAt: new Date() })
       .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, row.id)));
-    throw new JobPermanentError(BYTES_GONE_ERROR);
+    throw new JobPermanentError(loaded.message);
   }
 
-  await parseSolicitationFromBytes(row.id, organizationId, bytes);
+  await parseSolicitationFromBytes(row.id, organizationId, loaded.bytes);
 
   // The parser records its own outcome on the row; a reported failure
   // (unreadable file, AI refusal) is final for this job — the row shows
@@ -384,6 +422,7 @@ async function handleSolicitationDocumentParse(job: BackgroundJob, ctx: JobConte
       solicitationId: solicitationDocuments.solicitationId,
       storagePath: solicitationDocuments.storagePath,
       fileName: solicitationDocuments.fileName,
+      fileSize: solicitationDocuments.fileSize,
       contentType: solicitationDocuments.contentType,
     })
     .from(solicitationDocuments)
@@ -396,20 +435,20 @@ async function handleSolicitationDocumentParse(job: BackgroundJob, ctx: JobConte
     .limit(1);
   if (!row) throw new JobPermanentError("Document no longer exists.");
 
-  const bytes = await loadBytes(row.storagePath, ctx.bytes);
-  if (!bytes) {
+  const loaded = await loadUploadBytes(job, row, ctx.bytes);
+  if (!loaded.ok) {
     await db
       .update(solicitationDocuments)
-      .set({ parseStatus: "failed", parseError: BYTES_GONE_ERROR, updatedAt: new Date() })
+      .set({ parseStatus: "failed", parseError: loaded.message, updatedAt: new Date() })
       .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, row.id)));
-    throw new JobPermanentError(BYTES_GONE_ERROR);
+    throw new JobPermanentError(loaded.message);
   }
 
   await parseSolicitationDocumentFromBytes(
     row.id,
     row.solicitationId,
     organizationId,
-    bytes,
+    loaded.bytes,
     row.fileName,
     row.contentType,
   );

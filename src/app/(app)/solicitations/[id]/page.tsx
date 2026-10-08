@@ -39,6 +39,8 @@ import { normalizeRef } from "@/lib/solicitation-qa-logic";
 import { THEME } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-2c — room for filing an upload and starting its parse from this page.
+export const maxDuration = 300;
 
 const STATUS_LABEL: Record<string, string> = {
   uploaded: "Uploaded",

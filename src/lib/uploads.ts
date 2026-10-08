@@ -28,6 +28,7 @@ import { getStorageProvider, memoryStorageRefused, uploadTransport } from "@/lib
 import {
   assertKeyInOrg,
   expirySecondsFor,
+  isKeyInOrg,
   PROXY_MAX_BYTES_ON_VERCEL,
   resolvePolicy,
   UPLOAD_POLICIES,
@@ -523,4 +524,84 @@ export async function getReservedUploadBytes(organizationId: string): Promise<nu
     .from(fileUploads)
     .where(and(eq(fileUploads.organizationId, organizationId), inArray(fileUploads.purpose, counted)));
   return Number(row?.bytes ?? 0);
+}
+
+/**
+ * Read a stored file for parsing, refusing anything that is not this
+ * organization's or that changed after the upload was checked: the size
+ * and entity tag must match what `completeUpload` recorded. (The upload
+ * link stays valid for a while after the check, so the uploader could
+ * otherwise swap the file.) Files stored before the ledger have no row
+ * and are read as they are.
+ */
+export async function getVerifiedObject(i: {
+  organizationId: string;
+  storagePath: string;
+}): Promise<{ ok: true; bytes: Uint8Array; contentType: string } | { ok: false; reason: "gone" | "changed" | "foreign_key" }> {
+  if (!isKeyInOrg(i.organizationId, i.storagePath)) {
+    log.error("[uploads]", "refused to read a storage key outside the organization", { organizationId: i.organizationId });
+    return { ok: false, reason: "foreign_key" };
+  }
+  const [ledger] = await db
+    .select({ storedSize: fileUploads.storedSize, etag: fileUploads.etag })
+    .from(fileUploads)
+    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.storageKey, i.storagePath)))
+    .limit(1);
+  const obj = await getStorageProvider().get(i.storagePath);
+  if (!obj) return { ok: false, reason: "gone" };
+  if (ledger) {
+    const sizeChanged = ledger.storedSize !== null && obj.bytes.byteLength !== ledger.storedSize;
+    const tagChanged = Boolean(ledger.etag && obj.etag && ledger.etag !== obj.etag);
+    if (sizeChanged || tagChanged) return { ok: false, reason: "changed" };
+  }
+  return { ok: true, bytes: obj.bytes, contentType: obj.contentType };
+}
+
+/**
+ * In the in-memory storage mode (development, previews without R2) the
+ * parse runs from the bytes in hand: another server instance would not
+ * find them. Undefined with real storage, where the job reads storage.
+ */
+export async function inlineBytesForMemoryMode(i: { organizationId: string; storagePath: string }): Promise<Uint8Array | undefined> {
+  if (getStorageProvider().name !== "memory" || !isKeyInOrg(i.organizationId, i.storagePath)) return undefined;
+  return (await getStorageProvider().get(i.storagePath))?.bytes;
+}
+
+export type ProxyUploadResult = { status: number; body: UploadCompleteResult | { ok: false; error: string } };
+
+/**
+ * The browser's PUT when uploads go through the app (`proxy` transport:
+ * memory storage, or the operator's `UPLOAD_TRANSPORT=proxy` lever). The
+ * row must be this user's, pending, proxy and unexpired; the type and the
+ * declared length must match before the body is read; then the bytes are
+ * stored and checked exactly as a direct upload is.
+ */
+export async function receiveProxyUpload(i: {
+  organizationId: string;
+  actor: UploadActor;
+  uploadId: string;
+  contentType: string;
+  contentLength: number | null;
+  readBody: () => Promise<Uint8Array>;
+}): Promise<ProxyUploadResult> {
+  const row = await loadOwn(i.organizationId, i.actor.userId, i.uploadId);
+  if (!row) return { status: 404, body: { ok: false, error: "Upload not found." } };
+  if (row.status !== "pending" || row.transport !== "proxy" || row.urlExpiresAt.getTime() <= Date.now()) {
+    return { status: 409, body: { ok: false, error: "This upload link can no longer be used." } };
+  }
+  if (i.contentType.split(";")[0]!.trim().toLowerCase() !== row.contentType.toLowerCase()) {
+    return { status: 415, body: { ok: false, error: "The file's type doesn't match its upload link." } };
+  }
+  if (i.contentLength === null) return { status: 411, body: { ok: false, error: "The upload has no length." } };
+  if (i.contentLength !== row.declaredSize) return { status: 413, body: { ok: false, error: "The file's size doesn't match its upload link." } };
+  const bytes = await i.readBody();
+  if (bytes.byteLength !== row.declaredSize) return { status: 400, body: { ok: false, error: "The file arrived incomplete." } };
+  assertKeyInOrg(row.organizationId, row.storageKey);
+  await getStorageProvider().put({ key: row.storageKey, bytes, contentType: row.contentType });
+  await db
+    .update(fileUploads)
+    .set({ putAttempts: sql`${fileUploads.putAttempts} + 1`, updatedAt: new Date() })
+    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, row.id)));
+  const done = await completeUpload({ organizationId: i.organizationId, actor: i.actor, uploadId: row.id });
+  return { status: done.ok ? 200 : 422, body: done };
 }

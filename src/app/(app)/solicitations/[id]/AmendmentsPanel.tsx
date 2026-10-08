@@ -1,17 +1,20 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
-import { uploadSolicitationAction } from "../actions";
+import { UploadQueue } from "@/components/uploads/UploadQueue";
+import { useUploadQueue } from "@/components/uploads/useUploadQueue";
+import { acceptFor } from "@/lib/upload-policy";
+import { createSolicitationFromUploadAction } from "../actions";
 import type { AmendmentListRow } from "../actions";
 
-const STATUS_COLOR: Record<string, string> = {
-  uploaded: "#9BC9D9",
-  parsing: "#A78BFA",
-  parsed: "#10B981",
-  failed: "#EF4444",
+const STATUS_CLASS: Record<string, string> = {
+  uploaded: "text-teal bg-teal/10 border-teal/30",
+  parsing: "text-violet bg-violet/10 border-violet/30",
+  parsed: "text-emerald bg-emerald/10 border-emerald/30",
+  failed: "text-rose bg-rose/10 border-rose/30",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -40,9 +43,31 @@ export function AmendmentsPanel({
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [amendmentNumber, setAmendmentNumber] = useState("");
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // The amendment number as it was when the upload started.
+  const numberFor = useRef(new Map<File, string>());
+
+  // BL-STAB-2c — the amendment goes straight to storage (no size cap), then is filed under this solicitation.
+  const queue = useUploadQueue<string>({
+    purpose: "document",
+    concurrency: 1,
+    claim: async ({ uploadId, file: f }) => {
+      const res = await createSolicitationFromUploadAction({
+        uploadId,
+        parentSolicitationId: solicitationId,
+        amendmentNumber: numberFor.current.get(f) ?? "",
+      });
+      return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
+    },
+    onItemDone: (item) => {
+      if (item.phase !== "done") return;
+      setFile(null);
+      setAmendmentNumber("");
+      if (inputRef.current) inputRef.current.value = "";
+      router.refresh();
+    },
+  });
 
   function submitUpload() {
     if (!file) {
@@ -50,22 +75,10 @@ export function AmendmentsPanel({
       return;
     }
     setError(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("parentSolicitationId", solicitationId);
-    fd.append("amendmentNumber", amendmentNumber.trim());
-    startTransition(async () => {
-      const res = await uploadSolicitationAction(fd);
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setFile(null);
-      setAmendmentNumber("");
-      setOpen(false);
-      router.refresh();
-    });
+    numberFor.current.set(file, amendmentNumber.trim());
+    queue.add([file]);
   }
+  const pending = queue.busy;
 
   return (
     <Panel
@@ -119,7 +132,7 @@ export function AmendmentsPanel({
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.txt,.md,text/plain,text/markdown,image/jpeg,image/jpg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+              accept={acceptFor("document")}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="aur-input text-[12px]"
             />
@@ -136,6 +149,9 @@ export function AmendmentsPanel({
               {error}
             </div>
           ) : null}
+          <div className="mt-2">
+            <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
+          </div>
           <div className="mt-2 flex justify-end">
             <button
               type="button"
@@ -143,7 +159,7 @@ export function AmendmentsPanel({
               disabled={pending || !file}
               className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
             >
-              {pending ? "Uploading + parsing…" : "Upload amendment"}
+              {pending ? "Uploading…" : "Upload amendment"}
             </button>
           </div>
         </div>
@@ -158,7 +174,6 @@ export function AmendmentsPanel({
       ) : (
         <ul className="flex flex-col gap-1.5">
           {amendments.map((a) => {
-            const statusColor = STATUS_COLOR[a.parseStatus] ?? "#9BC9D9";
             return (
               <li
                 key={a.id}
@@ -179,12 +194,7 @@ export function AmendmentsPanel({
                   </div>
                 </div>
                 <span
-                  className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
-                  style={{
-                    color: statusColor,
-                    backgroundColor: `${statusColor}1A`,
-                    border: `1px solid ${statusColor}50`,
-                  }}
+                  className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${STATUS_CLASS[a.parseStatus] ?? STATUS_CLASS.uploaded}`}
                 >
                   {STATUS_LABEL[a.parseStatus] ?? a.parseStatus}
                 </span>

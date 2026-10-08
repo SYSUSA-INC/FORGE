@@ -224,6 +224,38 @@ export function assertKeyInOrg(organizationId: string, key: string): void {
   if (!isKeyInOrg(organizationId, key)) throw new Error("Storage key outside this organization.");
 }
 
+/**
+ * The largest file of each format FORGE reads automatically. Bigger files
+ * are kept and listed but not loaded into a function's memory to parse;
+ * the person is told to split them. `UPLOAD_PARSE_SCALE` (0.25 to 4)
+ * scales every budget. Images keep the vision model's own 5 MB limit.
+ */
+const PARSE_BUDGET_MIB: Record<UploadFormat, number> = { pdf: 150, pptx: 150, docx: 100, xlsx: 40, text: 25, image: 5 };
+
+export function parseBudgetBytes(format: UploadFormat, env: Record<string, string | undefined> = {}): number {
+  const raw = Number(env.UPLOAD_PARSE_SCALE);
+  const scale = format === "image" || !Number.isFinite(raw) || raw <= 0 ? 1 : Math.min(4, Math.max(0.25, raw));
+  return Math.floor(PARSE_BUDGET_MIB[format] * scale * MiB);
+}
+
+export function tooLargeToReadMessage(bytes: number, budget: number): string {
+  const mb = (n: number) => `${Math.round(n / MiB)} MB`;
+  return `Stored (${mb(bytes)}). FORGE reads files of this type up to ${mb(budget)} automatically; split it (for example by volume) and upload the parts to have it read.`;
+}
+
+/** The file picker's `accept` list for a purpose. */
+export function acceptFor(purpose: UploadPurpose): string {
+  const byFormat: Record<UploadFormat, string> = {
+    pdf: ".pdf,application/pdf",
+    docx: ".docx",
+    xlsx: ".xlsx",
+    pptx: ".pptx",
+    text: ".txt,.md,.csv,text/plain,text/markdown,text/csv",
+    image: ".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif",
+  };
+  return UPLOAD_POLICIES[purpose].formats.map((f) => byFormat[f]).join(",");
+}
+
 /** What the browser is told about an upload. */
 export type UploadView = {
   uploadId: string;
