@@ -330,31 +330,10 @@ export async function runSolicitationReviewAction(
       ),
     );
 
-  // Re-running invalidates downstream artifacts — they were keyed
-  // off a different requirements list. Delete the matrix and
-  // question_set so the UI re-shows the disabled buttons.
-  await db
-    .delete(solicitationCapabilityMatrices)
-    .where(
-      and(
-        eq(
-          solicitationCapabilityMatrices.solicitationId,
-          solicitationId,
-        ),
-        eq(
-          solicitationCapabilityMatrices.organizationId,
-          organizationId,
-        ),
-      ),
-    );
-  await db
-    .delete(solicitationQuestionSets)
-    .where(
-      and(
-        eq(solicitationQuestionSets.solicitationId, solicitationId),
-        eq(solicitationQuestionSets.organizationId, organizationId),
-      ),
-    );
+  // BL-STAB-9 — the matrix and questions are kept: a requirement keeps
+  // its id across re-runs, so the matrix's cells still apply, and
+  // requirements new to this review show as not yet scored ("Score
+  // remaining"). Cells for requirements no longer listed are not shown.
 
   // Look up the now-canonical row to return its id.
   const [row] = await db
@@ -407,17 +386,31 @@ export type RunCapabilityMatrixResult =
       ok: true;
       matrixId: string;
       cellCount: number;
+      /** Requirements still without a score (time budget or a failed window); "Score remaining" finishes them. */
+      unscoredCount: number;
       pwinLow: number;
       pwinHigh: number;
       stubbed: boolean;
     }
   | { ok: false; error: string };
 
+/** BL-STAB-9 — windows are started for this long; the rest wait for "Score remaining". */
+const MATRIX_TIME_BUDGET_MS = 170_000;
+
+/**
+ * Build (or finish) the capability matrix: every requirement of the
+ * review scored against the company's knowledge, a window at a time.
+ * Requirements that already have a cell keep it unless `rebuild` is set,
+ * so a run that stopped part-way is finished by the next.
+ */
 export async function runCapabilityMatrixAction(
   solicitationId: string,
+  options?: { rebuild?: boolean },
 ): Promise<RunCapabilityMatrixResult> {
+  const startedAt = Date.now();
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
+  const rebuild = options?.rebuild === true;
 
   const [doc] = await db
     .select({
@@ -454,11 +447,12 @@ export async function runCapabilityMatrixAction(
     };
   }
   const reviewResult = review.result;
-  if (!reviewResult.requirements || reviewResult.requirements.length === 0) {
+  const requirements = reviewResult.requirements ?? [];
+  if (requirements.length === 0) {
     return {
       ok: false,
       error:
-        "The review didn't surface any requirements. Re-run the review or upload a different version of the document.",
+        "The parse found no requirements in this document, so there is nothing to score. Check the requirements list (or add the ones it missed), then re-run the review.",
     };
   }
 
@@ -474,6 +468,17 @@ export async function runCapabilityMatrixAction(
     };
   }
 
+  const [existing] = await db
+    .select({ id: solicitationCapabilityMatrices.id, cells: solicitationCapabilityMatrices.cells })
+    .from(solicitationCapabilityMatrices)
+    .where(
+      and(
+        eq(solicitationCapabilityMatrices.solicitationId, solicitationId),
+        eq(solicitationCapabilityMatrices.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+
   // BL-AIP-1 — score against the knowledge the Brain ranks as relevant to
   // this solicitation. The prompt shows at most 60 entries; until now the
   // first 60 BY TITLE were sent, so for a larger Brain the matrix scored
@@ -484,9 +489,7 @@ export async function runCapabilityMatrixAction(
       `Solicitation: ${doc.title}`,
       doc.agency ? `Agency: ${doc.agency}` : "",
       doc.setAside ? `Set-aside: ${doc.setAside}` : "",
-      ...reviewResult.requirements
-        .slice(0, 40)
-        .map((r) => String((r as { text?: unknown }).text ?? "").slice(0, 200)),
+      ...requirements.slice(0, 40).map((r) => String(r.text ?? "").slice(0, 200)),
     ]
       .filter(Boolean)
       .join("\n"),
@@ -497,40 +500,21 @@ export async function runCapabilityMatrixAction(
     solicitationTitle: doc.title,
     agency: doc.agency,
     setAside: doc.setAside,
-    requirements: reviewResult.requirements,
+    requirements,
+    factors: reviewResult.evaluationFactors ?? [],
     knowledgeEntries: knowledge.entries,
+    existing: rebuild ? [] : (existing?.cells ?? []),
+    stopAt: startedAt + MATRIX_TIME_BUDGET_MS,
   });
   if (!result.ok) return { ok: false, error: result.error };
 
-  // Validate cells reference actual requirement ids — drop hallucinations.
-  const validReqIds = new Set(reviewResult.requirements.map((r) => r.id));
-  const cells: CapabilityMatrixCell[] = result.data.cells.filter((c) =>
-    validReqIds.has(c.requirementId),
-  );
-
+  const cells: CapabilityMatrixCell[] = result.data.cells;
   // Clamp + sort PWin recommendation.
   const low = clamp(result.data.pwinRecommendationLow, 0, 100);
   const high = clamp(result.data.pwinRecommendationHigh, 0, 100);
   const [pwinLow, pwinHigh] = low <= high ? [low, high] : [high, low];
 
   const now = new Date();
-  const [existing] = await db
-    .select({ id: solicitationCapabilityMatrices.id })
-    .from(solicitationCapabilityMatrices)
-    .where(
-      and(
-        eq(
-          solicitationCapabilityMatrices.solicitationId,
-          solicitationId,
-        ),
-        eq(
-          solicitationCapabilityMatrices.organizationId,
-          organizationId,
-        ),
-      ),
-    )
-    .limit(1);
-
   let matrixId: string;
   if (existing) {
     await db
@@ -574,6 +558,8 @@ export async function runCapabilityMatrixAction(
     metadata: {
       matrixId,
       cellCount: cells.length,
+      unscoredCount: result.data.unscored.length,
+      rebuild,
       pwinLow,
       pwinHigh,
       stubbed: result.stubbed,
@@ -585,6 +571,7 @@ export async function runCapabilityMatrixAction(
     ok: true,
     matrixId,
     cellCount: cells.length,
+    unscoredCount: result.data.unscored.length,
     pwinLow,
     pwinHigh,
     stubbed: result.stubbed,

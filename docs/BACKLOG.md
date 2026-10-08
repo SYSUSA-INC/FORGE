@@ -75,7 +75,7 @@ Effort key:
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365) |
-| 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | 🔄 9a in PR #366; 9b (matrix, questions) next |
+| 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | 🔄 9a shipped (PR #366); 9b (matrix, questions) in PR #367 |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
@@ -180,7 +180,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365) · 🔄 BL-STAB-9 in PR #366 · ⏳ BL-STAB-3 to 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365) · 🔄 BL-STAB-9 (9a shipped in PR #366; 9b in PR #367) · ⏳ BL-STAB-3 to 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -453,7 +453,7 @@ mind. Bandage will come off but a true fix will stay."
       from storage when their record is deleted; a test that keeps any
       file out of a server action.**
 - **BL-STAB-9 — The AI document review fails on a real
-  solicitation.** 🔄 in PR #366.
+  solicitation.** 🔄 9a shipped (PR #366); 9b in PR #367.
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI
     document review" → Initiate review shows "Review failed: AI
     response didn't match the expected shape (requirements: expected
@@ -509,8 +509,8 @@ mind. Bandage will come off but a true fix will stay."
       with its stop reason; the review is built on the parse and waits
       for it; another organization's solicitation is refused).
   - **Phases:**
-    - **9a — the gateway and the review** (above). 🔄 in PR #366.
-    - **9b — the capability matrix and the question generator.** ⏳ next.
+    - **9a — the gateway and the review** (above). ✅ shipped (PR #366).
+    - **9b — the capability matrix and the question generator.** 🔄 in PR #367.
       The matrix still asks one 4,000-token answer for every cell, and
       the review now hands it the whole verified list (up to 400), so a
       long RFP's matrix stops with the "cut off" message until then. The
@@ -524,7 +524,11 @@ mind. Bandage will come off but a true fix will stay."
       mandatory first, with 6,000 output tokens for its 25 questions,
       dropping a malformed question rather than the set. Built and
       tested alongside 9a; it ships as its own PR to keep each under
-      1,500 lines.
+      1,500 lines. Tests: the matrix scores 45 requirements in windows
+      of 20, re-reads a cut-off window in halves, and a window that
+      fails twice is finished by Score remaining, which re-scores only
+      the missing ones; re-running the review keeps the matrix; a
+      malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
   nowhere to set one.** ⏳ queued.
   - **Symptom:** Settings → SAM.gov sync (UEI) shows "SAM.gov 401:

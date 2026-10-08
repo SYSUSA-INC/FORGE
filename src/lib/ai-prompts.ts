@@ -11,9 +11,11 @@ import type { EditFeedbackSummary } from "@/lib/edit-feedback-summary";
 // sites can import everything ai-prompt-related from one place.
 export {
   buildCapabilityMatrixPrompt,
+  buildCapabilityPwinPrompt,
   buildQuestionGeneratorPrompt,
   buildSolicitationReviewPrompt,
   capabilityMatrixSchema,
+  capabilityPwinSchema,
   questionSetSchema,
   solicitationReviewSchema,
   type CapabilityMatrixVerdict,

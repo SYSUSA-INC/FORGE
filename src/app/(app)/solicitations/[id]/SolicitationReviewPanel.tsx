@@ -123,6 +123,7 @@ export function SolicitationReviewPanel({
   useEffect(() => setMatrix(initialMatrix), [initialMatrix]);
   useEffect(() => setQuestions(initialQuestions), [initialQuestions]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [reviewing, startReview] = useTransition();
   const [matrixing, startMatrix] = useTransition();
   const [questioning, startQuestion] = useTransition();
@@ -132,6 +133,12 @@ export function SolicitationReviewPanel({
 
   const reviewComplete = review.status === "complete";
   const downstreamDisabled = !reviewComplete;
+  // BL-STAB-9 — requirements of this review the matrix has not scored yet.
+  const unscored = useMemo(() => {
+    if (!matrix || !review.result) return 0;
+    const scored = new Set(matrix.cells.map((c) => c.requirementId));
+    return review.result.requirements.filter((r) => !scored.has(r.id)).length;
+  }, [matrix, review.result]);
 
   const knowledgeIndexById = useMemo(() => {
     const m = new Map<string, KnowledgeIndexEntry>();
@@ -141,6 +148,7 @@ export function SolicitationReviewPanel({
 
   function runReview() {
     setError(null);
+    setNotice(null);
     startReview(async () => {
       const res = await runSolicitationReviewAction(solicitationId);
       if (!res.ok) {
@@ -155,13 +163,19 @@ export function SolicitationReviewPanel({
     });
   }
 
-  function runMatrix() {
+  function runMatrix(rebuild: boolean) {
     setError(null);
+    setNotice(null);
     startMatrix(async () => {
-      const res = await runCapabilityMatrixAction(solicitationId);
+      const res = await runCapabilityMatrixAction(solicitationId, { rebuild });
       if (!res.ok) {
         setError(res.error);
         return;
+      }
+      if (res.unscoredCount > 0) {
+        setNotice(
+          `Scored ${res.cellCount} requirements; ${res.unscoredCount} are still to score (a long RFP takes more than one run). Click "Score remaining" to finish.`,
+        );
       }
       router.refresh();
       setOpenSection("matrix");
@@ -170,6 +184,7 @@ export function SolicitationReviewPanel({
 
   function runQuestions() {
     setError(null);
+    setNotice(null);
     startQuestion(async () => {
       const res = await runQuestionGeneratorAction(solicitationId);
       if (!res.ok) {
@@ -225,9 +240,20 @@ export function SolicitationReviewPanel({
                 ? "Re-run review"
                 : "Initiate review"}
           </button>
+          {matrix && unscored > 0 && !downstreamDisabled ? (
+            <button
+              type="button"
+              onClick={() => runMatrix(false)}
+              disabled={matrixing}
+              className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+              title="Score the requirements the matrix does not cover yet; scored ones are kept."
+            >
+              {matrixing ? "Scoring…" : `Score remaining (${unscored})`}
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={runMatrix}
+            onClick={() => runMatrix(Boolean(matrix))}
             disabled={downstreamDisabled || matrixing}
             className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
             title={
@@ -235,7 +261,9 @@ export function SolicitationReviewPanel({
                 ? "Run the document review first."
                 : matrixing
                   ? "Running…"
-                  : "Score the company's knowledge corpus against each requirement."
+                  : matrix
+                    ? "Score every requirement again from scratch."
+                    : "Score the company's knowledge corpus against each requirement."
             }
           >
             {matrixing
@@ -277,13 +305,19 @@ export function SolicitationReviewPanel({
           <div className="rounded-md border border-amber-400/40 bg-amber-400/[0.06] px-3 py-2 font-mono text-[11px] text-amber-200">
             The requirements or evaluation factors changed since this review
             (a re-parse, an amendment or a verdict). Re-run the review to
-            bring them in.
+            bring them in; the matrix keeps the scores it has.
           </div>
         ) : null}
         {reviewComplete && freshness === "legacy" ? (
           <div className="rounded-md border border-amber-400/40 bg-amber-400/[0.06] px-3 py-2 font-mono text-[11px] text-amber-200">
             This review was made before reviews were built on the parse. Re-run
             it to use the full, verified requirement list and Sections L and M.
+          </div>
+        ) : null}
+
+        {notice ? (
+          <div className="rounded-md border border-layer/15 bg-layer/[0.04] px-3 py-2 font-mono text-[11px] text-muted">
+            {notice}
           </div>
         ) : null}
 
@@ -325,7 +359,7 @@ export function SolicitationReviewPanel({
           {matrix ? (
             <Section
               title="Capability matrix"
-              eyebrow={`${matrix.cells.length} cells · PWin recommendation ${matrix.pwinLow}–${matrix.pwinHigh}%${matrix.stubbed ? " · stub mode" : ""}`}
+              eyebrow={`${review.result.requirements.length - unscored} of ${review.result.requirements.length} scored · PWin recommendation ${matrix.pwinLow}–${matrix.pwinHigh}%${matrix.stubbed ? " · stub mode" : ""}`}
               open={openSection === "matrix"}
               onToggle={() =>
                 setOpenSection((cur) =>
@@ -566,11 +600,14 @@ function MatrixView({
     return m;
   }, [requirements]);
 
+  // BL-STAB-9 — cells for requirements this review no longer lists (a
+  // re-parse or a verdict removed them) are not shown.
+  const shown = useMemo(() => cells.filter((c) => reqsById.has(c.requirementId)), [cells, reqsById]);
   const counts = useMemo(() => {
     const c = { strong: 0, partial: 0, gap: 0, not_addressed: 0 };
-    for (const cell of cells) c[cell.status]++;
+    for (const cell of shown) c[cell.status]++;
     return c;
-  }, [cells]);
+  }, [shown]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -592,7 +629,7 @@ function MatrixView({
       </div>
 
       <ul className="flex flex-col gap-1.5">
-        {cells.map((cell) => {
+        {shown.map((cell) => {
           const req = reqsById.get(cell.requirementId);
           const knowledgeId = cell.capabilityRef.startsWith("knowledge:")
             ? cell.capabilityRef.slice("knowledge:".length)
@@ -614,7 +651,7 @@ function MatrixView({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-body text-[13px] leading-relaxed text-text">
-                    {req?.text ?? `(unknown requirement: ${cell.requirementId})`}
+                    {req?.text}
                   </p>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 font-mono text-[10px] uppercase tracking-widest text-subtle">
                     {req?.sectionRef ? <span>{req.sectionRef}</span> : null}

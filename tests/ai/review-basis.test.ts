@@ -8,7 +8,7 @@ import { applyStopReason } from "@/lib/ai";
 import type { ReviewedRequirement } from "@/lib/requirement-review";
 import { buildReviewBasis, capabilityAreaOf, requirementIdOf, reviewFreshness, unscoredRequirementIds } from "@/lib/review-basis";
 import type { LmStructure } from "@/lib/solicitation-lm";
-import { solicitationReviewSchema } from "@/lib/ai-prompts-bl23";
+import { solicitationReviewSchema, questionSetSchema, capabilityMatrixSchema } from "@/lib/ai-prompts-bl23";
 import { describeZodIssues } from "@/lib/zod-issues";
 import { tolerantList } from "@/lib/zod-tolerant";
 
@@ -97,7 +97,7 @@ describe("BL-STAB-9 — the review's basis comes from the parse", () => {
   });
 });
 
-describe("BL-STAB-9 — the review answer is sized and read field by field", () => {
+describe("BL-STAB-9 — the answers are sized and read entry by entry", () => {
   it("asks the review model for judgement only", () => {
     const shape = Object.keys(solicitationReviewSchema.shape).sort();
     expect(shape).toEqual(["flaggedQuestions", "mandatoryCertifications", "periodOfPerformance", "placeOfPerformance", "setAside", "summary"]);
@@ -110,6 +110,14 @@ describe("BL-STAB-9 — the review answer is sized and read field by field", () 
       mandatoryCertifications: [],
       flaggedQuestions: ["ok", "also ok"],
     });
+  });
+
+  it("drops a malformed matrix cell or question instead of the answer", () => {
+    const cells = capabilityMatrixSchema.parse({ cells: [{ requirementId: "r1", status: "Strong" }, { status: "gap" }, null] });
+    expect(cells.cells).toEqual([{ requirementId: "r1", capabilityRef: "", status: "Strong", citation: "", narrative: "" }]);
+    const qs = questionSetSchema.parse({ questions: [{ text: "Is the page limit inclusive?" }, { text: "" }, "junk"] });
+    expect(qs.questions).toHaveLength(1);
+    expect(qs.questions[0]).toMatchObject({ id: "", category: "scope_ambiguity", text: "Is the page limit inclusive?" });
   });
 
   it("caps a tolerant list", () => {

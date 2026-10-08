@@ -72,7 +72,13 @@ import {
   winnerAnalysisSchema,
   type SectionDraftSnapshot,
 } from "@/lib/ai-prompts";
-import { capabilityMatrixSchema, questionSetSchema, solicitationReviewSchema } from "@/lib/ai-prompts-bl23";
+import {
+  buildCapabilityPwinPrompt,
+  capabilityMatrixSchema,
+  capabilityPwinSchema,
+  questionSetSchema,
+  solicitationReviewSchema,
+} from "@/lib/ai-prompts-bl23";
 import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
 import { buildScanUserPrompt, SCAN_SYSTEM } from "@/lib/proposal-scan-input";
@@ -294,6 +300,15 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       requirements: reviewVerdictRequirements,
       knowledgeEntries: [{ id: "k1", kind: "capability", title: "Cloud migration", body: "32 applications migrated for DHS.", tags: ["cloud"] }],
     }),
+    buildCapabilityPwinPrompt({
+      solicitationTitle: "Cloud migration support",
+      agency: "GSA",
+      setAside: "8(a)",
+      counts: { strong: 1, partial: 0, gap: 1, not_addressed: 0 },
+      strong: ["- [shall] Migrate 40 legacy applications. — 32 applications migrated for DHS."],
+      gaps: ["- [shall] Hold a Secret facility clearance. — No clearance on file."],
+      factors: [{ name: "Technical approach", weight: "most important", notes: "" }],
+    }),
   ],
   question_generator: () => [
     buildQuestionGeneratorPrompt({
@@ -436,7 +451,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   protest_viability: [protestViabilitySchema],
   solicitation_extract: [solicitationFrontMatterSchema, solicitationExtractionSchema, requirementsChunkSchema],
   solicitation_review: [solicitationReviewSchema],
-  capability_matrix: [capabilityMatrixSchema],
+  capability_matrix: [capabilityMatrixSchema, capabilityPwinSchema],
   question_generator: [questionSetSchema],
   ebuy_extract: [ebuyExtractionSchema],
   gsa_extract: [gsaExtractionSchema],
