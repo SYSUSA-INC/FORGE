@@ -28,6 +28,7 @@ import {
   type RecompeteTarget,
 } from "@/lib/recompete-match";
 import type { SamOpportunity } from "@/lib/samgov";
+import { applyOpportunityVerdicts, type ReviewedRequirement } from "@/lib/requirement-review";
 
 const PRIOR_LIMIT = 500;
 const MAX_SCOPE = RECOMPETE_THRESHOLDS.maxScopeChars;
@@ -36,7 +37,29 @@ const ATTENTION_RECENT_SOLS = 40;
 const ATTENTION_LIMIT = 8;
 const DAY_MS = 86_400_000;
 
-function requirementsText(reqs: unknown): string {
+/**
+ * BL-AIX Phase 2c — each row's requirements with the verdicts of the
+ * other rows on the same opportunity carried over (rows newest first),
+ * so an amendment's copy of a clause rejected on its base stays out.
+ */
+export function withOpportunityVerdicts<T extends { opportunityId: string | null; requirements: unknown }>(
+  rows: T[],
+): Map<T, ReviewedRequirement[]> {
+  const listOf = (r: T) => (Array.isArray(r.requirements) ? r.requirements : []) as ReviewedRequirement[];
+  const out = new Map<T, ReviewedRequirement[]>();
+  const groups = new Map<string, T[]>();
+  for (const r of rows) {
+    if (!r.opportunityId) out.set(r, listOf(r));
+    else groups.set(r.opportunityId, [...(groups.get(r.opportunityId) ?? []), r]);
+  }
+  for (const group of groups.values()) {
+    const lists = applyOpportunityVerdicts(group.map(listOf));
+    group.forEach((r, i) => out.set(r, lists[i]!));
+  }
+  return out;
+}
+
+export function requirementsText(reqs: unknown): string {
   if (!Array.isArray(reqs)) return "";
   const texts: string[] = [];
   for (const r of reqs) {
@@ -138,9 +161,10 @@ export async function loadRecompetePriors(organizationId: string): Promise<Recom
         ),
       )
       .orderBy(desc(solicitations.createdAt));
+    const reviewed = withOpportunityVerdicts(sols);
     for (const s of sols) {
       if (!s.opportunityId || scopeByOpp.has(s.opportunityId)) continue;
-      const text = [requirementsText(s.requirements), s.sectionL ?? ""].filter(Boolean).join("\n");
+      const text = [requirementsText(reviewed.get(s)), s.sectionL ?? ""].filter(Boolean).join("\n");
       if (text.trim()) scopeByOpp.set(s.opportunityId, text);
     }
   }
@@ -233,7 +257,16 @@ export async function getRecompeteForSolicitation(input: {
     if (parent?.opportunityId) ownOpps.add(parent.opportunityId);
   }
 
-  const reqText = requirementsText(s.requirements);
+  // An amendment carries its opportunity's verdicts (a clause rejected on the base stays out).
+  const siblings = s.opportunityId
+    ? await db
+        .select({ id: solicitations.id, opportunityId: solicitations.opportunityId, requirements: solicitations.extractedRequirements })
+        .from(solicitations)
+        .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.opportunityId, s.opportunityId)))
+        .orderBy(desc(solicitations.createdAt))
+    : [];
+  const self = siblings.find((x) => x.id === s.id);
+  const reqText = requirementsText(self ? withOpportunityVerdicts(siblings).get(self) : s.requirements);
   const scopeText = cap(
     reqText
       ? [reqText, s.sectionL ?? ""].filter(Boolean).join("\n")
@@ -393,6 +426,8 @@ export async function getRecompeteAttention(
     .limit(ATTENTION_RECENT_SOLS);
 
   const items: RecompeteAttentionItem[] = [];
+  // Verdicts carried within the batch (an amendment and its base both recent).
+  const recentReviewed = withOpportunityVerdicts(recentSols);
 
   for (const o of openOpps) {
     if (decidedOpps.has(o.id)) continue;
@@ -424,7 +459,7 @@ export async function getRecompeteAttention(
     if (s.opportunityId && (openOppIds.has(s.opportunityId) || decidedOpps.has(s.opportunityId))) {
       continue;
     }
-    const reqText = requirementsText(s.requirements);
+    const reqText = requirementsText(recentReviewed.get(s));
     const target: RecompeteTarget = {
       title: s.title ?? "",
       agency: s.agency ?? "",

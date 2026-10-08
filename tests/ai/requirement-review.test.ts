@@ -68,11 +68,18 @@ describe("BL-AIX Phase 2c — applying verdicts", () => {
     expect(undone).toEqual(list);
   });
 
-  it("scopes a verdict to the document the clause came from", () => {
-    const wrongDoc = applyCorrections(list, [fix({ originalKey: requirementKey(pws.text), action: "rejected" })]);
-    expect(wrongDoc[3]!.review).toBeUndefined();
-    const rightDoc = applyCorrections(list, [fix({ docKey: "doc-1", originalKey: requirementKey(pws.text), action: "rejected" })]);
-    expect(rightDoc[3]!.review?.status).toBe("rejected");
+  it("follows the wording, whichever document of the solicitation states it", () => {
+    const fromParent = applyCorrections(list, [fix({ originalKey: requirementKey(pws.text), action: "rejected" })]);
+    expect(fromParent[3]!.review?.status).toBe("rejected");
+    const fromDoc = applyCorrections(list, [fix({ docKey: "doc-1", originalKey: requirementKey(pws.text), action: "rejected" })]);
+    expect(fromDoc[3]!.review?.status).toBe("rejected");
+    // Two rows for one wording (from an earlier version): the newest wins.
+    const later = new Date("2026-10-08T00:00:00Z");
+    const both = applyCorrections(list, [
+      fix({ docKey: "doc-1", originalKey: requirementKey(pws.text), action: "rejected" }),
+      fix({ originalKey: requirementKey(pws.text), action: "confirmed", updatedAt: later }),
+    ]);
+    expect(both[3]!.review?.status).toBe("confirmed");
   });
 
   it("keeps rejected clauses from readers and counts what is left to do", () => {
@@ -120,8 +127,9 @@ describe("BL-AIX Phase 2c-1 review fixes — merging documents with verdicts", (
     const A = "Offerors may include a cover letter of one page.";
     const added = fix({ originalKey: requirementKey(A), action: "added", corrected: { kind: "may", text: A, ref: "" } });
     const docs = [{ id: "pws", requirements: [{ kind: "may" as const, text: A, ref: "" }] }];
+    // A companion states the added clause: it stays that document's clause, vouched for.
     const withAdd = mergeWithCorrections({ own: [], docs, corrections: [added] });
-    expect(withAdd.map((r) => [r.text, r.review?.status])).toEqual([[A, "added"]]);
+    expect(withAdd.map((r) => [r.text, r.sourceDocId, r.review?.status])).toEqual([[A, "pws", "confirmed"]]);
     const removed = mergeWithCorrections({ own: withAdd, docs, corrections: [] });
     expect(removed.map((r) => [r.text, r.sourceDocId, r.review?.status])).toEqual([[A, "pws", undefined]]);
   });
@@ -136,7 +144,7 @@ describe("BL-AIX Phase 2c-1 review fixes — merging documents with verdicts", (
     expect(mergeWithCorrections({ own: merged, docs: [], corrections: [] })).toEqual(extracted);
   });
 
-  it("applies each document's verdicts to its own clauses and adds an addition once", () => {
+  it("applies verdicts after merging documents and adds an addition once, at the end", () => {
     const P = "The contractor shall submit a monthly report.";
     const A = "Offerors may submit questions by email.";
     const corrections = [
@@ -152,10 +160,33 @@ describe("BL-AIX Phase 2c-1 review fixes — merging documents with verdicts", (
       corrections,
     });
     expect(merged.map((r) => [r.text, r.sourceDocId ?? "", r.review?.status ?? null])).toEqual([
-      [A, "", "added"],
       ["The contractor shall keep a risk register.", "doc-1", null],
       [P, "doc-2", "rejected"],
+      [A, "", "added"],
     ]);
+  });
+
+  it("keeps a verdict when another copy of the clause wins the merge (re-parse, deleted document)", () => {
+    const X = "Volume I shall not exceed 25 pages.";
+    const Y = "Volume I shall not exceed 30 pages.";
+    const editOnPws = fix({ docKey: "pws", originalKey: requirementKey(X), action: "edited", corrected: { kind: "shall", text: Y, ref: "L.5" } });
+    // The parent's re-parse now states X too, ahead of the PWS copy that was edited.
+    const reparsed = mergeWithCorrections({ own: [{ kind: "shall", text: X, ref: "L.5" }], docs: [{ id: "pws", requirements: [{ kind: "shall", text: X, ref: "" }] }], corrections: [editOnPws] });
+    expect(reparsed.map((r) => [r.text, r.review?.status])).toEqual([[Y, "edited"]]);
+    // The document holding the verdict is deleted; another document's copy survives.
+    const deleted = mergeWithCorrections({ own: [], docs: [{ id: "other", requirements: [{ kind: "shall", text: X, ref: "" }] }], corrections: [editOnPws] });
+    expect(deleted.map((r) => [r.text, r.sourceDocId, r.review?.status])).toEqual([[Y, "other", "edited"]]);
+  });
+
+  it("treats a stored 'added' row that carries provenance as the extracted clause it is", () => {
+    const A = "Offerors shall acknowledge every amendment.";
+    const legacy = [{ kind: "shall", text: A, ref: "L.2", source: { quote: "exact" as const, at: 40 }, review: { status: "added" as const } }] as ReviewedRequirement[];
+    const added = fix({ originalKey: requirementKey(A), action: "added", corrected: { kind: "shall", text: A, ref: "" } });
+    expect(mergeWithCorrections({ own: legacy, docs: [], corrections: [added] })).toEqual([
+      { kind: "shall", text: A, ref: "L.2", source: { quote: "exact", at: 40 }, review: { status: "confirmed", by: "u1", at: at.toISOString() } },
+    ]);
+    // Removing the addition keeps the clause the document states.
+    expect(mergeWithCorrections({ own: legacy, docs: [], corrections: [] })).toEqual([{ kind: "shall", text: A, ref: "L.2", source: { quote: "exact", at: 40 } }]);
   });
 });
 
@@ -169,12 +200,27 @@ describe("BL-AIX Phase 2c-1 review fixes — verdicts across an opportunity", ()
       { kind: "shall", text: "A brand new clause in the amendment.", ref: "" },
     ];
     const [after] = applyOpportunityVerdicts([amendment, [...rejected, ...edited]]);
-    expect(after!.map((r) => [r.text, r.review?.status ?? null])).toEqual([
-      [invented.text, "rejected"],
-      ["Volume I shall not exceed 30 pages.", "edited"],
-      ["A brand new clause in the amendment.", null],
+    expect(after!.map((r) => [r.text, r.review?.status ?? null, r.review?.carried ?? false])).toEqual([
+      [invented.text, "rejected", true],
+      ["Volume I shall not exceed 30 pages.", "edited", true],
+      ["A brand new clause in the amendment.", null, false],
     ]);
     expect(activeRequirements(after!)).toHaveLength(2);
     expect(applyOpportunityVerdicts([amendment])).toEqual([amendment]);
+  });
+
+  it("lets a rejection win over a confirmation elsewhere, and carries only what an edit changed", () => {
+    const rejectedOnBase = applyCorrections([invented], [fix({ originalKey: requirementKey(invented.text), action: "rejected" })]);
+    const confirmedOnAmendment = applyCorrections([{ ...invented }], [fix({ originalKey: requirementKey(invented.text), action: "confirmed" })]);
+    const [amendment] = applyOpportunityVerdicts([confirmedOnAmendment, rejectedOnBase]);
+    expect(amendment![0]!.review).toMatchObject({ status: "rejected", carried: true });
+
+    // The base corrected a typo only; the amendment renumbered the paragraph.
+    const typo = "Volume I shal not exceed 25 pages.";
+    const base = applyCorrections([{ kind: "shall", text: typo, ref: "L.5.2" }] as ReviewedRequirement[], [
+      fix({ originalKey: requirementKey(typo), action: "edited", corrected: { kind: "shall", text: "Volume I shall not exceed 25 pages.", ref: "L.5.2" } }),
+    ]);
+    const [renumbered] = applyOpportunityVerdicts([[{ kind: "shall", text: typo, ref: "L.6.2" }], base]);
+    expect(renumbered![0]).toMatchObject({ text: "Volume I shall not exceed 25 pages.", ref: "L.6.2" });
   });
 });
