@@ -7,6 +7,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { describeSource } from "@/lib/requirement-provenance";
+import { opportunityView } from "@/lib/requirement-corrections";
 import {
   docKeyOf,
   originalOf,
@@ -47,7 +48,12 @@ export default async function VerifyRequirementsPage({ params }: { params: { id:
     .where(and(eq(solicitationDocuments.solicitationId, s.id), eq(solicitationDocuments.organizationId, organizationId)));
   const docById = new Map(docs.map((d) => [d.id, d]));
 
-  const list = (s.extractedRequirements ?? []) as ReviewedRequirement[];
+  // Verdicts made on another solicitation of the opportunity (an amendment's base) show here too.
+  const list = await opportunityView({
+    organizationId,
+    solicitationId: s.id,
+    list: (s.extractedRequirements ?? []) as ReviewedRequirement[],
+  });
   const items: VerifyItem[] = verifyOrder(list).map((r) => {
     const doc = r.sourceDocId ? docById.get(r.sourceDocId) : undefined;
     const original = originalOf(r);
@@ -59,6 +65,7 @@ export default async function VerifyRequirementsPage({ params }: { params: { id:
       ref: r.ref,
       original: r.review?.original ?? null,
       status: r.review?.status ?? null,
+      carried: Boolean(r.review?.carried),
       quote: r.source?.quote ?? null,
       where: describeSource(r.source),
       snippet: sourceSnippet(doc ? doc.rawText : s.rawText, r.source?.at, original.text.length),

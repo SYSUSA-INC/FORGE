@@ -19,6 +19,7 @@
  *   - "after" items with no match are "added".
  */
 
+import { activeRequirements, applyOpportunityVerdicts, originalOf, type ReviewedRequirement } from "@/lib/requirement-review";
 import type { Solicitation } from "@/db/schema";
 
 type Req = { kind: string; text: string; ref: string };
@@ -138,8 +139,15 @@ export function computeAmendmentDiff(
     });
 
   // Requirements diff — pair best matches above threshold.
-  const beforeReqs = (base.extractedRequirements ?? []) as Req[];
-  const afterReqs = (amendment.extractedRequirements ?? []) as Req[];
+  // BL-AIX Phase 2c — compare what each document says (extracted wording),
+  // leaving out clauses the team rejected on either solicitation.
+  const [afterReviewed, beforeReviewed] = applyOpportunityVerdicts([
+    (amendment.extractedRequirements ?? []) as ReviewedRequirement[],
+    (base.extractedRequirements ?? []) as ReviewedRequirement[],
+  ]);
+  const asStated = (list: ReviewedRequirement[]) => activeRequirements(list).map((r) => ({ ...r, ...originalOf(r) })) as Req[];
+  const beforeReqs = asStated(beforeReviewed!);
+  const afterReqs = asStated(afterReviewed!);
   const afterTokens = afterReqs.map((r) => tokenize(r.text));
   const beforeTokens = beforeReqs.map((r) => tokenize(r.text));
 

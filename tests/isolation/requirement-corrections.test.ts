@@ -7,7 +7,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { requirementCorrections, solicitations } from "@/db/schema";
+import { requirementCorrections, solicitationDocuments, solicitations } from "@/db/schema";
+import { __setCompleteImplForTest } from "@/lib/ai";
+import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
 import {
   addRequirement,
   clearRequirementReview,
@@ -116,5 +118,112 @@ describe("BL-AIX Phase 2c — verify and correct (runtime)", () => {
       await db.select().from(requirementCorrections).where(and(eq(requirementCorrections.solicitationId, solicitationId))),
     ).toEqual([]);
     expect((await stored()).every((r) => !r.review)).toBe(true);
+  });
+
+  // ── BL-AIX Phase 2c-1 review fixes ───────────────────────────────────
+
+  it("keeps verdicts when an image solicitation is re-parsed through vision", async () => {
+    const org = { organizationId: fx.orgA.organizationId, solicitationId, actor: actorA() };
+    await db.update(solicitations).set({ fileName: "scan.png", contentType: "image/png" }).where(eq(solicitations.id, solicitationId));
+    await reviewRequirement({ ...org, docKey: "", originalKey: key(2), action: "rejected" });
+
+    const prevKey = process.env.ANTHROPIC_API_KEY;
+    const prevProvider = process.env.AI_PROVIDER;
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    process.env.AI_PROVIDER = "anthropic";
+    __setCompleteImplForTest(async () => ({
+      text: "",
+      provider: "anthropic" as const,
+      model: "test-mock",
+      inputTokens: 5,
+      outputTokens: 5,
+      stubbed: false,
+      structured: {
+        title: "Help desk RFP",
+        agency: "",
+        office: "",
+        solicitationNumber: "",
+        type: "rfp",
+        naicsCode: "",
+        setAside: "",
+        responseDueDate: null,
+        sectionLSummary: "",
+        sectionMSummary: "",
+        // The vision read finds one clause the earlier parse did not, so the write is visible.
+        requirements: [...extracted.map(({ kind, text, ref }) => ({ kind, text, ref })), { kind: "shall", text: "The contractor shall keep a visitor log.", ref: "C.9" }],
+      },
+    }));
+    try {
+      await parseSolicitationFromBytes(solicitationId, fx.orgA.organizationId, new Uint8Array([137, 80, 78, 71]));
+    } finally {
+      __setCompleteImplForTest(null);
+      if (prevKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = prevKey;
+      if (prevProvider === undefined) delete process.env.AI_PROVIDER;
+      else process.env.AI_PROVIDER = prevProvider;
+    }
+    const [row] = await db
+      .select({ parseStatus: solicitations.parseStatus, sectionLSummary: solicitations.sectionLSummary })
+      .from(solicitations)
+      .where(eq(solicitations.id, solicitationId));
+    expect(row!.parseStatus).toBe("parsed");
+    expect(row!.sectionLSummary).toContain("vision OCR");
+    const list = await stored();
+    expect(list.map((r) => [r.text, r.review?.status ?? null])).toEqual([
+      [extracted[0]!.text, null],
+      [extracted[1]!.text, null],
+      [extracted[2]!.text, "rejected"],
+      ["The contractor shall keep a visitor log.", null],
+    ]);
+  });
+
+  it("does not bring back a companion document's copy of a clause the team edited", async () => {
+    await db.insert(solicitationDocuments).values({
+      organizationId: fx.orgA.organizationId,
+      solicitationId,
+      fileName: "pws.pdf",
+      parseStatus: "parsed",
+      extractedRequirements: [{ kind: "shall", text: extracted[1]!.text, ref: "" }],
+    });
+    await mergeSolicitationRequirements(solicitationId, fx.orgA.organizationId);
+    const org = { organizationId: fx.orgA.organizationId, solicitationId, actor: actorA() };
+    await reviewRequirement({ ...org, docKey: "", originalKey: key(1), action: "edited", corrected: { kind: "shall", text: "Volume I shall not exceed 30 pages.", ref: "L.5" } });
+    // Any later merge (another verdict, a re-parse) must not resurrect the old wording.
+    await reviewRequirement({ ...org, docKey: "", originalKey: key(0), action: "confirmed" });
+    const texts = (await stored()).map((r) => r.text);
+    expect(texts).toContain("Volume I shall not exceed 30 pages.");
+    expect(texts).not.toContain(extracted[1]!.text);
+  });
+
+  it("keeps a rejected clause out when an amendment on the same opportunity repeats it", async () => {
+    await db.insert(solicitations).values({
+      organizationId: fx.orgA.organizationId,
+      opportunityId: fx.orgA.opportunityId,
+      title: "Amendment 0001",
+      parseStatus: "parsed",
+      extractedRequirements: [{ kind: "should", text: extracted[2]!.text, ref: "" }],
+    });
+    await reviewRequirement({ organizationId: fx.orgA.organizationId, solicitationId, actor: actorA(), docKey: "", originalKey: key(2), action: "rejected" });
+    const loaded = await loadOpportunityRequirements({ organizationId: fx.orgA.organizationId, opportunityId: fx.orgA.opportunityId });
+    expect(loaded.requirements.map((r) => r.text)).not.toContain(extracted[2]!.text);
+  });
+
+  it("does not let an amendment's bulk confirm undo a rejection made on its base", async () => {
+    const amendmentList: ReviewedRequirement[] = [{ ...extracted[2]!, source: { quote: "exact", at: 3 } }];
+    const [amendment] = await db
+      .insert(solicitations)
+      .values({
+        organizationId: fx.orgA.organizationId,
+        opportunityId: fx.orgA.opportunityId,
+        title: "Amendment 0001",
+        parseStatus: "parsed",
+        extractedRequirements: amendmentList,
+      })
+      .returning({ id: solicitations.id });
+    await reviewRequirement({ organizationId: fx.orgA.organizationId, solicitationId, actor: actorA(), docKey: "", originalKey: key(2), action: "rejected" });
+    const res = await confirmVerbatimRequirements({ organizationId: fx.orgA.organizationId, solicitationId: amendment!.id, actor: actorA() });
+    expect(res).toEqual({ ok: true, confirmed: 0 });
+    const loaded = await loadOpportunityRequirements({ organizationId: fx.orgA.organizationId, opportunityId: fx.orgA.opportunityId });
+    expect(loaded.requirements.map((r) => r.text)).not.toContain(extracted[2]!.text);
   });
 });

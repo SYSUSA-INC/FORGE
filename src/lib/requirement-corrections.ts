@@ -13,14 +13,14 @@
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { requirementCorrections, solicitations } from "@/db/schema";
 import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import { recordAudit } from "@/lib/audit-log";
 import {
+  applyOpportunityVerdicts,
   cleanClause,
-  docKeyOf,
   originalOf,
   reviewKeyOf,
   type ReviewAction,
@@ -31,6 +31,38 @@ import { mergeSolicitationRequirements } from "@/lib/solicitation-requirements";
 
 type Actor = { userId: string | null; email?: string | null };
 type Result = { ok: true } | { ok: false; error: string };
+
+/**
+ * The solicitation's list with the verdicts of the other solicitations on
+ * its opportunity carried onto it (`review.carried`), as every reader sees
+ * it. The verify screen shows carried verdicts and the bulk confirm skips
+ * them, so an amendment cannot quietly undo a rejection made on its base.
+ */
+export async function opportunityView(input: {
+  organizationId: string;
+  solicitationId: string;
+  list: ReviewedRequirement[];
+}): Promise<ReviewedRequirement[]> {
+  const [row] = await db
+    .select({ opportunityId: solicitations.opportunityId })
+    .from(solicitations)
+    .where(and(eq(solicitations.organizationId, input.organizationId), eq(solicitations.id, input.solicitationId)))
+    .limit(1);
+  if (!row?.opportunityId) return input.list;
+  const others = await db
+    .select({ list: solicitations.extractedRequirements })
+    .from(solicitations)
+    .where(
+      and(
+        eq(solicitations.organizationId, input.organizationId),
+        eq(solicitations.opportunityId, row.opportunityId),
+        ne(solicitations.id, input.solicitationId),
+      ),
+    )
+    .orderBy(desc(solicitations.createdAt));
+  if (others.length === 0) return input.list;
+  return applyOpportunityVerdicts([input.list, ...others.map((o) => (o.list ?? []) as ReviewedRequirement[])])[0]!;
+}
 
 async function currentList(organizationId: string, solicitationId: string): Promise<ReviewedRequirement[] | null> {
   const [row] = await db
@@ -51,6 +83,17 @@ async function upsert(input: {
   corrected: Partial<ReviewedRequirement>;
   userId: string | null;
 }): Promise<void> {
+  // One verdict per wording: drop any recorded under a document by an earlier version.
+  await db
+    .delete(requirementCorrections)
+    .where(
+      and(
+        eq(requirementCorrections.organizationId, input.organizationId),
+        eq(requirementCorrections.solicitationId, input.solicitationId),
+        eq(requirementCorrections.originalKey, input.originalKey),
+        ne(requirementCorrections.docKey, input.docKey),
+      ),
+    );
   const values = {
     organizationId: input.organizationId,
     solicitationId: input.solicitationId,
@@ -93,7 +136,8 @@ export async function reviewRequirement(input: {
   const { organizationId, solicitationId } = input;
   const list = await currentList(organizationId, solicitationId);
   if (!list) return { ok: false, error: "Solicitation not found." };
-  const target = list.find((r) => docKeyOf(r) === input.docKey && reviewKeyOf(r) === input.originalKey);
+  // Verdicts follow the extracted wording, whichever document states it.
+  const target = list.find((r) => reviewKeyOf(r) === input.originalKey);
   if (!target) return { ok: false, error: "That requirement is no longer on this solicitation." };
   if (target.review?.status === "added") return { ok: false, error: "An added requirement can only be removed." };
 
@@ -104,7 +148,7 @@ export async function reviewRequirement(input: {
     if (!clean) return { ok: false, error: "The requirement text can't be empty." };
     corrected = clean;
   }
-  await upsert({ organizationId, solicitationId, docKey: input.docKey, originalKey: input.originalKey, action: input.action, original, corrected, userId: input.actor.userId });
+  await upsert({ organizationId, solicitationId, docKey: "", originalKey: input.originalKey, action: input.action, original, corrected, userId: input.actor.userId });
   await mergeSolicitationRequirements(solicitationId, organizationId);
   await recordAudit({
     organizationId,
@@ -130,7 +174,7 @@ export async function addRequirement(input: {
   const clean = cleanClause(input.clause);
   if (!clean) return { ok: false, error: "The requirement text can't be empty." };
   const originalKey = requirementKey(clean.text);
-  if (list.some((r) => docKeyOf(r) === "" && reviewKeyOf(r) === originalKey)) {
+  if (list.some((r) => reviewKeyOf(r) === originalKey)) {
     return { ok: false, error: "That requirement is already on the list." };
   }
   await upsert({ organizationId, solicitationId, docKey: "", originalKey, action: "added", original: {}, corrected: clean, userId: input.actor.userId });
@@ -162,7 +206,6 @@ export async function clearRequirementReview(input: {
       and(
         eq(requirementCorrections.organizationId, organizationId),
         eq(requirementCorrections.solicitationId, solicitationId),
-        eq(requirementCorrections.docKey, input.docKey),
         eq(requirementCorrections.originalKey, input.originalKey),
       ),
     )
@@ -189,9 +232,11 @@ export async function confirmVerbatimRequirements(input: {
   const { organizationId, solicitationId } = input;
   const list = await currentList(organizationId, solicitationId);
   if (!list) return { ok: false, error: "Solicitation not found." };
-  const targets = list.filter((r) => !r.review && r.source?.quote === "exact");
+  // A clause rejected or edited on another solicitation of the opportunity is not confirmed here.
+  const view = await opportunityView({ organizationId, solicitationId, list });
+  const targets = view.filter((r) => !r.review && r.source?.quote === "exact");
   for (const r of targets) {
-    await upsert({ organizationId, solicitationId, docKey: docKeyOf(r), originalKey: reviewKeyOf(r), action: "confirmed", original: originalOf(r), corrected: {}, userId: input.actor.userId });
+    await upsert({ organizationId, solicitationId, docKey: "", originalKey: reviewKeyOf(r), action: "confirmed", original: originalOf(r), corrected: {}, userId: input.actor.userId });
   }
   if (targets.length > 0) {
     await mergeSolicitationRequirements(solicitationId, organizationId);

@@ -630,7 +630,7 @@ Each item shows where it sits in the document, or **not found in source** when i
 - **Confirm all found word for word** checks off, in one click, every requirement the document states exactly.
 - **Add a requirement** at the bottom records one the extraction missed.
 
-Your team's verdicts are kept if the solicitation is re-parsed.
+Your team's verdicts are kept if the solicitation is re-parsed, and an amendment that repeats a rejected or edited clause is treated the same way. When intake found nothing, **Add requirements** on the solicitation opens the same page.
 
 **Parses finish, or say why not (BL-AIP-4c).** Each solicitation or companion-document parse (and each harvest of a submitted or won proposal into the Brain) is recorded as a background job the moment you upload. If the server instance running it dies mid-way, the platform retries it automatically within a few minutes from the stored file (up to three attempts); the solicitation page shows the state next to **Parse** — "retry at 14:05 UTC (attempt 2 of 3)", "stuck (awaiting recovery)", or "failed after 3 attempts" with the reason. **Re-parse** always starts a fresh job.
 

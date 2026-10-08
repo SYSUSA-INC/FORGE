@@ -70,7 +70,8 @@ Effort key:
 | 3ap | **BL-AIX Phase 1i-2** — Candidate-model eval runs: the extraction accuracy check (any model id, platform admins) and the golden eval (listed Claude models, org admins; drafter only, the judge held fixed) run on a chosen model without changing any default; the model is stored on the run (migration 0122) | P0 | S | ✅ shipped (PR #354) |
 | 3aq | **BL-AIX Phase 2a** — Solicitation structure and requirement provenance: the text is split by its headings (UCF Sections B–M, attachments, numbered paragraphs) before the sweep, windows follow the parts and say which, and every requirement records its page, part and paragraph and whether the document says it word for word; the accuracy check reports the word-for-word share | P0 | M | ✅ shipped (PR #355) |
 | 3ar | **BL-AIX Phase 2b** — Sections L and M as structured data: dedicated passes read Section L (volumes with page limits, format and submission rules) and Section M (award basis, factors in order with importance and subfactors), each item quoted and located; shown on the solicitation page, fed to the outline bootstrap, scored by the accuracy check (migration 0123) | P0 | M | ✅ shipped (PR #356) |
-| 3as | **BL-AIX Phase 2c-1** — Verify and correct: a screen per solicitation where the team confirms, edits or rejects each extracted requirement against the document text around it, or adds one the extraction missed; verdicts are kept as tenant-only labelled data, re-applied on re-parse, and a rejected clause reaches no reader (migration 0124) | P0 | M | 🔄 in PR (PR #357) |
+| 3as | **BL-AIX Phase 2c-1** — Verify and correct: a screen per solicitation where the team confirms, edits or rejects each extracted requirement against the document text around it, or adds one the extraction missed; verdicts are kept as tenant-only labelled data, re-applied on re-parse, and a rejected clause reaches no reader (migration 0124) | P0 | M | ✅ shipped (PR #357) |
+| 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | 🔄 in PR (PR #358) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
@@ -168,7 +169,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-AIX — AI platform, next generation (2026-10-04)
-**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · ✅ Phase 2a shipped (PR #355) · ✅ Phase 2b shipped (PR #356) · 🔄 Phase 2c-1 in PR (PR #357)
+**Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · ✅ Phase 2a shipped (PR #355) · ✅ Phase 2b shipped (PR #356) · ✅ Phase 2c-1 shipped (PR #357) · 🔄 2c-1 review fixes in PR (PR #358)
 
 Owner's question (2026-10-04): is FORGE a true AI platform or an AI
 wrapper? The goal is a platform that reads a solicitation accurately,
@@ -714,7 +715,7 @@ the phases below.
     - Tests: `tests/ai/solicitation-lm.test.ts` and
       `tests/isolation/solicitation-provenance.test.ts`.
   - **2c — verify and correct** (owner's pick after 2b, 2026-10-07):
-    - **2c-1 — requirements:** 🔄 in PR (PR #357).
+    - **2c-1 — requirements:** ✅ shipped (PR #357).
       - `/solicitations/[id]/verify` lists every extracted requirement
         (the solicitation's and its companion documents'), what most
         needs a person first ("not found in source", then "in part"),
@@ -740,6 +741,43 @@ the phases below.
         `solicitation.requirement.review_undo`.
       - Tests: `tests/ai/requirement-review.test.ts` and
         `tests/isolation/requirement-corrections.test.ts`.
+    - **2c-1 review fixes:** 🔄 in PR (PR #358). Two adversarial rounds: a review of
+      PR #357 (six dimensions, three skeptics per finding; 24 of 25
+      upheld, eight distinct defects), then a review of the fix itself
+      (12 of 15 upheld). Resulting design:
+      - **A verdict follows the extracted wording** within a
+        solicitation, whichever document states it. The merge dedupes
+        the extracted clauses (own first, companions in a fixed order),
+        then applies verdicts by wording (`mergeWithCorrections`). An
+        edit never lets another copy of the old wording back in;
+        removing an addition never drops a clause a document states; a
+        verdict holds when another copy wins the merge or its document
+        is re-parsed or deleted. Undo deletes by wording. Rows stored as
+        "added" that carry provenance are treated as extracted.
+      - An addition a later extraction finds stays the extracted
+        clause, confirmed.
+      - Image and scanned-PDF parses now run the merge (they wiped
+        verdicts before).
+      - **Across an opportunity** (`applyOpportunityVerdicts`): a
+        rejection anywhere wins over a confirmation elsewhere; an edit
+        carries to unreviewed copies, changing only what it changed. It
+        is used by the loader, the amendment diff, the recompete radar,
+        the verify screen (carried verdicts shown read-only) and the
+        bulk confirm (which skips them).
+      - Amendment diff compares extracted wording and leaves out clauses
+        rejected on either side. Merge count leaves rejected clauses
+        out.
+      - Verify screen: stable row keys, the edit form starts from the
+        current wording, the add fields lock while saving and clear on
+        success, bulk confirm reports the server's count, "Add
+        requirements" when nothing was extracted, an all-rejected list
+        says so.
+      - Tests: `tests/ai/requirement-review.test.ts`,
+        `tests/ai/verdict-readers.test.ts` (diff, radar), and
+        `tests/isolation/requirement-corrections.test.ts` (image
+        re-parse through `parseSolicitationFromBytes` asserting the
+        vision write, a companion copy after an edit, an amendment
+        repeating a rejected clause, an amendment's bulk confirm).
     - **2c-2 — next:** the same for Section L/M items, and the
       organization's own corrections used to improve its own
       extraction (never another tenant's).
