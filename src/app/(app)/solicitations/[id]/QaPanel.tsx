@@ -41,10 +41,14 @@ export function QaPanel({
         setError(res.error);
         return;
       }
+      const notRead =
+        res.skipped.length > 0
+          ? ` ${res.skipped.length} attachment${res.skipped.length === 1 ? "" : "s"} not read${res.retrying > 0 ? ` (${res.retrying} will be retried)` : ""}: ${res.skipped[0]}`
+          : "";
       setNotice(
-        res.added > 0
+        (res.added > 0
           ? `Checked SAM.gov: ${res.newDocuments} new document${res.newDocuments === 1 ? "" : "s"}, ${res.added} answer${res.added === 1 ? "" : "s"} added${res.flagged > 0 ? `, ${res.flagged} compliance row${res.flagged === 1 ? "" : "s"} flagged` : ""}.`
-          : `Checked SAM.gov: nothing new${res.newDocuments > 0 ? ` (${res.newDocuments} new document${res.newDocuments === 1 ? "" : "s"}, none with Q&A)` : ""}.${res.skipped.length > 0 ? ` ${res.skipped.length} download${res.skipped.length === 1 ? "" : "s"} failed and will be retried.` : ""}`,
+          : `Checked SAM.gov: nothing new${res.newDocuments > 0 ? ` (${res.newDocuments} new document${res.newDocuments === 1 ? "" : "s"}, none with Q&A)` : ""}.`) + notRead,
       );
       router.refresh();
     });
@@ -70,7 +74,7 @@ export function QaPanel({
   const pollTitle = !noticeId
     ? "This solicitation has no SAM.gov notice ID"
     : !hasSamKey
-      ? "SAMGOV_API_KEY is not configured on the server"
+      ? "SAM.gov isn't connected in FORGE yet"
       : "Read the notice's new attachments and description for Q&A";
 
   return (

@@ -28,7 +28,8 @@ export const maxDuration = 60;
  *
  * BL-FB-SOL-QA — the same tick polls the SAM.gov notices of live
  * solicitations for new Q&A attachments (`dispatchSolicitationQaPolls`,
- * bounded, skipped without SAMGOV_API_KEY).
+ * bounded, skipped without SAMGOV_API_KEY; on FORGE's shared key, it
+ * stops at the first rejected or over-limit answer).
  *
  * Auth: Bearer ${CRON_SECRET} — same pattern as all other cron routes.
  */

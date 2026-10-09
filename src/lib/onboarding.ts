@@ -35,6 +35,7 @@ import {
   type OnboardingStatus,
 } from "@/lib/onboarding-logic";
 import { fetchSamGovByUei } from "@/lib/samgov";
+import { platformSamCredential, resolveSamCredential } from "@/lib/samgov-key";
 import { getScoutProfile, runScoutForOrganization, saveScoutProfile } from "@/lib/scout";
 import type { ScoutRunSummary } from "@/lib/scout-logic";
 import {
@@ -51,7 +52,7 @@ export type OnboardingState = {
   profile: OnboardingProfile;
   status: OnboardingStatus;
   scoutKeywords: string[];
-  /** SAMGOV_API_KEY is set, so a UEI lookup and a scout run can work. */
+  /** A SAM.gov key is available, so a UEI lookup and a scout run can work. */
   samConfigured: boolean;
   /** The AI provider is the stub: proposals come from the registration only. */
   aiStub: boolean;
@@ -102,7 +103,7 @@ export async function getOnboardingState(input: { organizationId: string }): Pro
     profile,
     status,
     scoutKeywords: scout.keywords,
-    samConfigured: Boolean(process.env.SAMGOV_API_KEY),
+    samConfigured: platformSamCredential() !== null,
     aiStub: getAIProviderStatus().active.name === "stub",
   };
 }
@@ -122,7 +123,9 @@ export async function applySamGovProfile(input: {
 }): Promise<SamGovApplyResult> {
   const { organizationId } = input;
   const uei = input.uei.trim();
-  const result = await fetchSamGovByUei(uei);
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) return { ok: false, error: sam.failure.error };
+  const result = await fetchSamGovByUei(sam.cred, uei);
   if (!result.ok) return { ok: false, error: result.error };
   const p = result.profile;
 

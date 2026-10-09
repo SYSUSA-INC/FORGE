@@ -30,6 +30,8 @@ import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { jaccard } from "@/lib/requirements-text";
 import { downloadSamResource, fetchSamNotice } from "@/lib/samgov";
+import { isKeyOrQuotaFailure, type SamErrorClass } from "@/lib/samgov-errors";
+import { platformSamCredential, resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
 import { extractTextFromAny } from "@/lib/solicitation-extract";
 import {
   QA_LIMITS,
@@ -167,17 +169,19 @@ export async function addManualQa(input: {
 export type QaPollResult =
   | {
       ok: true;
-      /** Attachment links not seen before, read this time. */
+      /** Attachment links not seen before that were read this time. */
       newDocuments: number;
       /** Of those (plus the description), how many carried Q&A. */
       qaDocuments: number;
       added: number;
       duplicates: number;
       flagged: number;
-      /** Downloads that failed and will be retried next time. */
+      /** Why each attachment that could not be read was skipped. */
       skipped: string[];
+      /** Of those, how many will be tried again next time (the rest never can be). */
+      retrying: number;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; cls?: SamErrorClass };
 
 /** Read the notice's new attachments and description for Q&A. */
 export async function pollSolicitationQa(input: {
@@ -185,6 +189,8 @@ export async function pollSolicitationQa(input: {
   solicitationId: string;
   /** Present for a user's "Check now"; absent for the cron. */
   actor?: Actor;
+  /** The key to poll with (the cron passes one); else the company's is resolved. */
+  sam?: SamCredential;
 }): Promise<QaPollResult> {
   const { organizationId } = input;
   const sol = await solicitationForOrg(organizationId, input.solicitationId);
@@ -192,8 +198,34 @@ export async function pollSolicitationQa(input: {
   if (!sol.noticeId) {
     return { ok: false, error: "This solicitation has no SAM.gov notice ID, so there is nothing to poll. Paste the Q&A instead." };
   }
-  const notice = await fetchSamNotice(sol.noticeId);
-  if (!notice.ok) return { ok: false, error: notice.error };
+  let cred = input.sam;
+  if (!cred) {
+    const sam = await resolveSamCredential(organizationId);
+    if (!sam.ok) return { ok: false, error: sam.failure.error, cls: sam.failure.cls };
+    cred = sam.cred;
+  }
+  const notice = await fetchSamNotice(cred, sol.noticeId);
+  if (!notice.ok) {
+    // SAM.gov answered that it has no such notice: that is a check, so the
+    // row goes to the back of the daily queue instead of blocking its head.
+    if (notice.noSuchNotice) {
+      await db
+        .update(solicitations)
+        .set({ qaCheckedAt: new Date() })
+        .where(and(eq(solicitations.id, input.solicitationId), eq(solicitations.organizationId, organizationId)));
+      if (input.actor) {
+        await recordAudit({
+          organizationId,
+          actor: input.actor,
+          action: "solicitation.qa.poll",
+          resourceType: "solicitation",
+          resourceId: input.solicitationId,
+          metadata: { noticeId: sol.noticeId, noSuchNotice: true },
+        });
+      }
+    }
+    return { ok: false, error: notice.error, cls: notice.cls };
+  }
 
   const seen = new Set(sol.qaSeenLinks);
   const toRead = notice.notice.resourceLinks.filter((l) => !seen.has(l)).slice(0, QA_LIMITS.maxDownloadsPerPoll);
@@ -204,12 +236,24 @@ export async function pollSolicitationQa(input: {
   let flagged = 0;
   let qaDocuments = 0;
   const skipped: string[] = [];
+  let retrying = 0;
   const nowSeen: string[] = [];
 
-  for (const link of toRead) {
-    const dl = await downloadSamResource(link, QA_LIMITS.maxDownloadBytes);
+  for (const [i, link] of toRead.entries()) {
+    const dl = await downloadSamResource(cred, link, QA_LIMITS.maxDownloadBytes);
     if (!dl.ok) {
       skipped.push(dl.error);
+      // A link that can never be read is marked seen, so it stops taking one
+      // of the poll's download slots ahead of a real Q&A attachment.
+      if (dl.permanent) nowSeen.push(link);
+      else retrying++;
+      // The same key would fail every remaining download: those stay unseen
+      // and are tried next time.
+      if (isKeyOrQuotaFailure(dl.cls)) {
+        for (let j = i + 1; j < toRead.length; j++) skipped.push(dl.error);
+        retrying += toRead.length - i - 1;
+        break;
+      }
       continue;
     }
     nowSeen.push(link);
@@ -268,10 +312,10 @@ export async function pollSolicitationQa(input: {
       action: "solicitation.qa.poll",
       resourceType: "solicitation",
       resourceId: input.solicitationId,
-      metadata: { noticeId: sol.noticeId, newDocuments: toRead.length, qaDocuments, added, duplicates, flagged, skipped: skipped.length },
+      metadata: { noticeId: sol.noticeId, newDocuments: toRead.length - skipped.length, qaDocuments, added, duplicates, flagged, skipped: skipped.length },
     });
   }
-  return { ok: true, newDocuments: toRead.length, qaDocuments, added, duplicates, flagged, skipped };
+  return { ok: true, newDocuments: toRead.length - skipped.length, qaDocuments, added, duplicates, flagged, skipped, retrying };
 }
 
 async function storePairs(input: {
@@ -364,17 +408,22 @@ export type QaCronSummary = {
   added: number;
   flagged: number;
   errors: number;
-  /** True when SAMGOV_API_KEY is not set and nothing was polled. */
+  /** True when FORGE's shared SAM.gov key is not set and nothing was polled. */
   skippedNoKey: boolean;
+  /** True when SAM.gov rejected the shared key (or its limit was reached) and the run stopped there. */
+  stoppedByKey: boolean;
 };
 
 /**
  * Daily: poll the notices of live solicitations not checked in the last
  * 20 hours, oldest check first, and tell the assigned team when answers
  * landed. Cross-tenant by design (cron worker); each poll is scoped.
+ * BL-STAB-7a — it polls on FORGE's shared key and stops at the first
+ * rejected or over-limit answer (every later poll would fail the same way).
  */
 export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
-  if (!process.env.SAMGOV_API_KEY) return { solicitationsPolled: 0, added: 0, flagged: 0, errors: 0, skippedNoKey: true };
+  const sam = platformSamCredential();
+  if (!sam) return { solicitationsPolled: 0, added: 0, flagged: 0, errors: 0, skippedNoKey: true, stoppedByKey: false };
   const checkedBefore = new Date(Date.now() - 20 * 3_600_000);
   const dueAfter = new Date(Date.now() - 7 * 86_400_000);
   const rows = await db
@@ -393,12 +442,19 @@ export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
   let added = 0;
   let flagged = 0;
   let errors = 0;
+  let polled = 0;
+  let stoppedByKey = false;
   for (const row of rows) {
+    polled++;
     try {
-      const res = await pollSolicitationQa({ organizationId: row.organizationId, solicitationId: row.id });
+      const res = await pollSolicitationQa({ organizationId: row.organizationId, solicitationId: row.id, sam });
       if (!res.ok) {
         errors++;
-        log.warn("[solicitation-qa]", "poll declined", { solicitationId: row.id, error: res.error });
+        log.warn("[solicitation-qa]", "poll declined", { solicitationId: row.id, cls: res.cls ?? null, error: res.error });
+        if (isKeyOrQuotaFailure(res.cls)) {
+          stoppedByKey = true;
+          break;
+        }
         continue;
       }
       added += res.added;
@@ -411,7 +467,7 @@ export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
       log.error("[solicitation-qa]", "poll failed", { solicitationId: row.id, error: err });
     }
   }
-  return { solicitationsPolled: rows.length, added, flagged, errors, skippedNoKey: false };
+  return { solicitationsPolled: polled, added, flagged, errors, skippedNoKey: false, stoppedByKey };
 }
 
 async function notifyTeam(input: { organizationId: string; solicitationId: string; title: string; added: number; flagged: number }) {

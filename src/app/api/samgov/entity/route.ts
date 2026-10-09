@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { fetchSamGovByUei } from "@/lib/samgov";
+import { samErrorMessage } from "@/lib/samgov-errors";
+import { platformSamCredential } from "@/lib/samgov-key";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,10 +38,13 @@ export async function GET(req: Request) {
     );
   }
 
-  const result = await fetchSamGovByUei(uei);
+  const sam = platformSamCredential();
+  if (!sam) return NextResponse.json({ ok: false, error: samErrorMessage({ cls: "missing_key", source: "platform", audience: "tenant" }) }, { status: 503 });
+  const result = await fetchSamGovByUei(sam, uei);
   if (!result.ok) {
+    // An upstream failure: SAM.gov's own 401 must not read as this route's "sign in".
     return NextResponse.json(result, {
-      status: result.status ?? 502,
+      status: 502,
       // Cache failures briefly so a flapping upstream doesn't get hammered.
       headers: { "Cache-Control": "private, max-age=60" },
     });

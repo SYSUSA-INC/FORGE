@@ -61,6 +61,8 @@ import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
 import { searchSamGovOpportunities, type SamOpportunity } from "@/lib/samgov";
+import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
+import { resolveSamCredential } from "@/lib/samgov-key";
 import {
   awardExpiresWithin,
   DEFAULT_SCOUT_PROFILE,
@@ -339,10 +341,11 @@ export async function runScoutForOrganization(input: {
 
   // 1. SAM.gov — the tenant's codes, then each keyword.
   const found = new Map<string, { sam: SamOpportunity; source: ScoutCandidateSource; keyword: string | null }>();
-  if (!process.env.SAMGOV_API_KEY) {
-    notes.push("SAMGOV_API_KEY is not configured; SAM.gov was not searched.");
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) {
+    notes.push(`SAM.gov was not searched: ${sam.failure.error}`);
   } else {
-    const searches: { params: Parameters<typeof searchSamGovOpportunities>[0]; source: ScoutCandidateSource; keyword: string | null }[] = [];
+    const searches: { params: Parameters<typeof searchSamGovOpportunities>[1]; source: ScoutCandidateSource; keyword: string | null }[] = [];
     if (naics.length > 0) {
       searches.push({
         params: { naicsCodes: naics, postedDaysBack: profile.postedDaysBack, limit: SAM_LIMIT },
@@ -360,13 +363,18 @@ export async function runScoutForOrganization(input: {
     if (searches.length === 0) {
       notes.push("No NAICS codes or keywords to search; add them under Settings → Classification or on the Scout page.");
     }
-    for (const s of searches) {
+    for (const [i, s] of searches.entries()) {
       summary.searches += 1;
       try {
-        const r = await searchSamGovOpportunities(s.params);
+        const r = await searchSamGovOpportunities(sam.cred, s.params);
         if (!r.ok) {
           summary.errors += 1;
           notes.push(`${s.keyword ? `Keyword "${s.keyword}"` : "NAICS"} search: ${r.error}`);
+          // BL-STAB-7a — the same key would fail every remaining search.
+          if (isKeyOrQuotaFailure(r.cls) && i < searches.length - 1) {
+            notes.push("Remaining SAM.gov searches skipped.");
+            break;
+          }
           continue;
         }
         for (const o of r.opportunities) {

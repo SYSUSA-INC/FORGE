@@ -26,7 +26,8 @@ export async function pollSolicitationQaAction(solicitationId: string): Promise<
   const { organizationId } = await requireCurrentOrg();
   const id = String(solicitationId ?? "");
   const res = await pollSolicitationQa({ organizationId, solicitationId: id, actor: { userId: user.id, email: user.email } });
-  if (res.ok) revalidatePath(`/solicitations/${id}`);
+  // A notice SAM.gov doesn't have is stamped checked: show the new date too.
+  if (res.ok || res.cls === "not_found") revalidatePath(`/solicitations/${id}`);
   return res;
 }
 
