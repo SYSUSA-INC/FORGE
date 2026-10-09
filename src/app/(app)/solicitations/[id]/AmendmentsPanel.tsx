@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { UploadQueue } from "@/components/uploads/UploadQueue";
 import { useUploadQueue } from "@/components/uploads/useUploadQueue";
-import { acceptFor } from "@/lib/upload-policy";
+import { amendmentNumberFromName } from "@/lib/amendment-name";
+import { acceptFor, validateUploadRequest } from "@/lib/upload-policy";
 import { createSolicitationFromUploadAction } from "../actions";
 import type { AmendmentListRow } from "../actions";
 
@@ -24,6 +25,9 @@ const STATUS_LABEL: Record<string, string> = {
   failed: "Failed",
 };
 
+/** A file picked but not yet uploaded, with the number it will be filed under. */
+type Staged = { key: number; file: File; number: string; error: string | null };
+
 type ParentInfo = {
   id: string;
   amendmentNumber: string;
@@ -34,51 +38,63 @@ export function AmendmentsPanel({
   solicitationId,
   parentSolicitation,
   amendments,
+  maxBytes,
 }: {
   solicitationId: string;
   parentSolicitation: ParentInfo | null;
   amendments: AmendmentListRow[];
+  /** The server's per-file limit for documents. */
+  maxBytes: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [amendmentNumber, setAmendmentNumber] = useState("");
+  const [staged, setStaged] = useState<Staged[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  // The amendment number as it was when the upload started.
-  const numberFor = useRef(new Map<File, string>());
+  const nextKey = useRef(0);
 
-  // BL-STAB-2c — the amendment goes straight to storage (no size cap), then is filed under this solicitation.
-  const queue = useUploadQueue<string>({
+  // BL-STAB-2c / BL-STAB-4 — each amendment goes straight to storage (no
+  // size cap), two at a time, then is filed under this solicitation with
+  // the number it was staged with.
+  const queue = useUploadQueue<string, { number: string }>({
     purpose: "document",
-    concurrency: 1,
-    claim: async ({ uploadId, file: f }) => {
+    concurrency: 2,
+    maxBytes,
+    claim: async ({ uploadId, meta }) => {
       const res = await createSolicitationFromUploadAction({
         uploadId,
         parentSolicitationId: solicitationId,
-        amendmentNumber: numberFor.current.get(f) ?? "",
+        amendmentNumber: meta.number,
       });
       return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
     },
     onItemDone: (item) => {
-      if (item.phase !== "done") return;
-      setFile(null);
-      setAmendmentNumber("");
-      if (inputRef.current) inputRef.current.value = "";
-      router.refresh();
+      if (item.phase === "done") router.refresh();
     },
   });
 
+  function stage(files: FileList | null) {
+    const picked = Array.from(files ?? []).map<Staged>((file) => {
+      const check = validateUploadRequest({ purpose: "document", fileName: file.name, size: file.size, maxBytes });
+      return { key: nextKey.current++, file, number: amendmentNumberFromName(file.name), error: check.ok ? null : check.error };
+    });
+    setStaged((list) => [...list, ...picked]);
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
   function submitUpload() {
-    if (!file) {
-      setError("Pick a file first.");
+    const ready = staged.filter((s) => !s.error);
+    if (ready.length === 0) {
+      setError(staged.length ? "None of the picked files can be uploaded." : "Pick one or more files first.");
       return;
     }
     setError(null);
-    numberFor.current.set(file, amendmentNumber.trim());
-    queue.add([file]);
+    queue.add(ready.map((s) => ({ file: s.file, meta: { number: s.number.trim().slice(0, 64) } })));
+    setStaged((list) => list.filter((s) => s.error));
   }
   const pending = queue.busy;
+  const readyCount = staged.filter((s) => !s.error).length;
 
   return (
     <Panel
@@ -123,43 +139,78 @@ export function AmendmentsPanel({
       {open && !parentSolicitation ? (
         <div className="mb-3 rounded-md border border-teal/30 bg-teal/[0.04] p-3">
           <p className="font-body text-[12px] text-muted">
-            Upload an amendment (e.g. Amendment 0001 from SAM.gov). FORGE
-            parses it independently, then runs a diff so you can see exactly
-            what changed: requirements added / removed / modified, due date
-            slips, page-limit edits.
+            Upload one or more amendments (e.g. Amendment 0001 from SAM.gov).
+            Each number is read from its file name where it says one; check
+            or type it before uploading. FORGE parses each amendment, then
+            runs a diff so you can see exactly what changed: requirements
+            added / removed / modified, due date slips, page-limit edits.
           </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <div className="mt-3">
             <input
               ref={inputRef}
               type="file"
+              multiple
               accept={acceptFor("document")}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => stage(e.target.files)}
               className="aur-input text-[12px]"
             />
-            <input
-              type="text"
-              placeholder='Amendment # (e.g. "0001")'
-              value={amendmentNumber}
-              onChange={(e) => setAmendmentNumber(e.target.value)}
-              className="aur-input text-[12px] sm:w-40"
-            />
           </div>
+          {staged.length > 0 ? (
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {staged.map((s) => (
+                <li key={s.key} className={`grid items-center gap-2 rounded-md border px-3 py-2 sm:grid-cols-[1fr_10rem_auto] ${s.error ? "border-rose/40 bg-rose/[0.05]" : "border-layer/15 bg-layer/[0.02]"}`}>
+                  <div className="min-w-0">
+                    <div className="truncate font-mono text-[12px] text-text" title={s.file.name}>
+                      {s.file.name}
+                    </div>
+                    {s.error ? <div className="font-mono text-[11px] text-rose">{s.error}</div> : null}
+                  </div>
+                  <input
+                    type="text"
+                    aria-label={`Amendment number for ${s.file.name}`}
+                    placeholder='Amendment # ("0001")'
+                    value={s.number}
+                    disabled={Boolean(s.error)}
+                    onChange={(e) => {
+                      const number = e.target.value;
+                      setStaged((list) => list.map((x) => (x.key === s.key ? { ...x, number } : x)));
+                    }}
+                    className="aur-input text-[12px]"
+                  />
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-ghost text-[10px]"
+                    onClick={() => setStaged((list) => list.filter((x) => x.key !== s.key))}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {error ? (
             <div className="mt-2 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
               {error}
             </div>
           ) : null}
           <div className="mt-2">
-            <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
+            <UploadQueue
+              items={queue.items}
+              onRetry={queue.retry}
+              onCancel={queue.cancel}
+              onRemove={queue.remove}
+              detail={(it) => (it.meta.number ? `Amendment ${it.meta.number}` : "no number")}
+            />
           </div>
           <div className="mt-2 flex justify-end">
             <button
               type="button"
               onClick={submitUpload}
-              disabled={pending || !file}
+              disabled={readyCount === 0}
               className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
             >
-              {pending ? "Uploading…" : "Upload amendment"}
+              {readyCount > 1 ? `Upload ${readyCount} amendments` : "Upload amendment"}
+              {pending ? " · uploading…" : ""}
             </button>
           </div>
         </div>

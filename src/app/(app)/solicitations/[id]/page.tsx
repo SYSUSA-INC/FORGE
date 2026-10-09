@@ -5,6 +5,7 @@ import { describeSource } from "@/lib/requirement-provenance";
 import { activeRequirements, reviewCounts, type ReviewedRequirement } from "@/lib/requirement-review";
 import { mergeLmStructures } from "@/lib/solicitation-lm";
 import { buildReviewBasis, reviewFreshness } from "@/lib/review-basis";
+import { resolvePolicy } from "@/lib/upload-policy";
 import { LmPanel } from "./LmPanel";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -367,6 +368,7 @@ export default async function SolicitationDetail({
           solicitationId={s.id}
           parentSolicitation={parentSolicitation}
           amendments={amendments}
+          maxBytes={resolvePolicy("document", process.env).maxBytes}
         />
       </div>
 

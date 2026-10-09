@@ -80,10 +80,21 @@ function serverError(bodyText: string): string | null {
  */
 export async function uploadFile(
   file: File,
-  opts: { purpose: UploadPurpose; onProgress?: (loaded: number, total: number) => void; onPhase?: (phase: UploadPhase) => void; signal?: AbortSignal },
+  opts: {
+    purpose: UploadPurpose;
+    onProgress?: (loaded: number, total: number) => void;
+    onPhase?: (phase: UploadPhase) => void;
+    signal?: AbortSignal;
+    /** The server's per-file limit for this purpose (the browser has no env). */
+    maxBytes?: number;
+  },
 ): Promise<UploadFileResult> {
-  const pre = validateUploadRequest({ purpose: opts.purpose, fileName: file.name, size: file.size });
+  const pre = validateUploadRequest({ purpose: opts.purpose, fileName: file.name, size: file.size, maxBytes: opts.maxBytes });
   if (!pre.ok) return { ok: false, error: pre.error };
+  const cancelled = async (uploadId: string): Promise<UploadFileResult> => {
+    await cancelUploadAction(uploadId).catch(() => undefined);
+    return { ok: false, error: describeUploadFailure("cancelled"), cancelled: true };
+  };
 
   for (let link = 0; link < 2; link++) {
     const intent = await requestUploadAction({ purpose: opts.purpose, fileName: file.name, size: file.size });
@@ -95,10 +106,16 @@ export async function uploadFile(
       try {
         put = await putWithProgress({ url: intent.put.url, headers: intent.put.headers, body: file, onProgress: opts.onProgress, signal: opts.signal });
       } catch {
-        await cancelUploadAction(intent.uploadId).catch(() => undefined);
-        return { ok: false, error: describeUploadFailure("cancelled"), cancelled: true };
+        return cancelled(intent.uploadId);
       }
       if (put.status >= 200 && put.status < 300) break;
+      // Through the app, a retried PUT whose first answer was lost finds the
+      // upload already stored (409): ask for its state instead of deleting it.
+      if (intent.transport === "proxy" && put.status === 409) {
+        const state = await completeUploadAction(intent.uploadId);
+        if (state.ok) return { ok: true, uploadId: intent.uploadId, upload: state.upload };
+        return { ok: false, error: state.error };
+      }
       const outcome = classifyPutFailure({ status: put.status, bodyText: put.bodyText, expiresAt: intent.expiresAt, now: Date.now() });
       const wait = outcome === "retry" || outcome === "network_or_cors" ? nextBackoffMs(attempt) : null;
       if (wait !== null) {
@@ -113,6 +130,8 @@ export async function uploadFile(
       return { ok: false, error: serverError(put.bodyText) ?? describeUploadFailure(outcome) };
     }
     if (renew) continue;
+    // Cancelled once the bytes had arrived: drop the upload rather than check and keep it.
+    if (opts.signal?.aborted) return cancelled(intent.uploadId);
 
     opts.onPhase?.("verifying");
     if (intent.transport === "proxy") {

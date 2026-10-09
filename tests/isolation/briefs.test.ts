@@ -26,6 +26,10 @@ describe("BL-AIP-7a — briefs", () => {
 
   beforeEach(async () => {
     fx = await createTwoTenants("briefs");
+    // One INSERT gives every row the same created_at (now() is fixed per
+    // transaction), so "latest" would be a tie broken by storage order.
+    // Give the rows distinct times: "Watch it." is the newer brief.
+    const at = (secondsAgo: number) => new Date(Date.now() - secondsAgo * 1000);
     const rows = await db
       .insert(aiBriefs)
       .values([
@@ -37,6 +41,7 @@ describe("BL-AIP-7a — briefs", () => {
           recommendation: "pursue",
           confidence: 0.7,
           snapshotKey: "k1",
+          createdAt: at(120),
         },
         {
           organizationId: fx.orgA.organizationId,
@@ -46,6 +51,7 @@ describe("BL-AIP-7a — briefs", () => {
           recommendation: "watch",
           confidence: 0.4,
           snapshotKey: "k2",
+          createdAt: at(60),
         },
         {
           organizationId: fx.orgB.organizationId,

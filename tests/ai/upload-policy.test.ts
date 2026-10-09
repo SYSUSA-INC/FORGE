@@ -102,7 +102,9 @@ describe("keys", () => {
     expect(isKeyInOrg(ORG, `org/${ORG}/../other/x`)).toBe(false);
     expect(isKeyInOrg(ORG, `org/${ORG}//x`)).toBe(false);
     expect(isKeyInOrg(ORG, `/org/${ORG}/x`)).toBe(false);
-    expect(isKeyInOrg(ORG, `org/${ORG}/a\\b`)).toBe(false);
+    // A backslash may be part of a legacy file name (old paths keep the raw name), never of the path.
+    expect(isKeyInOrg(ORG, `org/${ORG}\\x/a`)).toBe(false);
+    expect(isKeyInOrg(ORG, `org/${ORG}/solicitation/abc/a\\b.pdf`)).toBe(true);
   });
 });
 
@@ -133,5 +135,50 @@ describe("what the bytes show", () => {
     expect(familyMatches("docx", { family: "zip" })).toBe(true);
     expect(familyMatches("text", { family: "html" })).toBe(false);
     expect(describeMismatch("docx", { family: "ole2" })).toMatch(/older Office format/);
+  });
+});
+
+describe("BL-STAB-2c follow-ups and BL-STAB-4", () => {
+  it("reads an amendment number from a file name", async () => {
+    const { amendmentNumberFromName } = await import("@/lib/amendment-name");
+    expect(amendmentNumberFromName("Amendment 0003.pdf")).toBe("0003");
+    expect(amendmentNumberFromName("SF30 Amendment No. 4.pdf")).toBe("4");
+    expect(amendmentNumberFromName("RFP_Amd_02.docx")).toBe("02");
+    expect(amendmentNumberFromName("Mod 2.pdf")).toBe("2");
+    expect(amendmentNumberFromName("Modification 0001.pdf")).toBe("0001");
+    expect(amendmentNumberFromName("W912DY-26-R-0042_A0002.pdf")).toBe("0002");
+    expect(amendmentNumberFromName("P00003 Bilateral.pdf")).toBe("P00003");
+    expect(amendmentNumberFromName("5400029248 Solicitation (1).docx")).toBe("");
+    expect(amendmentNumberFromName("Section L.pdf")).toBe("");
+  });
+
+  it("lets the server's limit override the browser's default", async () => {
+    const { validateUploadRequest, formatLimit } = await import("@/lib/upload-policy");
+    const size = 600 * 1024 * 1024;
+    expect(validateUploadRequest({ purpose: "document", fileName: "big.pdf", size })).toMatchObject({ ok: false, code: "too_large" });
+    expect(validateUploadRequest({ purpose: "document", fileName: "big.pdf", size, maxBytes: 1024 * 1024 * 1024 })).toMatchObject({ ok: true });
+    expect(formatLimit(500 * 1024 * 1024)).toBe("500 MB");
+  });
+
+  it("says how large a file is beside its read budget without contradicting itself, with advice that fits images", async () => {
+    const { tooLargeToReadMessage } = await import("@/lib/upload-policy");
+    const MiB = 1024 * 1024;
+    expect(tooLargeToReadMessage(150.3 * MiB, 150 * MiB, "pdf")).toMatch(/^Stored \(150\.3 MB\)\. FORGE reads files of this type up to 150\.0 MB automatically; split it/);
+    expect(tooLargeToReadMessage(412 * MiB, 150 * MiB, "pdf")).toMatch(/^Stored \(412 MB\)\. FORGE reads files of this type up to 150 MB/);
+    expect(tooLargeToReadMessage(9 * MiB, 5 * MiB, "image")).toMatch(/save it smaller/);
+  });
+
+  it("accepts a backslash only in a legacy file name, never in the path", async () => {
+    const { isKeyInOrg } = await import("@/lib/upload-policy");
+    expect(isKeyInOrg("o1", "org/o1/solicitation/s1/a\\b.pdf")).toBe(true);
+    expect(isKeyInOrg("o1", "org/o1\\x/solicitation/s1/a.pdf")).toBe(false);
+    expect(isKeyInOrg("o1", "org/o1/../o2/a.pdf")).toBe(false);
+  });
+
+  it("refuses the in-memory store on any Vercel deployment", async () => {
+    const { memoryStorageRefused } = await import("@/lib/storage");
+    expect(memoryStorageRefused({})).toBe(false);
+    expect(memoryStorageRefused({ VERCEL: "1", VERCEL_ENV: "preview" })).toBe(true);
+    expect(memoryStorageRefused({ VERCEL_ENV: "production" })).toBe(true);
   });
 });

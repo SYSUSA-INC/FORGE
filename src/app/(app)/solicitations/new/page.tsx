@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { formatLimit, resolvePolicy } from "@/lib/upload-policy";
 import { UploadSolicitationForm } from "./UploadSolicitationForm";
 
 export const dynamic = "force-dynamic";
@@ -11,13 +12,15 @@ export const maxDuration = 300;
 export default async function NewSolicitationPage() {
   await requireAuth();
   await requireCurrentOrg();
+  // The per-file limit as this deployment sets it (UPLOAD_MAX_FILE_MB), handed to the browser's own check.
+  const maxBytes = resolvePolicy("document", process.env).maxBytes;
 
   return (
     <>
       <PageHeader
         eyebrow="Solicitations · Intake"
         title="New solicitation"
-        subtitle="Upload an RFP / RFI / RFQ / Sources Sought PDF. FORGE extracts the text, asks the AI gateway to pull Section L summary, Section M summary, and the top shall / should / may statements, then stamps the result onto a record you can convert into an opportunity."
+        subtitle={`Upload an RFP / RFI / RFQ / Sources Sought (PDF, Word, Excel, PowerPoint, text or image, up to ${formatLimit(maxBytes)}). FORGE reads the whole document for its requirements, Sections L and M and key dates, then stamps the result onto a record you can convert into an opportunity.`}
         actions={
           <Link href="/solicitations" className="aur-btn aur-btn-ghost">
             All solicitations
@@ -26,7 +29,7 @@ export default async function NewSolicitationPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-        <UploadSolicitationForm />
+        <UploadSolicitationForm maxBytes={maxBytes} />
 
         <Panel title="What happens next" eyebrow="Pipeline">
           <ol className="flex flex-col gap-3 font-body text-[13px] text-muted">
@@ -39,8 +42,9 @@ export default async function NewSolicitationPage() {
                   Upload
                 </div>
                 <div className="mt-0.5">
-                  The file is stored through the configured storage
-                  provider and parsed in the background.
+                  The file goes from your browser straight to secure
+                  storage, is checked, and is filed as a solicitation; the
+                  parse runs in the background.
                 </div>
               </div>
             </li>
@@ -67,9 +71,10 @@ export default async function NewSolicitationPage() {
                   AI extraction
                 </div>
                 <div className="mt-0.5">
-                  AI gateway returns Section L summary, Section M summary,
-                  agency / office / NAICS / set-aside / due date, plus the
-                  top 25 shall/should/may statements with section refs.
+                  The whole document is read, a part at a time, for every
+                  shall / should / may requirement and where it is stated;
+                  Sections L and M are structured; agency / office / NAICS /
+                  set-aside and key dates are captured.
                 </div>
               </div>
             </li>
@@ -94,9 +99,11 @@ export default async function NewSolicitationPage() {
               Heads-up
             </div>
             <p className="mt-1 font-body text-[12px] leading-relaxed text-muted">
-              25 MB cap per PDF in v1. Set <code>ANTHROPIC_API_KEY</code>{" "}
-              on Vercel to enable AI extraction (otherwise the upload
-              succeeds but the extracted summaries stay empty).
+              Files up to {formatLimit(maxBytes)} upload. Very large ones are
+              kept but read only up to a size per type (PDF 150 MB, Word
+              100 MB, Excel 40 MB); FORGE says so and asks you to split them.
+              Without <code>ANTHROPIC_API_KEY</code> on Vercel the upload
+              succeeds but the AI extraction stays empty.
             </p>
           </div>
         </Panel>

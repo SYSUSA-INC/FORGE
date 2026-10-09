@@ -142,12 +142,21 @@ export async function reparseSolicitationAction(
 
   // BL-STAB-2c — check the file is there without downloading it; the job
   // reads it (within its read budget, verified) from storage.
-  const head = await getStorageProvider().head(row.storagePath).catch(() => null);
+  // A storage error is not a missing file: say which it was.
+  let head: Awaited<ReturnType<ReturnType<typeof getStorageProvider>["head"]>>;
+  try {
+    head = await getStorageProvider().head(row.storagePath);
+  } catch (err) {
+    log.warn("[reparseSolicitationAction]", "storage check failed", { error: err });
+    return { ok: false, error: "File storage could not be reached just now. Try Re-parse again in a minute." };
+  }
   if (!head)
     return {
       ok: false,
       error:
-        "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)",
+        getStorageProvider().name === "memory"
+          ? "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)"
+          : "The stored file is no longer in storage — re-upload the document.",
     };
   const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: row.storagePath });
 
