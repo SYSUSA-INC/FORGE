@@ -169,7 +169,11 @@ export function GettingStartedClient({ state }: { state: OnboardingState }) {
                 </div>
                 {!state.samConfigured ? (
                   <p className="font-mono text-[11px] text-amber-200">
-                    SAM.gov isn&apos;t connected in FORGE yet; ask FORGE support. Meanwhile you can fill the profile by hand under{" "}
+                    SAM.gov lookups need a SAM.gov API key. Add your company&apos;s key under{" "}
+                    <Link href="/settings/integrations" className="underline">
+                      Settings → Integrations
+                    </Link>
+                    , or fill the profile by hand under{" "}
                     <Link href="/settings" className="underline">
                       Settings
                     </Link>

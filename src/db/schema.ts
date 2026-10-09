@@ -4703,6 +4703,29 @@ export const scoutProfiles = pgTable("scout_profile", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * BL-STAB-7b — a company's own SAM.gov API key, one row per company. The
+ * key is stored only as AES-256-GCM ciphertext bound to the organization
+ * (src/lib/secret-box.ts); last4 is for display. Status records what
+ * SAM.gov last said about the key ("ok", "invalid", "forbidden",
+ * "rate_limited").
+ */
+export const organizationSamgovKeys = pgTable("organization_samgov_key", {
+  organizationId: uuid("organization_id")
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  ciphertext: text("ciphertext").notNull(),
+  keyId: varchar("key_id", { length: 16 }).notNull(),
+  last4: varchar("last4", { length: 4 }).notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("ok"),
+  statusAt: timestamp("status_at", { withTimezone: true }).notNull().defaultNow(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  setByUserId: text("set_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  setAt: timestamp("set_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type OrganizationSamgovKey = typeof organizationSamgovKeys.$inferSelect;
+
 export const scoutRuns = pgTable(
   "scout_run",
   {

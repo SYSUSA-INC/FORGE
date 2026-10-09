@@ -74,7 +74,7 @@ export function QaPanel({
   const pollTitle = !noticeId
     ? "This solicitation has no SAM.gov notice ID"
     : !hasSamKey
-      ? "SAM.gov isn't connected in FORGE yet"
+      ? "SAM.gov isn't connected for your company. A company admin can add the SAM.gov API key under Settings → Integrations."
       : "Read the notice's new attachments and description for Q&A";
 
   return (

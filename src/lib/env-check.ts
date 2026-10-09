@@ -1,5 +1,6 @@
 import { resolveEnvLabel } from "@/lib/env-label";
 import { log } from "@/lib/log";
+import { keyringStatus } from "@/lib/secret-box";
 
 /**
  * Boot-time environment validation.
@@ -59,6 +60,10 @@ const OPTIONAL: EnvSpec[] = [
   {
     name: "R2_ACCOUNT_ID",
     purpose: "Cloudflare R2 — every uploaded file and rendered export (falls back to in-memory, not allowed in production or staging)",
+  },
+  {
+    name: "FORGE_SECRET_KEYS",
+    purpose: "encrypts secrets companies give FORGE (their SAM.gov API keys); without it companies can't save their own key. Never on preview deployments",
   },
   {
     name: "SAMGOV_API_KEY",
@@ -122,6 +127,19 @@ export function validateEnvOrWarn(): void {
     log.error("[env-check]", `file storage is the in-memory fallback in ${label}; uploads are refused until the R2 variables are set`, {
       missing: missingR2,
     });
+  }
+
+  // BL-STAB-7b — the keyring for company-supplied secrets. Errors carry an
+  // Error so they reach /admin/errors; only key ids are ever logged.
+  const ring = keyringStatus();
+  if (label === "preview" && (process.env.FORGE_SECRET_KEYS ?? "").trim()) {
+    log.error("[env-check]", "FORGE_SECRET_KEYS is set on a preview deployment and is ignored", {
+      error: new Error("FORGE_SECRET_KEYS must not be set on preview deployments (their databases are copies of production)"),
+    });
+  } else if ((label === "production" || label === "staging") && !ring.available) {
+    log.error("[env-check]", "company SAM.gov keys can't be saved or read", { error: new Error(`FORGE_SECRET_KEYS unavailable: ${ring.problem}`) });
+  } else if (ring.available) {
+    log.info("[env-check]", "secret keyring ready", { primaryKeyId: ring.primaryKeyId, keyIds: ring.keyIds });
   }
 
   if (missingOptional.length > 0) {

@@ -29,7 +29,7 @@ describe("BL-STAB-7a — SAM.gov error classes", () => {
     expect(m.cls).toBe("key_invalid");
     expect(m.code).toBe("API_KEY_INVALID");
     expect(m.text).toBe(
-      "SAM.gov rejected FORGE's shared SAM.gov key: it is invalid or has expired. This has been logged for FORGE support; try again later. (SAM.gov API_KEY_INVALID, HTTP 401)",
+      "SAM.gov rejected FORGE's shared SAM.gov key. This has been logged for FORGE support. To keep working now, a company admin can set your company's own key under Settings → Integrations. (SAM.gov API_KEY_INVALID, HTTP 401)",
     );
   });
 
@@ -80,8 +80,8 @@ describe("BL-STAB-7a — SAM.gov error classes", () => {
   it("names the company's key or, for platform admins, SAMGOV_API_KEY — and nothing else", () => {
     expect(message(401, OWNER_BODY, "company").text).toMatch(/^SAM\.gov rejected your company's SAM\.gov API key/);
     expect(message(401, OWNER_BODY, "platform", "operator").text).toContain("set SAMGOV_API_KEY in Vercel");
-    expect(samErrorMessage({ cls: "missing_key", source: "platform", audience: "tenant" })).toBe("SAM.gov isn't connected in FORGE yet. Ask FORGE support to connect it.");
-    const classes: SamErrorClass[] = ["missing_key", "key_invalid", "key_forbidden", "rate_limited", "bad_request", "not_found", "upstream", "timeout", "network", "bad_response", "foreign_host", "restricted"];
+    expect(samErrorMessage({ cls: "missing_key", source: "platform", audience: "tenant" })).toBe("SAM.gov isn't connected for your company. A company admin can add your SAM.gov API key under Settings → Integrations.");
+    const classes: SamErrorClass[] = ["missing_key", "key_invalid", "key_forbidden", "rate_limited", "bad_request", "not_found", "upstream", "timeout", "network", "bad_response", "foreign_host", "restricted", "key_unreadable"];
     for (const cls of classes) {
       for (const source of ["company", "platform"] as const) {
         const detail = "<script>x</script>".repeat(40);

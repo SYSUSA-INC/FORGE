@@ -153,6 +153,15 @@ export async function getReviewRequestByTokenAction(token: string) {
   The session can lag the current org context; always use
   `requireCurrentOrg()`.
 
+### Secrets at rest (BL-STAB-7b)
+
+A secret a company gives FORGE (today its SAM.gov API key) is stored
+only through `src/lib/secret-box.ts`: AES-256-GCM under the
+`FORGE_SECRET_KEYS` keyring, bound to a purpose and the
+`organizationId`. Never log, audit or return the plaintext (audits carry
+the last four characters at most); status reads check the key id and
+never decrypt; the keyring is never set on preview deployments.
+
 ---
 
 ## 2. Audit logging

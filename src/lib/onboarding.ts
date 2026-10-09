@@ -35,7 +35,7 @@ import {
   type OnboardingStatus,
 } from "@/lib/onboarding-logic";
 import { fetchSamGovByUei } from "@/lib/samgov";
-import { platformSamCredential, resolveSamCredential } from "@/lib/samgov-key";
+import { getSamKeyStatus, resolveSamCredential } from "@/lib/samgov-key";
 import { getScoutProfile, runScoutForOrganization, saveScoutProfile } from "@/lib/scout";
 import type { ScoutRunSummary } from "@/lib/scout-logic";
 import {
@@ -103,7 +103,7 @@ export async function getOnboardingState(input: { organizationId: string }): Pro
     profile,
     status,
     scoutKeywords: scout.keywords,
-    samConfigured: platformSamCredential() !== null,
+    samConfigured: (await getSamKeyStatus(organizationId)).usable,
     aiStub: getAIProviderStatus().active.name === "stub",
   };
 }

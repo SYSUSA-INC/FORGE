@@ -22,7 +22,8 @@ Every quarter, work through this list. Estimated time: 60-90 minutes total. Sche
 | `ANTHROPIC_API_KEY` | Anthropic console → API Keys → generate new | Vercel env | yes |
 | `CRON_SECRET` | generate: `openssl rand -base64 32` | Vercel env | yes (cron stops firing until redeploy) |
 | `NEON_API_KEY` (when configured) | Neon console → Account settings → API keys | Vercel env | yes |
-| `SAMGOV_API_KEY` (if used) | sam.gov account | Vercel env | yes |
+| `SAMGOV_API_KEY` (shared fallback; 8(a), gold set, health, daily Q&A) | sam.gov account → Account Details → Public API Key; renew before SAM.gov expires it | Vercel env | yes |
+| `FORGE_SECRET_KEYS` (keyring for company SAM.gov keys) | see the keyring procedure below — never the `_NEW` swap | Vercel env (Production and staging, never Preview) | yes |
 
 **Process per secret:**
 1. Generate the new value in the source console (or via `openssl rand`)
@@ -34,6 +35,8 @@ Every quarter, work through this list. Estimated time: 60-90 minutes total. Sche
 7. Delete the temporary `AUTH_SECRET_NEW`
 
 For `AUTH_SECRET` specifically, this two-step process avoids a logout storm: the app accepts tokens signed by either secret during the rollover.
+
+**`FORGE_SECRET_KEYS` (BL-STAB-7b) is a keyring, not a single secret.** Add the new entry in front (`knew:…,kold:…`) and redeploy; new saves use `knew`, stored keys still decrypt under `kold`. Do **not** remove `kold` until every stored key has been re-encrypted (BL-STAB-7e); removing it makes those company keys unreadable (calls fall back to the shared key and admins must re-enter them). Keep every entry in the password manager.
 
 ### Step 2: Audit the audit log (10 min)
 

@@ -8,6 +8,8 @@
  */
 export type SamErrorClass =
   | "missing_key"
+  /** A company key is stored but can't be read on this server, and there is no shared key. */
+  | "key_unreadable"
   | "key_invalid"
   | "key_forbidden"
   | "rate_limited"
@@ -36,6 +38,7 @@ export const SAM_TIMEOUTS_MS = {
   notice: 20_000,
   attachment: 45_000,
   entitySearch: 20_000,
+  keyTest: 15_000,
 } as const;
 export type SamEndpoint = keyof typeof SAM_TIMEOUTS_MS;
 
@@ -178,28 +181,31 @@ export function samErrorMessage(i: {
     case "missing_key":
       msg = operator
         ? "FORGE's shared SAM.gov key SAMGOV_API_KEY is not set. Add it in Vercel → Settings → Environment Variables and redeploy."
-        : "SAM.gov isn't connected in FORGE yet. Ask FORGE support to connect it.";
+        : "SAM.gov isn't connected for your company. A company admin can add your SAM.gov API key under Settings → Integrations.";
+      break;
+    case "key_unreadable":
+      msg = "Your company's SAM.gov key can't be read on this FORGE server. A company admin can see why under Settings → Integrations.";
       break;
     case "key_invalid":
       msg = operator
         ? `SAM.gov rejected FORGE's shared key SAMGOV_API_KEY. Generate a new key on SAM.gov, set SAMGOV_API_KEY in Vercel → Settings → Environment Variables (Production and staging) and redeploy.${tail}`
         : company
-          ? `SAM.gov rejected your company's SAM.gov API key: it is invalid, expired or not yet active. A company admin can generate a new key on SAM.gov and replace it.${tail}`
-          : `SAM.gov rejected FORGE's shared SAM.gov key: it is invalid or has expired. This has been logged for FORGE support; try again later.${tail}`;
+          ? `SAM.gov rejected your company's SAM.gov API key: it is invalid, expired or not yet active. A company admin can generate a new key on SAM.gov and replace it under Settings → Integrations.${tail}`
+          : `SAM.gov rejected FORGE's shared SAM.gov key. This has been logged for FORGE support. To keep working now, a company admin can set your company's own key under Settings → Integrations.${tail}`;
       break;
     case "key_forbidden":
       msg = operator
         ? `SAM.gov refused this request for FORGE's shared key SAMGOV_API_KEY: the key isn't allowed to use this SAM.gov service. Check its access on SAM.gov or replace it.${tail}`
         : company
-          ? `SAM.gov recognised your company's API key but refused this request: the key isn't allowed to use this SAM.gov service. Check the key's access on SAM.gov, or replace it.${tail}`
-          : `SAM.gov refused this request for FORGE's shared SAM.gov key. This has been logged for FORGE support; try again later.${tail}`;
+          ? `SAM.gov recognised your company's API key but refused this request: the key isn't allowed to use this SAM.gov service. Check the key's access on SAM.gov, or replace it under Settings → Integrations.${tail}`
+          : `SAM.gov refused this request for FORGE's shared SAM.gov key. This has been logged for FORGE support; try again later, or have a company admin set your company's own key under Settings → Integrations.${tail}`;
       break;
     case "rate_limited":
       msg = operator
         ? `SAMGOV_API_KEY has reached SAM.gov's request limit. Every company without its own key and the gold set share it; wait for SAM.gov's daily reset.${tail}`
         : company
           ? `Your company's SAM.gov API key has reached SAM.gov's request limit. ${retryHint(i.retryAfterSec)}; SAM.gov resets the limit daily.${tail}`
-          : `FORGE's shared SAM.gov key has reached SAM.gov's request limit. ${retryHint(i.retryAfterSec)}; SAM.gov resets the limit daily.${tail}`;
+          : `FORGE's shared SAM.gov key has reached SAM.gov's request limit. ${retryHint(i.retryAfterSec)}, or have a company admin set your company's own key under Settings → Integrations.${tail}`;
       break;
     case "bad_request":
       msg = i.detail

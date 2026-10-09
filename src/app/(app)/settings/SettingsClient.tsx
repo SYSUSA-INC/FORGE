@@ -540,6 +540,13 @@ function SamGovSyncPanel({
           {status === "loading" || pending ? "Syncing…" : "Sync from SAM.gov"}
         </button>
       </div>
+      <p className="mt-2 font-mono text-[10px] text-subtle">
+        Uses your company&apos;s SAM.gov API key when one is set — manage it under{" "}
+        <a href="/settings/integrations" className="underline">
+          Settings → Integrations
+        </a>
+        .
+      </p>
       {message ? (
         <div className={`mt-3 font-mono text-[11px] ${statusTone}`}>{message}</div>
       ) : null}
