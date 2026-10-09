@@ -39,6 +39,8 @@ export const SAM_TIMEOUTS_MS = {
   attachment: 45_000,
   entitySearch: 20_000,
   keyTest: 15_000,
+  sba8a: 20_000,
+  health: 10_000,
 } as const;
 export type SamEndpoint = keyof typeof SAM_TIMEOUTS_MS;
 
