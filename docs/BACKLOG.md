@@ -553,38 +553,29 @@ mind. Bandage will come off but a true fix will stay."
     "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
     "there has to be a place where the company admin can update their
     API key".
-  - **Root cause (traced call by call; design by three proposals and two
-    judges, checked by a completeness critic):**
-    - SAM.gov's key gateway answers a bad key as HTML or
-      `{"error":{"code"}}`; `friendlySamError` read only SAM.gov's own
-      JSON and fell through to the raw body (`samgov.ts:303`).
-    - One platform key, `SAMGOV_API_KEY`, for every company; no company
-      can supply its own, and presence checks lock everyone out without it.
-    - The key was appended to any link in SAM.gov's payload (description
-      and attachment links) with no host check, and thrown fetch errors
-      (which can carry the URL and key) were shown to users.
-    - Loops kept calling after a rejection; a notice SAM.gov no longer
-      has, and links that can never download, blocked the Q&A queue.
-  - **Phases (one PR each, in order):**
-    - **7a — plain errors; the key goes only to SAM.gov** (in PR #370):
-      `samgov-errors.ts` reads all three error shapes and words each
-      class (rejected key, refused, request limit, SAM.gov trouble,
-      timeout, unreachable, unreadable reply), naming whose key failed
-      with the SAM.gov code and HTTP status; `samgov-key.ts` carries the
-      key in a credential that never prints it; one `samGet` sends the
-      key only to https api.sam.gov / sam.gov, with a deadline on every
-      call; description lookups, the scout, Q&A downloads and the daily
-      Q&A poll stop at the first rejection; a missing notice is stamped
-      checked; unreadable links are marked seen; a dead shared key
-      reaches /admin/errors; the unused `/api/samgov/entity` is removed;
-      importing a company from SAM.gov is audited.
-    - **Queued:** 7b — a company admin sets the company's own key on
-      Settings → Integrations (encrypted with the organization bound in,
-      tested on save, migration 0127); 7c — the 8(a) registry, cert
-      refresh, gold set and health probe on the shared key, the cert
-      cron out of the `"use server"` module; 7d — nightly jobs per
-      company, fair and within the cron's time; 7e — platform admins see
-      and remove company keys and re-encrypt after a keyring rotation.
+  - **Root cause:** the key gateway answers a bad key as HTML or
+    `{"error":{"code"}}`; `friendlySamError` read only SAM.gov's own JSON
+    and showed the rest raw (`samgov.ts:303`). One platform key serves
+    every company. The key was appended to any link in SAM.gov's payload
+    with no host check, and thrown fetch errors (which can carry the URL
+    and key) reached users. Loops kept calling after a rejection, and the
+    Q&A queue could be blocked by notices or links that never resolve.
+  - **7a (PR #370):** plain messages for every failure class, naming whose
+    key failed with SAM.gov's code and HTTP status (`samgov-errors.ts`);
+    the key in a credential that never prints it (`samgov-key.ts`); one
+    `samGet` sends it only to https api.sam.gov / sam.gov with a deadline
+    on every call; a 401/403 on a request without FORGE's key is a
+    restricted file, not a dead key; loops stop at the first rejection;
+    the Q&A queue skips what can never be read; a dead shared key reaches
+    /admin/errors; importing a company from SAM.gov is audited.
+  - **Queued:** 7b — a company admin sets the company's own key on
+    Settings → Integrations (encrypted with the organization bound in,
+    tested on save, migration 0127); 7c — the 8(a) registry, cert
+    refresh, gold set and health probe on the shared key, the cert cron
+    out of the `"use server"` module, the unused `/api/samgov/entity`
+    removed; 7d — nightly jobs per company, fair and within the cron's
+    time; 7e — platform admins see and remove company keys and
+    re-encrypt after a keyring rotation.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
   data.** ⏳ queued (added 2026-10-08).
   - **Ask (owner):** "We need to enforce some security gates for

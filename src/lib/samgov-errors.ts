@@ -1,20 +1,11 @@
 /**
- * BL-STAB-7a — SAM.gov failures in plain words.
- *
- * SAM.gov answers a bad key from the api.data.gov gateway in front of it,
- * as HTML (`<h1>API_KEY_INVALID</h1>`) or as `{"error":{"code":…}}`, while
- * its own errors are `{errorCode, title, detail}`. The old formatter read
- * only the last shape and showed anything else raw ("SAM.gov 401:
- * <html>…"). This module reads all three, sorts the failure into a class
- * (the code first: the gateway sends API_KEY_INVALID as 401 or 403), and
- * words it for the person who will see it: what happened, whose key, what
- * to do, and the SAM.gov code and HTTP status for support. A message never
- * carries upstream HTML, the key, or an environment-variable name (except
- * the operator wording, for platform admins).
- *
- * Pure: no server-only, no I/O, so it is unit-tested directly.
+ * BL-STAB-7a — SAM.gov failures in plain words. The key gateway answers a
+ * bad key as HTML (`<h1>API_KEY_INVALID</h1>`) or `{"error":{"code"}}`;
+ * SAM.gov's own errors are `{errorCode, title, detail}`. All three are
+ * read, sorted into a class (code first: the gateway sends API_KEY_INVALID
+ * as 401 or 403) and worded for the reader, ending with the SAM.gov code
+ * and HTTP status; never upstream HTML or a key. Pure, for unit tests.
  */
-
 export type SamErrorClass =
   | "missing_key"
   | "key_invalid"
@@ -26,7 +17,9 @@ export type SamErrorClass =
   | "timeout"
   | "network"
   | "bad_response"
-  | "foreign_host";
+  | "foreign_host"
+  /** A file SAM.gov refused (401/403) on a request that didn't carry FORGE's key: not a key problem. */
+  | "restricted";
 
 /** Whose key a call used: the company's own, or FORGE's shared one. */
 export type SamKeySource = "company" | "platform";
@@ -235,6 +228,9 @@ export function samErrorMessage(i: {
       break;
     case "foreign_host":
       msg = "Skipped an attachment link that isn't on sam.gov.";
+      break;
+    case "restricted":
+      msg = `SAM.gov doesn't let FORGE download this attachment; it may be a controlled file that needs a SAM.gov sign-in${suffix(null, i.status)}.`;
       break;
   }
   return plain(msg, MAX_MESSAGE);

@@ -169,7 +169,7 @@ export async function addManualQa(input: {
 export type QaPollResult =
   | {
       ok: true;
-      /** Attachment links not seen before, read this time. */
+      /** Attachment links not seen before that were read this time. */
       newDocuments: number;
       /** Of those (plus the description), how many carried Q&A. */
       qaDocuments: number;
@@ -213,6 +213,16 @@ export async function pollSolicitationQa(input: {
         .update(solicitations)
         .set({ qaCheckedAt: new Date() })
         .where(and(eq(solicitations.id, input.solicitationId), eq(solicitations.organizationId, organizationId)));
+      if (input.actor) {
+        await recordAudit({
+          organizationId,
+          actor: input.actor,
+          action: "solicitation.qa.poll",
+          resourceType: "solicitation",
+          resourceId: input.solicitationId,
+          metadata: { noticeId: sol.noticeId, noSuchNotice: true },
+        });
+      }
     }
     return { ok: false, error: notice.error, cls: notice.cls };
   }
@@ -229,7 +239,7 @@ export async function pollSolicitationQa(input: {
   let retrying = 0;
   const nowSeen: string[] = [];
 
-  for (const link of toRead) {
+  for (const [i, link] of toRead.entries()) {
     const dl = await downloadSamResource(cred, link, QA_LIMITS.maxDownloadBytes);
     if (!dl.ok) {
       skipped.push(dl.error);
@@ -237,8 +247,13 @@ export async function pollSolicitationQa(input: {
       // of the poll's download slots ahead of a real Q&A attachment.
       if (dl.permanent) nowSeen.push(link);
       else retrying++;
-      // The same key would fail every remaining download.
-      if (isKeyOrQuotaFailure(dl.cls)) break;
+      // The same key would fail every remaining download: those stay unseen
+      // and are tried next time.
+      if (isKeyOrQuotaFailure(dl.cls)) {
+        for (let j = i + 1; j < toRead.length; j++) skipped.push(dl.error);
+        retrying += toRead.length - i - 1;
+        break;
+      }
       continue;
     }
     nowSeen.push(link);
@@ -297,10 +312,10 @@ export async function pollSolicitationQa(input: {
       action: "solicitation.qa.poll",
       resourceType: "solicitation",
       resourceId: input.solicitationId,
-      metadata: { noticeId: sol.noticeId, newDocuments: toRead.length, qaDocuments, added, duplicates, flagged, skipped: skipped.length },
+      metadata: { noticeId: sol.noticeId, newDocuments: toRead.length - skipped.length, qaDocuments, added, duplicates, flagged, skipped: skipped.length },
     });
   }
-  return { ok: true, newDocuments: toRead.length, qaDocuments, added, duplicates, flagged, skipped, retrying };
+  return { ok: true, newDocuments: toRead.length - skipped.length, qaDocuments, added, duplicates, flagged, skipped, retrying };
 }
 
 async function storePairs(input: {

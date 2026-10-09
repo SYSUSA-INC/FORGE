@@ -56,14 +56,11 @@ function reportSharedKeyRejected(endpoint: SamEndpoint, status: number | undefin
 }
 
 /**
- * Every SAM.gov request goes through here. The key is put only on a
- * request to SAM.gov itself (https on api.sam.gov or sam.gov; a link in
- * SAM.gov's payload pointing anywhere else is not fetched), every call
- * has a deadline that also covers reading the body, and a failure comes
- * back classified and worded, never as raw upstream text or a thrown
- * message (Node's "Failed to parse URL from …" would carry the key).
- * `keepLinkKey` leaves an `api_key` SAM.gov already put on an attachment
- * link (its `api_key=null` placeholder) as it is: those files are public.
+ * Every SAM.gov request goes through here: the key only on a request to
+ * SAM.gov itself (other hosts are not fetched), a deadline that covers the
+ * body too, and failures classified and worded, never raw upstream text or
+ * a thrown message (which can carry the URL and key). `keepLinkKey` keeps
+ * the `api_key=null` SAM.gov puts on its public attachment links.
  */
 async function samGet(
   cred: SamCredential,
@@ -74,7 +71,8 @@ async function samGet(
     log.warn("[samgov]", "skipped a link that is not on sam.gov", { endpoint: call.endpoint, host: url.hostname });
     return { ok: false, cls: "foreign_host", error: samErrorMessage({ cls: "foreign_host", source: cred.source, audience: cred.audience }) };
   }
-  if (!(call.keepLinkKey && url.searchParams.has("api_key"))) url.searchParams.set("api_key", cred.revealForSamRequest());
+  const keySent = !(call.keepLinkKey && url.searchParams.has("api_key"));
+  if (keySent) url.searchParams.set("api_key", cred.revealForSamRequest());
   let res: Response;
   try {
     res = await fetch(url, {
@@ -88,11 +86,16 @@ async function samGet(
   if (res.ok) return { ok: true, res };
   let body = "";
   try {
-    body = (await res.text()).slice(0, 4000);
+    // Redacted before it is cut or parsed, so no part of the key survives a trim.
+    body = redactSamSecrets(await res.text(), [cred.revealForSamRequest()]).slice(0, 4000);
   } catch {
     // The body is only read to classify the failure.
   }
-  return samFailure(cred, call.endpoint, { status: res.status, ...classifySamResponse(res.status, body, res.headers) });
+  const c = classifySamResponse(res.status, body, res.headers);
+  // A 401/403 is about FORGE's key only if the key was on the request and
+  // SAM.gov itself answered (not a storage host it redirected to).
+  const notOurKey = (!keySent || res.redirected) && (c.cls === "key_invalid" || c.cls === "key_forbidden");
+  return samFailure(cred, call.endpoint, { status: res.status, ...c, cls: notOurKey ? "restricted" : c.cls });
 }
 
 /** A SAM.gov JSON endpoint: a reply that isn't JSON is a failure, not a thrown SyntaxError. */
@@ -437,7 +440,7 @@ export async function searchSamGovOpportunities(
 
     return {
       ok: true,
-      opportunities: ops,
+      opportunities: withoutLinks(ops),
       totalRecords: totalAfterFilter,
     };
   } catch {
@@ -480,8 +483,9 @@ function buildAndKeyword(input: string): string {
  * Resolve description URLs into actual descriptions, four at a time.
  * BL-STAB-7a — a rejected or over-limit key stops new lookups (the same
  * key would fail every one), and so does a 20-second budget for the
- * whole set; a description still holding a URL is blanked so the UI
- * never shows it.
+ * whole set. A description that could not be resolved keeps its URL so
+ * the keyword filter can tell it apart; callers blank it (`withoutLinks`)
+ * so the UI never shows one.
  */
 async function enrichDescriptions(ops: SamOpportunity[], cred: SamCredential): Promise<SamOpportunity[]> {
   const queue = ops.map((op, i) => ({ op, i })).filter(({ op }) => isUrl(op.description));
@@ -496,14 +500,18 @@ async function enrichDescriptions(ops: SamOpportunity[], cred: SamCredential): P
       const item = queue.shift();
       if (!item) return;
       const r = await fetchNoticeDescription(item.op, cred);
-      out[item.i] = { ...item.op, description: r.ok ? r.text : "" };
-      if (!r.ok && isKeyOrQuotaFailure(r.cls)) stopped = true;
+      if (r.ok) out[item.i] = { ...item.op, description: r.text };
+      else if (isKeyOrQuotaFailure(r.cls)) stopped = true;
     }
   }
 
   await Promise.all(Array.from({ length: 4 }, () => worker()));
-  for (const { op, i } of queue) out[i] = { ...op, description: "" };
   return out;
+}
+
+/** A description still holding a link (never resolved) is blanked for display. */
+function withoutLinks(ops: SamOpportunity[]): SamOpportunity[] {
+  return ops.map((op) => (isUrl(op.description) ? { ...op, description: "" } : op));
 }
 
 function isUrl(s: string | null | undefined): boolean {
@@ -548,6 +556,9 @@ function filterByKeywordRelevance(
   if (tokens.length === 0) return ops;
 
   return ops.filter((op) => {
+    // BL-STAB-7a — a description FORGE couldn't fetch can't be checked;
+    // SAM.gov's own search matched the row, so it stays.
+    if (isUrl(op.description)) return true;
     const haystack = [
       op.title ?? "",
       op.description ?? "",
@@ -627,7 +638,7 @@ export async function fetchSamNotice(
         title: op.title ?? "",
         solicitationNumber: op.solicitationNumber ?? "",
         postedDate: op.postedDate ?? "",
-        description: enriched?.description ?? "",
+        description: enriched && !isUrl(enriched.description) ? enriched.description : "",
         uiLink: op.uiLink ?? "",
         resourceLinks: (op.resourceLinks ?? []).filter((l): l is string => typeof l === "string" && isUrl(l)),
       },
@@ -668,7 +679,7 @@ export async function downloadSamResource(
     return foreign();
   }
   const r = await samGet(cred, url, { endpoint: "attachment", keepLinkKey: true });
-  if (!r.ok) return { ...r, permanent: r.cls === "foreign_host" || r.cls === "not_found" };
+  if (!r.ok) return { ...r, permanent: r.cls === "foreign_host" || r.cls === "not_found" || r.cls === "restricted" };
   const res = r.res;
   const tooBig: SamDownloadFailure = { ok: false, permanent: true, error: `Attachment is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.` };
   if (Number(res.headers.get("content-length") ?? "0") > maxBytes) return tooBig;

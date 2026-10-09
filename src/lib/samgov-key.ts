@@ -2,16 +2,12 @@ import "server-only";
 import { samErrorMessage, type SamAudience, type SamFailure, type SamKeySource } from "@/lib/samgov-errors";
 
 /**
- * BL-STAB-7a — the SAM.gov key a call uses, as a value that cannot leak
- * by accident: the key sits in a private field, and JSON, string and
- * console forms show only its last four characters. Only samgov.ts reads
- * it, to put it on a request to SAM.gov.
- *
- * Every SAM.gov call takes a credential. Work for a company resolves one
- * with `resolveSamCredential(organizationId)`; platform work (the gold
- * set) uses `platformSamCredential({ audience: "operator" })`. Today both
- * are FORGE's shared key (SAMGOV_API_KEY); BL-STAB-7b adds the company's
- * own key to the resolver.
+ * BL-STAB-7a — the SAM.gov key a call uses, as a value that can't leak by
+ * accident: the key sits in a private field and its JSON, string and
+ * console forms show only the last four characters. Company work resolves
+ * one with `resolveSamCredential(organizationId)`; platform work (the gold
+ * set) uses `platformSamCredential({ audience: "operator" })`. Both are
+ * FORGE's shared key until BL-STAB-7b adds the company's own.
  */
 export class SamCredential {
   readonly #key: string;
@@ -68,7 +64,3 @@ export async function resolveSamCredential(organizationId: string): Promise<SamK
   };
 }
 
-/** The no-key failure for platform work (operator wording). */
-export function missingPlatformKeyFailure(): SamFailure {
-  return { ok: false, cls: "missing_key", error: samErrorMessage({ cls: "missing_key", source: "platform", audience: "operator" }) };
-}

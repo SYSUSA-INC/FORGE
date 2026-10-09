@@ -1,11 +1,7 @@
 /**
- * BL-STAB-7a — SAM.gov failures at runtime, against Postgres with fetch
- * stubbed. Two tenants. Asserts: the daily Q&A poll stops at the first
- * rejected-key answer (one call, nothing stamped) and does nothing without
- * a key; a notice SAM.gov says it doesn't have is stamped checked on its
- * owner's row only; attachment links that can never be read are marked
- * seen so they stop blocking a real Q&A attachment; importing a company
- * from SAM.gov is audited in the importer's organization only.
+ * BL-STAB-7a — SAM.gov failures at runtime (Postgres, fetch stubbed, two
+ * tenants): the daily Q&A poll stops at a rejected key; the Q&A queue
+ * skips what can never be read; stamps and audits stay with their owner.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
@@ -97,10 +93,29 @@ describe("BL-STAB-7a — SAM.gov failures at runtime", () => {
     const a = await solicitationWithNotice(fx.orgA.organizationId, "GONE-1");
     const b = await solicitationWithNotice(fx.orgB.organizationId, "GONE-1");
     stubFetch(() => json({ totalRecords: 0, opportunitiesData: [] }));
-    const poll = await pollSolicitationQa({ organizationId: fx.orgA.organizationId, solicitationId: a });
+    const poll = await pollSolicitationQa({ organizationId: fx.orgA.organizationId, solicitationId: a, actor: { userId: fx.orgA.userId, email: "a@test" } });
     expect(poll).toMatchObject({ ok: false, cls: "not_found", error: "SAM.gov has no notice with that ID posted in the last year." });
     expect((await qaState(fx.orgA.organizationId, a)).qaCheckedAt).not.toBeNull();
     expect((await qaState(fx.orgB.organizationId, b)).qaCheckedAt).toBeNull();
+    const audits = await db
+      .select({ metadata: auditLogs.metadata })
+      .from(auditLogs)
+      .where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "solicitation.qa.poll")));
+    expect(audits).toEqual([{ metadata: { noticeId: "GONE-1", noSuchNotice: true } }]);
+  });
+
+  it("a refused file is skipped for good; after a request limit the rest wait for next time", async () => {
+    const a = await solicitationWithNotice(fx.orgA.organizationId, "QA-2");
+    const refused = "https://sam.gov/files/cui/download?api_key=null&token=";
+    const later = [1, 2, 3].map((i) => `https://sam.gov/files/f${i}/download?api_key=null&token=`);
+    stubFetch((url) =>
+      url.pathname.endsWith("/search")
+        ? json({ opportunitiesData: [{ noticeId: "QA-2", title: "RFP", postedDate: "2026-10-01", description: "", resourceLinks: [refused, ...later] }] })
+        : new Response(url.pathname.includes("/cui/") ? "" : "<h1>OVER_RATE_LIMIT</h1>", { status: url.pathname.includes("/cui/") ? 403 : 429 }),
+    );
+    const poll = await pollSolicitationQa({ organizationId: fx.orgA.organizationId, solicitationId: a });
+    expect(poll).toMatchObject({ ok: true, newDocuments: 0, retrying: 3 });
+    expect((await qaState(fx.orgA.organizationId, a)).qaSeenLinks).toEqual([refused]);
   });
 
   it("links that can never be read are marked seen, so a real Q&A attachment is reached", async () => {
@@ -115,7 +130,7 @@ describe("BL-STAB-7a — SAM.gov failures at runtime", () => {
     );
 
     const first = await pollSolicitationQa({ organizationId: fx.orgA.organizationId, solicitationId: a });
-    expect(first).toMatchObject({ ok: true, newDocuments: 5, retrying: 0 });
+    expect(first).toMatchObject({ ok: true, newDocuments: 0, retrying: 0 });
     if (first.ok) expect(first.skipped[0]).toBe("Skipped an attachment link that isn't on sam.gov.");
     expect((await qaState(fx.orgA.organizationId, a)).qaSeenLinks).toEqual(foreign);
     expect(calls.filter((u) => u.hostname !== "api.sam.gov")).toHaveLength(0);

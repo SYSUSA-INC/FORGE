@@ -30,7 +30,8 @@ import {
   type TextHit,
 } from "@/lib/gold-set-logic";
 import { downloadSamResource, fetchSamNotice } from "@/lib/samgov";
-import { missingPlatformKeyFailure, platformSamCredential } from "@/lib/samgov-key";
+import { samErrorMessage } from "@/lib/samgov-errors";
+import { platformSamCredential } from "@/lib/samgov-key";
 import { extractTextFromAny } from "@/lib/solicitation-extract";
 
 /** Below this, a PDF has no usable text layer (a scan). */
@@ -88,7 +89,7 @@ export async function createGoldDocFromNotice(input: { noticeId: string; userId:
   if (await noticeTaken(noticeId)) return { ok: false, error: "That notice is already in the gold set." };
   // A platform asset: FORGE's shared key, with messages for platform admins.
   const sam = platformSamCredential({ audience: "operator" });
-  if (!sam) return { ok: false, error: missingPlatformKeyFailure().error };
+  if (!sam) return { ok: false, error: samErrorMessage({ cls: "missing_key", source: "platform", audience: "operator" }) };
   const found = await fetchSamNotice(sam, noticeId);
   if (!found.ok) return { ok: false, error: found.error };
   const notice = found.notice;

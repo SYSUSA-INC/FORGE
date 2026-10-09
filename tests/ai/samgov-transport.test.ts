@@ -1,10 +1,7 @@
 /**
- * BL-STAB-7a — how FORGE talks to SAM.gov, with fetch stubbed: the
- * owner's 401 page comes back as a plain message; the key is sent only to
- * SAM.gov hosts and never appears in an error; SAM.gov's own attachment
- * links keep their placeholder; every call has a deadline; description
- * lookups stop after a rejected key or when their budget runs out; the
- * credential never prints its key.
+ * BL-STAB-7a — how FORGE talks to SAM.gov (fetch stubbed): plain messages,
+ * the key only to SAM.gov hosts and never in an error, deadlines, and
+ * description lookups that stop after a rejection or their budget.
  */
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -117,12 +114,31 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("marks a gone attachment permanent and a server error retryable", async () => {
-    stubFetch((url) => new Response("", { status: url.pathname.includes("gone") ? 404 : 503 }));
-    const gone = await downloadSamResource(cred, "https://sam.gov/files/gone/download", 1024);
-    expect(gone).toMatchObject({ ok: false, cls: "not_found", permanent: true, error: "This attachment is no longer on SAM.gov (HTTP 404)." });
-    const busy = await downloadSamResource(cred, "https://sam.gov/files/busy/download", 1024);
-    expect(busy).toMatchObject({ ok: false, cls: "upstream", permanent: false });
+  it("redacts the key from SAM.gov's reply before trimming it", async () => {
+    stubFetch(() => json({ detail: `${"x".repeat(170)} key ${KEY} is not valid here` }, 400));
+    const r = await fetchSamNotice(cred, "N1");
+    expect(r).toMatchObject({ ok: false, cls: "bad_request" });
+    if (!r.ok) expect(r.error).not.toContain(KEY.slice(0, 8));
+  });
+
+  it("keeps keyword results whose description couldn't be checked (SAM.gov matched them)", async () => {
+    const ops = [1, 2, 3].map((i) => ({ ...op(i, `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=N${i}`), title: "Help desk" }));
+    stubFetch((url) => (url.pathname.endsWith("/search") ? json({ totalRecords: 3, opportunitiesData: ops }) : new Response(OWNER_BODY, { status: 401 })));
+    const r = await searchSamGovOpportunities(cred, { keyword: "cyber" });
+    expect(r.ok && r.opportunities.map((o) => o.description)).toEqual(["", "", ""]);
+  });
+
+  it("restricted and gone files are skipped for good; a server error is retried", async () => {
+    stubFetch((url) => new Response("", { status: url.pathname.includes("cui") ? 403 : url.pathname.includes("gone") ? 404 : 503 }));
+    // 403 on SAM.gov's own placeholder link: FORGE's key wasn't sent, so it isn't a key problem.
+    expect(await downloadSamResource(cred, "https://sam.gov/files/cui/download?api_key=null&token=", 1024)).toMatchObject({ ok: false, cls: "restricted", permanent: true });
+    expect(await downloadSamResource(cred, "https://sam.gov/files/gone/download", 1024)).toMatchObject({
+      ok: false,
+      cls: "not_found",
+      permanent: true,
+      error: "This attachment is no longer on SAM.gov (HTTP 404).",
+    });
+    expect(await downloadSamResource(cred, "https://sam.gov/files/busy/download", 1024)).toMatchObject({ ok: false, cls: "upstream", permanent: false });
   });
 
   it("never returns a thrown message (it can carry the URL and its key)", async () => {

@@ -1,9 +1,6 @@
 /**
- * BL-STAB-7a — SAM.gov failures in plain words (pure). The owner's
- * "SAM.gov 401: <html><body><h1>API_KEY_INVALID</h1>…" becomes a short
- * message naming whose key failed and what to do; every gateway and
- * SAM.gov error shape is read; no message carries HTML, a key or (for
- * tenants) an environment-variable name; only SAM.gov hosts get the key.
+ * BL-STAB-7a — SAM.gov failures in plain words (pure): every error shape is
+ * read; no message carries HTML, a key or (for tenants) a variable name.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -84,10 +81,7 @@ describe("BL-STAB-7a — SAM.gov error classes", () => {
     expect(message(401, OWNER_BODY, "company").text).toMatch(/^SAM\.gov rejected your company's SAM\.gov API key/);
     expect(message(401, OWNER_BODY, "platform", "operator").text).toContain("set SAMGOV_API_KEY in Vercel");
     expect(samErrorMessage({ cls: "missing_key", source: "platform", audience: "tenant" })).toBe("SAM.gov isn't connected in FORGE yet. Ask FORGE support to connect it.");
-    const classes: SamErrorClass[] = [
-      "missing_key", "key_invalid", "key_forbidden", "rate_limited", "bad_request", "not_found",
-      "upstream", "timeout", "network", "bad_response", "foreign_host",
-    ];
+    const classes: SamErrorClass[] = ["missing_key", "key_invalid", "key_forbidden", "rate_limited", "bad_request", "not_found", "upstream", "timeout", "network", "bad_response", "foreign_host", "restricted"];
     for (const cls of classes) {
       for (const source of ["company", "platform"] as const) {
         const detail = "<script>x</script>".repeat(40);
