@@ -388,6 +388,7 @@ export default async function SolicitationDetail({
         <SolicitationDocumentsPanel
           solicitationId={s.id}
           initial={companionDocs}
+          maxBytes={resolvePolicy("document", process.env).maxBytes}
         />
       </div>
 
