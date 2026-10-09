@@ -149,6 +149,7 @@ Follow `docs/SECRETS_ROTATION.md` for each of these on the prod Vercel project O
 - `CRON_SECRET` — fresh value
 - `RESEND_API_KEY` — fresh API key (request a new one from Resend)
 - `ANTHROPIC_API_KEY` — fresh API key
+- `FORGE_SECRET_KEYS` — the keyring for company SAM.gov keys (BL-STAB-7b), a **different** value on prod and on staging, marked Sensitive, **never** on Preview or Development. Generate one entry with `node -e "const c=require('crypto');console.log('k'+new Date().toISOString().slice(0,7).replace('-','')+c.randomBytes(2).toString('hex')+':'+c.randomBytes(32).toString('base64'))"` and keep a copy in the password manager: losing it makes every stored company key unreadable.
 
 Staging keeps the old keys for now; we rotate quarterly per `docs/SECRETS_ROTATION.md`.
 
@@ -192,7 +193,7 @@ Optionally, every developer has their own personal Neon branch under the staging
 
 ### PR previews
 
-Vercel automatically creates a preview deploy for every PR. Configured to use a per-PR Neon branch (via Vercel + Neon's preview integration).
+Vercel automatically creates a preview deploy for every PR. Configured to use a per-PR Neon branch (via Vercel + Neon's preview integration). Company SAM.gov keys can't be read there by design (`FORGE_SECRET_KEYS` is refused on previews), so previews use the shared `SAMGOV_API_KEY`.
 
 ### Promoting to staging
 

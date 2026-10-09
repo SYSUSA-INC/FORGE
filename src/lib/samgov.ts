@@ -450,6 +450,17 @@ export async function searchSamGovOpportunities(
 }
 
 /**
+ * BL-STAB-7b — one fixed search (the opportunity search, one result from
+ * the last day) that shows whether SAM.gov accepts a key, before it is saved.
+ */
+export async function testSamKey(cred: SamCredential): Promise<{ ok: true } | SamFailure> {
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const r = await samGetJson<unknown>(cred, samUrl(SAM_OPP_BASE, { limit: "1", postedFrom: mmddyyyy(yesterday), postedTo: mmddyyyy(today) }), "keyTest");
+  return r.ok ? { ok: true } : r;
+}
+
+/**
  * Compose a Lucene-style AND query from a user keyword. Quoted phrases
  * stay quoted (`"zero trust" deployment` becomes `+"zero trust" +deployment`).
  * Single tokens get a leading `+` so SAM.gov requires them.
@@ -489,6 +500,8 @@ function buildAndKeyword(input: string): string {
  */
 async function enrichDescriptions(ops: SamOpportunity[], cred: SamCredential): Promise<SamOpportunity[]> {
   const queue = ops.map((op, i) => ({ op, i })).filter(({ op }) => isUrl(op.description));
+  // BL-STAB-7b — a company's own key has its own (often small) daily allowance.
+  if (cred.source === "company") queue.splice(COMPANY_DESCRIPTION_LOOKUPS);
   if (queue.length === 0) return ops;
 
   const out = ops.slice();
@@ -508,6 +521,9 @@ async function enrichDescriptions(ops: SamOpportunity[], cred: SamCredential): P
   await Promise.all(Array.from({ length: 4 }, () => worker()));
   return out;
 }
+
+/** Description lookups per search on a company's own key; the rest stay unchecked. */
+const COMPANY_DESCRIPTION_LOOKUPS = 25;
 
 /** A description still holding a link (never resolved) is blanked for display. */
 function withoutLinks(ops: SamOpportunity[]): SamOpportunity[] {

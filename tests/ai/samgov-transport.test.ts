@@ -42,7 +42,7 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
       ok: false,
       cls: "key_invalid",
       status: 401,
-      error: "SAM.gov rejected FORGE's shared SAM.gov key: it is invalid or has expired. This has been logged for FORGE support; try again later. (SAM.gov API_KEY_INVALID, HTTP 401)",
+      error: "SAM.gov rejected FORGE's shared SAM.gov key, which your company uses because it hasn't added its own. This has been logged for FORGE support. To keep working now, a company admin can add your company's own key under Settings → Integrations. (SAM.gov API_KEY_INVALID, HTTP 401)",
     });
     expect(calls).toHaveLength(1);
     expect(new URL(calls[0]!.url).hostname).toBe("api.sam.gov");

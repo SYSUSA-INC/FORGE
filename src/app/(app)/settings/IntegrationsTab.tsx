@@ -31,11 +31,12 @@ export function IntegrationsTab({
         eyebrow={`${liveCount} of ${integrations.length} configured`}
       >
         <p className="font-body text-[13px] leading-relaxed text-muted">
-          Status of every external service FORGE talks to. These are
-          platform-level credentials (Vercel env vars) — features
-          gracefully degrade to stub mode when a provider isn&apos;t
-          configured, and the corresponding UI surfaces a banner so
-          you always know what&apos;s live versus mocked.
+          Status of the other external services FORGE talks to. These
+          run on platform-level credentials managed by the FORGE team —
+          features degrade to stub mode when a provider isn&apos;t
+          configured, and the UI shows a banner so you always know
+          what&apos;s live versus mocked. SAM.gov uses your company&apos;s
+          own key when one is set above.
         </p>
       </Panel>
 

@@ -37,6 +37,7 @@ A short tour of what arrived recently; each line points to the section that expl
 
 - **Request a trial** — anyone with a company email can ask for a 14-day trial workspace; editing never stops when a trial ends, only AI pauses (§1.0).
 - **API access** — admins create read-only API tokens to connect FORGE to a CRM or BI tool (§4.15).
+- **Your company's SAM.gov API key** — admins set the company's own key, tested with SAM.gov before it is saved (§4.16).
 - **Add-ons on your plan's invoice** — token top-ups, extra seats, extra storage and feature unlocks, added, changed or removed with proration (§4.14).
 - **Templates on your plan** — building and editing proposal templates is part of some plans; existing templates always keep working (§4.14).
 - **Reports** — win rate by agency, NAICS and set-aside, the stage funnel and twelve months of created vs won, each downloadable as CSV (§5.6).
@@ -174,7 +175,7 @@ Both pages source from the same `getOrganizationSnapshot()` aggregate, so the nu
 
 Until your organization has a UEI, its NAICS codes, scout keywords and a capability statement, org admins see a **Getting started** panel at the top of the Command Center (members never see it, and it disappears on its own once the four are in place):
 
-1. **Your SAM.gov registration** — enter your 12-character Unique Entity ID and click **Pull from SAM.gov**. FORGE fills in the company profile (name, address, CAGE, NAICS codes, set-asides) exactly as **Settings → Sync from SAM.gov** would. If the panel says SAM.gov lookups are not configured, ask your platform administrator, or fill the profile by hand under Settings.
+1. **Your SAM.gov registration** — enter your 12-character Unique Entity ID and click **Pull from SAM.gov**. FORGE fills in the company profile (name, address, CAGE, NAICS codes, set-asides) exactly as **Settings → Sync from SAM.gov** would. If the panel says SAM.gov lookups need a key, a company admin adds the company's SAM.gov API key under **Settings → Integrations** (§4.16), or fill the profile by hand under Settings.
 2. **A starting setup, proposed by the AI** — click **Propose a starting setup**. From the registration alone the AI drafts a **capability statement** (bracketed placeholders such as `[contract number]` mark facts only you can supply — it never invents contracts, customers or staff), picks **scout keywords**, suggests **extra NAICS to watch** and names **target agencies** with a reason each. Edit the text, remove or add keywords (Enter adds one), remove codes or agencies, then **Save to FORGE**: the keywords and extra NAICS go to the Scout profile (added to anything already there), the statement becomes a knowledge entry tagged `onboarding` that the Brain can cite, and the target agencies are kept with it. Tick **Run the scout now** to get the first overnight-style finds immediately. **Propose again** asks for a fresh proposal.
 
 If AI is not enabled for your plan the second step explains why; when the platform runs without a live AI provider the proposal is built from the registration only and says so.
@@ -310,6 +311,17 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 - **Revoked by FORGE support.** If FORGE support revokes a token (say, because it was reported leaked), the list shows "revoked by FORGE support" and your Audit Log records the reason. Make a new token for the integration.
 
 ---
+
+
+### 4.16 Your company's SAM.gov API key (admins)
+
+**Settings → Integrations → SAM.gov API key** (BL-STAB-7b). Import from SAM.gov, company search and sync, Getting started, the scout and **Check SAM.gov now** use your company's own key when one is set, and FORGE's shared key otherwise.
+
+- **Get a key:** sign in to SAM.gov, open **Account Details** and request a **Public API Key**. SAM.gov sets how many requests a day a key allows, and keys expire after a period SAM.gov sets; replace yours before it does.
+- **Test and save:** paste the key and click **Test and save**. FORGE runs one search with it first and saves it only if SAM.gov recognises it; otherwise nothing changes and the message says why (rejected, refused, or SAM.gov couldn't be reached). A key at its daily limit is saved, with a note. Up to five tests per company per hour.
+- **Never shown again:** FORGE encrypts the key and only ever sends it to SAM.gov; the panel shows its last four characters, who added it and when SAM.gov accepted it.
+- **Remove company key** goes back to FORGE's shared key (or turns SAM.gov features off if there is none).
+- **Members** see only whether SAM.gov is connected, and with whose key.
 
 ## 5. Opportunities
 

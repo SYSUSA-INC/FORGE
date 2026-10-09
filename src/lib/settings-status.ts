@@ -113,17 +113,6 @@ function envSet(name: string): boolean {
 export function getIntegrationStatuses(): IntegrationStatus[] {
   return [
     {
-      key: "samgov",
-      name: "SAM.gov",
-      category: "data",
-      configured: envSet("SAMGOV_API_KEY"),
-      powers:
-        "Opportunity search and import, entity (UEI/CAGE) lookups for organizations and competitors.",
-      detail: envSet("SAMGOV_API_KEY")
-        ? "SAMGOV_API_KEY is set."
-        : "Set SAMGOV_API_KEY on Vercel. Free key from sam.gov/data-services.",
-    },
-    {
       key: "usaspending",
       name: "USAspending.gov",
       category: "data",
