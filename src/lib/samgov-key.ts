@@ -12,12 +12,13 @@ import {
   KEYRING_UNAVAILABLE_MESSAGE,
   SAM_KEY_TEST_LIMITS,
   refusedMessage,
+  saveFailedMessage,
   saveOutcome,
   savedMessage,
   tooManyTestsMessage,
   validateSamKeyInput,
 } from "@/lib/samgov-key-logic";
-import { safeQuery } from "@/lib/schema-resilience";
+import { isSchemaSyncError, safeQuery } from "@/lib/schema-resilience";
 import { SecretBoxError, canDecryptKeyId, decryptSecret, encryptSecret, keyringStatus } from "@/lib/secret-box";
 
 /**
@@ -201,6 +202,8 @@ export async function setCompanySamKey(input: {
   const candidate = new SamCredential(valid.key, { source: "company", audience: "tenant", organizationId });
   const outcome = saveOutcome(await testSamKey(candidate));
   const previousLast4 = status.company?.last4 ?? null;
+  // Only a key this server can read is "still in use" if the new one isn't saved.
+  const keptLast4 = status.company?.readable ? status.company.last4 : null;
   if (!outcome.save) {
     await recordAudit({
       organizationId,
@@ -210,7 +213,7 @@ export async function setCompanySamKey(input: {
       resourceId: organizationId,
       metadata: { last4: candidate.last4, result: outcome.cls },
     });
-    return { ok: false, error: refusedMessage(outcome.cls, previousLast4) };
+    return { ok: false, error: refusedMessage(outcome.cls, keptLast4) };
   }
 
   const { ciphertext, keyId } = encryptSecret(valid.key, { purpose: PURPOSE, organizationId });
@@ -233,7 +236,7 @@ export async function setCompanySamKey(input: {
       .onConflictDoUpdate({ target: organizationSamgovKeys.organizationId, set: values });
   } catch (err) {
     log.error("[samgov-key]", "saving the company key failed", { organizationId, error: err });
-    return { ok: false, error: DATABASE_PENDING_MESSAGE };
+    return { ok: false, error: isSchemaSyncError(err) ? DATABASE_PENDING_MESSAGE : saveFailedMessage(keptLast4) };
   }
   await recordAudit({
     organizationId,

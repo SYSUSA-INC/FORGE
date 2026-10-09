@@ -75,9 +75,9 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
         {company && company.readable
           ? `${maskLast4(company.last4)} · added${company.setByName ? ` by ${company.setByName}` : ""} on ${day(company.setAt)}${company.verifiedAt ? ` · SAM.gov accepted it on ${day(company.verifiedAt)}` : ""}`
           : company
-            ? `This key (${maskLast4(company.last4)}) can't be read on this FORGE server, so ${view.platformConfigured ? "FORGE's shared key is used" : "SAM.gov features are off"}. Re-enter it to use it here.`
+            ? `This key (${maskLast4(company.last4)}) can't be read on this FORGE server, so ${view.platformConfigured ? "FORGE's shared key is used" : "SAM.gov features are off"}. ${view.canSave ? "Re-enter it to use it here." : "It will work again once FORGE support restores key encryption on this server; there is no need to remove it."}`
             : view.platformConfigured
-              ? "Using FORGE's shared SAM.gov key. Add your company's own key so your searches don't share a daily limit with other companies."
+              ? `Using FORGE's shared SAM.gov key.${view.canSave ? " Add your company's own key so your searches don't share a daily limit with other companies." : ""}`
               : "No SAM.gov key. Import, company search, the scout and Q&A checks are off until a company admin adds one."}
       </p>
       {company?.status === "rate_limited" ? (

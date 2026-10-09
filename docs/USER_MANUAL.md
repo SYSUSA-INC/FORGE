@@ -363,7 +363,7 @@ The page prefills your org's NAICS codes and returns active solicitations from t
 
 Click **Search**. Results show title, agency, solicitation number, NAICS, set-aside, place of performance, description preview, due date, and a link to the SAM.gov page. Checkboxes let you multi-select; **Select all** picks every un-imported result. Click **Import N selected** to pull them into your opportunities list.
 
-**When SAM.gov says no (BL-STAB-7a).** A failed search, sync or lookup now says what happened in one line, with SAM.gov's code and HTTP status at the end for support: SAM.gov **rejected** the key (it is invalid or expired; FORGE support is alerted), the key reached SAM.gov's **request limit** (try later; it resets daily), SAM.gov is **having trouble** or **didn't answer** in time (try again in a few minutes), or FORGE **couldn't reach** SAM.gov. Company search, **Sync from SAM.gov**, Getting started, the scout's run note and **Check SAM.gov now** use the same messages.
+**When SAM.gov says no (BL-STAB-7a).** A failed search, sync or lookup now says what happened in one line, with SAM.gov's code and HTTP status at the end for support: SAM.gov **rejected** the key (it is invalid or expired: if it is your company's own key, a company admin replaces it under **Settings → Integrations** (§4.16); if it is FORGE's shared key, FORGE support is alerted), the key reached SAM.gov's **request limit** (try later; it resets daily), SAM.gov is **having trouble** or **didn't answer** in time (try again in a few minutes), or FORGE **couldn't reach** SAM.gov. Company search, **Sync from SAM.gov**, Getting started, the scout's run note and **Check SAM.gov now** use the same messages.
 
 Already-imported notices are flagged and disabled so you don't duplicate.
 

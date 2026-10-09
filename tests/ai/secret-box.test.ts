@@ -46,7 +46,7 @@ describe("BL-STAB-7b — secret box", () => {
     expect(ivs.size).toBe(1000);
   });
 
-  it("refuses another organization, another purpose's binding, tampering and short tags", () => {
+  it("refuses another organization, tampering, short tags and unknown key ids", () => {
     const { ciphertext } = encryptSecret(SECRET, ctxA, ENV);
     expect(reason(() => decryptSecret(ciphertext, { ...ctxA, organizationId: ORG_B }, ENV))).toBe("auth_failed");
     for (const part of [2, 3, 4]) expect(reason(() => decryptSecret(flip(ciphertext, part), ctxA, ENV))).toBe("auth_failed");

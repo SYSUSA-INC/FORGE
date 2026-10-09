@@ -34,6 +34,7 @@ import { loadSamGovOpportunitiesAction } from "@/app/(app)/opportunities/import/
 import { setCompanySamKeyAction } from "@/app/(app)/settings/integrations/samgov-key-actions";
 
 const KEY_A = "CompanyAkey0123456789abcdefghijklmnopAAAA";
+const RING = `k1:${randomBytes(32).toString("base64")}`;
 const SHARED = "SharedKey0123456789abcdefghijklmnopqSHRD";
 const OWNER_BODY = "<html><body><h1>API_KEY_INVALID</h1></body></html>";
 
@@ -58,7 +59,7 @@ describe("BL-STAB-7b — a company's own SAM.gov key", () => {
     sessionUserStub.id = fx.orgA.userId;
     sessionUserStub.organizationId = fx.orgA.organizationId;
     flags.impersonating = false;
-    vi.stubEnv("FORGE_SECRET_KEYS", `k1:${randomBytes(32).toString("base64")}`);
+    vi.stubEnv("FORGE_SECRET_KEYS", RING);
     vi.stubEnv("SAMGOV_API_KEY", SHARED);
   });
   afterEach(async () => {
@@ -145,7 +146,8 @@ describe("BL-STAB-7b — a company's own SAM.gov key", () => {
     const copied = await resolveSamCredential(fx.orgB.organizationId);
     expect(copied.ok && copied.cred.revealForSamRequest()).toBe(SHARED);
 
-    for (const env of [{ FORGE_SECRET_KEYS: "" }, { VERCEL_ENV: "preview" }]) {
+    // The preview case keeps the valid ring: only the preview rule can refuse it.
+    for (const env of [{ FORGE_SECRET_KEYS: "" }, { FORGE_SECRET_KEYS: RING, VERCEL_ENV: "preview" }]) {
       for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
       const calls = stubFetch(200);
       expect((await setCompanySamKey({ organizationId: fx.orgA.organizationId, rawKey: KEY_A, actor: actorA() })).ok).toBe(false);

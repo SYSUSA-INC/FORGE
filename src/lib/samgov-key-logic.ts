@@ -52,6 +52,11 @@ export function refusedMessage(cls: SamErrorClass, previousLast4: string | null)
   return `SAM.gov couldn't be reached to test the key, so nothing was saved. Try again in a few minutes.${keep}`;
 }
 
+export function saveFailedMessage(keptLast4: string | null): string {
+  const keep = keptLast4 ? ` Your current key (${maskLast4(keptLast4)}) is still in use.` : "";
+  return `SAM.gov accepted the key, but FORGE couldn't save it just now, so nothing was saved. Try again in a few minutes.${keep}`;
+}
+
 export const KEYRING_UNAVAILABLE_MESSAGE =
   "Company SAM.gov keys can't be saved on this FORGE server yet. FORGE support has to enable key encryption first.";
 export const DATABASE_PENDING_MESSAGE =

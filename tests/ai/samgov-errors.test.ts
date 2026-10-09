@@ -29,7 +29,7 @@ describe("BL-STAB-7a — SAM.gov error classes", () => {
     expect(m.cls).toBe("key_invalid");
     expect(m.code).toBe("API_KEY_INVALID");
     expect(m.text).toBe(
-      "SAM.gov rejected FORGE's shared SAM.gov key, which your company uses because it hasn't added its own. This has been logged for FORGE support. To keep working now, a company admin can add your company's own key under Settings → Integrations. (SAM.gov API_KEY_INVALID, HTTP 401)",
+      "SAM.gov rejected FORGE's shared SAM.gov key. This has been logged for FORGE support. To keep working now, a company admin can set your company's own key under Settings → Integrations. (SAM.gov API_KEY_INVALID, HTTP 401)",
     );
   });
 
