@@ -74,12 +74,12 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 in PR #369) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
-| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
+| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a (plain errors; the key goes only to SAM.gov) in PR #370; 7b–7e queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
-| 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | 🔄 in PR #369 (with BL-STAB-2d-1) |
+| 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued, right after BL-STAB-2c (owner, 2026-10-08) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -180,7 +180,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368; 2d-1 in PR #369) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · 🔄 BL-STAB-6 in PR #369 · ⏳ BL-STAB-3, 5, 7 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · 🔄 BL-STAB-7 (7a in PR #370) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -446,7 +446,7 @@ mind. Bandage will come off but a true fix will stay."
         and images); two tests that would pass if the ETag or
         size-before-download guard broke.
     - **2d-1 — companion documents upload straight to storage, several
-      at once (with BL-STAB-6).** 🔄 in PR #369.
+      at once (with BL-STAB-6).** ✅ shipped (PR #369).
       - `addSolicitationDocumentFromUploadAction` replaces the multipart
         `addSolicitationDocumentAction` and its 25 MB cap: the parent is
         checked before the claim (a wrong parent leaves the upload
@@ -548,25 +548,43 @@ mind. Bandage will come off but a true fix will stay."
       the missing ones; re-running the review keeps the matrix; a
       malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
-  nowhere to set one.** ⏳ queued.
-  - **Symptom:** Settings → SAM.gov sync (UEI) shows "SAM.gov 401:
-    `<html><body><h1>API_KEY_INVALID</h1>…`". The owner: "there has to
-    be a place where the company admin can update their API key".
-  - **Root cause:** The SAM.gov key is a single platform-wide
-    environment variable, `SAMGOV_API_KEY`. It is read for calls in
-    `samgov.ts`, `scout.ts`, `solicitation-qa.ts`, `sba-8a.ts` and the
-    8(a) admin, and the health route. It is checked for presence in
-    onboarding, the solicitation page's Q&A panel (`hasSamKey`),
-    `settings-status.ts` and `env-check.ts`. No company can supply its
-    own, and SAM.gov's HTML error body is shown raw.
-  - **Fix:**
-    - A company admin sets the company's own SAM.gov key under
-      company settings. It is encrypted at rest, masked when shown,
-      checked with a live test call on save, and audited.
-    - Every SAM.gov call and presence check for that company uses it,
-      falling back to the platform key.
-    - 401, 403 and 429 responses become plain messages that say what
-      to do.
+  nowhere to set one.** 🔄 7a in PR #370; 7b–7e queued (re-sized S → L).
+  - **Symptom:** Import from SAM.gov and Settings → SAM.gov sync show
+    "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
+    "there has to be a place where the company admin can update their
+    API key".
+  - **Root cause (traced call by call; design by three proposals and two
+    judges, checked by a completeness critic):**
+    - SAM.gov's key gateway answers a bad key as HTML or
+      `{"error":{"code"}}`; `friendlySamError` read only SAM.gov's own
+      JSON and fell through to the raw body (`samgov.ts:303`).
+    - One platform key, `SAMGOV_API_KEY`, for every company; no company
+      can supply its own, and presence checks lock everyone out without it.
+    - The key was appended to any link in SAM.gov's payload (description
+      and attachment links) with no host check, and thrown fetch errors
+      (which can carry the URL and key) were shown to users.
+    - Loops kept calling after a rejection; a notice SAM.gov no longer
+      has, and links that can never download, blocked the Q&A queue.
+  - **Phases (one PR each, in order):**
+    - **7a — plain errors; the key goes only to SAM.gov** (in PR #370):
+      `samgov-errors.ts` reads all three error shapes and words each
+      class (rejected key, refused, request limit, SAM.gov trouble,
+      timeout, unreachable, unreadable reply), naming whose key failed
+      with the SAM.gov code and HTTP status; `samgov-key.ts` carries the
+      key in a credential that never prints it; one `samGet` sends the
+      key only to https api.sam.gov / sam.gov, with a deadline on every
+      call; description lookups, the scout, Q&A downloads and the daily
+      Q&A poll stop at the first rejection; a missing notice is stamped
+      checked; unreadable links are marked seen; a dead shared key
+      reaches /admin/errors; the unused `/api/samgov/entity` is removed;
+      importing a company from SAM.gov is audited.
+    - **Queued:** 7b — a company admin sets the company's own key on
+      Settings → Integrations (encrypted with the organization bound in,
+      tested on save, migration 0127); 7c — the 8(a) registry, cert
+      refresh, gold set and health probe on the shared key, the cert
+      cron out of the `"use server"` module; 7d — nightly jobs per
+      company, fair and within the cron's time; 7e — platform admins see
+      and remove company keys and re-encrypt after a keyring rotation.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
   data.** ⏳ queued (added 2026-10-08).
   - **Ask (owner):** "We need to enforce some security gates for
@@ -639,8 +657,8 @@ mind. Bandage will come off but a true fix will stay."
     each is filed under the solicitation with its number and parsed.
   - **4b — each amendment diffed against the one before it** (ordered by
     number and date) instead of only against the base. ⏳ queued.
-- **BL-STAB-6 — Companion documents one at a time.** 🔄 in PR #369
-  (with BL-STAB-2d-1).
+- **BL-STAB-6 — Companion documents one at a time.** ✅ shipped (PR #369,
+  with BL-STAB-2d-1).
   - **Ask:** Upload several companion documents in one go, to compare
     against.
   - **Fix:**

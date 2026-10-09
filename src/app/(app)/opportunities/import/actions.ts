@@ -15,6 +15,7 @@ import {
   searchSamGovOpportunities,
   type SamOpportunity,
 } from "@/lib/samgov";
+import { resolveSamCredential } from "@/lib/samgov-key";
 
 const GSA_DEPARTMENT = "General Services Administration";
 
@@ -83,7 +84,9 @@ export async function loadSamGovOpportunitiesAction(input?: {
     };
   }
 
-  const result = await searchSamGovOpportunities({
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) return { ok: false, error: sam.failure.error };
+  const result = await searchSamGovOpportunities(sam.cred, {
     naicsCodes,
     keyword: input?.keyword,
     postedDaysBack: input?.postedDaysBack ?? 30,

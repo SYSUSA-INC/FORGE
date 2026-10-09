@@ -1,6 +1,124 @@
+import "server-only";
 import { log } from "@/lib/log";
+import {
+  DESCRIPTION_BUDGET_MS,
+  SAM_TIMEOUTS_MS,
+  classifyFetchError,
+  classifySamResponse,
+  isKeyOrQuotaFailure,
+  isSamHost,
+  redactSamSecrets,
+  samErrorMessage,
+  type SamEndpoint,
+  type SamErrorClass,
+  type SamFailure,
+} from "@/lib/samgov-errors";
+import type { SamCredential } from "@/lib/samgov-key";
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-STAB-7a — the one way FORGE talks to SAM.gov
+// ─────────────────────────────────────────────────────────────────────
+
+/** A failure worded for whoever will read it; logged without the URL (it carries the key). */
+function samFailure(
+  cred: SamCredential,
+  endpoint: SamEndpoint,
+  f: { cls: SamErrorClass; status?: number; code?: string | null; detail?: string | null; retryAfterSec?: number | null },
+): SamFailure {
+  const detail = f.detail ? redactSamSecrets(f.detail, [cred.revealForSamRequest()]) : null;
+  const error = samErrorMessage({
+    ...f,
+    detail,
+    source: cred.source,
+    audience: cred.audience,
+    endpoint,
+    timeoutSec: Math.round(SAM_TIMEOUTS_MS[endpoint] / 1000),
+  });
+  log.warn("[samgov]", "request failed", { endpoint, status: f.status, cls: f.cls, code: f.code ?? null, source: cred.source });
+  if (cred.source === "platform" && (f.cls === "key_invalid" || f.cls === "key_forbidden")) {
+    reportSharedKeyRejected(endpoint, f.status, f.code ?? null);
+  }
+  return { ok: false, error, cls: f.cls, status: f.status };
+}
+
+let sharedKeyReportedAt = 0;
+/** A dead shared key reaches /admin/errors, at most every ten minutes per instance. */
+function reportSharedKeyRejected(endpoint: SamEndpoint, status: number | undefined, code: string | null) {
+  const now = Date.now();
+  if (now - sharedKeyReportedAt < 10 * 60_000) return;
+  sharedKeyReportedAt = now;
+  log.error("[samgov]", "shared key rejected", {
+    endpoint,
+    error: new Error(`SAM.gov rejected FORGE's shared key SAMGOV_API_KEY (HTTP ${status ?? "?"}${code ? ` ${code}` : ""}) on ${endpoint}`),
+  });
+}
+
+/**
+ * Every SAM.gov request goes through here. The key is put only on a
+ * request to SAM.gov itself (https on api.sam.gov or sam.gov; a link in
+ * SAM.gov's payload pointing anywhere else is not fetched), every call
+ * has a deadline that also covers reading the body, and a failure comes
+ * back classified and worded, never as raw upstream text or a thrown
+ * message (Node's "Failed to parse URL from …" would carry the key).
+ * `keepLinkKey` leaves an `api_key` SAM.gov already put on an attachment
+ * link (its `api_key=null` placeholder) as it is: those files are public.
+ */
+async function samGet(
+  cred: SamCredential,
+  url: URL,
+  call: { endpoint: SamEndpoint; accept?: "application/json"; keepLinkKey?: boolean },
+): Promise<{ ok: true; res: Response } | SamFailure> {
+  if (!isSamHost(url)) {
+    log.warn("[samgov]", "skipped a link that is not on sam.gov", { endpoint: call.endpoint, host: url.hostname });
+    return { ok: false, cls: "foreign_host", error: samErrorMessage({ cls: "foreign_host", source: cred.source, audience: cred.audience }) };
+  }
+  if (!(call.keepLinkKey && url.searchParams.has("api_key"))) url.searchParams.set("api_key", cred.revealForSamRequest());
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      cache: "no-store",
+      signal: timeoutSignal(SAM_TIMEOUTS_MS[call.endpoint]),
+      headers: call.accept ? { accept: call.accept } : undefined,
+    });
+  } catch (err) {
+    return samFailure(cred, call.endpoint, { cls: classifyFetchError(err) });
+  }
+  if (res.ok) return { ok: true, res };
+  let body = "";
+  try {
+    body = (await res.text()).slice(0, 4000);
+  } catch {
+    // The body is only read to classify the failure.
+  }
+  return samFailure(cred, call.endpoint, { status: res.status, ...classifySamResponse(res.status, body, res.headers) });
+}
+
+/** A SAM.gov JSON endpoint: a reply that isn't JSON is a failure, not a thrown SyntaxError. */
+async function samGetJson<T>(cred: SamCredential, url: URL, endpoint: SamEndpoint): Promise<{ ok: true; data: T } | SamFailure> {
+  const r = await samGet(cred, url, { endpoint, accept: "application/json" });
+  if (!r.ok) return r;
+  let text: string;
+  try {
+    text = await r.res.text();
+  } catch (err) {
+    return samFailure(cred, endpoint, { cls: classifyFetchError(err) });
+  }
+  try {
+    const data = JSON.parse(text) as T;
+    if (data && typeof data === "object") return { ok: true, data };
+  } catch {
+    // fall through
+  }
+  return samFailure(cred, endpoint, { cls: "bad_response", status: r.res.status });
+}
+
+function samUrl(base: string, params: Record<string, string>): URL {
+  const url = new URL(base);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  return url;
+}
 
 /**
  * SAM.gov Entity Management API hard-caps `size` at 10 records per
@@ -163,50 +281,18 @@ export function normalizeSamEntity(raw: SamRawEntity): NormalizedSamEntity {
 }
 
 export async function fetchSamGovByUei(
+  cred: SamCredential,
   uei: string,
-): Promise<
-  | { ok: true; profile: NormalizedSamEntity }
-  | { ok: false; error: string; status?: number }
-> {
-  const key = process.env.SAMGOV_API_KEY;
-  if (!key) {
-    return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
+): Promise<{ ok: true; profile: NormalizedSamEntity } | SamFailure> {
+  if (!uei) return { ok: false, cls: "bad_request", error: "Provide a UEI." };
+  const url = samUrl(SAM_BASE, { samRegistered: "Yes", page: "0", size: "1", ueiSAM: uei });
+  const r = await samGetJson<{ totalRecords?: number; entityData?: SamRawEntity[] }>(cred, url, "entity");
+  if (!r.ok) return r;
+  const first = Array.isArray(r.data.entityData) ? r.data.entityData[0] : undefined;
+  if (!first) {
+    return { ok: false, cls: "not_found", error: "No matching registered entity found in SAM.gov." };
   }
-  if (!uei) return { ok: false, error: "Provide a UEI." };
-
-  const params = new URLSearchParams({
-    api_key: key,
-    samRegistered: "Yes",
-    page: "0",
-    size: "1",
-    ueiSAM: uei,
-  });
-
-  try {
-    const res = await fetch(`${SAM_BASE}?${params.toString()}`, { cache: "no-store" });
-    const text = await res.text();
-    if (!res.ok) {
-      return {
-        ok: false,
-        error: friendlySamError(text, res.status),
-        status: res.status,
-      };
-    }
-    const data = JSON.parse(text) as {
-      totalRecords?: number;
-      entityData?: SamRawEntity[];
-    };
-    const first = data.entityData?.[0];
-    if (!first) {
-      return { ok: false, error: "No matching registered entity found in SAM.gov." };
-    }
-    return { ok: true, profile: normalizeSamEntity(first) };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
+  return { ok: true, profile: normalizeSamEntity(first) };
 }
 
 const SAM_OPP_BASE = "https://api.sam.gov/opportunities/v2/search";
@@ -274,52 +360,15 @@ function mmddyyyy(d: Date): string {
   return `${mm}/${dd}/${d.getFullYear()}`;
 }
 
-/**
- * SAM.gov returns errors as JSON like
- *   { httpStatus, title, detail, type, errorCode, source }
- * Surface that in a human-readable line; fall back to the raw body
- * (truncated) if the response isn't JSON. Keeps the UI from showing
- * a wall of unparsed JSON to end users when SAM.gov rejects a query.
- */
-function friendlySamError(body: string, httpStatus: number): string {
-  try {
-    const j = JSON.parse(body) as {
-      title?: string;
-      detail?: string;
-      errorCode?: string;
-      source?: string;
-    };
-    const parts = [
-      j.detail ?? j.title ?? "",
-      j.errorCode ? `[${j.errorCode}]` : "",
-      j.source ? `· ${j.source}` : "",
-    ]
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (parts.length) return parts.join(" ");
-  } catch {
-    // Not JSON; fall through.
-  }
-  return `SAM.gov ${httpStatus}: ${body.slice(0, 300)}`;
-}
-
 export async function searchSamGovOpportunities(
+  cred: SamCredential,
   input: SamOpportunitySearchParams,
-): Promise<
-  | { ok: true; opportunities: SamOpportunity[]; totalRecords: number }
-  | { ok: false; error: string; status?: number }
-> {
-  const key = process.env.SAMGOV_API_KEY;
-  if (!key) {
-    return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
-  }
-
+): Promise<{ ok: true; opportunities: SamOpportunity[]; totalRecords: number } | SamFailure> {
   const postedTo = new Date();
   const postedFrom = new Date();
   postedFrom.setDate(postedFrom.getDate() - (input.postedDaysBack ?? 30));
 
   const params = new URLSearchParams({
-    api_key: key,
     limit: String(input.limit ?? 50),
     postedFrom: mmddyyyy(postedFrom),
     postedTo: mmddyyyy(postedTo),
@@ -348,22 +397,12 @@ export async function searchSamGovOpportunities(
     params.set("deptname", input.department.trim());
   }
 
+  const url = new URL(SAM_OPP_BASE);
+  url.search = params.toString();
   try {
-    const res = await fetch(`${SAM_OPP_BASE}?${params.toString()}`, {
-      cache: "no-store",
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      return {
-        ok: false,
-        error: friendlySamError(text, res.status),
-        status: res.status,
-      };
-    }
-    const data = JSON.parse(text) as {
-      totalRecords?: number;
-      opportunitiesData?: SamOpportunity[];
-    };
+    const r = await samGetJson<{ totalRecords?: number; opportunitiesData?: SamOpportunity[] }>(cred, url, "oppSearch");
+    if (!r.ok) return r;
+    const data = r.data;
     let ops = (data.opportunitiesData ?? []).filter((o) =>
       input.activeOnly === false ? true : o.active === "Yes",
     );
@@ -374,7 +413,7 @@ export async function searchSamGovOpportunities(
     // a raw URL and downstream relevance filtering has something to
     // work with. Limit concurrency so we don't hammer the upstream.
     if (input.enrichDescriptions !== false) {
-      ops = await enrichDescriptions(ops, key);
+      ops = await enrichDescriptions(ops, cred);
     }
 
     // Post-fetch relevance gate. SAM.gov's `q` fuzzy-matches and often
@@ -401,11 +440,9 @@ export async function searchSamGovOpportunities(
       opportunities: ops,
       totalRecords: totalAfterFilter,
     };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
+  } catch {
+    // Data SAM.gov shaped unexpectedly: never a thrown message to the user.
+    return samFailure(cred, "oppSearch", { cls: "bad_response" });
   }
 }
 
@@ -440,43 +477,32 @@ function buildAndKeyword(input: string): string {
 }
 
 /**
- * Resolve description URLs into actual descriptions. Caps concurrency
- * at 4 so large result sets don't fan out into 50 requests at once.
+ * Resolve description URLs into actual descriptions, four at a time.
+ * BL-STAB-7a — a rejected or over-limit key stops new lookups (the same
+ * key would fail every one), and so does a 20-second budget for the
+ * whole set; a description still holding a URL is blanked so the UI
+ * never shows it.
  */
-async function enrichDescriptions(
-  ops: SamOpportunity[],
-  apiKey: string,
-): Promise<SamOpportunity[]> {
-  const needsFetch = ops
-    .map((op, i) => ({ op, i }))
-    .filter(({ op }) => isUrl(op.description));
-
-  if (needsFetch.length === 0) return ops;
+async function enrichDescriptions(ops: SamOpportunity[], cred: SamCredential): Promise<SamOpportunity[]> {
+  const queue = ops.map((op, i) => ({ op, i })).filter(({ op }) => isUrl(op.description));
+  if (queue.length === 0) return ops;
 
   const out = ops.slice();
-  const queue = needsFetch.slice();
-  const concurrency = 4;
+  const deadline = Date.now() + DESCRIPTION_BUDGET_MS;
+  let stopped = false;
 
   async function worker(): Promise<void> {
-    while (queue.length > 0) {
+    while (!stopped && Date.now() < deadline) {
       const item = queue.shift();
       if (!item) return;
-      try {
-        const fetched = await fetchNoticeDescription(item.op, apiKey);
-        if (fetched) {
-          out[item.i] = { ...item.op, description: fetched };
-        } else {
-          // Couldn't resolve — drop the URL so the UI doesn't show it.
-          out[item.i] = { ...item.op, description: "" };
-        }
-      } catch (err) {
-        log.warn("[samgov]", "noticedesc fetch failed", { error: err });
-        out[item.i] = { ...item.op, description: "" };
-      }
+      const r = await fetchNoticeDescription(item.op, cred);
+      out[item.i] = { ...item.op, description: r.ok ? r.text : "" };
+      if (!r.ok && isKeyOrQuotaFailure(r.cls)) stopped = true;
     }
   }
 
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  await Promise.all(Array.from({ length: 4 }, () => worker()));
+  for (const { op, i } of queue) out[i] = { ...op, description: "" };
   return out;
 }
 
@@ -485,34 +511,27 @@ function isUrl(s: string | null | undefined): boolean {
   return /^https?:\/\//i.test(s.trim());
 }
 
-async function fetchNoticeDescription(
-  op: SamOpportunity,
-  apiKey: string,
-): Promise<string> {
-  // Two paths: the description field IS the URL, or we synthesize one
-  // from noticeId. Some payloads only give us the URL.
-  const url = op.description?.trim();
-  let target = "";
-  if (url && isUrl(url)) {
-    // Append api_key if not present.
-    target = url.includes("api_key=")
-      ? url
-      : url + (url.includes("?") ? "&" : "?") + "api_key=" + encodeURIComponent(apiKey);
-  } else if (op.noticeId) {
-    target = `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=${encodeURIComponent(op.noticeId)}&api_key=${encodeURIComponent(apiKey)}`;
-  } else {
-    return "";
+/** The description behind a SAM.gov description link (JSON `{description}` or plain text). */
+async function fetchNoticeDescription(op: SamOpportunity, cred: SamCredential): Promise<{ ok: true; text: string } | SamFailure> {
+  let url: URL;
+  try {
+    url = new URL(op.description.trim());
+  } catch {
+    return { ok: true, text: "" };
   }
-
-  const res = await fetch(target, { cache: "no-store" });
-  if (!res.ok) return "";
-  const body = await res.text();
-  // Response shape: { description: "..." } — sometimes plain text.
+  const r = await samGet(cred, url, { endpoint: "noticeDesc" });
+  if (!r.ok) return r;
+  let body: string;
+  try {
+    body = await r.res.text();
+  } catch (err) {
+    return samFailure(cred, "noticeDesc", { cls: classifyFetchError(err) });
+  }
   try {
     const json = JSON.parse(body) as { description?: string };
-    return (json.description ?? "").trim();
+    return { ok: true, text: (json.description ?? "").trim() };
   } catch {
-    return body.trim();
+    return { ok: true, text: body.trim() };
   }
 }
 
@@ -585,30 +604,22 @@ export type SamNotice = {
 
 /** One notice by id: its posted date, description and attachment links. */
 export async function fetchSamNotice(
+  cred: SamCredential,
   noticeId: string,
-): Promise<{ ok: true; notice: SamNotice } | { ok: false; error: string; status?: number }> {
-  const key = process.env.SAMGOV_API_KEY;
-  if (!key) return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
+): Promise<{ ok: true; notice: SamNotice } | (SamFailure & { noSuchNotice?: true })> {
   const id = noticeId.trim();
-  if (!id) return { ok: false, error: "Provide a notice ID." };
+  if (!id) return { ok: false, cls: "bad_request", error: "Provide a notice ID." };
   // The search API requires a posted-date window of a year at most.
   const postedTo = new Date();
   const postedFrom = new Date(postedTo.getTime() - 364 * 86_400_000);
-  const params = new URLSearchParams({
-    api_key: key,
-    noticeid: id,
-    limit: "1",
-    postedFrom: mmddyyyy(postedFrom),
-    postedTo: mmddyyyy(postedTo),
-  });
+  const url = samUrl(SAM_OPP_BASE, { noticeid: id, limit: "1", postedFrom: mmddyyyy(postedFrom), postedTo: mmddyyyy(postedTo) });
   try {
-    const res = await fetch(`${SAM_OPP_BASE}?${params.toString()}`, { cache: "no-store", signal: timeoutSignal(20_000) });
-    const text = await res.text();
-    if (!res.ok) return { ok: false, error: friendlySamError(text, res.status), status: res.status };
-    const data = JSON.parse(text) as { opportunitiesData?: SamOpportunity[] };
-    const op = data.opportunitiesData?.[0];
-    if (!op) return { ok: false, error: "SAM.gov has no notice with that ID posted in the last year." };
-    const [enriched] = await enrichDescriptions([op], key);
+    const r = await samGetJson<{ opportunitiesData?: SamOpportunity[] }>(cred, url, "notice");
+    if (!r.ok) return r;
+    const op = r.data.opportunitiesData?.[0];
+    // SAM.gov answered and has no such notice: the one "not found" a caller may count as checked.
+    if (!op) return { ok: false, cls: "not_found", noSuchNotice: true, error: "SAM.gov has no notice with that ID posted in the last year." };
+    const [enriched] = await enrichDescriptions([op], cred);
     return {
       ok: true,
       notice: {
@@ -621,37 +632,59 @@ export async function fetchSamNotice(
         resourceLinks: (op.resourceLinks ?? []).filter((l): l is string => typeof l === "string" && isUrl(l)),
       },
     };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } catch {
+    // Data SAM.gov shaped unexpectedly: never a thrown message to the user.
+    return samFailure(cred, "notice", { cls: "bad_response" });
   }
 }
 
-/** Download one notice attachment, bounded; the file name comes from the response headers. */
+export type SamDownloadFailure = {
+  ok: false;
+  error: string;
+  cls?: SamErrorClass;
+  /** Retrying cannot help (a link off sam.gov, a file SAM.gov no longer has, a file over the cap). */
+  permanent: boolean;
+};
+
+/**
+ * Download one notice attachment, bounded; the file name comes from the
+ * response headers. Only links on sam.gov are fetched (see samGet).
+ */
 export async function downloadSamResource(
-  url: string,
+  cred: SamCredential,
+  link: string,
   maxBytes: number,
-): Promise<{ ok: true; fileName: string; contentType: string; bytes: Uint8Array } | { ok: false; error: string }> {
-  const key = process.env.SAMGOV_API_KEY;
-  if (!key) return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
-  const target = url.includes("api_key=")
-    ? url
-    : url + (url.includes("?") ? "&" : "?") + "api_key=" + encodeURIComponent(key);
-  const tooBig = `Attachment is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.`;
+): Promise<{ ok: true; fileName: string; contentType: string; bytes: Uint8Array } | SamDownloadFailure> {
+  const foreign = (): SamDownloadFailure => ({
+    ok: false,
+    cls: "foreign_host",
+    permanent: true,
+    error: samErrorMessage({ cls: "foreign_host", source: cred.source, audience: cred.audience }),
+  });
+  let url: URL;
   try {
-    const res = await fetch(target, { cache: "no-store", signal: timeoutSignal(45_000) });
-    if (!res.ok) return { ok: false, error: `SAM.gov ${res.status} downloading an attachment.` };
-    if (Number(res.headers.get("content-length") ?? "0") > maxBytes) return { ok: false, error: tooBig };
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length > maxBytes) return { ok: false, error: tooBig };
-    return {
-      ok: true,
-      fileName: fileNameFromHeaders(res.headers, url),
-      contentType: (res.headers.get("content-type") ?? "").split(";")[0]!.trim(),
-      bytes,
-    };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    url = new URL(link);
+  } catch {
+    return foreign();
   }
+  const r = await samGet(cred, url, { endpoint: "attachment", keepLinkKey: true });
+  if (!r.ok) return { ...r, permanent: r.cls === "foreign_host" || r.cls === "not_found" };
+  const res = r.res;
+  const tooBig: SamDownloadFailure = { ok: false, permanent: true, error: `Attachment is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.` };
+  if (Number(res.headers.get("content-length") ?? "0") > maxBytes) return tooBig;
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } catch (err) {
+    return { ...samFailure(cred, "attachment", { cls: classifyFetchError(err) }), permanent: false };
+  }
+  if (bytes.length > maxBytes) return tooBig;
+  return {
+    ok: true,
+    fileName: fileNameFromHeaders(res.headers, link),
+    contentType: (res.headers.get("content-type") ?? "").split(";")[0]!.trim(),
+    bytes,
+  };
 }
 
 /** Content-Disposition file name (RFC 5987 form first), else the URL's last path segment. */
@@ -696,15 +729,9 @@ export type SamEntitySearchParams = {
 };
 
 export async function searchSamGovEntities(
+  cred: SamCredential,
   input: SamEntitySearchParams,
-): Promise<
-  | { ok: true; entities: SamEntitySearchResult[]; totalRecords: number }
-  | { ok: false; error: string; status?: number }
-> {
-  const key = process.env.SAMGOV_API_KEY;
-  if (!key) {
-    return { ok: false, error: "SAMGOV_API_KEY not configured on the server." };
-  }
+): Promise<{ ok: true; entities: SamEntitySearchResult[]; totalRecords: number } | SamFailure> {
   if (
     !input.legalBusinessName &&
     !input.uei &&
@@ -713,13 +740,13 @@ export async function searchSamGovEntities(
   ) {
     return {
       ok: false,
+      cls: "bad_request",
       error:
         "Provide at least one search term (name, UEI, CAGE, or NAICS).",
     };
   }
 
   const params = new URLSearchParams({
-    api_key: key,
     samRegistered: "Yes",
     registrationStatus: "A",
     // SAM.gov Entity Management API caps `size` at 10 per request and
@@ -736,22 +763,12 @@ export async function searchSamGovEntities(
   if (input.naics) params.set("primaryNaics", input.naics);
   if (input.state) params.set("physicalAddressProvinceOrStateCode", input.state);
 
+  const url = new URL(SAM_BASE);
+  url.search = params.toString();
   try {
-    const res = await fetch(`${SAM_BASE}?${params.toString()}`, {
-      cache: "no-store",
-    });
-    const text = await res.text();
-    if (!res.ok) {
-      return {
-        ok: false,
-        error: friendlySamError(text, res.status),
-        status: res.status,
-      };
-    }
-    const data = JSON.parse(text) as {
-      totalRecords?: number;
-      entityData?: SamRawEntity[];
-    };
+    const r = await samGetJson<{ totalRecords?: number; entityData?: SamRawEntity[] }>(cred, url, "entitySearch");
+    if (!r.ok) return r;
+    const data = r.data;
     const entities: SamEntitySearchResult[] = (data.entityData ?? []).map(
       (raw) => {
         const reg = raw.entityRegistration ?? {};
@@ -779,10 +796,8 @@ export async function searchSamGovEntities(
       entities,
       totalRecords: data.totalRecords ?? entities.length,
     };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
+  } catch {
+    // Data SAM.gov shaped unexpectedly: never a thrown message to the user.
+    return samFailure(cred, "entitySearch", { cls: "bad_response" });
   }
 }

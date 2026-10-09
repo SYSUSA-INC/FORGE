@@ -11,6 +11,7 @@ import {
   searchSamGovEntities,
   type SamEntitySearchResult,
 } from "@/lib/samgov";
+import { resolveSamCredential } from "@/lib/samgov-key";
 import { log } from "@/lib/log";
 
 export type CompanyInput = {
@@ -179,7 +180,9 @@ export async function refreshCompanyFromSamGovAction(
     return { ok: false, error: "Company has no UEI to sync." };
   }
 
-  const result = await fetchSamGovByUei(row.uei);
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) return { ok: false, error: sam.failure.error };
+  const result = await fetchSamGovByUei(sam.cred, row.uei);
   if (!result.ok) return { ok: false, error: result.error };
   const p = result.profile;
 
@@ -249,7 +252,9 @@ export async function searchSamGovCompaniesAction(input: {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const res = await searchSamGovEntities({
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) return { ok: false, error: sam.failure.error };
+  const res = await searchSamGovEntities(sam.cred, {
     legalBusinessName: input.name,
     uei: input.uei,
     cage: input.cage,
@@ -303,7 +308,9 @@ export async function importSamGovCompanyAction(
     .limit(1);
   if (existing) return { ok: true, id: existing.id };
 
-  const result = await fetchSamGovByUei(uei);
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) return { ok: false, error: sam.failure.error };
+  const result = await fetchSamGovByUei(sam.cred, uei);
   if (!result.ok) return { ok: false, error: result.error };
   const p = result.profile;
 
@@ -341,6 +348,14 @@ export async function importSamGovCompanyAction(
       })
       .returning({ id: companies.id });
     if (!row) return { ok: false, error: "Insert failed." };
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "company.import_samgov",
+      resourceType: "company",
+      resourceId: row.id,
+      metadata: { uei: p.uei, relationship },
+    });
     revalidatePath("/companies");
     return { ok: true, id: row.id };
   } catch (err) {

@@ -37,6 +37,7 @@ import { QaPanel } from "./QaPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
 import { AgencyContactsPanel } from "@/components/crm/AgencyContactsPanel";
 import { listSolicitationQa } from "@/lib/solicitation-qa";
+import { platformSamCredential } from "@/lib/samgov-key";
 import { normalizeRef } from "@/lib/solicitation-qa-logic";
 import { THEME } from "@/lib/theme-colors";
 
@@ -378,7 +379,7 @@ export default async function SolicitationDetail({
           solicitationId={s.id}
           noticeId={s.noticeId}
           qaCheckedAt={s.qaCheckedAt ? s.qaCheckedAt.toISOString() : null}
-          hasSamKey={Boolean(process.env.SAMGOV_API_KEY)}
+          hasSamKey={platformSamCredential() !== null}
           initial={qa}
         />
       </div>

@@ -30,6 +30,7 @@ import {
   type TextHit,
 } from "@/lib/gold-set-logic";
 import { downloadSamResource, fetchSamNotice } from "@/lib/samgov";
+import { missingPlatformKeyFailure, platformSamCredential } from "@/lib/samgov-key";
 import { extractTextFromAny } from "@/lib/solicitation-extract";
 
 /** Below this, a PDF has no usable text layer (a scan). */
@@ -85,7 +86,10 @@ async function noticeTaken(noticeId: string): Promise<boolean> {
 export async function createGoldDocFromNotice(input: { noticeId: string; userId: string }): Promise<Result<{ id: string; files: GoldDocFile[] }>> {
   const noticeId = input.noticeId.trim();
   if (await noticeTaken(noticeId)) return { ok: false, error: "That notice is already in the gold set." };
-  const found = await fetchSamNotice(noticeId);
+  // A platform asset: FORGE's shared key, with messages for platform admins.
+  const sam = platformSamCredential({ audience: "operator" });
+  if (!sam) return { ok: false, error: missingPlatformKeyFailure().error };
+  const found = await fetchSamNotice(sam, noticeId);
   if (!found.ok) return { ok: false, error: found.error };
   const notice = found.notice;
 
@@ -96,7 +100,7 @@ export async function createGoldDocFromNotice(input: { noticeId: string; userId:
     files.push({ name: "Notice description", chars: notice.description.trim().length });
   }
   for (const link of notice.resourceLinks.slice(0, GOLD_MAX_FILES)) {
-    const dl = await downloadSamResource(link, GOLD_MAX_FILE_BYTES);
+    const dl = await downloadSamResource(sam, link, GOLD_MAX_FILE_BYTES);
     if (!dl.ok) {
       files.push({ name: link.split("/").slice(-2).join("/"), chars: 0, note: dl.error });
       continue;

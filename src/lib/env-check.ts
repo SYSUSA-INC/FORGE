@@ -62,7 +62,7 @@ const OPTIONAL: EnvSpec[] = [
   },
   {
     name: "SAMGOV_API_KEY",
-    purpose: "SAM.gov — entity registration lookups + 8(a) registry import",
+    purpose: "SAM.gov — opportunity import and search, entity lookups, the scout, Q&A polling, the 8(a) registry and the gold set",
   },
   {
     name: "USASPENDING_API_KEY",
