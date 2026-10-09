@@ -1,17 +1,21 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
+import { UploadQueue } from "@/components/uploads/UploadQueue";
+import { useUploadQueue } from "@/components/uploads/useUploadQueue";
+import { COMPANION_DOCUMENT_TYPES, documentTypeFromName, type CompanionDocumentType } from "@/lib/document-type-name";
+import { acceptFor, validateUploadRequest } from "@/lib/upload-policy";
 import {
-  addSolicitationDocumentAction,
+  addSolicitationDocumentFromUploadAction,
   deleteSolicitationDocumentAction,
   mergeSolicitationDocumentsAction,
   reparseSolicitationDocumentAction,
   type SolicitationDocumentRow,
 } from "./document-actions";
-import { THEME } from "@/lib/theme-colors";
 
-const DOC_TYPE_LABELS: Record<string, string> = {
+const DOC_TYPE_LABELS: Record<CompanionDocumentType, string> = {
   rfp: "RFP",
   pws: "PWS",
   sow: "SOW",
@@ -21,11 +25,21 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-const PARSE_STATUS_COLORS: Record<string, string> = {
-  uploaded: THEME.muted,
-  parsing: THEME.indigo,
-  parsed: THEME.green,
-  failed: THEME.red,
+const DOC_TYPE_OPTIONS: Record<CompanionDocumentType, string> = {
+  pws: "PWS — Performance Work Statement",
+  sow: "SOW — Statement of Work",
+  cdrl: "CDRL — Contract Data Requirements List",
+  j_attachment: "J-Attachment",
+  amendment: "Amendment",
+  rfp: "RFP (additional volume)",
+  other: "Other",
+};
+
+const PARSE_STATUS_CLASS: Record<string, string> = {
+  uploaded: "text-muted bg-layer/5 border-layer/15",
+  parsing: "text-violet bg-violet/10 border-violet/30",
+  parsed: "text-emerald bg-emerald/10 border-emerald/30",
+  failed: "text-rose bg-rose/10 border-rose/30",
 };
 
 function formatBytes(bytes: number): string {
@@ -34,55 +48,90 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** A file picked but not yet uploaded, with the type it will be filed as. */
+type Staged = { key: number; file: File; documentType: CompanionDocumentType; error: string | null };
+
 type Props = {
   solicitationId: string;
   initial: SolicitationDocumentRow[];
+  /** The server's per-file limit for documents. */
+  maxBytes: number;
 };
 
-export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
+export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }: Props) {
+  const router = useRouter();
   const [docs, setDocs] = useState<SolicitationDocumentRow[]>(initial);
-  const [uploading, startUpload] = useTransition();
+  // Adopt the server's list after a refresh (statuses move on as parses finish).
+  useEffect(() => setDocs(initial), [initial]);
   const [merging, startMerge] = useTransition();
   const [fileError, setFileError] = useState<string | null>(null);
   const [mergeMsg, setMergeMsg] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reparsingId, setReparsingId] = useState<string | null>(null);
+  const [staged, setStaged] = useState<Staged[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-  const typeRef = useRef<HTMLSelectElement>(null);
+  const nextKey = useRef(0);
 
-  function upload() {
+  // BL-STAB-2d / BL-STAB-6 — each document goes straight to storage (no
+  // size cap), two at a time, then is filed with the type it was staged with.
+  const queue = useUploadQueue<string, { documentType: CompanionDocumentType }>({
+    purpose: "document",
+    concurrency: 2,
+    maxBytes,
+    claim: async ({ uploadId, meta }) => {
+      const res = await addSolicitationDocumentFromUploadAction(solicitationId, { uploadId, documentType: meta.documentType });
+      return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
+    },
+    onItemDone: (item) => {
+      if (item.phase !== "done" || !item.result) return;
+      const id = item.result;
+      setDocs((prev) =>
+        prev.some((d) => d.id === id)
+          ? prev
+          : [
+              ...prev,
+              {
+                id,
+                solicitationId,
+                documentType: item.meta.documentType,
+                fileName: item.file.name,
+                fileSize: item.file.size,
+                parseStatus: "parsing",
+                parseError: "",
+                coverageWarnings: null,
+                lm: null,
+                requirementCount: 0,
+                sortOrder: 0,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+      );
+      router.refresh();
+    },
+  });
+
+  function stage(files: FileList | null) {
     setFileError(null);
     setMergeMsg(null);
-    const file = fileRef.current?.files?.[0];
-    if (!file) { setFileError("Pick a file first."); return; }
-    const form = new FormData();
-    form.set("file", file);
-    form.set("documentType", typeRef.current?.value ?? "other");
-
-    startUpload(async () => {
-      const res = await addSolicitationDocumentAction(solicitationId, form);
-      if (!res.ok) { setFileError(res.error); return; }
-      // Optimistically insert a "parsing" row while the async parse runs.
-      setDocs((prev) => [
-        ...prev,
-        {
-          id: res.id,
-          solicitationId,
-          documentType: (typeRef.current?.value ?? "other") as SolicitationDocumentRow["documentType"],
-          fileName: file.name,
-          fileSize: file.size,
-          parseStatus: "parsing",
-          parseError: "",
-          coverageWarnings: null,
-          lm: null,
-          requirementCount: 0,
-          sortOrder: 0,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      if (fileRef.current) fileRef.current.value = "";
+    const picked = Array.from(files ?? []).map<Staged>((file) => {
+      const check = validateUploadRequest({ purpose: "document", fileName: file.name, size: file.size, maxBytes });
+      return { key: nextKey.current++, file, documentType: documentTypeFromName(file.name), error: check.ok ? null : check.error };
     });
+    setStaged((list) => [...list, ...picked]);
+    if (fileRef.current) fileRef.current.value = "";
   }
+
+  function upload() {
+    const ready = staged.filter((s) => !s.error);
+    if (ready.length === 0) {
+      setFileError(staged.length ? "None of the picked files can be uploaded." : "Pick one or more files first.");
+      return;
+    }
+    setFileError(null);
+    queue.add(ready.map((s) => ({ file: s.file, meta: { documentType: s.documentType } })));
+    setStaged((list) => list.filter((s) => s.error));
+  }
+  const readyCount = staged.filter((s) => !s.error).length;
 
   function deleteDoc(id: string) {
     if (!window.confirm("Delete this companion document? Its requirements will be removed from the merged set.")) return;
@@ -126,47 +175,79 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
       title="Companion documents"
       eyebrow={`${docs.length} attached`}
     >
-      {/* Upload form */}
+      {/* Upload: pick one or more files; each gets a type, editable before upload. */}
       <div className="mb-4 flex flex-col gap-2">
         <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <label className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">
-              Document type
-            </label>
-            <select
-              ref={typeRef}
-              className="aur-input font-mono text-[11px]"
-              defaultValue="other"
-            >
-              <option value="pws">PWS — Performance Work Statement</option>
-              <option value="sow">SOW — Statement of Work</option>
-              <option value="cdrl">CDRL — Contract Data Requirements List</option>
-              <option value="j_attachment">J-Attachment</option>
-              <option value="amendment">Amendment</option>
-              <option value="rfp">RFP (additional volume)</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1 min-w-0 flex-1">
-            <label className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">
-              File
+              Files (several at once)
             </label>
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.png,.jpg,.jpeg,.webp,.gif"
+              multiple
+              accept={acceptFor("document")}
+              onChange={(e) => stage(e.target.files)}
               className="aur-input font-mono text-[11px] file:mr-2 file:rounded file:border-0 file:bg-layer/10 file:px-2 file:py-0.5 file:font-mono file:text-[11px] file:text-text"
             />
           </div>
           <button
             type="button"
             onClick={upload}
-            disabled={uploading}
-            className="aur-btn aur-btn-primary text-[11px] disabled:opacity-40 shrink-0"
+            disabled={readyCount === 0}
+            className="aur-btn aur-btn-primary shrink-0 text-[11px] disabled:opacity-40"
           >
-            {uploading ? "Uploading…" : "Add document"}
+            {readyCount > 1 ? `Add ${readyCount} documents` : "Add document"}
+            {queue.busy ? " · uploading…" : ""}
           </button>
         </div>
+        {staged.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {staged.map((st) => (
+              <li
+                key={st.key}
+                className={`grid items-center gap-2 rounded-md border px-3 py-2 sm:grid-cols-[1fr_16rem_auto] ${st.error ? "border-rose/40 bg-rose/[0.05]" : "border-layer/15 bg-layer/[0.02]"}`}
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-[11px] text-text" title={st.file.name}>
+                    {st.file.name}
+                  </div>
+                  {st.error ? <div className="font-mono text-[11px] text-rose">{st.error}</div> : null}
+                </div>
+                <select
+                  aria-label={`Document type for ${st.file.name}`}
+                  value={st.documentType}
+                  disabled={Boolean(st.error)}
+                  onChange={(e) => {
+                    const documentType = e.target.value as CompanionDocumentType;
+                    setStaged((list) => list.map((x) => (x.key === st.key ? { ...x, documentType } : x)));
+                  }}
+                  className="aur-input font-mono text-[11px]"
+                >
+                  {COMPANION_DOCUMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {DOC_TYPE_OPTIONS[t]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="aur-btn aur-btn-ghost text-[10px]"
+                  onClick={() => setStaged((list) => list.filter((x) => x.key !== st.key))}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <UploadQueue
+          items={queue.items}
+          onRetry={queue.retry}
+          onCancel={queue.cancel}
+          onRemove={queue.remove}
+          detail={(it) => DOC_TYPE_LABELS[it.meta.documentType]}
+        />
         {fileError && (
           <p className="font-mono text-[11px] text-rose">{fileError}</p>
         )}
@@ -180,21 +261,13 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
       ) : (
         <ul className="flex flex-col gap-1.5">
           {docs.map((doc) => {
-            const statusColor = PARSE_STATUS_COLORS[doc.parseStatus] ?? THEME.muted;
             return (
               <li
                 key={doc.id}
                 className="flex items-center gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 {/* Type badge */}
-                <span
-                  className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
-                  style={{
-                    color: THEME.muted,
-                    backgroundColor: "#9BC9D91A",
-                    border: "1px solid #9BC9D940",
-                  }}
-                >
+                <span className="shrink-0 rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
                   {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
                 </span>
 
@@ -209,16 +282,14 @@ export function SolicitationDocumentsPanel({ solicitationId, initial }: Props) {
                       ? ` · ${doc.requirementCount} reqs`
                       : ""}
                   </p>
+                  {doc.parseStatus === "failed" && doc.parseError ? (
+                    <p className="font-mono text-[10px] text-rose">{doc.parseError}</p>
+                  ) : null}
                 </div>
 
                 {/* Status badge */}
                 <span
-                  className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
-                  style={{
-                    color: statusColor,
-                    backgroundColor: `${statusColor}1A`,
-                    border: `1px solid ${statusColor}40`,
-                  }}
+                  className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${PARSE_STATUS_CLASS[doc.parseStatus] ?? PARSE_STATUS_CLASS.uploaded}`}
                 >
                   {doc.parseStatus}
                 </span>

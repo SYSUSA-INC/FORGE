@@ -182,3 +182,21 @@ describe("BL-STAB-2c follow-ups and BL-STAB-4", () => {
     expect(memoryStorageRefused({ VERCEL_ENV: "production" })).toBe(true);
   });
 });
+
+describe("BL-STAB-6 — a companion document's type from its name", () => {
+  it("guesses the common solicitation attachments and falls back to other", async () => {
+    const { documentTypeFromName, isCompanionDocumentType } = await import("@/lib/document-type-name");
+    expect(documentTypeFromName("Attachment J-3 Pricing.xlsx")).toBe("j_attachment");
+    expect(documentTypeFromName("J1_Labor_Categories.pdf")).toBe("j_attachment");
+    expect(documentTypeFromName("PWS_Final.docx")).toBe("pws");
+    expect(documentTypeFromName("Performance Work Statement v2.pdf")).toBe("pws");
+    expect(documentTypeFromName("Statement of Work.pdf")).toBe("sow");
+    expect(documentTypeFromName("CDRL A001.pdf")).toBe("cdrl");
+    expect(documentTypeFromName("Amendment 0002.pdf")).toBe("amendment");
+    expect(documentTypeFromName("SF30_0003.pdf")).toBe("amendment");
+    expect(documentTypeFromName("Volume II RFP.pdf")).toBe("rfp");
+    expect(documentTypeFromName("Org chart.png")).toBe("other");
+    expect(isCompanionDocumentType("pws")).toBe(true);
+    expect(isCompanionDocumentType("malware")).toBe(false);
+  });
+});

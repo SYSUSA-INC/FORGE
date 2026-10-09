@@ -74,12 +74,12 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365) |
-| 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | 🔄 9a shipped (PR #366); 9b (matrix, questions) in PR #367 |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 in PR #369) |
+| 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | S | ⏳ queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
-| 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) in PR #368; 4b (each diffed against the one before) queued |
-| 3az | **BL-STAB-6** — Several companion documents uploaded in one go | P0 | S | ⏳ queued (after BL-STAB-2) |
+| 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
+| 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | 🔄 in PR #369 (with BL-STAB-2d-1) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued, right after BL-STAB-2c (owner, 2026-10-08) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -180,7 +180,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365) · 🔄 BL-STAB-9 (9a shipped in PR #366; 9b in PR #367) · ⏳ BL-STAB-3 to 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368; 2d-1 in PR #369) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · 🔄 BL-STAB-6 in PR #369 · ⏳ BL-STAB-3, 5, 7 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -405,7 +405,7 @@ mind. Bandage will come off but a true fix will stay."
         and parsed from storage; amendment parent checks; a changed,
         oversize or foreign file refused at parse; through-the-app
         checks before reading).
-    - **2c follow-ups (post-merge review, 2026-10-08).** 🔄 in PR #368 (with
+    - **2c follow-ups (post-merge review, 2026-10-08).** ✅ shipped (PR #368, with
       BL-STAB-4a); every item below is fixed there, with tests. A review of PR #365 found these; each was verified by
       tracing the code:
       - **The upload queue gets stuck when a server action throws.**
@@ -445,15 +445,33 @@ mind. Bandage will come off but a true fix will stay."
         two docs claims (who can open File storage; `UPLOAD_PARSE_SCALE`
         and images); two tests that would pass if the ETag or
         size-before-download guard broke.
-    - **2d — companion documents and GSA attachments; abandoned uploads
-      cleaned up by the jobs cron.**
+    - **2d-1 — companion documents upload straight to storage, several
+      at once (with BL-STAB-6).** 🔄 in PR #369.
+      - `addSolicitationDocumentFromUploadAction` replaces the multipart
+        `addSolicitationDocumentAction` and its 25 MB cap: the parent is
+        checked before the claim (a wrong parent leaves the upload
+        usable), the document is recorded under the claim's id and the
+        upload's key (a retry returns the same document), an unknown
+        type is filed as "other", the parse reads from storage, and the
+        audit carries the upload id.
+      - Re-parse checks the file with a HEAD instead of downloading it,
+        and tells storage that can't be reached from a file that is gone.
+      - The panel moves onto the upload queue (two at a time, progress,
+        retry, cancel) and its colours onto theme tokens; a failed parse
+        shows its reason.
+      - Tests: `tests/isolation/uploads-documents.test.ts` (filed once
+        and parsed from storage; unknown type; foreign parent refused
+        before the claim; Re-parse unreachable vs gone) and the type
+        guesses in `tests/ai/upload-policy.test.ts`.
+    - **2d-2 — GSA attachments; abandoned uploads cleaned up by the jobs
+      cron.** ⏳ queued.
     - **2e — knowledge corpus; extraction as a durable job; one storage
       meter across every file type; Office zip checks.**
     - **2f — templates, chat attachments and contacts; files removed
       from storage when their record is deleted; a test that keeps any
       file out of a server action.**
 - **BL-STAB-9 — The AI document review fails on a real
-  solicitation.** 🔄 9a shipped (PR #366); 9b in PR #367.
+  solicitation.** ✅ shipped (9a PR #366, 9b PR #367).
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI
     document review" → Initiate review shows "Review failed: AI
     response didn't match the expected shape (requirements: expected
@@ -510,7 +528,7 @@ mind. Bandage will come off but a true fix will stay."
       for it; another organization's solicitation is refused).
   - **Phases:**
     - **9a — the gateway and the review** (above). ✅ shipped (PR #366).
-    - **9b — the capability matrix and the question generator.** 🔄 in PR #367.
+    - **9b — the capability matrix and the question generator.** ✅ shipped (PR #367).
       The matrix still asks one 4,000-token answer for every cell, and
       the review now hands it the whole verified list (up to 400), so a
       long RFP's matrix stops with the "cut off" message until then. The
@@ -612,21 +630,29 @@ mind. Bandage will come off but a true fix will stay."
       The label comes with a confidence and the evidence for it.
     - The user confirms or changes the labels, then each file is filed
       and parsed on its own path.
-- **BL-STAB-4 — Amendments one at a time.** 🔄 4a in PR #368.
+- **BL-STAB-4 — Amendments one at a time.** 🔄 4a shipped (PR #368).
   - **Ask:** Upload several amendments in one go.
-  - **4a — several at once (in PR #368):** Add amendment takes several files;
+  - **4a — several at once (shipped, PR #368):** Add amendment takes several files;
     each row reads its amendment number from the file name
     (`amendment-name.ts`: "Amendment 0003", "Amd 02", "Mod 2", "A0002",
     "P00003"), editable before upload; they upload two at a time and
     each is filed under the solicitation with its number and parsed.
   - **4b — each amendment diffed against the one before it** (ordered by
     number and date) instead of only against the base. ⏳ queued.
-- **BL-STAB-6 — Companion documents one at a time.** ⏳ queued, after
-  BL-STAB-2.
+- **BL-STAB-6 — Companion documents one at a time.** 🔄 in PR #369
+  (with BL-STAB-2d-1).
   - **Ask:** Upload several companion documents in one go, to compare
     against.
-  - **Fix:** Multi-file upload, each document typed and parsed, with
-    its requirements merged as today.
+  - **Fix:**
+    - The companion-documents picker takes several files. Each staged
+      row gets a type read from its file name (`document-type-name.ts`:
+      "PWS", "Statement of Work", "SOO", "CDRL", "DD 1423",
+      "Attachment J-3", "J1", "Amendment", "SF30", "RFP", "Volume";
+      else "Other"), editable before the upload starts; a file the
+      server would refuse is marked on its row and skipped.
+    - They upload two at a time, straight to storage with no size cap,
+      and each is filed with its type and parsed; its requirements are
+      merged as before.
 - **BL-STAB-5 — Q&A in the format the contracting officer released
   it.** ⏳ queued, after BL-STAB-2.
   - **Ask:** Accept Word, Excel, PDF or text. FORGE should make sense

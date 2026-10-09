@@ -15,14 +15,14 @@ import { mergeSolicitationRequirements } from "@/lib/solicitation-requirements";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
-import { detectFormat } from "@/lib/text-extract";
+import { isCompanionDocumentType } from "@/lib/document-type-name";
+import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
 import { runInBackground } from "@/lib/background";
 import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
 // BL-AIP-4c — the parse pipeline itself lives in
 // src/lib/solicitation-document-parse.ts so the jobs cron can re-run it.
-const MAX_BYTES = 25 * 1024 * 1024;
 
 export type SolicitationDocumentRow = {
   id: string;
@@ -111,17 +111,26 @@ export async function listSolicitationDocumentsAction(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Add (upload + async parse)
+// Add (from an upload straight to storage, then an async parse)
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function addSolicitationDocumentAction(
+/**
+ * BL-STAB-2d — file a checked upload as a companion document. The file
+ * went from the browser straight to storage (no request-size cap); this
+ * claims it once (a retry returns the same document), records the
+ * document under its key, and starts the parse, which reads the file
+ * from storage. In the in-memory storage mode (development) the parse
+ * gets the bytes in hand.
+ */
+export async function addSolicitationDocumentFromUploadAction(
   solicitationId: string,
-  formData: FormData,
+  input: { uploadId: string; documentType: string; sortOrder?: number },
 ): Promise<AddDocumentResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  // Verify parent solicitation belongs to this org.
+  // Verify the parent belongs to this org before the claim, so a wrong
+  // parent leaves the upload ready to try again.
   const [parentRow] = await db
     .select({ id: solicitations.id })
     .from(solicitations)
@@ -134,88 +143,56 @@ export async function addSolicitationDocumentAction(
     .limit(1);
   if (!parentRow) return { ok: false, error: "Solicitation not found." };
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) return { ok: false, error: "Pick a file to upload." };
-  if (file.size === 0) return { ok: false, error: "Selected file is empty." };
-  if (file.size > MAX_BYTES) {
-    return {
-      ok: false,
-      error: `File exceeds ${MAX_BYTES / 1024 / 1024} MB limit.`,
-    };
-  }
-  const format = detectFormat(file.type, file.name);
-  if (!format) {
-    return {
-      ok: false,
-      error: "Unsupported file type. Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD, or image.",
-    };
-  }
+  const documentType: SolicitationDocumentType = isCompanionDocumentType(input?.documentType) ? input.documentType : "other";
+  const sortOrder = Number.isSafeInteger(input?.sortOrder) ? Number(input.sortOrder) : 0;
 
-  const documentTypeRaw = formData.get("documentType");
-  const documentType: SolicitationDocumentType =
-    typeof documentTypeRaw === "string" &&
-    ["rfp", "pws", "sow", "cdrl", "j_attachment", "amendment", "other"].includes(
-      documentTypeRaw,
-    )
-      ? (documentTypeRaw as SolicitationDocumentType)
-      : "other";
-
-  const sortOrderRaw = formData.get("sortOrder");
-  const sortOrder =
-    typeof sortOrderRaw === "string" ? parseInt(sortOrderRaw, 10) || 0 : 0;
-
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const resolvedContentType = file.type || "application/octet-stream";
-
-  const [row] = await db
-    .insert(solicitationDocuments)
-    .values({
-      organizationId,
-      solicitationId,
-      documentType,
-      fileName: file.name,
-      fileSize: file.size,
-      contentType: resolvedContentType,
-      parseStatus: "uploaded",
-      uploadedByUserId: user.id,
-      sortOrder,
-    })
-    .returning({ id: solicitationDocuments.id });
-  if (!row) return { ok: false, error: "Could not create document record." };
+  const claim = await claimUpload({
+    organizationId,
+    userId: user.id,
+    uploadId: String(input?.uploadId ?? ""),
+    resourceType: "solicitation_document",
+  });
+  if (!claim.ok) return { ok: false, error: claim.error };
+  if ("alreadyClaimed" in claim) return { ok: true, id: claim.resourceId };
+  const file = claim.claim;
 
   try {
-    const storage = getStorageProvider();
-    const key = `org/${organizationId}/solicitation/${solicitationId}/documents/${row.id}/${file.name}`;
-    const stored = await storage.put({ key, bytes, contentType: resolvedContentType });
     await db
-      .update(solicitationDocuments)
-      .set({ storagePath: stored.storagePath, updatedAt: new Date() })
-      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, row.id)));
-  } catch (err) {
-    log.error("[addSolicitationDocumentAction]", "storage", { error: err });
-    await db
-      .update(solicitationDocuments)
-      .set({
-        parseStatus: "failed",
-        parseError: err instanceof Error ? err.message : "Storage write failed.",
-        updatedAt: new Date(),
+      .insert(solicitationDocuments)
+      .values({
+        id: file.resourceId,
+        organizationId,
+        solicitationId,
+        documentType,
+        fileName: file.fileName,
+        fileSize: file.size,
+        contentType: file.contentType,
+        storagePath: file.storageKey,
+        parseStatus: "uploaded",
+        uploadedByUserId: user.id,
+        sortOrder,
       })
-      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, row.id)));
-    return { ok: false, error: "Upload saved metadata but file storage failed." };
+      .onConflictDoNothing();
+  } catch (err) {
+    log.error("[addSolicitationDocumentFromUploadAction]", "insert failed", { error: err });
+    await releaseClaim({ organizationId, uploadId: file.uploadId });
+    return { ok: false, error: "Could not record the document; try again." };
   }
+  await finishClaim({ organizationId, uploadId: file.uploadId });
 
-  // BL-AIP-4c — a background_job row: runs now from the bytes in hand;
-  // the jobs cron re-runs it from storage if this instance dies.
+  // BL-AIP-4c — a background_job row; the jobs cron re-runs it from
+  // storage if this instance dies.
+  const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
   await runDurable(
-    "[addSolicitationDocumentAction] inline parse",
+    "[addSolicitationDocumentFromUploadAction] parse",
     {
       organizationId,
       kind: "solicitation_document_parse",
-      resourceId: row.id,
+      resourceId: file.resourceId,
       payload: { solicitationId },
       requestedByUserId: user.id,
     },
-    { bytes },
+    bytes ? { bytes } : {},
   );
 
   await recordAudit({
@@ -223,12 +200,12 @@ export async function addSolicitationDocumentAction(
     actor: { userId: user.id, email: user.email },
     action: "solicitation.document.upload",
     resourceType: "solicitation_document",
-    resourceId: row.id,
-    metadata: { solicitationId, documentType, fileName: file.name, fileSize: file.size },
+    resourceId: file.resourceId,
+    metadata: { solicitationId, uploadId: file.uploadId, documentType, fileName: file.fileName, fileSize: file.size },
   });
 
   revalidatePath(`/solicitations/${solicitationId}`);
-  return { ok: true, id: row.id };
+  return { ok: true, id: file.resourceId };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -314,14 +291,26 @@ export async function reparseSolicitationDocumentAction(
   if (!row.storagePath)
     return { ok: false, error: "No file stored for this document." };
 
-  const storage = getStorageProvider();
-  const obj = await storage.get(row.storagePath);
-  if (!obj) {
+  // BL-STAB-2d — check the file is there without downloading it; the job
+  // reads it (within its read budget, verified) from storage. A storage
+  // error is not a missing file.
+  let head: Awaited<ReturnType<ReturnType<typeof getStorageProvider>["head"]>>;
+  try {
+    head = await getStorageProvider().head(row.storagePath);
+  } catch (err) {
+    log.warn("[reparseSolicitationDocumentAction]", "storage check failed", { error: err });
+    return { ok: false, error: "File storage could not be reached just now. Try Reparse again in a minute." };
+  }
+  if (!head) {
     return {
       ok: false,
-      error: "File bytes are no longer in storage — re-upload the document.",
+      error:
+        getStorageProvider().name === "memory"
+          ? "File bytes are no longer in storage — re-upload the document. (Memory storage doesn't survive redeploys.)"
+          : "The stored file is no longer in storage — re-upload the document.",
     };
   }
+  const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: row.storagePath });
 
   await runDurable(
     "[reparseSolicitationDocumentAction] parse",
@@ -332,7 +321,7 @@ export async function reparseSolicitationDocumentAction(
       payload: { solicitationId: row.solicitationId },
       requestedByUserId: user.id,
     },
-    { bytes: obj.bytes },
+    bytes ? { bytes } : {},
   );
   return { ok: true };
 }
