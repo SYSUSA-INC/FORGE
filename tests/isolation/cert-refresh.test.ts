@@ -6,7 +6,7 @@
  * reports reachability only, never the upstream body or the key.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, like } from "drizzle-orm";
 import { db } from "@/db";
 import { certFirms, certImportRuns } from "@/db/schema";
 import { runCertRefresh } from "@/lib/cert-refresh";
@@ -95,7 +95,7 @@ describe("BL-STAB-7c — cert refresh and health on the shared key", () => {
 
   it("the public health probe reports reachability only", async () => {
     resetSamHealthMemo();
-    await db.delete(rateLimitCounters).where(eq(rateLimitCounters.key, "samgov:health-probe"));
+    await db.delete(rateLimitCounters).where(like(rateLimitCounters.key, "samgov:health-probe%"));
     await db.delete(platformSettings).where(eq(platformSettings.key, "samgov.health_last"));
     const res = await healthGet();
     const text = await res.text();

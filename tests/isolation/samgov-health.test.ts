@@ -5,7 +5,7 @@
  * fails open (database error) never buys a live probe.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { platformSettings, rateLimitCounters } from "@/db/schema";
 import * as rateLimit from "@/lib/rate-limit";
@@ -17,7 +17,7 @@ describe("BL-STAB-10b — the public health probe is capped", () => {
   let calls: URL[];
   async function clear() {
     resetSamHealthMemo();
-    await db.delete(rateLimitCounters).where(eq(rateLimitCounters.key, "samgov:health-probe"));
+    await db.delete(rateLimitCounters).where(like(rateLimitCounters.key, "samgov:health-probe%"));
     await db.delete(platformSettings).where(eq(platformSettings.key, "samgov.health_last"));
   }
   beforeEach(async () => {
@@ -47,11 +47,27 @@ describe("BL-STAB-10b — the public health probe is capped", () => {
     expect(await samHealth()).toEqual({ ...first, cached: true });
     expect(calls).toHaveLength(1);
     expect(JSON.stringify(first)).not.toContain(KEY);
+    expect(first).not.toHaveProperty("key");
+
+    // A replaced key is probed at once, not answered from the old key's result.
+    vi.stubEnv("SAMGOV_API_KEY", "NewSharedKey0123456789abcdefghijklmNEW1");
+    resetSamHealthMemo();
+    expect(await samHealth()).toMatchObject({ apiReachable: true, status: 200 });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("a server remembers a cached answer for 60 s too", async () => {
+    await samHealth();
+    resetSamHealthMemo();
+    const spy = vi.spyOn(rateLimit, "enforceRateLimit");
+    await samHealth();
+    await samHealth();
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("a counter that failed open is not a turn: no live probe", async () => {
     vi.spyOn(rateLimit, "enforceRateLimit").mockResolvedValue({ ok: true, remaining: 1, resetIn: 1800 });
-    expect(await samHealth()).toMatchObject({ keyConfigured: true, apiReachable: null, cached: true });
+    expect(await samHealth()).toMatchObject({ keyConfigured: true, apiReachable: null, cached: true, message: "Live check skipped: FORGE couldn't reach its own database." });
     expect(calls).toHaveLength(0);
   });
 });
