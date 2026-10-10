@@ -1,7 +1,8 @@
 /**
  * Known GSA contract vehicles — pure data, safe to import from client
- * components. The `keyword` is OR-merged into SAM.gov's `q` parameter
- * to surface task orders against the vehicle. `naicsHint` is advisory.
+ * components. A search with vehicles picked keeps notices that name one
+ * of their `keyword`s (BL-STAB-10; SAM.gov's search can't). `naicsHint`
+ * is advisory.
  *
  * Source for vehicle scope: GSA's "Buy Through Us" page + each
  * vehicle's solicitation, current as of 2026.

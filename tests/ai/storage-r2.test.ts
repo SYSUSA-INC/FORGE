@@ -45,11 +45,23 @@ describe("R2Storage", () => {
   });
 
   it("asks for the bytes as stored on every request, without signing that header", async () => {
-    respond = () => new Response(null, { status: 200, headers: { "content-length": "5" } });
-    await r2().head("k");
-    const headers = calls[0]!.init.headers as Record<string, string>;
-    expect(headers["accept-encoding"]).toBe("identity");
-    expect(headers.authorization).not.toContain("accept-encoding");
+    respond = (call) =>
+      call.init.method === "HEAD"
+        ? new Response(null, { status: 200 }) // no length: the range fallback runs too
+        : new Response(new Uint8Array([1]), { status: 206, headers: { "content-range": "bytes 0-0/5", "content-length": "1" } });
+    const storage = r2();
+    await storage.head("k");
+    await storage.get("k");
+    await storage.getRange("k", 0, 0);
+    await storage.put({ key: "k", bytes: new Uint8Array([1]), contentType: "text/plain" });
+    respond = () => new Response(null, { status: 204 });
+    await storage.delete("k");
+    expect(calls.map((c) => c.init.method)).toEqual(["HEAD", "GET", "GET", "GET", "PUT", "DELETE"]);
+    for (const c of calls) {
+      const headers = c.init.headers as Record<string, string>;
+      expect(headers["accept-encoding"]).toBe("identity");
+      expect(headers.authorization).not.toContain("accept-encoding");
+    }
   });
 
   it("head never reads a missing or re-encoded length as 0: it asks for the size with a one-byte range", async () => {

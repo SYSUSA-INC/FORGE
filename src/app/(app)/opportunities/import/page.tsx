@@ -13,6 +13,8 @@ import { listOwnSourceRequestsAction } from "./source-requests/actions";
 import { SourceRequestPanel } from "./source-requests/SourceRequestPanel";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-10 — a search is one SAM.gov request per NAICS code plus a few description reads.
+export const maxDuration = 60;
 
 export default async function ImportPage() {
   await requireAuth();
