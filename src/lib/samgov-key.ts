@@ -1,12 +1,12 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { organizationSamgovKeys, users } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { testSamKey } from "@/lib/samgov";
-import { samErrorMessage, type SamAudience, type SamFailure, type SamKeySource } from "@/lib/samgov-errors";
+import { samErrorMessage, type SamAudience, type SamEndpoint, type SamFailure, type SamKeySource } from "@/lib/samgov-errors";
 import {
   DATABASE_PENDING_MESSAGE,
   KEYRING_UNAVAILABLE_MESSAGE,
@@ -29,19 +29,46 @@ import { SecretBoxError, canDecryptKeyId, decryptSecret, encryptSecret, keyringS
  * else FORGE's shared one); platform work (the gold set) uses
  * `platformSamCredential({ audience: "operator" })`.
  */
+/** BL-STAB-7d — what an answer from SAM.gov says about a company key. */
+export type SamKeyOutcome = "ok" | "invalid" | "forbidden" | "rate_limited";
+type OutcomeWriter = (outcome: SamKeyOutcome, endpoint: SamEndpoint) => Promise<void>;
+
 export class SamCredential {
   readonly #key: string;
   readonly source: SamKeySource;
   readonly audience: SamAudience;
   readonly organizationId: string | null;
   readonly last4: string;
+  /** For a company key: what SAM.gov last said about it ("ok", "invalid", "forbidden", "rate_limited"). */
+  readonly storedStatus: string | null;
+  readonly #onOutcome: OutcomeWriter | null;
+  readonly #reported = new Set<SamKeyOutcome>();
 
-  constructor(key: string, opts: { source: SamKeySource; audience: SamAudience; organizationId: string | null }) {
+  constructor(
+    key: string,
+    opts: { source: SamKeySource; audience: SamAudience; organizationId: string | null; storedStatus?: string | null; onOutcome?: OutcomeWriter },
+  ) {
     this.#key = key;
     this.source = opts.source;
     this.audience = opts.audience;
     this.organizationId = opts.organizationId;
     this.last4 = key.slice(-4);
+    this.storedStatus = opts.storedStatus ?? null;
+    this.#onOutcome = opts.onOutcome ?? null;
+  }
+
+  /**
+   * BL-STAB-7d — record what SAM.gov said about this key (company keys
+   * only; once per kind of answer per credential). Never throws.
+   */
+  async reportOutcome(outcome: SamKeyOutcome, endpoint: SamEndpoint): Promise<void> {
+    if (!this.#onOutcome || this.#reported.has(outcome)) return;
+    this.#reported.add(outcome);
+    try {
+      await this.#onOutcome(outcome, endpoint);
+    } catch (err) {
+      log.warn("[samgov-key]", "recording the key's status failed", { organizationId: this.organizationId, outcome, error: err });
+    }
   }
 
   /** The key itself, for samgov.ts to put on a request to a SAM.gov host. */
@@ -77,11 +104,16 @@ export type SamKeyResolution = { ok: true; cred: SamCredential } | { ok: false; 
 const PURPOSE = "samgov_api_key" as const;
 
 /** The company's stored key row, or null (no row, or the table isn't there yet). */
-async function storedKey(organizationId: string): Promise<{ ciphertext: string; keyId: string; last4: string } | null> {
+async function storedKey(organizationId: string): Promise<{ ciphertext: string; keyId: string; last4: string; status: string } | null> {
   const rows = await safeQuery(
     () =>
       db
-        .select({ ciphertext: organizationSamgovKeys.ciphertext, keyId: organizationSamgovKeys.keyId, last4: organizationSamgovKeys.last4 })
+        .select({
+          ciphertext: organizationSamgovKeys.ciphertext,
+          keyId: organizationSamgovKeys.keyId,
+          last4: organizationSamgovKeys.last4,
+          status: organizationSamgovKeys.status,
+        })
         .from(organizationSamgovKeys)
         .where(eq(organizationSamgovKeys.organizationId, organizationId))
         .limit(1),
@@ -109,7 +141,17 @@ export async function resolveSamCredential(organizationId: string): Promise<SamK
   if (row) {
     try {
       const key = decryptSecret(row.ciphertext, { purpose: PURPOSE, organizationId });
-      return { ok: true, cred: new SamCredential(key, { source: "company", audience: "tenant", organizationId }) };
+      const { ciphertext, status } = row;
+      return {
+        ok: true,
+        cred: new SamCredential(key, {
+          source: "company",
+          audience: "tenant",
+          organizationId,
+          storedStatus: status,
+          onOutcome: (outcome, endpoint) => recordKeyOutcome({ organizationId, ciphertext, storedStatus: status, outcome, endpoint }),
+        }),
+      };
     } catch (err) {
       unreadable = true;
       const reason = err instanceof SecretBoxError ? err.reason : "unknown";
@@ -125,6 +167,43 @@ export async function resolveSamCredential(organizationId: string): Promise<SamK
   if (shared) return { ok: true, cred: shared };
   const cls = unreadable ? "key_unreadable" : "missing_key";
   return { ok: false, failure: { ok: false, cls, error: samErrorMessage({ cls, source: "company", audience: "tenant" }) } };
+}
+
+/**
+ * BL-STAB-7d — record what SAM.gov said about a company key. Every write
+ * is guarded by the ciphertext the call used, so a call still running
+ * with a key that has since been replaced never marks the new one. A
+ * rejection or acceptance that changes the status is audited (system
+ * actor; last four only); the daily request limit is status only, and a
+ * working key refreshes its "accepted on" date at most hourly.
+ */
+async function recordKeyOutcome(i: { organizationId: string; ciphertext: string; storedStatus: string; outcome: SamKeyOutcome; endpoint: SamEndpoint }) {
+  const k = organizationSamgovKeys;
+  const sameKey = and(eq(k.organizationId, i.organizationId), eq(k.ciphertext, i.ciphertext));
+  if (i.outcome === "ok" && i.storedStatus === "ok") {
+    await db
+      .update(k)
+      .set({ verifiedAt: sql`now()` })
+      .where(and(sameKey, or(isNull(k.verifiedAt), lt(k.verifiedAt, sql`now() - interval '1 hour'`))));
+    return;
+  }
+  const changes = i.outcome === "ok" ? { status: "ok", statusAt: sql`now()`, verifiedAt: sql`now()` } : { status: i.outcome, statusAt: sql`now()` };
+  const [row] = await db
+    .update(k)
+    .set(changes)
+    .where(and(sameKey, ne(k.status, i.outcome)))
+    .returning({ last4: k.last4 });
+  if (!row) return;
+  const audited = i.outcome === "ok" ? i.storedStatus === "invalid" || i.storedStatus === "forbidden" : i.outcome !== "rate_limited";
+  if (!audited) return;
+  await recordAudit({
+    organizationId: i.organizationId,
+    actor: { userId: null },
+    action: i.outcome === "ok" ? "settings.samgov_key.accepted" : "settings.samgov_key.rejected",
+    resourceType: "organization",
+    resourceId: i.organizationId,
+    metadata: { last4: row.last4, status: i.outcome, endpoint: i.endpoint },
+  });
 }
 
 export type SamKeyStatusView = {

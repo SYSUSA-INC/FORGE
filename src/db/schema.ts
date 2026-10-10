@@ -2495,6 +2495,8 @@ export const solicitations = pgTable("solicitation", {
   // the attachment links already read, so a poll downloads only what is
   // new (drizzle/0093).
   qaCheckedAt: timestamp("qa_checked_at", { withTimezone: true }),
+  /** BL-STAB-7d — the daily Q&A check's last attempt (answered or not); the queue rotates on it. */
+  qaAttemptedAt: timestamp("qa_attempted_at", { withTimezone: true }),
   qaSeenLinks: jsonb("qa_seen_links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   // BL-AIX Phase 0d — how much of the document the requirement sweep read
   // (drizzle/0114); the solicitation page warns when it fell short.

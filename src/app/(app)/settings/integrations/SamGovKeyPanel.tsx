@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { DATABASE_PENDING_MESSAGE, KEYRING_UNAVAILABLE_MESSAGE, maskLast4 } from "@/lib/samgov-key-logic";
+import { DATABASE_PENDING_MESSAGE, KEYRING_UNAVAILABLE_MESSAGE, maskLast4, type samKeyNotice } from "@/lib/samgov-key-logic";
 import { removeCompanySamKeyAction, setCompanySamKeyAction } from "./samgov-key-actions";
 
 /** What the page sends: details of the company key only to admins who can edit it. */
@@ -12,6 +12,8 @@ export type SamKeyPanelView = {
   canSave: boolean;
   dbReady: boolean;
   company: null | { last4: string; status: string; statusAt: string; verifiedAt: string | null; setAt: string; setByName: string | null; readable: boolean };
+  /** BL-STAB-7d — for people who can't see the key's details: what holds SAM.gov up, if anything. */
+  notice: ReturnType<typeof samKeyNotice>;
 };
 
 const day = (iso: string) => iso.slice(0, 10);
@@ -61,6 +63,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
               : "SAM.gov: not connected."}{" "}
           {isImpersonating ? "Read-only while impersonating." : "Company admins manage this key."}
         </p>
+        {view.notice ? <p className={`mt-1 font-mono text-[11px] ${view.notice.tone === "rose" ? "text-rose" : "text-gold"}`}>{view.notice.text}</p> : null}
       </Panel>
     );
   }
@@ -68,7 +71,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
   return (
     <Panel title="SAM.gov API key" eyebrow={eyebrow} accent="cobalt" className="mb-4">
       <p className="font-body text-[12px] leading-relaxed text-muted">
-        FORGE uses this key for Import from SAM.gov, company search and sync, Getting started, the scout and Check SAM.gov now. Without it, FORGE&apos;s shared key is used when available. Get a free key on SAM.gov: sign in, open Account Details and request a Public API Key.
+        FORGE uses this key for Import from SAM.gov, company search and sync, Getting started, the scout, the daily Q&amp;A check and Check SAM.gov now. Without it, FORGE&apos;s shared key is used when available. Get a free key on SAM.gov: sign in, open Account Details and request a Public API Key.
       </p>
 
       <p className="mt-3 font-mono text-[11px] text-text">
@@ -80,8 +83,17 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
               ? `Using FORGE's shared SAM.gov key.${view.canSave ? " Add your company's own key so your searches don't share a daily limit with other companies." : ""}`
               : "No SAM.gov key. Import, company search, the scout and Q&A checks are off until a company admin adds one."}
       </p>
-      {company?.status === "rate_limited" ? (
+      {/* BL-STAB-7d — what SAM.gov last said, for the key in use (an unreadable key isn't used). */}
+      {!company?.readable ? null : company.status === "rate_limited" ? (
         <p className="mt-1 font-mono text-[11px] text-gold">SAM.gov&apos;s request limit for this key was reached on {day(company.statusAt)}; it resets daily.</p>
+      ) : company.status === "invalid" ? (
+        <p className="mt-1 font-mono text-[11px] text-rose">
+          SAM.gov rejected this key on {day(company.statusAt)}: it is invalid or expired. SAM.gov searches fail and the daily Q&amp;A check is paused until a new key is saved.
+        </p>
+      ) : company.status === "forbidden" ? (
+        <p className="mt-1 font-mono text-[11px] text-gold">
+          SAM.gov refused a request for this key on {day(company.statusAt)}: it isn&apos;t allowed to use part of SAM.gov. Check its access on SAM.gov, or save a new key.
+        </p>
       ) : null}
 
       {view.canSave ? (

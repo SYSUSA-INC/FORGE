@@ -25,6 +25,10 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/cron/solicitation-qa",
+      "schedule": "15 8 * * *"
+    },
+    {
       "path": "/api/cron/brain-index",
       "schedule": "30 */6 * * *"
     },

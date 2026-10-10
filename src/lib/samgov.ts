@@ -7,6 +7,7 @@ import {
   classifySamResponse,
   isKeyOrQuotaFailure,
   isSamHost,
+  keyOutcomeOf,
   redactSamSecrets,
   samErrorMessage,
   type SamEndpoint,
@@ -83,7 +84,11 @@ async function samGet(
   } catch (err) {
     return samFailure(cred, call.endpoint, { cls: classifyFetchError(err) });
   }
-  if (res.ok) return { ok: true, res };
+  if (res.ok) {
+    // BL-STAB-7d — a company key that works is recorded as such.
+    if (keySent) await cred.reportOutcome("ok", call.endpoint);
+    return { ok: true, res };
+  }
   let body = "";
   try {
     // Redacted before it is cut or parsed, so no part of the key survives a trim.
@@ -95,6 +100,9 @@ async function samGet(
   // A 401/403 is about FORGE's key only if the key was on the request and
   // SAM.gov itself answered (not a storage host it redirected to).
   const notOurKey = (!keySent || res.redirected) && (c.cls === "key_invalid" || c.cls === "key_forbidden");
+  // BL-STAB-7d — the stored status changes only on what SAM.gov's gateway says about the key.
+  const outcome = notOurKey || !keySent ? null : keyOutcomeOf(c.code, res.status);
+  if (outcome) await cred.reportOutcome(outcome, call.endpoint);
   return samFailure(cred, call.endpoint, { status: res.status, ...c, cls: notOurKey ? "restricted" : c.cls });
 }
 

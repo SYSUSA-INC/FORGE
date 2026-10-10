@@ -22,7 +22,7 @@ Every quarter, work through this list. Estimated time: 60-90 minutes total. Sche
 | `ANTHROPIC_API_KEY` | Anthropic console → API Keys → generate new | Vercel env | yes |
 | `CRON_SECRET` | generate: `openssl rand -base64 32` | Vercel env | yes (cron stops firing until redeploy) |
 | `NEON_API_KEY` (when configured) | Neon console → Account settings → API keys | Vercel env | yes |
-| `SAMGOV_API_KEY` (shared fallback; 8(a), gold set, health, daily Q&A) | sam.gov account → Account Details → Public API Key; renew before SAM.gov expires it | Vercel env | yes |
+| `SAMGOV_API_KEY` (the fallback for companies without their own key; the only key for the 8(a) registry, cert refresh, gold set and health probe) | sam.gov account → Account Details → Public API Key; renew before SAM.gov expires it | Vercel env | yes |
 | `FORGE_SECRET_KEYS` (keyring for company SAM.gov keys) | see the keyring procedure below — never the `_NEW` swap | Vercel env (Production and staging, never Preview) | yes |
 
 **Process per secret:**

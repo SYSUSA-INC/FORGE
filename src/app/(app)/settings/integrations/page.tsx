@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getSamKeyStatus } from "@/lib/samgov-key";
+import { samKeyNotice } from "@/lib/samgov-key-logic";
 import { getIntegrationStatuses } from "@/lib/settings-status";
 import { IntegrationsTab } from "../IntegrationsTab";
 import { SamGovKeyPanel, type SamKeyPanelView } from "./SamGovKeyPanel";
@@ -32,6 +33,7 @@ export default async function IntegrationsPage() {
             readable: sam.company.readable,
           }
         : null,
+    notice: canEdit ? null : samKeyNotice(sam),
   };
 
   return (

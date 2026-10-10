@@ -8,6 +8,7 @@ import {
   classifySamResponse,
   isKeyOrQuotaFailure,
   isSamHost,
+  keyOutcomeOf,
   parseSamErrorBody,
   redactSamSecrets,
   samErrorMessage,
@@ -111,6 +112,18 @@ describe("BL-STAB-7a — the key goes only to SAM.gov", () => {
     ]) {
       expect(isSamHost(new URL(bad)), bad).toBe(false);
     }
+  });
+
+  it("BL-STAB-7d — only SAM.gov's gateway codes (and the request limit) say something about the key", () => {
+    const outcome = (status: number, body: string) => keyOutcomeOf(classifySamResponse(status, body).code, status);
+    expect(outcome(401, OWNER_BODY)).toBe("invalid");
+    expect(outcome(403, '{"error":{"code":"API_KEY_UNAUTHORIZED"}}')).toBe("forbidden");
+    expect(outcome(429, "<h1>OVER_RATE_LIMIT</h1>")).toBe("rate_limited");
+    expect(outcome(429, "")).toBe("rate_limited");
+    // An edge or firewall page, or a bare status, is not about the key.
+    expect(outcome(403, "<HTML><BODY><H1>Access Denied</H1></BODY></HTML>")).toBeNull();
+    expect(outcome(401, "")).toBeNull();
+    expect(outcome(500, OWNER_BODY.replace("API_KEY_INVALID", "INTERNAL_ERROR"))).toBeNull();
   });
 
   it("redacts api_key values and the key itself, whatever characters it has", () => {

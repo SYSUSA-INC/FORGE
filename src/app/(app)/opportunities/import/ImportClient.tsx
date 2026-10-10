@@ -11,7 +11,7 @@ import {
   type ImportableOpportunity,
 } from "./actions";
 
-export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
+export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: string[]; autoSearch: boolean }) {
   const router = useRouter();
   const [naicsInput, setNaicsInput] = useState(defaultNaics.join(", "));
   const [keyword, setKeyword] = useState("");
@@ -27,7 +27,7 @@ export function ImportClient({ defaultNaics }: { defaultNaics: string[] }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    if (defaultNaics.length > 0 && results === null) {
+    if (autoSearch && defaultNaics.length > 0 && results === null) {
       search();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
