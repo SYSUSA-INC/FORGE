@@ -1,12 +1,12 @@
 import "server-only";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, lt, max } from "drizzle-orm";
 import { db } from "@/db";
 import { certFirms, certImportRuns } from "@/db/schema";
 import { log } from "@/lib/log";
 import { getCertRetentionMonths } from "@/lib/platform-settings";
 import { CERT_SPECS, parseSba8aPage, sba8aPageUrl, type Sba8aFetchResult, type Sba8aRow } from "@/lib/sba-8a";
 import { samGetText } from "@/lib/samgov";
-import { isKeyOrQuotaFailure, samErrorMessage, type SamErrorClass } from "@/lib/samgov-errors";
+import { SAM_TIMEOUTS_MS, isKeyOrQuotaFailure, samErrorMessage, type SamErrorClass } from "@/lib/samgov-errors";
 import { platformSamCredential, type SamCredential } from "@/lib/samgov-key";
 
 /**
@@ -70,8 +70,12 @@ export async function upsertParticipant(row: Sba8aRow): Promise<void> {
  * full backfills stay an operator action (Pull batch on /admin/sba-8a).
  */
 const CRON_PAGES_PER_CERT = 30;
-/** Stop starting new pages after this, so the run ends inside the route's 60 s limit. */
-const RUN_BUDGET_MS = 45_000;
+/**
+ * Stop starting new pages after this: the slowest allowed page (its SAM.gov
+ * deadline), its upserts, the run-row update and the prune must still end
+ * inside the route's 60 s limit.
+ */
+const RUN_BUDGET_MS = 60_000 - SAM_TIMEOUTS_MS.sba8a - 5_000;
 
 export type CronRefreshResult = {
   ok: boolean;
@@ -101,7 +105,8 @@ function stopsRun(cls: SamErrorClass | undefined): boolean {
  * for authorization (super-admin action, or the cron route's
  * CRON_SECRET). After a key, quota or SAM.gov-down failure — or once the
  * time budget is used — the remaining cert types are not pulled, and
- * say why.
+ * say why. Each run starts with the cert type whose last complete pull is
+ * oldest, so a type the budget cut off goes first next time.
  */
 export async function runCertRefresh(): Promise<CronRefreshResult> {
   const start = new Date();
@@ -113,35 +118,54 @@ export async function runCertRefresh(): Promise<CronRefreshResult> {
   let stoppedBy: string | null = cred ? null : samErrorMessage({ cls: "missing_key", source: "platform", audience: "operator" });
 
   // Unverified codes are skipped: pulling them would burn the SAM quota for nothing.
-  for (const spec of CERT_SPECS) {
-    if (!spec.verified) continue;
+  const lastComplete = new Map(
+    (
+      await db
+        .select({ certType: certImportRuns.certType, at: max(certImportRuns.startedAt) })
+        .from(certImportRuns)
+        .where(and(eq(certImportRuns.source, "cron.sam.gov"), eq(certImportRuns.status, "ok")))
+        .groupBy(certImportRuns.certType)
+    ).map((r) => [r.certType, r.at?.getTime() ?? 0]),
+  );
+  const specs = CERT_SPECS.filter((s) => s.verified).sort((a, b) => (lastComplete.get(a.certType) ?? 0) - (lastComplete.get(b.certType) ?? 0));
+  for (const spec of specs) {
     if (stoppedBy || !cred) {
       pulled.push({ certType: spec.certType, rowsUpserted: 0, error: cred ? `Not pulled: SAM.gov stopped this run earlier — ${stoppedBy}` : stoppedBy });
       continue;
     }
     if (Date.now() >= deadline) {
-      pulled.push({ certType: spec.certType, rowsUpserted: 0, error: "Not pulled: this run's time budget was used up; the next run continues." });
+      pulled.push({ certType: spec.certType, rowsUpserted: 0, error: "Not pulled: this run's time budget was used up; the next run starts with this cert type." });
       continue;
     }
     let rowsUpserted = 0;
     let error: string | null = null;
+    let note: string | null = null;
     const [runRow] = await db
       .insert(certImportRuns)
       .values({ source: "cron.sam.gov", certType: spec.certType, status: "running" })
       .returning({ id: certImportRuns.id });
     try {
-      for (let page = 1; page <= CRON_PAGES_PER_CERT && Date.now() < deadline; page++) {
+      let page = 1;
+      let exhausted = false;
+      for (; page <= CRON_PAGES_PER_CERT && Date.now() < deadline; page++) {
         const res = await fetchSba8aPage(cred, page, spec.certType);
         if (!res.ok) {
           error = res.error;
           if (stopsRun(res.cls)) stoppedBy = res.error;
           break;
         }
-        if (res.rows.length === 0) break;
+        if (res.rows.length === 0) {
+          exhausted = true;
+          break;
+        }
         for (const row of res.rows) {
           await upsertParticipant(row);
           rowsUpserted += 1;
         }
+      }
+      // Cut short by the budget: say so, and keep it first in line next run.
+      if (!error && !exhausted && page <= CRON_PAGES_PER_CERT) {
+        note = `Stopped after page ${page - 1} of ${CRON_PAGES_PER_CERT}: this run's time budget was used up.`;
       }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -149,9 +173,9 @@ export async function runCertRefresh(): Promise<CronRefreshResult> {
     }
     await db
       .update(certImportRuns)
-      .set({ status: error ? "failed" : "ok", finishedAt: new Date(), rowsUpserted, error: (error ?? "").slice(0, 1000) })
+      .set({ status: error ? "failed" : note ? "partial" : "ok", finishedAt: new Date(), rowsUpserted, error: (error ?? note ?? "").slice(0, 1000) })
       .where(eq(certImportRuns.id, runRow!.id));
-    pulled.push({ certType: spec.certType, rowsUpserted, error });
+    pulled.push({ certType: spec.certType, rowsUpserted, error: error ?? note });
     totalRowsUpserted += rowsUpserted;
   }
 

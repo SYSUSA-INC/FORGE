@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { samGetText } from "@/lib/samgov";
+import { samErrorMessage } from "@/lib/samgov-errors";
 import { platformSamCredential } from "@/lib/samgov-key";
 
 export const runtime = "nodejs";
@@ -14,7 +15,7 @@ export async function GET() {
     return NextResponse.json({
       keyConfigured: false,
       apiReachable: false,
-      message: "The SAM.gov platform key is not configured in this environment.",
+      message: samErrorMessage({ cls: "missing_key", source: "platform", audience: "operator" }),
     });
   }
 

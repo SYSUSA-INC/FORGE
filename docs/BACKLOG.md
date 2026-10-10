@@ -587,7 +587,9 @@ mind. Bandage will come off but a true fix will stay."
     `"use server"` module with no auth check, so any signed-in browser
     could call it as a server action and spend the shared key. It now
     stops after a key, quota or SAM.gov-down answer (the rest are "Not
-    pulled", with the reason) and within 45 s. `sba-8a.ts` stays pure
+    pulled", with the reason), stops starting pages after 35 s so it ends
+    inside the cron's 60 s, records a cut-short type as "partial", and
+    starts each run with the type whose last complete pull is oldest. `sba-8a.ts` stays pure
     (client components import it). The health probe gained a 10 s
     deadline; `/api/samgov/entity` is removed; a source scan pins which
     code may use which key.
