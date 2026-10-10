@@ -24,6 +24,7 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
       "src/lib/cert-refresh.ts",
       "src/lib/gold-set.ts",
       "src/app/api/samgov/health/route.ts",
+      "src/lib/samgov-health.ts",
       ...walk("src/app/(app)/admin/sba-8a"),
     ];
     for (const file of platformOnly) {

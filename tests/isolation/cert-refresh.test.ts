@@ -6,11 +6,13 @@
  * reports reachability only, never the upstream body or the key.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, like } from "drizzle-orm";
 import { db } from "@/db";
 import { certFirms, certImportRuns } from "@/db/schema";
 import { runCertRefresh } from "@/lib/cert-refresh";
 import { GET as healthGet } from "@/app/api/samgov/health/route";
+import { platformSettings, rateLimitCounters } from "@/db/schema";
+import { resetSamHealthMemo } from "@/lib/samgov-health";
 
 const KEY = "SharedKey0123456789abcdefghijklmnopqSHRD";
 const OWNER_BODY = "<html><body><h1>API_KEY_INVALID</h1></body></html>";
@@ -92,9 +94,12 @@ describe("BL-STAB-7c — cert refresh and health on the shared key", () => {
   });
 
   it("the public health probe reports reachability only", async () => {
+    resetSamHealthMemo();
+    await db.delete(rateLimitCounters).where(like(rateLimitCounters.key, "samgov:health-probe%"));
+    await db.delete(platformSettings).where(eq(platformSettings.key, "samgov.health_last"));
     const res = await healthGet();
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ keyConfigured: true, apiReachable: false, status: 401 });
+    expect(JSON.parse(text)).toEqual({ keyConfigured: true, apiReachable: false, status: 401, checkedAt: expect.any(String) });
     expect(text).not.toContain(KEY);
     expect(text).not.toContain("API_KEY_INVALID");
   });
