@@ -135,6 +135,12 @@ export class MemoryStorage implements StorageProvider {
   }
 }
 
+/** A header holding a whole number of bytes, else null. */
+function wholeNumber(raw: string | null): number | null {
+  const v = (raw ?? "").trim();
+  return /^\d+$/.test(v) ? Number(v) : null;
+}
+
 /** An entity tag without its quotes (R2 returns `"abc…"`). */
 function cleanEtag(raw: string | null): string {
   return (raw ?? "").replace(/^W\//, "").replace(/"/g, "");
@@ -202,7 +208,11 @@ export class R2Storage implements StorageProvider {
     try {
       const res = await fetch(`https://${this.host}${path}`, {
         method,
-        headers: signed.headers,
+        // The bytes as stored. Fetch otherwise offers gzip/br, and Cloudflare
+        // then compresses text answers of about 50 bytes or more and drops
+        // their Content-Length, so a text file's size read as 0 (BL-STAB-2).
+        // Unsigned on purpose: SigV4 needs only host and x-amz-* signed.
+        headers: { ...signed.headers, "accept-encoding": "identity" },
         body: body ? Buffer.from(body) : undefined,
         signal: controller.signal,
       });
@@ -264,11 +274,29 @@ export class R2Storage implements StorageProvider {
     done();
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`R2 head failed (${res.status}) for ${key}`);
+    // A length is the object's size only on an answer that wasn't re-encoded;
+    // otherwise (or when it is missing) ask for the size outright, never assume 0.
+    const encoding = (res.headers.get("content-encoding") ?? "identity").trim().toLowerCase();
+    const length = encoding === "identity" ? wholeNumber(res.headers.get("content-length")) : null;
     return {
-      byteSize: Number(res.headers.get("content-length") ?? "0"),
+      byteSize: length ?? (await this.sizeFromRange(key)),
       contentType: res.headers.get("content-type") || "application/octet-stream",
       etag: cleanEtag(res.headers.get("etag")),
     };
+  }
+
+  /** The object's size from a one-byte ranged read (`Content-Range: bytes 0-0/<size>`). */
+  private async sizeFromRange(key: string): Promise<number> {
+    const { res, done } = await this.send("GET", key, null, { range: "bytes=0-0" });
+    try {
+      await res.arrayBuffer().catch(() => undefined);
+      // 206 for a non-empty object; 416 ("bytes */0") for an empty one.
+      const total = /\/(\d+)\s*$/.exec(res.headers.get("content-range") ?? "")?.[1];
+      if ((res.status === 206 || res.status === 416) && total !== undefined) return Number(total);
+      throw new Error(`R2 didn't report the size of ${key} (HTTP ${res.status})`);
+    } finally {
+      done();
+    }
   }
 
   async getRange(key: string, start: number, endInclusive: number): Promise<Uint8Array | null> {

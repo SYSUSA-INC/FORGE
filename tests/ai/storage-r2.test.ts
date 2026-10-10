@@ -6,9 +6,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
+import { createServer, type Server } from "node:http";
+import { gzipSync } from "node:zlib";
 import { MemoryStorage, R2Storage, storageTimeoutMs } from "@/lib/storage";
 
 type Call = { url: string; init: RequestInit };
+const realFetch = globalThis.fetch;
 
 function r2(): R2Storage {
   return new R2Storage("acct", "bucket", "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
@@ -39,6 +42,34 @@ describe("R2Storage", () => {
     expect(calls[0]!.url).toBe("https://acct.r2.cloudflarestorage.com/bucket/org/1/uploads/x");
     respond = () => new Response(null, { status: 404 });
     expect(await r2().head("org/1/uploads/missing")).toBeNull();
+  });
+
+  it("asks for the bytes as stored on every request, without signing that header", async () => {
+    respond = () => new Response(null, { status: 200, headers: { "content-length": "5" } });
+    await r2().head("k");
+    const headers = calls[0]!.init.headers as Record<string, string>;
+    expect(headers["accept-encoding"]).toBe("identity");
+    expect(headers.authorization).not.toContain("accept-encoding");
+  });
+
+  it("head never reads a missing or re-encoded length as 0: it asks for the size with a one-byte range", async () => {
+    // Cloudflare compressed the answer: no length (or the compressed one), so it can't be the size.
+    const answers: Record<string, string>[] = [{ "content-type": "text/plain" }, { "content-type": "text/plain", "content-encoding": "gzip", "content-length": "29" }];
+    for (const headers of answers) {
+      calls = [];
+      respond = (call) =>
+        call.init.method === "HEAD"
+          ? new Response(null, { status: 200, headers: { ...headers, etag: 'W/"e1"' } })
+          : new Response(new Uint8Array([0x61]), { status: 206, headers: { "content-range": "bytes 0-0/1024" } });
+      expect(await r2().head("k")).toEqual({ byteSize: 1024, contentType: "text/plain", etag: "e1" });
+      expect((calls[1]!.init.headers as Record<string, string>).range).toBe("bytes=0-0");
+    }
+    // An empty object answers the range with 416 and its size.
+    respond = (call) => (call.init.method === "HEAD" ? new Response(null, { status: 200 }) : new Response(null, { status: 416, headers: { "content-range": "bytes */0" } }));
+    expect((await r2().head("empty"))!.byteSize).toBe(0);
+    // No size anywhere: an error, never a guess.
+    respond = (call) => (call.init.method === "HEAD" ? new Response(null, { status: 200 }) : new Response("x", { status: 200 }));
+    await expect(r2().head("k")).rejects.toThrow(/didn't report the size/);
   });
 
   it("getRange signs a range header, accepts 206, and trims a whole-object 200", async () => {
@@ -118,6 +149,50 @@ describe("R2Storage", () => {
     await vi.advanceTimersByTimeAsync(60_001);
     expect((await pending)?.bytes.byteLength).toBe(4);
     expect(aborted).toBe(false);
+  });
+});
+
+/**
+ * BL-STAB-2 — through the real fetch, against a stand-in that compresses
+ * the way Cloudflare's edge does (200, a text type, 48 bytes or more, the
+ * client accepts gzip: Content-Encoding set, Content-Length dropped). A
+ * 1 KB text file used to read as 0 bytes, failing every .txt/.csv upload.
+ */
+describe("R2Storage behind an edge that compresses text", () => {
+  let server: Server;
+  let base = "";
+  const objects: Record<string, Buffer> = { "/bucket/big.txt": Buffer.alloc(1024, 0x61), "/bucket/small.txt": Buffer.alloc(16, 0x61) };
+
+  beforeEach(async () => {
+    server = createServer((req, res) => {
+      const body = objects[req.url ?? ""];
+      if (!body) return void res.writeHead(404).end();
+      const range = /^bytes=(\d+)-(\d+)$/.exec(req.headers.range ?? "");
+      if (range) {
+        const [start, end] = [Number(range[1]), Number(range[2])];
+        res.writeHead(206, { "content-type": "text/plain", "content-range": `bytes ${start}-${end}/${body.length}`, "content-length": String(end - start + 1) });
+        return void res.end(body.subarray(start, end + 1));
+      }
+      const gzip = /gzip/.test(req.headers["accept-encoding"] ?? "") && body.length >= 48;
+      res.writeHead(200, gzip ? { "content-type": "text/plain", "content-encoding": "gzip", etag: 'W/"e"' } : { "content-type": "text/plain", "content-length": String(body.length), etag: '"e"' });
+      res.end(req.method === "HEAD" ? undefined : gzip ? gzipSync(body) : body);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    base = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+    // R2's host, sent to the stand-in instead; everything else is the real fetch.
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => realFetch(url.replace("https://acct.r2.cloudflarestorage.com", base), init));
+  });
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it("reads a text file's real size, small or large, and its bytes", async () => {
+    const storage = new R2Storage("acct", "bucket", "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
+    expect(await storage.head("big.txt")).toEqual({ byteSize: 1024, contentType: "text/plain", etag: "e" });
+    expect((await storage.head("small.txt"))!.byteSize).toBe(16);
+    expect((await storage.get("big.txt"))!.bytes.byteLength).toBe(1024);
   });
 });
 

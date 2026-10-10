@@ -74,9 +74,9 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
-| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d in PR #373; 7e queued |
+| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
@@ -180,7 +180,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · 🔄 BL-STAB-7 (7a shipped in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · 🔄 BL-STAB-7 (7a shipped in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -463,6 +463,27 @@ mind. Bandage will come off but a true fix will stay."
         and parsed from storage; unknown type; foreign parent refused
         before the claim; Re-parse unreachable vs gone) and the type
         guesses in `tests/ai/upload-policy.test.ts`.
+    - **2d-fix — text files read as 0 bytes on R2.** PR #374.
+      - **Symptom (owner, 2026-10-10, first production R2 setup):**
+        Check storage was green, but Test from this browser said
+        "Storage answered 200, and holds 0 bytes instead of 1024".
+      - **Root cause:** FORGE's requests to R2 let fetch offer gzip/br.
+        Cloudflare's edge compresses text answers of about 50 bytes or
+        more and drops their Content-Length, and `head()` read the
+        missing length as 0. The file had arrived whole: R2 enforces the
+        signed size. Every `.txt` / `.csv` upload over about 50 bytes
+        would have been rejected as a size mismatch and deleted (PDF,
+        Office and image types aren't compressed). Check storage used a
+        16-byte file, too small to be compressed, so it never saw this.
+      - **Fix:** every R2 request asks for the bytes as stored
+        (`accept-encoding: identity`, unsigned). `head()` never turns a
+        missing or re-encoded length into 0: it asks for the size with a
+        one-byte range read (Content-Range), else fails. Check storage
+        uses a 1 KB text file, and the browser self-test names a
+        read-back error instead of saying the file is gone.
+      - **Tests:** the identity header, the range fallback (206, an empty
+        object's 416, no size at all), and the real fetch against a
+        stand-in edge that compresses like Cloudflare; mutation-checked.
     - **2d-2 — GSA attachments; abandoned uploads cleaned up by the jobs
       cron.** ⏳ queued.
     - **2e — knowledge corpus; extraction as a durable job; one storage
@@ -548,7 +569,7 @@ mind. Bandage will come off but a true fix will stay."
       the missing ones; re-running the review keeps the matrix; a
       malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
-  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c shipped (PR #372); 7d in PR #373; 7e queued (re-sized S → L).
+  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e queued (re-sized S → L).
   - **Symptom:** Import from SAM.gov and Settings → SAM.gov sync show
     "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
     "there has to be a place where the company admin can update their
@@ -593,7 +614,7 @@ mind. Bandage will come off but a true fix will stay."
     (client components import it). The health probe gained a 10 s
     deadline; `/api/samgov/entity` is removed; a source scan pins which
     code may use which key.
-  - **7d (PR #373):** SAM.gov's answers update the company key's
+  - **7d (shipped, PR #373):** SAM.gov's answers update the company key's
     status (rejected, refused, request limit, accepted), only for the key
     the call used (the write is guarded by its ciphertext), audited as
     `settings.samgov_key.rejected` / `.accepted` (the request limit is
