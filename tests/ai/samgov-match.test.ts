@@ -6,6 +6,9 @@ import { describe, expect, it } from "vitest";
 import {
   OPEN_NOTICE_TYPES,
   collapseBySolicitation,
+  describeKeyword,
+  hasKeyword,
+  keywordLabel,
   findTerm,
   isWantedType,
   matchNotice,
@@ -31,13 +34,40 @@ describe("BL-STAB-10 — notice types", () => {
 });
 
 describe("BL-STAB-10 — keywords", () => {
-  it("parses words, phrases, required and excluded terms", () => {
-    expect(parseKeyword(`"zero trust" +cloud -hardware OASIS+`)).toEqual({ terms: ["zero trust", "cloud", "oasis+"], excluded: ["hardware"], anyOf: [] });
-    expect(parseKeyword("  ", ["Multiple Award Schedule"])).toEqual({ terms: [], excluded: [], anyOf: ["multiple award schedule"] });
-    // Smart quotes, a stray quote and commas between words.
-    expect(parseKeyword("“zero trust”, ServiceNow; ITSM").terms).toEqual(["zero trust", "servicenow", "itsm"]);
-    expect(parseKeyword('"zero trust').terms).toEqual(["zero", "trust"]);
-    expect(parseKeyword("8(a) OASIS+").terms).toEqual(["8(a)", "oasis+"]);
+  it("parses words, phrases, required and excluded terms; a comma list means any of its items", () => {
+    const shape = (input: string, vehicles: string[] = []) => {
+      const q = parseKeyword(input, vehicles);
+      return { terms: q.terms, anyOf: q.anyOf, excluded: q.excluded };
+    };
+    // No comma: every word or quoted phrase must appear (unchanged).
+    expect(shape(`"zero trust" +cloud -hardware OASIS+`)).toEqual({ terms: ["zero trust", "cloud", "oasis+"], anyOf: [], excluded: ["hardware"] });
+    expect(shape("zero trust cloud")).toEqual({ terms: ["zero", "trust", "cloud"], anyOf: [], excluded: [] });
+    expect(shape('"zero trust').terms).toEqual(["zero", "trust"]);
+    expect(shape("8(a) OASIS+").terms).toEqual(["8(a)", "oasis+"]);
+    // BL-STAB-10b — the owner's search: any of three phrases.
+    expect(shape("Servicenow, ITSM, Enterprise Service Management")).toEqual({ terms: [], anyOf: [["servicenow", "itsm", "enterprise service management"]], excluded: [] });
+    expect(shape("zero trust cloud, ServiceNow").anyOf).toEqual([["zero trust cloud", "servicenow"]]);
+    expect(shape(`"Smith, Jones", ITSM`).anyOf).toEqual([["smith, jones", "itsm"]]);
+    expect(shape("ServiceNow, ITSM -hardware +federal")).toEqual({ terms: ["federal"], anyOf: [["servicenow", "itsm"]], excluded: ["hardware"] });
+    expect(shape("Enterprise Service Management,").anyOf).toEqual([["enterprise service management"]]);
+    expect(shape("“zero trust”, ServiceNow; ITSM").anyOf).toEqual([["zero trust", "servicenow", "itsm"]]);
+    expect(hasKeyword(parseKeyword(", ;"))).toBe(false);
+    expect(hasKeyword(parseKeyword("-"))).toBe(false);
+    // GSA vehicles are one more group; both must be met.
+    expect(shape("ServiceNow, ITSM", ["Multiple Award Schedule", "OASIS+"]).anyOf).toEqual([["servicenow", "itsm"], ["multiple award schedule", "oasis+"]]);
+    // Long lists are cut to 10, risky items are named, the user's spelling is kept for display.
+    const many = parseKeyword(Array.from({ length: 12 }, (_, i) => `term${i}`).join(", "));
+    expect(many.anyOf[0]).toHaveLength(10);
+    expect(many.notes[0]).toBe("Only the first 10 of 12 keywords are used.");
+    expect(parseKeyword("Smith & Jones, Inc.").notes).toEqual(["“Inc.” is in almost every notice."]);
+    expect(parseKeyword("over 1,000 seats").notes).toEqual(["A number like 1,000 is split at the comma: put it in quotes to keep it whole."]);
+    const owner = parseKeyword("Servicenow, ITSM, Enterprise Service Management");
+    expect(describeKeyword(owner)).toBe("Any of: Servicenow · ITSM · Enterprise Service Management");
+    expect(keywordLabel(owner)).toBe("any of “Servicenow”, “ITSM” or “Enterprise Service Management”");
+    expect(describeKeyword(parseKeyword("zero trust -hardware"))).toBe("All of: zero · trust; Not: hardware");
+    // A saved scout keyword is one phrase.
+    expect(shape("").anyOf).toEqual([]);
+    expect(parseKeyword("zero trust -hardware", [], { asList: true }).anyOf).toEqual([["zero trust"]]);
   });
 
   it("matches whole words and phrases only", () => {
@@ -73,6 +103,16 @@ describe("BL-STAB-10 — keywords", () => {
     expect(matchNotice(row("ServiceNow renewal"), both, { text: "Licenses only." })).toMatchObject({ status: "match", where: "title" });
     expect(matchNotice(row("ServiceNow renewal"), both, { text: "Includes hardware." })).toEqual({ status: "not_mentioned" });
     expect(matchNotice(row("ServiceNow renewal"), parseKeyword("ServiceNow ITOM"), { text: "ITSM only" })).toEqual({ status: "not_mentioned" });
+    // Any of a list; each item is a phrase, and every item found is reported with where.
+    const list = parseKeyword("Servicenow, ITSM, Enterprise Service Management");
+    expect(matchNotice(row("ITSM tooling"), list, { text: "Migrating to ServiceNow." })).toMatchObject({
+      status: "match",
+      matched: [
+        { term: "Servicenow", where: "description" },
+        { term: "ITSM", where: "title" },
+      ],
+    });
+    expect(matchNotice(row("Enterprise asset service"), list, { text: "Management services." })).toEqual({ status: "not_mentioned" });
     // A vehicle filter: one of them must appear.
     const mas = parseKeyword("", ["Multiple Award Schedule"]);
     expect(matchNotice(row("Multiple Award Schedule"), mas, null)).toMatchObject({ status: "match", where: "title" });
@@ -123,12 +163,13 @@ describe("BL-STAB-10 — the owner's search (NAICS 541519 + ServiceNow)", () => 
   });
 
   it("the results line says what was searched", () => {
-    const counts = { samTotal: 412, received: 412, otherTypes: 120, folded: 37, matched: 1, notMentioned: 230, noDescription: 20, unchecked: 4 };
-    expect(searchSummary(counts, { keyword: "ServiceNow", codes: ["541519"], days: 30 })).toBe(
-      "1 notice mentions “ServiceNow” · out of 412 notices SAM.gov has for NAICS 541519, posted in the last 30 days (230 don't mention it, 20 have no description, 4 not checked yet) · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in.",
+    const counts = { samTotal: 412, received: 412, truncated: false, otherTypes: 120, folded: 37, matched: 2, notMentioned: 230, noDescription: 20, unchecked: 4 };
+    const label = keywordLabel(parseKeyword("Servicenow, ITSM, Enterprise Service Management"));
+    expect(searchSummary(counts, { keyword: label, codes: ["541519"], days: 30 })).toBe(
+      "2 notices mention any of “Servicenow”, “ITSM” or “Enterprise Service Management” · out of 412 notices SAM.gov has for NAICS 541519, posted in the last 30 days (230 don't mention it, 20 have no description, 4 not checked yet) · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in.",
     );
-    expect(searchSummary({ ...counts, samTotal: 2412, received: 1000 }, { keyword: null, codes: [], days: 7 })).toBe(
-      "1 notice for all NAICS codes, posted in the last 7 days · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in · FORGE read the first 1,000 of 2,412; narrow the codes or the window to see the rest.",
+    expect(searchSummary({ ...counts, matched: 1, samTotal: 2412, received: 1000, truncated: true }, { keyword: null, codes: [], days: 7 })).toBe(
+      "1 notice for SAM.gov's title search (no NAICS codes), posted in the last 7 days · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in · SAM.gov sends at most 1,000 notices per code; FORGE read 1,000 of 2,412: narrow the codes or the window to see the rest.",
     );
   });
 });

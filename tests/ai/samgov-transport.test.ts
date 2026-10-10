@@ -87,19 +87,29 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
     expect([...read.values()].filter((d) => "unread" in d).length).toBeGreaterThan(0);
   });
 
-  it("BL-STAB-10 — asks SAM.gov per NAICS code, never with `q`, and keeps only active notices", async () => {
+  it("BL-STAB-10 — asks SAM.gov per NAICS code, never with `q`, keeps only active notices and says which code found each", async () => {
     const calls = stubFetch((url) =>
-      json({ totalRecords: 2, opportunitiesData: [op(Number(url.searchParams.get("ncode")), "x"), { ...op(9, "x"), active: "No" }] }),
+      // More than these 3 rows exist: the answer is truncated.
+      json({ totalRecords: 5, opportunitiesData: [op(Number(url.searchParams.get("ncode")), "x"), op(7, "x"), { ...op(9, "x"), active: "No" }] }),
     );
-    const r = await fetchSamOpportunities(cred, { naicsCodes: ["541512", " 541519 ", "541512"], title: "ServiceNow" });
+    const r = await fetchSamOpportunities(cred, { naicsCodes: ["541512", " 541519 ", "541512"], titles: ["ServiceNow"] });
     expect(calls.map((c) => new URL(c.url).searchParams.get("ncode")).sort()).toEqual(["541512", "541519"]);
     for (const c of calls) {
       const p = new URL(c.url).searchParams;
-      expect(p.has("q")).toBe(false);
-      expect([p.get("limit"), p.get("title")]).toEqual(["1000", "ServiceNow"]);
+      expect([p.has("q"), p.has("title"), p.get("limit")]).toEqual([false, false, "1000"]);
     }
-    expect(r).toMatchObject({ ok: true, samTotal: 4, received: 4, failedCodes: [] });
-    if (r.ok) expect(r.rows.map((o) => o.noticeId).sort()).toEqual(["N541512", "N541519"]);
+    expect(r).toMatchObject({ ok: true, samTotal: 10, received: 6, truncated: true, failedCodes: [] });
+    if (r.ok) {
+      expect(r.rows.map((o) => o.noticeId).sort()).toEqual(["N541512", "N541519", "N7"]);
+      expect(r.viaCodes.N7!.sort()).toEqual(["541512", "541519"]);
+    }
+  });
+
+  it("BL-STAB-10b — with no codes, one title search per item, counted once", async () => {
+    const calls = stubFetch((url) => json({ totalRecords: 2, opportunitiesData: [op(1, "x"), op(url.searchParams.get("title") === "itsm" ? 2 : 3, "x")] }));
+    const r = await fetchSamOpportunities(cred, { titles: ["servicenow", "itsm"] });
+    expect(calls.map((c) => new URL(c.url).searchParams.get("title")).sort()).toEqual(["itsm", "servicenow"]);
+    expect(r).toMatchObject({ ok: true, samTotal: 3, truncated: false, viaCodes: {} });
   });
 
   it("BL-STAB-10 — reads descriptions only when the title doesn't decide, within the key's budget", async () => {
