@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { DATABASE_PENDING_MESSAGE, KEYRING_UNAVAILABLE_MESSAGE, maskLast4 } from "@/lib/samgov-key-logic";
+import { DATABASE_PENDING_MESSAGE, KEYRING_UNAVAILABLE_MESSAGE, maskLast4, type samKeyNotice } from "@/lib/samgov-key-logic";
 import { removeCompanySamKeyAction, setCompanySamKeyAction } from "./samgov-key-actions";
 
 /** What the page sends: details of the company key only to admins who can edit it. */
@@ -12,6 +12,8 @@ export type SamKeyPanelView = {
   canSave: boolean;
   dbReady: boolean;
   company: null | { last4: string; status: string; statusAt: string; verifiedAt: string | null; setAt: string; setByName: string | null; readable: boolean };
+  /** BL-STAB-7d — for people who can't see the key's details: what holds SAM.gov up, if anything. */
+  notice: ReturnType<typeof samKeyNotice>;
 };
 
 const day = (iso: string) => iso.slice(0, 10);
@@ -61,6 +63,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
               : "SAM.gov: not connected."}{" "}
           {isImpersonating ? "Read-only while impersonating." : "Company admins manage this key."}
         </p>
+        {view.notice ? <p className={`mt-1 font-mono text-[11px] ${view.notice.tone === "rose" ? "text-rose" : "text-gold"}`}>{view.notice.text}</p> : null}
       </Panel>
     );
   }
@@ -82,6 +85,14 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
       </p>
       {company?.status === "rate_limited" ? (
         <p className="mt-1 font-mono text-[11px] text-gold">SAM.gov&apos;s request limit for this key was reached on {day(company.statusAt)}; it resets daily.</p>
+      ) : company?.status === "invalid" ? (
+        <p className="mt-1 font-mono text-[11px] text-rose">
+          SAM.gov rejected this key on {day(company.statusAt)}: it is invalid or expired. SAM.gov searches fail and the daily Q&amp;A check is paused until a new key is saved.
+        </p>
+      ) : company?.status === "forbidden" ? (
+        <p className="mt-1 font-mono text-[11px] text-gold">
+          SAM.gov refused a request for this key on {day(company.statusAt)}: it isn&apos;t allowed to use part of SAM.gov. Check its access on SAM.gov, or save a new key.
+        </p>
       ) : null}
 
       {view.canSave ? (

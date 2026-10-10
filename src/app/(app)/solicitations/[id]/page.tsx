@@ -38,6 +38,7 @@ import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPan
 import { AgencyContactsPanel } from "@/components/crm/AgencyContactsPanel";
 import { listSolicitationQa } from "@/lib/solicitation-qa";
 import { getSamKeyStatus } from "@/lib/samgov-key";
+import { samKeyNotice } from "@/lib/samgov-key-logic";
 import { normalizeRef } from "@/lib/solicitation-qa-logic";
 import { THEME } from "@/lib/theme-colors";
 
@@ -379,7 +380,7 @@ export default async function SolicitationDetail({
           solicitationId={s.id}
           noticeId={s.noticeId}
           qaCheckedAt={s.qaCheckedAt ? s.qaCheckedAt.toISOString() : null}
-          hasSamKey={(await getSamKeyStatus(organizationId)).usable}
+          sam={await getSamKeyStatus(organizationId).then((k) => ({ usable: k.usable, notice: samKeyNotice(k) }))}
           initial={qa}
         />
       </div>

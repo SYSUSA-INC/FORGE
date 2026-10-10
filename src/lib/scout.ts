@@ -301,6 +301,8 @@ export async function runScoutForOrganization(input: {
   requestedByUserId?: string | null;
   now?: Date;
   maxTriage?: number;
+  /** BL-STAB-7d — the cron's breaker: set once FORGE's shared key fails; later companies on it aren't searched. */
+  sharedKey?: { failed: string | null };
 }): Promise<ScoutRunSummary> {
   const { organizationId } = input;
   const now = input.now ?? new Date();
@@ -344,6 +346,8 @@ export async function runScoutForOrganization(input: {
   const sam = await resolveSamCredential(organizationId);
   if (!sam.ok) {
     notes.push(`SAM.gov was not searched: ${sam.failure.error}`);
+  } else if (sam.cred.source === "platform" && input.sharedKey?.failed) {
+    notes.push(`SAM.gov was not searched: ${input.sharedKey.failed}`);
   } else {
     const searches: { params: Parameters<typeof searchSamGovOpportunities>[1]; source: ScoutCandidateSource; keyword: string | null }[] = [];
     if (naics.length > 0) {
@@ -370,9 +374,11 @@ export async function runScoutForOrganization(input: {
         if (!r.ok) {
           summary.errors += 1;
           notes.push(`${s.keyword ? `Keyword "${s.keyword}"` : "NAICS"} search: ${r.error}`);
-          // BL-STAB-7a — the same key would fail every remaining search.
-          if (isKeyOrQuotaFailure(r.cls) && i < searches.length - 1) {
-            notes.push("Remaining SAM.gov searches skipped.");
+          // BL-STAB-7a — the same key would fail every remaining search
+          // (BL-STAB-7d — and, for the shared key, every later company on it).
+          if (isKeyOrQuotaFailure(r.cls)) {
+            if (sam.cred.source === "platform" && input.sharedKey) input.sharedKey.failed ??= r.error;
+            if (i < searches.length - 1) notes.push("Remaining SAM.gov searches skipped.");
             break;
           }
           continue;
@@ -843,6 +849,8 @@ export type ScoutCronSummary = {
   errors: number;
   /** Tenants due but left for the next tick (time budget). */
   deferred: number;
+  /** BL-STAB-7d — SAM.gov rejected FORGE's shared key (or its limit was reached); later companies on it weren't searched. */
+  sharedKeyFailed: boolean;
 };
 
 /**
@@ -855,7 +863,8 @@ export async function runScoutCron(opts: { maxOrgs?: number; budgetMs?: number }
   const maxOrgs = opts.maxOrgs ?? 25;
   const budgetMs = opts.budgetMs ?? 240_000;
   const started = Date.now();
-  const summary: ScoutCronSummary = { organizations: 0, created: 0, triaged: 0, errors: 0, deferred: 0 };
+  const summary: ScoutCronSummary = { organizations: 0, created: 0, triaged: 0, errors: 0, deferred: 0, sharedKeyFailed: false };
+  const sharedKey: { failed: string | null } = { failed: null };
 
   const due = rowsOf<{ organization_id: string }>(
     await db.execute(sql`
@@ -883,7 +892,7 @@ export async function runScoutCron(opts: { maxOrgs?: number; budgetMs?: number }
     }
     const organizationId = row.organization_id;
     try {
-      const r = await runScoutForOrganization({ organizationId, trigger: "cron" });
+      const r = await runScoutForOrganization({ organizationId, trigger: "cron", sharedKey });
       summary.organizations += 1;
       summary.created += r.created;
       summary.triaged += r.triaged;
@@ -893,6 +902,7 @@ export async function runScoutCron(opts: { maxOrgs?: number; budgetMs?: number }
       log.error("[scout]", "tenant run failed", { organizationId, error: err });
     }
   }
+  summary.sharedKeyFailed = sharedKey.failed !== null;
   return summary;
 }
 

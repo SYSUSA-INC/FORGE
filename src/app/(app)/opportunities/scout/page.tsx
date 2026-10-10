@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SamKeyNotice } from "@/components/ui/SamKeyNotice";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { getSamKeyStatus } from "@/lib/samgov-key";
+import { samKeyNotice } from "@/lib/samgov-key-logic";
 import { safeQuery } from "@/lib/schema-resilience";
 import {
   getScoutProfile,
@@ -35,7 +38,7 @@ export default async function ScoutPage() {
   const { organizationId } = await requireCurrentOrg();
   const isAdmin = user.role === "admin" || !!user.isSuperadmin;
 
-  const [profile, fresh, decided, track, lastRun] = await Promise.all([
+  const [profile, fresh, decided, track, lastRun, sam] = await Promise.all([
     safeQuery(() => getScoutProfile({ organizationId }), DEFAULT_SCOUT_PROFILE, { tag: "scout.profile" }),
     safeQuery<ScoutCandidateView[]>(
       () => listScoutCandidates({ organizationId, status: "new", limit: 60 }),
@@ -49,6 +52,7 @@ export default async function ScoutPage() {
     ),
     safeQuery(() => getScoutTrack({ organizationId }), EMPTY_SCOUT_TRACK, { tag: "scout.track" }),
     safeQuery<ScoutRunView | null>(() => latestScoutRun({ organizationId }), null, { tag: "scout.run" }),
+    getSamKeyStatus(organizationId),
   ]);
 
   const pursue = fresh.filter((c) => c.recommendation === "pursue").length;
@@ -78,6 +82,8 @@ export default async function ScoutPage() {
           { label: "Last run", value: lastRun ? ago(lastRun.startedAt) : "never" },
         ]}
       />
+      {/* BL-STAB-7d — why the nightly SAM.gov searches would come back empty. */}
+      <SamKeyNotice notice={samKeyNotice(sam)} />
       <ScoutClient
         profile={profile}
         candidates={fresh}

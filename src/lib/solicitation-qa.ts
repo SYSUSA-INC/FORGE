@@ -13,11 +13,12 @@
 import { activeRequirements, type ReviewedRequirement } from "@/lib/requirement-review";
 import "server-only";
 
-import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   complianceItems,
   notifications,
+  organizationSamgovKeys,
   proposals,
   solicitationAssignments,
   solicitationQa,
@@ -30,7 +31,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { jaccard } from "@/lib/requirements-text";
 import { downloadSamResource, fetchSamNotice } from "@/lib/samgov";
-import { isKeyOrQuotaFailure, type SamErrorClass } from "@/lib/samgov-errors";
+import { SAM_TIMEOUTS_MS, isKeyOrQuotaFailure, type SamErrorClass } from "@/lib/samgov-errors";
 import { platformSamCredential, resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
 import { extractTextFromAny } from "@/lib/solicitation-extract";
 import {
@@ -191,6 +192,8 @@ export async function pollSolicitationQa(input: {
   actor?: Actor;
   /** The key to poll with (the cron passes one); else the company's is resolved. */
   sam?: SamCredential;
+  /** The cron's time budget (epoch ms): no download starts that could run past it. */
+  downloadsUntil?: number;
 }): Promise<QaPollResult> {
   const { organizationId } = input;
   const sol = await solicitationForOrg(organizationId, input.solicitationId);
@@ -240,6 +243,12 @@ export async function pollSolicitationQa(input: {
   const nowSeen: string[] = [];
 
   for (const [i, link] of toRead.entries()) {
+    // BL-STAB-7d — the rest wait (unseen) for the next check rather than run past the cron's limit.
+    if (input.downloadsUntil !== undefined && Date.now() + SAM_TIMEOUTS_MS.attachment > input.downloadsUntil) {
+      for (let j = i; j < toRead.length; j++) skipped.push("Not downloaded: the daily check ran out of time; it is read on the next check.");
+      retrying += toRead.length - i;
+      break;
+    }
     const dl = await downloadSamResource(cred, link, QA_LIMITS.maxDownloadBytes);
     if (!dl.ok) {
       skipped.push(dl.error);
@@ -408,66 +417,159 @@ export type QaCronSummary = {
   added: number;
   flagged: number;
   errors: number;
-  /** True when FORGE's shared SAM.gov key is not set and nothing was polled. */
+  /** Neither FORGE's shared SAM.gov key nor any company key is set: nothing was polled. */
   skippedNoKey: boolean;
-  /** True when SAM.gov rejected the shared key (or its limit was reached) and the run stopped there. */
+  /** SAM.gov rejected FORGE's shared key (or its limit was reached): companies on it wait for the next run. */
   stoppedByKey: boolean;
+  /** Companies skipped for the rest of the run: SAM.gov rejected their own key, or they have no usable key. */
+  blockedOrganizations: number;
+  /** SAM.gov failed three polls in a row (timeouts, network, its own errors): the run stopped. */
+  samOutage: boolean;
+  /** Due notices this run didn't reach (time budget, the per-run cap, an outage); they go first next run. */
+  deferred: number;
 };
 
 /**
- * Daily: poll the notices of live solicitations not checked in the last
- * 20 hours, oldest check first, and tell the assigned team when answers
- * landed. Cross-tenant by design (cron worker); each poll is scoped.
- * BL-STAB-7a — it polls on FORGE's shared key and stops at the first
- * rejected or over-limit answer (every later poll would fail the same way).
+ * BL-STAB-7d — the cron route allows 300 s: polls start only in the first
+ * 200 s (a notice and its description take up to 30 s), and no download
+ * starts that could end after 260 s, leaving room to store what was read.
+ */
+const QA_CRON = { pollsMs: 200_000, downloadsMs: 260_000, window: 100, maxPasses: 4, outageStreak: 3 } as const;
+const TRANSIENT = new Set<SamErrorClass | undefined>(["timeout", "network", "upstream", "bad_response"]);
+
+/**
+ * Due notices, one per company in turn (each company's least recently
+ * tried first), so one company's backlog or dead key can't fill the run.
+ * Companies whose own key SAM.gov rejected are left out until an admin
+ * replaces it; `companyKeysOnly` once the shared key is unusable.
+ */
+function dueQaWhere(f: { blocked: Set<string>; companyKeysOnly: boolean; now: number }) {
+  const lastTry = sql`greatest(${solicitations.qaAttemptedAt}, ${solicitations.qaCheckedAt})`;
+  const triedBefore = new Date(f.now - 20 * 3_600_000).toISOString();
+  const dueAfter = new Date(f.now - 7 * 86_400_000);
+  return and(
+    ne(solicitations.noticeId, ""),
+    or(isNull(solicitations.responseDueDate), gt(solicitations.responseDueDate, dueAfter)),
+    sql`(${lastTry} is null or ${lastTry} < ${triedBefore}::timestamptz)`,
+    sql`not exists (select 1 from organization_samgov_key k where k.organization_id = ${solicitations.organizationId} and k.status = 'invalid')`,
+    f.companyKeysOnly ? sql`exists (select 1 from organization_samgov_key k where k.organization_id = ${solicitations.organizationId})` : undefined,
+    f.blocked.size > 0 ? notInArray(solicitations.organizationId, [...f.blocked]) : undefined,
+  );
+}
+
+/**
+ * Daily: poll the notices of live solicitations not tried in the last 20
+ * hours and tell the assigned team when answers landed. Cross-tenant by
+ * design (cron worker); each poll is scoped and uses its company's key
+ * (its own, else FORGE's shared one). BL-STAB-7d — every poll stamps
+ * qa_attempted_at, so a notice that keeps failing rotates to the back; a
+ * company whose key fails is skipped for the rest of the run, as are
+ * companies on the shared key once it fails; key failures don't use up
+ * the per-run cap; three SAM.gov failures in a row end the run.
  */
 export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
-  const sam = platformSamCredential();
-  if (!sam) return { solicitationsPolled: 0, added: 0, flagged: 0, errors: 0, skippedNoKey: true, stoppedByKey: false };
-  const checkedBefore = new Date(Date.now() - 20 * 3_600_000);
-  const dueAfter = new Date(Date.now() - 7 * 86_400_000);
-  const rows = await db
-    .select({ id: solicitations.id, organizationId: solicitations.organizationId, title: solicitations.title })
-    .from(solicitations)
-    .where(
-      and(
-        ne(solicitations.noticeId, ""),
-        or(isNull(solicitations.responseDueDate), gt(solicitations.responseDueDate, dueAfter)),
-        or(isNull(solicitations.qaCheckedAt), lt(solicitations.qaCheckedAt, checkedBefore)),
-      ),
-    )
-    .orderBy(sql`${solicitations.qaCheckedAt} asc nulls first`)
-    .limit(QA_LIMITS.maxSolicitationsPerCron);
+  const started = Date.now();
+  const summary: QaCronSummary = {
+    solicitationsPolled: 0,
+    added: 0,
+    flagged: 0,
+    errors: 0,
+    skippedNoKey: false,
+    stoppedByKey: false,
+    blockedOrganizations: 0,
+    samOutage: false,
+    deferred: 0,
+  };
+  const filter = { blocked: new Set<string>(), companyKeysOnly: platformSamCredential() === null, now: started };
+  if (filter.companyKeysOnly && (await db.select({ id: organizationSamgovKeys.organizationId }).from(organizationSamgovKeys).limit(1)).length === 0) {
+    return { ...summary, skippedNoKey: true };
+  }
+  const creds = new Map<string, SamCredential | null>();
+  let counted = 0;
+  let streak = 0;
+  let stopped = false;
 
-  let added = 0;
-  let flagged = 0;
-  let errors = 0;
-  let polled = 0;
-  let stoppedByKey = false;
-  for (const row of rows) {
-    polled++;
-    try {
-      const res = await pollSolicitationQa({ organizationId: row.organizationId, solicitationId: row.id, sam });
+  for (let pass = 0; pass < QA_CRON.maxPasses && !stopped; pass++) {
+    const rows = await db
+      .select({ id: solicitations.id, organizationId: solicitations.organizationId, title: solicitations.title })
+      .from(solicitations)
+      .where(dueQaWhere(filter))
+      .orderBy(
+        sql`row_number() over (partition by ${solicitations.organizationId} order by greatest(${solicitations.qaAttemptedAt}, ${solicitations.qaCheckedAt}) asc nulls first, ${solicitations.id})`,
+        sql`greatest(${solicitations.qaAttemptedAt}, ${solicitations.qaCheckedAt}) asc nulls first`,
+        solicitations.id,
+      )
+      .limit(QA_CRON.window);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      if (counted >= QA_LIMITS.maxSolicitationsPerCron || Date.now() >= started + QA_CRON.pollsMs) {
+        stopped = true;
+        break;
+      }
+      const organizationId = row.organizationId;
+      if (filter.blocked.has(organizationId)) continue;
+      if (!creds.has(organizationId)) {
+        const r = await resolveSamCredential(organizationId);
+        creds.set(organizationId, r.ok ? r.cred : null);
+      }
+      const sam = creds.get(organizationId) ?? null;
+      if (!sam || (sam.source === "platform" && summary.stoppedByKey)) {
+        if (!sam) summary.blockedOrganizations++;
+        filter.blocked.add(organizationId);
+        continue;
+      }
+      // Stamped first, so a poll that fails (or never returns) still rotates the row back.
+      await db
+        .update(solicitations)
+        .set({ qaAttemptedAt: new Date() })
+        .where(and(eq(solicitations.id, row.id), eq(solicitations.organizationId, organizationId)));
+      summary.solicitationsPolled++;
+      let res: QaPollResult;
+      try {
+        res = await pollSolicitationQa({ organizationId, solicitationId: row.id, sam, downloadsUntil: started + QA_CRON.downloadsMs });
+      } catch (err) {
+        summary.errors++;
+        counted++;
+        log.error("[solicitation-qa]", "poll failed", { solicitationId: row.id, error: err });
+        continue;
+      }
       if (!res.ok) {
-        errors++;
-        log.warn("[solicitation-qa]", "poll declined", { solicitationId: row.id, cls: res.cls ?? null, error: res.error });
+        summary.errors++;
+        log.warn("[solicitation-qa]", "poll declined", { solicitationId: row.id, cls: res.cls ?? null, source: sam.source, error: res.error });
         if (isKeyOrQuotaFailure(res.cls)) {
-          stoppedByKey = true;
+          // The same key fails every later poll: that company (or every company on the shared key) waits.
+          if (sam.source === "platform") {
+            summary.stoppedByKey = true;
+            filter.companyKeysOnly = true;
+          } else summary.blockedOrganizations++;
+          filter.blocked.add(organizationId);
+          streak = 0;
+          continue;
+        }
+        counted++;
+        streak = TRANSIENT.has(res.cls) ? streak + 1 : 0;
+        if (streak >= QA_CRON.outageStreak) {
+          summary.samOutage = true;
+          stopped = true;
           break;
         }
         continue;
       }
-      added += res.added;
-      flagged += res.flagged;
+      counted++;
+      streak = 0;
+      summary.added += res.added;
+      summary.flagged += res.flagged;
       if (res.added > 0) {
-        await notifyTeam({ organizationId: row.organizationId, solicitationId: row.id, title: row.title, added: res.added, flagged: res.flagged });
+        await notifyTeam({ organizationId, solicitationId: row.id, title: row.title, added: res.added, flagged: res.flagged });
       }
-    } catch (err) {
-      errors++;
-      log.error("[solicitation-qa]", "poll failed", { solicitationId: row.id, error: err });
     }
   }
-  return { solicitationsPolled: polled, added, flagged, errors, skippedNoKey: false, stoppedByKey };
+
+  if (stopped) {
+    const [left] = await db.select({ n: sql<number>`count(*)::int` }).from(solicitations).where(dueQaWhere(filter));
+    summary.deferred = left?.n ?? 0;
+  }
+  return summary;
 }
 
 async function notifyTeam(input: { organizationId: string; solicitationId: string; title: string; added: number; flagged: number }) {

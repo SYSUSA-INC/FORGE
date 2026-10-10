@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { dispatchKeyDateReminders } from "@/lib/solicitation-key-date-cron";
 import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
-import { dispatchSolicitationQaPolls } from "@/lib/solicitation-qa";
 import { dispatchReviewDueReminders } from "@/lib/review-reminders";
 import { dispatchContactTouchReminders } from "@/lib/crm-reminders";
 import { log } from "@/lib/log";
@@ -26,10 +25,8 @@ export const maxDuration = 60;
  * scans are independent; a failure in one is reported in the response
  * without blocking the other.
  *
- * BL-FB-SOL-QA — the same tick polls the SAM.gov notices of live
- * solicitations for new Q&A attachments (`dispatchSolicitationQaPolls`,
- * bounded, skipped without SAMGOV_API_KEY; on FORGE's shared key, it
- * stops at the first rejected or over-limit answer).
+ * BL-STAB-7d — the Q&A check (BL-FB-SOL-QA) moved to its own route,
+ * /api/cron/solicitation-qa, which has the time SAM.gov calls need.
  *
  * Auth: Bearer ${CRON_SECRET} — same pattern as all other cron routes.
  */
@@ -57,10 +54,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon, qaPolls, reviewReminders, contactReminders] = await Promise.allSettled([
+  const [keyDates, dueSoon, reviewReminders, contactReminders] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
-    dispatchSolicitationQaPolls(),
     // BL-FB-X-COLOR-TEAM Slice 2 — day-before nudge to unsubmitted reviewers.
     dispatchReviewDueReminders(),
     // BL-FB-X-CRM Slice 2 — follow-up owed to a customer contact's owner.
@@ -77,11 +73,6 @@ export async function GET(req: NextRequest) {
     const message = reviewReminders.reason instanceof Error ? reviewReminders.reason.message : String(reviewReminders.reason);
     log.error("[solicitation-key-date-cron]", "review reminders failed", { error: message });
     failures.push(`reviewReminders: ${message}`);
-  }
-  if (qaPolls.status === "rejected") {
-    const message = qaPolls.reason instanceof Error ? qaPolls.reason.message : String(qaPolls.reason);
-    log.error("[solicitation-key-date-cron]", "Q&A poll failed", { error: message });
-    failures.push(`solicitationQa: ${message}`);
   }
   if (keyDates.status === "rejected") {
     const message =
@@ -108,7 +99,6 @@ export async function GET(req: NextRequest) {
     ...(keyDates.status === "fulfilled" ? keyDates.value : {}),
     opportunityDueSoon:
       dueSoon.status === "fulfilled" ? dueSoon.value : null,
-    solicitationQa: qaPolls.status === "fulfilled" ? qaPolls.value : null,
     reviewReminders: reviewReminders.status === "fulfilled" ? reviewReminders.value : null,
     contactReminders: contactReminders.status === "fulfilled" ? contactReminders.value : null,
   };

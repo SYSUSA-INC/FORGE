@@ -5,6 +5,9 @@ import { organizations } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { SamKeyNotice } from "@/components/ui/SamKeyNotice";
+import { getSamKeyStatus } from "@/lib/samgov-key";
+import { samKeyNotice } from "@/lib/samgov-key-logic";
 import { ImportClient } from "./ImportClient";
 import { listOwnSourceRequestsAction } from "./source-requests/actions";
 import { SourceRequestPanel } from "./source-requests/SourceRequestPanel";
@@ -34,6 +37,10 @@ export default async function ImportPage() {
   );
 
   const ownRequests = await listOwnSourceRequestsAction();
+  // BL-STAB-7d — say why SAM.gov searches would fail, and don't search on arrival when they would.
+  const sam = await getSamKeyStatus(organizationId);
+  const samNotice = samKeyNotice(sam);
+  const autoSearch = sam.usable && !(sam.inUse === "company" && sam.company?.status === "invalid");
 
   return (
     <>
@@ -64,6 +71,7 @@ export default async function ImportPage() {
         }
       />
 
+      <SamKeyNotice notice={samNotice} />
       {naics.length === 0 ? (
         <Panel title="No NAICS codes configured">
           <p className="text-sm text-muted">
@@ -75,11 +83,11 @@ export default async function ImportPage() {
             NAICS codes.
           </p>
           <div className="mt-4">
-            <ImportClient defaultNaics={[]} />
+            <ImportClient defaultNaics={[]} autoSearch={false} />
           </div>
         </Panel>
       ) : (
-        <ImportClient defaultNaics={naics} />
+        <ImportClient defaultNaics={naics} autoSearch={autoSearch} />
       )}
 
       <div className="mt-6">

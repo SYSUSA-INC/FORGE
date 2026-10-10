@@ -315,13 +315,14 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 
 ### 4.16 Your company's SAM.gov API key (admins)
 
-**Settings → Integrations → SAM.gov API key** (BL-STAB-7b). Import from SAM.gov, company search and sync, Getting started, the scout and **Check SAM.gov now** use your company's own key when one is set, and FORGE's shared key otherwise.
+**Settings → Integrations → SAM.gov API key** (BL-STAB-7b). Import from SAM.gov, company search and sync, Getting started, the scout, the daily Q&A check and **Check SAM.gov now** use your company's own key when one is set, and FORGE's shared key otherwise.
 
 - **Get a key:** sign in to SAM.gov, open **Account Details** and request a **Public API Key**. SAM.gov sets how many requests a day a key allows, and keys expire after a period SAM.gov sets; replace yours before it does.
 - **Test and save:** paste the key and click **Test and save**. FORGE runs one search with it first and saves it only if SAM.gov recognises it; otherwise nothing changes and the message says why (rejected, refused, or SAM.gov couldn't be reached). A key at its daily limit is saved, with a note. Up to five tests per company per hour.
 - **Never shown again:** FORGE encrypts the key and only ever sends it to SAM.gov; the panel shows its last four characters, who added it and when SAM.gov accepted it.
 - **Remove company key** goes back to FORGE's shared key (or turns SAM.gov features off if there is none).
 - **Members** see only whether SAM.gov is connected, and with whose key.
+- **When SAM.gov stops accepting the key (BL-STAB-7d):** FORGE notes what SAM.gov last said about it. If SAM.gov **rejected** it (invalid or expired), Import from SAM.gov, Scout, the solicitation's Q&A panel and this panel say so in red; Import no longer searches on arrival, and the daily Q&A check skips your company until a new key is saved (saving one that SAM.gov accepts clears the note). If SAM.gov **refused** a request (the key isn't allowed to use part of SAM.gov) or the key reached its **daily request limit**, the same pages show an amber note. The audit log records each change as `settings.samgov_key.rejected` or `settings.samgov_key.accepted`, with the last four characters only.
 
 ## 5. Opportunities
 

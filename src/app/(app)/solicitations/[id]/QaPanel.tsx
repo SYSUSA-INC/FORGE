@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
+import { SamKeyNotice } from "@/components/ui/SamKeyNotice";
+import type { samKeyNotice } from "@/lib/samgov-key-logic";
 import { describeQa } from "@/lib/solicitation-qa-logic";
 import { addManualQaAction, pollSolicitationQaAction, type SolicitationQaView } from "./qa-actions";
 
@@ -15,15 +17,17 @@ export function QaPanel({
   solicitationId,
   noticeId,
   qaCheckedAt,
-  hasSamKey,
+  sam,
   initial,
 }: {
   solicitationId: string;
   noticeId: string;
   qaCheckedAt: string | null;
-  hasSamKey: boolean;
+  /** BL-STAB-7d — whether a key is usable, and what holds SAM.gov up for this company. */
+  sam: { usable: boolean; notice: ReturnType<typeof samKeyNotice> };
   initial: SolicitationQaView[];
 }) {
+  const hasSamKey = sam.usable;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -98,6 +102,7 @@ export function QaPanel({
         </div>
       }
     >
+      {noticeId ? <SamKeyNotice notice={sam.notice} className="mb-3" /> : null}
       {pasteOpen ? (
         <div className="mb-3 rounded-md border border-teal/30 bg-teal/[0.04] p-3">
           <p className="font-body text-[12px] text-muted">

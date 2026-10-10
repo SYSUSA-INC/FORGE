@@ -13,7 +13,10 @@ import {
   type SamErrorClass,
   type SamFailure,
 } from "@/lib/samgov-errors";
-import type { SamCredential } from "@/lib/samgov-key";
+import type { SamCredential, SamKeyOutcome } from "@/lib/samgov-key";
+
+/** BL-STAB-7d — the answers that say something about the key itself. */
+const KEY_OUTCOMES: Partial<Record<SamErrorClass, SamKeyOutcome>> = { key_invalid: "invalid", key_forbidden: "forbidden", rate_limited: "rate_limited" };
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 
@@ -83,7 +86,11 @@ async function samGet(
   } catch (err) {
     return samFailure(cred, call.endpoint, { cls: classifyFetchError(err) });
   }
-  if (res.ok) return { ok: true, res };
+  if (res.ok) {
+    // BL-STAB-7d — a company key that works is recorded as such.
+    if (keySent) await cred.reportOutcome("ok", call.endpoint);
+    return { ok: true, res };
+  }
   let body = "";
   try {
     // Redacted before it is cut or parsed, so no part of the key survives a trim.
@@ -95,6 +102,8 @@ async function samGet(
   // A 401/403 is about FORGE's key only if the key was on the request and
   // SAM.gov itself answered (not a storage host it redirected to).
   const notOurKey = (!keySent || res.redirected) && (c.cls === "key_invalid" || c.cls === "key_forbidden");
+  const outcome = notOurKey || !keySent ? null : KEY_OUTCOMES[c.cls];
+  if (outcome) await cred.reportOutcome(outcome, call.endpoint);
   return samFailure(cred, call.endpoint, { status: res.status, ...c, cls: notOurKey ? "restricted" : c.cls });
 }
 
