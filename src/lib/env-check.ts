@@ -124,8 +124,10 @@ export function validateEnvOrWarn(): void {
   const label = resolveEnvLabel();
   const missingR2 = ["R2_ACCOUNT_ID", "R2_BUCKET", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"].filter((n) => !(process.env[n] ?? "").trim());
   if ((label === "production" || label === "staging") && (missingR2.length > 0 || process.env.STORAGE_PROVIDER === "memory")) {
+    // An Error, so it reaches /admin/errors too (the operator's first check).
     log.error("[env-check]", `file storage is the in-memory fallback in ${label}; uploads are refused until the R2 variables are set`, {
       missing: missingR2,
+      error: new Error(`File storage is the in-memory fallback in ${label}: uploads are refused. Missing: ${missingR2.join(", ") || "none (STORAGE_PROVIDER=memory)"}`),
     });
   }
 
