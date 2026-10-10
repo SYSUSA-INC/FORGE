@@ -7,16 +7,14 @@ import {
   classifySamResponse,
   isKeyOrQuotaFailure,
   isSamHost,
+  keyOutcomeOf,
   redactSamSecrets,
   samErrorMessage,
   type SamEndpoint,
   type SamErrorClass,
   type SamFailure,
 } from "@/lib/samgov-errors";
-import type { SamCredential, SamKeyOutcome } from "@/lib/samgov-key";
-
-/** BL-STAB-7d — the answers that say something about the key itself. */
-const KEY_OUTCOMES: Partial<Record<SamErrorClass, SamKeyOutcome>> = { key_invalid: "invalid", key_forbidden: "forbidden", rate_limited: "rate_limited" };
+import type { SamCredential } from "@/lib/samgov-key";
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 
@@ -102,7 +100,8 @@ async function samGet(
   // A 401/403 is about FORGE's key only if the key was on the request and
   // SAM.gov itself answered (not a storage host it redirected to).
   const notOurKey = (!keySent || res.redirected) && (c.cls === "key_invalid" || c.cls === "key_forbidden");
-  const outcome = notOurKey || !keySent ? null : KEY_OUTCOMES[c.cls];
+  // BL-STAB-7d — the stored status changes only on what SAM.gov's gateway says about the key.
+  const outcome = notOurKey || !keySent ? null : keyOutcomeOf(c.code, res.status);
   if (outcome) await cred.reportOutcome(outcome, call.endpoint);
   return samFailure(cred, call.endpoint, { status: res.status, ...c, cls: notOurKey ? "restricted" : c.cls });
 }

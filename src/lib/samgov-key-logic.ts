@@ -81,8 +81,8 @@ export function samKeyNotice(
     return {
       tone: "rose",
       text: v.company
-        ? "Your company's SAM.gov key can't be read on this FORGE server and there is no shared key, so SAM.gov searches, the scout and Q&A checks are off. FORGE support can restore it."
-        : "SAM.gov isn't connected for your company, so SAM.gov searches, the scout and Q&A checks are off. A company admin can add your SAM.gov API key under Settings → Integrations.",
+        ? "Your company's SAM.gov key can't be read on this FORGE server and there is no shared key, so SAM.gov searches (Import and the scout's) and the daily Q&A check are off; the scout still checks your watchlist. FORGE support can restore it."
+        : "SAM.gov isn't connected for your company, so SAM.gov searches (Import and the scout's) and the daily Q&A check are off; the scout still checks your watchlist. A company admin can add your SAM.gov API key under Settings → Integrations.",
     };
   }
   const c = v.inUse === "company" ? v.company : null;

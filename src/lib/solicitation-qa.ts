@@ -33,6 +33,7 @@ import { jaccard } from "@/lib/requirements-text";
 import { downloadSamResource, fetchSamNotice } from "@/lib/samgov";
 import { SAM_TIMEOUTS_MS, isKeyOrQuotaFailure, type SamErrorClass } from "@/lib/samgov-errors";
 import { platformSamCredential, resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
+import { keyringStatus } from "@/lib/secret-box";
 import { extractTextFromAny } from "@/lib/solicitation-extract";
 import {
   QA_LIMITS,
@@ -438,12 +439,23 @@ const QA_CRON = { pollsMs: 200_000, downloadsMs: 260_000, window: 100, maxPasses
 const TRANSIENT = new Set<SamErrorClass | undefined>(["timeout", "network", "upstream", "bad_response"]);
 
 /**
+ * The company has a key this server can read (so it is the one in use;
+ * see resolveSamCredential), optionally one with this stored status.
+ */
+function readableCompanyKey(readable: string[], status?: string) {
+  if (readable.length === 0) return sql`false`;
+  const ids = sql.join(readable.map((id) => sql`${id}`), sql`, `);
+  return sql`exists (select 1 from organization_samgov_key k where k.organization_id = ${solicitations.organizationId} and k.key_id in (${ids})${status ? sql` and k.status = ${status}` : sql``})`;
+}
+
+/**
  * Due notices, one per company in turn (each company's least recently
  * tried first), so one company's backlog or dead key can't fill the run.
- * Companies whose own key SAM.gov rejected are left out until an admin
- * replaces it; `companyKeysOnly` once the shared key is unusable.
+ * Companies whose own key (the one in use) SAM.gov rejected are left out
+ * until an admin replaces it; `companyKeysOnly` once the shared key is
+ * unusable.
  */
-function dueQaWhere(f: { blocked: Set<string>; companyKeysOnly: boolean; now: number }) {
+function dueQaWhere(f: { blocked: Set<string>; companyKeysOnly: boolean; now: number; readable: string[] }) {
   const lastTry = sql`greatest(${solicitations.qaAttemptedAt}, ${solicitations.qaCheckedAt})`;
   const triedBefore = new Date(f.now - 20 * 3_600_000).toISOString();
   const dueAfter = new Date(f.now - 7 * 86_400_000);
@@ -451,8 +463,8 @@ function dueQaWhere(f: { blocked: Set<string>; companyKeysOnly: boolean; now: nu
     ne(solicitations.noticeId, ""),
     or(isNull(solicitations.responseDueDate), gt(solicitations.responseDueDate, dueAfter)),
     sql`(${lastTry} is null or ${lastTry} < ${triedBefore}::timestamptz)`,
-    sql`not exists (select 1 from organization_samgov_key k where k.organization_id = ${solicitations.organizationId} and k.status = 'invalid')`,
-    f.companyKeysOnly ? sql`exists (select 1 from organization_samgov_key k where k.organization_id = ${solicitations.organizationId})` : undefined,
+    sql`not ${readableCompanyKey(f.readable, "invalid")}`,
+    f.companyKeysOnly ? readableCompanyKey(f.readable) : undefined,
     f.blocked.size > 0 ? notInArray(solicitations.organizationId, [...f.blocked]) : undefined,
   );
 }
@@ -480,8 +492,13 @@ export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
     samOutage: false,
     deferred: 0,
   };
-  const filter = { blocked: new Set<string>(), companyKeysOnly: platformSamCredential() === null, now: started };
-  if (filter.companyKeysOnly && (await db.select({ id: organizationSamgovKeys.organizationId }).from(organizationSamgovKeys).limit(1)).length === 0) {
+  const readable = keyringStatus().keyIds;
+  const filter = { blocked: new Set<string>(), companyKeysOnly: platformSamCredential() === null, now: started, readable };
+  if (
+    filter.companyKeysOnly &&
+    (readable.length === 0 ||
+      (await db.select({ id: organizationSamgovKeys.organizationId }).from(organizationSamgovKeys).where(inArray(organizationSamgovKeys.keyId, readable)).limit(1)).length === 0)
+  ) {
     return { ...summary, skippedNoKey: true };
   }
   const creds = new Map<string, SamCredential | null>();
@@ -513,21 +530,27 @@ export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
         creds.set(organizationId, r.ok ? r.cred : null);
       }
       const sam = creds.get(organizationId) ?? null;
-      if (!sam || (sam.source === "platform" && summary.stoppedByKey)) {
-        if (!sam) summary.blockedOrganizations++;
+      if (sam?.source === "platform" && summary.stoppedByKey) {
         filter.blocked.add(organizationId);
         continue;
       }
-      // Stamped first, so a poll that fails (or never returns) still rotates the row back.
-      await db
-        .update(solicitations)
-        .set({ qaAttemptedAt: new Date() })
-        .where(and(eq(solicitations.id, row.id), eq(solicitations.organizationId, organizationId)));
-      summary.solicitationsPolled++;
+      // No usable key, or the company's own key is one SAM.gov already rejected: no call.
+      if (!sam || (sam.source === "company" && sam.storedStatus === "invalid")) {
+        summary.blockedOrganizations++;
+        filter.blocked.add(organizationId);
+        continue;
+      }
       let res: QaPollResult;
       try {
+        // Stamped first, so a poll that fails (or never returns) still rotates the row back.
+        await db
+          .update(solicitations)
+          .set({ qaAttemptedAt: new Date() })
+          .where(and(eq(solicitations.id, row.id), eq(solicitations.organizationId, organizationId)));
+        summary.solicitationsPolled++;
         res = await pollSolicitationQa({ organizationId, solicitationId: row.id, sam, downloadsUntil: started + QA_CRON.downloadsMs });
       } catch (err) {
+        // FORGE's side failed (the database, reading a file): this row only, and not a SAM.gov outage.
         summary.errors++;
         counted++;
         log.error("[solicitation-qa]", "poll failed", { solicitationId: row.id, error: err });
@@ -560,7 +583,12 @@ export async function dispatchSolicitationQaPolls(): Promise<QaCronSummary> {
       summary.added += res.added;
       summary.flagged += res.flagged;
       if (res.added > 0) {
-        await notifyTeam({ organizationId, solicitationId: row.id, title: row.title, added: res.added, flagged: res.flagged });
+        try {
+          await notifyTeam({ organizationId, solicitationId: row.id, title: row.title, added: res.added, flagged: res.flagged });
+        } catch (err) {
+          summary.errors++;
+          log.error("[solicitation-qa]", "team notification failed", { solicitationId: row.id, error: err });
+        }
       }
     }
   }

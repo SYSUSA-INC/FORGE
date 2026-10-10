@@ -71,7 +71,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
   return (
     <Panel title="SAM.gov API key" eyebrow={eyebrow} accent="cobalt" className="mb-4">
       <p className="font-body text-[12px] leading-relaxed text-muted">
-        FORGE uses this key for Import from SAM.gov, company search and sync, Getting started, the scout and Check SAM.gov now. Without it, FORGE&apos;s shared key is used when available. Get a free key on SAM.gov: sign in, open Account Details and request a Public API Key.
+        FORGE uses this key for Import from SAM.gov, company search and sync, Getting started, the scout, the daily Q&amp;A check and Check SAM.gov now. Without it, FORGE&apos;s shared key is used when available. Get a free key on SAM.gov: sign in, open Account Details and request a Public API Key.
       </p>
 
       <p className="mt-3 font-mono text-[11px] text-text">
@@ -83,13 +83,14 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
               ? `Using FORGE's shared SAM.gov key.${view.canSave ? " Add your company's own key so your searches don't share a daily limit with other companies." : ""}`
               : "No SAM.gov key. Import, company search, the scout and Q&A checks are off until a company admin adds one."}
       </p>
-      {company?.status === "rate_limited" ? (
+      {/* BL-STAB-7d — what SAM.gov last said, for the key in use (an unreadable key isn't used). */}
+      {!company?.readable ? null : company.status === "rate_limited" ? (
         <p className="mt-1 font-mono text-[11px] text-gold">SAM.gov&apos;s request limit for this key was reached on {day(company.statusAt)}; it resets daily.</p>
-      ) : company?.status === "invalid" ? (
+      ) : company.status === "invalid" ? (
         <p className="mt-1 font-mono text-[11px] text-rose">
           SAM.gov rejected this key on {day(company.statusAt)}: it is invalid or expired. SAM.gov searches fail and the daily Q&amp;A check is paused until a new key is saved.
         </p>
-      ) : company?.status === "forbidden" ? (
+      ) : company.status === "forbidden" ? (
         <p className="mt-1 font-mono text-[11px] text-gold">
           SAM.gov refused a request for this key on {day(company.statusAt)}: it isn&apos;t allowed to use part of SAM.gov. Check its access on SAM.gov, or save a new key.
         </p>

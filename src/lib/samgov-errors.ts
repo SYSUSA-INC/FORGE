@@ -124,6 +124,19 @@ export function classifyFetchError(err: unknown): "timeout" | "network" {
   return name === "AbortError" || name === "TimeoutError" ? "timeout" : "network";
 }
 
+/**
+ * BL-STAB-7d — what an answer says about the key itself, for its stored
+ * status: only what SAM.gov's key gateway names (a bare 401/403 can come
+ * from an edge, a firewall or a file host, so it says nothing reliable
+ * about the key), and the request limit.
+ */
+export function keyOutcomeOf(code: string | null, status: number): "invalid" | "forbidden" | "rate_limited" | null {
+  if (code && KEY_INVALID_CODES.has(code)) return "invalid";
+  if (code === "API_KEY_UNAUTHORIZED") return "forbidden";
+  if (code === "OVER_RATE_LIMIT" || status === 429) return "rate_limited";
+  return null;
+}
+
 /** A rejected or over-limit key: further calls with it will fail the same way. */
 export function isKeyOrQuotaFailure(cls: SamErrorClass | undefined): boolean {
   return cls === "key_invalid" || cls === "key_forbidden" || cls === "rate_limited";

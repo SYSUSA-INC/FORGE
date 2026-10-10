@@ -155,6 +155,38 @@ describe("BL-STAB-7d — company keys in the background jobs", () => {
     expect(up.map((u) => u.searchParams.get("noticeid")).filter((id) => tried.has(id))).toEqual([]);
   });
 
+  it("a key this server can't read isn't the one in use: its stored rejection doesn't skip the company", async () => {
+    await db.insert(organizationSamgovKeys).values({ organizationId: fx.orgA.organizationId, ciphertext: "fsb1.kgone.x.y.z", keyId: "kgone", last4: "GONE", status: "invalid" });
+    await solicitationsFor(fx.orgA.organizationId, ["NA-1"]);
+    const calls = stubFetch((url) => notice(url.searchParams.get("noticeid") ?? ""));
+    expect(await dispatchSolicitationQaPolls()).toMatchObject({ solicitationsPolled: 1, blockedOrganizations: 0 });
+    expect(keysOf(calls)).toEqual([SHARED]);
+  });
+
+  it("a bare 401 or 403 (no SAM.gov key code) never changes the stored status", async () => {
+    await saveKeyA();
+    stubFetch(() => new Response("<HTML><BODY><H1>Access Denied</H1></BODY></HTML>", { status: 403 }));
+    const a = await resolveSamCredential(fx.orgA.organizationId);
+    if (!a.ok) throw new Error("expected a credential");
+    expect((await fetchSamNotice(a.cred, "NA-1")).ok).toBe(false);
+    stubFetch(() => new Response("", { status: 401 }));
+    expect((await fetchSamNotice(a.cred, "NA-2")).ok).toBe(false);
+    expect(await keyRow()).toMatchObject({ status: "ok" });
+    expect(await keyAudits(fx.orgA.organizationId)).toHaveLength(0);
+  });
+
+  it("no poll starts after the run's first 200 s; what is left is reported as deferred", async () => {
+    await solicitationsFor(fx.orgA.organizationId, ["NA-1"]);
+    await solicitationsFor(fx.orgB.organizationId, ["NB-1"]);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const calls = stubFetch((url) => {
+      vi.setSystemTime(Date.now() + 201_000); // the first poll "takes" the whole window
+      return notice(url.searchParams.get("noticeid") ?? "");
+    });
+    expect(await dispatchSolicitationQaPolls()).toMatchObject({ solicitationsPolled: 1, deferred: 1 });
+    expect(calls).toHaveLength(1);
+  });
+
   it("no download starts that could run past the cron's budget; those links wait unseen", async () => {
     const [a] = await solicitationsFor(fx.orgA.organizationId, ["NA-1"]);
     const links = [1, 2].map((i) => `https://sam.gov/files/f${i}/download?api_key=null&token=`);
