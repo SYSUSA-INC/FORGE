@@ -10,7 +10,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, organizationSamgovKeys, organizations, scoutRuns, solicitations } from "@/db/schema";
 import { fetchSamNotice } from "@/lib/samgov";
@@ -79,7 +79,8 @@ describe("BL-STAB-7d — company keys in the background jobs", () => {
     db
       .select({ action: auditLogs.action, metadata: auditLogs.metadata })
       .from(auditLogs)
-      .where(and(eq(auditLogs.organizationId, organizationId), inArray(auditLogs.action, ["settings.samgov_key.rejected", "settings.samgov_key.accepted"])));
+      .where(and(eq(auditLogs.organizationId, organizationId), inArray(auditLogs.action, ["settings.samgov_key.rejected", "settings.samgov_key.accepted"])))
+      .orderBy(asc(auditLogs.createdAt));
 
   it("a company whose key SAM.gov rejects costs one call; another company's notice is still checked", async () => {
     await saveKeyA();
