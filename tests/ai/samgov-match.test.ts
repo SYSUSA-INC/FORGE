@@ -1,9 +1,6 @@
 /**
- * BL-STAB-10 — keyword matching for SAM.gov searches (pure): a notice is a
- * match only when the keyword was found in text FORGE read; an unread
- * description is "unchecked", never a match; open notice types by
- * default; one row per solicitation; and the results line says what was
- * searched. Includes the owner's report (NAICS 541519 + "ServiceNow").
+ * BL-STAB-10 — keyword matching for SAM.gov searches (pure), including the
+ * owner's report (NAICS 541519 + "ServiceNow"): a match only in text FORGE read.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -37,6 +34,10 @@ describe("BL-STAB-10 — keywords", () => {
   it("parses words, phrases, required and excluded terms", () => {
     expect(parseKeyword(`"zero trust" +cloud -hardware OASIS+`)).toEqual({ terms: ["zero trust", "cloud", "oasis+"], excluded: ["hardware"], anyOf: [] });
     expect(parseKeyword("  ", ["Multiple Award Schedule"])).toEqual({ terms: [], excluded: [], anyOf: ["multiple award schedule"] });
+    // Smart quotes, a stray quote and commas between words.
+    expect(parseKeyword("“zero trust”, ServiceNow; ITSM").terms).toEqual(["zero trust", "servicenow", "itsm"]);
+    expect(parseKeyword('"zero trust').terms).toEqual(["zero", "trust"]);
+    expect(parseKeyword("8(a) OASIS+").terms).toEqual(["8(a)", "oasis+"]);
   });
 
   it("matches whole words and phrases only", () => {
@@ -45,6 +46,9 @@ describe("BL-STAB-10 — keywords", () => {
     expect(findTerm("buy on oasis+ now", "oasis+")).toBe(7);
     expect(findTerm("servicenow itsm", "servicenow")).toBe(0);
     expect(findTerm("service now", "servicenow")).toBe(-1);
+    expect(findTerm("software licenses renewal", "license")).toBe(9);
+    expect(findTerm("counter-uas for drones.", "drone")).toBe(16);
+    expect(findTerm("licensed vendors", "license")).toBe(-1);
     expect(plainText("<p>ServiceNow&nbsp;&amp; ITSM</p>")).toBe("ServiceNow & ITSM");
   });
 
@@ -90,6 +94,12 @@ describe("BL-STAB-10 — one row per solicitation", () => {
       ["b1", []],
       ["b2", []],
     ]);
+    // The same placeholder number from two departments is two notices.
+    const rfi = [
+      { noticeId: "x", solicitationNumber: "N/A", postedDate: "2026-10-01", department: "DEPT OF THE ARMY" },
+      { noticeId: "y", solicitationNumber: "N/A", postedDate: "2026-10-02", fullParentPathName: "VETERANS AFFAIRS, DEPARTMENT OF.VA" },
+    ];
+    expect(collapseBySolicitation(rfi).map((r) => r.noticeId)).toEqual(["x", "y"]);
   });
 });
 

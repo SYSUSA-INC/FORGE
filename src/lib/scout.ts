@@ -63,7 +63,7 @@ import { flagSamResults } from "@/lib/recompete-radar";
 import { noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
 import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
 import { resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
-import { OPEN_NOTICE_TYPES } from "@/lib/samgov-match";
+import { OPEN_NOTICE_TYPES, noticeAgency } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
 import {
   awardExpiresWithin,
@@ -241,7 +241,7 @@ function fromSam(o: SamOpportunity, source: ScoutCandidateSource): CandidateDraf
     source,
     noticeId: o.noticeId,
     title: str(o.title, 500) || "Untitled",
-    agency: [str(o.department, 200), str(o.subTier, 200)].filter(Boolean).join(" · "),
+    agency: str(noticeAgency(o), 400),
     office: str(o.office, 200),
     solicitationNumber: str(o.solicitationNumber, 200),
     noticeType: str(o.type, 200),
@@ -1027,6 +1027,14 @@ export async function decideScoutCandidate(input: {
   let opportunityId: string | null = null;
 
   if (input.decision === "imported") {
+    // BL-STAB-10 — a find whose description the nightly run didn't read gets it now (one SAM.gov request).
+    let description = c.description;
+    const link = !description && c.source !== "watchlist_award" ? noticeDescriptionUrl(c.noticeId) : null;
+    const sam = link ? await resolveSamCredential(organizationId) : null;
+    if (link && sam?.ok) {
+      const d = (await readNoticeDescriptions(sam.cred, [{ noticeId: c.noticeId, description: link }], 1)).get(c.noticeId);
+      if (d && "text" in d) description = d.text.slice(0, 20_000);
+    }
     const [opp] = await db
       .insert(opportunities)
       .values({
@@ -1045,7 +1053,7 @@ export async function decideScoutCandidate(input: {
         setAside: c.setAside,
         placeOfPerformance: c.placeOfPerformance,
         incumbent: c.incumbent,
-        description: c.description,
+        description,
         ownerUserId: input.actor.userId ?? undefined,
         createdByUserId: input.actor.userId ?? undefined,
       })

@@ -1,11 +1,7 @@
 /**
- * BL-STAB-10 — Import from SAM.gov and the scout against Postgres, with
- * SAM.gov stubbed (two tenants). SAM.gov ignores a keyword, so FORGE
- * checks it: only notices that really mention it come back as matches,
- * award notices stay out by default, each solicitation is one row and
- * "already imported" counts only this organization's opportunities. The
- * description check takes validated notice ids only; an import keeps
- * the notice's description; a scout keyword find is one FORGE confirmed.
+ * BL-STAB-10 — Import from SAM.gov and the scout against Postgres (SAM.gov
+ * stubbed, two tenants): only notices that really mention the keyword are
+ * matches; types, folding and "already imported" are per organization.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
@@ -92,9 +88,10 @@ describe("BL-STAB-10 — Import from SAM.gov checks the keyword itself", () => {
     const calls = stubSam(returned, descriptions);
     const res = await loadSamGovOpportunitiesAction({ naicsCodes: ["541519"], keyword: "ServiceNow" });
     if (!res.ok) throw new Error(res.error);
+    // Newest first.
     expect(res.opportunities.map((o) => [o.title, o.match?.status === "match" ? o.match.where : null])).toEqual([
-      ["ServiceNow ITSM renewal", "title"],
       ["ERP discovery session", "description"],
+      ["ServiceNow ITSM renewal", "title"],
     ]);
     expect(res.unchecked).toEqual([]);
     expect(res.counts).toMatchObject({ samTotal: 6, otherTypes: 1, folded: 1, matched: 2, notMentioned: 2 });
@@ -103,6 +100,23 @@ describe("BL-STAB-10 — Import from SAM.gov checks the keyword itself", () => {
     expect(search[0]!.searchParams.has("q")).toBe(false);
     // The title match needed no description read; the award was never read.
     expect(calls.map((u) => u.searchParams.get("noticeid")).filter(Boolean).sort()).toEqual([id(2), id(4), id(6)]);
+  });
+
+  it("a solicitation matches through any of its notices; an awarded one isn't listed as open; over 10 codes, the first 10", async () => {
+    const lifecycle = [
+      notice(11, { title: "ServiceNow platform support", type: "Sources Sought", solicitationNumber: "70RTAC26R0001", postedDate: "2026-09-20" }),
+      notice(12, { title: "IT support services", solicitationNumber: "70RTAC26R0001", postedDate: "2026-10-05", description: "See the attached RFP." }),
+      notice(13, { title: "ServiceNow licenses", type: "Combined Synopsis/Solicitation", solicitationNumber: "AWD-1", postedDate: "2026-09-01" }),
+      notice(14, { title: "ServiceNow licenses", type: "Award Notice", solicitationNumber: "AWD-1", postedDate: "2026-10-02" }),
+    ];
+    const calls = stubSam(lifecycle, {});
+    const codes = Array.from({ length: 12 }, (_, i) => String(541500 + i));
+    const res = await loadSamGovOpportunitiesAction({ naicsCodes: codes, keyword: "ServiceNow" });
+    if (!res.ok) throw new Error(res.error);
+    expect(res.opportunities.map((o) => [o.noticeId, o.earlierNoticeIds])).toEqual([[id(12), [id(11)]]]);
+    expect(res.counts).toMatchObject({ otherTypes: 1, folded: 2 });
+    expect(res.warning).toMatch(/^Searched the first 10 of 12 NAICS codes/);
+    expect(calls.filter((u) => u.pathname.endsWith("/search"))).toHaveLength(10);
   });
 
   it("'already imported' counts only this organization's opportunities, across a solicitation's notices", async () => {

@@ -12,7 +12,7 @@ import { flagSamResults } from "@/lib/recompete-radar";
 import { sanitizeSamImportRows } from "@/lib/sam-import-row";
 import { GSA_VEHICLES, noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
 import { resolveSamCredential } from "@/lib/samgov-key";
-import { noticeAgency, parseNoticeTypes, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
+import { hasKeyword, noticeAgency, parseKeyword, parseNoticeTypes, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities, type FoundNotice } from "@/lib/samgov-search";
 
 export type ImportableOpportunity = FoundNotice & {
@@ -71,19 +71,21 @@ export async function loadSamGovOpportunitiesAction(input?: {
 
   let naicsCodes = (input?.naicsCodes ?? []).map((c) => String(c).trim()).filter(Boolean);
   if (naicsCodes.length === 0) {
-    naicsCodes = Array.from(new Set([orgPrimary, ...orgList].map((s) => (s ?? "").trim()).filter(Boolean)));
+    // The org's own list may hold entries like "541512 - Computer Systems Design": its codes only.
+    naicsCodes = [orgPrimary, ...orgList].map((s) => (s ?? "").replace(/\D/g, "")).filter((c) => /^\d{2,6}$/.test(c));
   }
   const badCode = naicsCodes.find((c) => !/^\d{2,6}$/.test(c));
   if (badCode) return { ok: false, error: `"${badCode.slice(0, 20)}" isn't a NAICS code (2 to 6 digits).` };
   naicsCodes = [...new Set(naicsCodes)];
-  if (naicsCodes.length > MAX_SEARCH_CODES) {
-    return { ok: false, error: `Search up to ${MAX_SEARCH_CODES} NAICS codes at a time (SAM.gov takes one request per code).` };
-  }
+  const allCodes = naicsCodes.length;
+  naicsCodes = naicsCodes.slice(0, MAX_SEARCH_CODES);
 
   const vehicleKeywords = (input?.vehicleIds ?? [])
     .map((id) => GSA_VEHICLES.find((v) => v.id === id)?.keyword ?? "")
     .filter(Boolean);
-  const keyword = (input?.keyword ?? "").trim().slice(0, 200);
+  let keyword = (input?.keyword ?? "").trim().slice(0, 200);
+  // Nothing searchable in it ("-", a lone quote): no keyword, rather than "everything matches".
+  if (!hasKeyword(parseKeyword(keyword))) keyword = "";
   if (naicsCodes.length === 0 && !keyword) {
     return {
       ok: false,
@@ -136,7 +138,10 @@ export async function loadSamGovOpportunitiesAction(input?: {
     unchecked: result.unchecked.map(decorate),
     counts: result.counts,
     scope: { keyword: keyword || (vehicleKeywords.length ? vehicleKeywords.join(" or ") : null), codes: naicsCodes, days },
-    warning: result.warning,
+    warning:
+      [allCodes > naicsCodes.length ? `Searched the first ${naicsCodes.length} of ${allCodes} NAICS codes (SAM.gov is asked once per code).` : "", result.warning ?? ""]
+        .filter(Boolean)
+        .join(" ") || null,
     usedNaics: naicsCodes,
     orgPrimaryNaics: orgPrimary,
     orgNaicsList: orgList,

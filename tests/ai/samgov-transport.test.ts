@@ -108,6 +108,8 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
     const company = new SamCredential(KEY, { source: "company", audience: "tenant", organizationId: "org" });
     const r = await findSamOpportunities(company, { naicsCodes: ["541519"], keyword: "ServiceNow", noticeTypes: OPEN_NOTICE_TYPES, postedDaysBack: 30 });
     expect(calls.filter((c) => c.url.includes("noticedesc"))).toHaveLength(10);
+    // With codes, SAM.gov's title filter isn't used (it would hide description matches).
+    expect(new URL(calls[0]!.url).searchParams.has("title")).toBe(false);
     expect(r).toMatchObject({ ok: true, counts: { matched: 1, notMentioned: 10, unchecked: 4 } });
     if (r.ok) expect(r.notices.map((n) => [n.noticeId, n.match?.status])).toEqual([["N1", "match"]]);
 

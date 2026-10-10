@@ -1,12 +1,8 @@
 /**
- * BL-STAB-10 — keyword matching for SAM.gov opportunity searches (pure, so
- * the Import page can re-check rows in the browser).
- *
- * SAM.gov's public opportunities search has no keyword parameter (only
- * `title`), so FORGE checks the keyword itself, in text it actually read.
- * A notice is a match only when every term was found in its title,
- * agency or description; one whose description FORGE couldn't read is
- * "unchecked" — never a match, never a non-match.
+ * BL-STAB-10 — keyword matching for SAM.gov searches (pure; the Import page
+ * re-checks rows with it). SAM.gov's public search has no keyword parameter,
+ * so FORGE checks the keyword itself, in text it read: a notice whose
+ * description wasn't read is "unchecked" — never a match, never a non-match.
  */
 
 /** SAM.gov notice types (its `ptype` codes), the open ones first. */
@@ -53,24 +49,20 @@ export function isWantedType(row: { type?: string | null; baseType?: string | nu
   return code === null || wanted.includes(code);
 }
 
-export type KeywordQuery = {
-  /** Every one must appear (words or quoted phrases, lower-case). */
-  terms: string[];
-  /** None may appear (`-word`). */
-  excluded: string[];
-  /** At least one must appear, when any are given (the GSA vehicle names). */
-  anyOf: string[];
-};
+/** terms: all must appear; excluded (`-word`): none may; anyOf (GSA vehicles): one must, when given. Lower-case. */
+export type KeywordQuery = { terms: string[]; excluded: string[]; anyOf: string[] };
 
 /** `"zero trust" +cloud -hardware` → terms ["zero trust", "cloud"], excluded ["hardware"]. */
 export function parseKeyword(input: string, anyOf: string[] = []): KeywordQuery {
   const terms: string[] = [];
   const excluded: string[] = [];
   const re = /([+-]?)"([^"]+)"|(\S+)/g;
+  const text0 = (input ?? "").replace(/[“”„]/g, '"');
   let m: RegExpExecArray | null;
-  while ((m = re.exec(input ?? "")) !== null) {
+  while ((m = re.exec(text0)) !== null) {
     let sign = m[1] ?? "";
-    let text = m[2] ?? m[3] ?? "";
+    // A loose word loses stray quotes and trailing commas ("ServiceNow, ITSM"); + and ) stay (OASIS+, 8(a)).
+    let text = m[2] ?? (m[3] ?? "").replace(/"/g, "").replace(/[,;:!?]+$/, "");
     if (!m[2] && /^[+-]/.test(text)) {
       sign = text[0]!;
       text = text.slice(1);
@@ -103,19 +95,20 @@ function norm(s: string): string {
 
 const WORD = /[a-z0-9]/;
 
-/** Where `term` appears in lower-cased `text` as a whole word or phrase ("ai" is not in "maintain"), else -1. */
+/** Where `term` appears in lower-cased `text` as a whole word or phrase, or its plural, else -1. */
 export function findTerm(text: string, term: string): number {
   for (let at = text.indexOf(term); at !== -1; at = text.indexOf(term, at + 1)) {
     const before = text[at - 1] ?? " ";
-    const after = text[at + term.length] ?? " ";
     const startsWord = WORD.test(term[0]!);
     const endsWord = WORD.test(term[term.length - 1]!);
+    // A plural counts ("license" finds "licenses"); "ai" still isn't in "maintain".
+    const end = at + term.length + (endsWord ? (/^e?s(?![a-z0-9])/.exec(text.slice(at + term.length))?.[0].length ?? 0) : 0);
+    const after = text[end] ?? " ";
     if ((!startsWord || !WORD.test(before)) && (!endsWord || !WORD.test(after))) return at;
   }
   return -1;
 }
 
-/** What FORGE knows of a notice's description. */
 export type DescriptionState = { text: string } | { none: true } | { unread: true };
 
 export type NoticeMatch =
@@ -173,19 +166,18 @@ export function matchNotice(row: { title: string; agency: string }, q: KeywordQu
  * as its own notice. The latest (by posted date) stands for the group; the
  * others are listed by id. Notices without a number are never grouped.
  */
-export function collapseBySolicitation<T extends { noticeId: string; solicitationNumber: string; postedDate: string }>(
-  rows: T[],
-): (T & { earlierNoticeIds: string[] })[] {
+export function collapseBySolicitation<
+  T extends { noticeId: string; solicitationNumber: string; postedDate: string; department?: string | null; fullParentPathName?: string | null },
+>(rows: T[]): (T & { earlierNoticeIds: string[] })[] {
   const groups = new Map<string, T[]>();
   const order: string[] = [];
   for (const row of rows) {
     const number = (row.solicitationNumber ?? "").replace(/\s+/g, "").toUpperCase();
-    const key = number ? `n:${number}` : `id:${row.noticeId}`;
-    if (!groups.has(key)) {
-      groups.set(key, []);
-      order.push(key);
-    }
-    groups.get(key)!.push(row);
+    // Within one department: "N/A" or "RFI-001" from two agencies are different notices.
+    const dept = (row.department || (row.fullParentPathName ?? "").split(".")[0] || "").trim().toUpperCase();
+    const key = number ? `n:${dept}|${number}` : `id:${row.noticeId}`;
+    if (!groups.has(key)) order.push(key);
+    groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   const time = (r: T) => Date.parse(r.postedDate) || 0;
   return order.map((key) => {
@@ -195,14 +187,11 @@ export function collapseBySolicitation<T extends { noticeId: string; solicitatio
   });
 }
 
+/** samTotal: what SAM.gov said it has; received: rows FORGE got (1,000 a request at most); otherTypes: solicitations of unwanted types; folded: earlier notices folded into the latest. */
 export type KeywordSearchCounts = {
-  /** What SAM.gov said it has for the request(s). */
   samTotal: number;
-  /** Rows FORGE received (SAM.gov returns at most 1,000 per request). */
   received: number;
-  /** Rows of other notice types, left out. */
   otherTypes: number;
-  /** Earlier notices of the same solicitation, folded into the latest. */
   folded: number;
   matched: number;
   notMentioned: number;

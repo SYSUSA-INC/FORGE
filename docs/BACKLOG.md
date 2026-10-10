@@ -494,33 +494,25 @@ mind. Bandage will come off but a true fix will stay."
       file out of a server action.**
 - **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a in
   PR #375.
-  - **Symptom (owner, 2026-10-10):** NAICS 541519 plus the keyword
-    "ServiceNow" listed 11 notices — 10 award notices with no
-    description ("Multiple Award Schedule" four times) and one sources
-    sought — none about ServiceNow: "it completely ignored the keyword".
-  - **Root cause:** SAM.gov's public opportunities search has no keyword
-    parameter (only `title`), so the `q` FORGE sent was ignored and the
-    answer was every NAICS 541519 notice. FORGE's own check then kept
-    every notice whose description it hadn't read (added in the
-    BL-STAB-7a review fixes on the false premise that SAM.gov had matched
-    them). No notice type was sent, so award notices came back; each
-    amendment is its own notice; "total" was the count left after
-    filtering; the GSA vehicle chips only ever fed the ignored `q`.
-  - **10a (PR #375):** FORGE checks the keyword itself: a notice is a
-    match only when the keyword was found in its title, agency or a
-    description FORGE read (up to 30 reads a search, 10 on a company
-    key; unread ones are "not checked", never a match). One SAM.gov
-    request per NAICS code, no `q`; the open notice types by default; one
-    row per solicitation number; the results line gives SAM.gov's total
-    and why the rest were left out. Import gains type chips, match
-    badges with the passage, a "Not checked" group with "Check 10 more",
-    and reads a picked notice's missing description. GSA vehicle chips
-    now filter. The scout's keyword finds are title matches FORGE
-    confirmed. Tests: `samgov-match`, `samgov-transport` (the test that
-    pinned the keep-unread rule is replaced), `samgov-import`.
-  - **Next:** a shared cache of public notice descriptions (fewer SAM.gov
-    requests per search); confirm `title` and `ptype` behaviour on a live
-    key, then send `ptype` to SAM.gov instead of filtering after.
+  - **Symptom (owner, 2026-10-10):** NAICS 541519 + "ServiceNow" listed 10
+    award notices and a sources sought, none about ServiceNow.
+  - **Root cause:** SAM.gov's public search has no keyword parameter (only
+    `title`), so FORGE's `q` was ignored; FORGE then kept every notice
+    whose description it hadn't read (a BL-STAB-7a review fix, on the
+    false premise that SAM.gov had matched them). No notice type was sent;
+    each amendment is its own notice; "total" was the filtered count.
+  - **10a (PR #375):** FORGE checks the keyword itself — a match only in a
+    title, agency or description it read (30 reads a search, 10 on a
+    company key; the rest "not checked", never a match), across every
+    notice of a solicitation. One SAM.gov request per NAICS code (10 at
+    most), no `q`; open types by default; one row per solicitation (an
+    awarded one isn't listed as open); SAM.gov's total in the results
+    line. Import: type chips, match badges with the passage, "Check 10
+    more", missing descriptions read on import (also from Scout). GSA
+    vehicle chips filter. Scout keyword finds are confirmed title matches.
+  - **Next (10b):** honest counts for agency filters and title-only
+    searches, smaller result payloads, Scout description reads by fit, a
+    shared description cache, `ptype` once confirmed on a live key.
 - **BL-STAB-9 — The AI document review fails on a real
   solicitation.** ✅ shipped (9a PR #366, 9b PR #367).
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI

@@ -72,13 +72,18 @@ export async function findSamOpportunities(
   if (!r.ok) return r;
 
   const agencyOk = (o: SamOpportunity) => !i.gsaOnly || /general services administration/i.test(`${noticeAgency(o)} ${o.fullParentPathName ?? ""}`);
-  const wanted = r.rows.filter((o) => isWantedType(o, i.noticeTypes) && agencyOk(o));
-  const groups = collapseBySolicitation(wanted);
+  const rows = r.rows.filter(agencyOk);
+  // Folded before the type filter: a solicitation whose latest notice is its award is awarded, not open.
+  const folded = collapseBySolicitation(rows);
+  const groups = folded
+    .filter((g) => isWantedType(g, i.noticeTypes))
+    .sort((a, b) => (Date.parse(b.postedDate) || 0) - (Date.parse(a.postedDate) || 0));
+  const byId = new Map(rows.map((o) => [o.noticeId, o]));
   const counts: KeywordSearchCounts = {
     samTotal: r.samTotal,
     received: r.received,
-    otherTypes: r.rows.length - wanted.length,
-    folded: wanted.length - groups.length,
+    otherTypes: folded.length - groups.length,
+    folded: rows.length - folded.length,
     matched: 0,
     notMentioned: 0,
     noDescription: 0,
@@ -91,13 +96,15 @@ export async function findSamOpportunities(
     return { ok: true, notices: withoutLinks(groups.map((g) => ({ ...g, match: null }))), unchecked: [], counts, warning };
   }
 
-  // Title and agency first (free); descriptions only where they decide, newest first.
+  // Title and agency first, for free — of every notice of the solicitation (an
+  // amendment's title rarely repeats the keyword); descriptions only where they decide.
   const agency = (o: SamOpportunity) => noticeAgency(o);
-  const first = groups.map((g) => ({ g, m: matchNotice({ title: g.title, agency: agency(g) }, q, null) }));
-  const toRead = first
-    .filter((x) => x.m.status === "unchecked")
-    .map((x) => x.g)
-    .sort((a, b) => (Date.parse(b.postedDate) || 0) - (Date.parse(a.postedDate) || 0));
+  const first = groups.map((g) => {
+    const members = [g, ...g.earlierNoticeIds.map((id) => byId.get(id)).filter((o): o is SamOpportunity => !!o)];
+    const free = members.map((o) => matchNotice({ title: o.title, agency: agency(o) }, q, null));
+    return { g, m: free.find((m) => m.status === "match") ?? free[0]! };
+  });
+  const toRead = first.filter((x) => x.m.status === "unchecked").map((x) => x.g);
   const budget = i.readBudget ?? DESCRIPTION_READS[cred.source];
   // Inline descriptions are already read; links cost one request each, up to the budget.
   const read = await readNoticeDescriptions(cred, toRead, budget);

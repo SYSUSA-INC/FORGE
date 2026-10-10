@@ -15,7 +15,7 @@ import {
   type SamFailure,
 } from "@/lib/samgov-errors";
 import type { SamCredential } from "@/lib/samgov-key";
-import type { DescriptionState } from "@/lib/samgov-match";
+import { plainText, type DescriptionState } from "@/lib/samgov-match";
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 
@@ -390,12 +390,10 @@ function mmddyyyy(d: Date): string {
 }
 
 /**
- * BL-STAB-10 — opportunity notices from SAM.gov's public search, which has
- * no keyword parameter: FORGE used to send the keyword as `q`, which
- * SAM.gov ignores. Keyword matching is the caller's (src/lib/samgov-
- * search.ts). One request per NAICS code, three at a time; a key or quota
- * failure fails the search, any other failure of one code is reported
- * with the rows the others returned. Descriptions are not read here.
+ * BL-STAB-10 — notices from SAM.gov's public search, which has no keyword
+ * parameter (the `q` FORGE used to send was ignored; matching is in
+ * samgov-search.ts). One request per NAICS code, three at a time; a key or
+ * quota failure fails the search, another code's failure is reported.
  */
 export async function fetchSamOpportunities(cred: SamCredential, q: SamOpportunityQuery): Promise<SamOpportunityRows | SamFailure> {
   const postedTo = new Date();
@@ -466,13 +464,10 @@ export function noticeDescriptionUrl(noticeId: string): string | null {
 }
 
 /**
- * BL-STAB-10 — what FORGE can say about each notice's description, reading
- * at most `budget` links, four at a time, inside a 20-second budget (a
- * company's own key often allows few requests a day). Inline text is read
- * already; an empty one, the literal "null" or SAM.gov's "Description Not
- * Found" (or a 404) means the notice has none — checked, not unread. A
- * rejected or over-limit key stops new lookups; whatever wasn't read stays
- * `unread`, never assumed empty.
+ * BL-STAB-10 — each notice's description: inline text is read already; at
+ * most `budget` links are fetched, four at a time, within 20 s. Empty,
+ * "null", "Description Not Found" or a 404 means none (checked); a key or
+ * quota failure stops lookups; the rest stay `unread`, never assumed empty.
  */
 export async function readNoticeDescriptions(cred: SamCredential, rows: { noticeId: string; description: string }[], budget: number): Promise<Map<string, DescriptionState>> {
   const out = new Map<string, DescriptionState>();
@@ -501,7 +496,7 @@ export async function readNoticeDescriptions(cred: SamCredential, rows: { notice
 }
 
 function noDescription(text: string): boolean {
-  const t = text.trim();
+  const t = plainText(text);
   return !t || t.toLowerCase() === "null" || /^description not found\.?$/i.test(t);
 }
 
