@@ -5,8 +5,10 @@
  */
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadSamResource, fetchSamNotice, searchSamGovOpportunities } from "@/lib/samgov";
+import { downloadSamResource, fetchSamNotice, fetchSamOpportunities, readNoticeDescriptions } from "@/lib/samgov";
 import { SamCredential, platformSamCredential } from "@/lib/samgov-key";
+import { OPEN_NOTICE_TYPES } from "@/lib/samgov-match";
+import { findSamOpportunities } from "@/lib/samgov-search";
 
 const KEY = "SECRETKEY0123456789abcd";
 const cred = new SamCredential(KEY, { source: "platform", audience: "tenant", organizationId: null });
@@ -26,7 +28,8 @@ function stubFetch(answer: (url: URL) => Response | Promise<Response>): Call[] {
   return calls;
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const op = (i: number, description: string) => ({ noticeId: `N${i}`, title: `Notice ${i}`, active: "Yes", description });
+const op = (i: number, description: string) => ({ noticeId: `N${i}`, title: `Notice ${i}`, active: "Yes", type: "Solicitation", description });
+const descLink = (i: number) => `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=N${i}`;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -37,7 +40,7 @@ afterEach(() => {
 describe("BL-STAB-7a — SAM.gov transport", () => {
   it("turns the owner's 401 page into the plain message, with the status and class", async () => {
     const calls = stubFetch(() => new Response(OWNER_BODY, { status: 401 }));
-    const r = await searchSamGovOpportunities(cred, { keyword: "cyber" });
+    const r = await fetchSamOpportunities(cred, { naicsCodes: ["541512"] });
     expect(r).toEqual({
       ok: false,
       cls: "key_invalid",
@@ -59,40 +62,77 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
       "https://api.sam.gov.evil.example/d",
       "https://api.sam.gov@evil.example/d",
     ];
-    const calls = stubFetch((url) =>
-      url.pathname.endsWith("/search") ? json({ totalRecords: 4, opportunitiesData: foreign.map((d, i) => op(i, d)) }) : json({ description: "leaked" }),
-    );
-    const r = await searchSamGovOpportunities(cred, { naicsCodes: ["541512"] });
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.opportunities.map((o) => o.description)).toEqual(["", "", "", ""]);
-    expect(calls).toHaveLength(1);
+    const calls = stubFetch(() => json({ description: "leaked" }));
+    const read = await readNoticeDescriptions(cred, foreign.map((d, i) => op(i, d)), 10);
+    expect([...read.values()]).toEqual(foreign.map(() => ({ unread: true })));
+    expect(calls).toHaveLength(0);
   });
 
   it("stops description lookups after a rejected key instead of trying every one", async () => {
-    const ops = Array.from({ length: 20 }, (_, i) => op(i, `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=N${i}`));
-    const calls = stubFetch((url) =>
-      url.pathname.endsWith("/search") ? json({ totalRecords: 20, opportunitiesData: ops }) : new Response(OWNER_BODY, { status: 401 }),
-    );
-    const r = await searchSamGovOpportunities(cred, { naicsCodes: ["541512"] });
-    expect(r.ok).toBe(true);
-    const descCalls = calls.filter((c) => c.url.includes("noticedesc"));
+    const calls = stubFetch(() => new Response(OWNER_BODY, { status: 401 }));
+    const read = await readNoticeDescriptions(cred, Array.from({ length: 20 }, (_, i) => op(i, descLink(i))), 20);
     // At most the four already in flight when the first 401 lands.
-    expect(descCalls.length).toBeLessThanOrEqual(4);
-    if (r.ok) expect(r.opportunities.every((o) => o.description === "")).toBe(true);
+    expect(calls.length).toBeLessThanOrEqual(4);
+    expect([...read.values()].every((d) => "unread" in d)).toBe(true);
   });
 
   it("stops description lookups when their time budget runs out", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    const ops = Array.from({ length: 12 }, (_, i) => op(i, `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=N${i}`));
-    const calls = stubFetch((url) => {
-      if (url.pathname.endsWith("/search")) return json({ totalRecords: 12, opportunitiesData: ops });
+    const calls = stubFetch(() => {
       vi.setSystemTime(Date.now() + 15_000); // each lookup "takes" 15 s
       return json({ description: "text" });
     });
-    const r = await searchSamGovOpportunities(cred, { naicsCodes: ["541512"] });
-    expect(r.ok).toBe(true);
-    expect(calls.filter((c) => c.url.includes("noticedesc")).length).toBeLessThan(12);
-    if (r.ok) expect(r.opportunities.filter((o) => o.description === "").length).toBeGreaterThan(0);
+    const read = await readNoticeDescriptions(cred, Array.from({ length: 12 }, (_, i) => op(i, descLink(i))), 12);
+    expect(calls.length).toBeLessThan(12);
+    expect([...read.values()].filter((d) => "unread" in d).length).toBeGreaterThan(0);
+  });
+
+  it("BL-STAB-10 — asks SAM.gov per NAICS code, never with `q`, and keeps only active notices", async () => {
+    const calls = stubFetch((url) =>
+      json({ totalRecords: 2, opportunitiesData: [op(Number(url.searchParams.get("ncode")), "x"), { ...op(9, "x"), active: "No" }] }),
+    );
+    const r = await fetchSamOpportunities(cred, { naicsCodes: ["541512", " 541519 ", "541512"], title: "ServiceNow" });
+    expect(calls.map((c) => new URL(c.url).searchParams.get("ncode")).sort()).toEqual(["541512", "541519"]);
+    for (const c of calls) {
+      const p = new URL(c.url).searchParams;
+      expect(p.has("q")).toBe(false);
+      expect([p.get("limit"), p.get("title")]).toEqual(["1000", "ServiceNow"]);
+    }
+    expect(r).toMatchObject({ ok: true, samTotal: 4, received: 4, failedCodes: [] });
+    if (r.ok) expect(r.rows.map((o) => o.noticeId).sort()).toEqual(["N541512", "N541519"]);
+  });
+
+  it("BL-STAB-10 — reads descriptions only when the title doesn't decide, within the key's budget", async () => {
+    const rows = [{ ...op(1, descLink(1)), title: "ServiceNow licenses" }, ...Array.from({ length: 14 }, (_, i) => op(i + 2, descLink(i + 2)))];
+    const calls = stubFetch((url) => (url.pathname.endsWith("/search") ? json({ totalRecords: 15, opportunitiesData: rows }) : json({ description: "IT services" })));
+    const company = new SamCredential(KEY, { source: "company", audience: "tenant", organizationId: "org" });
+    const r = await findSamOpportunities(company, { naicsCodes: ["541519"], keyword: "ServiceNow", noticeTypes: OPEN_NOTICE_TYPES, postedDaysBack: 30 });
+    expect(calls.filter((c) => c.url.includes("noticedesc"))).toHaveLength(10);
+    // With codes, SAM.gov's title filter isn't used (it would hide description matches).
+    expect(new URL(calls[0]!.url).searchParams.has("title")).toBe(false);
+    expect(r).toMatchObject({ ok: true, counts: { matched: 1, notMentioned: 10, unchecked: 4 } });
+    if (r.ok) expect(r.notices.map((n) => [n.noticeId, n.match?.status])).toEqual([["N1", "match"]]);
+
+    // No keyword: no description reads at all.
+    const browse = stubFetch(() => json({ totalRecords: 15, opportunitiesData: rows }));
+    expect(await findSamOpportunities(cred, { naicsCodes: ["541519"], noticeTypes: OPEN_NOTICE_TYPES, postedDaysBack: 30 })).toMatchObject({ ok: true, counts: { matched: 15 } });
+    expect(browse).toHaveLength(1);
+  });
+
+  it("BL-STAB-10 — a notice whose description wasn't read is never a match; one SAM.gov has no description for is checked", async () => {
+    const ops = [1, 2, 3].map((i) => ({ ...op(i, descLink(i)), title: "Help desk" }));
+    stubFetch((url) => (url.pathname.endsWith("/search") ? json({ totalRecords: 3, opportunitiesData: ops }) : new Response(OWNER_BODY, { status: 401 })));
+    const r = await findSamOpportunities(cred, { naicsCodes: ["541519"], keyword: "cyber", noticeTypes: OPEN_NOTICE_TYPES, postedDaysBack: 30 });
+    expect(r).toMatchObject({ ok: true, notices: [], counts: { matched: 0, unchecked: 3 } });
+    if (r.ok) expect(r.unchecked.map((o) => o.description)).toEqual(["", "", ""]);
+
+    stubFetch((url) => (url.pathname.endsWith("/search") ? json({ totalRecords: 3, opportunitiesData: ops }) : new Response("Description Not Found", { status: 404 })));
+    expect(await findSamOpportunities(cred, { naicsCodes: ["541519"], keyword: "cyber", noticeTypes: OPEN_NOTICE_TYPES, postedDaysBack: 30 })).toMatchObject({
+      ok: true,
+      notices: [],
+      unchecked: [],
+      counts: { noDescription: 3, unchecked: 0 },
+    });
   });
 
   it("keeps SAM.gov's own placeholder on an attachment link and refuses foreign links without a fetch", async () => {
@@ -119,13 +159,6 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
     const r = await fetchSamNotice(cred, "N1");
     expect(r).toMatchObject({ ok: false, cls: "bad_request" });
     if (!r.ok) expect(r.error).not.toContain(KEY.slice(0, 8));
-  });
-
-  it("keeps keyword results whose description couldn't be checked (SAM.gov matched them)", async () => {
-    const ops = [1, 2, 3].map((i) => ({ ...op(i, `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=N${i}`), title: "Help desk" }));
-    stubFetch((url) => (url.pathname.endsWith("/search") ? json({ totalRecords: 3, opportunitiesData: ops }) : new Response(OWNER_BODY, { status: 401 })));
-    const r = await searchSamGovOpportunities(cred, { keyword: "cyber" });
-    expect(r.ok && r.opportunities.map((o) => o.description)).toEqual(["", "", ""]);
   });
 
   it("restricted and gone files are skipped for good; a server error is retried", async () => {

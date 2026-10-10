@@ -60,9 +60,11 @@ import { getCustomerIntelligence } from "@/lib/customer-intelligence";
 import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
-import { searchSamGovOpportunities, type SamOpportunity } from "@/lib/samgov";
+import { noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
 import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
-import { resolveSamCredential } from "@/lib/samgov-key";
+import { resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
+import { OPEN_NOTICE_TYPES, noticeAgency } from "@/lib/samgov-match";
+import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
 import {
   awardExpiresWithin,
   DEFAULT_SCOUT_PROFILE,
@@ -97,6 +99,8 @@ const MAX_CUSTOMER_LOOKUPS = 8;
 /** Watchlisted awards ending within this window become recompete candidates. */
 const WATCHLIST_HORIZON_DAYS = 180;
 const SAM_LIMIT = 100;
+/** NAICS codes searched per run (one SAM.gov request each, BL-STAB-10). */
+const MAX_SEARCH_CODES = 10;
 /** A tenant is scouted again once this much time has passed. */
 const RERUN_AFTER_HOURS = 20;
 
@@ -237,7 +241,7 @@ function fromSam(o: SamOpportunity, source: ScoutCandidateSource): CandidateDraf
     source,
     noticeId: o.noticeId,
     title: str(o.title, 500) || "Untitled",
-    agency: [str(o.department, 200), str(o.subTier, 200)].filter(Boolean).join(" · "),
+    agency: str(noticeAgency(o), 400),
     office: str(o.office, 200),
     solicitationNumber: str(o.solicitationNumber, 200),
     noticeType: str(o.type, 200),
@@ -343,47 +347,51 @@ export async function runScoutForOrganization(input: {
 
   // 1. SAM.gov — the tenant's codes, then each keyword.
   const found = new Map<string, { sam: SamOpportunity; source: ScoutCandidateSource; keyword: string | null }>();
+  let descriptionCred: SamCredential | null = null;
   const sam = await resolveSamCredential(organizationId);
   if (!sam.ok) {
     notes.push(`SAM.gov was not searched: ${sam.failure.error}`);
   } else if (sam.cred.source === "platform" && input.sharedKey?.failed) {
     notes.push(`SAM.gov was not searched: ${input.sharedKey.failed}`);
   } else {
-    const searches: { params: Parameters<typeof searchSamGovOpportunities>[1]; source: ScoutCandidateSource; keyword: string | null }[] = [];
-    if (naics.length > 0) {
-      searches.push({
-        params: { naicsCodes: naics, postedDaysBack: profile.postedDaysBack, limit: SAM_LIMIT },
-        source: "org_naics",
-        keyword: null,
-      });
-    }
-    for (const kw of profile.keywords.slice(0, MAX_KEYWORD_SEARCHES)) {
-      searches.push({
-        params: { keyword: kw, postedDaysBack: profile.postedDaysBack, limit: SAM_LIMIT },
-        source: "keyword",
-        keyword: kw,
-      });
-    }
+    // BL-STAB-10 — SAM.gov can't filter by keyword: the codes' search takes
+    // the open notice types, and a keyword search asks for notices with the
+    // keyword in the title; only those FORGE confirms are keyword finds.
+    descriptionCred = sam.cred;
+    const codes = naics.slice(0, MAX_SEARCH_CODES);
+    if (naics.length > codes.length) notes.push(`Searched the first ${codes.length} of ${naics.length} NAICS codes (one SAM.gov request each).`);
+    const searches: { naicsCodes: string[]; source: ScoutCandidateSource; keyword: string | null }[] = [];
+    if (codes.length > 0) searches.push({ naicsCodes: codes, source: "org_naics", keyword: null });
+    for (const kw of profile.keywords.slice(0, MAX_KEYWORD_SEARCHES)) searches.push({ naicsCodes: [], source: "keyword", keyword: kw });
     if (searches.length === 0) {
       notes.push("No NAICS codes or keywords to search; add them under Settings → Classification or on the Scout page.");
     }
     for (const [i, s] of searches.entries()) {
       summary.searches += 1;
       try {
-        const r = await searchSamGovOpportunities(sam.cred, s.params);
+        const r = await findSamOpportunities(sam.cred, {
+          naicsCodes: s.naicsCodes,
+          keyword: s.keyword ?? undefined,
+          noticeTypes: OPEN_NOTICE_TYPES,
+          postedDaysBack: profile.postedDaysBack,
+          limit: SAM_LIMIT,
+          readBudget: 0,
+        });
         if (!r.ok) {
           summary.errors += 1;
           notes.push(`${s.keyword ? `Keyword "${s.keyword}"` : "NAICS"} search: ${r.error}`);
           // BL-STAB-7a — the same key would fail every remaining search
           // (BL-STAB-7d — and, for the shared key, every later company on it).
           if (isKeyOrQuotaFailure(r.cls)) {
+            descriptionCred = null;
             if (sam.cred.source === "platform" && input.sharedKey) input.sharedKey.failed ??= r.error;
             if (i < searches.length - 1) notes.push("Remaining SAM.gov searches skipped.");
             break;
           }
           continue;
         }
-        for (const o of r.opportunities) {
+        if (r.warning) notes.push(r.warning);
+        for (const o of r.notices) {
           if (!o.noticeId || found.has(o.noticeId)) continue;
           found.set(o.noticeId, { sam: o, source: s.source, keyword: s.keyword });
         }
@@ -437,6 +445,21 @@ export async function runScoutForOrganization(input: {
   const known = new Set([...seen, ...imported].map((r) => r.noticeId));
   const freshSam = [...found.values()].filter((f) => !known.has(f.sam.noticeId));
   const freshAwards = awardDrafts.filter((d) => !known.has(d.noticeId));
+
+  // BL-STAB-10 — the searches read no descriptions; read the new finds'
+  // (newest first, within the key's per-search budget) so scoring and
+  // triage have the text.
+  if (descriptionCred && freshSam.length > 0) {
+    const wanted = freshSam
+      .filter((f) => !f.sam.description)
+      .sort((a, b) => (Date.parse(b.sam.postedDate) || 0) - (Date.parse(a.sam.postedDate) || 0))
+      .map((f) => ({ noticeId: f.sam.noticeId, description: noticeDescriptionUrl(f.sam.noticeId) ?? "" }));
+    const read = await readNoticeDescriptions(descriptionCred, wanted, DESCRIPTION_READS[descriptionCred.source]);
+    for (const f of freshSam) {
+      const d = read.get(f.sam.noticeId);
+      if (d && "text" in d) f.sam = { ...f.sam, description: d.text };
+    }
+  }
 
   // 4. Grounding — recompete flags for the SAM rows, customer record per agency.
   let flags: Record<string, RecompeteFlag> = {};
@@ -1004,6 +1027,14 @@ export async function decideScoutCandidate(input: {
   let opportunityId: string | null = null;
 
   if (input.decision === "imported") {
+    // BL-STAB-10 — a find whose description the nightly run didn't read gets it now (one SAM.gov request).
+    let description = c.description;
+    const link = !description && c.source !== "watchlist_award" ? noticeDescriptionUrl(c.noticeId) : null;
+    const sam = link ? await resolveSamCredential(organizationId) : null;
+    if (link && sam?.ok) {
+      const d = (await readNoticeDescriptions(sam.cred, [{ noticeId: c.noticeId, description: link }], 1)).get(c.noticeId);
+      if (d && "text" in d) description = d.text.slice(0, 20_000);
+    }
     const [opp] = await db
       .insert(opportunities)
       .values({
@@ -1022,7 +1053,7 @@ export async function decideScoutCandidate(input: {
         setAside: c.setAside,
         placeOfPerformance: c.placeOfPerformance,
         incumbent: c.incumbent,
-        description: c.description,
+        description,
         ownerUserId: input.actor.userId ?? undefined,
         createdByUserId: input.actor.userId ?? undefined,
       })

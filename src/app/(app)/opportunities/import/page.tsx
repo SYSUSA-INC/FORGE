@@ -13,6 +13,8 @@ import { listOwnSourceRequestsAction } from "./source-requests/actions";
 import { SourceRequestPanel } from "./source-requests/SourceRequestPanel";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-10 — a search is one SAM.gov request per NAICS code (up to 10) plus a few description reads.
+export const maxDuration = 300;
 
 export default async function ImportPage() {
   await requireAuth();
@@ -30,9 +32,8 @@ export default async function ImportPage() {
 
   const naics = Array.from(
     new Set(
-      [org?.primaryNaics ?? "", ...(org?.naicsList ?? [])].filter(
-        (s) => s && s.trim(),
-      ),
+      // Codes only: a stored entry may carry its title ("541512 - Computer Systems Design").
+      [org?.primaryNaics ?? "", ...(org?.naicsList ?? [])].map((s) => (s ?? "").replace(/\D/g, "")).filter((s) => /^\d{2,6}$/.test(s)),
     ),
   );
 

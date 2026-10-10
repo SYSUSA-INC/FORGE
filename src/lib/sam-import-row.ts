@@ -17,6 +17,8 @@ export type SamImportRow = {
   department: string;
   subTier: string;
   office: string;
+  /** BL-STAB-10 — v2's agency path, used when department and sub-tier are empty. */
+  fullParentPathName: string;
   postedDate: string;
   type: string;
   typeOfSetAsideDescription: string;
@@ -78,6 +80,7 @@ export function sanitizeSamImportRows(input: unknown): SamImportRow[] {
       department: str(r.department, SHORT),
       subTier: str(r.subTier, SHORT),
       office: str(r.office, SHORT),
+      fullParentPathName: str(r.fullParentPathName, TITLE),
       postedDate: str(r.postedDate, SHORT),
       type: str(r.type, SHORT),
       typeOfSetAsideDescription: str(r.typeOfSetAsideDescription, SHORT),

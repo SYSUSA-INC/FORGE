@@ -9,35 +9,45 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
-import { sanitizeSamImportRows, type SamImportRow } from "@/lib/sam-import-row";
-import {
-  GSA_VEHICLES,
-  searchSamGovOpportunities,
-  type SamOpportunity,
-} from "@/lib/samgov";
+import { sanitizeSamImportRows } from "@/lib/sam-import-row";
+import { GSA_VEHICLES, noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
 import { resolveSamCredential } from "@/lib/samgov-key";
+import { hasKeyword, noticeAgency, parseKeyword, parseNoticeTypes, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
+import { DESCRIPTION_READS, findSamOpportunities, type FoundNotice } from "@/lib/samgov-search";
 
-const GSA_DEPARTMENT = "General Services Administration";
-
-export type ImportableOpportunity = SamOpportunity & {
+export type ImportableOpportunity = FoundNotice & {
   alreadyImported: boolean;
   /** BL-FB-WIN-RECOMPETE — best prior pursuit this looks like, if any. */
   recompete: RecompeteFlag | null;
 };
 
+/** One SAM.gov request per code (BL-STAB-10): a search takes at most this many. */
+const MAX_SEARCH_CODES = 10;
+
+/**
+ * BL-STAB-10 — search SAM.gov for the codes' notices of the chosen types,
+ * and (with a keyword or GSA vehicles) keep only those that really
+ * mention them; notices FORGE couldn't check yet come back separately.
+ */
 export async function loadSamGovOpportunitiesAction(input?: {
   naicsCodes?: string[];
   keyword?: string;
   postedDaysBack?: number;
-  /** Restrict to GSA-issued opportunities (sets SAM.gov deptname). */
+  /** Only GSA-issued opportunities. */
   gsaOnly?: boolean;
-  /** GSA vehicle ids from GSA_VEHICLES — adds vehicle keywords to the query. */
+  /** GSA vehicle ids from GSA_VEHICLES: a notice must name one of them. */
   vehicleIds?: string[];
+  /** SAM.gov notice type codes; none means the open ones. */
+  noticeTypes?: string[];
 }): Promise<
   | {
       ok: true;
       opportunities: ImportableOpportunity[];
-      totalRecords: number;
+      unchecked: ImportableOpportunity[];
+      counts: KeywordSearchCounts;
+      /** What the counts are about, for the results line (searchSummary). */
+      scope: { keyword: string | null; codes: string[]; days: number };
+      warning: string | null;
       usedNaics: string[];
       orgPrimaryNaics: string;
       orgNaicsList: string[];
@@ -59,80 +69,104 @@ export async function loadSamGovOpportunitiesAction(input?: {
   const orgPrimary = org?.primaryNaics ?? "";
   const orgList = org?.naicsList ?? [];
 
-  let naicsCodes = input?.naicsCodes;
-  if (!naicsCodes || naicsCodes.length === 0) {
-    naicsCodes = Array.from(
-      new Set([orgPrimary, ...orgList].filter((s) => s && s.trim())),
-    );
+  let naicsCodes = (input?.naicsCodes ?? []).map((c) => String(c).trim()).filter(Boolean);
+  if (naicsCodes.length === 0) {
+    // The org's own list may hold entries like "541512 - Computer Systems Design": its codes only.
+    naicsCodes = [orgPrimary, ...orgList].map((s) => (s ?? "").replace(/\D/g, "")).filter((c) => /^\d{2,6}$/.test(c));
   }
+  const badCode = naicsCodes.find((c) => !/^\d{2,6}$/.test(c));
+  if (badCode) return { ok: false, error: `"${badCode.slice(0, 20)}" isn't a NAICS code (2 to 6 digits).` };
+  naicsCodes = [...new Set(naicsCodes)];
+  const allCodes = naicsCodes.length;
+  naicsCodes = naicsCodes.slice(0, MAX_SEARCH_CODES);
 
-  const vehicleIds = input?.vehicleIds ?? [];
-  const vehicleKeywords = vehicleIds
+  const vehicleKeywords = (input?.vehicleIds ?? [])
     .map((id) => GSA_VEHICLES.find((v) => v.id === id)?.keyword ?? "")
     .filter(Boolean);
-
-  // GSA-scoped queries (department filter or vehicle keywords) carry
-  // their own scope, so an empty NAICS list isn't a hard error there.
-  const hasGsaFilter =
-    input?.gsaOnly === true || vehicleKeywords.length > 0;
-
-  if (naicsCodes.length === 0 && !input?.keyword && !hasGsaFilter) {
+  let keyword = (input?.keyword ?? "").trim().slice(0, 200);
+  // Nothing searchable in it ("-", a lone quote): no keyword, rather than "everything matches".
+  if (!hasKeyword(parseKeyword(keyword))) keyword = "";
+  if (naicsCodes.length === 0 && !keyword) {
     return {
       ok: false,
-      error:
-        "No NAICS codes configured. Add them under Settings → Classification, or enter a keyword / pick a GSA vehicle.",
+      error: "No NAICS codes configured. Add them under Settings → Classification, or enter a keyword (SAM.gov then searches notice titles).",
     };
   }
 
   const sam = await resolveSamCredential(organizationId);
   if (!sam.ok) return { ok: false, error: sam.failure.error };
-  const result = await searchSamGovOpportunities(sam.cred, {
+  const days = input?.postedDaysBack ?? 30;
+  const result = await findSamOpportunities(sam.cred, {
     naicsCodes,
-    keyword: input?.keyword,
-    postedDaysBack: input?.postedDaysBack ?? 30,
-    department: input?.gsaOnly ? GSA_DEPARTMENT : undefined,
-    extraKeywords: vehicleKeywords,
+    keyword,
+    anyOf: vehicleKeywords,
+    noticeTypes: parseNoticeTypes(input?.noticeTypes),
+    postedDaysBack: days,
+    gsaOnly: input?.gsaOnly === true,
   });
   if (!result.ok) return { ok: false, error: result.error };
 
-  const noticeIds = result.opportunities
-    .map((o) => o.noticeId)
-    .filter(Boolean);
+  // Already imported: any notice of the solicitation, in this organization.
+  const all = [...result.notices, ...result.unchecked];
+  const ids = all.flatMap((o) => [o.noticeId, ...o.earlierNoticeIds]).filter(Boolean);
   const existing =
-    noticeIds.length === 0
+    ids.length === 0
       ? []
       : await db
           .select({ noticeId: opportunities.noticeId })
           .from(opportunities)
-          .where(
-            and(
-              eq(opportunities.organizationId, organizationId),
-              inArray(opportunities.noticeId, noticeIds),
-            ),
-          );
+          .where(and(eq(opportunities.organizationId, organizationId), inArray(opportunities.noticeId, ids)));
   const existingSet = new Set(existing.map((r) => r.noticeId));
 
   // BL-FB-WIN-RECOMPETE — flag results that look like a pursuit we
   // already decided. Best-effort: a failure here never blocks the list.
   let recompeteFlags: Record<string, RecompeteFlag> = {};
   try {
-    recompeteFlags = await flagSamResults(organizationId, result.opportunities);
+    recompeteFlags = await flagSamResults(organizationId, all);
   } catch (err) {
     log.warn("[samgov-import]", "recompete flagging failed", { error: err });
   }
+  const decorate = (o: FoundNotice): ImportableOpportunity => ({
+    ...o,
+    alreadyImported: [o.noticeId, ...o.earlierNoticeIds].some((id) => existingSet.has(id)),
+    recompete: recompeteFlags[o.noticeId] ?? null,
+  });
 
   return {
     ok: true,
-    opportunities: result.opportunities.map((o) => ({
-      ...o,
-      alreadyImported: existingSet.has(o.noticeId),
-      recompete: recompeteFlags[o.noticeId] ?? null,
-    })),
-    totalRecords: result.totalRecords,
+    opportunities: result.notices.map(decorate),
+    unchecked: result.unchecked.map(decorate),
+    counts: result.counts,
+    scope: { keyword: keyword || (vehicleKeywords.length ? vehicleKeywords.join(" or ") : null), codes: naicsCodes, days },
+    warning:
+      [allCodes > naicsCodes.length ? `Searched the first ${naicsCodes.length} of ${allCodes} NAICS codes (SAM.gov is asked once per code).` : "", result.warning ?? ""]
+        .filter(Boolean)
+        .join(" ") || null,
     usedNaics: naicsCodes,
     orgPrimaryNaics: orgPrimary,
     orgNaicsList: orgList,
   };
+}
+
+/**
+ * BL-STAB-10 — read the descriptions of up to 10 notices the search left
+ * unchecked (one SAM.gov request each, on the company's key). The links
+ * are built here from validated notice ids; nothing is written.
+ */
+export async function readSamDescriptionsAction(
+  noticeIds: string[],
+): Promise<{ ok: true; descriptions: Record<string, DescriptionState> } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const rows = (Array.isArray(noticeIds) ? noticeIds : [])
+    .slice(0, 10)
+    .map((id) => ({ noticeId: String(id), description: noticeDescriptionUrl(String(id)) }))
+    .filter((r): r is { noticeId: string; description: string } => r.description !== null);
+  if (rows.length === 0) return { ok: false, error: "Nothing to check." };
+  const sam = await resolveSamCredential(organizationId);
+  if (!sam.ok) return { ok: false, error: sam.failure.error };
+  const read = await readNoticeDescriptions(sam.cred, rows, rows.length);
+  return { ok: true, descriptions: Object.fromEntries(read) };
 }
 
 function parseSamDate(s: string | null | undefined): Date | null {
@@ -172,7 +206,7 @@ function mapStageFromType(type: string): "identified" | "sources_sought" {
  * and audits the batch.
  */
 export async function importSamGovOpportunitiesAction(
-  selected: SamImportRow[],
+  selected: unknown[],
 ): Promise<
   | { ok: true; imported: number; skipped: number }
   | { ok: false; error: string }
@@ -203,10 +237,25 @@ export async function importSamGovOpportunitiesAction(
     return { ok: true, imported: 0, skipped: noticeIds.length };
   }
 
+  // BL-STAB-10 — searches read descriptions only to check a keyword: read
+  // the picked notices' missing ones now (within the key's budget), so an
+  // imported opportunity keeps its description.
+  const missing = toImport.filter((o) => !o.description).map((o) => ({ noticeId: o.noticeId, description: noticeDescriptionUrl(o.noticeId) ?? "" }));
+  if (missing.length > 0) {
+    const sam = await resolveSamCredential(organizationId);
+    if (sam.ok) {
+      const read = await readNoticeDescriptions(sam.cred, missing, DESCRIPTION_READS[sam.cred.source]);
+      for (const o of toImport) {
+        const d = read.get(o.noticeId);
+        if (!o.description && d && "text" in d) o.description = d.text.slice(0, 20_000);
+      }
+    }
+  }
+
   const rows = toImport.map((o) => ({
     organizationId,
     title: o.title || "Untitled",
-    agency: [o.department, o.subTier].filter(Boolean).join(" · "),
+    agency: noticeAgency(o),
     office: o.office ?? "",
     stage: mapStageFromType(o.type) as "identified" | "sources_sought",
     solicitationNumber: o.solicitationNumber ?? "",

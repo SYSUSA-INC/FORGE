@@ -15,6 +15,7 @@ import {
   type SamFailure,
 } from "@/lib/samgov-errors";
 import type { SamCredential } from "@/lib/samgov-key";
+import { plainText, type DescriptionState } from "@/lib/samgov-match";
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 
@@ -331,6 +332,8 @@ export type SamOpportunity = {
   department: string;
   subTier: string;
   office: string;
+  /** v2's agency path ("DEPT.SUB-TIER.OFFICE"); department/subTier/office are deprecated there. */
+  fullParentPathName?: string | null;
   postedDate: string;
   type: string;
   baseType: string;
@@ -350,30 +353,29 @@ export type SamOpportunity = {
   resourceLinks?: string[] | null;
 };
 
-export type SamOpportunitySearchParams = {
+export type SamOpportunityQuery = {
+  /** One request per code: SAM.gov documents `ncode` as a single NAICS code. */
   naicsCodes?: string[];
-  keyword?: string;
+  /** SAM.gov's only text filter, on the notice title (BL-STAB-10). */
+  title?: string;
   postedDaysBack?: number;
-  activeOnly?: boolean;
+  /** Rows per request; SAM.gov returns at most 1,000. */
   limit?: number;
-  /**
-   * Restrict to a specific contracting department, matched against
-   * SAM.gov's `deptname` parameter. For GSA-issued opportunities use
-   * "General Services Administration" exactly.
-   */
+  /** SAM.gov's `deptname`; callers also check the agency themselves (the parameter is deprecated). */
   department?: string;
-  /**
-   * Free-text keywords to OR-merge into the `q` parameter. We use this
-   * to bias toward GSA contract vehicles (Polaris, OASIS+, STARS III,
-   * etc.) without forcing the user to remember exact strings.
-   */
-  extraKeywords?: string[];
-  /**
-   * SAM.gov sometimes returns description as a URL pointing to a
-   * noticedesc endpoint. When true (default), we resolve those URLs
-   * into actual descriptions before returning.
-   */
-  enrichDescriptions?: boolean;
+};
+
+export type SamOpportunityRows = {
+  ok: true;
+  /** Active notices, one per notice id, descriptions as SAM.gov sent them (often a link). */
+  rows: SamOpportunity[];
+  /** What SAM.gov said it has, summed over the requests. */
+  samTotal: number;
+  /** Rows received (before the active filter). */
+  received: number;
+  /** Codes whose request failed while others answered, and why. */
+  failedCodes: string[];
+  failure: SamFailure | null;
 };
 
 // GSA vehicle list lives in @/lib/gsa-vehicles so it can be safely
@@ -387,91 +389,63 @@ function mmddyyyy(d: Date): string {
   return `${mm}/${dd}/${d.getFullYear()}`;
 }
 
-export async function searchSamGovOpportunities(
-  cred: SamCredential,
-  input: SamOpportunitySearchParams,
-): Promise<{ ok: true; opportunities: SamOpportunity[]; totalRecords: number } | SamFailure> {
+/**
+ * BL-STAB-10 — notices from SAM.gov's public search, which has no keyword
+ * parameter (the `q` FORGE used to send was ignored; matching is in
+ * samgov-search.ts). One request per NAICS code, three at a time; a key or
+ * quota failure fails the search, another code's failure is reported.
+ */
+export async function fetchSamOpportunities(cred: SamCredential, q: SamOpportunityQuery): Promise<SamOpportunityRows | SamFailure> {
   const postedTo = new Date();
-  const postedFrom = new Date();
-  postedFrom.setDate(postedFrom.getDate() - (input.postedDaysBack ?? 30));
-
-  const params = new URLSearchParams({
-    limit: String(input.limit ?? 50),
-    postedFrom: mmddyyyy(postedFrom),
-    postedTo: mmddyyyy(postedTo),
-  });
-
-  // SAM.gov's `q` is a single string. We default to AND semantics on
-  // multi-word keywords by prefixing each token with "+" (Lucene-style
-  // required term). Multi-word phrases stay quoted so we don't break
-  // them apart. Vehicle hints OR into the same query.
-  const userKeyword = input.keyword?.trim() ?? "";
-  const keywordParts: string[] = [];
-  if (userKeyword) keywordParts.push(buildAndKeyword(userKeyword));
-  if (input.extraKeywords && input.extraKeywords.length > 0) {
-    const quoted = input.extraKeywords
-      .map((k) => k.trim())
-      .filter(Boolean)
-      .map((k) => (k.includes(" ") ? `"${k}"` : k));
-    if (quoted.length > 0) keywordParts.push(`(${quoted.join(" OR ")})`);
-  }
-  if (keywordParts.length > 0) params.set("q", keywordParts.join(" "));
-
-  if (input.naicsCodes && input.naicsCodes.length > 0) {
-    params.set("ncode", input.naicsCodes.join(","));
-  }
-  if (input.department && input.department.trim()) {
-    params.set("deptname", input.department.trim());
-  }
-
-  const url = new URL(SAM_OPP_BASE);
-  url.search = params.toString();
+  const postedFrom = new Date(postedTo.getTime() - (q.postedDaysBack ?? 30) * 86_400_000);
+  const codes = [...new Set((q.naicsCodes ?? []).map((c) => c.trim()).filter(Boolean))];
+  const one = async (code: string | null): Promise<{ code: string | null; r: { ok: true; data: SamSearchPage } | SamFailure }> => {
+    const params: Record<string, string> = { limit: String(Math.min(q.limit ?? 1000, 1000)), postedFrom: mmddyyyy(postedFrom), postedTo: mmddyyyy(postedTo) };
+    if (code) params.ncode = code;
+    if (q.title?.trim()) params.title = q.title.trim();
+    if (q.department?.trim()) params.deptname = q.department.trim();
+    return { code, r: await samGetJson<SamSearchPage>(cred, samUrl(SAM_OPP_BASE, params), "oppSearch") };
+  };
+  const pending: (string | null)[] = codes.length > 0 ? [...codes] : [null];
+  const answers: Awaited<ReturnType<typeof one>>[] = [];
+  await Promise.all(
+    Array.from({ length: Math.min(3, pending.length) }, async () => {
+      for (let next = pending.shift(); next !== undefined; next = pending.shift()) {
+        const a = await one(next);
+        answers.push(a);
+        // The same key fails every remaining code: stop asking.
+        if (!a.r.ok && isKeyOrQuotaFailure(a.r.cls)) pending.length = 0;
+      }
+    }),
+  );
+  const failed = answers.filter((a): a is { code: string | null; r: SamFailure } => !a.r.ok);
+  const keyFailure = failed.find((a) => isKeyOrQuotaFailure(a.r.cls));
+  if (keyFailure) return keyFailure.r;
+  if (failed.length === answers.length) return failed[0]!.r;
+  const seen = new Set<string>();
+  const rows: SamOpportunity[] = [];
+  let samTotal = 0;
+  let received = 0;
   try {
-    const r = await samGetJson<{ totalRecords?: number; opportunitiesData?: SamOpportunity[] }>(cred, url, "oppSearch");
-    if (!r.ok) return r;
-    const data = r.data;
-    let ops = (data.opportunitiesData ?? []).filter((o) =>
-      input.activeOnly === false ? true : o.active === "Yes",
-    );
-
-    // SAM.gov frequently returns the description as a URL pointing to
-    // /v1/noticedesc?noticeid=… instead of inline text. Enrich those
-    // entries by fetching the actual description so the UI doesn't show
-    // a raw URL and downstream relevance filtering has something to
-    // work with. Limit concurrency so we don't hammer the upstream.
-    if (input.enrichDescriptions !== false) {
-      ops = await enrichDescriptions(ops, cred);
-    }
-
-    // Post-fetch relevance gate. SAM.gov's `q` fuzzy-matches and often
-    // returns weakly-related results when only a NAICS is set. If the
-    // caller passed a keyword, drop entries whose title + description +
-    // agency don't actually contain ALL of the search tokens.
-    let totalAfterFilter = data.totalRecords ?? ops.length;
-    if (userKeyword) {
-      const before = ops.length;
-      ops = filterByKeywordRelevance(ops, userKeyword);
-      totalAfterFilter = ops.length;
-      if (before !== ops.length) {
-        // Soft-log; not user-facing here.
-        log.info("[samgov]", "keyword filtered results", {
-          userKeyword,
-          before,
-          after: ops.length,
-        });
+    for (const a of answers) {
+      if (!a.r.ok) continue;
+      const page = a.r.data.opportunitiesData ?? [];
+      samTotal += Number(a.r.data.totalRecords ?? page.length) || 0;
+      received += page.length;
+      for (const o of page) {
+        if (!o?.noticeId || seen.has(o.noticeId) || o.active !== "Yes") continue;
+        seen.add(o.noticeId);
+        rows.push(o);
       }
     }
-
-    return {
-      ok: true,
-      opportunities: withoutLinks(ops),
-      totalRecords: totalAfterFilter,
-    };
   } catch {
     // Data SAM.gov shaped unexpectedly: never a thrown message to the user.
     return samFailure(cred, "oppSearch", { cls: "bad_response" });
   }
+  return { ok: true, rows, samTotal, received, failedCodes: failed.map((a) => a.code ?? ""), failure: failed[0]?.r ?? null };
 }
+
+type SamSearchPage = { totalRecords?: number; opportunitiesData?: SamOpportunity[] };
 
 /**
  * BL-STAB-7b — one fixed search (the opportunity search, one result from
@@ -484,73 +458,50 @@ export async function testSamKey(cred: SamCredential): Promise<{ ok: true } | Sa
   return r.ok ? { ok: true } : r;
 }
 
-/**
- * Compose a Lucene-style AND query from a user keyword. Quoted phrases
- * stay quoted (`"zero trust" deployment` becomes `+"zero trust" +deployment`).
- * Single tokens get a leading `+` so SAM.gov requires them.
- */
-function buildAndKeyword(input: string): string {
-  // Pull out quoted phrases first.
-  const tokens: string[] = [];
-  const trimmed = input.trim();
-  const quotedRegex = /"([^"]+)"/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = quotedRegex.exec(trimmed)) !== null) {
-    if (match.index > lastIndex) {
-      tokens.push(...trimmed.slice(lastIndex, match.index).trim().split(/\s+/));
-    }
-    tokens.push(`"${match[1]}"`);
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < trimmed.length) {
-    tokens.push(...trimmed.slice(lastIndex).trim().split(/\s+/));
-  }
-
-  const cleaned = tokens
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
-    .map((t) => (t.startsWith("+") || t.startsWith("-") ? t : `+${t}`));
-  return cleaned.join(" ");
+/** The description link SAM.gov gives every notice (built from a validated id, never taken from a browser). */
+export function noticeDescriptionUrl(noticeId: string): string | null {
+  return /^[0-9a-f]{32}$/i.test(noticeId) ? `https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=${noticeId}` : null;
 }
 
 /**
- * Resolve description URLs into actual descriptions, four at a time.
- * BL-STAB-7a — a rejected or over-limit key stops new lookups (the same
- * key would fail every one), and so does a 20-second budget for the
- * whole set. A description that could not be resolved keeps its URL so
- * the keyword filter can tell it apart; callers blank it (`withoutLinks`)
- * so the UI never shows one.
+ * BL-STAB-10 — each notice's description: inline text is read already; at
+ * most `budget` links are fetched, four at a time, within 20 s. Empty,
+ * "null", "Description Not Found" or a 404 means none (checked); a key or
+ * quota failure stops lookups; the rest stay `unread`, never assumed empty.
  */
-async function enrichDescriptions(ops: SamOpportunity[], cred: SamCredential): Promise<SamOpportunity[]> {
-  const queue = ops.map((op, i) => ({ op, i })).filter(({ op }) => isUrl(op.description));
-  // BL-STAB-7b — a company's own key has its own (often small) daily allowance.
-  if (cred.source === "company") queue.splice(COMPANY_DESCRIPTION_LOOKUPS);
-  if (queue.length === 0) return ops;
-
-  const out = ops.slice();
+export async function readNoticeDescriptions(cred: SamCredential, rows: { noticeId: string; description: string }[], budget: number): Promise<Map<string, DescriptionState>> {
+  const out = new Map<string, DescriptionState>();
+  const queue: { noticeId: string; url: string }[] = [];
+  for (const r of rows) {
+    const d = (r.description ?? "").trim();
+    if (isUrl(d)) {
+      out.set(r.noticeId, { unread: true });
+      if (queue.length < budget) queue.push({ noticeId: r.noticeId, url: d });
+    } else out.set(r.noticeId, noDescription(d) ? { none: true } : { text: d });
+  }
   const deadline = Date.now() + DESCRIPTION_BUDGET_MS;
   let stopped = false;
-
   async function worker(): Promise<void> {
     while (!stopped && Date.now() < deadline) {
       const item = queue.shift();
       if (!item) return;
-      const r = await fetchNoticeDescription(item.op, cred);
-      if (r.ok) out[item.i] = { ...item.op, description: r.text };
+      const r = await fetchNoticeDescription(item.url, cred);
+      if (r.ok) out.set(item.noticeId, noDescription(r.text) ? { none: true } : { text: r.text });
+      else if (r.cls === "not_found") out.set(item.noticeId, { none: true });
       else if (isKeyOrQuotaFailure(r.cls)) stopped = true;
     }
   }
-
   await Promise.all(Array.from({ length: 4 }, () => worker()));
   return out;
 }
 
-/** Description lookups per search on a company's own key; the rest stay unchecked. */
-const COMPANY_DESCRIPTION_LOOKUPS = 25;
+function noDescription(text: string): boolean {
+  const t = plainText(text);
+  return !t || t.toLowerCase() === "null" || /^description not found\.?$/i.test(t);
+}
 
 /** A description still holding a link (never resolved) is blanked for display. */
-function withoutLinks(ops: SamOpportunity[]): SamOpportunity[] {
+export function withoutLinks<T extends { description: string }>(ops: T[]): T[] {
   return ops.map((op) => (isUrl(op.description) ? { ...op, description: "" } : op));
 }
 
@@ -560,10 +511,10 @@ function isUrl(s: string | null | undefined): boolean {
 }
 
 /** The description behind a SAM.gov description link (JSON `{description}` or plain text). */
-async function fetchNoticeDescription(op: SamOpportunity, cred: SamCredential): Promise<{ ok: true; text: string } | SamFailure> {
+async function fetchNoticeDescription(link: string, cred: SamCredential): Promise<{ ok: true; text: string } | SamFailure> {
   let url: URL;
   try {
-    url = new URL(op.description.trim());
+    url = new URL(link.trim());
   } catch {
     return { ok: true, text: "" };
   }
@@ -576,59 +527,11 @@ async function fetchNoticeDescription(op: SamOpportunity, cred: SamCredential): 
     return samFailure(cred, "noticeDesc", { cls: classifyFetchError(err) });
   }
   try {
-    const json = JSON.parse(body) as { description?: string };
+    const json = JSON.parse(body) as { description?: string | null };
     return { ok: true, text: (json.description ?? "").trim() };
   } catch {
     return { ok: true, text: body.trim() };
   }
-}
-
-/**
- * Drop results that don't actually contain the user's keyword tokens
- * in title / description / agency. Quoted phrases must appear verbatim;
- * single tokens just need to appear somewhere in the searchable text.
- */
-function filterByKeywordRelevance(
-  ops: SamOpportunity[],
-  keyword: string,
-): SamOpportunity[] {
-  const tokens = parseKeywordTokens(keyword);
-  if (tokens.length === 0) return ops;
-
-  return ops.filter((op) => {
-    // BL-STAB-7a — a description FORGE couldn't fetch can't be checked;
-    // SAM.gov's own search matched the row, so it stays.
-    if (isUrl(op.description)) return true;
-    const haystack = [
-      op.title ?? "",
-      op.description ?? "",
-      op.department ?? "",
-      op.subTier ?? "",
-      op.office ?? "",
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    return tokens.every((t) => haystack.includes(t.toLowerCase()));
-  });
-}
-
-function parseKeywordTokens(keyword: string): string[] {
-  const tokens: string[] = [];
-  const quotedRegex = /"([^"]+)"/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = quotedRegex.exec(keyword)) !== null) {
-    if (match.index > lastIndex) {
-      tokens.push(...keyword.slice(lastIndex, match.index).trim().split(/\s+/));
-    }
-    tokens.push(match[1]!);
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < keyword.length) {
-    tokens.push(...keyword.slice(lastIndex).trim().split(/\s+/));
-  }
-  return tokens.map((t) => t.trim()).filter((t) => t.length > 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -670,7 +573,7 @@ export async function fetchSamNotice(
     const op = r.data.opportunitiesData?.[0];
     // SAM.gov answered and has no such notice: the one "not found" a caller may count as checked.
     if (!op) return { ok: false, cls: "not_found", noSuchNotice: true, error: "SAM.gov has no notice with that ID posted in the last year." };
-    const [enriched] = await enrichDescriptions([op], cred);
+    const desc = (await readNoticeDescriptions(cred, [op], 1)).get(op.noticeId);
     return {
       ok: true,
       notice: {
@@ -678,7 +581,7 @@ export async function fetchSamNotice(
         title: op.title ?? "",
         solicitationNumber: op.solicitationNumber ?? "",
         postedDate: op.postedDate ?? "",
-        description: enriched && !isUrl(enriched.description) ? enriched.description : "",
+        description: desc && "text" in desc ? desc.text : "",
         uiLink: op.uiLink ?? "",
         resourceLinks: (op.resourceLinks ?? []).filter((l): l is string => typeof l === "string" && isUrl(l)),
       },
