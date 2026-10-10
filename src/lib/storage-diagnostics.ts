@@ -147,20 +147,23 @@ export async function probeStorage(i: { origins: string[] }): Promise<StoragePro
   const transport = uploadTransport();
   const steps: ProbeStep[] = [];
   const base = `tmp/diagnostic/${randomUUID()}`;
-  const payload = bytesOf(16);
+  // 1 KB of text: big enough that Cloudflare would compress a text answer,
+  // so the check sees what a real text upload sees (a 16-byte file never was).
+  const size = 1024;
+  const payload = bytesOf(size);
 
   steps.push(
     await step("Write a file", async () => {
       const put = await storage.put({ key: `${base}/server`, bytes: payload, contentType: "text/plain" });
-      return { ok: put.byteSize === 16, detail: `Stored 16 bytes${put.etag ? ` (ETag ${put.etag.slice(0, 12)}…)` : ""}.` };
+      return { ok: put.byteSize === size, detail: `Stored ${size} bytes${put.etag ? ` (ETag ${put.etag.slice(0, 12)}…)` : ""}.` };
     }),
   );
   steps.push(
     await step("Read its size", async () => {
       const head = await storage.head(`${base}/server`);
-      return head && head.byteSize === 16
-        ? { ok: true, detail: `16 bytes, ${head.contentType}.` }
-        : { ok: false, detail: head ? `Reported ${head.byteSize} bytes, expected 16.` : "The file just written was not found." };
+      return head && head.byteSize === size
+        ? { ok: true, detail: `${size} bytes, ${head.contentType}.` }
+        : { ok: false, detail: head ? `Reported ${head.byteSize} bytes, expected ${size}.` : "The file just written was not found." };
     }),
   );
   steps.push(
@@ -181,20 +184,23 @@ export async function probeStorage(i: { origins: string[] }): Promise<StoragePro
   const cors: CorsProbe[] = [];
   if (status.name === "r2") {
     const key = `${base}/presigned`;
-    const direct = storage.presignPut({ key, contentType: "text/plain", byteSize: 16, expiresSeconds: 300 });
+    const direct = storage.presignPut({ key, contentType: "text/plain", byteSize: size, expiresSeconds: 300 });
     if (direct) {
       steps.push(
         await step("Upload through a presigned link", async () => {
           const code = await putTo(direct.url, payload, "text/plain");
           if (code < 200 || code >= 300) return { ok: false, detail: `R2 answered ${code} to a correctly signed upload (check the credentials and the server clock).` };
           const head = await storage.head(key);
-          return { ok: head?.byteSize === 16, detail: head?.byteSize === 16 ? "R2 accepted the signed upload." : "R2 accepted the upload but the file is missing." };
+          return {
+            ok: head?.byteSize === size,
+            detail: head?.byteSize === size ? "R2 accepted the signed upload." : head ? `R2 accepted the upload but reports ${head.byteSize} bytes, expected ${size}.` : "R2 accepted the upload but the file is missing.",
+          };
         }),
       );
       steps.push(
         await step("Refuses a different size than signed", async () => {
           if (process.env.UPLOAD_SIGN_CONTENT_LENGTH === "0") return { ok: null, detail: "Not tested: UPLOAD_SIGN_CONTENT_LENGTH=0 leaves the size unsigned." };
-          const code = await putTo(direct.url, bytesOf(17), "text/plain");
+          const code = await putTo(direct.url, bytesOf(size + 1), "text/plain");
           signedLengthEnforced = code === 403;
           return {
             ok: null,

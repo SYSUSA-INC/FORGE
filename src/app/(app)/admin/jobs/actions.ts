@@ -108,7 +108,11 @@ export async function finishStorageSelfTestAction(input: { key: string; putStatu
   const actor = await requireSuperadmin();
   if (!SELF_TEST_KEY.test(input.key)) return { ok: false, error: "That is not a self-test file." };
   const storage = getStorageProvider();
-  const head = await storage.head(input.key).catch(() => null);
+  let headError: string | null = null;
+  const head = await storage.head(input.key).catch((err: unknown) => {
+    headError = err instanceof Error ? err.message : String(err);
+    return null;
+  });
   await storage.delete(input.key).catch(() => undefined);
   let result: { ok: true; detail: string } | { ok: false; error: string; cors?: CorsProbe };
   const answered = input.putStatus >= 200 && input.putStatus < 300;
@@ -130,7 +134,10 @@ export async function finishStorageSelfTestAction(input: { key: string; putStatu
       cors,
     };
   } else {
-    result = { ok: false, error: `Storage answered ${input.putStatus}${head ? `, and holds ${head.byteSize} bytes instead of ${SELF_TEST_BYTES}` : " and the file is not there"}.` };
+    result = {
+      ok: false,
+      error: `Storage answered ${input.putStatus}${head ? `, and holds ${head.byteSize} bytes instead of ${SELF_TEST_BYTES}` : headError ? `, but reading the file back failed: ${headError}` : " and the file is not there"}.`,
+    };
   }
   if (actor.organizationId) {
     await recordAudit({
