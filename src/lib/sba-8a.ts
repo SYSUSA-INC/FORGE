@@ -3,8 +3,7 @@
  *
  * Source: SAM.gov Entity Management API
  *   GET https://api.sam.gov/entity-information/v4/entities
- *       ?api_key=<SAMGOV_API_KEY>
- *       &sbaBusinessTypeCode=A6        <-- 8(a) Program Participant
+ *       ?sbaBusinessTypeCode=A6        <-- 8(a) Program Participant
  *       &samRegistered=Yes
  *       &page=<n>&size=10
  *
@@ -23,9 +22,8 @@
  * any active sense, so missing them is a fine trade-off. Operators can
  * always backfill via the manual-CSV path for historical analysis.
  *
- * The API requires a free SAM.gov API key set in `SAMGOV_API_KEY`
- * (same env var used by src/lib/samgov.ts for entity registration
- * lookups — single key, two consumers).
+ * The API needs FORGE's shared SAM.gov key (`SAMGOV_API_KEY`); the
+ * server-only fetch in src/lib/cert-refresh.ts adds it (BL-STAB-7c).
  *
  * Tier limits on the public/free key:
  *   - 10 records per page (size capped at 10, larger requests 400)
@@ -38,6 +36,8 @@
  * (which require an SAM application) lift size to 100 if higher
  * throughput becomes necessary.
  */
+
+import type { SamErrorClass } from "@/lib/samgov-errors";
 
 const SAM_BASE = "https://api.sam.gov/entity-information/v4/entities";
 /**
@@ -128,7 +128,7 @@ export type Sba8aFetchResult =
        */
       debugNormalizeTrace: NormalizeTrace[];
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; cls?: SamErrorClass };
 
 export type NormalizeTrace = {
   index: number;
@@ -182,74 +182,37 @@ export function normalizeFirmName(name: string): string {
 }
 
 /**
- * Pull one page of 8(a) participants from SAM.gov. Returns the parsed
- * rows and the total record count (for pagination). On non-200 the
- * upstream error body is included in the returned `error`.
- *
- * Pagination convention: callers pass 1-based page numbers ("page 1
- * = first page") for operator-friendliness in the admin UI. SAM.gov
- * is internally 0-based, so we subtract one when building the URL.
- * Caller-facing nextPage values stay 1-based.
+ * BL-STAB-7c — the SAM.gov URL for one page of a cert type, or null for
+ * an unknown type. Callers pass 1-based page numbers ("page 1 = first
+ * page") for operator-friendliness; SAM.gov is 0-based, so one is
+ * subtracted here. The key is added by the server-only fetch in
+ * src/lib/cert-refresh.ts, never here (client components import this file).
  */
-export async function fetchSba8aPage(
-  apiKey: string,
-  page: number,
-  certType: string = "8a",
-): Promise<Sba8aFetchResult> {
-  if (!apiKey.trim()) {
-    return { ok: false, error: "SAMGOV_API_KEY not set." };
-  }
+export function sba8aPageUrl(page: number, certType: string = "8a"): URL | null {
   const spec = certSpecFor(certType);
-  if (!spec) {
-    return { ok: false, error: `Unknown cert type '${certType}'.` };
-  }
-  // SAM.gov is 0-based; admin UI is 1-based. Convert here so the rest
-  // of the system can think in plain "page 1 / 2 / 3" terms.
-  const samPage = Math.max(0, page - 1);
-  const url =
-    `${SAM_BASE}?api_key=${encodeURIComponent(apiKey)}` +
-    `&sbaBusinessTypeCode=${spec.samBusinessTypeCode}` +
-    `&samRegistered=Yes` +
-    // registrationStatus=A filters to currently-Active SAM
-    // registrations. The Entity API silently returns empty entityData
-    // for filtered-out totals if this is missing — matches the
-    // behaviour of src/lib/samgov.ts entity searches.
-    `&registrationStatus=A` +
-    `&size=${PAGE_SIZE}` +
-    `&page=${samPage}`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    return {
-      ok: false,
-      error: `SAM.gov ${res.status}: ${body.slice(0, 240)}`,
-    };
-  }
-  // Read once as text so we can include a sample in debug output even
-  // when JSON parsing succeeds — needed to diagnose the empty-data
-  // tier-limit case.
-  const rawText = await res.text();
+  if (!spec) return null;
+  const url = new URL(SAM_BASE);
+  url.searchParams.set("sbaBusinessTypeCode", spec.samBusinessTypeCode);
+  url.searchParams.set("samRegistered", "Yes");
+  // registrationStatus=A filters to currently-Active SAM registrations.
+  // The Entity API silently returns empty entityData for filtered-out
+  // totals if this is missing — matches src/lib/samgov.ts entity searches.
+  url.searchParams.set("registrationStatus", "A");
+  url.searchParams.set("size", String(PAGE_SIZE));
+  url.searchParams.set("page", String(Math.max(0, page - 1)));
+  return url;
+}
+
+/**
+ * One page of SAM.gov's answer as rows and the total record count (for
+ * pagination), with a diagnostic sample when no rows came back.
+ */
+export function parseSba8aPage(rawText: string, certType: string): Sba8aFetchResult {
   let data: unknown;
   try {
     data = JSON.parse(rawText);
-  } catch (err) {
-    return {
-      ok: false,
-      error:
-        `SAM.gov returned non-JSON: ${err instanceof Error ? err.message : String(err)}. ` +
-        `Body sample: ${rawText.slice(0, 240)}`,
-    };
+  } catch {
+    return { ok: false, error: "SAM.gov sent a reply FORGE couldn't read (not JSON). Try again in a few minutes." };
   }
   const envelope = data as {
     totalRecords?: number;

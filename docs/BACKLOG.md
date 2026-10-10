@@ -76,7 +76,7 @@ Effort key:
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
-| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) in PR #371; 7c–7e queued |
+| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c in PR #372; 7d–7e queued |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
@@ -180,7 +180,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · 🔄 BL-STAB-7 (7a shipped in PR #370, 7b in PR #371) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · 🔄 BL-STAB-7 (7a shipped in PR #370, 7b in PR #371, 7c in PR #372) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -548,7 +548,7 @@ mind. Bandage will come off but a true fix will stay."
       the missing ones; re-running the review keeps the matrix; a
       malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
-  nowhere to set one.** 🔄 7a shipped (PR #370); 7b in PR #371; 7c–7e queued (re-sized S → L).
+  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c in PR #372; 7d–7e queued (re-sized S → L).
   - **Symptom:** Import from SAM.gov and Settings → SAM.gov sync show
     "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
     "there has to be a place where the company admin can update their
@@ -568,7 +568,7 @@ mind. Bandage will come off but a true fix will stay."
     restricted file, not a dead key; loops stop at the first rejection;
     the Q&A queue skips what can never be read; a dead shared key reaches
     /admin/errors; importing a company from SAM.gov is audited.
-  - **7b (PR #371) — the owner's ask:** a company admin pastes the
+  - **7b (shipped, PR #371) — the owner's ask:** a company admin pastes the
     company's key on **Settings → Integrations**; FORGE tests it with one
     SAM.gov search and saves it only if SAM.gov recognises it (5 tests
     per company and 10 per user an hour). It is stored as AES-256-GCM
@@ -580,11 +580,21 @@ mind. Bandage will come off but a true fix will stay."
     the shared key is the fallback. Presence checks are per company and
     never decrypt; messages point to Settings → Integrations; impersonating
     platform admins see it read-only.
-  - **Queued:** 7c — the 8(a) registry, cert
-    refresh, gold set and health probe on the shared key, the cert cron
-    out of the `"use server"` module, the unused `/api/samgov/entity`
-    removed; 7d — nightly jobs per company, fair and within the cron's
-    time; 7e — platform admins see and remove company keys and
+  - **7c (PR #372):** the 8(a) registry, monthly cert refresh, gold set
+    and public health probe use FORGE's shared key only, through the same
+    guarded SAM.gov client, with operator wording. The cert refresh moved
+    to the server-only `src/lib/cert-refresh.ts`: it was exported from a
+    `"use server"` module with no auth check, so any signed-in browser
+    could call it as a server action and spend the shared key. It now
+    stops after a key, quota or SAM.gov-down answer (the rest are "Not
+    pulled", with the reason), stops starting pages after 35 s so it ends
+    inside the cron's 60 s, records a cut-short type as "partial", and
+    starts each run with the type whose last complete pull is oldest. `sba-8a.ts` stays pure
+    (client components import it). The health probe gained a 10 s
+    deadline; `/api/samgov/entity` is removed; a source scan pins which
+    code may use which key.
+  - **Queued:** 7d — nightly jobs per company, fair and within the
+    cron's time; 7e — platform admins see and remove company keys and
     re-encrypt after a keyring rotation.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
   data.** ⏳ queued (added 2026-10-08).

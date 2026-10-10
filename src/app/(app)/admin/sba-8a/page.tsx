@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { platformSamCredential } from "@/lib/samgov-key";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireSuperadmin } from "@/lib/auth-helpers";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function Sba8aAdminPage() {
   await requireSuperadmin();
 
-  const apiKeyPresent = !!(process.env.SAMGOV_API_KEY || "").trim();
+  const apiKeyPresent = platformSamCredential() !== null;
   const cronSecretPresent = !!(process.env.CRON_SECRET || "").trim();
   const [stats, runs, retentionMonths] = await Promise.all([
     safeStats(),

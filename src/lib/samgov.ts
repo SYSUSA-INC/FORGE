@@ -117,6 +117,22 @@ async function samGetJson<T>(cred: SamCredential, url: URL, endpoint: SamEndpoin
   return samFailure(cred, endpoint, { cls: "bad_response", status: r.res.status });
 }
 
+/**
+ * BL-STAB-7c — a SAM.gov reply as text, for callers that read it
+ * themselves (the 8(a) registry, the health probe). Same guarantees as
+ * every other SAM.gov call: the key only to SAM.gov, a deadline, and a
+ * worded failure.
+ */
+export async function samGetText(cred: SamCredential, url: URL, endpoint: SamEndpoint): Promise<{ ok: true; text: string; status: number } | SamFailure> {
+  const r = await samGet(cred, url, { endpoint, accept: "application/json" });
+  if (!r.ok) return r;
+  try {
+    return { ok: true, text: await r.res.text(), status: r.res.status };
+  } catch (err) {
+    return samFailure(cred, endpoint, { cls: classifyFetchError(err) });
+  }
+}
+
 function samUrl(base: string, params: Record<string, string>): URL {
   const url = new URL(base);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { runCertRefreshFromCron } from "@/app/(app)/admin/sba-8a/actions";
+import { revalidatePath } from "next/cache";
+import { runCertRefresh } from "@/lib/cert-refresh";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -57,7 +58,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await runCertRefreshFromCron();
+    const result = await runCertRefresh();
+    revalidatePath("/admin/sba-8a");
+    revalidatePath("/intelligence/firms");
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
