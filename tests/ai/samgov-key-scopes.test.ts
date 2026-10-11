@@ -25,6 +25,9 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
       "src/lib/gold-set.ts",
       "src/app/api/samgov/health/route.ts",
       "src/lib/samgov-health.ts",
+      "src/lib/sam-notice-csv.ts",
+      "src/lib/sam-notice-load.ts",
+      "src/app/api/cron/sam-notices/route.ts",
       ...walk("src/app/(app)/admin/sba-8a"),
     ];
     for (const file of platformOnly) {
@@ -39,6 +42,15 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
       if (file !== join("src", "lib", "samgov-key.ts")) expect(src, file).not.toMatch(/process\.env\.SAMGOV_API_KEY|env\.SAMGOV_API_KEY/);
       if (!["samgov.ts", "samgov-errors.ts"].some((f) => file === join("src", "lib", f))) expect(src, file).not.toMatch(/["'`?&]api_key=/);
     }
+  });
+
+  it("BL-STAB-10b — only the nightly load writes FORGE's copy of SAM.gov descriptions, and it holds no company data", () => {
+    for (const file of walk("src")) {
+      if (file === join("src", "lib", "sam-notice-load.ts")) continue;
+      expect(read(file), file).not.toMatch(/\.(insert|update|delete)\(samNotices\)|(INSERT INTO|UPDATE|DELETE FROM)\s+"?sam_notice\b/);
+    }
+    const ddl = read("drizzle/0129_sam_notice.sql").replace(/--.*$/gm, "");
+    expect(ddl).not.toMatch(/organization_id|user_id|email|phone/);
   });
 
   it("the cert refresh is not a server action, and every 8(a) action checks for a platform admin", () => {

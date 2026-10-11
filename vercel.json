@@ -37,6 +37,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/sam-notices",
+      "schedule": "20 4,6,8 * * *"
+    },
+    {
       "path": "/api/cron/scout",
       "schedule": "0 9 * * *"
     },
