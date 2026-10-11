@@ -61,6 +61,14 @@ describe("BL-STAB-10 — keywords", () => {
     expect(many.notes[0]).toBe("Only the first 10 of 12 keywords are used.");
     expect(parseKeyword("Smith & Jones, Inc.").notes).toEqual(["“Inc.” is in almost every notice."]);
     expect(parseKeyword("over 1,000 seats").notes).toEqual(["A number like 1,000 is split at the comma: put it in quotes to keep it whole."]);
+    // Review fixes: acronyms aren't "everywhere"; a quoted number isn't split; a term and its vehicle count once.
+    expect(parseKeyword("AI, 5G, IT").notes).toEqual(["“IT” is in almost every notice."]);
+    expect(parseKeyword(`"over 1,000 seats", ITSM`).notes).toEqual([]);
+    const oasis = parseKeyword("OASIS+", ["OASIS+"]);
+    expect([oasis.terms, oasis.anyOf, keywordLabel(oasis)]).toEqual([["oasis+"], [], "“OASIS+”"]);
+    expect(matchNotice(row("OASIS+ task order"), parseKeyword("OASIS+, Polaris", ["OASIS+"]), null)).toMatchObject({ matched: [{ term: "OASIS+", where: "title" }] });
+    expect(keywordLabel(parseKeyword("-hardware"))).toBe("none of “hardware”");
+    expect(keywordLabel(parseKeyword("ServiceNow, ITSM -hardware"))).toBe("any of “ServiceNow” or “ITSM” but not “hardware”");
     const owner = parseKeyword("Servicenow, ITSM, Enterprise Service Management");
     expect(describeKeyword(owner)).toBe("Any of: Servicenow · ITSM · Enterprise Service Management");
     expect(keywordLabel(owner)).toBe("any of “Servicenow”, “ITSM” or “Enterprise Service Management”");
@@ -169,7 +177,7 @@ describe("BL-STAB-10 — the owner's search (NAICS 541519 + ServiceNow)", () => 
       "2 notices mention any of “Servicenow”, “ITSM” or “Enterprise Service Management” · out of 412 notices SAM.gov has for NAICS 541519, posted in the last 30 days (230 don't mention it, 20 have no description, 4 not checked yet) · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in.",
     );
     expect(searchSummary({ ...counts, matched: 1, samTotal: 2412, received: 1000, truncated: true }, { keyword: null, codes: [], days: 7 })).toBe(
-      "1 notice for SAM.gov's title search (no NAICS codes), posted in the last 7 days · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in · SAM.gov sends at most 1,000 notices per code; FORGE read 1,000 of 2,412: narrow the codes or the window to see the rest.",
+      "1 notice for all NAICS codes, posted in the last 7 days · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in · SAM.gov sends at most 1,000 notices per request; FORGE read 1,000 of 2,412: narrow the search or the window to see the rest.",
     );
   });
 });

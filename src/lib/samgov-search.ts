@@ -99,7 +99,7 @@ export async function findSamOpportunities(
   };
   const warning =
     [
-      r.failure ? `SAM.gov didn't answer for ${r.failedCodes.join(", ")}: ${r.failure.error}` : "",
+      r.failure ? `SAM.gov didn't answer for ${i.naicsCodes.length ? "NAICS " : "the title search for "}${r.failedCodes.map((c) => q.labels[c] ?? c).join(", ")}: ${r.failure.error}` : "",
       notSent.length ? `With no NAICS codes, SAM.gov is asked about the first 5 keywords only; not searched: ${notSent.map((t) => q.labels[t] ?? t).join(", ")}.` : "",
     ]
       .filter(Boolean)
