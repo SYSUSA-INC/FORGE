@@ -58,7 +58,7 @@ export function isWantedType(row: { type?: string | null; baseType?: string | nu
 export type KeywordQuery = { terms: string[]; anyOf: string[][]; excluded: string[]; labels: Record<string, string>; notes: string[] };
 
 const MAX_ITEMS = 10;
-const GENERIC = new Set(["inc", "llc", "corp", "ltd", "co", "the", "and", "of", "for"]);
+const GENERIC = new Set(["inc", "llc", "corp", "ltd", "co", "the", "and", "of", "for", "it", "a", "an", "in", "on", "to", "or", "by", "at", "is", "as"]);
 
 /**
  * BL-STAB-10b — a comma or semicolon (outside quotes) makes a list: each
@@ -109,14 +109,17 @@ export function parseKeyword(input: string, vehicles: string[] = [], opts: { asL
     }
     if (phrases.length > MAX_ITEMS) notes.push(`Only the first ${MAX_ITEMS} of ${phrases.length} keywords are used.`);
     const kept = phrases.slice(0, MAX_ITEMS);
-    for (const p of kept) if (p.length <= 2 || GENERIC.has(p.replace(/\.$/, ""))) notes.push(`“${labels[p]}” is in almost every notice.`);
-    if (/\d,\d{3}/.test(text)) notes.push("A number like 1,000 is split at the comma: put it in quotes to keep it whole.");
+    // Two-letter acronyms (AI, 5G, VA) are fine: matching is by whole word.
+    for (const p of kept) if (p.length <= 1 || GENERIC.has(p.replace(/\.$/, ""))) notes.push(`“${labels[p]}” is in almost every notice.`);
+    if (/\d,\d{3}/.test(text.replace(/"[^"]*"/g, ""))) notes.push("A number like 1,000 is split at the comma: put it in quotes to keep it whole.");
     if (kept.length) anyOf.push(kept);
   } else terms.push(...items[0]!.map((w) => w.term));
   const vehicleTerms = [...new Set(vehicles.map(norm).filter(Boolean))];
   for (const v of vehicles) labels[norm(v)] ??= v;
   if (vehicleTerms.length) anyOf.push(vehicleTerms);
-  return { terms: [...new Set(terms)], anyOf, excluded: [...new Set(excluded)], labels, notes };
+  // A group a required term already meets adds nothing ("OASIS+" typed and its vehicle picked).
+  const required = new Set(terms);
+  return { terms: [...required], anyOf: anyOf.filter((g) => !g.some((t) => required.has(t))), excluded: [...new Set(excluded)], labels, notes };
 }
 
 export function hasKeyword(q: KeywordQuery): boolean {
@@ -139,7 +142,9 @@ export function describeKeyword(q: KeywordQuery): string {
 export function keywordLabel(q: KeywordQuery): string {
   const quote = (t: string) => `“${q.labels[t] ?? t}”`;
   const list = (g: string[]) => (g.length === 1 ? quote(g[0]!) : `any of ${g.slice(0, -1).map(quote).join(", ")} or ${quote(g[g.length - 1]!)}`);
-  return [...(q.terms.length ? [q.terms.map(quote).join(" ")] : []), ...q.anyOf.map(list)].join(" and ") || "the keyword";
+  const base = [...(q.terms.length ? [q.terms.map(quote).join(" ")] : []), ...q.anyOf.map(list)].join(" and ");
+  const not = q.excluded.map(quote).join(", ");
+  return base ? (not ? `${base} but not ${not}` : base) : not ? `none of ${not}` : "the keyword";
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
@@ -219,7 +224,8 @@ export function matchNotice(row: { title: string; agency: string }, q: KeywordQu
   const found = hits.every(Boolean) && groupHits.every((g) => g.length > 0);
   // Excluded terms can hide in an unread description: not decided until it's read.
   if (found && (read || q.excluded.length === 0)) {
-    const all = [...hits.filter((h): h is NonNullable<typeof h> => !!h), ...groupHits.flat()];
+    // One entry per keyword (it may be both a term and a list item).
+    const all = [...new Map([...hits.filter((h): h is NonNullable<typeof h> => !!h), ...groupHits.flat()].map((h) => [h.term, h])).values()];
     const where = all.some((h) => h.field.where === "description") ? "description" : all.some((h) => h.field.where === "agency") ? "agency" : "title";
     const lead = all.find((h) => h.field.where === where) ?? all[0];
     return {
@@ -279,11 +285,11 @@ export type KeywordSearchCounts = {
 export function searchSummary(c: KeywordSearchCounts, i: { keyword: string | null; codes: string[]; days: number }): string {
   const n = (v: number) => v.toLocaleString("en-US");
   const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
-  const scope = `${i.codes.length ? `NAICS ${i.codes.join(", ")}` : "SAM.gov's title search (no NAICS codes)"}, posted in the last ${i.days} days`;
+  const scope = `${i.codes.length ? `NAICS ${i.codes.join(", ")}` : "all NAICS codes"}, posted in the last ${i.days} days`;
   const extra = [
     c.otherTypes > 0 ? `${plural(c.otherTypes, "notice")} of other types left out` : "",
     c.folded > 0 ? `${plural(c.folded, "earlier notice")} of the same solicitations folded in` : "",
-    c.truncated ? `SAM.gov sends at most 1,000 notices per code; FORGE read ${n(c.received)} of ${n(c.samTotal)}: narrow the codes or the window to see the rest` : "",
+    c.truncated ? `SAM.gov sends at most 1,000 notices per request; FORGE read ${n(c.received)} of ${n(c.samTotal)}: narrow the search or the window to see the rest` : "",
   ].filter(Boolean);
   const tail = extra.length ? ` · ${extra.join(" · ")}` : "";
   if (!i.keyword) return `${plural(c.matched, "notice")} for ${scope}${tail}.`;
