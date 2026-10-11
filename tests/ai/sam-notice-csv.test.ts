@@ -41,6 +41,7 @@ describe("BL-STAB-10b — SAM.gov's notice file", () => {
     const h = readHeader(rows[0]!);
     if (!h.ok) throw new Error("header");
     expect(readHeader(["NoticeId", "Title", "Active"])).toEqual({ ok: false, missing: ["PostedDate", "Description"] });
+    expect(readHeader(["\u00EF\u00BB\u00BFNoticeId", "PostedDate", "Active", "Description"]).ok).toBe(true);
     expect(toNotice(rows[1]!, h.header)).toEqual({
       noticeId: "ab12cd34ef56ab12cd34ef56ab12cd34",
       state: "text",

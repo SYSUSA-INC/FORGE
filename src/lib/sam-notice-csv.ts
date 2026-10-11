@@ -106,7 +106,8 @@ export type SamFileHeader = { width: number; at: Record<keyof typeof REQUIRED, n
 
 /** The file's header row: where the columns FORGE reads are (by name, not position). */
 export function readHeader(fields: string[]): { ok: true; header: SamFileHeader } | { ok: false; missing: string[] } {
-  const names = fields.map((f) => f.trim().replace(/^﻿/, ""));
+  // A UTF-8 byte-order mark, as itself or read as Windows-1252 ("ï»¿").
+  const names = fields.map((f) => f.replace(/^(\uFEFF|\u00EF\u00BB\u00BF)/, "").trim());
   const at = Object.fromEntries(Object.entries(REQUIRED).map(([k, name]) => [k, names.indexOf(name)])) as SamFileHeader["at"];
   const missing = Object.entries(REQUIRED).filter(([k]) => at[k as keyof typeof REQUIRED] === -1).map(([, name]) => name);
   return missing.length ? { ok: false, missing } : { ok: true, header: { width: fields.length, at } };
