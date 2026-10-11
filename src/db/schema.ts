@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   customType,
+  date,
   index,
   integer,
   jsonb,
@@ -3527,6 +3528,51 @@ export const certImportRuns = pgTable(
 );
 
 export type CertImportRun = typeof certImportRuns.$inferSelect;
+
+/**
+ * BL-STAB-10b — FORGE's copy of SAM.gov's public notice descriptions, from
+ * the nightly Contract Opportunities file (drizzle/0129). Platform data:
+ * no organization, no user. `state`: text | truncated (cut at 32,000
+ * characters) | none | link (a URL, treated as missing). `gone_on`: the
+ * first complete file the notice was missing from (purged 30 days later).
+ */
+export const samNotices = pgTable(
+  "sam_notice",
+  {
+    noticeId: varchar("notice_id", { length: 32 }).primaryKey(),
+    description: text("description"),
+    state: varchar("state", { length: 10 }).notNull(),
+    postedAt: timestamp("posted_at"),
+    digest: varchar("digest", { length: 32 }).notNull(),
+    goneOn: date("gone_on"),
+  },
+  (t) => ({
+    goneIdx: index("sam_notice_gone_idx").on(t.goneOn).where(sql`"gone_on" IS NOT NULL`),
+  }),
+);
+
+export const samNoticeLoadRuns = pgTable(
+  "sam_notice_load_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    status: varchar("status", { length: 12 }).notNull().default("running"),
+    etag: text("etag").notNull().default(""),
+    sourceModifiedAt: timestamp("source_modified_at", { withTimezone: true }),
+    bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+    rowsSeen: integer("rows_seen").notNull().default(0),
+    rowsWritten: integer("rows_written").notNull().default(0),
+    rowsGone: integer("rows_gone").notNull().default(0),
+    rowsPurged: integer("rows_purged").notNull().default(0),
+    rowsSkipped: integer("rows_skipped").notNull().default(0),
+    newestPostedAt: timestamp("newest_posted_at"),
+    error: text("error").notNull().default(""),
+  },
+  (t) => ({
+    startedIdx: index("sam_notice_load_run_started_idx").on(t.startedAt),
+  }),
+);
 
 /**
  * Singleton key/value store for platform-wide (non-tenant) settings.
