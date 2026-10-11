@@ -49,33 +49,97 @@ export function isWantedType(row: { type?: string | null; baseType?: string | nu
   return code === null || wanted.includes(code);
 }
 
-/** terms: all must appear; excluded (`-word`): none may; anyOf (GSA vehicles): one must, when given. Lower-case. */
-export type KeywordQuery = { terms: string[]; excluded: string[]; anyOf: string[] };
+/**
+ * What a keyword asks for (lower-case): every `terms` entry must appear;
+ * each `anyOf` group (a comma list, the GSA vehicles) needs one hit; no
+ * `excluded` entry may appear. `labels` keeps the user's spelling for
+ * display; `notes` says what the list dropped or why an item is risky.
+ */
+export type KeywordQuery = { terms: string[]; anyOf: string[][]; excluded: string[]; labels: Record<string, string>; notes: string[] };
 
-/** `"zero trust" +cloud -hardware` → terms ["zero trust", "cloud"], excluded ["hardware"]. */
-export function parseKeyword(input: string, anyOf: string[] = []): KeywordQuery {
+const MAX_ITEMS = 10;
+const GENERIC = new Set(["inc", "llc", "corp", "ltd", "co", "the", "and", "of", "for"]);
+
+/**
+ * BL-STAB-10b — a comma or semicolon (outside quotes) makes a list: each
+ * item is one phrase and a notice needs any of them ("ServiceNow, ITSM,
+ * Enterprise Service Management"). Without one, every word or "quoted
+ * phrase" must appear (`"zero trust" cloud`). `+word` is always required
+ * and `-word` always excluded. `asList` reads the input as one list item
+ * (a saved scout keyword).
+ */
+export function parseKeyword(input: string, vehicles: string[] = [], opts: { asList?: boolean } = {}): KeywordQuery {
+  const text = (input ?? "").replace(/[“”„]/g, '"').slice(0, 200);
   const terms: string[] = [];
   const excluded: string[] = [];
-  const re = /([+-]?)"([^"]+)"|(\S+)/g;
-  const text0 = (input ?? "").replace(/[“”„]/g, '"');
+  const labels: Record<string, string> = {};
+  const notes: string[] = [];
+  const items: { term: string; label: string; required: boolean }[][] = [[]];
+  let list = !!opts.asList;
+  const re = /([+-]?)"([^"]*)"|([,;])|([^\s,;]+)/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text0)) !== null) {
-    let sign = m[1] ?? "";
-    // A loose word loses stray quotes and trailing commas ("ServiceNow, ITSM"); + and ) stay (OASIS+, 8(a)).
-    let text = m[2] ?? (m[3] ?? "").replace(/"/g, "").replace(/[,;:!?]+$/, "");
-    if (!m[2] && /^[+-]/.test(text)) {
-      sign = text[0]!;
-      text = text.slice(1);
+  while ((m = re.exec(text)) !== null) {
+    if (m[3]) {
+      list = true;
+      items.push([]);
+      continue;
     }
-    const term = norm(text);
+    let sign = m[1] ?? "";
+    // A loose word loses stray quotes and trailing ":!?"; + and ) stay (OASIS+, 8(a)).
+    let raw = m[2] ?? (m[4] ?? "").replace(/"/g, "").replace(/[:!?]+$/, "");
+    if (m[2] === undefined && /^[+-]/.test(raw)) {
+      sign = raw[0]!;
+      raw = raw.slice(1);
+    }
+    const term = norm(raw);
     if (!term) continue;
-    (sign === "-" ? excluded : terms).push(term);
+    labels[term] ??= plainText(raw);
+    if (sign === "-") excluded.push(term);
+    else items[items.length - 1]!.push({ term, label: labels[term]!, required: sign === "+" });
   }
-  return { terms: [...new Set(terms)], excluded: [...new Set(excluded)], anyOf: [...new Set(anyOf.map(norm).filter(Boolean))] };
+  const anyOf: string[][] = [];
+  if (list) {
+    const phrases: string[] = [];
+    for (const item of items) {
+      terms.push(...item.filter((w) => w.required).map((w) => w.term));
+      const phrase = item.filter((w) => !w.required).map((w) => w.term).join(" ").slice(0, 100);
+      if (!phrase || phrases.includes(phrase)) continue;
+      labels[phrase] ??= item.filter((w) => !w.required).map((w) => w.label).join(" ");
+      phrases.push(phrase);
+    }
+    if (phrases.length > MAX_ITEMS) notes.push(`Only the first ${MAX_ITEMS} of ${phrases.length} keywords are used.`);
+    const kept = phrases.slice(0, MAX_ITEMS);
+    for (const p of kept) if (p.length <= 2 || GENERIC.has(p.replace(/\.$/, ""))) notes.push(`“${labels[p]}” is in almost every notice.`);
+    if (/\d,\d{3}/.test(text)) notes.push("A number like 1,000 is split at the comma: put it in quotes to keep it whole.");
+    if (kept.length) anyOf.push(kept);
+  } else terms.push(...items[0]!.map((w) => w.term));
+  const vehicleTerms = [...new Set(vehicles.map(norm).filter(Boolean))];
+  for (const v of vehicles) labels[norm(v)] ??= v;
+  if (vehicleTerms.length) anyOf.push(vehicleTerms);
+  return { terms: [...new Set(terms)], anyOf, excluded: [...new Set(excluded)], labels, notes };
 }
 
 export function hasKeyword(q: KeywordQuery): boolean {
-  return q.terms.length > 0 || q.excluded.length > 0 || q.anyOf.length > 0;
+  return q.terms.length > 0 || q.excluded.length > 0 || q.anyOf.some((g) => g.length > 0);
+}
+
+/** How FORGE reads a keyword, for the line under the box: "Any of: ServiceNow · ITSM". */
+export function describeKeyword(q: KeywordQuery): string {
+  const l = (t: string) => q.labels[t] ?? t;
+  return [
+    q.terms.length ? `All of: ${q.terms.map(l).join(" · ")}` : "",
+    ...q.anyOf.map((g) => (g.length === 1 ? `Must mention: ${l(g[0]!)}` : `Any of: ${g.map(l).join(" · ")}`)),
+    q.excluded.length ? `Not: ${q.excluded.map(l).join(" · ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+/** The keyword as the results line quotes it: “a”, any of “a”, “b” or “c”. */
+export function keywordLabel(q: KeywordQuery): string {
+  const quote = (t: string) => `“${q.labels[t] ?? t}”`;
+  const list = (g: string[]) => (g.length === 1 ? quote(g[0]!) : `any of ${g.slice(0, -1).map(quote).join(", ")} or ${quote(g[g.length - 1]!)}`);
+  return [...(q.terms.length ? [q.terms.map(quote).join(" ")] : []), ...q.anyOf.map(list)].join(" and ") || "the keyword";
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
@@ -111,8 +175,11 @@ export function findTerm(text: string, term: string): number {
 
 export type DescriptionState = { text: string } | { none: true } | { unread: true };
 
+export type NoticeWhere = "title" | "agency" | "description";
+
 export type NoticeMatch =
-  | { status: "match"; where: "title" | "agency" | "description"; snippet: string }
+  /** `matched`: each keyword found, and where (the whole text when it was read; title and agency otherwise). */
+  | { status: "match"; where: NoticeWhere; snippet: string; matched: { term: string; where: NoticeWhere }[] }
   | { status: "not_mentioned" }
   | { status: "no_description" }
   | { status: "unchecked" };
@@ -128,11 +195,11 @@ function snippetAt(text: string, at: number, length: number): string {
 /**
  * Check one notice. Title and agency are always known; the description
  * only when FORGE read it (`null` = not read yet, same as unread). A
- * match needs every term and one of `anyOf`, and no excluded term — and
- * an excluded term can only be ruled out in text that was read.
+ * match needs every term, a hit in every `anyOf` group and no excluded
+ * term — and an excluded term can only be ruled out in text that was read.
  */
 export function matchNotice(row: { title: string; agency: string }, q: KeywordQuery, desc: DescriptionState | null): NoticeMatch {
-  const fields: { where: "title" | "agency" | "description"; text: string }[] = [
+  const fields: { where: NoticeWhere; text: string }[] = [
     { where: "title", text: plainText(row.title) },
     { where: "agency", text: plainText(row.agency) },
   ];
@@ -142,20 +209,25 @@ export function matchNotice(row: { title: string; agency: string }, q: KeywordQu
   const locate = (term: string) => {
     for (const [i, t] of lower.entries()) {
       const at = findTerm(t, term);
-      if (at !== -1) return { field: fields[i]!, at, length: term.length };
+      if (at !== -1) return { term, field: fields[i]!, at, length: term.length };
     }
     return null;
   };
   if (q.excluded.some((t) => locate(t))) return { status: "not_mentioned" };
   const hits = q.terms.map(locate);
-  const anyHit = q.anyOf.length === 0 ? null : q.anyOf.map(locate).find(Boolean) ?? undefined;
-  const found = hits.every(Boolean) && anyHit !== undefined;
+  const groupHits = q.anyOf.map((g) => g.map(locate).filter((h): h is NonNullable<typeof h> => !!h));
+  const found = hits.every(Boolean) && groupHits.every((g) => g.length > 0);
   // Excluded terms can hide in an unread description: not decided until it's read.
   if (found && (read || q.excluded.length === 0)) {
-    const first = [...hits, anyHit].filter((h): h is NonNullable<typeof h> => !!h);
-    const where = first.some((h) => h.field.where === "description") ? "description" : first.some((h) => h.field.where === "agency") ? "agency" : "title";
-    const lead = first.find((h) => h.field.where === where) ?? first[0];
-    return { status: "match", where, snippet: lead ? snippetAt(lead.field.text, lead.at, lead.length) : fields[0]!.text };
+    const all = [...hits.filter((h): h is NonNullable<typeof h> => !!h), ...groupHits.flat()];
+    const where = all.some((h) => h.field.where === "description") ? "description" : all.some((h) => h.field.where === "agency") ? "agency" : "title";
+    const lead = all.find((h) => h.field.where === where) ?? all[0];
+    return {
+      status: "match",
+      where,
+      snippet: lead ? snippetAt(lead.field.text, lead.at, lead.length) : fields[0]!.text,
+      matched: all.map((h) => ({ term: q.labels[h.term] ?? h.term, where: h.field.where })),
+    };
   }
   if (!read) return { status: "unchecked" };
   return desc && "none" in desc ? { status: "no_description" } : { status: "not_mentioned" };
@@ -187,10 +259,11 @@ export function collapseBySolicitation<
   });
 }
 
-/** samTotal: what SAM.gov said it has; received: rows FORGE got (1,000 a request at most); otherTypes: solicitations of unwanted types; folded: earlier notices folded into the latest. */
+/** samTotal: what SAM.gov said it has; received: rows FORGE got; truncated: a request had more than its 1,000 rows; otherTypes: solicitations of unwanted types; folded: earlier notices folded into the latest. */
 export type KeywordSearchCounts = {
   samTotal: number;
   received: number;
+  truncated: boolean;
   otherTypes: number;
   folded: number;
   matched: number;
@@ -199,23 +272,27 @@ export type KeywordSearchCounts = {
   unchecked: number;
 };
 
-/** The results line the Import page shows (tested here, so the wording is true). */
+/**
+ * The results line the Import page shows (tested here, so the wording is
+ * true). `keyword` is the quoted label (keywordLabel), or null.
+ */
 export function searchSummary(c: KeywordSearchCounts, i: { keyword: string | null; codes: string[]; days: number }): string {
-  const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
-  const scope = `${i.codes.length ? `NAICS ${i.codes.join(", ")}` : "all NAICS codes"}, posted in the last ${i.days} days`;
+  const n = (v: number) => v.toLocaleString("en-US");
+  const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
+  const scope = `${i.codes.length ? `NAICS ${i.codes.join(", ")}` : "SAM.gov's title search (no NAICS codes)"}, posted in the last ${i.days} days`;
   const extra = [
     c.otherTypes > 0 ? `${plural(c.otherTypes, "notice")} of other types left out` : "",
     c.folded > 0 ? `${plural(c.folded, "earlier notice")} of the same solicitations folded in` : "",
-    c.received < c.samTotal ? `FORGE read the first ${c.received.toLocaleString("en-US")} of ${c.samTotal.toLocaleString("en-US")}; narrow the codes or the window to see the rest` : "",
+    c.truncated ? `SAM.gov sends at most 1,000 notices per code; FORGE read ${n(c.received)} of ${n(c.samTotal)}: narrow the codes or the window to see the rest` : "",
   ].filter(Boolean);
   const tail = extra.length ? ` · ${extra.join(" · ")}` : "";
   if (!i.keyword) return `${plural(c.matched, "notice")} for ${scope}${tail}.`;
   const why = [
-    c.notMentioned > 0 ? `${c.notMentioned.toLocaleString("en-US")} don't mention it` : "",
-    c.noDescription > 0 ? `${c.noDescription.toLocaleString("en-US")} have no description` : "",
-    c.unchecked > 0 ? `${c.unchecked.toLocaleString("en-US")} not checked yet` : "",
+    c.notMentioned > 0 ? `${n(c.notMentioned)} don't mention it` : "",
+    c.noDescription > 0 ? `${n(c.noDescription)} have no description` : "",
+    c.unchecked > 0 ? `${n(c.unchecked)} not checked yet` : "",
   ].filter(Boolean);
-  return `${plural(c.matched, "notice")} ${c.matched === 1 ? "mentions" : "mention"} “${i.keyword}” · out of ${plural(c.samTotal, "notice")} SAM.gov has for ${scope}${why.length ? ` (${why.join(", ")})` : ""}${tail}.`;
+  return `${plural(c.matched, "notice")} ${c.matched === 1 ? "mentions" : "mention"} ${i.keyword} · out of ${plural(c.samTotal, "notice")} SAM.gov has for ${scope}${why.length ? ` (${why.join(", ")})` : ""}${tail}.`;
 }
 
 /** A notice's agency: v2's path ("DEPT.SUB-TIER.OFFICE"), else the deprecated department and sub-tier. */

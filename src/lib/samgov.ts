@@ -356,8 +356,8 @@ export type SamOpportunity = {
 export type SamOpportunityQuery = {
   /** One request per code: SAM.gov documents `ncode` as a single NAICS code. */
   naicsCodes?: string[];
-  /** SAM.gov's only text filter, on the notice title (BL-STAB-10). */
-  title?: string;
+  /** SAM.gov's only text filter, on the notice title: with no codes, one request per title (BL-STAB-10b). */
+  titles?: string[];
   postedDaysBack?: number;
   /** Rows per request; SAM.gov returns at most 1,000. */
   limit?: number;
@@ -369,11 +369,15 @@ export type SamOpportunityRows = {
   ok: true;
   /** Active notices, one per notice id, descriptions as SAM.gov sent them (often a link). */
   rows: SamOpportunity[];
-  /** What SAM.gov said it has, summed over the requests. */
+  /** What SAM.gov said it has: summed over codes, the distinct rows over several titles. */
   samTotal: number;
   /** Rows received (before the active filter). */
   received: number;
-  /** Codes whose request failed while others answered, and why. */
+  /** A request had more rows than SAM.gov sends (1,000). */
+  truncated: boolean;
+  /** BL-STAB-10b — which code's search returned each notice. */
+  viaCodes: Record<string, string[]>;
+  /** Codes (or titles) whose request failed while others answered, and why. */
   failedCodes: string[];
   failure: SamFailure | null;
 };
@@ -392,48 +396,59 @@ function mmddyyyy(d: Date): string {
 /**
  * BL-STAB-10 — notices from SAM.gov's public search, which has no keyword
  * parameter (the `q` FORGE used to send was ignored; matching is in
- * samgov-search.ts). One request per NAICS code, three at a time; a key or
- * quota failure fails the search, another code's failure is reported.
+ * samgov-search.ts). One request per NAICS code (or, with none, per title),
+ * three at a time; a key or quota failure fails the search, another
+ * request's failure is reported with the rows the others returned.
  */
 export async function fetchSamOpportunities(cred: SamCredential, q: SamOpportunityQuery): Promise<SamOpportunityRows | SamFailure> {
   const postedTo = new Date();
   const postedFrom = new Date(postedTo.getTime() - (q.postedDaysBack ?? 30) * 86_400_000);
   const codes = [...new Set((q.naicsCodes ?? []).map((c) => c.trim()).filter(Boolean))];
-  const one = async (code: string | null): Promise<{ code: string | null; r: { ok: true; data: SamSearchPage } | SamFailure }> => {
+  const titles = [...new Set((q.titles ?? []).map((t) => t.trim()).filter(Boolean))];
+  type Ask = { code?: string; title?: string };
+  const one = async (ask: Ask): Promise<{ ask: Ask; r: { ok: true; data: SamSearchPage } | SamFailure }> => {
     const params: Record<string, string> = { limit: String(Math.min(q.limit ?? 1000, 1000)), postedFrom: mmddyyyy(postedFrom), postedTo: mmddyyyy(postedTo) };
-    if (code) params.ncode = code;
-    if (q.title?.trim()) params.title = q.title.trim();
+    if (ask.code) params.ncode = ask.code;
+    if (ask.title) params.title = ask.title;
     if (q.department?.trim()) params.deptname = q.department.trim();
-    return { code, r: await samGetJson<SamSearchPage>(cred, samUrl(SAM_OPP_BASE, params), "oppSearch") };
+    return { ask, r: await samGetJson<SamSearchPage>(cred, samUrl(SAM_OPP_BASE, params), "oppSearch") };
   };
-  const pending: (string | null)[] = codes.length > 0 ? [...codes] : [null];
+  const pending: Ask[] = codes.length > 0 ? codes.map((code) => ({ code })) : titles.length > 0 ? titles.map((title) => ({ title })) : [{}];
   const answers: Awaited<ReturnType<typeof one>>[] = [];
   await Promise.all(
     Array.from({ length: Math.min(3, pending.length) }, async () => {
       for (let next = pending.shift(); next !== undefined; next = pending.shift()) {
         const a = await one(next);
         answers.push(a);
-        // The same key fails every remaining code: stop asking.
+        // The same key fails every remaining request: stop asking.
         if (!a.r.ok && isKeyOrQuotaFailure(a.r.cls)) pending.length = 0;
       }
     }),
   );
-  const failed = answers.filter((a): a is { code: string | null; r: SamFailure } => !a.r.ok);
+  const failed = answers.filter((a): a is { ask: Ask; r: SamFailure } => !a.r.ok);
   const keyFailure = failed.find((a) => isKeyOrQuotaFailure(a.r.cls));
   if (keyFailure) return keyFailure.r;
   if (failed.length === answers.length) return failed[0]!.r;
   const seen = new Set<string>();
   const rows: SamOpportunity[] = [];
+  const viaCodes: Record<string, string[]> = {};
+  const distinct = new Set<string>();
   let samTotal = 0;
   let received = 0;
+  let truncated = false;
   try {
     for (const a of answers) {
       if (!a.r.ok) continue;
       const page = a.r.data.opportunitiesData ?? [];
-      samTotal += Number(a.r.data.totalRecords ?? page.length) || 0;
+      const total = Number(a.r.data.totalRecords ?? page.length) || 0;
+      samTotal += total;
       received += page.length;
+      truncated ||= total > page.length;
       for (const o of page) {
-        if (!o?.noticeId || seen.has(o.noticeId) || o.active !== "Yes") continue;
+        if (o?.noticeId) distinct.add(o.noticeId);
+        if (!o?.noticeId || o.active !== "Yes") continue;
+        if (a.ask.code) (viaCodes[o.noticeId] ??= []).push(a.ask.code);
+        if (seen.has(o.noticeId)) continue;
         seen.add(o.noticeId);
         rows.push(o);
       }
@@ -442,7 +457,9 @@ export async function fetchSamOpportunities(cred: SamCredential, q: SamOpportuni
     // Data SAM.gov shaped unexpectedly: never a thrown message to the user.
     return samFailure(cred, "oppSearch", { cls: "bad_response" });
   }
-  return { ok: true, rows, samTotal, received, failedCodes: failed.map((a) => a.code ?? ""), failure: failed[0]?.r ?? null };
+  // Several title searches overlap: their sum would count a notice twice.
+  if (titles.length > 1 && !codes.length && !truncated) samTotal = distinct.size;
+  return { ok: true, rows, samTotal, received, truncated, viaCodes, failedCodes: failed.map((a) => a.ask.code ?? a.ask.title ?? ""), failure: failed[0]?.r ?? null };
 }
 
 type SamSearchPage = { totalRecords?: number; opportunitiesData?: SamOpportunity[] };

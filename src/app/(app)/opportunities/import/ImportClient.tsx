@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { GSA_VEHICLES } from "@/lib/gsa-vehicles";
 import { MAX_IMPORT_ROWS } from "@/lib/sam-import-row";
-import { NOTICE_TYPES, OPEN_NOTICE_TYPES, matchNotice, noticeAgency, parseKeyword, searchSummary, type KeywordSearchCounts, type NoticeTypeCode } from "@/lib/samgov-match";
+import { NOTICE_TYPES, OPEN_NOTICE_TYPES, describeKeyword, matchNotice, noticeAgency, parseKeyword, searchSummary, type KeywordSearchCounts, type NoticeTypeCode } from "@/lib/samgov-match";
 import {
   importSamGovOpportunitiesAction,
   loadSamGovOpportunitiesAction,
@@ -30,6 +30,10 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
   const [searchInfo, setSearchInfo] = useState<Search | null>(null);
   const [checking, startChecking] = useTransition();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // BL-STAB-10b — how FORGE reads the keyword, as it is typed.
+  const keywordQuery = useMemo(() => parseKeyword(keyword), [keyword]);
+  const keywordReading = describeKeyword(keywordQuery);
+  const keywordNotes = keywordQuery.notes;
   const [loading, startLoading] = useTransition();
   const [importing, startImporting] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -276,9 +280,15 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
               className="aur-input"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Optional — e.g., ServiceNow, &quot;zero trust&quot;"
+              placeholder="Optional — e.g., ServiceNow, ITSM, Enterprise Service Management"
             />
-            <div className="mt-1 font-mono text-[10px] text-muted">Checked in each notice&rsquo;s title and description. SAM.gov can&rsquo;t search descriptions, so FORGE reads them (one SAM.gov request each, a few per search).</div>
+            <div className="mt-1 font-mono text-[10px] text-muted">
+              {keywordReading ? <span className="text-text">{keywordReading}. </span> : null}
+              Commas separate alternatives (any of them); words without commas must all appear; &quot;quotes&quot; keep a phrase; -word excludes. Checked in each notice&rsquo;s title and description.
+            </div>
+            {keywordNotes.map((n) => (
+              <div key={n} className="mt-1 font-mono text-[10px] text-gold">{n}</div>
+            ))}
           </div>
           <div>
             <label className="aur-label">Posted in last</label>
@@ -372,7 +382,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
           )}
           {unchecked.length > 0 && searchInfo?.scope.keyword ? (
             <details className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
-              <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-widest text-muted">Not checked for “{searchInfo.scope.keyword}” ({unchecked.length})</summary>
+              <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-widest text-muted">Not checked for {searchInfo.scope.keyword} ({unchecked.length})</summary>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <p className="font-body text-[12px] text-muted">FORGE hasn&rsquo;t read these descriptions yet, so it can&rsquo;t tell whether they mention it. They aren&rsquo;t counted as matches or picked by Select all.</p>
                 <button type="button" className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" disabled={checking} onClick={checkMore}>
@@ -458,10 +468,24 @@ function OpportunityRow({
                 {o.type}
               </span>
             ) : null}
-            {o.match?.status === "match" ? (
-              <span className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">{`${o.match.where} match`}</span>
-            ) : null}
           </div>
+          {/* BL-STAB-10b — which of the search's keywords and NAICS codes this notice matched. */}
+          {o.match?.status === "match" || o.viaCodes.length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {o.match?.status === "match"
+                ? o.match.matched.map((m) => (
+                    <span key={`${m.term}|${m.where}`} className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[10px] text-teal">
+                      {m.term} · {m.where}
+                    </span>
+                  ))
+                : null}
+              {o.viaCodes.map((c) => (
+                <span key={c} className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] text-text">
+                  NAICS {c}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
             {noticeAgency(o) || "—"}
           </div>

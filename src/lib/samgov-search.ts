@@ -9,6 +9,7 @@ import {
   matchNotice,
   noticeAgency,
   parseKeyword,
+  type KeywordQuery,
   type KeywordSearchCounts,
   type NoticeMatch,
   type NoticeTypeCode,
@@ -29,7 +30,8 @@ import {
 /** Description reads per search: a company's own key often allows few requests a day. */
 export const DESCRIPTION_READS = { platform: 30, company: 10 } as const;
 
-export type FoundNotice = SamOpportunity & { earlierNoticeIds: string[]; match: NoticeMatch | null };
+/** `viaCodes`: which of the searched NAICS codes returned the solicitation (BL-STAB-10b). */
+export type FoundNotice = SamOpportunity & { earlierNoticeIds: string[]; viaCodes: string[]; match: NoticeMatch | null };
 
 export type SamSearchResult = {
   ok: true;
@@ -49,6 +51,8 @@ export async function findSamOpportunities(
     keyword?: string;
     /** At least one of these must appear (GSA vehicle names). */
     anyOf?: string[];
+    /** A parsed keyword instead of `keyword` (the scout's saved phrases). */
+    query?: KeywordQuery;
     noticeTypes: NoticeTypeCode[];
     postedDaysBack: number;
     /** Only notices whose agency is GSA (checked here; SAM.gov's `deptname` is deprecated). */
@@ -58,13 +62,16 @@ export async function findSamOpportunities(
     readBudget?: number;
   },
 ): Promise<SamSearchResult | SamFailure> {
-  const q = parseKeyword(i.keyword ?? "", i.anyOf ?? []);
+  const q = i.query ?? parseKeyword(i.keyword ?? "", i.anyOf ?? []);
   const keyworded = hasKeyword(q);
-  // With no codes, SAM.gov's own title filter narrows the request; FORGE still checks every row.
-  const titleTerm = i.naicsCodes.length === 0 ? [...q.terms].sort((a, b) => b.length - a.length)[0] : undefined;
+  // With no codes, SAM.gov's own title filter narrows the request (FORGE still checks every
+  // row): the longest required term, else one request per list item, five at most.
+  const longest = [...q.terms].sort((a, b) => b.length - a.length)[0];
+  const titles = i.naicsCodes.length ? [] : longest ? [longest] : (q.anyOf[0] ?? []).slice(0, 5);
+  const notSent = i.naicsCodes.length || longest ? [] : (q.anyOf[0] ?? []).slice(5);
   const r = await fetchSamOpportunities(cred, {
     naicsCodes: i.naicsCodes,
-    title: titleTerm,
+    titles,
     postedDaysBack: i.postedDaysBack,
     limit: i.limit,
     department: i.gsaOnly ? "General Services Administration" : undefined,
@@ -82,6 +89,7 @@ export async function findSamOpportunities(
   const counts: KeywordSearchCounts = {
     samTotal: r.samTotal,
     received: r.received,
+    truncated: r.truncated,
     otherTypes: folded.length - groups.length,
     folded: rows.length - folded.length,
     matched: 0,
@@ -89,11 +97,18 @@ export async function findSamOpportunities(
     noDescription: 0,
     unchecked: 0,
   };
-  const warning = r.failure ? `SAM.gov didn't answer for NAICS ${r.failedCodes.join(", ")}: ${r.failure.error}` : null;
+  const warning =
+    [
+      r.failure ? `SAM.gov didn't answer for ${r.failedCodes.join(", ")}: ${r.failure.error}` : "",
+      notSent.length ? `With no NAICS codes, SAM.gov is asked about the first 5 keywords only; not searched: ${notSent.map((t) => q.labels[t] ?? t).join(", ")}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ") || null;
+  const via = (g: { noticeId: string; earlierNoticeIds: string[] }) => [...new Set([g.noticeId, ...g.earlierNoticeIds].flatMap((id) => r.viaCodes[id] ?? []))];
 
   if (!keyworded) {
     counts.matched = groups.length;
-    return { ok: true, notices: withoutLinks(groups.map((g) => ({ ...g, match: null }))), unchecked: [], counts, warning };
+    return { ok: true, notices: withoutLinks(groups.map((g) => ({ ...g, viaCodes: via(g), match: null }))), unchecked: [], counts, warning };
   }
 
   // Title and agency first, for free — of every notice of the solicitation (an
@@ -115,7 +130,7 @@ export async function findSamOpportunities(
     const desc = read.get(g.noticeId) ?? null;
     const m = titleMatch.status === "unchecked" ? matchNotice({ title: g.title, agency: agency(g) }, q, desc) : titleMatch;
     const description = desc && "text" in desc ? desc.text : g.description;
-    const found: FoundNotice = { ...g, description, match: m };
+    const found: FoundNotice = { ...g, description, viaCodes: via(g), match: m };
     if (m.status === "match") notices.push(found);
     else if (m.status === "unchecked") unchecked.push(found);
     else if (m.status === "no_description") counts.noDescription++;

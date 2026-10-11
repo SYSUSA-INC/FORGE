@@ -63,7 +63,7 @@ import { flagSamResults } from "@/lib/recompete-radar";
 import { noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
 import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
 import { resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
-import { OPEN_NOTICE_TYPES, noticeAgency } from "@/lib/samgov-match";
+import { OPEN_NOTICE_TYPES, noticeAgency, parseKeyword } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
 import {
   awardExpiresWithin,
@@ -371,7 +371,8 @@ export async function runScoutForOrganization(input: {
       try {
         const r = await findSamOpportunities(sam.cred, {
           naicsCodes: s.naicsCodes,
-          keyword: s.keyword ?? undefined,
+          // BL-STAB-10b — each saved keyword is one phrase (+word / -word still apply).
+          query: s.keyword ? parseKeyword(s.keyword, [], { asList: true }) : undefined,
           noticeTypes: OPEN_NOTICE_TYPES,
           postedDaysBack: profile.postedDaysBack,
           limit: SAM_LIMIT,

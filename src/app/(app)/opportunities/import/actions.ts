@@ -12,7 +12,7 @@ import { flagSamResults } from "@/lib/recompete-radar";
 import { sanitizeSamImportRows } from "@/lib/sam-import-row";
 import { GSA_VEHICLES, noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
 import { resolveSamCredential } from "@/lib/samgov-key";
-import { hasKeyword, noticeAgency, parseKeyword, parseNoticeTypes, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
+import { hasKeyword, keywordLabel, noticeAgency, parseKeyword, parseNoticeTypes, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities, type FoundNotice } from "@/lib/samgov-search";
 
 export type ImportableOpportunity = FoundNotice & {
@@ -137,7 +137,7 @@ export async function loadSamGovOpportunitiesAction(input?: {
     opportunities: result.notices.map(decorate),
     unchecked: result.unchecked.map(decorate),
     counts: result.counts,
-    scope: { keyword: keyword || (vehicleKeywords.length ? vehicleKeywords.join(" or ") : null), codes: naicsCodes, days },
+    scope: { keyword: keyword || vehicleKeywords.length ? keywordLabel(parseKeyword(keyword, vehicleKeywords)) : null, codes: naicsCodes, days },
     warning:
       [allCodes > naicsCodes.length ? `Searched the first ${naicsCodes.length} of ${allCodes} NAICS codes (SAM.gov is asked once per code).` : "", result.warning ?? ""]
         .filter(Boolean)

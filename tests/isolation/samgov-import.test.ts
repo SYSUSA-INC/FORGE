@@ -119,6 +119,33 @@ describe("BL-STAB-10 — Import from SAM.gov checks the keyword itself", () => {
     expect(calls.filter((u) => u.pathname.endsWith("/search"))).toHaveLength(10);
   });
 
+  it("BL-STAB-10b — a comma list matches any item; each result names the keywords and the NAICS code it matched", async () => {
+    const byCode: Record<string, unknown[]> = {
+      "541519": [notice(21, { title: "ITSM tooling", description: "Moving to ServiceNow." }), notice(22, { title: "Help desk", description: "Tier 1." })],
+      "541512": [notice(23, { title: "Enterprise Service Management platform", description: "" })],
+    };
+    const calls: URL[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: URL | string) => {
+        const url = new URL(String(input));
+        calls.push(url);
+        const rows = byCode[url.searchParams.get("ncode") ?? ""] ?? [];
+        return json({ totalRecords: rows.length, opportunitiesData: rows });
+      }),
+    );
+    const res = await loadSamGovOpportunitiesAction({ naicsCodes: ["541519", "541512"], keyword: "Servicenow, ITSM, Enterprise Service Management" });
+    if (!res.ok) throw new Error(res.error);
+    const seen = Object.fromEntries(res.opportunities.map((o) => [o.title, [o.viaCodes, o.match?.status === "match" ? o.match.matched : []]]));
+    // A title match spends no SAM.gov request on the description, so only what was read is listed.
+    expect(seen).toEqual({
+      "ITSM tooling": [["541519"], [{ term: "ITSM", where: "title" }]],
+      "Enterprise Service Management platform": [["541512"], [{ term: "Enterprise Service Management", where: "title" }]],
+    });
+    expect(res.scope.keyword).toBe("any of “Servicenow”, “ITSM” or “Enterprise Service Management”");
+    expect(calls.filter((u) => u.pathname.endsWith("/search")).every((u) => !u.searchParams.has("title"))).toBe(true);
+  });
+
   it("'already imported' counts only this organization's opportunities, across a solicitation's notices", async () => {
     await db.insert(opportunities).values([
       { organizationId: fx.orgB.organizationId, title: "B's copy", noticeId: id(1) },
