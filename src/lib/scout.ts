@@ -64,7 +64,7 @@ import { noticeDescriptionUrl, type SamOpportunity } from "@/lib/samgov";
 import { descriptionsFor } from "@/lib/samgov-descriptions";
 import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
 import { resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
-import { OPEN_NOTICE_TYPES, noticeAgency, parseKeyword } from "@/lib/samgov-match";
+import { OPEN_NOTICE_TYPES, noticeAgency, parseKeyword, readableText } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
 import {
   awardExpiresWithin,
@@ -115,10 +115,6 @@ function parseDate(s: string | null | undefined): Date | null {
   if (!s) return null;
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function stripTags(s: string): string {
-  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function unique(list: string[]): string[] {
@@ -253,7 +249,7 @@ function fromSam(o: SamOpportunity, source: ScoutCandidateSource): CandidateDraf
     postedAt: parseDate(o.postedDate),
     responseDueAt: parseDate(o.responseDeadLine),
     placeOfPerformance: placeOf(o.placeOfPerformance).slice(0, 300),
-    description: stripTags(o.description ?? "").slice(0, 20_000),
+    description: readableText(o.description).slice(0, 20_000),
     uiLink: str(o.uiLink, 2_000),
   };
 }
@@ -453,7 +449,8 @@ export async function runScoutForOrganization(input: {
   // descriptions (BL-STAB-10b; free, even with no working key), then live,
   // newest first, within the key's per-search budget.
   if (freshSam.length > 0) {
-    const wanted = [...freshSam]
+    const wanted = freshSam
+      .filter((f) => !f.sam.description)
       .sort((a, b) => (Date.parse(b.sam.postedDate) || 0) - (Date.parse(a.sam.postedDate) || 0))
       .map((f) => f.sam.noticeId);
     const read = await descriptionsFor(descriptionCred, wanted, descriptionCred ? DESCRIPTION_READS[descriptionCred.source] : 0);
@@ -1035,7 +1032,7 @@ export async function decideScoutCandidate(input: {
     if (!description && c.source !== "watchlist_award" && noticeDescriptionUrl(c.noticeId)) {
       const sam = await resolveSamCredential(organizationId);
       const d = (await descriptionsFor(sam.ok ? sam.cred : null, [c.noticeId], 1)).get(c.noticeId);
-      if (d && "text" in d) description = d.text.slice(0, 20_000);
+      if (d && "text" in d) description = readableText(d.text).slice(0, 20_000);
     }
     const [opp] = await db
       .insert(opportunities)

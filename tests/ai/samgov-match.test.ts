@@ -10,13 +10,16 @@ import {
   hasKeyword,
   keywordLabel,
   findTerm,
+  gluedTerm,
   isWantedType,
   matchNotice,
+  mentionsExcluded,
   noticeTypeCode,
   parseKeyword,
   parseNoticeTypes,
   plainText,
   searchSummary,
+  withEarlierHit,
 } from "@/lib/samgov-match";
 
 const row = (title: string, agency = "VETERANS AFFAIRS, DEPARTMENT OF") => ({ title, agency });
@@ -136,6 +139,30 @@ describe("BL-STAB-10 — keywords", () => {
     expect(matchNotice(row("ServiceNow renewal"), both, { text: "Includes hardware…", partial: true })).toEqual({ status: "not_mentioned" });
     expect(matchNotice(row("ServiceNow renewal"), both, { text: "Licenses…", partial: true })).toEqual({ status: "unchecked" });
   });
+
+  it("BL-STAB-10b — FORGE's copy: escaped text, paragraphs run together, and earlier notices of a solicitation", () => {
+    const q = parseKeyword("ServiceNow");
+    // The copy's text is HTML-escaped when read: a literal "<" is text, not a tag.
+    expect(matchNotice(row("Help desk"), q, { text: "Response time &lt;4 hours. Migrate to ServiceNow. Uptime &gt;99.9% &amp; more." })).toMatchObject({ status: "match" });
+    // A keyword glued to a neighbouring word (a capital after a lower-case letter, or a digit) can't be settled from the copy.
+    expect(gluedTerm("BackgroundServiceNow is the tool.", q)).toBe(true);
+    expect(gluedTerm("Microsoft 365ServiceNow", q)).toBe(true);
+    expect(gluedTerm("The tool is ServiceNow.", q)).toBe(false);
+    expect(gluedTerm("Help desk.Support", parseKeyword("support"))).toBe(false);
+    expect(gluedTerm("No hardware here", parseKeyword("help, -Hardware"))).toBe(false);
+    expect(gluedTerm("Network refreshHardware", parseKeyword("help, -hardware"))).toBe(true);
+    // An excluded term in the latest notice beats a hit in an earlier one; a miss there doesn't.
+    const ex = parseKeyword("ServiceNow -hardware");
+    const earlier = matchNotice(row("Modules"), ex, { text: "ServiceNow modules." });
+    expect(earlier).toMatchObject({ status: "match" });
+    expect(mentionsExcluded(row("Amendment"), ex, { text: "Adds a hardware refresh." })).toBe(true);
+    expect(mentionsExcluded(row("Amendment"), ex, { text: "Due date moves." })).toBe(false);
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Adds a hardware refresh." }, earlier)).toEqual({ status: "not_mentioned" });
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Due date moves." }, earlier)).toBe(earlier);
+    expect(withEarlierHit(row("Amendment"), ex, { none: true }, earlier)).toBe(earlier);
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Due date…", partial: true }, earlier)).toEqual({ status: "unchecked" });
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Due date moves." }, null)).toEqual({ status: "not_mentioned" });
+  });
 });
 
 describe("BL-STAB-10 — one row per solicitation", () => {
@@ -191,8 +218,8 @@ describe("BL-STAB-10 — the owner's search (NAICS 541519 + ServiceNow)", () => 
     );
     // BL-STAB-10b — unchecked notices posted since the nightly file FORGE reads say so.
     const plain = { ...counts, otherTypes: 0, folded: 0, notMentioned: 0, noDescription: 0 };
-    expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet: new since SAM.gov's nightly file of 9 Oct\)\.$/);
-    expect(searchSummary({ ...plain, uncheckedNew: 3 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet — 3 new since SAM.gov's nightly file of 9 Oct\)\.$/);
+    expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet: posted after FORGE's nightly copy of SAM\.gov, which runs through 9 Oct\)\.$/);
+    expect(searchSummary({ ...plain, uncheckedNew: 3 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet — 3 of them posted after FORGE's nightly copy of SAM\.gov, which runs through 9 Oct\)\.$/);
     expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: null })).toMatch(/\(4 not checked yet\)\.$/);
   });
 });

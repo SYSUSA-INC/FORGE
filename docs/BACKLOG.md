@@ -557,14 +557,20 @@ mind. Bandage will come off but a true fix will stay."
       `sam_notice.reads` switch falls back to live reads):
       - a match in any notice of the solicitation counts; only the latest
         notice's whole description decides "doesn't mention it";
+      - an excluded term in the latest notice's text rules it out, and
+        an earlier notice's hit waits until the latest is known clear;
+      - stored text is HTML-escaped (a literal `<` is never a tag), and
+        a keyword glued to a neighbouring word there (paragraphs run
+        together) leaves the notice to a live read;
       - live reads only for notices posted since the file, link-only
-        ones and cut descriptions with no hit;
-      - results carry a 400-character preview, and the import takes the
-        whole text from the copy;
-      - Check more, the scout's finds and the scout's import read the
-        copy first (`descriptionsFor`);
-      - the results line says how many unchecked notices are new since
-        the file, and a copy over 48 h old is named in the warning.
+        ones and text the copy can't settle;
+      - results carry a 400-character `preview` apart from
+        `description`, so a failed copy read never saves a preview; the
+        import and the scout take whole text from the copy, else live
+        (`descriptionsFor`); Check more reads live first;
+      - the results line counts unchecked notices posted after the
+        copy, and a copy over 48 h old is named in the warning;
+      - store failures log the driver's code only (never the ids).
     - **10b-4:** log the key's remaining requests (rate-limit headers).
 - **BL-STAB-9 — The AI document review fails on a real
   solicitation.** ✅ shipped (9a PR #366, 9b PR #367).

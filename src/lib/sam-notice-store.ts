@@ -14,8 +14,13 @@ import { getPlatformSetting } from "@/lib/platform-settings";
  * "not in the copy", so searches fall back to reading SAM.gov live.
  */
 
-/** Text cut at SAM.gov's 32,000 characters is `partial`: a hit counts, a miss proves nothing. */
-export type StoredDescription = { text: string; partial: boolean } | { none: true };
+/**
+ * `text` is HTML-escaped, the shape of SAM.gov's live descriptions, so a
+ * literal "<" in the file's plain text is never taken for a tag. Cut at
+ * SAM.gov's 32,000 characters is `partial`: a hit counts, a miss proves
+ * nothing. `link`: in the file, but only as a link to SAM.gov.
+ */
+export type StoredDescription = { text: string; partial: boolean } | { none: true } | { link: true };
 
 export type NoticeStore = {
   on: boolean;
@@ -30,37 +35,56 @@ const LOOKUP_MS = 5_000;
 const CHUNK = 1_000;
 const OFF: NoticeStore = { on: false, fileOf: null, newestPostedAt: null, lookup: async () => new Map() };
 
-/** Resolves to `fallback` after `ms` (the query keeps running; the search stops waiting for it). */
-function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Resolves to `fallback` after `ms` (the search stops waiting; `onTimeout` lets the work stop too). */
+function within<T>(p: Promise<T>, ms: number, fallback: T, onTimeout = () => {}): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  return Promise.race([p, new Promise<T>((resolve) => (timer = setTimeout(() => resolve(fallback), ms)))]).finally(() => clearTimeout(timer));
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      onTimeout();
+      resolve(fallback);
+    }, ms);
+  });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}
+
+/** Never the error itself: drizzle's message lists the query's parameters, here notice ids. */
+function failure(err: unknown) {
+  const cause = (err as { cause?: unknown })?.cause ?? err;
+  return { code: (cause as { code?: string })?.code ?? null, reason: cause instanceof Error ? cause.message.slice(0, 200) : "unknown" };
 }
 
 async function lookup(noticeIds: string[]): Promise<Map<string, StoredDescription>> {
   const ids = [...new Set(noticeIds.map((id) => id.toLowerCase()).filter((id) => /^[0-9a-f]{32}$/.test(id)))];
   const out = new Map<string, StoredDescription>();
   if (ids.length === 0) return out;
+  let abandoned = false;
   const read = async () => {
-    for (let i = 0; i < ids.length; i += CHUNK) {
+    for (let i = 0; i < ids.length && !abandoned; i += CHUNK) {
       const rows = await db
         .select({ noticeId: samNotices.noticeId, state: samNotices.state, description: samNotices.description })
         .from(samNotices)
         .where(inArray(samNotices.noticeId, ids.slice(i, i + CHUNK)));
       for (const r of rows) {
-        // A link-only row is a miss: SAM.gov holds that description elsewhere.
         if (r.state === "none") out.set(r.noticeId, { none: true });
-        else if ((r.state === "text" || r.state === "truncated") && r.description) out.set(r.noticeId, { text: r.description, partial: r.state === "truncated" });
+        else if ((r.state === "text" || r.state === "truncated") && r.description) out.set(r.noticeId, { text: escapeHtml(r.description), partial: r.state === "truncated" });
+        else out.set(r.noticeId, { link: true });
       }
     }
     return true;
   };
   const done = await within(
     read().catch((err) => {
-      log.warn("[sam-store]", "lookup failed", { error: err });
+      log.warn("[sam-store]", "lookup failed", { asked: ids.length, ...failure(err) });
       return false;
     }),
     LOOKUP_MS,
     false,
+    () => {
+      abandoned = true;
+      log.warn("[sam-store]", "lookup timed out", { asked: ids.length });
+    },
   );
   if (!done) return new Map();
   let partial = 0;
@@ -72,25 +96,24 @@ async function lookup(noticeIds: string[]): Promise<Map<string, StoredDescriptio
 /** The copy as searches see it now: off (switched off, never loaded, or unreachable) reads nothing. */
 export async function noticeStore(): Promise<NoticeStore> {
   try {
-    const status = within(
+    const last = await within(
       (async () => {
         if ((await getPlatformSetting("sam_notice.reads", "on")) === "off") return null;
-        const [last] = await db
+        const [run] = await db
           .select({ fileOf: samNoticeLoadRuns.sourceModifiedAt, newestPostedAt: samNoticeLoadRuns.newestPostedAt })
           .from(samNoticeLoadRuns)
           .where(inArray(samNoticeLoadRuns.status, ["ok", "unchanged"]))
           .orderBy(desc(samNoticeLoadRuns.startedAt))
           .limit(1);
-        return last ?? null;
+        return run ?? null;
       })(),
       LOOKUP_MS,
       null,
     );
-    const last = await status;
     if (!last) return OFF;
     return { on: true, fileOf: last.fileOf, newestPostedAt: last.newestPostedAt, lookup };
   } catch (err) {
-    log.warn("[sam-store]", "status failed", { error: err });
+    log.warn("[sam-store]", "status failed", failure(err));
     return OFF;
   }
 }

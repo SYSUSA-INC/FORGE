@@ -7,7 +7,9 @@ import {
   collapseBySolicitation,
   hasKeyword,
   isWantedType,
+  gluedTerm,
   matchNotice,
+  mentionsExcluded,
   noticeAgency,
   parseKeyword,
   plainText,
@@ -16,6 +18,7 @@ import {
   type KeywordSearchCounts,
   type NoticeMatch,
   type NoticeTypeCode,
+  withEarlierHit,
 } from "@/lib/samgov-match";
 
 /**
@@ -43,14 +46,30 @@ function preview(text: string): string {
   return t.length > PREVIEW ? `${t.slice(0, PREVIEW).trimEnd()}…` : t;
 }
 
-function asDescription(s: StoredDescription | undefined): DescriptionState | null {
-  if (!s) return null;
+/** A stored description as matching sees it; a link-only row is a miss. */
+function asDescription(s: StoredDescription | undefined, q: KeywordQuery | null): DescriptionState | null {
+  if (!s || "link" in s) return null;
   if ("none" in s) return { none: true };
-  return s.partial ? { text: s.text, partial: true } : { text: s.text };
+  // The copy runs paragraphs together: a term glued to a neighbouring word leaves it undecided.
+  return s.partial || (q && gluedTerm(s.text, q)) ? { text: s.text, partial: true } : { text: s.text };
 }
 
-/** `viaCodes`: which of the searched NAICS codes returned the solicitation (BL-STAB-10b). */
-export type FoundNotice = SamOpportunity & { earlierNoticeIds: string[]; viaCodes: string[]; match: NoticeMatch | null };
+/**
+ * `viaCodes`: which of the searched NAICS codes returned the solicitation (BL-STAB-10b).
+ * `preview`: the start of the description FORGE's copy holds, for display only (the
+ * import reads the whole text; `description` stays empty unless SAM.gov was read live).
+ * `afterCopy`: unchecked, and posted after the newest notice in the copy.
+ * `earlierMatch`: unchecked, with a hit in an earlier notice that counts once the
+ * latest notice is read and names no excluded term (withEarlierHit).
+ */
+export type FoundNotice = SamOpportunity & {
+  earlierNoticeIds: string[];
+  viaCodes: string[];
+  match: NoticeMatch | null;
+  preview?: string;
+  afterCopy?: true;
+  earlierMatch?: NoticeMatch;
+};
 
 export type SamSearchResult = {
   ok: true;
@@ -138,8 +157,8 @@ export async function findSamOpportunities(
     // A preview of each stored description, so the list reads like SAM.gov's.
     const stored = await store.lookup(groups.map((g) => g.noticeId));
     const withText = groups.map((g) => {
-      const d = asDescription(stored.get(g.noticeId.toLowerCase()));
-      return { ...g, description: d && "text" in d ? preview(d.text) : g.description, viaCodes: via(g), match: null };
+      const d = asDescription(stored.get(g.noticeId.toLowerCase()), null);
+      return { ...g, viaCodes: via(g), match: null, ...(d && "text" in d ? { preview: preview(d.text) } : {}) };
     });
     return { ok: true, notices: withoutLinks(withText), unchecked: [], counts, warning, copyThrough };
   }
@@ -154,22 +173,32 @@ export async function findSamOpportunities(
   });
 
   // Then FORGE's copy, for free: a match in any notice's description counts; only the
-  // latest notice's whole description can decide that the solicitation doesn't mention it.
+  // latest notice's whole description can decide that the solicitation doesn't mention it,
+  // and an excluded term in it rules the solicitation out whatever earlier notices say.
   const stored = await store.lookup(first.flatMap((x) => x.members.map((o) => o.noticeId)));
-  const storedOf = (id: string) => asDescription(stored.get(id.toLowerCase()));
+  const storedOf = (id: string) => asDescription(stored.get(id.toLowerCase()), q);
   const decided = first.map(({ g, members, m }) => {
     const own = storedOf(g.noticeId);
-    if (m.status !== "unchecked") return { g, m, desc: own };
-    for (const o of members) {
-      const d = storedOf(o.noticeId);
-      const hit = d ? matchNotice({ title: o.title, agency: agency(o) }, q, d) : null;
-      if (hit?.status === "match") return { g, m: hit, desc: own };
-    }
-    return { g, m: own ? matchNotice({ title: g.title, agency: agency(g) }, q, own) : m, desc: own };
+    const latest = { title: g.title, agency: agency(g) };
+    if (m.status !== "unchecked") return { g, m, desc: own, earlier: null };
+    const mine = own ? matchNotice(latest, q, own) : m;
+    if (mine.status === "match" || (own && mentionsExcluded(latest, q, own))) return { g, m: mine, desc: own, earlier: null };
+    const earlier =
+      members
+        .slice(1)
+        .map((o) => {
+          const d = storedOf(o.noticeId);
+          return d ? matchNotice({ title: o.title, agency: agency(o) }, q, d) : null;
+        })
+        .find((h) => h?.status === "match") ?? null;
+    // With excluded terms, an earlier hit counts once the latest text is known to be clear of them.
+    if (earlier && (q.excluded.length === 0 || mine.status !== "unchecked")) return { g, m: earlier, desc: own, earlier: null };
+    return { g, m: mine, desc: own, earlier };
   });
 
   // Then SAM.gov live for what the copy couldn't decide (posted since the file, only a link
-  // there, or cut at 32,000 characters with no hit): one request each, newest first.
+  // there, cut at 32,000 characters or run together with no hit, or an earlier hit waiting
+  // on the latest notice's excluded terms): one request each, newest first.
   const toRead = decided.filter((x) => x.m.status === "unchecked").map((x) => x.g);
   const read = await readNoticeDescriptions(cred, toRead, budget);
 
@@ -180,14 +209,25 @@ export async function findSamOpportunities(
     const { g } = x;
     let { m } = x;
     const live = m.status === "unchecked" ? read.get(g.noticeId) : undefined;
-    if (live && !("unread" in live)) m = matchNotice({ title: g.title, agency: agency(g) }, q, live);
-    // Live text in full, as before; stored text as a preview (the import reads the rest).
-    const description = live && "text" in live ? live.text : x.desc && "text" in x.desc ? preview(x.desc.text) : g.description;
-    const found: FoundNotice = { ...g, description, viaCodes: via(g), match: m };
+    const latest = { title: g.title, agency: agency(g) };
+    if (live && !("unread" in live)) m = withEarlierHit(latest, q, live, x.earlier);
+    // Live text in full, as before; stored text only as a preview (the import reads the whole).
+    const shown = !(live && "text" in live) && x.desc && "text" in x.desc ? { preview: preview(x.desc.text) } : {};
+    const afterCopy = m.status === "unchecked" && !!copyThrough && !stored.has(g.noticeId.toLowerCase()) && (g.postedDate ?? "").slice(0, 10) >= copyThrough;
+    const pending = m.status === "unchecked" && x.earlier ? { earlierMatch: x.earlier } : {};
+    const found: FoundNotice = {
+      ...g,
+      description: live && "text" in live ? live.text : g.description,
+      viaCodes: via(g),
+      match: m,
+      ...shown,
+      ...pending,
+      ...(afterCopy ? { afterCopy: true as const } : {}),
+    };
     if (m.status === "match") notices.push(found);
     else if (m.status === "unchecked") {
       unchecked.push(found);
-      if (copyThrough && (g.postedDate ?? "").slice(0, 10) >= copyThrough) uncheckedNew++;
+      if (afterCopy) uncheckedNew++;
     } else if (m.status === "no_description") counts.noDescription++;
     else counts.notMentioned++;
   }

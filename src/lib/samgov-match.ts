@@ -158,6 +158,23 @@ export function plainText(s: string | null | undefined): string {
     .trim();
 }
 
+/**
+ * BL-STAB-10b — a description (SAM.gov's HTML, or FORGE's copy, escaped to
+ * the same shape) as text to keep: paragraph and line ends become line
+ * breaks, tags go, entities are decoded.
+ */
+export function readableText(s: string | null | undefined): string {
+  return (s ?? "")
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/\s*(p|div|li|tr|h[1-6])\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(amp|lt|gt|quot|apos|nbsp|#39);/g, (_, e: string) => ENTITIES[e] ?? " ")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ ?\n ?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function norm(s: string): string {
   return plainText(s).toLowerCase();
 }
@@ -241,6 +258,46 @@ export function matchNotice(row: { title: string; agency: string }, q: KeywordQu
   return desc && "none" in desc ? { status: "no_description" } : { status: "not_mentioned" };
 }
 
+/** Whether an excluded (-word) term appears in the title, agency or the text read so far. */
+export function mentionsExcluded(row: { title: string; agency: string }, q: KeywordQuery, desc: DescriptionState | null): boolean {
+  if (q.excluded.length === 0) return false;
+  return matchNotice(row, { ...q, terms: [], anyOf: [] }, desc).status === "not_mentioned";
+}
+
+/**
+ * BL-STAB-10b — the latest notice of a solicitation, read: its own match,
+ * else a hit in an earlier notice's description, unless the latest notice
+ * names an excluded term (or wasn't read in full).
+ */
+export function withEarlierHit(row: { title: string; agency: string }, q: KeywordQuery, desc: DescriptionState, earlier: NoticeMatch | null | undefined): NoticeMatch {
+  const mine = matchNotice(row, q, desc);
+  return mine.status === "match" || mine.status === "unchecked" || !earlier || mentionsExcluded(row, q, desc) ? mine : earlier;
+}
+
+/**
+ * BL-STAB-10b — FORGE's copy of SAM.gov's descriptions runs paragraphs
+ * together ("BackgroundServiceNow is…"): whether a keyword, list item or
+ * excluded term sits glued to a neighbouring word there (a lower-case
+ * letter before a capital, or a digit against a letter), so only SAM.gov's
+ * own text can settle it.
+ */
+export function gluedTerm(text: string, q: KeywordQuery): boolean {
+  const plain = plainText(text);
+  const lower = plain.toLowerCase();
+  if (lower.length !== plain.length) return false;
+  const soft = (i: number) => {
+    const a = plain[i - 1] ?? "";
+    const b = plain[i] ?? "";
+    return (/[a-z]/.test(a) && /[A-Z]/.test(b)) || (/[0-9]/.test(a) && /[A-Za-z]/.test(b)) || (/[A-Za-z]/.test(a) && /[0-9]/.test(b));
+  };
+  for (const term of [...q.terms, ...q.anyOf.flat(), ...q.excluded]) {
+    for (let at = lower.indexOf(term); at !== -1; at = lower.indexOf(term, at + 1)) {
+      if (soft(at) || soft(at + term.length)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * One row per solicitation number: SAM.gov posts each amendment or award
  * as its own notice. The latest (by posted date) stands for the group; the
@@ -278,7 +335,7 @@ export type KeywordSearchCounts = {
   notMentioned: number;
   noDescription: number;
   unchecked: number;
-  /** BL-STAB-10b — of the unchecked, those posted since FORGE's copy of SAM.gov's descriptions. */
+  /** BL-STAB-10b — of the unchecked, those posted after the newest notice in FORGE's copy (so not in it). */
   uncheckedNew?: number;
 };
 
@@ -288,10 +345,11 @@ export type KeywordSearchCounts = {
  */
 export function searchSummary(c: KeywordSearchCounts, i: { keyword: string | null; codes: string[]; days: number; copyThrough?: string | null }): string {
   const n = (v: number) => v.toLocaleString("en-US");
-  // BL-STAB-10b — why a notice can still be unchecked: posted after the nightly file FORGE reads.
-  const fileOf = i.copyThrough ? new Date(`${i.copyThrough}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
+  // BL-STAB-10b — why a notice can still be unchecked: posted after FORGE's nightly copy.
+  const through = i.copyThrough ? new Date(`${i.copyThrough}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
   const fresh = c.uncheckedNew ?? 0;
-  const since = fileOf && fresh > 0 ? (fresh >= c.unchecked ? `: new since SAM.gov's nightly file of ${fileOf}` : ` — ${n(fresh)} new since SAM.gov's nightly file of ${fileOf}`) : "";
+  const copy = `FORGE's nightly copy of SAM.gov, which runs through ${through}`;
+  const since = through && fresh > 0 ? (fresh >= c.unchecked ? `: posted after ${copy}` : ` — ${n(fresh)} of them posted after ${copy}`) : "";
   const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
   const scope = `${i.codes.length ? `NAICS ${i.codes.join(", ")}` : "all NAICS codes"}, posted in the last ${i.days} days`;
   const extra = [
