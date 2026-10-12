@@ -4,7 +4,7 @@
  * chunks; header by name; description states; notice ids.
  */
 import { describe, expect, it } from "vitest";
-import { classifyDescription, csvParser, decodeCp1252, readHeader, toNotice } from "@/lib/sam-notice-csv";
+import { classifyDescription, compareDescriptions, csvParser, decodeCp1252, readHeader, toNotice } from "@/lib/sam-notice-csv";
 
 const FIXTURE = [
   '"NoticeId","Title","PostedDate","Active","Description"',
@@ -54,5 +54,15 @@ describe("BL-STAB-10b — SAM.gov's notice file", () => {
     expect(classifyDescription("https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=x")).toEqual({ state: "link", description: null });
     expect(classifyDescription(`${"x".repeat(32_000)}...`).state).toBe("truncated");
     expect(classifyDescription("null")).toEqual({ state: "none", description: null });
+  });
+
+  it("compares a stored description with SAM.gov's live one as letters and digits only", () => {
+    const text = { state: "text", description: "Help desk, Tier 1.Support" };
+    expect(compareDescriptions(text, { text: "<p>Help desk, Tier&nbsp;1.</p>\n<p>Support</p>" })).toBe("same");
+    expect(compareDescriptions(text, { text: "Help desk, Tier 2." })).toBe("different");
+    expect(compareDescriptions({ state: "truncated", description: "Long text..." }, { text: "Long text that goes on" })).toBe("same");
+    expect(compareDescriptions({ state: "none", description: null }, { text: "Something" })).toBe("missing_in_file");
+    expect(compareDescriptions(text, { none: true })).toBe("not_at_sam");
+    expect(compareDescriptions(text, { unread: true })).toBe("unread");
   });
 });

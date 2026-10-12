@@ -77,7 +77,7 @@ Effort key:
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e queued |
-| 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions in PR #379 |
+| 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
@@ -537,15 +537,18 @@ mind. Bandage will come off but a true fix will stay."
       NAICS codes that found it; with no codes, one title search per item
       (five at most) counted once; a truncated SAM.gov answer still says
       so; saved scout keywords are phrases.
-    - **10b-2a (PR #379):** a nightly copy of the public file in a
+    - **10b-2a (shipped, PR #379):** a nightly copy of the public file in a
       platform table (`sam_notice`, migration 0129, no company data): a
       streaming Windows-1252 CSV reader (`sam-notice-csv.ts`, pure) and
       the only writer (`sam-notice-load.ts`) — conditional download, only
       changed rows written, gone rows marked on a whole file and purged
       after 30 days, cut or malformed files never mark anything gone —
       run by `/api/cron/sam-notices` at 04:20, 06:20 and 08:20 UTC.
-    - **10b-2b:** an admin page with the load's runs, switches and a
-      spot-check against SAM.gov.
+    - **10b-2b (PR #380):** `/admin/sam-notices` — what the copy holds
+      by state, the file's date (red after 48 h), the last 14 runs, **Run
+      load now**, the two switches (`sam_notice.load`, `sam_notice.reads`)
+      and a spot-check of 13 stored notices against SAM.gov on the shared
+      key (three a day; counts only, compared as letters and digits).
     - **10b-3:** searches read the copy first; live reads only for
       notices posted since the last file; lighter results.
     - **10b-4:** log the key's remaining requests (rate-limit headers).
