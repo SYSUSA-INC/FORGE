@@ -9,16 +9,42 @@ import type { SamErrorClass } from "@/lib/samgov-errors";
 export const SAM_KEY_TEST_LIMITS = { perUserPerHour: 10, perOrgPerHour: 5 } as const;
 
 const KEY_SHAPE = /^[A-Za-z0-9._-]{20,128}$/;
+/** Characters a copy can carry that nobody sees: zero-width spaces and joiners, byte-order marks, soft hyphens. */
+const INVISIBLE = /[­᠎​-‏‪-‮⁠-⁤﻿]/g;
+/** Words of the label a key may be copied with. */
+const LABEL = /^(public|api|key|apikey|api_key|sam|gov|sam\.gov|your|is|the)$/i;
 
+/**
+ * BL-STAB-7b — a pasted key, cleaned up the way a copy from SAM.gov's
+ * Account Details page goes wrong: invisible characters, surrounding
+ * quotes or a label ("API Key: …"), or a key wrapped onto two lines. A
+ * refusal says what is wrong (by its length or kind of character), never
+ * any part of what was pasted.
+ */
 export function validateSamKeyInput(raw: unknown): { ok: true; key: string } | { ok: false; error: string } {
-  const key = typeof raw === "string" ? raw.trim() : "";
-  if (!KEY_SHAPE.test(key)) {
+  const text = (typeof raw === "string" ? raw : "").replace(INVISIBLE, "").trim();
+  if (!text) return { ok: false, error: "Paste the key first." };
+  if (KEY_SHAPE.test(text)) return { ok: true, key: text };
+  const tokens = text.split(/[\s:=,;"'`<>()[\]{}]+/).filter(Boolean);
+  const candidates = tokens.filter((t) => KEY_SHAPE.test(t));
+  // The key with only a label or quotes around it ("Public API Key: …"); anything else might be part of the key.
+  if (candidates.length === 1 && tokens.every((t) => t === candidates[0] || LABEL.test(t))) return { ok: true, key: candidates[0]! };
+  // A key wrapped onto several lines, with nothing else in it.
+  const joined = text.replace(/\s+/g, "");
+  if (/^[A-Za-z0-9._-]+([ \t]*\r?\n[ \t]*[A-Za-z0-9._-]+)+$/.test(text) && KEY_SHAPE.test(joined)) return { ok: true, key: joined };
+  const tail = "Copy it again from SAM.gov (sign in → Account Details → Public API Key) and paste only the key.";
+  if (candidates.length > 0) return { ok: false, error: `That holds more than the key. ${tail}` };
+  if (/[^A-Za-z0-9._\-\s]/.test(text)) {
     return {
       ok: false,
-      error: "That doesn't look like a SAM.gov API key. Paste the key exactly as SAM.gov shows it (letters, digits and dashes, no spaces).",
+      error: `That has symbols or characters a SAM.gov API key doesn't use (it is about 40 letters and digits). If your browser or password manager filled the box, ${tail.charAt(0).toLowerCase()}${tail.slice(1)}`,
     };
   }
-  return { ok: true, key };
+  const n = joined.length;
+  return {
+    ok: false,
+    error: n < 20 ? `That's only ${n} characters; a SAM.gov API key is about 40. ${tail}` : `That's ${n} characters, more than a SAM.gov API key (about 40). ${tail}`,
+  };
 }
 
 export function maskLast4(last4: string): string {

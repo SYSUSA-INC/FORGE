@@ -88,6 +88,33 @@ describe("BL-STAB-7b — a company's SAM.gov key: shape and save outcomes", () =
     }
   });
 
+  it("cleans up a key copied with invisible characters, a label, quotes or a line break, and says what's wrong otherwise", () => {
+    for (const pasted of [
+      `​${SECRET}﻿`,
+      `Public API Key: ${SECRET}`,
+      `"${SECRET}"`,
+      `api_key=${SECRET}`,
+      `${SECRET.slice(0, 25)}\n${SECRET.slice(25)}`,
+      `${SECRET.slice(0, 25)} \r\n ${SECRET.slice(25)}`,
+    ]) expect(validateSamKeyInput(pasted), JSON.stringify(pasted)).toEqual({ ok: true, key: SECRET });
+    const why = (raw: unknown) => {
+      const r = validateSamKeyInput(raw);
+      if (r.ok) throw new Error(`accepted ${JSON.stringify(raw)}`);
+      return r.error;
+    };
+    expect(why("")).toBe("Paste the key first.");
+    expect(why(null)).toBe("Paste the key first.");
+    expect(why("​ ")).toBe("Paste the key first.");
+    expect(why("short")).toMatch(/^That's only 5 characters; a SAM\.gov API key is about 40\./);
+    expect(why("x".repeat(129))).toMatch(/^That's 129 characters, more than a SAM\.gov API key/);
+    // What a password manager fills in: symbols.
+    expect(why("Xy7#kP2!mQ9$wR4&tZ8^")).toMatch(/^That has symbols or characters a SAM\.gov API key doesn't use .* If your browser or password manager filled the box/);
+    // Part of a key beside something else: never guessed at.
+    expect(why(`${SECRET.slice(0, 10)} ${SECRET.slice(10)}`)).toMatch(/^That holds more than the key\./);
+    expect(why(`Key ${SECRET} and ${SECRET}`)).toMatch(/^That holds more than the key\./);
+    for (const bad of ["Xy7#kP2!mQ9$wR4&tZ8^", `${SECRET.slice(0, 10)} ${SECRET.slice(10)}`]) expect(why(bad)).not.toContain(bad.slice(0, 6));
+  });
+
   it("saves only a key SAM.gov recognised, and says so", () => {
     expect(saveOutcome({ ok: true })).toEqual({ save: true, status: "ok", verified: true });
     expect(saveOutcome({ ok: false, cls: "rate_limited" })).toEqual({ save: true, status: "rate_limited", verified: false });

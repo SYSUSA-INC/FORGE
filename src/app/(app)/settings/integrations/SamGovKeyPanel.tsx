@@ -25,6 +25,7 @@ const day = (iso: string) => iso.slice(0, 10);
  */
 export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKeyPanelView; canEdit: boolean; isImpersonating: boolean }) {
   const [key, setKey] = useState("");
+  const [shown, setShown] = useState(false);
   const [status, setStatus] = useState<{ kind: "idle" } | { kind: "ok" | "err"; message: string }>({ kind: "idle" });
   const [pending, startTransition] = useTransition();
   const company = view.company;
@@ -39,6 +40,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
         setStatus({ kind: "err", message: "FORGE didn't answer. Check your connection and try again." });
       } finally {
         setKey("");
+        setShown(false);
       }
     });
   }
@@ -100,16 +102,28 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
             <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">New SAM.gov API key</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              spellCheck={false}
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              disabled={pending}
-              placeholder="Paste the key — SAM.gov checks it before it is saved"
-              className="aur-input font-mono text-[12px]"
-            />
+            <span className="flex items-center gap-2">
+              {/* Not a password: no browser or password-manager suggestions, which fill the box with something else (BL-STAB-7b). */}
+              <input
+                type={shown ? "text" : "password"}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore="true"
+                data-form-type="other"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                disabled={pending}
+                placeholder="Paste the key — SAM.gov checks it before it is saved"
+                className="aur-input min-w-0 flex-1 font-mono text-[12px]"
+              />
+              <button type="button" disabled={pending || !key} onClick={() => setShown((v) => !v)} className="font-mono text-[10px] text-muted underline disabled:opacity-40">
+                {shown ? "Hide" : "Show"}
+              </button>
+            </span>
           </label>
           <button type="button" disabled={pending || !key.trim()} onClick={() => run(() => setCompanySamKeyAction({ key }))} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
             {pending ? "Testing with SAM.gov…" : "Test and save"}
