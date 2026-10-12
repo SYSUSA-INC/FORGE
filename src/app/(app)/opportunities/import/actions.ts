@@ -123,7 +123,8 @@ export async function loadSamGovOpportunitiesAction(input?: {
   // already decided. Best-effort: a failure here never blocks the list.
   let recompeteFlags: Record<string, RecompeteFlag> = {};
   try {
-    recompeteFlags = await flagSamResults(organizationId, all);
+    // Notices decided from FORGE's copy carry only a preview: flag them on its text (BL-STAB-10b).
+    recompeteFlags = await flagSamResults(organizationId, all.map((o) => (o.description || !result.storedText.has(o.noticeId) ? o : { ...o, description: result.storedText.get(o.noticeId)! })));
   } catch (err) {
     log.warn("[samgov-import]", "recompete flagging failed", { error: err });
   }

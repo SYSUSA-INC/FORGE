@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { samNoticeLoadRuns, samNotices } from "@/db/schema";
 import { log } from "@/lib/log";
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { escapeHtml } from "@/lib/samgov-match";
 
 /**
  * BL-STAB-10b — searches read FORGE's copy of SAM.gov's notice
@@ -34,8 +35,6 @@ export type NoticeStore = {
 const LOOKUP_MS = 5_000;
 const CHUNK = 1_000;
 const OFF: NoticeStore = { on: false, fileOf: null, newestPostedAt: null, lookup: async () => new Map() };
-
-const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Resolves to `fallback` after `ms` (the search stops waiting; `onTimeout` lets the work stop too). */
 function within<T>(p: Promise<T>, ms: number, fallback: T, onTimeout = () => {}): Promise<T> {
