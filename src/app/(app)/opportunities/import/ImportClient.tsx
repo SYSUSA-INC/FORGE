@@ -15,7 +15,7 @@ import {
 } from "./actions";
 
 /** BL-STAB-10 — a search's counts and scope, and the keyword and vehicle names its results were checked against. */
-type Search = { counts: KeywordSearchCounts; scope: { keyword: string | null; codes: string[]; days: number }; query: { keyword: string; anyOf: string[] }; warning: string | null };
+type Search = { counts: KeywordSearchCounts; scope: { keyword: string | null; codes: string[]; days: number; copyThrough: string | null }; query: { keyword: string; anyOf: string[] }; warning: string | null };
 
 export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: string[]; autoSearch: boolean }) {
   const router = useRouter();
@@ -98,9 +98,12 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
       for (const o of batch) {
         const desc = res.descriptions[o.noticeId];
         if (!desc || "unread" in desc) continue;
+        const m = matchNotice({ title: o.title, agency: noticeAgency(o) }, q, desc);
+        // Only the start of the text, with no hit: still not checked.
+        if (m.status === "unchecked") continue;
         done.add(o.noticeId);
         counts.unchecked--;
-        const m = matchNotice({ title: o.title, agency: noticeAgency(o) }, q, desc);
+        if (searchInfo.scope.copyThrough && (o.postedDate ?? "").slice(0, 10) >= searchInfo.scope.copyThrough && counts.uncheckedNew) counts.uncheckedNew--;
         if (m.status === "match") {
           found.push({ ...o, description: "text" in desc ? desc.text : "", match: m });
           counts.matched++;

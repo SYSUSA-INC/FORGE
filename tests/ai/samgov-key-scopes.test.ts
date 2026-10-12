@@ -29,6 +29,7 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
       "src/lib/sam-notice-load.ts",
       "src/app/api/cron/sam-notices/route.ts",
       "src/lib/sam-notice-admin.ts",
+      "src/lib/sam-notice-store.ts",
       ...walk("src/app/(app)/admin/sam-notices"),
       ...walk("src/app/(app)/admin/sba-8a"),
     ];

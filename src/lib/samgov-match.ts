@@ -178,7 +178,8 @@ export function findTerm(text: string, term: string): number {
   return -1;
 }
 
-export type DescriptionState = { text: string } | { none: true } | { unread: true };
+/** `partial`: only the start of the text (FORGE's copy cuts at 32,000 characters) — a hit counts, a miss proves nothing. */
+export type DescriptionState = { text: string; partial?: true } | { none: true } | { unread: true };
 
 export type NoticeWhere = "title" | "agency" | "description";
 
@@ -208,7 +209,8 @@ export function matchNotice(row: { title: string; agency: string }, q: KeywordQu
     { where: "title", text: plainText(row.title) },
     { where: "agency", text: plainText(row.agency) },
   ];
-  const read = desc !== null && !("unread" in desc);
+  // Read in full: only then can a missing keyword or an excluded one be ruled out.
+  const read = desc !== null && !("unread" in desc) && !("partial" in desc && desc.partial);
   if (desc && "text" in desc && desc.text.trim()) fields.push({ where: "description", text: plainText(desc.text) });
   const lower = fields.map((f) => f.text.toLowerCase());
   const locate = (term: string) => {
@@ -276,14 +278,20 @@ export type KeywordSearchCounts = {
   notMentioned: number;
   noDescription: number;
   unchecked: number;
+  /** BL-STAB-10b — of the unchecked, those posted since FORGE's copy of SAM.gov's descriptions. */
+  uncheckedNew?: number;
 };
 
 /**
  * The results line the Import page shows (tested here, so the wording is
  * true). `keyword` is the quoted label (keywordLabel), or null.
  */
-export function searchSummary(c: KeywordSearchCounts, i: { keyword: string | null; codes: string[]; days: number }): string {
+export function searchSummary(c: KeywordSearchCounts, i: { keyword: string | null; codes: string[]; days: number; copyThrough?: string | null }): string {
   const n = (v: number) => v.toLocaleString("en-US");
+  // BL-STAB-10b — why a notice can still be unchecked: posted after the nightly file FORGE reads.
+  const fileOf = i.copyThrough ? new Date(`${i.copyThrough}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
+  const fresh = c.uncheckedNew ?? 0;
+  const since = fileOf && fresh > 0 ? (fresh >= c.unchecked ? `: new since SAM.gov's nightly file of ${fileOf}` : ` — ${n(fresh)} new since SAM.gov's nightly file of ${fileOf}`) : "";
   const plural = (v: number, one: string, many = `${one}s`) => `${n(v)} ${v === 1 ? one : many}`;
   const scope = `${i.codes.length ? `NAICS ${i.codes.join(", ")}` : "all NAICS codes"}, posted in the last ${i.days} days`;
   const extra = [
@@ -296,7 +304,7 @@ export function searchSummary(c: KeywordSearchCounts, i: { keyword: string | nul
   const why = [
     c.notMentioned > 0 ? `${n(c.notMentioned)} don't mention it` : "",
     c.noDescription > 0 ? `${n(c.noDescription)} have no description` : "",
-    c.unchecked > 0 ? `${n(c.unchecked)} not checked yet` : "",
+    c.unchecked > 0 ? `${n(c.unchecked)} not checked yet${since}` : "",
   ].filter(Boolean);
   return `${plural(c.matched, "notice")} ${c.matched === 1 ? "mentions" : "mention"} ${i.keyword} · out of ${plural(c.samTotal, "notice")} SAM.gov has for ${scope}${why.length ? ` (${why.join(", ")})` : ""}${tail}.`;
 }

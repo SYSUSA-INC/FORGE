@@ -126,6 +126,16 @@ describe("BL-STAB-10 — keywords", () => {
     expect(matchNotice(row("Multiple Award Schedule"), mas, null)).toMatchObject({ status: "match", where: "title" });
     expect(matchNotice(row("Help desk"), mas, { text: "Under OASIS+." })).toEqual({ status: "not_mentioned" });
   });
+
+  it("BL-STAB-10b — the start of a description (cut at 32,000 characters): a hit counts, a miss proves nothing", () => {
+    const q = parseKeyword("ServiceNow");
+    expect(matchNotice(row("Help desk"), q, { text: "ServiceNow licenses…", partial: true })).toMatchObject({ status: "match", where: "description" });
+    expect(matchNotice(row("Help desk"), q, { text: "Hardware…", partial: true })).toEqual({ status: "unchecked" });
+    // An excluded term found rules it out; not found, the rest of the text might hold it.
+    const both = parseKeyword("ServiceNow -hardware");
+    expect(matchNotice(row("ServiceNow renewal"), both, { text: "Includes hardware…", partial: true })).toEqual({ status: "not_mentioned" });
+    expect(matchNotice(row("ServiceNow renewal"), both, { text: "Licenses…", partial: true })).toEqual({ status: "unchecked" });
+  });
 });
 
 describe("BL-STAB-10 — one row per solicitation", () => {
@@ -179,5 +189,10 @@ describe("BL-STAB-10 — the owner's search (NAICS 541519 + ServiceNow)", () => 
     expect(searchSummary({ ...counts, matched: 1, samTotal: 2412, received: 1000, truncated: true }, { keyword: null, codes: [], days: 7 })).toBe(
       "1 notice for all NAICS codes, posted in the last 7 days · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in · SAM.gov sends at most 1,000 notices per request; FORGE read 1,000 of 2,412: narrow the search or the window to see the rest.",
     );
+    // BL-STAB-10b — unchecked notices posted since the nightly file FORGE reads say so.
+    const plain = { ...counts, otherTypes: 0, folded: 0, notMentioned: 0, noDescription: 0 };
+    expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet: new since SAM.gov's nightly file of 9 Oct\)\.$/);
+    expect(searchSummary({ ...plain, uncheckedNew: 3 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet — 3 new since SAM.gov's nightly file of 9 Oct\)\.$/);
+    expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: null })).toMatch(/\(4 not checked yet\)\.$/);
   });
 });
