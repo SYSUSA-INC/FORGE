@@ -144,7 +144,8 @@ export type SpotCheckResult = "same" | "different" | "missing_in_file" | "not_at
  * BL-STAB-10b — how a stored description compares with SAM.gov's live one
  * (the admin spot-check). The file's text has its HTML removed and
  * paragraphs run together, so both are compared as letters and digits
- * only; a truncated one must be the start of the live text.
+ * only; a truncated one must be the start of the live text. Only the live
+ * text is HTML: the stored text keeps its literal "<" and ">".
  */
 export function compareDescriptions(
   stored: { state: string; description: string | null },
@@ -153,8 +154,8 @@ export function compareDescriptions(
   if ("unread" in live) return "unread";
   if ("none" in live) return stored.state === "none" ? "same" : "not_at_sam";
   if (stored.state === "none" || !stored.description) return "missing_in_file";
-  const squash = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/&[a-z0-9#]+;/gi, " ").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const squash = (s: string) => s.replace(/&[a-z0-9#]+;/gi, " ").toLowerCase().replace(/[^a-z0-9]/g, "");
   const a = squash(stored.description);
-  const b = squash(live.text);
+  const b = squash(live.text.replace(/<[^>]*>/g, " "));
   return (stored.state === "truncated" ? b.startsWith(a) : a === b) ? "same" : "different";
 }

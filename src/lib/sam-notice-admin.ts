@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, isNull, max, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { samNoticeLoadRuns, samNotices } from "@/db/schema";
 import { getPlatformSetting } from "@/lib/platform-settings";
@@ -15,9 +15,22 @@ import { safeQuery } from "@/lib/schema-resilience";
  * SAM.gov itself on the shared key. Read-only; platform data only.
  */
 export async function samNoticeOverview() {
-  const [runs, states, totals, size, load, reads] = await Promise.all([
+  const [runs, lastGood, states, totals, size, load, reads] = await Promise.all([
     safeQuery(() => db.select().from(samNoticeLoadRuns).orderBy(desc(samNoticeLoadRuns.startedAt)).limit(14), [], { tag: "sam-notice.runs" }),
-    safeQuery(() => db.select({ state: samNotices.state, n: count() }).from(samNotices).groupBy(samNotices.state), [], { tag: "sam-notice.states" }),
+    // The file's date comes from the last good run, however many failed runs followed it.
+    safeQuery(
+      () =>
+        db
+          .select({ at: samNoticeLoadRuns.sourceModifiedAt })
+          .from(samNoticeLoadRuns)
+          .where(inArray(samNoticeLoadRuns.status, ["ok", "unchanged"]))
+          .orderBy(desc(samNoticeLoadRuns.startedAt))
+          .limit(1),
+      [],
+      { tag: "sam-notice.last-good" },
+    ),
+    // Notices still in SAM.gov's file; the gone ones are counted apart.
+    safeQuery(() => db.select({ state: samNotices.state, n: count() }).from(samNotices).where(isNull(samNotices.goneOn)).groupBy(samNotices.state), [], { tag: "sam-notice.states" }),
     safeQuery(
       () => db.select({ gone: sql<number>`count(*) filter (where ${samNotices.goneOn} is not null)::int`, newest: max(samNotices.postedAt) }).from(samNotices),
       [],
@@ -27,14 +40,13 @@ export async function samNoticeOverview() {
     getPlatformSetting("sam_notice.load", "on"),
     getPlatformSetting("sam_notice.reads", "on"),
   ]);
-  const lastGood = runs.find((r) => r.status === "ok" || r.status === "unchanged") ?? null;
   return {
     runs,
     byState: Object.fromEntries(states.map((s) => [s.state, s.n])) as Record<string, number>,
     gone: totals[0]?.gone ?? 0,
     newestPostedAt: totals[0]?.newest ?? null,
     bytes: size,
-    fileUpdatedAt: lastGood?.sourceModifiedAt ?? null,
+    fileUpdatedAt: lastGood[0]?.at ?? null,
     switches: { load: load !== "off", reads: reads !== "off" },
   };
 }
@@ -44,9 +56,13 @@ const SAMPLE = { text: 6, truncated: 2, none: 5 } as const;
 /**
  * Read a few stored rows' descriptions live from SAM.gov (one shared-key
  * request each, 13 at most) and count how they compare. Counts only:
- * no text or ids leave this function.
+ * no text or ids leave this function. `beforeSpend` runs only when there
+ * is something to ask SAM.gov (the caller's daily limit); a message from
+ * it stops the check.
  */
-export async function spotCheckSamNotices(): Promise<{ ok: true; sampled: number; counts: Record<SpotCheckResult, number> } | { ok: false; error: string }> {
+export async function spotCheckSamNotices(
+  beforeSpend: () => Promise<string | null> = async () => null,
+): Promise<{ ok: true; sampled: number; counts: Record<SpotCheckResult, number> } | { ok: false; error: string }> {
   const cred = platformSamCredential({ audience: "operator" });
   if (!cred) return { ok: false, error: "SAMGOV_API_KEY isn't set, so SAM.gov can't be asked." };
   const recent = sql`${samNotices.postedAt} > now() - interval '30 days'`;
@@ -59,6 +75,8 @@ export async function spotCheckSamNotices(): Promise<{ ok: true; sampled: number
       .limit(SAMPLE[state]);
   const rows = (await Promise.all([pick("text"), pick("truncated"), pick("none")])).flat();
   if (rows.length === 0) return { ok: false, error: "The copy has no notices posted in the last 30 days to check yet." };
+  const stop = await beforeSpend();
+  if (stop) return { ok: false, error: stop };
   const live = await readNoticeDescriptions(cred, rows.map((r) => ({ noticeId: r.noticeId, description: noticeDescriptionUrl(r.noticeId) ?? "" })), rows.length);
   const counts: Record<SpotCheckResult, number> = { same: 0, different: 0, missing_in_file: 0, not_at_sam: 0, unread: 0 };
   for (const r of rows) counts[compareDescriptions(r, live.get(r.noticeId) ?? { unread: true })]++;
