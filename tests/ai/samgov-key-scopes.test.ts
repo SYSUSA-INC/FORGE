@@ -28,6 +28,8 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
       "src/lib/sam-notice-csv.ts",
       "src/lib/sam-notice-load.ts",
       "src/app/api/cron/sam-notices/route.ts",
+      "src/lib/sam-notice-admin.ts",
+      ...walk("src/app/(app)/admin/sam-notices"),
       ...walk("src/app/(app)/admin/sba-8a"),
     ];
     for (const file of platformOnly) {
@@ -61,6 +63,10 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
     // The first thing each action awaits is the platform-admin gate.
     for (const body of bodies) expect(/await (\w+)/.exec(body)?.[1], body.slice(0, 40)).toBe("requireSuperadmin");
     expect(read("src/app/api/cron/refresh-certifications/route.ts")).toMatch(/from "@\/lib\/cert-refresh"/);
+    // BL-STAB-10b — the SAM.gov notice copy's actions check for a platform admin first too.
+    const copy = read("src/app/(app)/admin/sam-notices/actions.ts").split(/\nexport async function /).slice(1);
+    expect(copy).toHaveLength(3);
+    for (const body of copy) expect(/await (\w+)/.exec(body)?.[1], body.slice(0, 40)).toBe("requireSuperadmin");
     expect(existsSync("src/app/api/samgov/entity/route.ts")).toBe(false);
   });
 });
