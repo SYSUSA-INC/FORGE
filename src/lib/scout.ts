@@ -60,10 +60,11 @@ import { getCustomerIntelligence } from "@/lib/customer-intelligence";
 import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
-import { noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
+import { noticeDescriptionUrl, type SamOpportunity } from "@/lib/samgov";
+import { descriptionsFor } from "@/lib/samgov-descriptions";
 import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
 import { resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
-import { OPEN_NOTICE_TYPES, noticeAgency, parseKeyword } from "@/lib/samgov-match";
+import { OPEN_NOTICE_TYPES, noticeAgency, parseKeyword, readableText } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
 import {
   awardExpiresWithin,
@@ -114,10 +115,6 @@ function parseDate(s: string | null | undefined): Date | null {
   if (!s) return null;
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function stripTags(s: string): string {
-  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function unique(list: string[]): string[] {
@@ -252,7 +249,7 @@ function fromSam(o: SamOpportunity, source: ScoutCandidateSource): CandidateDraf
     postedAt: parseDate(o.postedDate),
     responseDueAt: parseDate(o.responseDeadLine),
     placeOfPerformance: placeOf(o.placeOfPerformance).slice(0, 300),
-    description: stripTags(o.description ?? "").slice(0, 20_000),
+    description: readableText(o.description).slice(0, 20_000),
     uiLink: str(o.uiLink, 2_000),
   };
 }
@@ -448,14 +445,15 @@ export async function runScoutForOrganization(input: {
   const freshAwards = awardDrafts.filter((d) => !known.has(d.noticeId));
 
   // BL-STAB-10 — the searches read no descriptions; read the new finds'
-  // (newest first, within the key's per-search budget) so scoring and
-  // triage have the text.
-  if (descriptionCred && freshSam.length > 0) {
+  // so scoring and triage have the text: from FORGE's copy of SAM.gov's
+  // descriptions (BL-STAB-10b; free, even with no working key), then live,
+  // newest first, within the key's per-search budget.
+  if (freshSam.length > 0) {
     const wanted = freshSam
       .filter((f) => !f.sam.description)
       .sort((a, b) => (Date.parse(b.sam.postedDate) || 0) - (Date.parse(a.sam.postedDate) || 0))
-      .map((f) => ({ noticeId: f.sam.noticeId, description: noticeDescriptionUrl(f.sam.noticeId) ?? "" }));
-    const read = await readNoticeDescriptions(descriptionCred, wanted, DESCRIPTION_READS[descriptionCred.source]);
+      .map((f) => f.sam.noticeId);
+    const read = await descriptionsFor(descriptionCred, wanted, descriptionCred ? DESCRIPTION_READS[descriptionCred.source] : 0);
     for (const f of freshSam) {
       const d = read.get(f.sam.noticeId);
       if (d && "text" in d) f.sam = { ...f.sam, description: d.text };
@@ -1028,13 +1026,13 @@ export async function decideScoutCandidate(input: {
   let opportunityId: string | null = null;
 
   if (input.decision === "imported") {
-    // BL-STAB-10 — a find whose description the nightly run didn't read gets it now (one SAM.gov request).
+    // BL-STAB-10 — a find whose description the nightly run didn't read gets it now
+    // (FORGE's copy, else one SAM.gov request).
     let description = c.description;
-    const link = !description && c.source !== "watchlist_award" ? noticeDescriptionUrl(c.noticeId) : null;
-    const sam = link ? await resolveSamCredential(organizationId) : null;
-    if (link && sam?.ok) {
-      const d = (await readNoticeDescriptions(sam.cred, [{ noticeId: c.noticeId, description: link }], 1)).get(c.noticeId);
-      if (d && "text" in d) description = d.text.slice(0, 20_000);
+    if (!description && c.source !== "watchlist_award" && noticeDescriptionUrl(c.noticeId)) {
+      const sam = await resolveSamCredential(organizationId);
+      const d = (await descriptionsFor(sam.ok ? sam.cred : null, [c.noticeId], 1)).get(c.noticeId);
+      if (d && "text" in d) description = readableText(d.text).slice(0, 20_000);
     }
     const [opp] = await db
       .insert(opportunities)

@@ -6,7 +6,18 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { GSA_VEHICLES } from "@/lib/gsa-vehicles";
 import { MAX_IMPORT_ROWS } from "@/lib/sam-import-row";
-import { NOTICE_TYPES, OPEN_NOTICE_TYPES, describeKeyword, matchNotice, noticeAgency, parseKeyword, searchSummary, type KeywordSearchCounts, type NoticeTypeCode } from "@/lib/samgov-match";
+import {
+  NOTICE_TYPES,
+  OPEN_NOTICE_TYPES,
+  describeKeyword,
+  noticeAgency,
+  parseKeyword,
+  plainText,
+  searchSummary,
+  withEarlierHit,
+  type KeywordSearchCounts,
+  type NoticeTypeCode,
+} from "@/lib/samgov-match";
 import {
   importSamGovOpportunitiesAction,
   loadSamGovOpportunitiesAction,
@@ -15,7 +26,7 @@ import {
 } from "./actions";
 
 /** BL-STAB-10 — a search's counts and scope, and the keyword and vehicle names its results were checked against. */
-type Search = { counts: KeywordSearchCounts; scope: { keyword: string | null; codes: string[]; days: number }; query: { keyword: string; anyOf: string[] }; warning: string | null };
+type Search = { counts: KeywordSearchCounts; scope: { keyword: string | null; codes: string[]; days: number; copyThrough: string | null }; query: { keyword: string; anyOf: string[] }; warning: string | null };
 
 export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: string[]; autoSearch: boolean }) {
   const router = useRouter();
@@ -98,11 +109,15 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
       for (const o of batch) {
         const desc = res.descriptions[o.noticeId];
         if (!desc || "unread" in desc) continue;
+        const m = withEarlierHit({ title: o.title, agency: noticeAgency(o) }, q, desc, o.earlierMatch);
+        // Only the start of the text, with no hit: still not checked.
+        if (m.status === "unchecked") continue;
         done.add(o.noticeId);
         counts.unchecked--;
-        const m = matchNotice({ title: o.title, agency: noticeAgency(o) }, q, desc);
+        if (o.afterCopy && counts.uncheckedNew) counts.uncheckedNew--;
         if (m.status === "match") {
-          found.push({ ...o, description: "text" in desc ? desc.text : "", match: m });
+          // Only whole text travels with the row; the import reads the rest of a partial one.
+          found.push({ ...o, description: "text" in desc && !desc.partial ? desc.text : "", match: m });
           counts.matched++;
         } else if (m.status === "no_description") counts.noDescription++;
         else counts.notMentioned++;
@@ -501,9 +516,9 @@ function OpportunityRow({
           </div>
           {o.match?.status === "match" && o.match.where === "description" ? (
             <div className="mt-2 rounded-md border border-teal/20 bg-teal/[0.04] px-2.5 py-1.5 font-body text-[12px] text-text">{o.match.snippet}</div>
-          ) : o.description ? (
+          ) : o.description || o.preview ? (
             <div className="mt-2 line-clamp-3 font-body text-[12px] text-muted">
-              {o.description.replace(/<[^>]*>/g, "")}
+              {o.description ? plainText(o.description) : o.preview}
             </div>
           ) : null}
           {o.earlierNoticeIds.length > 0 ? (

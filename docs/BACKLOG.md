@@ -552,8 +552,25 @@ mind. Bandage will come off but a true fix will stay."
       10b-3) and a spot-check of 13 stored notices against SAM.gov on the
       shared key (three a day, counted only when SAM.gov is asked; counts
       only, compared as letters and digits).
-    - **10b-3:** searches read the copy first; live reads only for
-      notices posted since the last file; lighter results.
+    - **10b-3 (PR #382):** searches read the copy first
+      (`sam-notice-store.ts`, SELECT by id, 5 s limit, any failure or the
+      `sam_notice.reads` switch falls back to live reads):
+      - a match in any notice of the solicitation counts; only the latest
+        notice's whole description decides "doesn't mention it";
+      - an excluded term in the latest notice's text rules it out, and
+        an earlier notice's hit waits until the latest is known clear;
+      - stored text is HTML-escaped (a literal `<` is never a tag), and
+        a keyword glued to a neighbouring word there (paragraphs run
+        together) leaves the notice to a live read;
+      - live reads only for notices posted since the file, link-only
+        ones and text the copy can't settle;
+      - results carry a 400-character `preview` apart from
+        `description`, so a failed copy read never saves a preview; the
+        import and the scout take whole text from the copy, else live
+        (`descriptionsFor`); Check more reads live first;
+      - the results line counts unchecked notices posted after the
+        copy, and a copy over 48 h old is named in the warning;
+      - store failures log the driver's code only (never the ids).
     - **10b-4:** log the key's remaining requests (rate-limit headers).
 - **BL-STAB-9 — The AI document review fails on a real
   solicitation.** ✅ shipped (9a PR #366, 9b PR #367).

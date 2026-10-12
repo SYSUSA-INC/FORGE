@@ -1,4 +1,5 @@
 import "server-only";
+import { noticeStore, type StoredDescription } from "@/lib/sam-notice-store";
 import { fetchSamOpportunities, readNoticeDescriptions, withoutLinks, type SamOpportunity } from "@/lib/samgov";
 import type { SamFailure } from "@/lib/samgov-errors";
 import type { SamCredential } from "@/lib/samgov-key";
@@ -6,13 +7,18 @@ import {
   collapseBySolicitation,
   hasKeyword,
   isWantedType,
+  gluedTerm,
   matchNotice,
+  mentionsExcluded,
   noticeAgency,
   parseKeyword,
+  plainText,
+  type DescriptionState,
   type KeywordQuery,
   type KeywordSearchCounts,
   type NoticeMatch,
   type NoticeTypeCode,
+  withEarlierHit,
 } from "@/lib/samgov-match";
 
 /**
@@ -22,16 +28,48 @@ import {
  * notices with the keyword in the title), keeps the wanted notice types,
  * folds each solicitation's notices into the latest, and checks the
  * keyword itself: in the title and agency for free, then in descriptions
- * — one SAM.gov request each, newest first, within a per-search budget.
- * A notice whose description wasn't read is returned as unchecked, never
- * as a match.
+ * — from FORGE's nightly copy of SAM.gov's descriptions for free
+ * (BL-STAB-10b), then one SAM.gov request each, newest first, within a
+ * per-search budget, for the rest. A notice whose description wasn't read
+ * is returned as unchecked, never as a match.
  */
 
 /** Description reads per search: a company's own key often allows few requests a day. */
 export const DESCRIPTION_READS = { platform: 30, company: 10 } as const;
 
-/** `viaCodes`: which of the searched NAICS codes returned the solicitation (BL-STAB-10b). */
-export type FoundNotice = SamOpportunity & { earlierNoticeIds: string[]; viaCodes: string[]; match: NoticeMatch | null };
+/** Results carry this much of a stored description (the import reads the whole of it from the copy). */
+const PREVIEW = 400;
+const STALE_MS = 48 * 3_600_000;
+
+function preview(text: string): string {
+  const t = plainText(text);
+  return t.length > PREVIEW ? `${t.slice(0, PREVIEW).trimEnd()}…` : t;
+}
+
+/** A stored description as matching sees it; a link-only row is a miss. */
+function asDescription(s: StoredDescription | undefined, q: KeywordQuery | null): DescriptionState | null {
+  if (!s || "link" in s) return null;
+  if ("none" in s) return { none: true };
+  // The copy runs paragraphs together: a term glued to a neighbouring word leaves it undecided.
+  return s.partial || (q && gluedTerm(s.text, q)) ? { text: s.text, partial: true } : { text: s.text };
+}
+
+/**
+ * `viaCodes`: which of the searched NAICS codes returned the solicitation (BL-STAB-10b).
+ * `preview`: the start of the description FORGE's copy holds, for display only (the
+ * import reads the whole text; `description` stays empty unless SAM.gov was read live).
+ * `afterCopy`: unchecked, and posted after the newest notice in the copy.
+ * `earlierMatch`: unchecked, with a hit in an earlier notice that counts once the
+ * latest notice is read and names no excluded term (withEarlierHit).
+ */
+export type FoundNotice = SamOpportunity & {
+  earlierNoticeIds: string[];
+  viaCodes: string[];
+  match: NoticeMatch | null;
+  preview?: string;
+  afterCopy?: true;
+  earlierMatch?: NoticeMatch;
+};
 
 export type SamSearchResult = {
   ok: true;
@@ -40,8 +78,10 @@ export type SamSearchResult = {
   /** Keyword searches only: notices whose description FORGE hasn't read yet. */
   unchecked: FoundNotice[];
   counts: KeywordSearchCounts;
-  /** A code SAM.gov couldn't answer for, while the others did. */
+  /** A code SAM.gov couldn't answer for, while the others did; FORGE's copy of descriptions out of date. */
   warning: string | null;
+  /** The day of the newest notice in FORGE's copy (YYYY-MM-DD), when searches read it. */
+  copyThrough: string | null;
 };
 
 export async function findSamOpportunities(
@@ -97,10 +137,16 @@ export async function findSamOpportunities(
     noDescription: 0,
     unchecked: 0,
   };
+  const budget = i.readBudget ?? DESCRIPTION_READS[cred.source];
+  const store = await noticeStore();
+  const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  const copyThrough = store.on ? day(store.newestPostedAt) : null;
+  const stale = keyworded && store.on && store.fileOf && Date.now() - store.fileOf.getTime() > STALE_MS;
   const warning =
     [
       r.failure ? `SAM.gov didn't answer for ${i.naicsCodes.length ? "NAICS " : "the title search for "}${r.failedCodes.map((c) => q.labels[c] ?? c).join(", ")}: ${r.failure.error}` : "",
       notSent.length ? `With no NAICS codes, SAM.gov is asked about the first 5 keywords only; not searched: ${notSent.map((t) => q.labels[t] ?? t).join(", ")}.` : "",
+      stale ? `FORGE's copy of SAM.gov descriptions is from ${day(store.fileOf)}, so newer notices ${budget > 0 ? `are read live, ${budget} per search` : "can't be checked"}.` : "",
     ]
       .filter(Boolean)
       .join(" ") || null;
@@ -108,7 +154,13 @@ export async function findSamOpportunities(
 
   if (!keyworded) {
     counts.matched = groups.length;
-    return { ok: true, notices: withoutLinks(groups.map((g) => ({ ...g, viaCodes: via(g), match: null }))), unchecked: [], counts, warning };
+    // A preview of each stored description, so the list reads like SAM.gov's.
+    const stored = await store.lookup(groups.map((g) => g.noticeId));
+    const withText = groups.map((g) => {
+      const d = asDescription(stored.get(g.noticeId.toLowerCase()), null);
+      return { ...g, viaCodes: via(g), match: null, ...(d && "text" in d ? { preview: preview(d.text) } : {}) };
+    });
+    return { ok: true, notices: withoutLinks(withText), unchecked: [], counts, warning, copyThrough };
   }
 
   // Title and agency first, for free — of every notice of the solicitation (an
@@ -117,26 +169,70 @@ export async function findSamOpportunities(
   const first = groups.map((g) => {
     const members = [g, ...g.earlierNoticeIds.map((id) => byId.get(id)).filter((o): o is SamOpportunity => !!o)];
     const free = members.map((o) => matchNotice({ title: o.title, agency: agency(o) }, q, null));
-    return { g, m: free.find((m) => m.status === "match") ?? free[0]! };
+    return { g, members, m: free.find((m) => m.status === "match") ?? free[0]! };
   });
-  const toRead = first.filter((x) => x.m.status === "unchecked").map((x) => x.g);
-  const budget = i.readBudget ?? DESCRIPTION_READS[cred.source];
-  // Inline descriptions are already read; links cost one request each, up to the budget.
+
+  // Then FORGE's copy, for free: a match in any notice's description counts; only the
+  // latest notice's whole description can decide that the solicitation doesn't mention it,
+  // and an excluded term in it rules the solicitation out whatever earlier notices say.
+  const stored = await store.lookup(first.flatMap((x) => x.members.map((o) => o.noticeId)));
+  const storedOf = (id: string) => asDescription(stored.get(id.toLowerCase()), q);
+  const decided = first.map(({ g, members, m }) => {
+    const own = storedOf(g.noticeId);
+    const latest = { title: g.title, agency: agency(g) };
+    if (m.status !== "unchecked") return { g, m, desc: own, earlier: null };
+    const mine = own ? matchNotice(latest, q, own) : m;
+    if (mine.status === "match" || (own && mentionsExcluded(latest, q, own))) return { g, m: mine, desc: own, earlier: null };
+    const earlier =
+      members
+        .slice(1)
+        .map((o) => {
+          const d = storedOf(o.noticeId);
+          return d ? matchNotice({ title: o.title, agency: agency(o) }, q, d) : null;
+        })
+        .find((h) => h?.status === "match") ?? null;
+    // With excluded terms, an earlier hit counts once the latest text is known to be clear of them.
+    if (earlier && (q.excluded.length === 0 || mine.status !== "unchecked")) return { g, m: earlier, desc: own, earlier: null };
+    return { g, m: mine, desc: own, earlier };
+  });
+
+  // Then SAM.gov live for what the copy couldn't decide (posted since the file, only a link
+  // there, cut at 32,000 characters or run together with no hit, or an earlier hit waiting
+  // on the latest notice's excluded terms): one request each, newest first.
+  const toRead = decided.filter((x) => x.m.status === "unchecked").map((x) => x.g);
   const read = await readNoticeDescriptions(cred, toRead, budget);
 
   const notices: FoundNotice[] = [];
   const unchecked: FoundNotice[] = [];
-  for (const { g, m: titleMatch } of first) {
-    const desc = read.get(g.noticeId) ?? null;
-    const m = titleMatch.status === "unchecked" ? matchNotice({ title: g.title, agency: agency(g) }, q, desc) : titleMatch;
-    const description = desc && "text" in desc ? desc.text : g.description;
-    const found: FoundNotice = { ...g, description, viaCodes: via(g), match: m };
+  let uncheckedNew = 0;
+  for (const x of decided) {
+    const { g } = x;
+    let { m } = x;
+    const live = m.status === "unchecked" ? read.get(g.noticeId) : undefined;
+    const latest = { title: g.title, agency: agency(g) };
+    if (live && !("unread" in live)) m = withEarlierHit(latest, q, live, x.earlier);
+    // Live text in full, as before; stored text only as a preview (the import reads the whole).
+    const shown = !(live && "text" in live) && x.desc && "text" in x.desc ? { preview: preview(x.desc.text) } : {};
+    const afterCopy = m.status === "unchecked" && !!copyThrough && !stored.has(g.noticeId.toLowerCase()) && (g.postedDate ?? "").slice(0, 10) >= copyThrough;
+    const pending = m.status === "unchecked" && x.earlier ? { earlierMatch: x.earlier } : {};
+    const found: FoundNotice = {
+      ...g,
+      description: live && "text" in live ? live.text : g.description,
+      viaCodes: via(g),
+      match: m,
+      ...shown,
+      ...pending,
+      ...(afterCopy ? { afterCopy: true as const } : {}),
+    };
     if (m.status === "match") notices.push(found);
-    else if (m.status === "unchecked") unchecked.push(found);
-    else if (m.status === "no_description") counts.noDescription++;
+    else if (m.status === "unchecked") {
+      unchecked.push(found);
+      if (afterCopy) uncheckedNew++;
+    } else if (m.status === "no_description") counts.noDescription++;
     else counts.notMentioned++;
   }
   counts.matched = notices.length;
   counts.unchecked = unchecked.length;
-  return { ok: true, notices: withoutLinks(notices), unchecked: withoutLinks(unchecked), counts, warning };
+  counts.uncheckedNew = uncheckedNew;
+  return { ok: true, notices: withoutLinks(notices), unchecked: withoutLinks(unchecked), counts, warning, copyThrough };
 }

@@ -10,13 +10,16 @@ import {
   hasKeyword,
   keywordLabel,
   findTerm,
+  gluedTerm,
   isWantedType,
   matchNotice,
+  mentionsExcluded,
   noticeTypeCode,
   parseKeyword,
   parseNoticeTypes,
   plainText,
   searchSummary,
+  withEarlierHit,
 } from "@/lib/samgov-match";
 
 const row = (title: string, agency = "VETERANS AFFAIRS, DEPARTMENT OF") => ({ title, agency });
@@ -126,6 +129,40 @@ describe("BL-STAB-10 — keywords", () => {
     expect(matchNotice(row("Multiple Award Schedule"), mas, null)).toMatchObject({ status: "match", where: "title" });
     expect(matchNotice(row("Help desk"), mas, { text: "Under OASIS+." })).toEqual({ status: "not_mentioned" });
   });
+
+  it("BL-STAB-10b — the start of a description (cut at 32,000 characters): a hit counts, a miss proves nothing", () => {
+    const q = parseKeyword("ServiceNow");
+    expect(matchNotice(row("Help desk"), q, { text: "ServiceNow licenses…", partial: true })).toMatchObject({ status: "match", where: "description" });
+    expect(matchNotice(row("Help desk"), q, { text: "Hardware…", partial: true })).toEqual({ status: "unchecked" });
+    // An excluded term found rules it out; not found, the rest of the text might hold it.
+    const both = parseKeyword("ServiceNow -hardware");
+    expect(matchNotice(row("ServiceNow renewal"), both, { text: "Includes hardware…", partial: true })).toEqual({ status: "not_mentioned" });
+    expect(matchNotice(row("ServiceNow renewal"), both, { text: "Licenses…", partial: true })).toEqual({ status: "unchecked" });
+  });
+
+  it("BL-STAB-10b — FORGE's copy: escaped text, paragraphs run together, and earlier notices of a solicitation", () => {
+    const q = parseKeyword("ServiceNow");
+    // The copy's text is HTML-escaped when read: a literal "<" is text, not a tag.
+    expect(matchNotice(row("Help desk"), q, { text: "Response time &lt;4 hours. Migrate to ServiceNow. Uptime &gt;99.9% &amp; more." })).toMatchObject({ status: "match" });
+    // A keyword glued to a neighbouring word (a capital after a lower-case letter, or a digit) can't be settled from the copy.
+    expect(gluedTerm("BackgroundServiceNow is the tool.", q)).toBe(true);
+    expect(gluedTerm("Microsoft 365ServiceNow", q)).toBe(true);
+    expect(gluedTerm("The tool is ServiceNow.", q)).toBe(false);
+    expect(gluedTerm("Help desk.Support", parseKeyword("support"))).toBe(false);
+    expect(gluedTerm("No hardware here", parseKeyword("help, -Hardware"))).toBe(false);
+    expect(gluedTerm("Network refreshHardware", parseKeyword("help, -hardware"))).toBe(true);
+    // An excluded term in the latest notice beats a hit in an earlier one; a miss there doesn't.
+    const ex = parseKeyword("ServiceNow -hardware");
+    const earlier = matchNotice(row("Modules"), ex, { text: "ServiceNow modules." });
+    expect(earlier).toMatchObject({ status: "match" });
+    expect(mentionsExcluded(row("Amendment"), ex, { text: "Adds a hardware refresh." })).toBe(true);
+    expect(mentionsExcluded(row("Amendment"), ex, { text: "Due date moves." })).toBe(false);
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Adds a hardware refresh." }, earlier)).toEqual({ status: "not_mentioned" });
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Due date moves." }, earlier)).toBe(earlier);
+    expect(withEarlierHit(row("Amendment"), ex, { none: true }, earlier)).toBe(earlier);
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Due date…", partial: true }, earlier)).toEqual({ status: "unchecked" });
+    expect(withEarlierHit(row("Amendment"), ex, { text: "Due date moves." }, null)).toEqual({ status: "not_mentioned" });
+  });
 });
 
 describe("BL-STAB-10 — one row per solicitation", () => {
@@ -179,5 +216,10 @@ describe("BL-STAB-10 — the owner's search (NAICS 541519 + ServiceNow)", () => 
     expect(searchSummary({ ...counts, matched: 1, samTotal: 2412, received: 1000, truncated: true }, { keyword: null, codes: [], days: 7 })).toBe(
       "1 notice for all NAICS codes, posted in the last 7 days · 120 notices of other types left out · 37 earlier notices of the same solicitations folded in · SAM.gov sends at most 1,000 notices per request; FORGE read 1,000 of 2,412: narrow the search or the window to see the rest.",
     );
+    // BL-STAB-10b — unchecked notices posted since the nightly file FORGE reads say so.
+    const plain = { ...counts, otherTypes: 0, folded: 0, notMentioned: 0, noDescription: 0 };
+    expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet: posted after FORGE's nightly copy of SAM\.gov, which runs through 9 Oct\)\.$/);
+    expect(searchSummary({ ...plain, uncheckedNew: 3 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: "2026-10-09" })).toMatch(/\(4 not checked yet — 3 of them posted after FORGE's nightly copy of SAM\.gov, which runs through 9 Oct\)\.$/);
+    expect(searchSummary({ ...plain, uncheckedNew: 4 }, { keyword: "“ITSM”", codes: [], days: 30, copyThrough: null })).toMatch(/\(4 not checked yet\)\.$/);
   });
 });

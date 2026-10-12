@@ -10,9 +10,10 @@ import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
 import { sanitizeSamImportRows } from "@/lib/sam-import-row";
-import { GSA_VEHICLES, noticeDescriptionUrl, readNoticeDescriptions, type SamOpportunity } from "@/lib/samgov";
+import { GSA_VEHICLES, noticeDescriptionUrl, type SamOpportunity } from "@/lib/samgov";
+import { descriptionsFor } from "@/lib/samgov-descriptions";
 import { resolveSamCredential } from "@/lib/samgov-key";
-import { hasKeyword, keywordLabel, noticeAgency, parseKeyword, parseNoticeTypes, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
+import { hasKeyword, keywordLabel, noticeAgency, parseKeyword, parseNoticeTypes, readableText, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities, type FoundNotice } from "@/lib/samgov-search";
 
 export type ImportableOpportunity = FoundNotice & {
@@ -46,7 +47,7 @@ export async function loadSamGovOpportunitiesAction(input?: {
       unchecked: ImportableOpportunity[];
       counts: KeywordSearchCounts;
       /** What the counts are about, for the results line (searchSummary). */
-      scope: { keyword: string | null; codes: string[]; days: number };
+      scope: { keyword: string | null; codes: string[]; days: number; copyThrough: string | null };
       warning: string | null;
       usedNaics: string[];
       orgPrimaryNaics: string;
@@ -137,7 +138,7 @@ export async function loadSamGovOpportunitiesAction(input?: {
     opportunities: result.notices.map(decorate),
     unchecked: result.unchecked.map(decorate),
     counts: result.counts,
-    scope: { keyword: keyword || vehicleKeywords.length ? keywordLabel(parseKeyword(keyword, vehicleKeywords)) : null, codes: naicsCodes, days },
+    scope: { keyword: keyword || vehicleKeywords.length ? keywordLabel(parseKeyword(keyword, vehicleKeywords)) : null, codes: naicsCodes, days, copyThrough: result.copyThrough },
     warning:
       [allCodes > naicsCodes.length ? `Searched the first ${naicsCodes.length} of ${allCodes} NAICS codes (SAM.gov is asked once per code).` : "", result.warning ?? ""]
         .filter(Boolean)
@@ -150,22 +151,24 @@ export async function loadSamGovOpportunitiesAction(input?: {
 
 /**
  * BL-STAB-10 — read the descriptions of up to 10 notices the search left
- * unchecked (one SAM.gov request each, on the company's key). The links
- * are built here from validated notice ids; nothing is written.
+ * unchecked (one SAM.gov request each, on the company's key; FORGE's copy
+ * answers, as partial text, only when SAM.gov doesn't, BL-STAB-10b). The
+ * links are built here from validated notice ids; nothing is written.
  */
 export async function readSamDescriptionsAction(
   noticeIds: string[],
 ): Promise<{ ok: true; descriptions: Record<string, DescriptionState> } | { ok: false; error: string }> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  const rows = (Array.isArray(noticeIds) ? noticeIds : [])
+  const ids = (Array.isArray(noticeIds) ? noticeIds : [])
     .slice(0, 10)
-    .map((id) => ({ noticeId: String(id), description: noticeDescriptionUrl(String(id)) }))
-    .filter((r): r is { noticeId: string; description: string } => r.description !== null);
-  if (rows.length === 0) return { ok: false, error: "Nothing to check." };
+    .map(String)
+    .filter((id) => noticeDescriptionUrl(id) !== null);
+  if (ids.length === 0) return { ok: false, error: "Nothing to check." };
   const sam = await resolveSamCredential(organizationId);
-  if (!sam.ok) return { ok: false, error: sam.failure.error };
-  const read = await readNoticeDescriptions(sam.cred, rows, rows.length);
+  const read = await descriptionsFor(sam.ok ? sam.cred : null, ids, ids.length, { liveFirst: true });
+  // No key: only FORGE's copy could answer, and it had none of them.
+  if (!sam.ok && [...read.values()].every((d) => "unread" in d)) return { ok: false, error: sam.failure.error };
   return { ok: true, descriptions: Object.fromEntries(read) };
 }
 
@@ -238,17 +241,16 @@ export async function importSamGovOpportunitiesAction(
   }
 
   // BL-STAB-10 — searches read descriptions only to check a keyword: read
-  // the picked notices' missing ones now (within the key's budget), so an
-  // imported opportunity keeps its description.
-  const missing = toImport.filter((o) => !o.description).map((o) => ({ noticeId: o.noticeId, description: noticeDescriptionUrl(o.noticeId) ?? "" }));
+  // the picked notices' missing ones now, so an imported opportunity keeps
+  // its description — from FORGE's copy (BL-STAB-10b; results show only a
+  // preview of it), else live within the key's budget.
+  const missing = toImport.filter((o) => !o.description).map((o) => o.noticeId);
   if (missing.length > 0) {
     const sam = await resolveSamCredential(organizationId);
-    if (sam.ok) {
-      const read = await readNoticeDescriptions(sam.cred, missing, DESCRIPTION_READS[sam.cred.source]);
-      for (const o of toImport) {
-        const d = read.get(o.noticeId);
-        if (!o.description && d && "text" in d) o.description = d.text.slice(0, 20_000);
-      }
+    const read = await descriptionsFor(sam.ok ? sam.cred : null, missing, sam.ok ? DESCRIPTION_READS[sam.cred.source] : 0);
+    for (const o of toImport) {
+      const d = read.get(o.noticeId);
+      if (!o.description && d && "text" in d) o.description = d.text;
     }
   }
 
@@ -266,7 +268,8 @@ export async function importSamGovOpportunitiesAction(
     pscCode: o.classificationCode ?? "",
     setAside: o.typeOfSetAsideDescription ?? "",
     placeOfPerformance: extractPoP(o.placeOfPerformance),
-    description: o.description ?? "",
+    // SAM.gov's HTML (or the copy's text, escaped to match) as readable text (BL-STAB-10b).
+    description: readableText(o.description).slice(0, 20_000),
     createdByUserId: actor.id,
   }));
 

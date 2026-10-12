@@ -24,7 +24,7 @@ export default async function SamNoticesPage() {
       <PageHeader
         eyebrow="Platform admin"
         title="SAM.gov notice copy"
-        subtitle="Every active SAM.gov notice's description, from SAM.gov's public nightly file (no API key, no request limit). Searches start checking keywords against it in a later step (10b-3)."
+        subtitle="Every active SAM.gov notice's description, from SAM.gov's public nightly file (no API key, no request limit). Keyword searches read it before asking SAM.gov."
         meta={[
           { label: "Notices", value: total.toLocaleString("en-US") },
           { label: "SAM.gov file of", value: o.fileUpdatedAt ? o.fileUpdatedAt.toISOString().slice(0, 10) : "never loaded", accent: stale ? "rose" : undefined },
@@ -32,7 +32,7 @@ export default async function SamNoticesPage() {
           { label: "Size", value: `${Math.round(o.bytes / 1_048_576)} MB` },
         ]}
       />
-      <Panel title="Controls" eyebrow={`Nightly load ${o.switches.load ? "on" : "paused"} · searches ${o.switches.reads ? "will read" : "won't read"} the copy (10b-3)`} className="mb-4">
+      <Panel title="Controls" eyebrow={`Nightly load ${o.switches.load ? "on" : "paused"} · searches ${o.switches.reads ? "read" : "don't read"} the copy`} className="mb-4">
         <p className="mb-3 font-body text-[12px] text-muted">
           The load runs at 04:20, 06:20 and 08:20 UTC; an unchanged file costs one request to SAM.gov&apos;s file server and no writes. A run cut short
           is finished by the next one. The spot-check reads 13 stored notices live from SAM.gov (shared key) and counts how they compare.
