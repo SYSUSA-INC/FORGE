@@ -544,11 +544,14 @@ mind. Bandage will come off but a true fix will stay."
       changed rows written, gone rows marked on a whole file and purged
       after 30 days, cut or malformed files never mark anything gone —
       run by `/api/cron/sam-notices` at 04:20, 06:20 and 08:20 UTC.
-    - **10b-2b (PR #380):** `/admin/sam-notices` — what the copy holds
-      by state, the file's date (red after 48 h), the last 14 runs, **Run
-      load now**, the two switches (`sam_notice.load`, `sam_notice.reads`)
-      and a spot-check of 13 stored notices against SAM.gov on the shared
-      key (three a day; counts only, compared as letters and digits).
+    - **10b-2b (shipped, PR #380; review fixes PR #381):**
+      `/admin/sam-notices` — what the copy holds by state (gone notices
+      counted apart), the file's date from the last good run (red after
+      48 h), the last 14 runs, **Run load now**, the two switches
+      (`sam_notice.load`, `sam_notice.reads`, the second honoured from
+      10b-3) and a spot-check of 13 stored notices against SAM.gov on the
+      shared key (three a day, counted only when SAM.gov is asked; counts
+      only, compared as letters and digits).
     - **10b-3:** searches read the copy first; live reads only for
       notices posted since the last file; lighter results.
     - **10b-4:** log the key's remaining requests (rate-limit headers).

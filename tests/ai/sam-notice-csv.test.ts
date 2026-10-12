@@ -60,6 +60,8 @@ describe("BL-STAB-10b — SAM.gov's notice file", () => {
     const text = { state: "text", description: "Help desk, Tier 1.Support" };
     expect(compareDescriptions(text, { text: "<p>Help desk, Tier&nbsp;1.</p>\n<p>Support</p>" })).toBe("same");
     expect(compareDescriptions(text, { text: "Help desk, Tier 2." })).toBe("different");
+    // Angle brackets in the stored plain text are text, not tags.
+    expect(compareDescriptions({ state: "text", description: "Contact <a@b.mil> today" }, { text: "<p>Contact &lt;a@b.mil&gt; today</p>" })).toBe("same");
     expect(compareDescriptions({ state: "truncated", description: "Long text..." }, { text: "Long text that goes on" })).toBe("same");
     expect(compareDescriptions({ state: "none", description: null }, { text: "Something" })).toBe("missing_in_file");
     expect(compareDescriptions(text, { none: true })).toBe("not_at_sam");

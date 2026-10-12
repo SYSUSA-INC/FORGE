@@ -58,11 +58,15 @@ describe("BL-STAB-10b — the SAM.gov notice copy admin page", () => {
   });
 
   it("spot-checks stored rows against SAM.gov (counts only, three a day) and counts what the copy holds", async () => {
+    // Nothing to compare: no request to SAM.gov, and no check used up.
+    for (let i = 0; i < 4; i++) expect(await spotCheckSamNoticesAction()).toMatchObject({ ok: false, error: expect.stringMatching(/^The copy has no notices/) });
     const posted = new Date(Date.now() - 2 * 86_400_000);
     await db.insert(samNotices).values([
       { noticeId: id(1), state: "text", description: "ServiceNow ITSM support.", postedAt: posted, digest: "a" },
       { noticeId: id(2), state: "text", description: "Help desk", postedAt: posted, digest: "b" },
       { noticeId: id(3), state: "none", description: null, postedAt: posted, digest: "c" },
+      // Gone from SAM.gov's file: counted apart, never sampled.
+      { noticeId: id(4), state: "text", description: "Old", postedAt: posted, digest: "d", goneOn: "2026-10-01" },
     ]);
     const live: Record<string, string> = { [id(1)]: "<p>ServiceNow ITSM\nsupport.</p>", [id(2)]: "Something else", [id(3)]: "SAM.gov has text" };
     const calls: URL[] = [];
@@ -82,6 +86,18 @@ describe("BL-STAB-10b — the SAM.gov notice copy admin page", () => {
     expect(await spotCheckSamNoticesAction()).toMatchObject({ ok: false, error: expect.stringMatching(/^Three spot-checks a day/) });
 
     const o = await samNoticeOverview();
-    expect([o.byState, o.gone, o.newestPostedAt?.getTime()]).toEqual([{ text: 2, none: 1 }, 0, posted.getTime()]);
+    expect([o.byState, o.gone, o.newestPostedAt?.getTime()]).toEqual([{ text: 2, none: 1 }, 1, posted.getTime()]);
+  });
+
+  it("dates the file from the last good run, however many failed runs followed it", async () => {
+    const fileOf = new Date("2026-10-08T03:30:00Z");
+    await db.insert(samNoticeLoadRuns).values({ status: "ok", sourceModifiedAt: fileOf, startedAt: new Date(Date.now() - 20 * 3_600_000) });
+    await db.insert(samNoticeLoadRuns).values(
+      Array.from({ length: 15 }, (_, i) => ({ status: "failed", startedAt: new Date(Date.now() - i * 60_000), error: "HTTP 503" })),
+    );
+    const o = await samNoticeOverview();
+    expect(o.runs).toHaveLength(14);
+    expect(o.runs.every((r) => r.status === "failed")).toBe(true);
+    expect(o.fileUpdatedAt?.getTime()).toBe(fileOf.getTime());
   });
 });

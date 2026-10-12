@@ -41,9 +41,12 @@ export async function runSamNoticeLoadNowAction(): Promise<{ ok: true; result: S
 /** Compare 13 stored rows with SAM.gov's live descriptions (shared key; three checks a day). */
 export async function spotCheckSamNoticesAction(): Promise<{ ok: true; sampled: number; counts: Record<SpotCheckResult, number> } | { ok: false; error: string }> {
   const actor = await requireSuperadmin();
-  const limit = await enforceRateLimit({ key: "samgov:spot-check", limit: 3, windowSeconds: 86_400 });
-  if (!limit.ok) return { ok: false, error: "Three spot-checks a day: each one spends shared-key requests. Try again tomorrow." };
-  const r = await spotCheckSamNotices();
+  // Counted only when the check would ask SAM.gov: a missing key or an empty copy costs nothing.
+  const r = await spotCheckSamNotices(async () =>
+    (await enforceRateLimit({ key: "samgov:spot-check", limit: 3, windowSeconds: 86_400 })).ok
+      ? null
+      : "Three spot-checks a day: each one spends shared-key requests. Try again tomorrow.",
+  );
   if (r.ok) await audit(actor, "admin.sam_notice.spot_check", { sampled: r.sampled, ...r.counts });
   return r;
 }
