@@ -17,6 +17,14 @@ import { OPEN_NOTICE_TYPES } from "@/lib/samgov-match";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const user = { id: "PLACEHOLDER", email: "capture@store.test", name: "Capture", image: null as null, isSuperadmin: false as const, organizationId: "PLACEHOLDER", role: "admin" as const };
+// What the import's recompete radar is shown (it reads the description).
+const flagged = vi.hoisted(() => [] as { noticeId: string; description: string }[]);
+vi.mock("@/lib/recompete-radar", () => ({
+  flagSamResults: async (_org: string, rows: { noticeId: string; description: string }[]) => {
+    flagged.push(...rows.map((r) => ({ noticeId: r.noticeId, description: r.description })));
+    return {};
+  },
+}));
 vi.mock("@/lib/auth-helpers", () => ({
   requireAuth: async () => user,
   requireCurrentOrg: async () => ({ user, organizationId: user.organizationId, isImpersonating: false }),
@@ -136,8 +144,12 @@ describe("BL-STAB-10b — searches read FORGE's copy of SAM.gov descriptions fir
     await seed();
     const before = await storeRows();
     const calls = stubSam();
+    flagged.length = 0;
     const r = await loadSamGovOpportunitiesAction({ naicsCodes: ["541519"], keyword: "ServiceNow" });
     if (!r.ok) throw new Error(r.error);
+    // The radar sees the copy's whole text, though the browser gets only a preview.
+    expect(flagged.find((f) => f.noticeId === id(9))?.description).toBe(LONG);
+    expect(flagged.find((f) => f.noticeId === id(4))?.description).toBe(LIVE[id(4)]);
     // Live reads: posted after the file, cut with no hit, and run together around the keyword.
     expect(asked(calls)).toEqual([id(4), id(5), id(11)]);
     expect(r.opportunities.map((o) => o.noticeId).sort()).toEqual([1, 4, 5, 6, 8, 9, 11].map(id));

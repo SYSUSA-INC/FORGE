@@ -10,15 +10,18 @@ import {
   hasKeyword,
   keywordLabel,
   findTerm,
-  gluedTerm,
   isWantedType,
+  escapeHtml,
   matchNotice,
+  matchStored,
   mentionsExcluded,
   noticeTypeCode,
   parseKeyword,
   parseNoticeTypes,
   plainText,
+  readableText,
   searchSummary,
+  unglued,
   withEarlierHit,
 } from "@/lib/samgov-match";
 
@@ -91,6 +94,13 @@ describe("BL-STAB-10 — keywords", () => {
     expect(findTerm("counter-uas for drones.", "drone")).toBe(16);
     expect(findTerm("licensed vendors", "license")).toBe(-1);
     expect(plainText("<p>ServiceNow&nbsp;&amp; ITSM</p>")).toBe("ServiceNow & ITSM");
+    // BL-STAB-10b — only tag-shaped markup goes; numeric and common named entities are decoded.
+    expect(plainText("Response time <4 hours, uptime >99.9%. <b>Bold</b><!-- note --> &#8217;&#x2019;&ndash;&bogus;")).toBe("Response time <4 hours, uptime >99.9%. Bold ’’–&bogus;");
+    // Kept text: block ends and <br> are line breaks, the markup's own line breaks aren't.
+    expect(readableText("<p>The Contractor&#8217;s staff &ndash; 24/7&nbsp;</p><p>We need zero\ntrust support.</p>Response <4 hours<br>Next")).toBe(
+      "The Contractor’s staff – 24/7\nWe need zero trust support.\nResponse <4 hours\nNext",
+    );
+    expect(readableText("Line one\r\nLine two &lt;b&gt;")).toBe("Line one\nLine two <b>");
   });
 
   it("a title or agency match needs no description; a description match quotes it", () => {
@@ -144,13 +154,34 @@ describe("BL-STAB-10 — keywords", () => {
     const q = parseKeyword("ServiceNow");
     // The copy's text is HTML-escaped when read: a literal "<" is text, not a tag.
     expect(matchNotice(row("Help desk"), q, { text: "Response time &lt;4 hours. Migrate to ServiceNow. Uptime &gt;99.9% &amp; more." })).toMatchObject({ status: "match" });
-    // A keyword glued to a neighbouring word (a capital after a lower-case letter, or a digit) can't be settled from the copy.
-    expect(gluedTerm("BackgroundServiceNow is the tool.", q)).toBe(true);
-    expect(gluedTerm("Microsoft 365ServiceNow", q)).toBe(true);
-    expect(gluedTerm("The tool is ServiceNow.", q)).toBe(false);
-    expect(gluedTerm("Help desk.Support", parseKeyword("support"))).toBe(false);
-    expect(gluedTerm("No hardware here", parseKeyword("help, -Hardware"))).toBe(false);
-    expect(gluedTerm("Network refreshHardware", parseKeyword("help, -hardware"))).toBe(true);
+    // Paragraphs run together in the copy: where reading a seam apart would change the answer, SAM.gov decides.
+    const stored = (k: string, t: string) => matchStored(row("Notice", "DEPT"), parseKeyword(k), { text: escapeHtml(t) }).status;
+    for (const [k, t] of [
+      ["ServiceNow", "BackgroundServiceNow is the tool."],
+      ["ServiceNow", "BACKGROUNDServiceNow is the tool."],
+      ["ServiceNow", "BACKGROUNDSERVICENOW IS THE TOOL."],
+      ["ServiceNow", "Microsoft 365ServiceNow"],
+      ["ITSM", "Scope: ServiceNow ITSMThe contractor shall"],
+      ["CMMC", "Requirements CMMCFedRAMP"],
+      ["license", "ServiceNow licensesTraining"],
+      ["tool", "Software toolsTraining"],
+      ["incident", "change managementincident management"],
+      // An excluded word hiding in a seam can't be ruled out either.
+      ["ServiceNow -hardware", "ServiceNow ITSMCMDBHardware refresh"],
+    ]) expect(stored(k!, t!), `${k} in ${t}`).toBe("unchecked");
+    // Inside a word, or found whole anyway: the copy decides.
+    for (const [k, t, want] of [
+      ["AI", "PERFORM MAINTENANCE ON AIRCRAFT", "not_mentioned"],
+      ["VA", "Develop JavaScript widgets", "not_mentioned"],
+      ["edge", "Maintain the KnowledgeBase", "not_mentioned"],
+      ["license", "Software is licensed per seat", "not_mentioned"],
+      ["service", "Selfservice portal", "not_mentioned"],
+      ["network", "networking gear", "not_mentioned"],
+      ["ServiceNow", "The tool is ServiceNow.", "match"],
+      ["ServiceNow -hardware", "BackgroundServiceNow licenses. ServiceNow ITSM modules.", "match"],
+      ["ServiceNow -hardware", "Hardware refresh. ServiceNow.", "not_mentioned"],
+    ]) expect(stored(k!, t!), `${k} in ${t}`).toBe(want);
+    expect(unglued(escapeHtml("Response <4 hours. BACKGROUNDServiceNow"), q)).toBe("Response &lt;4 hours. BACKGROUND ServiceNow");
     // An excluded term in the latest notice beats a hit in an earlier one; a miss there doesn't.
     const ex = parseKeyword("ServiceNow -hardware");
     const earlier = matchNotice(row("Modules"), ex, { text: "ServiceNow modules." });

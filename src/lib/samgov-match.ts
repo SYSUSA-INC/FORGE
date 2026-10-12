@@ -147,28 +147,43 @@ export function keywordLabel(q: KeywordQuery): string {
   return base ? (not ? `${base} but not ${not}` : base) : not ? `none of ${not}` : "the keyword";
 }
 
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
+const ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
+  ndash: "–", mdash: "—", hellip: "…", bull: "•", middot: "·", sect: "§", copy: "©", reg: "®", trade: "™",
+};
+/** Markup shaped like a tag, as a browser reads it: a "<" before a digit, space or "=" stays text. */
+const TAG = /<\/?[A-Za-z][^>]*>|<!--[\s\S]*?-->|<![^>]*>/g;
 
-/** Readable text: tags removed, common entities decoded, whitespace collapsed. */
+function decodeEntities(s: string): string {
+  return s.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]{2,8});/gi, (whole, e: string) => {
+    if (e[0] !== "#") return ENTITIES[e.toLowerCase()] ?? whole;
+    const code = /^#x/i.test(e) ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return code > 31 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff) ? String.fromCodePoint(code) : " ";
+  });
+}
+
+/** BL-STAB-10b — plain text in the shape of SAM.gov's HTML descriptions (FORGE's copy is read this way). */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Readable text: tags removed, entities decoded, whitespace collapsed. */
 export function plainText(s: string | null | undefined): string {
-  return (s ?? "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&(amp|lt|gt|quot|apos|nbsp|#39);/g, (_, e: string) => ENTITIES[e] ?? " ")
+  return decodeEntities((s ?? "").replace(TAG, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
 
 /**
  * BL-STAB-10b — a description (SAM.gov's HTML, or FORGE's copy, escaped to
- * the same shape) as text to keep: paragraph and line ends become line
- * breaks, tags go, entities are decoded.
+ * the same shape) as text to keep: in markup, paragraph and line ends
+ * become line breaks (its raw line breaks are just spaces); tags go,
+ * entities are decoded.
  */
 export function readableText(s: string | null | undefined): string {
-  return (s ?? "")
-    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
-    .replace(/<\/\s*(p|div|li|tr|h[1-6])\s*>/gi, "\n")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&(amp|lt|gt|quot|apos|nbsp|#39);/g, (_, e: string) => ENTITIES[e] ?? " ")
+  let t = s ?? "";
+  if (/<\/?[A-Za-z]/.test(t)) t = t.replace(/\s+/g, " ");
+  return decodeEntities(t.replace(/<\s*br\s*\/?\s*>/gi, "\n").replace(/<\/\s*(p|div|li|tr|h[1-6])\s*>/gi, "\n").replace(TAG, " "))
     .replace(/[^\S\n]+/g, " ")
     .replace(/ ?\n ?/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -276,26 +291,73 @@ export function withEarlierHit(row: { title: string; agency: string }, q: Keywor
 
 /**
  * BL-STAB-10b — FORGE's copy of SAM.gov's descriptions runs paragraphs
- * together ("BackgroundServiceNow is…"): whether a keyword, list item or
- * excluded term sits glued to a neighbouring word there (a lower-case
- * letter before a capital, or a digit against a letter), so only SAM.gov's
- * own text can settle it.
+ * together ("BACKGROUNDServiceNow is…", "licensesTraining"). The text with
+ * a space wherever a keyword, list item or excluded term (or its plural)
+ * sits glued to a neighbouring word at what may be such a seam — escaped
+ * again — or null when there is none. A seam: a digit against a letter, a
+ * lower-case letter before a capital, a capital before a capitalised word,
+ * or, with no case to go by, a join next to a term of five or more
+ * characters that isn't a common prefix or ending ("selfservice",
+ * "licensed"); a short term like "ai" is usually inside a word.
  */
-export function gluedTerm(text: string, q: KeywordQuery): boolean {
+const PREFIX = /^(re|pre|un|non|sub|co|multi|inter|intra|cyber|self|super|over|under|out|anti|auto|micro|tele|post|semi|mis|dis)$/;
+const SUFFIX = /^(e?d|e?r|e?rs|ing|ings|ment|ments|al|ally|ly|ity|ities|ion|ions|ive|able|ible|i[sz]e[ds]?|i[sz]ing)$/;
+
+export function unglued(text: string, q: KeywordQuery): string | null {
   const plain = plainText(text);
   const lower = plain.toLowerCase();
-  if (lower.length !== plain.length) return false;
-  const soft = (i: number) => {
+  if (lower.length !== plain.length) return null;
+  const isWord = (c: string | undefined) => !!c && /[A-Za-z0-9]/.test(c);
+  const seam = (i: number, long: boolean, side: "left" | "right") => {
     const a = plain[i - 1] ?? "";
     const b = plain[i] ?? "";
-    return (/[a-z]/.test(a) && /[A-Z]/.test(b)) || (/[0-9]/.test(a) && /[A-Za-z]/.test(b)) || (/[A-Za-z]/.test(a) && /[0-9]/.test(b));
+    if (/[0-9]/.test(a) !== /[0-9]/.test(b)) return true;
+    if (/[a-z]/.test(a) && /[A-Z]/.test(b)) return true;
+    if (/[A-Z]/.test(a) && /[A-Z]/.test(b) && /[a-z]/.test(plain[i + 1] ?? "")) return true;
+    if (!long) return false;
+    return side === "left" ? !PREFIX.test(/[a-z]*$/.exec(lower.slice(0, i))![0]) : !SUFFIX.test(/^[a-z]*/.exec(lower.slice(i))![0]);
   };
-  for (const term of [...q.terms, ...q.anyOf.flat(), ...q.excluded]) {
+  const cuts = new Set<number>();
+  for (const term of new Set([...q.terms, ...q.anyOf.flat(), ...q.excluded])) {
+    const long = term.replace(/[^a-z0-9]/g, "").length >= 5;
+    const startsWord = WORD.test(term[0]!);
+    const endsWord = WORD.test(term[term.length - 1]!);
     for (let at = lower.indexOf(term); at !== -1; at = lower.indexOf(term, at + 1)) {
-      if (soft(at) || soft(at + term.length)) return true;
+      const leftCut = startsWord && isWord(plain[at - 1]);
+      if (leftCut && !seam(at, long, "left")) continue;
+      const bare = at + term.length;
+      // The plural end first, as findTerm reads "licenses".
+      const ends = endsWord ? [...new Set([bare + (/^e?s/.exec(lower.slice(bare))?.[0].length ?? 0), bare])] : [bare];
+      const whole = !endsWord || ends.some((e) => !isWord(plain[e]));
+      const rightCut = whole ? null : ends.find((e) => seam(e, long, "right"));
+      if (!whole && rightCut === undefined) continue;
+      if (leftCut) cuts.add(at);
+      if (rightCut != null) cuts.add(rightCut);
     }
   }
-  return false;
+  if (cuts.size === 0) return null;
+  let out = "";
+  let from = 0;
+  for (const i of [...cuts].sort((a, b) => a - b)) {
+    out += `${plain.slice(from, i)} `;
+    from = i;
+  }
+  return escapeHtml(out + plain.slice(from));
+}
+
+/**
+ * BL-STAB-10b — match a notice against a description from FORGE's copy.
+ * Where reading its glued seams apart (unglued) would change the answer —
+ * a keyword, or an excluded term, hiding in one — only SAM.gov's own text
+ * can settle it: unchecked.
+ */
+export function matchStored(row: { title: string; agency: string }, q: KeywordQuery, desc: DescriptionState): NoticeMatch {
+  const strict = matchNotice(row, q, desc);
+  if (!("text" in desc) || desc.partial || strict.status === "unchecked") return strict;
+  const split = unglued(desc.text, q);
+  if (!split) return strict;
+  const loose = matchNotice(row, q, { text: split });
+  return (strict.status === "match") === (loose.status === "match") ? strict : { status: "unchecked" };
 }
 
 /**

@@ -179,10 +179,12 @@ export function scoutFit(c: FitInput, ctx: FitContext): FitResult {
     }
   }
 
-  const haystack = `${c.title} ${c.description}`.toLowerCase();
-  const hit = ctx.keyword && haystack.includes(norm(ctx.keyword))
+  // Line breaks in a description (readableText keeps them) don't split a phrase.
+  const haystack = `${c.title} ${c.description}`.toLowerCase().replace(/\s+/g, " ");
+  const phrase = (k: string) => norm(k).replace(/\s+/g, " ");
+  const hit = ctx.keyword && haystack.includes(phrase(ctx.keyword))
     ? ctx.keyword
-    : ctx.keywords.find((k) => k.trim() && haystack.includes(norm(k)));
+    : ctx.keywords.find((k) => k.trim() && haystack.includes(phrase(k)));
   if (hit) {
     score += 10;
     signals.push(`Matches your keyword: ${hit.trim()}`);

@@ -51,6 +51,11 @@ describe("scoutFit", () => {
     );
   });
 
+  it("BL-STAB-10b — a keyword phrase still hits across a line break in the description", () => {
+    const r = scoutFit({ ...base, title: "Support", description: "Tier 1 help\ndesk services." }, ctx);
+    expect(r.signals).toEqual(expect.arrayContaining([expect.stringContaining("keyword: help desk")]));
+  });
+
   it("penalises a foreign NAICS, an ineligible set-aside and a near due date, floored at zero", () => {
     const r = scoutFit(
       {
