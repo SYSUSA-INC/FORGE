@@ -59,7 +59,7 @@ export function PipelineFunnel({
         return (
           <div key={stat.key} className="flex flex-col">
             <Link
-              href={drillHref(window, null, stat.key)}
+              href={drillHref(window, null, stat.key, mode)}
               className="group flex items-center gap-3 rounded-md py-2 transition-colors hover:bg-layer/[0.02]"
             >
               <span
@@ -131,7 +131,7 @@ export function PipelineFunnel({
               return (
                 <Link
                   key={stat.key}
-                  href={drillHref(window, null, stat.key)}
+                  href={drillHref(window, null, stat.key, mode)}
                   className="group flex items-center gap-3 rounded-md py-1.5 transition-colors hover:bg-layer/[0.02]"
                 >
                   <span

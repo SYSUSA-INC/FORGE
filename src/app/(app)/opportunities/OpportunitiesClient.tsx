@@ -114,7 +114,11 @@ export function OpportunitiesClient({
 
       {drill ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-cobalt/30 bg-cobalt/[0.06] px-4 py-3">
-          <p className="font-body text-[13px] text-text">{drill.summary}</p>
+          <p className="font-body text-[13px] text-text">
+            {drill.summary}
+            {/* The stage part follows the tile picked below (a funnel stage opens with it picked). */}
+            {stageFilter !== "all" ? ` In ${stages.find((s) => s.key === stageFilter)?.label ?? stageFilter}: ${opportunities.filter((o) => o.stage === stageFilter).length}.` : ""}
+          </p>
           <span className="flex items-center gap-3 font-mono text-[11px]">
             <Link href={drill.backHref} className="text-cobalt-300 underline">
               Back to the pipeline

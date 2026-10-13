@@ -5,7 +5,7 @@ import type { OpportunityStage } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
-import { applyDrill, drillSummary, isDrill, parsePipelineDrill, weightedValueOf } from "@/lib/pipeline-drill";
+import { applyDrill, drillSummary, isDrill, parsePipelineDrill, pipelineHref, weightedValueOf } from "@/lib/pipeline-drill";
 import { buildStageStats } from "./stage-stats";
 import { OpportunitiesClient } from "./OpportunitiesClient";
 
@@ -16,7 +16,7 @@ const VALID_STAGES = new Set(STAGES.map((s) => s.key));
 export default async function OpportunitiesPage({
   searchParams,
 }: {
-  searchParams: { stage?: string; days?: string; view?: string };
+  searchParams: { stage?: string; days?: string; view?: string; mode?: string };
 }) {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -95,11 +95,13 @@ export default async function OpportunitiesPage({
 
   return (
     <OpportunitiesClient
+      // A new drill or stage (or "Show all") starts the list afresh: its filters are client state.
+      key={`${requestedStage ?? ""}|${drilled ? `${drill.days}|${drill.view ?? ""}` : ""}`}
       opportunities={list}
       stageStats={drilled ? buildStageStats(rows) : snapshot.oppStageStats}
       stages={STAGES}
       initialStageFilter={requestedStage ?? "all"}
-      drill={drilled ? { summary: drillSummary(rows, drill), backHref: drill.days === "all" ? "/pipeline?days=all" : `/pipeline?days=${drill.days}` } : null}
+      drill={drilled ? { summary: drillSummary(rows, drill), backHref: pipelineHref(drill) } : null}
     />
   );
 }

@@ -5,7 +5,7 @@ import { opportunities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { drillHref } from "@/lib/pipeline-drill";
+import { drillHref, windowStart } from "@/lib/pipeline-drill";
 import { buildFunnelData, formatDollars } from "./funnel-stats";
 import { PipelineFilters } from "./PipelineFilters";
 import { PipelineFunnel } from "./PipelineFunnel";
@@ -32,10 +32,8 @@ export default async function PipelinePage({
       ? (searchParams.mode as "count" | "value")
       : "count";
 
-  const sinceCutoff =
-    windowKey === "all"
-      ? null
-      : new Date(Date.now() - Number(windowKey) * 24 * 60 * 60 * 1000);
+  // BL-PIPE-DRILL — the same window rule the drilled lists use.
+  const sinceCutoff = windowStart(windowKey, new Date());
 
   // Tenant predicate stays inline with the statement (the isolation
   // checker reads it per statement); `and()` drops the undefined arm.
@@ -118,17 +116,17 @@ export default async function PipelinePage({
           {
             label: "In window",
             value: String(data.totalCount).padStart(2, "0"),
-            href: drillHref(windowKey),
+            href: drillHref(windowKey, null, undefined, mode),
           },
           {
             label: "Active",
             value: String(activeCount).padStart(2, "0"),
             accent: activeCount > 0 ? "magenta" : undefined,
-            href: drillHref(windowKey, "active"),
+            href: drillHref(windowKey, "active", undefined, mode),
           },
           {
             label: "Win rate",
-            href: drillHref(windowKey, "decided"),
+            href: drillHref(windowKey, "decided", undefined, mode),
             value: data.winRate === null ? "—" : `${data.winRate}%`,
             accent:
               data.winRate !== null && data.winRate >= 40
@@ -140,7 +138,7 @@ export default async function PipelinePage({
           {
             label: mode === "value" ? "Weighted value" : "Pipeline value",
             value: formatDollars(data.totalWeightedValue),
-            href: drillHref(windowKey, "valued"),
+            href: drillHref(windowKey, "valued", undefined, mode),
           },
         ]}
       />
