@@ -1,6 +1,5 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -13,10 +12,16 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { aiExtractGsa } from "@/lib/gsa-extract";
 import type { GsaExtractionResult } from "@/lib/ai-prompts";
-import { getStorageProvider } from "@/lib/storage";
-import { detectFormat } from "@/lib/text-extract";
-import { runDurable } from "@/lib/jobs";
+import { runDurableBatch, type JobSpec } from "@/lib/jobs";
 import { log } from "@/lib/log";
+import {
+  claimUpload,
+  finishClaim,
+  inlineBytesForMemoryMode,
+  peekStoredUploads,
+  releaseClaim,
+} from "@/lib/uploads";
+import { GSA_MAX_ATTACHMENTS } from "./gsa-constants";
 
 export type GsaParseResult =
   | {
@@ -53,9 +58,6 @@ export async function parseGsaTextAction(
   return aiExtractGsa(organizationId, rawText);
 }
 
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB per file
-const MAX_ATTACHMENTS = 5;
-
 const NOTICE_TYPE_TO_SOLICITATION_TYPE: Record<string, SolicitationType> = {
   rfp: "rfp",
   rfq: "rfq",
@@ -63,6 +65,26 @@ const NOTICE_TYPE_TO_SOLICITATION_TYPE: Record<string, SolicitationType> = {
   sources_sought: "sources_sought",
   task_order: "rfp",
   other: "other",
+};
+
+export type GsaCreateInput = {
+  /** The pasted email, kept on the opportunity's activity. */
+  text: string;
+  title: string;
+  noticeType: string;
+  solicitationNumber: string;
+  buyingAgency: string;
+  office: string;
+  vehicle: string;
+  naicsCode: string;
+  setAside: string;
+  /** YYYY-MM-DD, or "". */
+  responseDueDate: string;
+  placeOfPerformance: string;
+  scopeSummary: string;
+  notes: string;
+  /** Attachments already uploaded to storage and checked (`useUploadQueue` without a claim). */
+  uploadIds: string[];
 };
 
 export type GsaCreateResult =
@@ -75,33 +97,37 @@ export type GsaCreateResult =
   | { ok: false; error: string };
 
 /**
- * Create an opportunity from the reviewed GSA extraction, optionally
- * attaching uploaded files. Each file becomes a Solicitation row
- * linked to the new opportunity, with bytes stored via the same
- * pipeline as `/solicitations/new`.
- *
- * Multipart inputs (because of the file uploads):
- *   text             — original pasted email (string)
- *   title            — string
- *   noticeType       — "rfp" | "rfq" | "rfi" | "sources_sought" | "task_order" | "other"
- *   solicitationNumber, buyingAgency, office, vehicle, naicsCode,
- *   setAside, responseDueDate (YYYY-MM-DD or ""), placeOfPerformance,
- *   scopeSummary, notes — strings
- *   files            — File[] (zero or more attachments)
+ * Create an opportunity from the reviewed GSA extraction. BL-STAB-2d —
+ * its attachments were uploaded straight to storage first, so this
+ * request carries their ids, never their bytes (no request-size cap).
+ * Every id is checked before anything is created; one that can't be
+ * filed is reported back, and the opportunity is still created. Each
+ * attachment is filed as a Solicitation linked to the opportunity, and
+ * their parses run one after another in the background.
  */
 export async function createOpportunityFromGsaAction(
-  formData: FormData,
+  input: GsaCreateInput,
 ): Promise<GsaCreateResult> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const get = (key: string): string => {
-    const v = formData.get(key);
+  const get = (key: keyof Omit<GsaCreateInput, "uploadIds">): string => {
+    const v = input?.[key];
     return typeof v === "string" ? v : "";
   };
 
   const title = get("title").trim();
   if (!title) return { ok: false, error: "Title is required." };
+
+  const uploadIds = Array.from(
+    new Set(Array.isArray(input?.uploadIds) ? input.uploadIds.filter((id): id is string => typeof id === "string") : []),
+  );
+  if (uploadIds.length > GSA_MAX_ATTACHMENTS) {
+    return {
+      ok: false,
+      error: `At most ${GSA_MAX_ATTACHMENTS} attachments at a time. Once the opportunity is created, add the others as documents on one of its solicitations.`,
+    };
+  }
 
   const noticeType = get("noticeType") || "other";
   const solicitationType: SolicitationType =
@@ -138,37 +164,18 @@ export async function createOpportunityFromGsaAction(
     .filter(Boolean)
     .join(" · ");
 
-  // Validate attachments up front so we don't half-create an
-  // opportunity with garbage uploads.
-  const files = formData.getAll("files").filter(
-    (f): f is File => f instanceof File && f.size > 0,
-  );
-  if (files.length > MAX_ATTACHMENTS) {
-    return {
-      ok: false,
-      error: `Max ${MAX_ATTACHMENTS} attachments at a time. Upload the rest from the opportunity detail page after this one is created.`,
-    };
-  }
-  const attachmentsSkipped: { name: string; reason: string }[] = [];
-  for (const f of files) {
-    if (f.size > MAX_ATTACHMENT_BYTES) {
-      attachmentsSkipped.push({
-        name: f.name,
-        reason: `larger than ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB`,
-      });
-    }
-    const fmt = detectFormat(f.type, f.name);
-    if (!fmt) {
-      attachmentsSkipped.push({
-        name: f.name,
-        reason: "unsupported format (use PDF / DOCX / XLSX / PPTX / TXT / image)",
-      });
-    }
-  }
-  const acceptedFiles = files.filter(
-    (f) =>
-      f.size <= MAX_ATTACHMENT_BYTES && detectFormat(f.type, f.name) !== null,
-  );
+  // Check every attachment before creating anything; one that can't be
+  // filed (expired, someone else's, not a document) is reported back.
+  const { ready, bad } = await peekStoredUploads({
+    organizationId,
+    userId: actor.id,
+    uploadIds,
+    resourceType: "solicitation",
+  });
+  const attachmentsSkipped: { name: string; reason: string }[] = bad.map((b) => ({
+    name: b.fileName || "An attachment",
+    reason: b.reason,
+  }));
 
   // Create the opportunity first. If anything below fails we'll
   // report a partial success rather than rolling back — the
@@ -208,7 +215,7 @@ export async function createOpportunityFromGsaAction(
       metadata: {
         source: "gsa-paste",
         noticeType,
-        attachmentsCount: acceptedFiles.length,
+        attachmentsCount: ready.length,
       },
     });
   } catch (err) {
@@ -219,78 +226,67 @@ export async function createOpportunityFromGsaAction(
     };
   }
 
-  // Upload each attachment as a Solicitation row linked to the new
-  // opportunity. Failures here are recorded on the row + reported
-  // back to the caller; the opportunity itself stays.
+  // File each attachment as a Solicitation linked to the new opportunity
+  // (the upload ledger's claim: the record takes the id fixed at the
+  // claim, so a retry never files it twice). The parses start together
+  // below.
   const solicitationIds: string[] = [];
-  for (const file of acceptedFiles) {
+  const parses: { spec: JobSpec; bytes?: Uint8Array }[] = [];
+  for (const upload of ready) {
+    const claim = await claimUpload({ organizationId, userId: actor.id, uploadId: upload.uploadId, resourceType: "solicitation" });
+    if (!claim.ok) {
+      attachmentsSkipped.push({ name: upload.fileName, reason: claim.error });
+      continue;
+    }
+    if ("alreadyClaimed" in claim) {
+      attachmentsSkipped.push({ name: upload.fileName, reason: "This file was already saved on another record." });
+      continue;
+    }
+    const file = claim.claim;
+    let inserted: { id: string }[];
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const [row] = await db
+      inserted = await db
         .insert(solicitations)
         .values({
+          id: file.resourceId,
           organizationId,
-          title: stripExt(file.name),
+          title: stripExt(file.fileName),
           type: solicitationType,
           solicitationNumber,
-          fileName: file.name,
+          fileName: file.fileName,
           fileSize: file.size,
-          contentType: file.type || "application/octet-stream",
+          contentType: file.contentType,
+          storagePath: file.storageKey,
           parseStatus: "uploaded",
           uploadedByUserId: actor.id,
           source: "gsa-paste",
           opportunityId,
         })
+        .onConflictDoNothing()
         .returning({ id: solicitations.id });
-      if (!row) {
-        attachmentsSkipped.push({
-          name: file.name,
-          reason: "could not record solicitation row",
-        });
-        continue;
-      }
-
-      const storage = getStorageProvider();
-      const key = `org/${organizationId}/solicitation/${row.id}/${file.name}`;
-      const stored = await storage.put({
-        key,
-        bytes,
-        contentType: file.type || "application/octet-stream",
-      });
-      await db
-        .update(solicitations)
-        .set({
-          storagePath: stored.storagePath,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, row.id)));
-
-      solicitationIds.push(row.id);
-
-      // BL-AIP-1 — extract the attachment the same way an upload is.
-      // These rows used to stay at parseStatus "uploaded" forever, so
-      // the opportunity's Documents & AI review never became available.
-      // BL-AIP-4c — as a durable job, retried by the cron if this dies.
-      await runDurable(
-        "[createOpportunityFromGsaAction] attachment parse",
-        {
-          organizationId,
-          kind: "solicitation_parse",
-          resourceId: row.id,
-          requestedByUserId: actor.id,
-        },
-        { bytes },
-      );
     } catch (err) {
-      log.error("[createOpportunityFromGsaAction]", "attachment", {
-        error: err,
-        fileName: file.name,
-      });
-      attachmentsSkipped.push({
-        name: file.name,
-        reason: err instanceof Error ? err.message : "upload failed",
-      });
+      log.error("[createOpportunityFromGsaAction]", "attachment insert failed", { error: err, uploadId: file.uploadId });
+      await releaseClaim({ organizationId, uploadId: file.uploadId });
+      attachmentsSkipped.push({ name: file.fileName, reason: "Could not record the solicitation." });
+      continue;
     }
+    await finishClaim({ organizationId, uploadId: file.uploadId });
+    if (inserted.length === 0) {
+      // An earlier attempt that died filed it already, on its own opportunity.
+      attachmentsSkipped.push({ name: file.fileName, reason: "This file was already saved on another record." });
+      continue;
+    }
+    solicitationIds.push(file.resourceId);
+    // BL-AIP-1 — extract the attachment the same way an upload is; the
+    // job reads it from storage (in the in-memory mode, from these bytes).
+    const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
+    parses.push({
+      spec: { organizationId, kind: "solicitation_parse", resourceId: file.resourceId, requestedByUserId: actor.id },
+      ...(bytes ? { bytes } : {}),
+    });
+  }
+  if (parses.length > 0) {
+    await runDurableBatch("[createOpportunityFromGsaAction] attachment parse", parses);
   }
 
   await recordAudit({
@@ -304,6 +300,7 @@ export async function createOpportunityFromGsaAction(
       noticeType,
       attachments: solicitationIds.length,
       attachmentsSkipped: attachmentsSkipped.length,
+      uploadIds,
     },
   });
 

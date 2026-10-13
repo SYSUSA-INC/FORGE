@@ -9,18 +9,33 @@
  *   claim    → a typed action files it on a record: `stored → claiming`
  *              with the record id allocated up front, then `claimed`
  *
+ *   sweep    → the jobs cron (`sweepUploads`): uploads that never arrived
+ *              or were never filed are failed, filings that died are
+ *              finished or failed, and every object due for deletion is
+ *              deleted; ledger rows are kept 90 days after that
+ *
  * No step uses a transaction: every change is one conditional UPDATE, and
  * a claim that dies halfway is retried with the same record id.
  *
  * Server-only. Every read and write is scoped by organizationId (and by
  * the uploading user for complete / claim / cancel); callers own auth.
+ * The sweep crosses organizations by design (it is the cron's), and
+ * still writes each row under its own organization.
  */
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { fileUploads, type FileUpload } from "@/db/schema";
+import {
+  fileUploads,
+  knowledgeArtifacts,
+  proposalTemplates,
+  sectionChatAttachments,
+  solicitationDocuments,
+  solicitations,
+  type FileUpload,
+} from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -63,6 +78,7 @@ const FAILURE_MESSAGES: Record<string, string> = {
   type_mismatch: "The file's contents don't match its type.",
   cancelled: "Upload cancelled.",
   unclaimed: "The upload was not saved within a day and was removed. Upload it again.",
+  claim_incomplete: "Saving the file didn't finish within a day, and it was removed. Upload it again.",
   claim_failed: "The file could not be read.",
 };
 
@@ -409,26 +425,23 @@ export async function claimUpload(i: {
   return { ok: false, error: view(current).message || "This upload can no longer be used." };
 }
 
+const TRANSIENT_PURPOSES = UPLOAD_PURPOSES.filter((p) => UPLOAD_POLICIES[p].transient);
+
+/**
+ * `purge_after` for a claimed upload, in the same statement that claims it:
+ * a kept file never sits `claimed` with a deletion date the sweeper could
+ * act on; a transient one is deleted again once its upload link is dead.
+ */
+const claimedPurgeAfter = sql`case when ${inArray(fileUploads.purpose, TRANSIENT_PURPOSES)} then ${fileUploads.urlExpiresAt} + interval '5 minutes' else null end`;
+
 /** The record is saved: the upload is claimed. A transient file's object is deleted now. */
 export async function finishClaim(i: { organizationId: string; uploadId: string }): Promise<void> {
   const [row] = await db
     .update(fileUploads)
-    .set({ status: "claimed", updatedAt: new Date() })
+    .set({ status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() })
     .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId), eq(fileUploads.status, "claiming")))
     .returning();
-  if (!row) return;
-  if (UPLOAD_POLICIES[row.purpose].transient) {
-    await deleteObject(row.organizationId, row.storageKey);
-    await db
-      .update(fileUploads)
-      .set({ purgeAfter: new Date(row.urlExpiresAt.getTime() + 5 * MINUTE), updatedAt: new Date() })
-      .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId)));
-  } else {
-    await db
-      .update(fileUploads)
-      .set({ purgeAfter: null, updatedAt: new Date() })
-      .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId)));
-  }
+  if (row && UPLOAD_POLICIES[row.purpose].transient) await deleteObject(row.organizationId, row.storageKey);
 }
 
 /** The record could not be saved (a refusal, not the file's fault): back to `stored`, record id kept for a retry. */
@@ -466,7 +479,7 @@ export async function peekStoredUploads(i: {
   userId: string;
   uploadIds: string[];
   resourceType: UploadResourceType;
-}): Promise<{ ready: StoredUploadPreview[]; bad: { uploadId: string; reason: string }[] }> {
+}): Promise<{ ready: StoredUploadPreview[]; bad: { uploadId: string; fileName: string; reason: string }[] }> {
   const ids = Array.from(new Set(i.uploadIds)).slice(0, 50);
   const valid = ids.filter((id) => UUID.test(id));
   const rows = valid.length
@@ -479,13 +492,14 @@ export async function peekStoredUploads(i: {
   const purposes = purposesClaimableAs(i.resourceType);
   const now = Date.now();
   const ready: StoredUploadPreview[] = [];
-  const bad: { uploadId: string; reason: string }[] = [];
+  const bad: { uploadId: string; fileName: string; reason: string }[] = [];
   for (const id of ids) {
     const row = byId.get(id);
-    if (!row) bad.push({ uploadId: id, reason: "Upload not found." });
-    else if (!purposes.includes(row.purpose)) bad.push({ uploadId: id, reason: "This file was uploaded for something else." });
-    else if (row.status !== "stored") bad.push({ uploadId: id, reason: view(row).message || "This file is not ready to save." });
-    else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, reason: FAILURE_MESSAGES.unclaimed! });
+    if (!row) bad.push({ uploadId: id, fileName: "", reason: "Upload not found." });
+    else if (!purposes.includes(row.purpose)) bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was uploaded for something else." });
+    else if (row.status === "claimed") bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was already saved." });
+    else if (row.status !== "stored") bad.push({ uploadId: id, fileName: row.fileName, reason: view(row).message || "This file is not ready to save." });
+    else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, fileName: row.fileName, reason: FAILURE_MESSAGES.unclaimed! });
     else ready.push({ uploadId: id, fileName: row.fileName, size: row.storedSize ?? row.declaredSize, format: (row.detectedFormat || row.declaredFormat) as UploadFormat, contentType: row.contentType });
   }
   return { ready, bad };
@@ -573,6 +587,262 @@ export async function getVerifiedObject(i: {
 export async function inlineBytesForMemoryMode(i: { organizationId: string; storagePath: string }): Promise<Uint8Array | undefined> {
   if (getStorageProvider().name !== "memory" || !isKeyInOrg(i.organizationId, i.storagePath)) return undefined;
   return (await getStorageProvider().get(i.storagePath))?.bytes;
+}
+
+/** Longer than any request runs (300 s): a filing still `claiming` after this died with its instance. */
+const ABANDONED_CLAIM_MS = 30 * MINUTE;
+const PURGED_ROW_KEEP_MS = 90 * 24 * 60 * MINUTE;
+/** A delete that has failed this often is logged as an error, not a warning. */
+const PURGE_ALERT_ATTEMPTS = 5;
+
+export type UploadSweep = {
+  /** Uploads whose link expired before the file arrived. */
+  expired: number;
+  /** Checked uploads nobody filed within a day. */
+  unclaimed: number;
+  /** Filings that died after their record was saved, now finished. */
+  promoted: number;
+  /** Filings that died before their record was saved, failed once the day to retry had passed. */
+  abandoned: number;
+  /** Objects deleted. */
+  purged: number;
+  /** Deletes that failed (retried later) or were refused (a key not built for that upload). */
+  purgeErrors: number;
+  /** Ledger rows removed 90 days after their object. */
+  pruned: number;
+  /** More was due than this tick took (row cap or time budget); the next tick continues. */
+  deferred: boolean;
+};
+
+/** Rows grouped by organization, so every write names one. */
+function byOrganization(rows: { id: string; organizationId: string }[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const r of rows) out.set(r.organizationId, [...(out.get(r.organizationId) ?? []), r.id]);
+  return out;
+}
+
+/** Whether the record a claim names exists and holds this upload's file (a chat attachment keeps only its text). */
+async function recordHoldsUpload(row: Pick<FileUpload, "organizationId" | "resourceType" | "resourceId" | "storageKey">): Promise<boolean> {
+  const { organizationId, resourceId, storageKey } = row;
+  if (!resourceId) return false;
+  const found = async (q: Promise<unknown[]>) => (await q).length > 0;
+  switch (row.resourceType) {
+    case "solicitation":
+      return found(
+        db
+          .select({ id: solicitations.id })
+          .from(solicitations)
+          .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, resourceId), eq(solicitations.storagePath, storageKey)))
+          .limit(1),
+      );
+    case "solicitation_document":
+      return found(
+        db
+          .select({ id: solicitationDocuments.id })
+          .from(solicitationDocuments)
+          .where(
+            and(
+              eq(solicitationDocuments.organizationId, organizationId),
+              eq(solicitationDocuments.id, resourceId),
+              eq(solicitationDocuments.storagePath, storageKey),
+            ),
+          )
+          .limit(1),
+      );
+    case "knowledge_artifact":
+      return found(
+        db
+          .select({ id: knowledgeArtifacts.id })
+          .from(knowledgeArtifacts)
+          .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, resourceId), eq(knowledgeArtifacts.storagePath, storageKey)))
+          .limit(1),
+      );
+    case "proposal_template":
+      return found(
+        db
+          .select({ id: proposalTemplates.id })
+          .from(proposalTemplates)
+          .where(and(eq(proposalTemplates.organizationId, organizationId), eq(proposalTemplates.id, resourceId), eq(proposalTemplates.docxStoragePath, storageKey)))
+          .limit(1),
+      );
+    case "section_chat_attachment":
+      return found(
+        db
+          .select({ id: sectionChatAttachments.id })
+          .from(sectionChatAttachments)
+          .where(and(eq(sectionChatAttachments.organizationId, organizationId), eq(sectionChatAttachments.id, resourceId)))
+          .limit(1),
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * BL-STAB-2d — the jobs cron's pass over the ledger, inside a time budget:
+ *
+ *   1. `pending` past its window (the link's life + 15 min) → `failed` (`expired`)
+ *   2. `stored` and not filed within a day → `failed` (`unclaimed`)
+ *   3. `claiming` for over 30 minutes: `claimed` when its record holds the
+ *      file; once the day to retry has passed without one, `failed`
+ *      (`claim_incomplete`). Each change holds only if no retry took the
+ *      claim over meanwhile.
+ *   4. every object due is deleted (failed, released, transient claimed);
+ *      a failed delete is retried with backoff, and a key that isn't the
+ *      one the server built for that upload is never deleted
+ *   5. rows whose object was deleted over 90 days ago are removed
+ *
+ * A file a record keeps (`claimed`, not transient) is never deleted here.
+ */
+export async function sweepUploads(o: { now?: Date; budgetMs?: number; limit?: number } = {}): Promise<UploadSweep> {
+  const now = o.now ?? new Date();
+  const limit = o.limit ?? 200;
+  const deadline = Date.now() + (o.budgetMs ?? 15_000);
+  const out: UploadSweep = { expired: 0, unclaimed: 0, promoted: 0, abandoned: 0, purged: 0, purgeErrors: 0, pruned: 0, deferred: false };
+  const capped = (n: number) => {
+    if (n >= limit) out.deferred = true;
+  };
+  const outOfTime = () => {
+    if (Date.now() <= deadline) return false;
+    out.deferred = true;
+    return true;
+  };
+
+  // 1–2. Never arrived, or never filed: failed now, deleted in step 4.
+  for (const [from, reason] of [
+    ["pending", "expired"],
+    ["stored", "unclaimed"],
+  ] as const) {
+    const due = await db
+      .select({ id: fileUploads.id, organizationId: fileUploads.organizationId })
+      .from(fileUploads)
+      .where(and(eq(fileUploads.status, from), lte(fileUploads.purgeAfter, now), isNull(fileUploads.purgedAt)))
+      .orderBy(asc(fileUploads.purgeAfter))
+      .limit(limit);
+    capped(due.length);
+    for (const [organizationId, ids] of byOrganization(due)) {
+      const failed = await db
+        .update(fileUploads)
+        .set({ status: "failed", failureReason: reason, updatedAt: new Date() })
+        .where(and(eq(fileUploads.organizationId, organizationId), inArray(fileUploads.id, ids), eq(fileUploads.status, from), lte(fileUploads.purgeAfter, now)))
+        .returning({ id: fileUploads.id });
+      out[reason] += failed.length;
+    }
+  }
+
+  // 3. Filings that died with their instance.
+  const stale = await db
+    .select({
+      id: fileUploads.id,
+      organizationId: fileUploads.organizationId,
+      resourceType: fileUploads.resourceType,
+      resourceId: fileUploads.resourceId,
+      storageKey: fileUploads.storageKey,
+      claimedAt: fileUploads.claimedAt,
+      purgeAfter: fileUploads.purgeAfter,
+    })
+    .from(fileUploads)
+    .where(
+      and(
+        eq(fileUploads.status, "claiming"),
+        lte(fileUploads.claimedAt, new Date(now.getTime() - ABANDONED_CLAIM_MS)),
+        // Always true of a claim (it needs an open window); lets the purge index serve the query.
+        isNotNull(fileUploads.purgeAfter),
+        isNull(fileUploads.purgedAt),
+      ),
+    )
+    .orderBy(asc(fileUploads.purgeAfter))
+    .limit(limit);
+  capped(stale.length);
+  for (const row of stale) {
+    if (outOfTime()) break;
+    const held = await recordHoldsUpload(row);
+    // No record yet, but the uploader can still retry the filing.
+    if (!held && row.purgeAfter && row.purgeAfter.getTime() > now.getTime()) continue;
+    // Holds only if no retry took the claim over meanwhile.
+    const moved = await db
+      .update(fileUploads)
+      .set(
+        held
+          ? { status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() }
+          : { status: "failed", failureReason: "claim_incomplete", purgeAfter: now, updatedAt: new Date() },
+      )
+      .where(
+        and(
+          eq(fileUploads.organizationId, row.organizationId),
+          eq(fileUploads.id, row.id),
+          eq(fileUploads.status, "claiming"),
+          eq(fileUploads.claimedAt, row.claimedAt!),
+        ),
+      )
+      .returning({ id: fileUploads.id });
+    if (moved.length > 0) out[held ? "promoted" : "abandoned"] += 1;
+  }
+
+  // 4. Delete what is due.
+  if (!outOfTime()) {
+    const purgeable = await db
+      .select({ id: fileUploads.id, organizationId: fileUploads.organizationId, purpose: fileUploads.purpose, storageKey: fileUploads.storageKey, purgeAttempts: fileUploads.purgeAttempts })
+      .from(fileUploads)
+      .where(
+        and(
+          lte(fileUploads.purgeAfter, now),
+          isNull(fileUploads.purgedAt),
+          or(inArray(fileUploads.status, ["failed", "released"]), and(eq(fileUploads.status, "claimed"), inArray(fileUploads.purpose, TRANSIENT_PURPOSES))),
+        ),
+      )
+      .orderBy(asc(fileUploads.purgeAfter))
+      .limit(limit);
+    capped(purgeable.length);
+    const storage = getStorageProvider();
+    for (const row of purgeable) {
+      if (outOfTime()) break;
+      if (row.storageKey !== uploadKeyFor(row.organizationId, row.id, UPLOAD_POLICIES[row.purpose]?.transient ?? false)) {
+        // The server builds every ledger key; this row was changed by hand or by a bug. Leave the object.
+        log.error("[uploads]", "an upload's storage key is not the one built for it; its object was not deleted", { organizationId: row.organizationId, uploadId: row.id });
+        await db.update(fileUploads).set({ purgeAfter: null, updatedAt: new Date() }).where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), isNull(fileUploads.purgedAt)));
+        out.purgeErrors += 1;
+        continue;
+      }
+      try {
+        await storage.delete(row.storageKey);
+        await db.update(fileUploads).set({ purgedAt: new Date(), updatedAt: new Date() }).where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), isNull(fileUploads.purgedAt)));
+        out.purged += 1;
+      } catch (err) {
+        const attempts = row.purgeAttempts + 1;
+        await db
+          .update(fileUploads)
+          .set({ purgeAttempts: attempts, purgeAfter: new Date(now.getTime() + Math.min(2 ** attempts, 360) * MINUTE), updatedAt: new Date() })
+          .where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), isNull(fileUploads.purgedAt)));
+        (attempts >= PURGE_ALERT_ATTEMPTS ? log.error : log.warn)("[uploads]", "could not delete an upload's object; retrying later", {
+          organizationId: row.organizationId,
+          uploadId: row.id,
+          attempts,
+          error: err,
+        });
+        out.purgeErrors += 1;
+      }
+    }
+  }
+
+  // 5. Forget rows long after their object is gone.
+  if (!outOfTime()) {
+    const cutoff = new Date(now.getTime() - PURGED_ROW_KEEP_MS);
+    const old = await db
+      .select({ id: fileUploads.id, organizationId: fileUploads.organizationId })
+      .from(fileUploads)
+      .where(lte(fileUploads.purgedAt, cutoff))
+      .limit(limit);
+    capped(old.length);
+    for (const [organizationId, ids] of byOrganization(old)) {
+      const gone = await db
+        .delete(fileUploads)
+        .where(and(eq(fileUploads.organizationId, organizationId), inArray(fileUploads.id, ids), lte(fileUploads.purgedAt, cutoff)))
+        .returning({ id: fileUploads.id });
+      out.pruned += gone.length;
+    }
+  }
+  return out;
 }
 
 export type ProxyUploadResult = { status: number; body: UploadCompleteResult | { ok: false; error: string } };

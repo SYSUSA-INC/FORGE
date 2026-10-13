@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { collectAiBatches } from "@/lib/ai-batch-queue";
 import { runJobsCron } from "@/lib/jobs";
 import { log } from "@/lib/log";
+import { sweepUploads } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ export const maxDuration = 300;
  * solicitation parses, companion-document parses and proposal harvests
  * — from the stored file bytes, three per tick inside a time budget.
  * See `runJobsCron`. First it reads any finished AI batches (BL-AIX
- * Phase 1g-2, `collectAiBatches`), inside a minute of its own.
+ * Phase 1g-2, `collectAiBatches`), inside a minute of its own, then
+ * sweeps the upload ledger (BL-STAB-2d, `sweepUploads`) inside 15
+ * seconds: uploads never filed are deleted, filings that died are
+ * settled. Budgets: 60 + 15 + 165 s, inside the 300 s limit.
  *
  * Auth: Bearer ${CRON_SECRET} — same pattern as all other cron routes.
  */
@@ -45,9 +49,13 @@ export async function GET(req: NextRequest) {
       log.error("[jobs-cron]", "AI batch collection failed", { error: err });
       return null;
     });
-    const result = await runJobsCron({ budgetMs: 180_000 });
-    log.info("[jobs-cron]", "tick complete", { ...result, batches });
-    return NextResponse.json({ ok: true, ...result, batches });
+    const uploads = await sweepUploads({ budgetMs: 15_000, limit: 200 }).catch((err) => {
+      log.error("[jobs-cron]", "upload sweep failed", { error: err });
+      return null;
+    });
+    const result = await runJobsCron({ budgetMs: 165_000 });
+    log.info("[jobs-cron]", "tick complete", { ...result, batches, uploads });
+    return NextResponse.json({ ok: true, ...result, batches, uploads });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.error("[jobs-cron]", "cron run failed", { error: message });

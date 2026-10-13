@@ -183,6 +183,10 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
     },
     remove(id: string) {
       controllers.current.get(id)?.abort();
+      // A file in storage that was never filed (no claim, or its filing failed) is
+      // deleted now rather than a day later by the sweeper; a filed one is left alone.
+      const gone = items.find((it) => it.id === id);
+      if (gone?.stored && gone.uploadId && !running.current.has(id)) void cancelUploadAction(gone.uploadId).catch(() => undefined);
       setItems((list) => list.filter((it) => it.id !== id));
     },
     clear() {

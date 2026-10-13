@@ -151,6 +151,37 @@ export async function runDurable(
 }
 
 /**
+ * BL-STAB-2d — several jobs from one request (a GSA email's attachments):
+ * every row is recorded first, then one background run works through
+ * them in order, one at a time, so a batch of large files never parses
+ * side by side in one instance. Whatever it doesn't reach, the jobs
+ * cron runs.
+ */
+export async function runDurableBatch(
+  label: string,
+  items: { spec: JobSpec; bytes?: Uint8Array }[],
+): Promise<{ jobIds: string[] }> {
+  const jobIds: string[] = [];
+  const queued: { jobId: string; organizationId: string; bytes?: Uint8Array }[] = [];
+  for (const item of items) {
+    const { job } = await enqueueJob(item.spec);
+    jobIds.push(job.id);
+    if (job.status === "queued") queued.push({ jobId: job.id, organizationId: job.organizationId, bytes: item.bytes });
+  }
+  if (queued.length > 0) {
+    runInBackground(label, async () => {
+      for (const q of queued) {
+        // One job's database error doesn't stop the rest; the cron retries it.
+        await executeJob(q.jobId, q.organizationId, { bytes: q.bytes, viaCron: false }).catch((err) =>
+          log.error(label, "batch job could not run", { jobId: q.jobId, organizationId: q.organizationId, error: err }),
+        );
+      }
+    });
+  }
+  return { jobIds };
+}
+
+/**
  * Claim a queued row and run its handler. Safe to call from two places
  * at once: only the caller whose conditional UPDATE lands runs it.
  */

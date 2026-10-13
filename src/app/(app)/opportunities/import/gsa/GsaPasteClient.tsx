@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
+import { UploadQueue } from "@/components/uploads/UploadQueue";
+import { useUploadQueue } from "@/components/uploads/useUploadQueue";
+import { acceptFor, formatLimit } from "@/lib/upload-policy";
 import {
   createOpportunityFromGsaAction,
   parseGsaTextAction,
 } from "./actions";
+import { GSA_MAX_ATTACHMENTS } from "./gsa-constants";
 import type { GsaExtractionResult } from "@/lib/ai-prompts";
 
 type Fields = GsaExtractionResult;
@@ -36,20 +41,27 @@ const NOTICE_TYPES: { value: string; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-
-export function GsaPasteClient() {
+/**
+ * BL-STAB-2d — attachments upload straight to storage as soon as they are
+ * picked (each with its own progress, retry and cancel), so they are not
+ * bound by a request's size; creating the opportunity then sends only
+ * their ids, and the server files each one as a solicitation.
+ */
+export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
   const router = useRouter();
   const [rawText, setRawText] = useState("");
   const [fields, setFields] = useState<Fields>(EMPTY);
   const [parsedOnce, setParsedOnce] = useState(false);
   const [stubbed, setStubbed] = useState(false);
   const [provider, setProvider] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ opportunityId: string; skipped: { name: string; reason: string }[] } | null>(null);
   const [parsing, startParse] = useTransition();
   const [creating, startCreate] = useTransition();
+  const queue = useUploadQueue({ purpose: "document", maxBytes });
+  // Files that didn't upload would be silently left out: retry or remove them first.
+  const unfinished = queue.items.filter((it) => it.phase === "failed" || it.phase === "cancelled").length;
 
   function parse() {
     setError(null);
@@ -75,21 +87,18 @@ export function GsaPasteClient() {
 
   function onFilesPicked(picked: FileList | null) {
     if (!picked) return;
-    const next = [...files];
+    const taken = queue.items.map((it) => it.file);
+    const add: File[] = [];
+    let over = 0;
     for (const f of Array.from(picked)) {
-      if (next.length >= MAX_ATTACHMENTS) break;
       // Skip duplicates by name+size — common when the user picks
       // files twice in a row by mistake.
-      if (next.some((existing) => existing.name === f.name && existing.size === f.size)) {
-        continue;
-      }
-      next.push(f);
+      if ([...taken, ...add].some((existing) => existing.name === f.name && existing.size === f.size)) continue;
+      if (taken.length + add.length >= GSA_MAX_ATTACHMENTS) over += 1;
+      else add.push(f);
     }
-    setFiles(next);
-  }
-
-  function removeFile(idx: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
+    setNotice(over > 0 ? `${over} file${over === 1 ? "" : "s"} not added: at most ${GSA_MAX_ATTACHMENTS} attachments here. Once the opportunity is created, add the others as documents on one of its solicitations.` : null);
+    queue.add(add.map((file) => ({ file, meta: undefined })));
   }
 
   function create() {
@@ -99,39 +108,41 @@ export function GsaPasteClient() {
       return;
     }
     startCreate(async () => {
-      const fd = new FormData();
-      fd.set("text", rawText);
-      fd.set("title", fields.title);
-      fd.set("noticeType", fields.noticeType);
-      fd.set("solicitationNumber", fields.solicitationNumber);
-      fd.set("buyingAgency", fields.buyingAgency);
-      fd.set("office", fields.office);
-      fd.set("vehicle", fields.vehicle);
-      fd.set("naicsCode", fields.naicsCode);
-      fd.set("setAside", fields.setAside);
-      fd.set("responseDueDate", fields.responseDueDate ?? "");
-      fd.set("placeOfPerformance", fields.placeOfPerformance);
-      fd.set("scopeSummary", fields.scopeSummary);
-      fd.set("notes", fields.notes);
-      for (const f of files) fd.append("files", f);
-
-      const res = await createOpportunityFromGsaAction(fd);
+      let res: Awaited<ReturnType<typeof createOpportunityFromGsaAction>>;
+      try {
+        res = await createOpportunityFromGsaAction({
+          text: rawText,
+          title: fields.title,
+          noticeType: fields.noticeType,
+          solicitationNumber: fields.solicitationNumber,
+          buyingAgency: fields.buyingAgency,
+          office: fields.office,
+          vehicle: fields.vehicle,
+          naicsCode: fields.naicsCode,
+          setAside: fields.setAside,
+          responseDueDate: fields.responseDueDate ?? "",
+          placeOfPerformance: fields.placeOfPerformance,
+          scopeSummary: fields.scopeSummary,
+          notes: fields.notes,
+          uploadIds: queue.readyUploadIds,
+        });
+      } catch {
+        // It may have been created before the answer was lost: look before trying again.
+        setError("FORGE didn't answer. Check Opportunities for this one before creating it again.");
+        return;
+      }
       if (!res.ok) {
         setError(res.error);
         return;
       }
-      // If some attachments were skipped, surface that on the dest
-      // page via a query flag the opportunity detail can read.
-      const skipParam =
-        res.attachmentsSkipped.length > 0
-          ? `?attachmentsSkipped=${res.attachmentsSkipped.length}`
-          : "";
-      router.push(`/opportunities/${res.opportunityId}${skipParam}`);
+      // Attachments that couldn't be filed are named here, not lost behind a redirect.
+      if (res.attachmentsSkipped.length > 0) {
+        setCreated({ opportunityId: res.opportunityId, skipped: res.attachmentsSkipped });
+        return;
+      }
+      router.push(`/opportunities/${res.opportunityId}`);
     });
   }
-
-  const totalAttachmentBytes = files.reduce((s, f) => s + f.size, 0);
-  const totalAttachmentTooLarge = totalAttachmentBytes > MAX_ATTACHMENT_BYTES * MAX_ATTACHMENTS;
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr]">
@@ -185,15 +196,41 @@ export function GsaPasteClient() {
             disabled={
               !parsedOnce ||
               creating ||
+              created !== null ||
               fields.title.trim() === "" ||
-              totalAttachmentTooLarge
+              queue.busy ||
+              unfinished > 0
+            }
+            title={
+              queue.busy
+                ? "Wait for the attachments to finish uploading."
+                : unfinished > 0
+                  ? "Retry or remove the attachments that didn't upload."
+                  : undefined
             }
             onClick={create}
           >
-            {creating ? "Creating…" : "Create opportunity"}
+            {creating ? "Creating…" : queue.busy ? "Uploading attachments…" : "Create opportunity"}
           </button>
         }
       >
+        {created ? (
+          <div className="mb-3 flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 font-mono text-[11px] text-text">
+            <span>
+              Opportunity created. {created.skipped.length} attachment{created.skipped.length === 1 ? " wasn't" : "s weren't"} filed with it:
+            </span>
+            <ul className="flex flex-col gap-0.5">
+              {created.skipped.map((s, i) => (
+                <li key={`${s.name}_${i}`}>
+                  {s.name}: <span className="text-muted">{s.reason}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href={`/opportunities/${created.opportunityId}`} className="aur-btn aur-btn-primary self-start text-[11px]">
+              Open the opportunity
+            </Link>
+          </div>
+        ) : null}
         {!parsedOnce ? (
           <div className="font-mono text-[11px] text-muted">
             Paste the email body and click <strong>Extract with AI</strong> to
@@ -315,21 +352,21 @@ export function GsaPasteClient() {
           run to several rows once files are picked. */}
       <Panel
         title="Attachments"
-        eyebrow={`${files.length} of ${MAX_ATTACHMENTS} max`}
+        eyebrow={`${queue.items.length} of ${GSA_MAX_ATTACHMENTS} max`}
         className="xl:col-span-2"
       >
         <div className="flex flex-col gap-2">
           <p className="font-body text-[12px] text-muted">
             Optional. If the email came with the RFP / RFQ as a PDF, drop it
-            here. Each attached file becomes a Solicitation linked to the new
-            opportunity, parsed in the background. Up to {MAX_ATTACHMENTS} files,{" "}
-            {MAX_ATTACHMENT_BYTES / 1024 / 1024} MB each.
+            here. Each file uploads straight to secure storage, then becomes a
+            Solicitation linked to the new opportunity, parsed in the
+            background. Up to {GSA_MAX_ATTACHMENTS} files, {formatLimit(maxBytes)} each.
           </p>
           <input
             type="file"
             multiple
-            accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,image/*"
-            disabled={files.length >= MAX_ATTACHMENTS}
+            accept={acceptFor("document")}
+            disabled={queue.items.length >= GSA_MAX_ATTACHMENTS || creating || created !== null}
             onChange={(e) => {
               onFilesPicked(e.target.files);
               // Allow re-adding the same file after removing it.
@@ -337,36 +374,8 @@ export function GsaPasteClient() {
             }}
             className="aur-input file:mr-3 file:rounded file:border-0 file:bg-layer/10 file:px-3 file:py-1 file:text-[12px] file:text-text"
           />
-          {files.length > 0 ? (
-            <ul className="flex flex-col gap-1">
-              {files.map((f, i) => (
-                <li
-                  key={`${f.name}_${f.size}_${i}`}
-                  className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px]"
-                >
-                  <div className="min-w-0 flex-1 truncate text-text">
-                    {f.name}
-                  </div>
-                  <span className="shrink-0 text-muted">
-                    {(f.size / 1024).toFixed(0)} kB
-                    {f.size > MAX_ATTACHMENT_BYTES ? (
-                      <span className="ml-2 text-rose">
-                        too large
-                      </span>
-                    ) : null}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(i)}
-                    className="shrink-0 text-muted hover:text-text"
-                    aria-label={`Remove ${f.name}`}
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {notice ? <div className="font-mono text-[11px] text-muted">{notice}</div> : null}
+          <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
         </div>
       </Panel>
     </div>
