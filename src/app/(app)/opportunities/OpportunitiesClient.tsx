@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { OpportunityStage } from "@/db/schema";
 import { SendForReviewButton } from "./[id]/review/SendForReviewButton";
-import { formatDollarRange } from "@/lib/money";
+import { formatDollarRange, formatDollars } from "@/lib/money";
 import { StageWidget, spellOutStageCode } from "./StageWidget";
 import { formatDueProximity, type StageStat } from "./stage-stats";
 
@@ -24,6 +24,8 @@ type Opp = {
   pWin: number;
   owner: { userId: string; name: string | null; email: string } | null;
   updatedAt: string;
+  /** BL-PIPE-DRILL — PWin × midpoint, shown when opened from "Pipeline value". */
+  weightedValue?: number | null;
 };
 
 type StageConfig = {
@@ -38,6 +40,7 @@ export function OpportunitiesClient({
   stageStats,
   stages,
   initialStageFilter = "all",
+  drill = null,
 }: {
   opportunities: Opp[];
   /** Map of stage key → server-aggregated stats. Missing keys = zero. */
@@ -46,6 +49,8 @@ export function OpportunitiesClient({
   /** Pre-applied stage filter from URL (?stage=capture). Used when
    *  drilled into from the Command Center tiles. */
   initialStageFilter?: OpportunityStage | "all";
+  /** BL-PIPE-DRILL — opened from a pipeline number: what the list holds, and the way back. */
+  drill?: { summary: string; backHref: string } | null;
 }) {
   const [filter, setFilter] = useState("");
   const [stageFilter, setStageFilter] = useState<OpportunityStage | "all">(
@@ -106,6 +111,20 @@ export function OpportunitiesClient({
           },
         ]}
       />
+
+      {drill ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-cobalt/30 bg-cobalt/[0.06] px-4 py-3">
+          <p className="font-body text-[13px] text-text">{drill.summary}</p>
+          <span className="flex items-center gap-3 font-mono text-[11px]">
+            <Link href={drill.backHref} className="text-cobalt-300 underline">
+              Back to the pipeline
+            </Link>
+            <Link href="/opportunities" className="text-muted underline">
+              Show all opportunities
+            </Link>
+          </span>
+        </div>
+      ) : null}
 
       {/* Widget grid: 10 stages, click to filter. The "All" tile is
           a sibling so the click target for "no filter" is consistent
@@ -232,8 +251,10 @@ function OppRow({ o }: { o: Opp }) {
         {o.stageLabel}
       </span>
       <div className="font-mono text-[11px] text-muted">
-        <div className="text-muted">Value</div>
-        <div className="text-text">{valueRange}</div>
+        <div className="text-muted">{o.weightedValue != null ? "Weighted" : "Value"}</div>
+        <div className="text-text" title={o.weightedValue != null ? `PWin ${o.pWin}% × the middle of ${valueRange}` : undefined}>
+          {o.weightedValue != null ? formatDollars(o.weightedValue) : valueRange}
+        </div>
       </div>
       <div className="font-mono text-[11px] text-muted">
         <div className="text-muted">Due</div>

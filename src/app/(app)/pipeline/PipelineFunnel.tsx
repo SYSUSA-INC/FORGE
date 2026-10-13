@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { drillHref, type PipelineWindow } from "@/lib/pipeline-drill";
 import {
   formatDollars,
   type FunnelData,
@@ -28,9 +29,12 @@ import {
 export function PipelineFunnel({
   data,
   mode,
+  window = "all",
 }: {
   data: FunnelData;
   mode: "count" | "value";
+  /** The page's time window, kept when a stage opens its list (BL-PIPE-DRILL). */
+  window?: PipelineWindow;
 }) {
   // Find the largest metric value across active stages so we can
   // size every bar relative to that maximum (proper funnel scaling).
@@ -55,7 +59,7 @@ export function PipelineFunnel({
         return (
           <div key={stat.key} className="flex flex-col">
             <Link
-              href={`/opportunities?stage=${stat.key}`}
+              href={drillHref(window, null, stat.key)}
               className="group flex items-center gap-3 rounded-md py-2 transition-colors hover:bg-layer/[0.02]"
             >
               <span
@@ -127,7 +131,7 @@ export function PipelineFunnel({
               return (
                 <Link
                   key={stat.key}
-                  href={`/opportunities?stage=${stat.key}`}
+                  href={drillHref(window, null, stat.key)}
                   className="group flex items-center gap-3 rounded-md py-1.5 transition-colors hover:bg-layer/[0.02]"
                 >
                   <span

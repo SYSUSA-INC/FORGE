@@ -5,6 +5,8 @@ import type { OpportunityStage } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
+import { applyDrill, drillSummary, isDrill, parsePipelineDrill, weightedValueOf } from "@/lib/pipeline-drill";
+import { buildStageStats } from "./stage-stats";
 import { OpportunitiesClient } from "./OpportunitiesClient";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,7 @@ const VALID_STAGES = new Set(STAGES.map((s) => s.key));
 export default async function OpportunitiesPage({
   searchParams,
 }: {
-  searchParams: { stage?: string };
+  searchParams: { stage?: string; days?: string; view?: string };
 }) {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -26,8 +28,12 @@ export default async function OpportunitiesPage({
       : null;
 
   const snapshot = await getOrganizationSnapshot(organizationId);
+  // BL-PIPE-DRILL — opened from a pipeline number: the same rows that number counts.
+  const drill = parsePipelineDrill(searchParams);
+  const drilled = isDrill(drill);
+  const rows = drilled ? applyDrill(snapshot.oppRows, drill, new Date()) : snapshot.oppRows;
 
-  const list = snapshot.oppRows.map((r) => ({
+  const list = rows.map((r) => ({
     id: r.id,
     title: r.title,
     agency: r.agency,
@@ -48,9 +54,10 @@ export default async function OpportunitiesPage({
           }
         : null,
     updatedAt: r.updatedAt.toISOString(),
+    weightedValue: drill.view === "valued" ? weightedValueOf(r) : null,
   }));
 
-  if (list.length === 0) {
+  if (list.length === 0 && !drilled) {
     return (
       <>
         <PageHeader
@@ -89,9 +96,10 @@ export default async function OpportunitiesPage({
   return (
     <OpportunitiesClient
       opportunities={list}
-      stageStats={snapshot.oppStageStats}
+      stageStats={drilled ? buildStageStats(rows) : snapshot.oppStageStats}
       stages={STAGES}
       initialStageFilter={requestedStage ?? "all"}
+      drill={drilled ? { summary: drillSummary(rows, drill), backHref: drill.days === "all" ? "/pipeline?days=all" : `/pipeline?days=${drill.days}` } : null}
     />
   );
 }

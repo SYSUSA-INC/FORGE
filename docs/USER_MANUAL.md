@@ -344,6 +344,8 @@ The page leads with a **10-widget grid** of stage tiles — one per active stage
 
 Click a tile to filter the list below to that stage. The active tile gets a colored border + filled background so you can tell at a glance what's selected.
 
+**From the pipeline (BL-PIPE-DRILL).** On **Opportunities → Pipeline**, the four numbers at the top open the opportunities behind them, for the time window you picked: **In window** (every opportunity created in it), **Active** (those in Identified through Submitted), **Win rate** (those won or lost — no-bids aren't counted) and **Pipeline value** (those with a value, largest weighted value first, each row showing its PWin × the middle of its value range). Each stage of the funnel opens that stage in the same window. A line above the list says what it holds and how the number was made, with **Back to the pipeline** and **Show all opportunities**; the list always has as many rows as the number you clicked.
+
 Below the grid:
 - **Search** — title, agency, owner, solicitation number
 - **+ New opportunity** — manual create

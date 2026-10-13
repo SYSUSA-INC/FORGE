@@ -5,6 +5,7 @@ import { opportunities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { drillHref } from "@/lib/pipeline-drill";
 import { buildFunnelData, formatDollars } from "./funnel-stats";
 import { PipelineFilters } from "./PipelineFilters";
 import { PipelineFunnel } from "./PipelineFunnel";
@@ -113,17 +114,21 @@ export default async function PipelinePage({
         }
         actions={headerActions}
         meta={[
+          // BL-PIPE-DRILL — each number opens the opportunities behind it.
           {
             label: "In window",
             value: String(data.totalCount).padStart(2, "0"),
+            href: drillHref(windowKey),
           },
           {
             label: "Active",
             value: String(activeCount).padStart(2, "0"),
             accent: activeCount > 0 ? "magenta" : undefined,
+            href: drillHref(windowKey, "active"),
           },
           {
             label: "Win rate",
+            href: drillHref(windowKey, "decided"),
             value: data.winRate === null ? "—" : `${data.winRate}%`,
             accent:
               data.winRate !== null && data.winRate >= 40
@@ -135,6 +140,7 @@ export default async function PipelinePage({
           {
             label: mode === "value" ? "Weighted value" : "Pipeline value",
             value: formatDollars(data.totalWeightedValue),
+            href: drillHref(windowKey, "valued"),
           },
         ]}
       />
@@ -149,7 +155,7 @@ export default async function PipelinePage({
             : "Width = number of opportunities in stage"
         }
       >
-        <PipelineFunnel data={data} mode={mode} />
+        <PipelineFunnel data={data} mode={mode} window={windowKey} />
       </Panel>
     </>
   );
