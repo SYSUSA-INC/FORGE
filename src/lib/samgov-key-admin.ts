@@ -26,8 +26,14 @@ export type CompanyKeyRow = {
   setAt: Date;
   setBy: string | null;
   keyId: string;
-  /** Its keyring entry is present here, so FORGE can use it. */
+  /** It decrypts here, so FORGE can use it. */
   readable: boolean;
+  /**
+   * Why not, when it doesn't: its keyring entry is missing; the entry is
+   * there but its value doesn't match (a mistyped FORGE_SECRET_KEYS — every
+   * key under it fails the same way); or the stored value is damaged.
+   */
+  decrypts: "ok" | "missing_entry" | "wrong_entry" | "damaged";
   /** Encrypted under the keyring's first entry (nothing to re-encrypt). */
   current: boolean;
 };
@@ -46,6 +52,7 @@ export async function listCompanySamKeys(): Promise<{ keyring: ReturnType<typeof
       setByName: users.name,
       setByEmail: users.email,
       keyId: organizationSamgovKeys.keyId,
+      ciphertext: organizationSamgovKeys.ciphertext,
     })
     .from(organizationSamgovKeys)
     .innerJoin(organizations, eq(organizations.id, organizationSamgovKeys.organizationId))
@@ -53,17 +60,32 @@ export async function listCompanySamKeys(): Promise<{ keyring: ReturnType<typeof
     .orderBy(asc(organizations.name));
   return {
     keyring,
-    rows: rows.map(({ setByName, setByEmail, ...r }) => ({
-      ...r,
-      setBy: setByName || setByEmail || null,
-      readable: canDecryptKeyId(r.keyId),
-      current: r.keyId === keyring.primaryKeyId,
-    })),
+    // Only whether each decrypts leaves this function, never the ciphertext or the key.
+    rows: rows.map(({ setByName, setByEmail, ciphertext, ...r }) => {
+      const decrypts = decryptState(ciphertext, r.keyId, r.organizationId);
+      return { ...r, setBy: setByName || setByEmail || null, readable: decrypts === "ok", decrypts, current: r.keyId === keyring.primaryKeyId };
+    }),
   };
 }
 
+/** A trial decryption (the result is discarded): whether FORGE can use the stored key. */
+function decryptState(ciphertext: string, keyId: string, organizationId: string): CompanyKeyRow["decrypts"] {
+  if (!canDecryptKeyId(keyId)) return "missing_entry";
+  try {
+    decryptSecret(ciphertext, { purpose: PURPOSE, organizationId });
+    return "ok";
+  } catch (err) {
+    return err instanceof SecretBoxError && err.reason === "auth_failed" ? "wrong_entry" : "damaged";
+  }
+}
+
+/**
+ * `mismatched`: keys whose entry is there but doesn't decrypt them, per key
+ * id — almost always a mistyped FORGE_SECRET_KEYS value (restore it), not
+ * damaged keys; `failed`: anything else (a damaged value, a database error).
+ */
 export type ReencryptResult =
-  | { ok: true; moved: number; alreadyCurrent: number; unreadable: number; failed: number }
+  | { ok: true; moved: number; alreadyCurrent: number; unreadable: number; mismatched: { keyId: string; count: number }[]; failed: number }
   | { ok: false; error: string };
 
 /**
@@ -80,7 +102,8 @@ export async function reencryptCompanySamKeys(): Promise<ReencryptResult> {
   const rows = await db
     .select({ organizationId: organizationSamgovKeys.organizationId, ciphertext: organizationSamgovKeys.ciphertext, keyId: organizationSamgovKeys.keyId })
     .from(organizationSamgovKeys);
-  const result = { ok: true as const, moved: 0, alreadyCurrent: 0, unreadable: 0, failed: 0 };
+  const result = { ok: true as const, moved: 0, alreadyCurrent: 0, unreadable: 0, mismatched: [] as { keyId: string; count: number }[], failed: 0 };
+  const mismatch = new Map<string, number>();
   for (const row of rows) {
     if (row.keyId === keyring.primaryKeyId) {
       result.alreadyCurrent++;
@@ -106,8 +129,9 @@ export async function reencryptCompanySamKeys(): Promise<ReencryptResult> {
         .returning({ organizationId: organizationSamgovKeys.organizationId });
       if (written.length > 0) result.moved++;
     } catch (err) {
-      result.failed++;
       const reason = err instanceof SecretBoxError ? err.reason : "error";
+      if (reason === "auth_failed") mismatch.set(row.keyId, (mismatch.get(row.keyId) ?? 0) + 1);
+      else result.failed++;
       log.error("[samgov-key]", "company key re-encryption failed", {
         organizationId: row.organizationId,
         keyId: row.keyId,
@@ -115,5 +139,6 @@ export async function reencryptCompanySamKeys(): Promise<ReencryptResult> {
       });
     }
   }
+  result.mismatched = [...mismatch].map(([keyId, count]) => ({ keyId, count }));
   return result;
 }

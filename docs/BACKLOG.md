@@ -779,7 +779,11 @@ mind. Bandage will come off but a true fix will stay."
     reason recorded in the company's audit log, and re-encrypt every key
     on an older keyring entry to the first one after a rotation (rows
     written only if unchanged since read; unreadable and damaged ones
-    counted, not touched).
+    counted, not touched). Review fixes: Remove deletes only the key the
+    page showed (last four + when it was set); each key is test-decrypted
+    so a mistyped keyring value shows as "doesn't decrypt with this entry"
+    and re-encryption counts it apart, with the advice to restore the
+    value rather than remove keys.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
   data.** ⏳ queued (added 2026-10-08).
   - **Ask (owner):** "We need to enforce some security gates for

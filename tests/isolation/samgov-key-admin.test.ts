@@ -72,12 +72,16 @@ describe("BL-STAB-7e — company SAM.gov keys for platform admins", () => {
     const before = (await listCompanySamKeys()).rows.filter((r) => orgs().includes(r.organizationId) || r.organizationId === fx2.orgB.organizationId);
     expect(JSON.stringify(before)).not.toContain(KEY_A.slice(0, 12));
     const flags = Object.fromEntries(before.map((r) => [r.organizationId, [r.keyId, r.readable, r.current]]));
-    expect(flags[fx.orgA.organizationId]).toEqual(["k1", true, false]);
     expect(flags[fx.orgB.organizationId]).toEqual(["k0", false, false]);
     expect(flags[fx2.orgA.organizationId]).toEqual(["k2", true, true]);
 
+    expect(flags[fx.orgA.organizationId]).toEqual(["k1", true, false]);
+    // A value that doesn't decrypt under an entry that is there: the entry's value is wrong (or the value damaged).
+    expect(before.find((x) => x.organizationId === fx2.orgB.organizationId)).toMatchObject({ readable: false, decrypts: "wrong_entry" });
+    expect(before.find((x) => x.organizationId === fx.orgB.organizationId)).toMatchObject({ readable: false, decrypts: "missing_entry" });
+
     const r = await reencryptCompanySamKeysAction();
-    expect(r).toMatchObject({ ok: true, moved: 1, unreadable: 1, failed: 1 });
+    expect(r).toMatchObject({ ok: true, moved: 1, unreadable: 1, mismatched: [{ keyId: "k1", count: 1 }], failed: 0 });
     const rows = await db.select().from(organizationSamgovKeys).where(inArray(organizationSamgovKeys.organizationId, [...orgs(), fx2.orgB.organizationId]));
     const byOrg = new Map(rows.map((x) => [x.organizationId, x]));
     // Moved to k2, and still the company's key.
@@ -89,16 +93,24 @@ describe("BL-STAB-7e — company SAM.gov keys for platform admins", () => {
     expect(byOrg.get(fx.orgB.organizationId)!.ciphertext).toBe(b.ciphertext);
     expect(byOrg.get(fx2.orgB.organizationId)!.ciphertext).toBe(broken);
     const [audit] = await db.select({ metadata: auditLogs.metadata }).from(auditLogs).where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "admin.samgov_keys.reencrypt")));
-    expect(audit?.metadata).toMatchObject({ moved: 1, unreadable: 1, failed: 1 });
+    expect(audit?.metadata).toMatchObject({ moved: 1, unreadable: 1, mismatched: 1, failed: 0 });
     await db.delete(organizationSamgovKeys).where(eq(organizationSamgovKeys.organizationId, fx2.orgB.organizationId));
   });
 
-  it("removes a company's key with the reason in that company's audit log", async () => {
+  it("removes the company's key the admin saw, with the reason in that company's audit log", async () => {
     const b = under(`k2:${K2}`, KEY_B, fx.orgB.organizationId);
-    await db.insert(organizationSamgovKeys).values({ organizationId: fx.orgB.organizationId, ciphertext: b.ciphertext, keyId: b.keyId, last4: "BBBB" });
-    expect(await adminRemoveCompanySamKeyAction({ organizationId: fx.orgB.organizationId, reason: "" })).toMatchObject({ ok: false });
-    expect(await adminRemoveCompanySamKeyAction({ organizationId: "00000000-0000-0000-0000-000000000000", reason: "Leaked in a ticket" })).toEqual({ ok: false, error: "Organization not found." });
-    expect(await adminRemoveCompanySamKeyAction({ organizationId: fx.orgB.organizationId, reason: "Leaked in a ticket" })).toEqual({ ok: true, removed: true });
+    const seenAt = new Date("2026-10-01T10:00:00.123Z");
+    await db.insert(organizationSamgovKeys).values({ organizationId: fx.orgB.organizationId, ciphertext: b.ciphertext, keyId: b.keyId, last4: "BBBB", setAt: seenAt });
+    const seen = { last4: "BBBB", setAt: seenAt.toISOString() };
+    expect(await adminRemoveCompanySamKeyAction({ organizationId: fx.orgB.organizationId, reason: "", expected: seen })).toMatchObject({ ok: false });
+    expect(await adminRemoveCompanySamKeyAction({ organizationId: "00000000-0000-0000-0000-000000000000", reason: "Leaked in a ticket", expected: seen })).toEqual({ ok: false, error: "Organization not found." });
+    // The company saved a new key since the page loaded: it stays, and nothing is audited.
+    expect(await adminRemoveCompanySamKeyAction({ organizationId: fx.orgB.organizationId, reason: "Leaked in a ticket", expected: { last4: "BBBB", setAt: "2026-09-01T00:00:00.000Z" } })).toEqual({
+      ok: false,
+      error: "The company changed its key since this page loaded; reload and check again.",
+    });
+    expect(await db.select().from(organizationSamgovKeys).where(eq(organizationSamgovKeys.organizationId, fx.orgB.organizationId))).toHaveLength(1);
+    expect(await adminRemoveCompanySamKeyAction({ organizationId: fx.orgB.organizationId, reason: "Leaked in a ticket", expected: seen })).toEqual({ ok: true, removed: true });
     expect(await db.select().from(organizationSamgovKeys).where(eq(organizationSamgovKeys.organizationId, fx.orgB.organizationId))).toEqual([]);
     const audits = await db
       .select({ organizationId: auditLogs.organizationId, metadata: auditLogs.metadata })

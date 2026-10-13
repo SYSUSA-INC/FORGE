@@ -34,6 +34,7 @@ export async function removeCompanySamKeyAction(): Promise<SamKeyActionResult> {
   const actor = await requireOrgAdmin(ctx.organizationId);
   const res = await removeCompanySamKey({ organizationId: ctx.organizationId, actor: { userId: actor.id, email: actor.email ?? null } });
   revalidateSamKeyPages();
+  if (!res.ok) return res;
   return {
     ok: true,
     message: res.removed ? "Removed. FORGE's shared SAM.gov key is used for your company when one is available." : "There was no company key to remove.",

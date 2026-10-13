@@ -22,7 +22,15 @@ export function ReencryptButton({ pending, disabled }: { pending: number; disabl
               const r = await reencryptCompanySamKeysAction();
               setNote(
                 r.ok
-                  ? { ok: r.failed === 0, text: `Re-encrypted ${r.moved}; ${r.alreadyCurrent} already current${r.unreadable ? `; ${r.unreadable} not readable here (their keyring entry is missing)` : ""}${r.failed ? `; ${r.failed} failed (see /admin/errors)` : ""}.` }
+                  ? {
+                      ok: r.failed === 0 && r.mismatched.length === 0,
+                      text:
+                        `Re-encrypted ${r.moved}; ${r.alreadyCurrent} already current` +
+                        (r.unreadable ? `; ${r.unreadable} not readable here (their keyring entry is missing — add it back)` : "") +
+                        r.mismatched.map((m) => `; ${m.count} don't decrypt with entry ${m.keyId} — its value in FORGE_SECRET_KEYS is probably wrong: restore it, don't remove these keys`).join("") +
+                        (r.failed ? `; ${r.failed} failed (see /admin/errors)` : "") +
+                        ".",
+                    }
                   : { ok: false, text: r.error },
               );
             } catch {
@@ -40,7 +48,7 @@ export function ReencryptButton({ pending, disabled }: { pending: number; disabl
 }
 
 /** BL-STAB-7e — remove one company's key, with the reason its admins will see. */
-export function RemoveKeyButton({ organizationId, organizationName, last4 }: { organizationId: string; organizationName: string; last4: string }) {
+export function RemoveKeyButton({ organizationId, organizationName, last4, setAt }: { organizationId: string; organizationName: string; last4: string; setAt: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -61,7 +69,7 @@ export function RemoveKeyButton({ organizationId, organizationName, last4 }: { o
         start(async () => {
           setError(null);
           try {
-            const r = await adminRemoveCompanySamKeyAction({ organizationId, reason });
+            const r = await adminRemoveCompanySamKeyAction({ organizationId, reason, expected: { last4, setAt } });
             if (!r.ok) return setError(r.error);
             setOpen(false);
             router.refresh();

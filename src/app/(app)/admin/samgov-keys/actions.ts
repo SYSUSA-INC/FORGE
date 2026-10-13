@@ -21,14 +21,19 @@ import { removeCompanySamKey } from "@/lib/samgov-key";
 export async function adminRemoveCompanySamKeyAction(input: {
   organizationId: string;
   reason: string;
+  /** The key the page showed: its last four characters and when it was set (ISO). */
+  expected: { last4: string; setAt: string };
 }): Promise<{ ok: true; removed: boolean } | { ok: false; error: string }> {
   const actor = await requireSuperadmin();
   const reason = typeof input?.reason === "string" ? input.reason.trim().slice(0, 300) : "";
   if (reason.length < 3) return { ok: false, error: "Say why the key is being removed; the company sees it in its audit log." };
+  const last4 = typeof input?.expected?.last4 === "string" ? input.expected.last4 : "";
+  const setAt = new Date(typeof input?.expected?.setAt === "string" ? input.expected.setAt : NaN);
+  if (last4.length !== 4 || Number.isNaN(setAt.getTime())) return { ok: false, error: "Reload the page and try again." };
   const organizationId = typeof input?.organizationId === "string" ? input.organizationId : "";
   const [org] = organizationId ? await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, organizationId)).limit(1) : [];
   if (!org) return { ok: false, error: "Organization not found." };
-  const res = await removeCompanySamKey({ organizationId, actor: { userId: actor.id, email: actor.email ?? null }, platformReason: reason });
+  const res = await removeCompanySamKey({ organizationId, actor: { userId: actor.id, email: actor.email ?? null }, platformReason: reason, expected: { last4, setAt } });
   revalidatePath("/admin/samgov-keys");
   return res;
 }
@@ -42,7 +47,7 @@ export async function reencryptCompanySamKeysAction(): Promise<ReencryptResult> 
       actor: { userId: actor.id, email: actor.email ?? null },
       action: "admin.samgov_keys.reencrypt",
       resourceType: "organization_samgov_key",
-      metadata: { moved: res.moved, alreadyCurrent: res.alreadyCurrent, unreadable: res.unreadable, failed: res.failed },
+      metadata: { moved: res.moved, alreadyCurrent: res.alreadyCurrent, unreadable: res.unreadable, mismatched: res.mismatched.reduce((n, m) => n + m.count, 0), failed: res.failed },
     });
   }
   revalidatePath("/admin/samgov-keys");

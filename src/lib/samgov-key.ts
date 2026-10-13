@@ -333,12 +333,28 @@ export async function setCompanySamKey(input: {
  * to the shared key. `platformReason`: removed by a platform admin
  * (BL-STAB-7e), recorded in the company's audit log with the reason.
  */
-export async function removeCompanySamKey(input: { organizationId: string; actor: Actor; platformReason?: string }): Promise<{ ok: true; removed: boolean }> {
-  const { organizationId, actor } = input;
+export async function removeCompanySamKey(input: {
+  organizationId: string;
+  actor: Actor;
+  platformReason?: string;
+  /** Delete only this key (the one the admin saw): a key the company saved since stays. */
+  expected?: { last4: string; setAt: Date };
+}): Promise<{ ok: true; removed: boolean } | { ok: false; error: string }> {
+  const { organizationId, actor, expected } = input;
   const [row] = await db
     .delete(organizationSamgovKeys)
-    .where(eq(organizationSamgovKeys.organizationId, organizationId))
+    .where(
+      and(
+        eq(organizationSamgovKeys.organizationId, organizationId),
+        expected ? eq(organizationSamgovKeys.last4, expected.last4) : undefined,
+        expected ? sql`date_trunc('milliseconds', ${organizationSamgovKeys.setAt}) = ${expected.setAt.toISOString()}::timestamptz` : undefined,
+      ),
+    )
     .returning({ last4: organizationSamgovKeys.last4 });
+  if (!row && expected) {
+    const [still] = await db.select({ last4: organizationSamgovKeys.last4 }).from(organizationSamgovKeys).where(eq(organizationSamgovKeys.organizationId, organizationId)).limit(1);
+    if (still) return { ok: false, error: "The company changed its key since this page loaded; reload and check again." };
+  }
   if (row) {
     await recordAudit({
       organizationId,

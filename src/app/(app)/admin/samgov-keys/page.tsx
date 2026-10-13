@@ -20,6 +20,7 @@ export default async function SamgovKeysPage() {
   const { keyring, rows } = await listCompanySamKeys();
   const old = rows.filter((r) => !r.current);
   const unreadable = rows.filter((r) => !r.readable);
+  const wrongEntry = [...new Set(rows.filter((r) => r.decrypts === "wrong_entry").map((r) => r.keyId))];
   return (
     <>
       <PageHeader
@@ -44,6 +45,12 @@ export default async function SamgovKeysPage() {
           ) : (
             <p className="text-rose">Company keys can&apos;t be saved or read here: {keyring.problem}.</p>
           )}
+          {wrongEntry.length > 0 ? (
+            <p className="text-rose">
+              Keys under {wrongEntry.join(", ")} don&apos;t decrypt with that entry&apos;s value here: FORGE_SECRET_KEYS probably holds a mistyped
+              value for it. Restore the original value from where it&apos;s kept; don&apos;t remove these keys or the entry.
+            </p>
+          ) : null}
           <ReencryptButton pending={old.filter((r) => r.readable).length} disabled={!keyring.available || !old.some((r) => r.readable)} />
         </div>
       </Panel>
@@ -78,10 +85,18 @@ export default async function SamgovKeysPage() {
                     </td>
                     <td className={`py-2 pr-3 ${!r.readable ? "text-rose" : r.current ? "text-muted" : "text-gold"}`}>
                       {r.keyId}
-                      {!r.readable ? " · not in this keyring" : r.current ? "" : " · older entry"}
+                      {r.decrypts === "missing_entry"
+                        ? " · not in this keyring"
+                        : r.decrypts === "wrong_entry"
+                          ? " · doesn't decrypt with this entry (check its value)"
+                          : r.decrypts === "damaged"
+                            ? " · damaged"
+                            : r.current
+                              ? ""
+                              : " · older entry"}
                     </td>
                     <td className="py-2 text-right">
-                      <RemoveKeyButton organizationId={r.organizationId} organizationName={r.organizationName} last4={r.last4} />
+                      <RemoveKeyButton organizationId={r.organizationId} organizationName={r.organizationName} last4={r.last4} setAt={r.setAt.toISOString()} />
                     </td>
                   </tr>
                 ))}
