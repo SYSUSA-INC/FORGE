@@ -196,7 +196,7 @@ function SettingsPanel({
       >
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <label className="block">
-            <span className="aur-label">Keywords (comma-separated, up to 10; the first three are searched nightly)</span>
+            <span className="aur-label">Keywords (comma-separated, up to 10; a find mentions at least one)</span>
             <input
               className="aur-input mt-1 font-body text-sm"
               value={keywords}
@@ -206,7 +206,7 @@ function SettingsPanel({
             />
           </label>
           <label className="block">
-            <span className="aur-label">Extra NAICS codes (added to your organization&apos;s codes)</span>
+            <span className="aur-label">NAICS codes (searched first, then your organization&apos;s; 10 in all)</span>
             <input
               className="aur-input mt-1 font-mono text-sm"
               value={extraNaics}

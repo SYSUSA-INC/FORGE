@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { samNoticeLoadRuns, samNotices } from "@/db/schema";
 import { log } from "@/lib/log";
 import { getPlatformSetting } from "@/lib/platform-settings";
-import { escapeHtml } from "@/lib/samgov-match";
+import { escapeHtml, type DescriptionState } from "@/lib/samgov-match";
 
 /**
  * BL-STAB-10b — searches read FORGE's copy of SAM.gov's notice
@@ -22,6 +22,13 @@ import { escapeHtml } from "@/lib/samgov-match";
  * nothing. `link`: in the file, but only as a link to SAM.gov.
  */
 export type StoredDescription = { text: string; partial: boolean } | { none: true } | { link: true };
+
+/** A stored description as matching reads it (matchStored); a link-only row is a miss. */
+export function asDescription(s: StoredDescription | undefined): DescriptionState | null {
+  if (!s || "link" in s) return null;
+  if ("none" in s) return { none: true };
+  return s.partial ? { text: s.text, partial: true } : { text: s.text };
+}
 
 export type NoticeStore = {
   on: boolean;

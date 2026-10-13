@@ -5,6 +5,7 @@
  * the next prompt is shown, and the expiring-award window. Unit-tested.
  */
 import { setAsideEligibility, type SocioEconomic } from "@/lib/pwin-model";
+import { hasKeyword, matchNotice, matchStored, parseKeyword, type DescriptionState, type KeywordQuery } from "@/lib/samgov-match";
 
 export type ScoutRecommendation = "pursue" | "watch" | "skip";
 export type ScoutDecision = "imported" | "dismissed";
@@ -298,4 +299,65 @@ export function awardExpiresWithin(
   if (days > withinDays) return null;
   if (days < -30) return null;
   return days;
+}
+
+// ── what a run searches, and what still fits (BL-STAB-10d) ────────────
+
+/** A NAICS code from a saved entry ("541512", "541512 - Computer Systems Design"), else "". */
+export function naicsCodeOf(entry: string | null | undefined): string {
+  const m = /\d+/.exec(entry ?? "");
+  return m && m[0].length >= 2 && m[0].length <= 6 ? m[0] : "";
+}
+
+/**
+ * The NAICS codes a run searches: the Scout page's own first, then the
+ * organization's primary and listed codes — at most `max` (one SAM.gov
+ * request each); `all` is every code, searched or not.
+ */
+export function scoutCodes(i: { extra: string[]; primary: string | null; list: string[] }, max: number): { searched: string[]; all: string[] } {
+  const all = [...new Set([...i.extra, i.primary, ...i.list].map(naicsCodeOf).filter(Boolean))];
+  return { searched: all.slice(0, max), all };
+}
+
+/**
+ * Every saved keyword as one list: a find mentions at least one, each a
+ * phrase. A `-word` excludes it from every find; a `+word` stays part of
+ * its phrase (it can't be required of every find when any keyword will
+ * do). Parsed one keyword at a time, so all ten count.
+ */
+export function scoutKeywordQuery(keywords: string[]): KeywordQuery | null {
+  const merged: KeywordQuery = { terms: [], anyOf: [], excluded: [], labels: {}, notes: [] };
+  const phrases: string[] = [];
+  for (const k of keywords) {
+    const q = parseKeyword(k.replace(/[,;]/g, " ").replace(/(^|\s)\+(?=\S)/g, "$1"), [], { asList: true });
+    for (const p of q.anyOf.flat()) if (!phrases.includes(p)) phrases.push(p);
+    for (const e of q.excluded) if (!merged.excluded.includes(e)) merged.excluded.push(e);
+    merged.labels = { ...q.labels, ...merged.labels };
+  }
+  if (phrases.length) merged.anyOf.push(phrases);
+  return hasKeyword(merged) ? merged : null;
+}
+
+/** Saved descriptions are cut here: one this long may hold more than was kept. */
+export const SCOUT_DESCRIPTION_CHARS = 20_000;
+
+/**
+ * Why a waiting find no longer fits the scout's rules — past its due date,
+ * outside the codes, or not mentioning a keyword — or null when it still
+ * fits or FORGE can't tell yet. A watchlisted award is never judged here.
+ * `desc` is the find's description as matching reads it (FORGE's copy of
+ * SAM.gov when the find has none of its own), or null if unknown.
+ */
+export function staleReason(
+  c: { source: ScoutSource; naicsCode: string; responseDueAt: Date | null; title: string; agency: string },
+  rules: { codes: string[]; query: KeywordQuery | null; now: Date },
+  desc: DescriptionState | null,
+): "past_due" | "other_code" | "no_keyword" | null {
+  if (c.source === "watchlist_award") return null;
+  if (c.responseDueAt && c.responseDueAt.getTime() < rules.now.getTime()) return "past_due";
+  if (rules.codes.length > 0 && !rules.codes.includes(naicsCodeOf(c.naicsCode))) return "other_code";
+  if (!rules.query) return null;
+  const row = { title: c.title, agency: c.agency };
+  const m = desc ? matchStored(row, rules.query, desc) : matchNotice(row, rules.query, null);
+  return m.status === "not_mentioned" || m.status === "no_description" ? "no_keyword" : null;
 }

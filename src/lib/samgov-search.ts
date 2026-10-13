@@ -1,5 +1,5 @@
 import "server-only";
-import { noticeStore, type StoredDescription } from "@/lib/sam-notice-store";
+import { asDescription, noticeStore } from "@/lib/sam-notice-store";
 import { fetchSamOpportunities, readNoticeDescriptions, withoutLinks, type SamOpportunity } from "@/lib/samgov";
 import type { SamFailure } from "@/lib/samgov-errors";
 import type { SamCredential } from "@/lib/samgov-key";
@@ -13,7 +13,6 @@ import {
   noticeAgency,
   parseKeyword,
   plainText,
-  type DescriptionState,
   type KeywordQuery,
   type KeywordSearchCounts,
   type NoticeMatch,
@@ -44,13 +43,6 @@ const STALE_MS = 48 * 3_600_000;
 function preview(text: string): string {
   const t = plainText(text);
   return t.length > PREVIEW ? `${t.slice(0, PREVIEW).trimEnd()}…` : t;
-}
-
-/** A stored description as matching sees it (matchStored); a link-only row is a miss. */
-function asDescription(s: StoredDescription | undefined): DescriptionState | null {
-  if (!s || "link" in s) return null;
-  if ("none" in s) return { none: true };
-  return s.partial ? { text: s.text, partial: true } : { text: s.text };
 }
 
 /**

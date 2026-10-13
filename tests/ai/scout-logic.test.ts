@@ -8,7 +8,11 @@ import {
   EMPTY_SCOUT_TRACK,
   gradeTriage,
   learningExamples,
+  naicsCodeOf,
+  scoutCodes,
   scoutFit,
+  scoutKeywordQuery,
+  staleReason,
   summarizeScoutTrack,
   type FitContext,
   type FitInput,
@@ -168,5 +172,47 @@ describe("awardExpiresWithin", () => {
     expect(awardExpiresWithin("", now, 180)).toBeNull();
     expect(awardExpiresWithin(null, now, 180)).toBeNull();
     expect(awardExpiresWithin("not a date", now, 180)).toBeNull();
+  });
+});
+
+describe("BL-STAB-10d — what the scout searches and what still fits", () => {
+  it("searches the Scout page's codes first, then the organization's, ten at most, codes only", () => {
+    expect(["541512", "541512 - Computer Systems Design", "NAICS 541519", "5", "1234567", "", null].map(naicsCodeOf)).toEqual(["541512", "541512", "541519", "", "", "", ""]);
+    const org = { primary: "518210", list: ["541715 - R&D", "541512", "236220", "541330", "541611", "541618", "541690", "541990", "561110", "611430"] };
+    const c = scoutCodes({ extra: ["541519", "541513", "541511", "541512"], ...org }, 10);
+    expect(c.searched).toEqual(["541519", "541513", "541511", "541512", "518210", "541715", "236220", "541330", "541611", "541618"]);
+    expect(c.all.slice(10)).toEqual(["541690", "541990", "561110", "611430"]);
+  });
+
+  it("reads every saved keyword as one any-of list: -word excludes from every find, +word stays in its phrase", () => {
+    const q = scoutKeywordQuery(["Enterprise IT modernization", "ServiceNow", "Digital Transformation"])!;
+    expect(q.anyOf).toEqual([["enterprise it modernization", "servicenow", "digital transformation"]]);
+    expect(q.terms).toEqual([]);
+    const ten = scoutKeywordQuery(Array.from({ length: 10 }, (_, i) => `keyword number ${i} ${"x".repeat(40)}`))!;
+    expect(ten.anyOf[0]).toHaveLength(10);
+    const signs = scoutKeywordQuery(["+cloud migration", "zero trust -hardware", "a, b"])!;
+    expect(signs).toMatchObject({ terms: [], anyOf: [["cloud migration", "zero trust", "a b"]], excluded: ["hardware"] });
+    expect(scoutKeywordQuery([])).toBeNull();
+    expect(scoutKeywordQuery(["  ", "-"])).toBeNull();
+  });
+
+  it("says why a waiting find no longer fits — past due, another code, no keyword — and keeps what it can't judge", () => {
+    const now = new Date("2026-10-13T12:00:00Z");
+    const rules = { codes: ["541519", "541512"], query: scoutKeywordQuery(["ServiceNow", "Digital Transformation"]), now };
+    const find = { source: "org_naics" as const, naicsCode: "541512", responseDueAt: new Date("2026-11-01T00:00:00Z"), title: "IT support", agency: "VA" };
+    expect(staleReason(find, rules, { text: "Migrating the help desk to ServiceNow." })).toBeNull();
+    expect(staleReason({ ...find, title: "ServiceNow renewal" }, rules, null)).toBeNull();
+    expect(staleReason(find, rules, { text: "Data collection support services." })).toBe("no_keyword");
+    expect(staleReason(find, rules, { none: true })).toBe("no_keyword");
+    expect(staleReason({ ...find, naicsCode: "518210" }, rules, { text: "ServiceNow." })).toBe("other_code");
+    expect(staleReason({ ...find, responseDueAt: new Date("2026-10-01T00:00:00Z") }, rules, { text: "ServiceNow." })).toBe("past_due");
+    // Can't tell yet: no description known, cut text without a hit, or paragraphs run together around a keyword.
+    expect(staleReason(find, rules, null)).toBeNull();
+    expect(staleReason(find, rules, { text: "Data collection…", partial: true })).toBeNull();
+    expect(staleReason(find, rules, { text: "BackgroundServiceNow is the tool." })).toBeNull();
+    // A watchlisted award isn't judged by keywords or codes; with no keywords, codes alone decide.
+    expect(staleReason({ ...find, source: "watchlist_award", naicsCode: "" }, rules, null)).toBeNull();
+    expect(staleReason(find, { ...rules, query: null }, null)).toBeNull();
+    expect(staleReason({ ...find, naicsCode: "" }, { ...rules, query: null }, null)).toBe("other_code");
   });
 });

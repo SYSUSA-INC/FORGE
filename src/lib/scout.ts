@@ -61,10 +61,11 @@ import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
 import { noticeDescriptionUrl, type SamOpportunity } from "@/lib/samgov";
+import { asDescription, noticeStore } from "@/lib/sam-notice-store";
 import { descriptionsFor } from "@/lib/samgov-descriptions";
 import { isKeyOrQuotaFailure } from "@/lib/samgov-errors";
 import { resolveSamCredential, type SamCredential } from "@/lib/samgov-key";
-import { OPEN_NOTICE_TYPES, noticeAgency, parseKeyword, readableText } from "@/lib/samgov-match";
+import { OPEN_NOTICE_TYPES, escapeHtml, keywordLabel, noticeAgency, readableText, type DescriptionState, type KeywordQuery } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
 import {
   awardExpiresWithin,
@@ -72,7 +73,12 @@ import {
   gradeTriage,
   isScoutRecommendation,
   learningExamples,
+  naicsCodeOf,
+  SCOUT_DESCRIPTION_CHARS,
+  scoutCodes,
   scoutFit,
+  scoutKeywordQuery,
+  staleReason,
   summarizeScoutTrack,
   type ScoutCandidateView,
   type ScoutDecision,
@@ -95,7 +101,6 @@ export type { ScoutCandidateView, ScoutProfileView, ScoutRunSummary, ScoutRunVie
 const DAY_MS = 24 * 60 * 60_000;
 /** Model calls per tenant per run. */
 const MAX_TRIAGE_PER_RUN = 10;
-const MAX_KEYWORD_SEARCHES = 3;
 const MAX_CUSTOMER_LOOKUPS = 8;
 /** Watchlisted awards ending within this window become recompete candidates. */
 const WATCHLIST_HORIZON_DAYS = 180;
@@ -249,7 +254,7 @@ function fromSam(o: SamOpportunity, source: ScoutCandidateSource): CandidateDraf
     postedAt: parseDate(o.postedDate),
     responseDueAt: parseDate(o.responseDeadLine),
     placeOfPerformance: placeOf(o.placeOfPerformance).slice(0, 300),
-    description: readableText(o.description).slice(0, 20_000),
+    description: readableText(o.description).slice(0, SCOUT_DESCRIPTION_CHARS),
     uiLink: str(o.uiLink, 2_000),
   };
 }
@@ -334,7 +339,10 @@ export async function runScoutForOrganization(input: {
   if (!org) return { ...summary, note: "Organization not found." };
 
   const profile = await getScoutProfile({ organizationId });
-  const naics = unique([org.primaryNaics, ...org.naicsList, ...profile.extraNaics]);
+  // BL-STAB-10d — the Scout page's codes first, then the organization's; a find is in
+  // one of them AND mentions a keyword (the owner's rule for Import, 2026-10-13).
+  const codes = scoutCodes({ extra: profile.extraNaics, primary: org.primaryNaics, list: org.naicsList }, MAX_SEARCH_CODES);
+  const query = scoutKeywordQuery(profile.keywords);
 
   const [run] = await db
     .insert(scoutRuns)
@@ -350,54 +358,63 @@ export async function runScoutForOrganization(input: {
     notes.push(`SAM.gov was not searched: ${sam.failure.error}`);
   } else if (sam.cred.source === "platform" && input.sharedKey?.failed) {
     notes.push(`SAM.gov was not searched: ${input.sharedKey.failed}`);
+  } else if (codes.searched.length === 0 && !query) {
+    notes.push("No NAICS codes or keywords to search; add them under Settings → Classification or on the Scout page.");
   } else {
-    // BL-STAB-10 — SAM.gov can't filter by keyword: the codes' search takes
-    // the open notice types, and a keyword search asks for notices with the
-    // keyword in the title; only those FORGE confirms are keyword finds.
+    // BL-STAB-10 — SAM.gov can't filter by keyword: it is asked for the codes'
+    // open notices (or, with no codes, notices with a keyword in the title), and
+    // FORGE keeps those that mention a keyword — in the title, or the
+    // description from FORGE's nightly copy of SAM.gov (no live reads here; a
+    // notice the copy can't settle yet is checked on the next run).
     descriptionCred = sam.cred;
-    const codes = naics.slice(0, MAX_SEARCH_CODES);
-    if (naics.length > codes.length) notes.push(`Searched the first ${codes.length} of ${naics.length} NAICS codes (one SAM.gov request each).`);
-    const searches: { naicsCodes: string[]; source: ScoutCandidateSource; keyword: string | null }[] = [];
-    if (codes.length > 0) searches.push({ naicsCodes: codes, source: "org_naics", keyword: null });
-    for (const kw of profile.keywords.slice(0, MAX_KEYWORD_SEARCHES)) searches.push({ naicsCodes: [], source: "keyword", keyword: kw });
-    if (searches.length === 0) {
-      notes.push("No NAICS codes or keywords to search; add them under Settings → Classification or on the Scout page.");
+    notes.push(
+      `${codes.searched.length ? `NAICS searched: ${codes.searched.join(", ")}` : "All NAICS codes"}${query ? `; kept notices that mention ${keywordLabel(query)}` : ""}.`,
+    );
+    if (codes.all.length > codes.searched.length) {
+      notes.push(`Not searched (${MAX_SEARCH_CODES} codes at most, one SAM.gov request each): ${codes.all.slice(MAX_SEARCH_CODES).join(", ")}.`);
     }
-    for (const [i, s] of searches.entries()) {
-      summary.searches += 1;
-      try {
-        const r = await findSamOpportunities(sam.cred, {
-          naicsCodes: s.naicsCodes,
-          // BL-STAB-10b — each saved keyword is one phrase (+word / -word still apply).
-          query: s.keyword ? parseKeyword(s.keyword, [], { asList: true }) : undefined,
-          noticeTypes: OPEN_NOTICE_TYPES,
-          postedDaysBack: profile.postedDaysBack,
-          limit: SAM_LIMIT,
-          readBudget: 0,
-        });
-        if (!r.ok) {
-          summary.errors += 1;
-          notes.push(`${s.keyword ? `Keyword "${s.keyword}"` : "NAICS"} search: ${r.error}`);
-          // BL-STAB-7a — the same key would fail every remaining search
-          // (BL-STAB-7d — and, for the shared key, every later company on it).
-          if (isKeyOrQuotaFailure(r.cls)) {
-            descriptionCred = null;
-            if (sam.cred.source === "platform" && input.sharedKey) input.sharedKey.failed ??= r.error;
-            if (i < searches.length - 1) notes.push("Remaining SAM.gov searches skipped.");
-            break;
-          }
-          continue;
+    summary.searches = codes.searched.length || Math.min(5, query?.anyOf[0]?.length ?? 1);
+    try {
+      const r = await findSamOpportunities(sam.cred, {
+        naicsCodes: codes.searched,
+        query: query ?? undefined,
+        noticeTypes: OPEN_NOTICE_TYPES,
+        postedDaysBack: profile.postedDaysBack,
+        limit: SAM_LIMIT,
+        readBudget: 0,
+      });
+      if (!r.ok) {
+        summary.errors += 1;
+        notes.push(`SAM.gov search: ${r.error}`);
+        // BL-STAB-7a/7d — the same key fails the description reads, and (shared) every later company on it.
+        if (isKeyOrQuotaFailure(r.cls)) {
+          descriptionCred = null;
+          if (sam.cred.source === "platform" && input.sharedKey) input.sharedKey.failed ??= r.error;
         }
+      } else {
         if (r.warning) notes.push(r.warning);
+        if (r.counts.unchecked > 0) {
+          notes.push(`${r.counts.unchecked} notice${r.counts.unchecked === 1 ? "" : "s"} couldn't be checked for the keywords from FORGE's copy of SAM.gov yet; the next run checks again.`);
+        }
         for (const o of r.notices) {
           if (!o.noticeId || found.has(o.noticeId)) continue;
-          found.set(o.noticeId, { sam: o, source: s.source, keyword: s.keyword });
+          const keyword = o.match?.status === "match" ? (o.match.matched[0]?.term ?? null) : null;
+          found.set(o.noticeId, { sam: o, source: query ? "keyword" : "org_naics", keyword });
         }
-      } catch (err) {
-        summary.errors += 1;
-        log.warn("[scout]", "sam search failed", { organizationId, error: err });
       }
+    } catch (err) {
+      summary.errors += 1;
+      log.warn("[scout]", "sam search failed", { organizationId, error: err });
     }
+  }
+
+  // BL-STAB-10d — waiting finds that no longer fit (past due, outside the codes,
+  // or not mentioning a keyword) are cleared; a cleared notice can come back.
+  try {
+    const cleared = await clearStaleFinds(organizationId, { codes: codes.all, query, now });
+    if (cleared > 0) notes.push(`Cleared ${cleared} waiting find${cleared === 1 ? "" : "s"} that no longer fit${cleared === 1 ? "s" : ""} your keywords and codes, or ${cleared === 1 ? "is" : "are"} past due.`);
+  } catch (err) {
+    log.warn("[scout]", "clearing stale finds failed", { organizationId, error: err });
   }
 
   // 2. Watchlisted awards ending soon.
@@ -496,8 +513,8 @@ export async function runScoutForOrganization(input: {
 
   // 5. Score and store.
   const ctxBase = {
-    primaryNaics: org.primaryNaics,
-    naicsList: [...org.naicsList, ...profile.extraNaics],
+    primaryNaics: naicsCodeOf(org.primaryNaics),
+    naicsList: codes.all,
     socio: org.socio,
     keywords: profile.keywords,
     now,
@@ -831,6 +848,41 @@ async function learningHistory(organizationId: string): Promise<{ imported: stri
     .orderBy(desc(scoutCandidates.decidedAt))
     .limit(12);
   return learningExamples(rows);
+}
+
+/**
+ * BL-STAB-10d — delete the organization's waiting finds (never decided,
+ * not watchlisted awards) that no longer fit the scout's rules
+ * (staleReason). A find with no description of its own is judged on FORGE's
+ * copy of SAM.gov; one that can't be judged yet is kept.
+ */
+async function clearStaleFinds(organizationId: string, rules: { codes: string[]; query: KeywordQuery | null; now: Date }): Promise<number> {
+  const waiting = await db
+    .select({
+      id: scoutCandidates.id,
+      noticeId: scoutCandidates.noticeId,
+      source: scoutCandidates.source,
+      title: scoutCandidates.title,
+      agency: scoutCandidates.agency,
+      naicsCode: scoutCandidates.naicsCode,
+      responseDueAt: scoutCandidates.responseDueAt,
+      description: scoutCandidates.description,
+    })
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), ne(scoutCandidates.source, "watchlist_award")));
+  if (waiting.length === 0) return 0;
+  const stored = rules.query ? await (await noticeStore()).lookup(waiting.filter((w) => !w.description).map((w) => w.noticeId)) : new Map();
+  const descOf = (w: (typeof waiting)[number]): DescriptionState | null =>
+    w.description
+      ? // Saved as readable text, cut at SCOUT_DESCRIPTION_CHARS: a cut one may hold more.
+        { text: escapeHtml(w.description), ...(w.description.length >= SCOUT_DESCRIPTION_CHARS ? { partial: true as const } : {}) }
+      : asDescription(stored.get(w.noticeId.toLowerCase()));
+  const stale = waiting.filter((w) => staleReason(w, rules, descOf(w)) !== null).map((w) => w.id);
+  if (stale.length === 0) return 0;
+  await db
+    .delete(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), inArray(scoutCandidates.id, stale)));
+  return stale.length;
 }
 
 async function finishRun(

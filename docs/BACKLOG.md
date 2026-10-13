@@ -585,6 +585,26 @@ mind. Bandage will come off but a true fix will stay."
       `[samgov] quota low` under a tenth of the limit; numbers, endpoint,
       key source and timing only. A shared-key reserve waits for what
       these logs show (10c).
+  - **10d (PR #385, with 10b-4) — the scout finds what both its keywords and codes
+    ask for.** Owner's report (2026-10-13): with keywords "Enterprise IT
+    modernization, ServiceNow, Digital Transformation" and four IT codes,
+    the scout listed a data-collection notice under NAICS 518210 and a
+    research BAA under 541715 — the organization's own codes, matching no
+    keyword. The scout searched every notice in its codes unfiltered, plus
+    three keywords as separate title searches across SAM.gov (either one),
+    with the organization's codes ahead of the Scout page's (so those could
+    be cut at 10) and labelled codes sent as-is. Owner's decisions: both
+    must match, the Scout page's codes first, stale finds cleared.
+    - One search over the codes (`scoutCodes`: Scout page first, then the
+      organization's, labels read as codes, 10 at most, the rest named),
+      keeping notices that mention any of all ten keywords
+      (`scoutKeywordQuery`: each a phrase, `-word` excludes from every
+      find); title or FORGE's copy of the descriptions, no live reads.
+    - Each run deletes waiting finds that no longer fit (`staleReason`:
+      past due, another code, no keyword), never decided ones or
+      watchlisted awards; a find FORGE can't judge yet is kept.
+    - The run note names the codes searched and how many finds were
+      cleared; the Scout page's labels say the rule.
 - **BL-STAB-9 — The AI document review fails on a real
   solicitation.** ✅ shipped (9a PR #366, 9b PR #367).
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI
