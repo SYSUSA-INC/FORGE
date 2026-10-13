@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
 import {
   SCOUT_RECOMMENDATION_LABELS,
+  scoutKeywordQuery,
   type ScoutCandidateView,
   type ScoutDecision,
   type ScoutProfileView,
@@ -127,6 +128,11 @@ function SettingsPanel({
   const router = useRouter();
   const [enabled, setEnabled] = useState(profile.enabled);
   const [keywords, setKeywords] = useState(profile.keywords.join(", "));
+  // BL-STAB-10d — what the scout makes of the keywords ("“IT” is in almost every notice").
+  const keywordNotes = useMemo(
+    () => scoutKeywordQuery(keywords.split(/[,;\n]+/).map((k) => k.trim()).filter(Boolean))?.notes ?? [],
+    [keywords],
+  );
   const [extraNaics, setExtraNaics] = useState(profile.extraNaics.join(", "));
   const [days, setDays] = useState(profile.postedDaysBack);
   const [saving, startSaving] = useTransition();
@@ -196,7 +202,7 @@ function SettingsPanel({
       >
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <label className="block">
-            <span className="aur-label">Keywords (comma-separated, up to 10; the first three are searched nightly)</span>
+            <span className="aur-label">Keywords (comma-separated, up to 10; a find mentions at least one)</span>
             <input
               className="aur-input mt-1 font-body text-sm"
               value={keywords}
@@ -204,9 +210,10 @@ function SettingsPanel({
               disabled={!isAdmin}
               placeholder="zero trust, help desk, cloud migration"
             />
+            {keywordNotes.length > 0 ? <span className="mt-1 block font-mono text-[10px] text-gold">{keywordNotes.join(" ")}</span> : null}
           </label>
           <label className="block">
-            <span className="aur-label">Extra NAICS codes (added to your organization&apos;s codes)</span>
+            <span className="aur-label">NAICS codes (searched first, then your organization&apos;s; 10 in all)</span>
             <input
               className="aur-input mt-1 font-mono text-sm"
               value={extraNaics}

@@ -228,8 +228,11 @@ describe("BL-STAB-10b — searches read FORGE's copy of SAM.gov descriptions fir
     const by = new Map(rows.map((r) => [r.noticeId, r.description]));
     expect(by.get(id(9))).toBe(LONG);
     expect(by.get(id(1))).toBe(BRACKETS);
-    // Only notices the copy doesn't hold are read live.
-    expect(asked(calls).every((n) => n === id(4))).toBe(true);
+    // Only what the copy can't settle is read live: not held (4), cut off with no hit (5), run
+    // together around the keyword (11); the matches it read live are kept in full.
+    expect(asked(calls)).toEqual([id(4), id(5), id(11)]);
+    expect(by.get(id(4))).toBe(LIVE[id(4)]);
+    expect(by.get(id(11))).toBe("Background\nServiceNow is the tool.");
   });
 
   it("with no reads left, counts only notices the copy can't hold as newer than it", async () => {

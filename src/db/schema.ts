@@ -4828,6 +4828,8 @@ export const scoutCandidates = pgTable(
     placeOfPerformance: text("place_of_performance").notNull().default(""),
     description: text("description").notNull().default(""),
     uiLink: text("ui_link").notNull().default(""),
+    /** BL-STAB-10d — the keyword the find was kept for (its title, agency, description or an earlier notice's); "" when none. */
+    matchedKeyword: text("matched_keyword").notNull().default(""),
     /** 0..100 heuristic fit before the model's take. */
     fitScore: integer("fit_score").notNull().default(0),
     signals: jsonb("signals").$type<string[]>().notNull().default(sql`'[]'::jsonb`),

@@ -96,6 +96,21 @@ function retryAfterSeconds(headers: Headers | undefined, now: number): number | 
   return Number.isNaN(at) ? null : Math.max(0, Math.round((at - now) / 1000));
 }
 
+export type SamQuota = { limit: number | null; remaining: number | null; retryAfterSec: number | null };
+
+/**
+ * BL-STAB-10b — the gateway's request-limit headers, from an allow-list
+ * and digits only: nothing else from the reply is ever kept or logged.
+ */
+export function quotaFromHeaders(headers: Headers | undefined): SamQuota | null {
+  const num = (name: string) => {
+    const v = headers?.get(name)?.trim();
+    return v && /^\d{1,7}$/.test(v) ? Number(v) : null;
+  };
+  const q = { limit: num("x-ratelimit-limit"), remaining: num("x-ratelimit-remaining"), retryAfterSec: num("retry-after") };
+  return q.limit === null && q.remaining === null && q.retryAfterSec === null ? null : q;
+}
+
 /** Sort a non-2xx answer into a class (the code first, then the status). */
 export function classifySamResponse(
   status: number,

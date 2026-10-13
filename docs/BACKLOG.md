@@ -578,7 +578,42 @@ mind. Bandage will come off but a true fix will stay."
         tag-shaped markup only and numeric entities in `plainText` /
         `readableText`; the recompete radar sees the copy's text; the
         scout's keyword fit reads across line breaks.
-    - **10b-4:** log the key's remaining requests (rate-limit headers).
+    - **10b-4 (PR #385):** log the key's remaining requests from the
+      gateway's rate-limit headers (`x-ratelimit-limit`,
+      `x-ratelimit-remaining`, `retry-after`; digits only), only on
+      replies to FORGE's own key: `[samgov] quota` once per credential,
+      `[samgov] quota low` under a tenth of the limit; numbers, endpoint,
+      key source and timing only. A shared-key reserve waits for what
+      these logs show (10c).
+  - **10d (PR #385, with 10b-4) — the scout finds what both its keywords and codes
+    ask for.** Owner's report (2026-10-13): with keywords "Enterprise IT
+    modernization, ServiceNow, Digital Transformation" and four IT codes,
+    the scout listed a data-collection notice under NAICS 518210 and a
+    research BAA under 541715 — the organization's own codes, matching no
+    keyword. The scout searched every notice in its codes unfiltered, plus
+    three keywords as separate title searches across SAM.gov (either one),
+    with the organization's codes ahead of the Scout page's (so those could
+    be cut at 10) and labelled codes sent as-is. Owner's decisions: both
+    must match, the Scout page's codes first, stale finds cleared.
+    - One search over the codes (`scoutCodes`: Scout page first, then the
+      organization's, labels read as codes, 10 at most, the rest named),
+      keeping notices that mention any of all ten keywords
+      (`scoutKeywordQuery`: each a phrase, `-word` excludes from every
+      find); title or FORGE's copy of the descriptions, no live reads.
+    - Each run deletes waiting finds that no longer fit (`staleReason`:
+      past due, another code, no keyword), never decided ones,
+      watchlisted awards, or what the run's search kept or couldn't
+      settle; a find FORGE can't judge yet is kept.
+    - Review fixes: the keyword a find was kept for is stored
+      (`matched_keyword`, migration 0130), so a find matched through an
+      earlier notice or its agency isn't cleared while the keyword is
+      still searched; past-due notices are never found; what FORGE's copy
+      can't settle is read live within the key's budget; labelled codes
+      take the 6-digit code or are named, never guessed; generic
+      keywords are flagged; a decision made while a run clears its find
+      is kept.
+    - The run note names the codes searched and how many finds were
+      cleared; the Scout page's labels say the rule.
 - **BL-STAB-9 — The AI document review fails on a real
   solicitation.** ✅ shipped (9a PR #366, 9b PR #367).
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI
