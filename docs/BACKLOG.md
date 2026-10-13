@@ -601,8 +601,17 @@ mind. Bandage will come off but a true fix will stay."
       (`scoutKeywordQuery`: each a phrase, `-word` excludes from every
       find); title or FORGE's copy of the descriptions, no live reads.
     - Each run deletes waiting finds that no longer fit (`staleReason`:
-      past due, another code, no keyword), never decided ones or
-      watchlisted awards; a find FORGE can't judge yet is kept.
+      past due, another code, no keyword), never decided ones,
+      watchlisted awards, or what the run's search kept or couldn't
+      settle; a find FORGE can't judge yet is kept.
+    - Review fixes: the keyword a find was kept for is stored
+      (`matched_keyword`, migration 0130), so a find matched through an
+      earlier notice or its agency isn't cleared while the keyword is
+      still searched; past-due notices are never found; what FORGE's copy
+      can't settle is read live within the key's budget; labelled codes
+      take the 6-digit code or are named, never guessed; generic
+      keywords are flagged; a decision made while a run clears its find
+      is kept.
     - The run note names the codes searched and how many finds were
       cleared; the Scout page's labels say the rule.
 - **BL-STAB-9 — The AI document review fails on a real

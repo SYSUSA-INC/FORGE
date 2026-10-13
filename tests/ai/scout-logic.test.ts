@@ -177,11 +177,19 @@ describe("awardExpiresWithin", () => {
 
 describe("BL-STAB-10d — what the scout searches and what still fits", () => {
   it("searches the Scout page's codes first, then the organization's, ten at most, codes only", () => {
-    expect(["541512", "541512 - Computer Systems Design", "NAICS 541519", "5", "1234567", "", null].map(naicsCodeOf)).toEqual(["541512", "541512", "541519", "", "", "", ""]);
+    expect(["541512", "541512 - Computer Systems Design", "NAICS 541519", "2022 NAICS 541512", "1234567 541512", "54", "5", "1234567", "541512 or 541519", "2022 code 54", "", null].map(naicsCodeOf)).toEqual([
+      "541512", "541512", "541519", "541512", "541512", "54", "", "", "", "", "", "",
+    ]);
     const org = { primary: "518210", list: ["541715 - R&D", "541512", "236220", "541330", "541611", "541618", "541690", "541990", "561110", "611430"] };
     const c = scoutCodes({ extra: ["541519", "541513", "541511", "541512"], ...org }, 10);
     expect(c.searched).toEqual(["541519", "541513", "541511", "541512", "518210", "541715", "236220", "541330", "541611", "541618"]);
     expect(c.all.slice(10)).toEqual(["541690", "541990", "561110", "611430"]);
+    expect(c.unreadable).toEqual([]);
+    expect(scoutCodes({ extra: ["541519"], primary: null, list: ["Computer Systems Design", "541512 or 541519"] }, 10)).toEqual({
+      searched: ["541519"],
+      all: ["541519"],
+      unreadable: ["Computer Systems Design", "541512 or 541519"],
+    });
   });
 
   it("reads every saved keyword as one any-of list: -word excludes from every find, +word stays in its phrase", () => {
@@ -192,6 +200,7 @@ describe("BL-STAB-10d — what the scout searches and what still fits", () => {
     expect(ten.anyOf[0]).toHaveLength(10);
     const signs = scoutKeywordQuery(["+cloud migration", "zero trust -hardware", "a, b"])!;
     expect(signs).toMatchObject({ terms: [], anyOf: [["cloud migration", "zero trust", "a b"]], excluded: ["hardware"] });
+    expect(scoutKeywordQuery(["IT", "ServiceNow"])!.notes).toEqual(["“IT” is in almost every notice."]);
     expect(scoutKeywordQuery([])).toBeNull();
     expect(scoutKeywordQuery(["  ", "-"])).toBeNull();
   });
@@ -214,5 +223,16 @@ describe("BL-STAB-10d — what the scout searches and what still fits", () => {
     expect(staleReason({ ...find, source: "watchlist_award", naicsCode: "" }, rules, null)).toBeNull();
     expect(staleReason(find, { ...rules, query: null }, null)).toBeNull();
     expect(staleReason({ ...find, naicsCode: "" }, { ...rules, query: null }, null)).toBe("other_code");
+    // Kept for a keyword still searched (found in an earlier notice or the agency): it stays,
+    // unless an excluded word shows; once that keyword is dropped, its own text decides.
+    const amendment = { ...find, title: "Amendment 0001", matchedKeyword: "ServiceNow" };
+    expect(staleReason(amendment, rules, { text: "Extends the due date." })).toBeNull();
+    expect(staleReason(amendment, { ...rules, query: scoutKeywordQuery(["ServiceNow -hardware"]) }, { text: "Adds a hardware refresh." })).toBe("no_keyword");
+    expect(staleReason(amendment, { ...rules, query: scoutKeywordQuery(["Digital Transformation"]) }, { text: "Extends the due date." })).toBe("no_keyword");
+  });
+
+  it("scores a keyword the search confirmed, wherever it was found", () => {
+    const r = scoutFit({ ...base, title: "Help desk", description: "Tier 1 support." }, { ...ctx, keywords: ["Veterans Affairs"], keyword: "Veterans Affairs" });
+    expect(r.signals).toEqual(expect.arrayContaining([expect.stringContaining("keyword: Veterans Affairs")]));
   });
 });
