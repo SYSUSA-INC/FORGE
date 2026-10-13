@@ -1,18 +1,13 @@
 import Link from "next/link";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { resolvePolicy } from "@/lib/upload-policy";
 import { GsaPasteClient } from "./GsaPasteClient";
 
 export const dynamic = "force-dynamic";
-// BL-STAB-2d — room for filing up to 20 attachments and starting their parses from this page.
-export const maxDuration = 300;
 
 export default async function GsaImportPage() {
   await requireAuth();
   await requireCurrentOrg();
-  // The per-file limit as this deployment sets it (UPLOAD_MAX_FILE_MB), handed to the browser's own check.
-  const maxBytes = resolvePolicy("document", process.env).maxBytes;
 
   return (
     <>
@@ -26,7 +21,7 @@ export default async function GsaImportPage() {
           </Link>
         }
       />
-      <GsaPasteClient maxBytes={maxBytes} />
+      <GsaPasteClient />
     </>
   );
 }

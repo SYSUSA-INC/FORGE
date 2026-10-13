@@ -30,7 +30,6 @@ export function UploadQueue<R, M>({
   onCancel,
   onRemove,
   detail,
-  locked = false,
 }: {
   items: UploadItem<R, M>[];
   onRetry: (id: string) => void;
@@ -38,8 +37,6 @@ export function UploadQueue<R, M>({
   onRemove: (id: string) => void;
   /** Extra text for a row (for example its amendment number). */
   detail?: (item: UploadItem<R, M>) => string;
-  /** The files are being (or have been) filed by a form: no retry, cancel or remove. */
-  locked?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
@@ -79,7 +76,7 @@ export function UploadQueue<R, M>({
               </div>
             ) : null}
             {it.error ? <p className="mt-1 font-mono text-[11px] text-rose">{it.error}</p> : null}
-            <div className={`mt-1.5 flex gap-2 ${locked ? "hidden" : ""}`}>
+            <div className="mt-1.5 flex gap-2">
               {failed || it.phase === "cancelled" ? (
                 <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onRetry(it.id)}>
                   {failed && it.stored ? "Retry saving" : "Retry"}

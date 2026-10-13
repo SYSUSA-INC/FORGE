@@ -99,14 +99,13 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
         uploadId = res.uploadId;
         patch(item.id, { uploadId, stored: true, loaded: item.file.size });
       }
-      // Last moment a cancel applies (a cancel pressed while the file was being
-      // checked lands here): once filing starts it runs to the end.
+      const claim = optsRef.current.claim;
+      if (!claim) return { phase: "done", uploadId, loaded: item.file.size };
+      // Last moment a cancel applies: once filing starts it runs to the end.
       if (controller.signal.aborted) {
         await cancelUploadAction(uploadId).catch(() => undefined);
         return { phase: "cancelled", error: "Upload cancelled.", stored: false, uploadId: undefined };
       }
-      const claim = optsRef.current.claim;
-      if (!claim) return { phase: "done", uploadId, loaded: item.file.size };
       controllers.current.delete(item.id);
       patch(item.id, { phase: "saving", error: undefined });
       const filed = await claim({ uploadId, file: item.file, meta: item.meta });
@@ -184,10 +183,6 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
     },
     remove(id: string) {
       controllers.current.get(id)?.abort();
-      // A file in storage that was never filed (no claim, or its filing failed) is
-      // deleted now rather than a day later by the sweeper; a filed one is left alone.
-      const gone = items.find((it) => it.id === id);
-      if (gone?.stored && gone.uploadId && !running.current.has(id)) void cancelUploadAction(gone.uploadId).catch(() => undefined);
       setItems((list) => list.filter((it) => it.id !== id));
     },
     clear() {

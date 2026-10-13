@@ -501,7 +501,7 @@ export async function peekStoredUploads(i: {
   userId: string;
   uploadIds: string[];
   resourceType: UploadResourceType;
-}): Promise<{ ready: StoredUploadPreview[]; bad: { uploadId: string; fileName: string; reason: string }[] }> {
+}): Promise<{ ready: StoredUploadPreview[]; bad: { uploadId: string; reason: string }[] }> {
   const ids = Array.from(new Set(i.uploadIds)).slice(0, 50);
   const valid = ids.filter((id) => UUID.test(id));
   const rows = valid.length
@@ -514,14 +514,13 @@ export async function peekStoredUploads(i: {
   const purposes = purposesClaimableAs(i.resourceType);
   const now = Date.now();
   const ready: StoredUploadPreview[] = [];
-  const bad: { uploadId: string; fileName: string; reason: string }[] = [];
+  const bad: { uploadId: string; reason: string }[] = [];
   for (const id of ids) {
     const row = byId.get(id);
-    if (!row) bad.push({ uploadId: id, fileName: "", reason: "Upload not found." });
-    else if (!purposes.includes(row.purpose)) bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was uploaded for something else." });
-    else if (row.status === "claimed") bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was already saved." });
-    else if (row.status !== "stored") bad.push({ uploadId: id, fileName: row.fileName, reason: view(row).message || "This file is not ready to save." });
-    else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, fileName: row.fileName, reason: FAILURE_MESSAGES.unclaimed! });
+    if (!row) bad.push({ uploadId: id, reason: "Upload not found." });
+    else if (!purposes.includes(row.purpose)) bad.push({ uploadId: id, reason: "This file was uploaded for something else." });
+    else if (row.status !== "stored") bad.push({ uploadId: id, reason: view(row).message || "This file is not ready to save." });
+    else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, reason: FAILURE_MESSAGES.unclaimed! });
     else ready.push({ uploadId: id, fileName: row.fileName, size: row.storedSize ?? row.declaredSize, format: (row.detectedFormat || row.declaredFormat) as UploadFormat, contentType: row.contentType });
   }
   return { ready, bad };
