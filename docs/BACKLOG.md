@@ -689,6 +689,13 @@ mind. Bandage will come off but a true fix will stay."
     the shared key is the fallback. Presence checks are per company and
     never decrypt; messages point to Settings → Integrations; impersonating
     platform admins see it read-only.
+    - **Follow-up (PR #384), the owner's report "That doesn't look like a
+      SAM.gov API key":** the key box no longer invites browser or
+      password-manager suggestions (it was a "new password" field), has a
+      **Show** toggle, and a paste is cleaned up (invisible characters,
+      quotes, a "Public API Key:" label, a key wrapped onto two lines); a
+      refusal says what is wrong — too short, too long, symbols, more than
+      the key — never any part of what was pasted.
   - **7c (shipped, PR #372):** the 8(a) registry, monthly cert refresh, gold set
     and public health probe use FORGE's shared key only, through the same
     guarded SAM.gov client, with operator wording. The cert refresh moved
