@@ -68,6 +68,11 @@ describe("BL-STAB-7c — SAM.gov key scopes", () => {
     const copy = read("src/app/(app)/admin/sam-notices/actions.ts").split(/\nexport async function /).slice(1);
     expect(copy).toHaveLength(3);
     for (const body of copy) expect(/await (\w+)/.exec(body)?.[1], body.slice(0, 40)).toBe("requireSuperadmin");
+    // BL-STAB-7e — so do the company-key actions, and the page.
+    const keys = read("src/app/(app)/admin/samgov-keys/actions.ts").split(/\nexport async function /).slice(1);
+    expect(keys).toHaveLength(2);
+    for (const body of keys) expect(/await (\w+)/.exec(body)?.[1], body.slice(0, 40)).toBe("requireSuperadmin");
+    expect(/export default async function \w+\(\) \{\n\s+await requireSuperadmin\(\);/.test(read("src/app/(app)/admin/samgov-keys/page.tsx"))).toBe(true);
     expect(existsSync("src/app/api/samgov/entity/route.ts")).toBe(false);
   });
 });
