@@ -517,15 +517,44 @@ mind. Bandage will come off but a true fix will stay."
         its day could be seen by a sweep as a kept file due for deletion;
         now one statement. Removing a stored but unfiled file from an
         upload list now deletes it at once instead of a day later.
+      - **Review fixes (adversarial review, 13 of 22 findings upheld):**
+        - A claim put back after its record was saved (an insert that
+          landed but reported an error, or a slow request releasing a
+          retry's claim) would have had its file deleted a day later:
+          the sweep now finishes a `stored` upload whose record holds it,
+          and `finishClaim` / `releaseClaim` / `failClaim` take the
+          claim's own `claimedAt`, so a request a retry took over changes
+          nothing.
+        - A filing that died between its record and its parse left the
+          record unparsed for good: every upload action now queues the
+          parse before finishing the claim, and a record the sweep
+          finishes gets the parse it never had (`queueMissingParse`).
+        - GSA: each attachment is filed on its own (one failure is named,
+          the rest are filed, the opportunity is always audited); an
+          attachment saved by an earlier attempt is left on its
+          opportunity and its parse ensured; the batch starts no job
+          after two minutes (the cron runs the rest, without losing an
+          attempt to a killed instance).
+        - Cancel pressed while a file is being checked now cancels it on
+          screens with no filing step (it was filed anyway); the GSA list
+          is locked once Create is pressed and marks each file filed or
+          not filed.
       - **Tests:** `tests/isolation/uploads-sweep.test.ts` (each
-        transition; a retry's takeover; a record holding another file;
-        transient re-delete; kept files and rewritten keys never deleted;
-        delete backoff; pruning; the row cap) and
-        `tests/isolation/gsa-attachments.test.ts` (one foreign id named
-        while the opportunity is created; files linked and parsed in
-        order in one run; an already-filed file named; over 20 refused
-        before anything is created). The sweep's guards are
-        mutation-checked.
+        transition; a retry, a late finish and a late check landing
+        between the sweep's read and write; a put-back claim whose record
+        holds the file, and its parse queued once; a slow request's late
+        release or finish after a takeover; a record holding another
+        file; transient re-delete; no second delete; kept files and
+        rewritten keys never deleted; delete backoff; pruning; the row
+        cap) and `tests/isolation/gsa-attachments.test.ts` (the same
+        person's upload from another organization named while the
+        opportunity is created; files linked and parsed in order in one
+        run; an already-filed file named; a file an earlier attempt saved
+        left on its opportunity with its parse queued; one failed insert
+        named and put back while the rest are filed and audited; the
+        batch's budget; over 20 refused before anything is created).
+        Nine sweep guards and five GSA guards are mutation-checked: each,
+        broken, fails a test.
     - **2e — knowledge corpus; extraction as a durable job; one storage
       meter across every file type; Office zip checks.**
     - **2f — templates, chat attachments and contacts; files removed

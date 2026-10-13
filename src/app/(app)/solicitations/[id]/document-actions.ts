@@ -175,13 +175,13 @@ export async function addSolicitationDocumentFromUploadAction(
       .onConflictDoNothing();
   } catch (err) {
     log.error("[addSolicitationDocumentFromUploadAction]", "insert failed", { error: err });
-    await releaseClaim({ organizationId, uploadId: file.uploadId });
+    await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
     return { ok: false, error: "Could not record the document; try again." };
   }
-  await finishClaim({ organizationId, uploadId: file.uploadId });
 
   // BL-AIP-4c — a background_job row; the jobs cron re-runs it from
-  // storage if this instance dies.
+  // storage if this instance dies. Queued before the claim is finished
+  // (BL-STAB-2d): the upload sweep finishes a filing that dies in between.
   const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
   await runDurable(
     "[addSolicitationDocumentFromUploadAction] parse",
@@ -194,6 +194,7 @@ export async function addSolicitationDocumentFromUploadAction(
     },
     bytes ? { bytes } : {},
   );
+  await finishClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
 
   await recordAudit({
     organizationId,

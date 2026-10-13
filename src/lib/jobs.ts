@@ -49,7 +49,7 @@ import { harvestProposal } from "@/lib/proposal-harvest";
 import { parseSolicitationDocumentFromBytes } from "@/lib/solicitation-document-parse";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
 import { detectFormat } from "@/lib/text-extract";
-import { isKeyInOrg, parseBudgetBytes, tooLargeToReadMessage } from "@/lib/upload-policy";
+import { isKeyInOrg, parseBudgetBytes, tooLargeToReadMessage, type UploadResourceType } from "@/lib/upload-policy";
 import { sniffFormat } from "@/lib/upload-verify";
 import { getVerifiedObject } from "@/lib/uploads";
 
@@ -151,34 +151,58 @@ export async function runDurable(
 }
 
 /**
- * BL-STAB-2d — several jobs from one request (a GSA email's attachments):
- * every row is recorded first, then one background run works through
- * them in order, one at a time, so a batch of large files never parses
- * side by side in one instance. Whatever it doesn't reach, the jobs
- * cron runs.
+ * BL-STAB-2d — run jobs a request has already recorded (a GSA email's
+ * attachments) one after another, in one background run, so a batch of
+ * large files never parses side by side in one instance. A job is started
+ * only within `budgetMs` of the first, so none is begun just before the
+ * instance's time runs out (it would sit `running` until the stuck window
+ * and lose an attempt); whatever isn't started stays queued for the jobs
+ * cron.
  */
-export async function runDurableBatch(
+export function runDurableBatch(
   label: string,
-  items: { spec: JobSpec; bytes?: Uint8Array }[],
-): Promise<{ jobIds: string[] }> {
-  const jobIds: string[] = [];
-  const queued: { jobId: string; organizationId: string; bytes?: Uint8Array }[] = [];
-  for (const item of items) {
-    const { job } = await enqueueJob(item.spec);
-    jobIds.push(job.id);
-    if (job.status === "queued") queued.push({ jobId: job.id, organizationId: job.organizationId, bytes: item.bytes });
-  }
-  if (queued.length > 0) {
-    runInBackground(label, async () => {
-      for (const q of queued) {
-        // One job's database error doesn't stop the rest; the cron retries it.
-        await executeJob(q.jobId, q.organizationId, { bytes: q.bytes, viaCron: false }).catch((err) =>
-          log.error(label, "batch job could not run", { jobId: q.jobId, organizationId: q.organizationId, error: err }),
-        );
+  queued: { jobId: string; organizationId: string; bytes?: Uint8Array }[],
+  opts: { budgetMs?: number } = {},
+): void {
+  if (queued.length === 0) return;
+  const budgetMs = opts.budgetMs ?? 120_000;
+  runInBackground(label, async () => {
+    const startedAt = Date.now();
+    for (const [i, q] of queued.entries()) {
+      if (Date.now() - startedAt > budgetMs) {
+        log.info(label, "left the rest of the batch to the jobs cron", { organizationId: q.organizationId, left: queued.length - i });
+        return;
       }
-    });
-  }
-  return { jobIds };
+      // One job's database error doesn't stop the rest; the cron retries it.
+      await executeJob(q.jobId, q.organizationId, { bytes: q.bytes, viaCron: false }).catch((err) =>
+        log.error(label, "batch job could not run", { jobId: q.jobId, organizationId: q.organizationId, error: err }),
+      );
+    }
+  });
+}
+
+const PARSE_KIND: Partial<Record<UploadResourceType, BackgroundJobKind>> = {
+  solicitation: "solicitation_parse",
+  solicitation_document: "solicitation_document_parse",
+};
+
+/**
+ * BL-STAB-2d — a record the upload sweep found holding its file, whose
+ * filing died before it queued the parse: queue it, unless one was ever
+ * queued (a parsed or failed record keeps its result; Re-parse is the way
+ * to run it again). Returns whether a job was queued.
+ */
+export async function queueMissingParse(r: { organizationId: string; resourceType: UploadResourceType; resourceId: string }): Promise<boolean> {
+  const kind = PARSE_KIND[r.resourceType];
+  if (!kind) return false;
+  const [any] = await db
+    .select({ id: backgroundJobs.id })
+    .from(backgroundJobs)
+    .where(and(eq(backgroundJobs.organizationId, r.organizationId), eq(backgroundJobs.kind, kind), eq(backgroundJobs.resourceId, r.resourceId)))
+    .limit(1);
+  if (any) return false;
+  await enqueueJob({ organizationId: r.organizationId, kind, resourceId: r.resourceId });
+  return true;
 }
 
 /**

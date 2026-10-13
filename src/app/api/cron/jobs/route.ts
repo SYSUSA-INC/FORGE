@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { collectAiBatches } from "@/lib/ai-batch-queue";
-import { runJobsCron } from "@/lib/jobs";
+import { queueMissingParse, runJobsCron } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import { sweepUploads } from "@/lib/uploads";
 
@@ -21,7 +21,9 @@ export const maxDuration = 300;
  * Phase 1g-2, `collectAiBatches`), inside a minute of its own, then
  * sweeps the upload ledger (BL-STAB-2d, `sweepUploads`) inside 15
  * seconds: uploads never filed are deleted, filings that died are
- * settled. Budgets: 60 + 15 + 165 s, inside the 300 s limit.
+ * settled (a record they saved gets the parse they never queued, which
+ * this tick's job run may pick up). Budgets: 60 + 15 + 165 s, inside the
+ * 300 s limit.
  *
  * Auth: Bearer ${CRON_SECRET} — same pattern as all other cron routes.
  */
@@ -49,7 +51,7 @@ export async function GET(req: NextRequest) {
       log.error("[jobs-cron]", "AI batch collection failed", { error: err });
       return null;
     });
-    const uploads = await sweepUploads({ budgetMs: 15_000, limit: 200 }).catch((err) => {
+    const uploads = await sweepUploads({ budgetMs: 15_000, limit: 200, onPromoted: queueMissingParse }).catch((err) => {
       log.error("[jobs-cron]", "upload sweep failed", { error: err });
       return null;
     });

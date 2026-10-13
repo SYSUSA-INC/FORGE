@@ -56,7 +56,7 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
   const [provider, setProvider] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ opportunityId: string; skipped: { name: string; reason: string }[] } | null>(null);
+  const [created, setCreated] = useState<{ opportunityId: string; skipped: { uploadId: string; name: string; reason: string }[] } | null>(null);
   const [parsing, startParse] = useTransition();
   const [creating, startCreate] = useTransition();
   const queue = useUploadQueue({ purpose: "document", maxBytes });
@@ -375,7 +375,18 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
             className="aur-input file:mr-3 file:rounded file:border-0 file:bg-layer/10 file:px-3 file:py-1 file:text-[12px] file:text-text"
           />
           {notice ? <div className="font-mono text-[11px] text-muted">{notice}</div> : null}
-          <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
+          <UploadQueue
+            items={queue.items}
+            onRetry={queue.retry}
+            onCancel={queue.cancel}
+            onRemove={queue.remove}
+            // Once Create is pressed the list is what is being filed: no more changes.
+            locked={creating || created !== null}
+            detail={(it) => {
+              if (!created || !it.uploadId) return "";
+              return created.skipped.some((s) => s.uploadId === it.uploadId) ? "· not filed" : "· filed";
+            }}
+          />
         </div>
       </Panel>
     </div>

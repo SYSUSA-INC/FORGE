@@ -12,16 +12,49 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { fileUploads, solicitations, type FileUpload } from "@/db/schema";
+import { backgroundJobs, fileUploads, solicitations, type FileUpload } from "@/db/schema";
+import { queueMissingParse } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
-import { cancelUpload, claimUpload, completeUpload, createUploadIntent, finishClaim, sweepUploads } from "@/lib/uploads";
+import { cancelUpload, claimUpload, completeUpload, createUploadIntent, finishClaim, releaseClaim, sweepUploads } from "@/lib/uploads";
 import type { UploadPurpose } from "@/lib/upload-policy";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const TEXT = new TextEncoder().encode("Section C. The contractor shall staff the help desk.\n");
 const MINUTE = 60_000;
 const ago = (ms: number) => new Date(Date.now() - ms);
+
+/**
+ * Run `between` just before the sweep's first UPDATE whose values match
+ * `when`, as if another request landed between the sweep's read and its
+ * write. Every other update (including `between`'s own) passes through.
+ */
+function raceBeforeUpdate(when: (values: Record<string, unknown>) => boolean, between: () => Promise<unknown>) {
+  const real = db.update.bind(db);
+  let fired = false;
+  return vi.spyOn(db, "update").mockImplementation(((table: Parameters<typeof db.update>[0]) => {
+    const builder = real(table);
+    const set = builder.set.bind(builder);
+    builder.set = ((values: Record<string, unknown>) => {
+      const next = set(values as never);
+      if (fired || !when(values)) return next;
+      fired = true;
+      const where = next.where.bind(next);
+      next.where = ((cond: unknown) => {
+        const q = where(cond as never);
+        const returning = q.returning.bind(q);
+        q.returning = ((cols: unknown) =>
+          (async () => {
+            await between();
+            return returning(cols as never);
+          })()) as never;
+        return q;
+      }) as never;
+      return next;
+    }) as never;
+    return builder;
+  }) as never);
+}
 
 describe("BL-STAB-2d — upload sweeper (runtime)", () => {
   let fx: TwoTenantFixture;
@@ -89,6 +122,94 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
       expect(await row(up)).toMatchObject({ status: "stored", purgedAt: null });
       expect(await kept(up.key)).toBe(true);
     }
+    // Deleted once: the next tick doesn't select them again.
+    const del = vi.spyOn(storage(), "delete");
+    await sweepUploads();
+    expect(del.mock.calls.map((c) => c[0])).not.toContain(never.key);
+    expect(del.mock.calls.map((c) => c[0])).not.toContain(unfiled.key);
+  });
+
+  it("keeps a file whose record was saved though its claim was put back, and queues the parse it never got", async () => {
+    // The insert landed but reported an error (a dropped connection after commit), so the claim was released.
+    const up = await claiming();
+    await db.insert(solicitations).values({ id: up.resourceId, organizationId: up.organizationId, title: "RFP", storagePath: up.key, parseStatus: "uploaded" });
+    await releaseClaim({ organizationId: up.organizationId, uploadId: up.id });
+    expect(await row(up)).toMatchObject({ status: "stored", resourceId: up.resourceId });
+    await set(up, { purgeAfter: ago(MINUTE) });
+
+    const onPromoted = vi.fn(queueMissingParse);
+    const sweep = await sweepUploads({ onPromoted });
+    expect(sweep.promoted).toBeGreaterThanOrEqual(1);
+    expect(await row(up)).toMatchObject({ status: "claimed", purgeAfter: null, purgedAt: null });
+    expect(await kept(up.key)).toBe(true);
+    expect(onPromoted).toHaveBeenCalledWith({ organizationId: up.organizationId, resourceType: "solicitation", resourceId: up.resourceId });
+    const jobs = await db
+      .select({ kind: backgroundJobs.kind, status: backgroundJobs.status })
+      .from(backgroundJobs)
+      .where(and(eq(backgroundJobs.organizationId, up.organizationId), eq(backgroundJobs.resourceId, up.resourceId)));
+    expect(jobs).toEqual([{ kind: "solicitation_parse", status: "queued" }]);
+    // Never a second parse for a record that had one.
+    expect(await queueMissingParse({ organizationId: up.organizationId, resourceType: "solicitation", resourceId: up.resourceId })).toBe(false);
+  });
+
+  it("a slow request never undoes or finishes a claim a retry took over", async () => {
+    const up = await claiming();
+    const stamp = ago(3 * MINUTE);
+    await set(up, { claimedAt: stamp });
+    const retry = await claimUpload({ organizationId: up.organizationId, userId: up.userId, uploadId: up.id, resourceType: "solicitation" });
+    if (!retry.ok || !("claim" in retry)) throw new Error("takeover failed");
+    await db.insert(solicitations).values({ id: up.resourceId, organizationId: up.organizationId, title: "RFP", storagePath: up.key, parseStatus: "uploaded" });
+    // The first request's late answers change nothing.
+    await releaseClaim({ organizationId: up.organizationId, uploadId: up.id, claimedAt: stamp });
+    await finishClaim({ organizationId: up.organizationId, uploadId: up.id, claimedAt: stamp });
+    expect(await row(up)).toMatchObject({ status: "claiming", claimedAt: retry.claim.claimedAt });
+    await finishClaim({ organizationId: up.organizationId, uploadId: up.id, claimedAt: retry.claim.claimedAt });
+    expect(await row(up)).toMatchObject({ status: "claimed", purgeAfter: null });
+  });
+
+  it("leaves a row another request changed between the sweep's read and its write", async () => {
+    // A retry takes a dead claim over and saves its record just as the sweep gives up on it.
+    const takenOver = await claiming();
+    await set(takenOver, { claimedAt: ago(31 * MINUTE), purgeAfter: ago(MINUTE) });
+    raceBeforeUpdate(
+      (v) => v.failureReason === "claim_incomplete",
+      async () => {
+        const retry = await claimUpload({ organizationId: takenOver.organizationId, userId: takenOver.userId, uploadId: takenOver.id, resourceType: "solicitation" });
+        expect(retry).toMatchObject({ ok: true, rerun: true });
+        await db.insert(solicitations).values({ id: takenOver.resourceId, organizationId: takenOver.organizationId, title: "RFP", storagePath: takenOver.key, parseStatus: "uploaded" });
+      },
+    );
+    await sweepUploads();
+    expect(await row(takenOver)).toMatchObject({ status: "claiming", purgedAt: null });
+    expect(await kept(takenOver.key)).toBe(true);
+    vi.restoreAllMocks();
+
+    // The original request finishes its claim (same stamp) just as the sweep gives up on it.
+    const finished = await claiming();
+    await set(finished, { claimedAt: ago(31 * MINUTE), purgeAfter: ago(MINUTE) });
+    const stamp = (await row(finished))!.claimedAt!;
+    raceBeforeUpdate(
+      (v) => v.failureReason === "claim_incomplete",
+      async () => {
+        await db.insert(solicitations).values({ id: finished.resourceId, organizationId: finished.organizationId, title: "RFP", storagePath: finished.key, parseStatus: "uploaded" });
+        await finishClaim({ organizationId: finished.organizationId, uploadId: finished.id, claimedAt: stamp });
+      },
+    );
+    await sweepUploads();
+    expect(await row(finished)).toMatchObject({ status: "claimed", purgedAt: null });
+    expect(await kept(finished.key)).toBe(true);
+    vi.restoreAllMocks();
+
+    // A large upload's check lands just as the sweep fails it as expired.
+    const late = await arrived();
+    await set(late, { purgeAfter: ago(MINUTE) });
+    raceBeforeUpdate(
+      (v) => v.failureReason === "expired",
+      () => completeUpload({ organizationId: late.organizationId, actor: { userId: late.userId, email: null }, uploadId: late.id }),
+    );
+    await sweepUploads();
+    expect(await row(late)).toMatchObject({ status: "stored", purgedAt: null });
+    expect(await kept(late.key)).toBe(true);
   });
 
   it("settles filings that died: finished when the record holds the file, failed once the day to retry is over", async () => {

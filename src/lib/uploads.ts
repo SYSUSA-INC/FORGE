@@ -336,6 +336,8 @@ export type ClaimedUpload = {
   contentType: string;
   format: UploadFormat;
   transient: boolean;
+  /** This claim's own stamp: finishing or releasing it is a no-op once a retry has taken it over. */
+  claimedAt: Date;
 };
 
 function claimed(row: FileUpload): ClaimedUpload {
@@ -348,7 +350,18 @@ function claimed(row: FileUpload): ClaimedUpload {
     contentType: row.contentType,
     format: (row.detectedFormat || row.declaredFormat) as UploadFormat,
     transient: UPLOAD_POLICIES[row.purpose].transient,
+    claimedAt: row.claimedAt!,
   };
+}
+
+/** The claim this request holds: its row, still `claiming`, and (when the caller knows it) still its stamp. */
+function heldClaim(i: { organizationId: string; uploadId: string; claimedAt?: Date }) {
+  return and(
+    eq(fileUploads.organizationId, i.organizationId),
+    eq(fileUploads.id, i.uploadId),
+    eq(fileUploads.status, "claiming"),
+    i.claimedAt ? eq(fileUploads.claimedAt, i.claimedAt) : undefined,
+  );
 }
 
 function purposesClaimableAs(resourceType: UploadResourceType): UploadPurpose[] {
@@ -434,30 +447,39 @@ const TRANSIENT_PURPOSES = UPLOAD_PURPOSES.filter((p) => UPLOAD_POLICIES[p].tran
  */
 const claimedPurgeAfter = sql`case when ${inArray(fileUploads.purpose, TRANSIENT_PURPOSES)} then ${fileUploads.urlExpiresAt} + interval '5 minutes' else null end`;
 
-/** The record is saved: the upload is claimed. A transient file's object is deleted now. */
-export async function finishClaim(i: { organizationId: string; uploadId: string }): Promise<void> {
+/**
+ * The record is saved: the upload is claimed. A transient file's object is
+ * deleted now. Callers pass their claim's `claimedAt`, so a request that
+ * outlived its claim (a retry took it over) changes nothing.
+ */
+export async function finishClaim(i: { organizationId: string; uploadId: string; claimedAt?: Date }): Promise<void> {
   const [row] = await db
     .update(fileUploads)
     .set({ status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() })
-    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId), eq(fileUploads.status, "claiming")))
+    .where(and(eq(fileUploads.organizationId, i.organizationId), heldClaim(i)))
     .returning();
   if (row && UPLOAD_POLICIES[row.purpose].transient) await deleteObject(row.organizationId, row.storageKey);
 }
 
-/** The record could not be saved (a refusal, not the file's fault): back to `stored`, record id kept for a retry. */
-export async function releaseClaim(i: { organizationId: string; uploadId: string }): Promise<void> {
+/**
+ * The record could not be saved (a refusal, not the file's fault): back to
+ * `stored`, record id kept for a retry. With the claim's `claimedAt`, a
+ * slow request never undoes a retry that took its claim over (and may
+ * have saved the record).
+ */
+export async function releaseClaim(i: { organizationId: string; uploadId: string; claimedAt?: Date }): Promise<void> {
   await db
     .update(fileUploads)
     .set({ status: "stored", updatedAt: new Date() })
-    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId), eq(fileUploads.status, "claiming")));
+    .where(and(eq(fileUploads.organizationId, i.organizationId), heldClaim(i)));
 }
 
 /** The file itself is unusable (it could not be read): fail the upload and delete the object. */
-export async function failClaim(i: { organizationId: string; uploadId: string; reason: string; detail: string }): Promise<void> {
+export async function failClaim(i: { organizationId: string; uploadId: string; claimedAt?: Date; reason: string; detail: string }): Promise<void> {
   const [row] = await db
     .update(fileUploads)
     .set({ status: "failed", failureReason: i.reason || "claim_failed", failureDetail: i.detail.slice(0, 500), updatedAt: new Date() })
-    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId), eq(fileUploads.status, "claiming")))
+    .where(and(eq(fileUploads.organizationId, i.organizationId), heldClaim(i)))
     .returning();
   if (!row) return;
   await deleteObject(row.organizationId, row.storageKey);
@@ -600,7 +622,7 @@ export type UploadSweep = {
   expired: number;
   /** Checked uploads nobody filed within a day. */
   unclaimed: number;
-  /** Filings that died after their record was saved, now finished. */
+  /** Filings whose record was saved but whose claim never finished (the instance died, or the save was reported failed after it landed), now finished. */
   promoted: number;
   /** Filings that died before their record was saved, failed once the day to retry had passed. */
   abandoned: number;
@@ -613,6 +635,9 @@ export type UploadSweep = {
   /** More was due than this tick took (row cap or time budget); the next tick continues. */
   deferred: boolean;
 };
+
+/** A record a sweep found holding its upload: the caller makes sure its parse was ever queued. */
+export type PromotedUpload = { organizationId: string; resourceType: UploadResourceType; resourceId: string };
 
 /** Rows grouped by organization, so every write names one. */
 function byOrganization(rows: { id: string; organizationId: string }[]): Map<string, string[]> {
@@ -682,11 +707,15 @@ async function recordHoldsUpload(row: Pick<FileUpload, "organizationId" | "resou
  * BL-STAB-2d — the jobs cron's pass over the ledger, inside a time budget:
  *
  *   1. `pending` past its window (the link's life + 15 min) → `failed` (`expired`)
- *   2. `stored` and not filed within a day → `failed` (`unclaimed`)
+ *   2. `stored` and not filed within a day → `failed` (`unclaimed`), unless
+ *      a record holds the file (a save reported failed after it landed put
+ *      the claim back): then `claimed`
  *   3. `claiming` for over 30 minutes: `claimed` when its record holds the
  *      file; once the day to retry has passed without one, `failed`
  *      (`claim_incomplete`). Each change holds only if no retry took the
  *      claim over meanwhile.
+ *   Every record found this way goes to `onPromoted`, so a parse its
+ *   filing never queued is queued (the jobs cron passes `queueMissingParse`).
  *   4. every object due is deleted (failed, released, transient claimed);
  *      a failed delete is retried with backoff, and a key that isn't the
  *      one the server built for that upload is never deleted
@@ -694,7 +723,9 @@ async function recordHoldsUpload(row: Pick<FileUpload, "organizationId" | "resou
  *
  * A file a record keeps (`claimed`, not transient) is never deleted here.
  */
-export async function sweepUploads(o: { now?: Date; budgetMs?: number; limit?: number } = {}): Promise<UploadSweep> {
+export async function sweepUploads(
+  o: { now?: Date; budgetMs?: number; limit?: number; onPromoted?: (r: PromotedUpload) => Promise<unknown> } = {},
+): Promise<UploadSweep> {
   const now = o.now ?? new Date();
   const limit = o.limit ?? 200;
   const deadline = Date.now() + (o.budgetMs ?? 15_000);
@@ -707,6 +738,15 @@ export async function sweepUploads(o: { now?: Date; budgetMs?: number; limit?: n
     out.deferred = true;
     return true;
   };
+  const promoted = async (row: { organizationId: string; resourceType: UploadResourceType | ""; resourceId: string | null }) => {
+    out.promoted += 1;
+    if (!o.onPromoted || !row.resourceType || !row.resourceId) return;
+    try {
+      await o.onPromoted({ organizationId: row.organizationId, resourceType: row.resourceType, resourceId: row.resourceId });
+    } catch (err) {
+      log.error("[uploads]", "could not queue the parse of a record the sweep finished", { organizationId: row.organizationId, resourceId: row.resourceId, error: err });
+    }
+  };
 
   // 1–2. Never arrived, or never filed: failed now, deleted in step 4.
   for (const [from, reason] of [
@@ -714,13 +754,33 @@ export async function sweepUploads(o: { now?: Date; budgetMs?: number; limit?: n
     ["stored", "unclaimed"],
   ] as const) {
     const due = await db
-      .select({ id: fileUploads.id, organizationId: fileUploads.organizationId })
+      .select({
+        id: fileUploads.id,
+        organizationId: fileUploads.organizationId,
+        resourceType: fileUploads.resourceType,
+        resourceId: fileUploads.resourceId,
+        storageKey: fileUploads.storageKey,
+      })
       .from(fileUploads)
       .where(and(eq(fileUploads.status, from), lte(fileUploads.purgeAfter, now), isNull(fileUploads.purgedAt)))
       .orderBy(asc(fileUploads.purgeAfter))
       .limit(limit);
     capped(due.length);
-    for (const [organizationId, ids] of byOrganization(due)) {
+    const unfiled: typeof due = [];
+    for (const row of due) {
+      // A claim was put back, but its record was saved: keep the file.
+      if (!row.resourceId || !(await recordHoldsUpload(row))) {
+        unfiled.push(row);
+        continue;
+      }
+      const [moved] = await db
+        .update(fileUploads)
+        .set({ status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() })
+        .where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), eq(fileUploads.status, from), lte(fileUploads.purgeAfter, now)))
+        .returning({ id: fileUploads.id });
+      if (moved) await promoted(row);
+    }
+    for (const [organizationId, ids] of byOrganization(unfiled)) {
       const failed = await db
         .update(fileUploads)
         .set({ status: "failed", failureReason: reason, updatedAt: new Date() })
@@ -776,7 +836,9 @@ export async function sweepUploads(o: { now?: Date; budgetMs?: number; limit?: n
         ),
       )
       .returning({ id: fileUploads.id });
-    if (moved.length > 0) out[held ? "promoted" : "abandoned"] += 1;
+    if (moved.length === 0) continue;
+    if (held) await promoted(row);
+    else out.abandoned += 1;
   }
 
   // 4. Delete what is due.

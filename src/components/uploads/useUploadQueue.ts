@@ -99,13 +99,14 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
         uploadId = res.uploadId;
         patch(item.id, { uploadId, stored: true, loaded: item.file.size });
       }
-      const claim = optsRef.current.claim;
-      if (!claim) return { phase: "done", uploadId, loaded: item.file.size };
-      // Last moment a cancel applies: once filing starts it runs to the end.
+      // Last moment a cancel applies (a cancel pressed while the file was being
+      // checked lands here): once filing starts it runs to the end.
       if (controller.signal.aborted) {
         await cancelUploadAction(uploadId).catch(() => undefined);
         return { phase: "cancelled", error: "Upload cancelled.", stored: false, uploadId: undefined };
       }
+      const claim = optsRef.current.claim;
+      if (!claim) return { phase: "done", uploadId, loaded: item.file.size };
       controllers.current.delete(item.id);
       patch(item.id, { phase: "saving", error: undefined });
       const filed = await claim({ uploadId, file: item.file, meta: item.meta });

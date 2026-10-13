@@ -12,7 +12,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { aiExtractGsa } from "@/lib/gsa-extract";
 import type { GsaExtractionResult } from "@/lib/ai-prompts";
-import { runDurableBatch, type JobSpec } from "@/lib/jobs";
+import { enqueueJob, queueMissingParse, runDurableBatch } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import {
   claimUpload,
@@ -20,6 +20,7 @@ import {
   inlineBytesForMemoryMode,
   peekStoredUploads,
   releaseClaim,
+  type StoredUploadPreview,
 } from "@/lib/uploads";
 import { GSA_MAX_ATTACHMENTS } from "./gsa-constants";
 
@@ -92,7 +93,8 @@ export type GsaCreateResult =
       ok: true;
       opportunityId: string;
       solicitationIds: string[];
-      attachmentsSkipped: { name: string; reason: string }[];
+      /** Attachments that weren't filed, by upload id, with the reason. */
+      attachmentsSkipped: { uploadId: string; name: string; reason: string }[];
     }
   | { ok: false; error: string };
 
@@ -172,7 +174,8 @@ export async function createOpportunityFromGsaAction(
     uploadIds,
     resourceType: "solicitation",
   });
-  const attachmentsSkipped: { name: string; reason: string }[] = bad.map((b) => ({
+  const attachmentsSkipped: { uploadId: string; name: string; reason: string }[] = bad.map((b) => ({
+    uploadId: b.uploadId,
     name: b.fileName || "An attachment",
     reason: b.reason,
   }));
@@ -226,68 +229,21 @@ export async function createOpportunityFromGsaAction(
     };
   }
 
-  // File each attachment as a Solicitation linked to the new opportunity
-  // (the upload ledger's claim: the record takes the id fixed at the
-  // claim, so a retry never files it twice). The parses start together
-  // below.
+  // File each attachment as a Solicitation linked to the new opportunity.
+  // Each file stands alone: one that fails is named, the rest go on, and
+  // the opportunity is audited either way. Their parses run together below.
   const solicitationIds: string[] = [];
-  const parses: { spec: JobSpec; bytes?: Uint8Array }[] = [];
+  const queued: { jobId: string; organizationId: string; bytes?: Uint8Array }[] = [];
   for (const upload of ready) {
-    const claim = await claimUpload({ organizationId, userId: actor.id, uploadId: upload.uploadId, resourceType: "solicitation" });
-    if (!claim.ok) {
-      attachmentsSkipped.push({ name: upload.fileName, reason: claim.error });
+    const filed = await fileAttachment({ organizationId, userId: actor.id, upload, opportunityId, solicitationType, solicitationNumber });
+    if (!filed.ok) {
+      attachmentsSkipped.push({ uploadId: upload.uploadId, name: upload.fileName, reason: filed.reason });
       continue;
     }
-    if ("alreadyClaimed" in claim) {
-      attachmentsSkipped.push({ name: upload.fileName, reason: "This file was already saved on another record." });
-      continue;
-    }
-    const file = claim.claim;
-    let inserted: { id: string }[];
-    try {
-      inserted = await db
-        .insert(solicitations)
-        .values({
-          id: file.resourceId,
-          organizationId,
-          title: stripExt(file.fileName),
-          type: solicitationType,
-          solicitationNumber,
-          fileName: file.fileName,
-          fileSize: file.size,
-          contentType: file.contentType,
-          storagePath: file.storageKey,
-          parseStatus: "uploaded",
-          uploadedByUserId: actor.id,
-          source: "gsa-paste",
-          opportunityId,
-        })
-        .onConflictDoNothing()
-        .returning({ id: solicitations.id });
-    } catch (err) {
-      log.error("[createOpportunityFromGsaAction]", "attachment insert failed", { error: err, uploadId: file.uploadId });
-      await releaseClaim({ organizationId, uploadId: file.uploadId });
-      attachmentsSkipped.push({ name: file.fileName, reason: "Could not record the solicitation." });
-      continue;
-    }
-    await finishClaim({ organizationId, uploadId: file.uploadId });
-    if (inserted.length === 0) {
-      // An earlier attempt that died filed it already, on its own opportunity.
-      attachmentsSkipped.push({ name: file.fileName, reason: "This file was already saved on another record." });
-      continue;
-    }
-    solicitationIds.push(file.resourceId);
-    // BL-AIP-1 — extract the attachment the same way an upload is; the
-    // job reads it from storage (in the in-memory mode, from these bytes).
-    const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
-    parses.push({
-      spec: { organizationId, kind: "solicitation_parse", resourceId: file.resourceId, requestedByUserId: actor.id },
-      ...(bytes ? { bytes } : {}),
-    });
+    solicitationIds.push(filed.solicitationId);
+    if (filed.job) queued.push(filed.job);
   }
-  if (parses.length > 0) {
-    await runDurableBatch("[createOpportunityFromGsaAction] attachment parse", parses);
-  }
+  runDurableBatch("[createOpportunityFromGsaAction] attachment parse", queued);
 
   await recordAudit({
     organizationId,
@@ -316,6 +272,88 @@ export async function createOpportunityFromGsaAction(
     attachmentsSkipped,
   };
 }
+
+type FiledAttachment =
+  | { ok: true; solicitationId: string; job: { jobId: string; organizationId: string; bytes?: Uint8Array } | null }
+  | { ok: false; reason: string };
+
+/**
+ * File one uploaded attachment as a Solicitation on the opportunity (the
+ * upload ledger's claim: the record takes the id fixed at the claim, so a
+ * retry never files it twice). The parse is queued before the claim is
+ * finished, so a filing that dies in between is finished by the upload
+ * sweep, never left without its parse. Never throws.
+ */
+async function fileAttachment(i: {
+  organizationId: string;
+  userId: string;
+  upload: StoredUploadPreview;
+  opportunityId: string;
+  solicitationType: SolicitationType;
+  solicitationNumber: string;
+}): Promise<FiledAttachment> {
+  const { organizationId } = i;
+  let savedId: string | null = null;
+  try {
+    const claim = await claimUpload({ organizationId, userId: i.userId, uploadId: i.upload.uploadId, resourceType: "solicitation" });
+    if (!claim.ok) return { ok: false, reason: claim.error };
+    if ("alreadyClaimed" in claim) return { ok: false, reason: ALREADY_FILED };
+    const file = claim.claim;
+    let inserted: { id: string }[];
+    try {
+      inserted = await db
+        .insert(solicitations)
+        .values({
+          id: file.resourceId,
+          organizationId,
+          title: stripExt(file.fileName),
+          type: i.solicitationType,
+          solicitationNumber: i.solicitationNumber,
+          fileName: file.fileName,
+          fileSize: file.size,
+          contentType: file.contentType,
+          storagePath: file.storageKey,
+          parseStatus: "uploaded",
+          uploadedByUserId: i.userId,
+          source: "gsa-paste",
+          opportunityId: i.opportunityId,
+        })
+        .onConflictDoNothing()
+        .returning({ id: solicitations.id });
+    } catch (err) {
+      log.error("[createOpportunityFromGsaAction]", "attachment insert failed", { error: err, organizationId, uploadId: file.uploadId });
+      await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
+      return { ok: false, reason: "Could not record the solicitation; add the file again." };
+    }
+    if (inserted.length === 0) {
+      // An earlier attempt saved it, on its own opportunity: leave it there,
+      // make sure it was ever parsed, and finish the claim.
+      await queueMissingParse({ organizationId, resourceType: "solicitation", resourceId: file.resourceId });
+      await finishClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
+      return { ok: false, reason: ALREADY_FILED };
+    }
+    savedId = file.resourceId;
+    // BL-AIP-1 — extract the attachment the same way an upload is; the
+    // job reads it from storage (in the in-memory mode, from these bytes).
+    const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
+    const { job } = await enqueueJob({ organizationId, kind: "solicitation_parse", resourceId: file.resourceId, requestedByUserId: i.userId });
+    await finishClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
+    return {
+      ok: true,
+      solicitationId: file.resourceId,
+      job: job.status === "queued" ? { jobId: job.id, organizationId, ...(bytes ? { bytes } : {}) } : null,
+    };
+  } catch (err) {
+    // A database error after the record was saved: the record stands, and
+    // the upload sweep and the jobs cron finish its claim and its parse.
+    log.error("[createOpportunityFromGsaAction]", "attachment", { error: err, organizationId, uploadId: i.upload.uploadId, saved: savedId !== null });
+    return savedId
+      ? { ok: true, solicitationId: savedId, job: null }
+      : { ok: false, reason: "Could not save this file; add it again." };
+  }
+}
+
+const ALREADY_FILED = "This file was already saved on another record.";
 
 function stripExt(name: string): string {
   const dot = name.lastIndexOf(".");
