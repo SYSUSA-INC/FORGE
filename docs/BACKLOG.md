@@ -578,7 +578,13 @@ mind. Bandage will come off but a true fix will stay."
         tag-shaped markup only and numeric entities in `plainText` /
         `readableText`; the recompete radar sees the copy's text; the
         scout's keyword fit reads across line breaks.
-    - **10b-4:** log the key's remaining requests (rate-limit headers).
+    - **10b-4 (PR #385):** log the key's remaining requests from the
+      gateway's rate-limit headers (`x-ratelimit-limit`,
+      `x-ratelimit-remaining`, `retry-after`; digits only), only on
+      replies to FORGE's own key: `[samgov] quota` once per credential,
+      `[samgov] quota low` under a tenth of the limit; numbers, endpoint,
+      key source and timing only. A shared-key reserve waits for what
+      these logs show (10c).
 - **BL-STAB-9 — The AI document review fails on a real
   solicitation.** ✅ shipped (9a PR #366, 9b PR #367).
   - **Symptom (owner, 2026-10-08):** Solicitation page → "BL-23 AI

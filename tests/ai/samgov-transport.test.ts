@@ -5,7 +5,9 @@
  */
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { log } from "@/lib/log";
 import { downloadSamResource, fetchSamNotice, fetchSamOpportunities, readNoticeDescriptions } from "@/lib/samgov";
+import { quotaFromHeaders } from "@/lib/samgov-errors";
 import { SamCredential, platformSamCredential } from "@/lib/samgov-key";
 import { OPEN_NOTICE_TYPES } from "@/lib/samgov-match";
 import { findSamOpportunities } from "@/lib/samgov-search";
@@ -35,6 +37,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("BL-STAB-7a — SAM.gov transport", () => {
@@ -212,5 +215,62 @@ describe("BL-STAB-7a — SAM.gov transport", () => {
     expect(platformSamCredential()).toBeNull();
     vi.stubEnv("SAMGOV_API_KEY", ` ${KEY} `);
     expect(platformSamCredential()?.revealForSamRequest()).toBe(KEY);
+  });
+});
+
+describe("BL-STAB-10b — how many requests the key has left", () => {
+  const limits = (remaining: number, extra: Record<string, string> = {}) => ({ "x-ratelimit-limit": "1000", "x-ratelimit-remaining": String(remaining), ...extra });
+  const page = (headers: Record<string, string>, status = 200) =>
+    new Response(JSON.stringify(status === 200 ? { totalRecords: 0, opportunitiesData: [] } : { error: { code: "OVER_RATE_LIMIT" } }), { status, headers });
+  const quotaLogs = (spy: { mock: { calls: unknown[][] } }, message: string) => spy.mock.calls.filter((c) => c[1] === message).map((c) => c[2]);
+
+  it("reads only the gateway's limit headers, digits only", () => {
+    expect(quotaFromHeaders(new Headers(limits(990)))).toEqual({ limit: 1000, remaining: 990, retryAfterSec: null });
+    expect(quotaFromHeaders(new Headers({ "X-RateLimit-Limit": "10000", "Retry-After": "3600" }))).toEqual({ limit: 10000, remaining: null, retryAfterSec: 3600 });
+    for (const junk of ["", "-1", "12a", "1e3", "99999999", "5 5", KEY]) expect(quotaFromHeaders(new Headers({ "x-ratelimit-remaining": junk })), junk).toBeNull();
+    expect(quotaFromHeaders(new Headers({ "x-other": "5" }))).toBeNull();
+    expect(quotaFromHeaders(undefined)).toBeNull();
+  });
+
+  it("logs them once per credential, numbers only, and warns once under a tenth of the limit", async () => {
+    const info = vi.spyOn(log, "info");
+    const warn = vi.spyOn(log, "warn");
+    const company = new SamCredential(KEY, { source: "company", audience: "tenant", organizationId: "org-quota-1" });
+    let remaining = 300;
+    stubFetch(() => page(limits(remaining--)));
+    await fetchSamOpportunities(company, { naicsCodes: ["541511", "541512", "541519"] });
+    expect(quotaLogs(info, "quota")).toEqual([{ endpoint: "oppSearch", source: "company", status: 200, ms: expect.any(Number), limit: 1000, remaining: expect.any(Number), retryAfterSec: null }]);
+    // Under a tenth: one warning, however many requests follow.
+    remaining = 99;
+    await fetchSamOpportunities(company, { naicsCodes: ["541511", "541512"] });
+    expect(quotaLogs(warn, "quota low")).toHaveLength(1);
+    expect(quotaLogs(info, "quota")).toHaveLength(1);
+    // The next search's credential logs again; SAM.gov refusing for the limit is logged too.
+    stubFetch(() => page(limits(0, { "retry-after": "3600" }), 429));
+    await fetchSamOpportunities(cred, { naicsCodes: ["541511"] });
+    expect(quotaLogs(warn, "quota low").at(-1)).toMatchObject({ source: "platform", status: 429, remaining: 0, retryAfterSec: 3600 });
+    // Never the URL, the key or the company.
+    const logged = JSON.stringify([...info.mock.calls, ...warn.mock.calls]);
+    for (const secret of [KEY, "api_key", "org-quota-1"]) expect(logged).not.toContain(secret);
+  });
+
+  it("ignores replies not to FORGE's key: an attachment link with SAM.gov's own placeholder, or a redirect", async () => {
+    const info = vi.spyOn(log, "info");
+    const warn = vi.spyOn(log, "warn");
+    stubFetch(() => new Response(new Uint8Array([1]), { status: 200, headers: limits(1) }));
+    // Fresh credentials: one already logged wouldn't log again either way.
+    const fresh = () => new SamCredential(KEY, { source: "platform", audience: "tenant", organizationId: null });
+    expect(await downloadSamResource(fresh(), "https://sam.gov/api/prod/opps/v3/opportunities/resources/files/abc/download?api_key=null&token=", 1024)).toMatchObject({ ok: true });
+    stubFetch(() => {
+      const res = page(limits(1));
+      Object.defineProperty(res, "redirected", { value: true });
+      return res;
+    });
+    await fetchSamOpportunities(fresh(), { naicsCodes: ["541511"] });
+    expect([...quotaLogs(info, "quota"), ...quotaLogs(warn, "quota low")]).toEqual([]);
+    // The same reply to FORGE's key is logged.
+    stubFetch(() => page(limits(1)));
+    await fetchSamOpportunities(fresh(), { naicsCodes: ["541511"] });
+    expect(quotaLogs(warn, "quota low")).toHaveLength(1);
   });
 });

@@ -8,6 +8,7 @@ import {
   isKeyOrQuotaFailure,
   isSamHost,
   keyOutcomeOf,
+  quotaFromHeaders,
   redactSamSecrets,
   samErrorMessage,
   type SamEndpoint,
@@ -57,6 +58,27 @@ function reportSharedKeyRejected(endpoint: SamEndpoint, status: number | undefin
   });
 }
 
+const quotaLogged = new WeakMap<SamCredential, "seen" | "low">();
+
+/**
+ * BL-STAB-10b — how many requests the key has left, from the gateway's
+ * headers on a reply to FORGE's own key (not one a link or a redirect
+ * answered): logged once per credential (a search, a scout run, a check),
+ * again as a warning once it is under a tenth of the limit. Numbers only —
+ * never the URL, which carries the key.
+ */
+function noteQuota(cred: SamCredential, endpoint: SamEndpoint, res: Response, ms: number) {
+  const q = quotaFromHeaders(res.headers);
+  if (!q) return;
+  const low = q.limit !== null && q.remaining !== null && q.remaining < q.limit / 10;
+  const was = quotaLogged.get(cred);
+  if (was === "low" || (was === "seen" && !low)) return;
+  quotaLogged.set(cred, low ? "low" : "seen");
+  const ctx = { endpoint, source: cred.source, status: res.status, ms, limit: q.limit, remaining: q.remaining, retryAfterSec: q.retryAfterSec };
+  if (low) log.warn("[samgov]", "quota low", ctx);
+  else log.info("[samgov]", "quota", ctx);
+}
+
 /**
  * Every SAM.gov request goes through here: the key only on a request to
  * SAM.gov itself (other hosts are not fetched), a deadline that covers the
@@ -76,6 +98,7 @@ async function samGet(
   const keySent = !(call.keepLinkKey && url.searchParams.has("api_key"));
   if (keySent) url.searchParams.set("api_key", cred.revealForSamRequest());
   let res: Response;
+  const started = Date.now();
   try {
     res = await fetch(url, {
       cache: "no-store",
@@ -85,6 +108,7 @@ async function samGet(
   } catch (err) {
     return samFailure(cred, call.endpoint, { cls: classifyFetchError(err) });
   }
+  if (keySent && !res.redirected) noteQuota(cred, call.endpoint, res, Date.now() - started);
   if (res.ok) {
     // BL-STAB-7d — a company key that works is recorded as such.
     if (keySent) await cred.reportOutcome("ok", call.endpoint);
