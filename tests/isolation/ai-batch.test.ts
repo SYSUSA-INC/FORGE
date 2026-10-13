@@ -107,7 +107,7 @@ describe("BL-AIX Phase 1g-2 — batched scout triage (runtime)", () => {
     const prompt = buildScoutTriagePrompt({
       organizationName: "Org A",
       asOf: "2026-10-07",
-      organization: { primaryNaics: "541512", naicsList: [], setAsides: [], keywords: [] },
+      organization: { primaryNaics: "541512", naicsList: [], setAsides: [], keywords: [], capabilities: [] },
       candidate: {
         source: "org_naics",
         title: "A one",
@@ -124,6 +124,7 @@ describe("BL-AIX Phase 1g-2 — batched scout triage (runtime)", () => {
         daysToDue: null,
         placeOfPerformance: "",
         description: "",
+        matchedKeyword: "",
       },
       fitScore: 80,
       signals: [],

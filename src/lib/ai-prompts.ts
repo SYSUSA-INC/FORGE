@@ -1192,7 +1192,9 @@ export function buildPipelineBriefPrompt(
 /**
  * BL-AIP-7b — the nightly scout's triage of one candidate. Grounded in
  * the heuristic fit score and its signals, the recompete match, the
- * customer record and what this team imported / dismissed before.
+ * customer record and what this team imported / dismissed before; since
+ * BL-STAB-10e also in what the organization says it does (its capability
+ * statement and capability entries) and the keyword the notice was found for.
  */
 export type ScoutTriageSnapshot = {
   organizationName: string;
@@ -1202,6 +1204,8 @@ export type ScoutTriageSnapshot = {
     naicsList: string[];
     setAsides: string[];
     keywords: string[];
+    /** The capability statement first, then other capability entries (short excerpts). */
+    capabilities: { title: string; text: string }[];
   };
   candidate: {
     source: "org_naics" | "keyword" | "watchlist_award";
@@ -1219,6 +1223,8 @@ export type ScoutTriageSnapshot = {
     daysToDue: number | null;
     placeOfPerformance: string;
     description: string;
+    /** The organization's keyword the notice was found for ("" when none). */
+    matchedKeyword: string;
   };
   fitScore: number;
   signals: string[];
@@ -1242,12 +1248,16 @@ export const SCOUT_TRIAGE_PROMPT_VERSION = PROMPT_VERSIONS.opportunity_triage;
 const SCOUT_TRIAGE_SYSTEM = `You are the overnight scout inside FORGE — a federal proposal operations platform. Each morning a capture manager reads your triage of the notices that appeared overnight and decides which to import into the pipeline.
 
 Rules:
-- Use only the snapshot. Never invent agencies, values, dates, incumbents or history.
+- Use only the snapshot. Never invent agencies, values, dates, incumbents, history or capabilities.
+- Scope decides. \`organization.capabilities\` is what this organization says it does. Recommend pursue only when the notice's own text describes work within those capabilities, and quote the phrase from the notice that shows it. If the notice's scope is outside them, skip, whatever the NAICS code or score.
+- A NAICS match or set-aside eligibility only makes a notice eligible; on its own it is never a reason to pursue.
+- \`candidate.matchedKeyword\` is the organization's keyword the notice was found for (it may be in an earlier notice of the same solicitation). A keyword found only in the agency name, or a generic word, is weak evidence.
+- If the snapshot can't show the scope (a thin or missing description) or \`organization.capabilities\` is empty, recommend watch at most and say what is missing.
 - \`fitScore\` (0–100) and \`signals\` are the platform's heuristic: NAICS match, set-aside eligibility, recompete radar, the record at this customer, keyword hits, the due date. You may disagree with the score; if you do, say which signal you weigh differently and why.
 - \`recompete\` is a past bid of this organization that looks like this notice, with how it ended and the lesson written down afterwards. \`customer\` is the organization's record at this agency. \`history\` is what this team actually imported and dismissed from earlier scout finds, newest first, with what the scout said at the time — learn the team's taste from it, and \`history.track\` is how often the scout's decisive calls matched the team.
 - A set-aside the organization does not qualify for is a skip unless teaming is realistic; a response date already past is a skip.
 - Speak in capture language: pursuit, recompete, incumbent, set-aside, NAICS. No compliance jargon.
-- Answer through the record_scout_triage tool: \`recommendation\` — exactly one of pursue, watch or skip — \`confidence\` (0 to 1), \`rationale\` (2–4 plain sentences leading with the deciding signal) and \`nextActions\` (up to three concrete steps for the capture manager, or an empty list for a skip).`;
+- Answer through the record_scout_triage tool: \`recommendation\` — exactly one of pursue, watch or skip — \`confidence\` (0 to 1: how sure you are of the recommendation, not the chance of winning), \`rationale\` (2–4 plain sentences leading with the deciding signal) and \`nextActions\` (up to three concrete steps for the capture manager, or an empty list for a skip).`;
 
 export const scoutTriageSchema = z.object({
   recommendation: z.enum(["pursue", "watch", "skip"]),

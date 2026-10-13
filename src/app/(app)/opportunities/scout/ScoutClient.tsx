@@ -276,9 +276,12 @@ function RecBadge({ candidate }: { candidate: ScoutCandidateView }) {
     );
   }
   return (
-    <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${REC_CLASS[r]}`}>
+    <span
+      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${REC_CLASS[r]}`}
+      title="The AI's recommendation and how sure it is of it — not a chance of winning."
+    >
       {SCOUT_RECOMMENDATION_LABELS[r]}
-      {candidate.confidence !== null ? ` · ${Math.round(candidate.confidence * 100)}%` : ""}
+      {candidate.confidence !== null ? ` · ${Math.round(candidate.confidence * 100)}% sure` : ""}
     </span>
   );
 }

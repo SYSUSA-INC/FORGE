@@ -33,11 +33,12 @@
  */
 import "server-only";
 
-import { and, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/db";
 import {
   bdWatchlistItems,
+  knowledgeEntries,
   opportunities,
   organizations,
   scoutCandidates,
@@ -659,9 +660,11 @@ export async function runScoutForOrganization(input: {
     const queue = [...inserted].sort((a, b) => b.fitScore - a.fitScore).slice(0, maxTriage);
     const history = await learningHistory(organizationId);
     const track = await getScoutTrack({ organizationId });
+    const capabilities = await capabilitiesOf(organizationId);
+    if (capabilities.length === 0) notes.push("No capability statement in the Knowledge base: the AI can't judge scope, so it recommends Watch at most.");
     const snapshotOf = (row: ScoutCandidate) => {
       const s = byNotice.get(row.noticeId);
-      return buildSnapshot(org.name, org.primaryNaics, org.naicsList, org.socio, profile, row, s?.flag ?? null, s?.customer ?? null, history, track, now);
+      return buildSnapshot(org.name, org.primaryNaics, org.naicsList, org.socio, profile, capabilities, row, s?.flag ?? null, s?.customer ?? null, history, track, now);
     };
     // BL-AIX Phase 1g-2 — the nightly run sends its triage as one batch
     // (half price, read by the jobs cron); a manual run, another provider
@@ -854,12 +857,35 @@ export const scoutTriageBatchHandler: BatchHandler<z.infer<typeof scoutTriageSch
   },
 };
 
+/**
+ * BL-STAB-10e — what the organization says it does, for the triage: its
+ * capability statement first (Getting started's, tagged
+ * `capability-statement`), then its best other capability entries; short
+ * excerpts, archived entries left out.
+ */
+async function capabilitiesOf(organizationId: string): Promise<{ title: string; text: string }[]> {
+  const rows = await db
+    .select({ title: knowledgeEntries.title, body: knowledgeEntries.body })
+    .from(knowledgeEntries)
+    .where(and(eq(knowledgeEntries.organizationId, organizationId), eq(knowledgeEntries.kind, "capability"), isNull(knowledgeEntries.archivedAt)))
+    .orderBy(
+      desc(sql`'capability-statement' = ANY(${knowledgeEntries.tags})`),
+      sql`${knowledgeEntries.qualityScore} DESC NULLS LAST`,
+      desc(knowledgeEntries.updatedAt),
+    )
+    .limit(4);
+  return rows
+    .map((r) => ({ title: r.title.slice(0, 120), text: readableText(r.body).replace(/\s+/g, " ").slice(0, 700) }))
+    .filter((r) => r.text);
+}
+
 function buildSnapshot(
   organizationName: string,
   primaryNaics: string,
   naicsList: string[],
   socio: { sba8a: boolean; smallBusiness: boolean; sdb: boolean; wosb: boolean; sdvosb: boolean; hubzone: boolean } | null,
   profile: ScoutProfileView,
+  capabilities: { title: string; text: string }[],
   row: ScoutCandidate,
   flag: RecompeteFlag | null,
   customer: CustomerCounts | null,
@@ -878,6 +904,7 @@ function buildSnapshot(
       naicsList: unique([...naicsList, ...profile.extraNaics]),
       setAsides,
       keywords: profile.keywords,
+      capabilities,
     },
     candidate: {
       source: row.source,
@@ -895,6 +922,7 @@ function buildSnapshot(
       daysToDue: row.responseDueAt ? Math.ceil((row.responseDueAt.getTime() - now.getTime()) / DAY_MS) : null,
       placeOfPerformance: row.placeOfPerformance,
       description: row.description.slice(0, 1_500),
+      matchedKeyword: row.matchedKeyword,
     },
     fitScore: row.fitScore,
     signals: row.signals,

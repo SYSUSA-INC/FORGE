@@ -62,8 +62,8 @@
       "sha256": "2b1bad7e1dcdae4bbc63b4f6b0d17379e68df89cff0076c61f16aafd2247bab7"
     },
     "opportunity_triage": {
-      "version": "2026-09-29.1",
-      "sha256": "6f6473f900e295f419c4214776fba3a5e5354fe1f518cc7dbf6213453bbcdaaf"
+      "version": "2026-10-13.1",
+      "sha256": "2593b487494e9e386e178b4bdba0b18e3c536609552db5032273220f4bc3903d"
     },
     "pipeline_brief": {
       "version": "2026-09-28.1",
