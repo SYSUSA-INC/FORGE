@@ -76,7 +76,7 @@ Effort key:
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
-| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e queued |
+| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
@@ -182,7 +182,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · 🔄 BL-STAB-7 (7a shipped in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -705,7 +705,7 @@ mind. Bandage will come off but a true fix will stay."
       the missing ones; re-running the review keeps the matrix; a
       malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
-  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e queued (re-sized S → L).
+  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388).
   - **Symptom:** Import from SAM.gov and Settings → SAM.gov sync show
     "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
     "there has to be a place where the company admin can update their
@@ -773,8 +773,13 @@ mind. Bandage will come off but a true fix will stay."
     Import, Scout, the Q&A panel and Settings → Integrations say when the
     company's key is rejected, refused or over its limit (Import no
     longer searches on arrival then).
-  - **Queued:** 7e — platform admins see and remove company keys and
-    re-encrypt after a keyring rotation.
+  - **7e (shipped, PR #388):** `/admin/samgov-keys` — platform admins see
+    every company's own key (last four, SAM.gov's last answer, who set it,
+    which keyring entry holds it, readable or not), remove one with a
+    reason recorded in the company's audit log, and re-encrypt every key
+    on an older keyring entry to the first one after a rotation (rows
+    written only if unchanged since read; unreadable and damaged ones
+    counted, not touched).
 - **BL-STAB-8 — Security gates for a platform holding sensitive
   data.** ⏳ queued (added 2026-10-08).
   - **Ask (owner):** "We need to enforce some security gates for

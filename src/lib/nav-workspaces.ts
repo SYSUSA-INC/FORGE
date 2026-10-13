@@ -257,6 +257,7 @@ const PLATFORM_NAV: WorkspaceNavGroup[] = [
       { href: "/admin/migrations", label: "Database migrations" },
       { href: "/admin/sba-8a", label: "SBA 8(a) registry" },
       { href: "/admin/sam-notices", label: "SAM.gov notice copy" },
+      { href: "/admin/samgov-keys", label: "Company SAM.gov keys" },
       { href: "/admin/gold-set", label: "Extraction gold set" },
       { href: "/platform/audit-log", label: "Audit Log" },
     ],
