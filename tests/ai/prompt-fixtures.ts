@@ -374,7 +374,13 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
     buildScoutTriagePrompt({
       organizationName: "Acme Federal",
       asOf: "2026-10-05",
-      organization: { primaryNaics: "541512", naicsList: ["541512", "541519"], setAsides: ["8(a)"], keywords: ["cloud migration"] },
+      organization: {
+        primaryNaics: "541512",
+        naicsList: ["541512", "541519"],
+        setAsides: ["8(a)"],
+        keywords: ["cloud migration"],
+        capabilities: [{ title: "Capability statement", text: "Cloud migration and managed services for civilian agencies." }],
+      },
       candidate: {
         source: "keyword",
         title: "Cloud migration support",
@@ -391,6 +397,7 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
         daysToDue: 30,
         placeOfPerformance: "Washington, DC",
         description: "Migrate legacy workloads.",
+        matchedKeyword: "cloud migration",
       },
       fitScore: 72,
       signals: ["NAICS match", "keyword: cloud migration"],

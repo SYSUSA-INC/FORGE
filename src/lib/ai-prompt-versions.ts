@@ -44,7 +44,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   loss_intelligence: "2026-10-05.1",
   review_preflight: "2026-10-05.1",
   proposal_bootstrap: "2026-10-07.1",
-  opportunity_triage: "2026-09-29.1",
+  opportunity_triage: "2026-10-13.1",
   brain_answer: "2026-10-05.1",
   onboarding_assist: "2026-10-01.1",
   graphics_suggest: "2026-10-03.1",

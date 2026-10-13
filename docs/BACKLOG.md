@@ -612,6 +612,18 @@ mind. Bandage will come off but a true fix will stay."
       take the 6-digit code or are named, never guessed; generic
       keywords are flagged; a decision made while a run clears its find
       is kept.
+  - **10e (PR #386) — the scout's AI triage judges scope, not codes.**
+    Owner's report (2026-10-13): an EPA SBIR BAA under NAICS 541715 was
+    triaged "Pursue · 75%" because the code was in the list and the
+    set-aside fit; the triage saw only keywords, codes and set-asides,
+    never what SYSUSA does. The snapshot now carries the capability
+    statement (Getting started's, tagged `capability-statement`) and up
+    to three other capability entries, and the matched keyword; the
+    prompt says scope decides, NAICS and set-aside alone never make a
+    pursue, out of scope is a skip, and without capabilities or a
+    readable scope the answer is watch at most (version 2026-10-13.1).
+    The card says "75% sure" (the AI's confidence, not a chance of
+    winning); a run with no capability statement says so in its note.
     - The run note names the codes searched and how many finds were
       cleared; the Scout page's labels say the rule.
 - **BL-STAB-9 — The AI document review fails on a real
