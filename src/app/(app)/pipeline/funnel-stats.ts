@@ -1,5 +1,5 @@
 import type { OpportunityStage } from "@/db/schema";
-import { parseDollars } from "@/lib/money";
+import { weightedValueOf } from "@/lib/pipeline-drill";
 import { STAGES } from "@/lib/opportunity-types";
 
 /**
@@ -60,11 +60,8 @@ export function buildFunnelData(rows: RowLike[]): FunnelData {
     const stat = byKey[r.stage];
     if (!stat) continue;
     stat.count += 1;
-    const low = parseDollars(r.valueLow);
-    const high = parseDollars(r.valueHigh);
-    const mid = high > 0 && low > 0 ? (low + high) / 2 : Math.max(low, high);
-    const pWinFrac = Math.max(0, Math.min(100, r.pWin)) / 100;
-    stat.weightedValue += mid * pWinFrac;
+    // BL-PIPE-DRILL — the same rule the "Pipeline value" drill-down lists by.
+    stat.weightedValue += weightedValueOf(r);
   }
 
   const totalCount = active.reduce((s, x) => s + x.count, 0)

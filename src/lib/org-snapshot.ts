@@ -44,6 +44,8 @@ export type SnapshotOpportunityRow = {
   ownerName: string | null;
   ownerEmail: string | null;
   updatedAt: Date;
+  /** BL-PIPE-DRILL — the pipeline's windows count by creation date. */
+  createdAt: Date;
 };
 
 export type OrganizationSnapshot = {
@@ -113,6 +115,7 @@ export async function getOrganizationSnapshot(
         ownerName: users.name,
         ownerEmail: users.email,
         updatedAt: opportunities.updatedAt,
+        createdAt: opportunities.createdAt,
       })
       .from(opportunities)
       .leftJoin(users, eq(users.id, opportunities.ownerUserId))
