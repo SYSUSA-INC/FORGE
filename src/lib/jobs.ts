@@ -95,7 +95,9 @@ export type JobsCronSummary = {
 /**
  * Insert a job row, or return the open (queued / running) row that
  * already exists for the same resource so a double click or a re-parse
- * during a parse never runs the same work twice.
+ * during a parse never runs the same work twice. BL-STAB-2d — the
+ * database keeps one open job per resource (0132), so two callers at the
+ * same moment get the same row rather than two.
  */
 export async function enqueueJob(
   spec: JobSpec,
@@ -125,9 +127,24 @@ export async function enqueueJob(
       requestedByUserId: spec.requestedByUserId ?? null,
       maxAttempts: spec.maxAttempts ?? JOB_MAX_ATTEMPTS,
     })
+    .onConflictDoNothing()
     .returning();
-  if (!job) throw new Error("Could not create background job.");
-  return { job, reused: false };
+  if (job) return { job, reused: false };
+  // Another caller queued it between our read and our insert: theirs is the job.
+  const [theirs] = await db
+    .select()
+    .from(backgroundJobs)
+    .where(
+      and(
+        eq(backgroundJobs.organizationId, organizationId),
+        eq(backgroundJobs.kind, spec.kind),
+        eq(backgroundJobs.resourceId, spec.resourceId),
+        inArray(backgroundJobs.status, ["queued", "running"]),
+      ),
+    )
+    .limit(1);
+  if (!theirs) throw new Error("Could not create background job.");
+  return { job: theirs, reused: true };
 }
 
 /**

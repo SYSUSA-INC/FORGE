@@ -561,6 +561,23 @@ mind. Bandage will come off but a true fix will stay."
         being checked now cancels it on screens with no filing step; a
         stored, unfiled file removed from any upload list is deleted at
         once. 300 seconds per request.
+      - **Third review of 2d-2's fixes (6 of 8 upheld), fixed here:**
+        two sweeps at once (a duplicate cron delivery) could each queue a
+        parse — the database now keeps one open job per record (migration
+        0132: a partial unique index; existing duplicates failed with a
+        note) and `enqueueJob` inserts ON CONFLICT DO NOTHING, which also
+        closes the old double-click race; a retry that re-created a
+        record the user had deleted skipped its parse — now any record
+        the request created is parsed; a retry started late in a link's
+        life failed as "too slow" — it now gets one fresh link; the PUT
+        limit runs on a monotonic clock; the 15-minute window is one
+        shared constant (`PENDING_GRACE_MS`) the browser's limit derives
+        from. Tests: a failed queue on a dead claim retried next tick;
+        two concurrent sweeps and two concurrent enqueues yield one job;
+        a re-created record parsed; the intent's window; `uploadFile`'s
+        time limit, cancel and renewal with a stubbed XHR
+        (`tests/ai/upload-client.test.ts`). Seven more guards
+        mutation-checked.
       - **Tests:** `tests/isolation/gsa-attachments.test.ts` — the same
         person's upload from another organization named while the
         opportunity is created; files linked and parsed in order in one

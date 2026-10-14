@@ -44,6 +44,7 @@ import {
   assertKeyInOrg,
   expirySecondsFor,
   isKeyInOrg,
+  PENDING_GRACE_MS,
   PROXY_MAX_BYTES_ON_VERCEL,
   resolvePolicy,
   UPLOAD_POLICIES,
@@ -216,7 +217,7 @@ export async function createUploadIntent(i: {
     declaredSize: i.size,
     origin: (i.origin || "").slice(0, 256),
     urlExpiresAt,
-    purgeAfter: new Date(urlExpiresAt.getTime() + 15 * MINUTE),
+    purgeAfter: new Date(urlExpiresAt.getTime() + PENDING_GRACE_MS),
   });
   await recordAudit({
     organizationId,

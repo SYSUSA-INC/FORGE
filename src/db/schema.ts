@@ -4392,6 +4392,10 @@ export const backgroundJobs = pgTable(
     openIdx: index("background_job_open_idx")
       .on(t.status, t.nextAttemptAt)
       .where(sql`${t.status} IN ('queued', 'running')`),
+    // BL-STAB-2d — at most one open job per record (0132): enqueueJob inserts ON CONFLICT DO NOTHING.
+    oneOpenIdx: uniqueIndex("background_job_one_open_idx")
+      .on(t.organizationId, t.kind, t.resourceId)
+      .where(sql`${t.status} IN ('queued', 'running')`),
   }),
 );
 

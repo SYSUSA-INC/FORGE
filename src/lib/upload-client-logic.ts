@@ -4,6 +4,8 @@
  * is unit-tested; `upload-client.ts` drives the request itself.
  */
 
+import { PENDING_GRACE_MS } from "@/lib/upload-policy";
+
 export type PutOutcome = "retry" | "renew" | "network_or_cors" | "fatal_signature" | "fatal_too_large";
 
 /**
@@ -32,16 +34,18 @@ export function classifyPutFailure(i: { status: number; bodyText: string; expire
 
 /**
  * BL-STAB-2d — the server's upload sweep deletes an upload that hasn't
- * arrived 15 minutes after its link expires. A PUT still running then
- * could land after that delete and leave a file nothing tracks, so the
- * browser stops a PUT 10 minutes after its link expires.
+ * arrived `PENDING_GRACE_MS` (15 minutes) after its link expires. A PUT
+ * still running then could land after that delete and leave a file
+ * nothing tracks, so the browser stops a PUT five minutes sooner (room
+ * for the request's own latency).
  */
-export const PUT_GRACE_MS = 10 * 60_000;
+export const PUT_GRACE_MS = PENDING_GRACE_MS - 5 * 60_000;
 
 /**
  * How long a PUT may still run: the link's life counted from when it was
- * issued (so a wrong clock on this computer doesn't matter) plus the
- * grace. At least a second.
+ * issued plus the grace, at least a second. Callers pass a monotonic
+ * clock (`performance.now()`), so neither a wrong clock on this computer
+ * nor one corrected mid-upload matters.
  */
 export function putTimeoutMs(issuedAt: number, expiresInSeconds: number, now: number): number {
   return Math.max(1_000, issuedAt + expiresInSeconds * 1_000 + PUT_GRACE_MS - now);
