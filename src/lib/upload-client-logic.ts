@@ -30,6 +30,23 @@ export function classifyPutFailure(i: { status: number; bodyText: string; expire
   return "fatal_signature";
 }
 
+/**
+ * BL-STAB-2d — the server's upload sweep deletes an upload that hasn't
+ * arrived 15 minutes after its link expires. A PUT still running then
+ * could land after that delete and leave a file nothing tracks, so the
+ * browser stops a PUT 10 minutes after its link expires.
+ */
+export const PUT_GRACE_MS = 10 * 60_000;
+
+/**
+ * How long a PUT may still run: the link's life counted from when it was
+ * issued (so a wrong clock on this computer doesn't matter) plus the
+ * grace. At least a second.
+ */
+export function putTimeoutMs(issuedAt: number, expiresInSeconds: number, now: number): number {
+  return Math.max(1_000, issuedAt + expiresInSeconds * 1_000 + PUT_GRACE_MS - now);
+}
+
 /** Wait before retry number `attempt` (1-based): 1 s, 4 s, 10 s, then give up (null). */
 export function nextBackoffMs(attempt: number): number | null {
   const steps = [1_000, 4_000, 10_000];
@@ -69,6 +86,8 @@ export function describeUploadFailure(code: string): string {
       return "Storage was busy and the upload did not finish. Try again.";
     case "cancelled":
       return "Upload cancelled.";
+    case "too_slow":
+      return "The upload was too slow to finish while its link was valid. Try again on a faster connection, or split the file.";
     default:
       return "The upload did not finish. Try again.";
   }

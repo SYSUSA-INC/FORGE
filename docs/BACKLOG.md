@@ -500,8 +500,9 @@ mind. Bandage will come off but a true fix will stay."
         no other request changed the row meanwhile. Never deleted: a file
         a record keeps (also excluded by the query, not only by its null
         `purge_after`), or a key that isn't the one FORGE built for that
-        upload. A record the sweep finishes gets the parse its filing
-        never queued (`queueMissingParse`; never a second one).
+        upload. A record the sweep finishes first gets the parse its
+        filing never queued (`queueMissingParse`; never a second one); if
+        that fails, the row waits for the next tick.
       - **Claims hardened (adversarial review):** `finishClaim` sets
         `claimed` and clears `purge_after` in one statement (in two, a
         claim finished at the end of its day could look due for
@@ -509,15 +510,29 @@ mind. Bandage will come off but a true fix will stay."
         claim's own `claimedAt`, so a slow request never undoes or
         finishes a claim a retry took over; the new-solicitation and
         companion-document actions queue the parse before finishing the
-        claim, so a filing that dies in between is never left unparsed.
+        claim, so a filing that dies in between is never left unparsed,
+        and a retry of a filing whose parse already ran doesn't parse it
+        again.
+      - **Second review (9 of 15 upheld):** the sweep queued the parse
+        after marking the filing finished, so a failed queue was never
+        retried — now before; the rerun double parse above; a browser PUT
+        could outlive its link and land after the sweep's delete,
+        leaving a file nothing tracks — the browser now stops a PUT 10
+        minutes after its link expires (counted from when the link was
+        issued; the sweep deletes at 15); the tests below.
       - **Tests:** `tests/isolation/uploads-sweep.test.ts` — each
         transition; a retry, a late finish and a late check landing
         between the sweep's read and write; a put-back claim whose record
-        holds the file, and its parse queued once; a slow request's late
-        release or finish after a takeover; a record holding another
-        file; transient re-delete; no second delete; kept files and
-        rewritten keys never deleted; delete backoff; pruning; the row
-        cap. Nine guards mutation-checked: each, broken, fails a test.
+        holds the file, its parse queued once, and a failed queue retried
+        next tick; a dead filing's record parsed, an already parsed one
+        not again; a slow request's late release or finish after a
+        takeover; a record holding another file; transient re-delete; no
+        second delete; kept files and rewritten keys never deleted;
+        delete backoff; pruning; the row cap.
+        `tests/isolation/uploads-solicitation.test.ts` — a retry after a
+        parse ran doesn't parse again; one after a refused save does.
+        `tests/ai/upload-client-logic.test.ts` — the PUT's time limit.
+        Fourteen guards mutation-checked: each, broken, fails a test.
       - **Split out (diff cap):** GSA paste attachments upload straight
         to storage — built and reviewed with this phase, next PR (2d-3).
     - **2d-3 — GSA attachments upload straight to storage.** ⏳ next.

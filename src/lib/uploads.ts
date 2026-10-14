@@ -122,6 +122,8 @@ export type UploadIntentResult =
       transport: UploadTransport;
       put: { url: string; method: "PUT"; headers: Record<string, string> };
       expiresAt: string;
+      /** The link's life; the browser stops its PUT this long (plus a grace) after receiving it. */
+      expiresInSeconds: number;
       maxBytes: number;
     }
   | { ok: false; code: string; error: string };
@@ -224,7 +226,7 @@ export async function createUploadIntent(i: {
     resourceId: uploadId,
     metadata: { purpose: i.purpose, size: i.size, format: check.format, transport },
   });
-  return { ok: true, uploadId, transport, put, expiresAt: urlExpiresAt.toISOString(), maxBytes: check.maxBytes };
+  return { ok: true, uploadId, transport, put, expiresAt: urlExpiresAt.toISOString(), expiresInSeconds: expiresSeconds, maxBytes: check.maxBytes };
 }
 
 export type UploadCompleteResult =
@@ -713,8 +715,10 @@ async function recordHoldsUpload(row: Pick<FileUpload, "organizationId" | "resou
  *      file; once the day to retry has passed without one, `failed`
  *      (`claim_incomplete`). Each change holds only if no retry took the
  *      claim over meanwhile.
- *   Every record found this way goes to `onPromoted`, so a parse its
- *   filing never queued is queued (the jobs cron passes `queueMissingParse`).
+ *   Every record found this way goes to `onPromoted` first, so a parse its
+ *   filing never queued is queued before the filing is finished (the jobs
+ *   cron passes `queueMissingParse`); if that fails, the row waits for the
+ *   next tick.
  *   4. every object due is deleted (failed, released, transient claimed);
  *      a failed delete is retried with backoff, and a key that isn't the
  *      one the server built for that upload is never deleted
@@ -737,13 +741,23 @@ export async function sweepUploads(
     out.deferred = true;
     return true;
   };
-  const promoted = async (row: { organizationId: string; resourceType: UploadResourceType | ""; resourceId: string | null }) => {
-    out.promoted += 1;
-    if (!o.onPromoted || !row.resourceType || !row.resourceId) return;
+  /**
+   * Before a filing is finished, its record's parse is queued: a row is
+   * marked `claimed` only once that is done, so a failure here leaves it
+   * for the next tick rather than finished and never parsed.
+   */
+  const parseQueued = async (row: { organizationId: string; resourceType: UploadResourceType | ""; resourceId: string | null }) => {
+    if (!o.onPromoted || !row.resourceType || !row.resourceId) return true;
     try {
       await o.onPromoted({ organizationId: row.organizationId, resourceType: row.resourceType, resourceId: row.resourceId });
+      return true;
     } catch (err) {
-      log.error("[uploads]", "could not queue the parse of a record the sweep finished", { organizationId: row.organizationId, resourceId: row.resourceId, error: err });
+      log.error("[uploads]", "could not queue the parse of a record the sweep found; left for the next tick", {
+        organizationId: row.organizationId,
+        resourceId: row.resourceId,
+        error: err,
+      });
+      return false;
     }
   };
 
@@ -772,12 +786,13 @@ export async function sweepUploads(
         unfiled.push(row);
         continue;
       }
+      if (!(await parseQueued(row))) continue;
       const [moved] = await db
         .update(fileUploads)
         .set({ status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() })
         .where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), eq(fileUploads.status, from), lte(fileUploads.purgeAfter, now)))
         .returning({ id: fileUploads.id });
-      if (moved) await promoted(row);
+      if (moved) out.promoted += 1;
     }
     for (const [organizationId, ids] of byOrganization(unfiled)) {
       const failed = await db
@@ -818,6 +833,7 @@ export async function sweepUploads(
     const held = await recordHoldsUpload(row);
     // No record yet, but the uploader can still retry the filing.
     if (!held && row.purgeAfter && row.purgeAfter.getTime() > now.getTime()) continue;
+    if (held && !(await parseQueued(row))) continue;
     // Holds only if no retry took the claim over meanwhile.
     const moved = await db
       .update(fileUploads)
@@ -835,9 +851,7 @@ export async function sweepUploads(
         ),
       )
       .returning({ id: fileUploads.id });
-    if (moved.length === 0) continue;
-    if (held) await promoted(row);
-    else out.abandoned += 1;
+    if (moved.length > 0) out[held ? "promoted" : "abandoned"] += 1;
   }
 
   // 4. Delete what is due.

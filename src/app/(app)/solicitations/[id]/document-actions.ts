@@ -18,7 +18,7 @@ import { getStorageProvider } from "@/lib/storage";
 import { isCompanionDocumentType } from "@/lib/document-type-name";
 import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
 import { runInBackground } from "@/lib/background";
-import { runDurable } from "@/lib/jobs";
+import { hasAnyJob, runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
 // BL-AIP-4c — the parse pipeline itself lives in
@@ -181,19 +181,19 @@ export async function addSolicitationDocumentFromUploadAction(
 
   // BL-AIP-4c — a background_job row; the jobs cron re-runs it from
   // storage if this instance dies. Queued before the claim is finished
-  // (BL-STAB-2d): the upload sweep finishes a filing that dies in between.
-  const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
-  await runDurable(
-    "[addSolicitationDocumentFromUploadAction] parse",
-    {
-      organizationId,
-      kind: "solicitation_document_parse",
-      resourceId: file.resourceId,
-      payload: { solicitationId },
-      requestedByUserId: user.id,
-    },
-    bytes ? { bytes } : {},
-  );
+  // (BL-STAB-2d): the upload sweep finishes a filing that dies in between;
+  // a retry of a filing that died after queueing it doesn't parse it again.
+  const parse = {
+    organizationId,
+    kind: "solicitation_document_parse" as const,
+    resourceId: file.resourceId,
+    payload: { solicitationId },
+    requestedByUserId: user.id,
+  };
+  if (!claim.rerun || !(await hasAnyJob(parse))) {
+    const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
+    await runDurable("[addSolicitationDocumentFromUploadAction] parse", parse, bytes ? { bytes } : {});
+  }
   await finishClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
 
   await recordAudit({

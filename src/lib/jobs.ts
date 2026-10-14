@@ -155,6 +155,16 @@ const PARSE_KIND: Partial<Record<UploadResourceType, BackgroundJobKind>> = {
   solicitation_document: "solicitation_document_parse",
 };
 
+/** Whether this resource has ever had a job of this kind, whatever became of it. */
+export async function hasAnyJob(r: { organizationId: string; kind: BackgroundJobKind; resourceId: string }): Promise<boolean> {
+  const [any] = await db
+    .select({ id: backgroundJobs.id })
+    .from(backgroundJobs)
+    .where(and(eq(backgroundJobs.organizationId, r.organizationId), eq(backgroundJobs.kind, r.kind), eq(backgroundJobs.resourceId, r.resourceId)))
+    .limit(1);
+  return Boolean(any);
+}
+
 /**
  * BL-STAB-2d — a record the upload sweep found holding its file, whose
  * filing died before it queued the parse: queue it, unless one was ever
@@ -164,12 +174,7 @@ const PARSE_KIND: Partial<Record<UploadResourceType, BackgroundJobKind>> = {
 export async function queueMissingParse(r: { organizationId: string; resourceType: UploadResourceType; resourceId: string }): Promise<boolean> {
   const kind = PARSE_KIND[r.resourceType];
   if (!kind) return false;
-  const [any] = await db
-    .select({ id: backgroundJobs.id })
-    .from(backgroundJobs)
-    .where(and(eq(backgroundJobs.organizationId, r.organizationId), eq(backgroundJobs.kind, kind), eq(backgroundJobs.resourceId, r.resourceId)))
-    .limit(1);
-  if (any) return false;
+  if (await hasAnyJob({ organizationId: r.organizationId, kind, resourceId: r.resourceId })) return false;
   await enqueueJob({ organizationId: r.organizationId, kind, resourceId: r.resourceId });
   return true;
 }

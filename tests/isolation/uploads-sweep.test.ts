@@ -137,7 +137,12 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     expect(await row(up)).toMatchObject({ status: "stored", resourceId: up.resourceId });
     await set(up, { purgeAfter: ago(MINUTE) });
 
-    const onPromoted = vi.fn(queueMissingParse);
+    // Queueing its parse fails once: the file stays and the next tick finishes it.
+    vi.spyOn(log, "error").mockImplementation(() => undefined);
+    const onPromoted = vi.fn(queueMissingParse).mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
+    await sweepUploads({ onPromoted });
+    expect(await row(up)).toMatchObject({ status: "stored", purgedAt: null });
+    expect(await kept(up.key)).toBe(true);
     const sweep = await sweepUploads({ onPromoted });
     expect(sweep.promoted).toBeGreaterThanOrEqual(1);
     expect(await row(up)).toMatchObject({ status: "claimed", purgeAfter: null, purgedAt: null });
@@ -227,10 +232,23 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     // Claimed (or taken over by a retry) a few minutes ago: still in flight.
     const recent = await claiming();
     await set(recent, { claimedAt: ago(5 * MINUTE), purgeAfter: ago(MINUTE) });
+    // Died after its parse was queued and had run: it is finished, never parsed again.
+    const parsed = await claiming();
+    await db.insert(solicitations).values({ id: parsed.resourceId, organizationId: parsed.organizationId, title: "RFP", storagePath: parsed.key, parseStatus: "parsed" });
+    await db.insert(backgroundJobs).values({ organizationId: parsed.organizationId, kind: "solicitation_parse", resourceId: parsed.resourceId, status: "done" });
+    await set(parsed, { claimedAt: ago(31 * MINUTE) });
 
-    await sweepUploads();
+    const onPromoted = vi.fn(queueMissingParse);
+    await sweepUploads({ onPromoted });
     expect(await row(saved)).toMatchObject({ status: "claimed", purgeAfter: null, purgedAt: null });
     expect(await kept(saved.key)).toBe(true);
+    // The dead filing's record gets the parse it never queued; the parsed one doesn't get a second.
+    const jobsFor = async (resourceId: string) =>
+      db.select({ kind: backgroundJobs.kind, status: backgroundJobs.status }).from(backgroundJobs).where(and(eq(backgroundJobs.organizationId, fx.orgA.organizationId), eq(backgroundJobs.resourceId, resourceId)));
+    expect(await jobsFor(saved.resourceId)).toEqual([{ kind: "solicitation_parse", status: "queued" }]);
+    expect(await row(parsed)).toMatchObject({ status: "claimed" });
+    expect(await jobsFor(parsed.resourceId)).toEqual([{ kind: "solicitation_parse", status: "done" }]);
+    expect(onPromoted.mock.calls.map((c) => c[0].resourceId).sort()).toEqual([parsed.resourceId, saved.resourceId].sort());
     expect(await row(unsaved)).toMatchObject({ status: "claiming" });
     expect(await kept(unsaved.key)).toBe(true);
     expect(await row(elsewhere)).toMatchObject({ status: "failed", failureReason: "claim_incomplete", purgedAt: expect.any(Date) });

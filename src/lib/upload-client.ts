@@ -8,10 +8,10 @@
  */
 
 import { cancelUploadAction, completeUploadAction, requestUploadAction } from "@/app/(app)/uploads/actions";
-import { classifyPutFailure, describeUploadFailure, nextBackoffMs } from "@/lib/upload-client-logic";
+import { classifyPutFailure, describeUploadFailure, nextBackoffMs, putTimeoutMs } from "@/lib/upload-client-logic";
 import { validateUploadRequest, type UploadPurpose, type UploadView } from "@/lib/upload-policy";
 
-export type PutResult = { status: number; bodyText: string };
+export type PutResult = { status: number; bodyText: string; timedOut?: boolean };
 
 /**
  * PUT `body` to a presigned URL, reporting progress. Sends only the headers
@@ -26,6 +26,8 @@ export function putWithProgress(i: {
   body: Blob;
   onProgress?: (loaded: number, total: number) => void;
   signal?: AbortSignal;
+  /** Stop the PUT after this long (BL-STAB-2d: never past its link's life plus a grace). */
+  timeoutMs?: number;
 }): Promise<PutResult> {
   return new Promise((resolve, reject) => {
     if (i.signal?.aborted) {
@@ -35,6 +37,7 @@ export function putWithProgress(i: {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", i.url, true);
     xhr.withCredentials = false;
+    if (i.timeoutMs) xhr.timeout = i.timeoutMs;
     for (const [name, value] of Object.entries(i.headers)) xhr.setRequestHeader(name, value);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) i.onProgress?.(e.loaded, e.total);
@@ -48,7 +51,7 @@ export function putWithProgress(i: {
     };
     xhr.onload = () => finish({ status: xhr.status, bodyText: typeof xhr.responseText === "string" ? xhr.responseText.slice(0, 2_000) : "" });
     xhr.onerror = () => finish({ status: 0, bodyText: "" });
-    xhr.ontimeout = () => finish({ status: 0, bodyText: "" });
+    xhr.ontimeout = () => finish({ status: 0, bodyText: "", timedOut: true });
     xhr.onabort = () => finish(null);
     xhr.send(i.body);
   });
@@ -99,16 +102,28 @@ export async function uploadFile(
   for (let link = 0; link < 2; link++) {
     const intent = await requestUploadAction({ purpose: opts.purpose, fileName: file.name, size: file.size });
     if (!intent.ok) return { ok: false, error: intent.error };
+    const issuedAt = Date.now();
     opts.onPhase?.("uploading");
     let put: PutResult | null = null;
     let renew = false;
     for (let attempt = 1; ; attempt++) {
       try {
-        put = await putWithProgress({ url: intent.put.url, headers: intent.put.headers, body: file, onProgress: opts.onProgress, signal: opts.signal });
+        put = await putWithProgress({
+          url: intent.put.url,
+          headers: intent.put.headers,
+          body: file,
+          onProgress: opts.onProgress,
+          signal: opts.signal,
+          timeoutMs: putTimeoutMs(issuedAt, intent.expiresInSeconds, Date.now()),
+        });
       } catch {
         return cancelled(intent.uploadId);
       }
       if (put.status >= 200 && put.status < 300) break;
+      if (put.timedOut) {
+        await cancelUploadAction(intent.uploadId).catch(() => undefined);
+        return { ok: false, error: describeUploadFailure("too_slow") };
+      }
       // Through the app, a retried PUT whose first answer was lost finds the
       // upload already stored (409): ask for its state instead of deleting it.
       if (intent.transport === "proxy" && put.status === 409) {
