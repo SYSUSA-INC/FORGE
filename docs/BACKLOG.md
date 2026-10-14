@@ -74,7 +74,7 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
@@ -182,7 +182,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -486,8 +486,56 @@ mind. Bandage will come off but a true fix will stay."
       - **Tests:** the identity header, the range fallback (206, an empty
         object's 416, no size at all), and the real fetch against a
         stand-in edge that compresses like Cloudflare; mutation-checked.
-    - **2d-2 — GSA attachments; abandoned uploads cleaned up by the jobs
-      cron.** ⏳ queued.
+    - **2d-2 — abandoned uploads cleaned up by the jobs cron.** ✅ shipped
+      (PR #389).
+      - **The sweep (`sweepUploads`, in the jobs cron; 60 + 15 + 165 s):**
+        expired `pending` and day-old `stored` uploads are failed and
+        deleted — unless a record holds the file (a save that landed but
+        reported an error put the claim back), which is finished instead;
+        a filing still `claiming` after 30 minutes (longer than any
+        request) is finished when its record holds the file, else failed
+        once the day to retry is over; due objects are deleted with
+        backoff on failure; rows are pruned 90 days after their object
+        (migration 0131 indexes `purged_at`). Every change holds only if
+        no other request changed the row meanwhile. Never deleted: a file
+        a record keeps (also excluded by the query, not only by its null
+        `purge_after`), or a key that isn't the one FORGE built for that
+        upload. A record the sweep finishes first gets the parse its
+        filing never queued (`queueMissingParse`; never a second one); if
+        that fails, the row waits for the next tick.
+      - **Claims hardened (adversarial review):** `finishClaim` sets
+        `claimed` and clears `purge_after` in one statement (in two, a
+        claim finished at the end of its day could look due for
+        deletion); `finishClaim` / `releaseClaim` / `failClaim` take the
+        claim's own `claimedAt`, so a slow request never undoes or
+        finishes a claim a retry took over; the new-solicitation and
+        companion-document actions queue the parse before finishing the
+        claim, so a filing that dies in between is never left unparsed,
+        and a retry of a filing whose parse already ran doesn't parse it
+        again.
+      - **Second review (9 of 15 upheld):** the sweep queued the parse
+        after marking the filing finished, so a failed queue was never
+        retried — now before; the rerun double parse above; a browser PUT
+        could outlive its link and land after the sweep's delete,
+        leaving a file nothing tracks — the browser now stops a PUT 10
+        minutes after its link expires (counted from when the link was
+        issued; the sweep deletes at 15); the tests below.
+      - **Tests:** `tests/isolation/uploads-sweep.test.ts` — each
+        transition; a retry, a late finish and a late check landing
+        between the sweep's read and write; a put-back claim whose record
+        holds the file, its parse queued once, and a failed queue retried
+        next tick; a dead filing's record parsed, an already parsed one
+        not again; a slow request's late release or finish after a
+        takeover; a record holding another file; transient re-delete; no
+        second delete; kept files and rewritten keys never deleted;
+        delete backoff; pruning; the row cap.
+        `tests/isolation/uploads-solicitation.test.ts` — a retry after a
+        parse ran doesn't parse again; one after a refused save does.
+        `tests/ai/upload-client-logic.test.ts` — the PUT's time limit.
+        Fourteen guards mutation-checked: each, broken, fails a test.
+      - **Split out (diff cap):** GSA paste attachments upload straight
+        to storage — built and reviewed with this phase, next PR (2d-3).
+    - **2d-3 — GSA attachments upload straight to storage.** ⏳ next.
     - **2e — knowledge corpus; extraction as a durable job; one storage
       meter across every file type; Office zip checks.**
     - **2f — templates, chat attachments and contacts; files removed

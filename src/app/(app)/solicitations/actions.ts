@@ -12,7 +12,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { stripExt } from "@/lib/solicitation-parse";
-import { runDurable } from "@/lib/jobs";
+import { hasAnyJob, runDurable } from "@/lib/jobs";
 import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
 import { log } from "@/lib/log";
 
@@ -80,19 +80,21 @@ export async function createSolicitationFromUploadAction(input: {
       .onConflictDoNothing();
   } catch (err) {
     log.error("[createSolicitationFromUploadAction]", "insert failed", { error: err });
-    await releaseClaim({ organizationId, uploadId: file.uploadId });
+    await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
     return { ok: false, error: "Could not record the solicitation; try again." };
   }
-  await finishClaim({ organizationId, uploadId: file.uploadId });
 
   // The parse reads the file from storage; in the in-memory mode it gets
-  // the bytes in hand. A job already open for this record is reused.
-  const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
-  await runDurable(
-    "[createSolicitationFromUploadAction] parse",
-    { organizationId, kind: "solicitation_parse", resourceId: file.resourceId, requestedByUserId: user.id },
-    bytes ? { bytes } : {},
-  );
+  // the bytes in hand. A job already open for this record is reused. It
+  // is queued before the claim is finished: a filing that dies in between
+  // is finished by the upload sweep, which never sees a finished one. A
+  // retry of a filing that died after queueing it doesn't parse it again.
+  const parse = { organizationId, kind: "solicitation_parse" as const, resourceId: file.resourceId, requestedByUserId: user.id };
+  if (!claim.rerun || !(await hasAnyJob(parse))) {
+    const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
+    await runDurable("[createSolicitationFromUploadAction] parse", parse, bytes ? { bytes } : {});
+  }
+  await finishClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
 
   await recordAudit({
     organizationId,

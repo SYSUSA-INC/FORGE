@@ -49,7 +49,7 @@ import { harvestProposal } from "@/lib/proposal-harvest";
 import { parseSolicitationDocumentFromBytes } from "@/lib/solicitation-document-parse";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
 import { detectFormat } from "@/lib/text-extract";
-import { isKeyInOrg, parseBudgetBytes, tooLargeToReadMessage } from "@/lib/upload-policy";
+import { isKeyInOrg, parseBudgetBytes, tooLargeToReadMessage, type UploadResourceType } from "@/lib/upload-policy";
 import { sniffFormat } from "@/lib/upload-verify";
 import { getVerifiedObject } from "@/lib/uploads";
 
@@ -148,6 +148,35 @@ export async function runDurable(
     );
   }
   return { jobId: job.id, reused };
+}
+
+const PARSE_KIND: Partial<Record<UploadResourceType, BackgroundJobKind>> = {
+  solicitation: "solicitation_parse",
+  solicitation_document: "solicitation_document_parse",
+};
+
+/** Whether this resource has ever had a job of this kind, whatever became of it. */
+export async function hasAnyJob(r: { organizationId: string; kind: BackgroundJobKind; resourceId: string }): Promise<boolean> {
+  const [any] = await db
+    .select({ id: backgroundJobs.id })
+    .from(backgroundJobs)
+    .where(and(eq(backgroundJobs.organizationId, r.organizationId), eq(backgroundJobs.kind, r.kind), eq(backgroundJobs.resourceId, r.resourceId)))
+    .limit(1);
+  return Boolean(any);
+}
+
+/**
+ * BL-STAB-2d — a record the upload sweep found holding its file, whose
+ * filing died before it queued the parse: queue it, unless one was ever
+ * queued (a parsed or failed record keeps its result; Re-parse is the way
+ * to run it again). Returns whether a job was queued.
+ */
+export async function queueMissingParse(r: { organizationId: string; resourceType: UploadResourceType; resourceId: string }): Promise<boolean> {
+  const kind = PARSE_KIND[r.resourceType];
+  if (!kind) return false;
+  if (await hasAnyJob({ organizationId: r.organizationId, kind, resourceId: r.resourceId })) return false;
+  await enqueueJob({ organizationId: r.organizationId, kind, resourceId: r.resourceId });
+  return true;
 }
 
 /**

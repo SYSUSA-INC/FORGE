@@ -12,7 +12,7 @@ import { db } from "@/db";
 import { backgroundJobs, fileUploads, solicitations } from "@/db/schema";
 import { executeJob } from "@/lib/jobs";
 import { getStorageProvider } from "@/lib/storage";
-import { completeUpload, createUploadIntent, receiveProxyUpload } from "@/lib/uploads";
+import { claimUpload, completeUpload, createUploadIntent, receiveProxyUpload, releaseClaim } from "@/lib/uploads";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const sessionUserStub = {
@@ -93,6 +93,31 @@ describe("BL-STAB-2c — solicitations from direct uploads (runtime)", () => {
     const parsed = await runParse(res.id);
     expect(parsed.parseStatus).toBe("parsed");
     expect(parsed.rawText).toContain("Help Desk Support Services");
+  });
+
+  it("a retry of a filing that died after queueing its parse finishes it without a second parse (BL-STAB-2d)", async () => {
+    const org = fx.orgA.organizationId;
+    const jobsFor = (resourceId: string) => db.select({ status: backgroundJobs.status }).from(backgroundJobs).where(and(eq(backgroundJobs.organizationId, org), eq(backgroundJobs.resourceId, resourceId)));
+    // Saved, parsed, then the instance died before finishing the claim.
+    const died = await storedUpload("died.txt");
+    const claim = await claimUpload({ organizationId: org, userId: fx.orgA.userId, uploadId: died.uploadId, resourceType: "solicitation" });
+    if (!claim.ok || !("claim" in claim)) throw new Error("claim failed");
+    await db.insert(solicitations).values({ id: claim.claim.resourceId, organizationId: org, title: "died", storagePath: died.key, parseStatus: "parsed" });
+    await db.insert(backgroundJobs).values({ organizationId: org, kind: "solicitation_parse", resourceId: claim.claim.resourceId, status: "done" });
+    await db.update(fileUploads).set({ claimedAt: new Date(Date.now() - 3 * 60_000) }).where(and(eq(fileUploads.organizationId, org), eq(fileUploads.id, died.uploadId)));
+    expect(await createSolicitationFromUploadAction({ uploadId: died.uploadId })).toEqual({ ok: true, id: claim.claim.resourceId });
+    expect(await jobsFor(claim.claim.resourceId)).toEqual([{ status: "done" }]);
+    const [ledger] = await db.select().from(fileUploads).where(and(eq(fileUploads.organizationId, org), eq(fileUploads.id, died.uploadId)));
+    expect(ledger).toMatchObject({ status: "claimed", purgeAfter: null });
+
+    // A retry after a refused save (claim put back, nothing queued) parses as usual.
+    const refused = await storedUpload("refused.txt");
+    const first = await claimUpload({ organizationId: org, userId: fx.orgA.userId, uploadId: refused.uploadId, resourceType: "solicitation" });
+    if (!first.ok || !("claim" in first)) throw new Error("claim failed");
+    await releaseClaim({ organizationId: org, uploadId: refused.uploadId, claimedAt: first.claim.claimedAt });
+    const res = await createSolicitationFromUploadAction({ uploadId: refused.uploadId });
+    expect(res).toEqual({ ok: true, id: first.claim.resourceId });
+    expect(await jobsFor(first.claim.resourceId)).toEqual([{ status: "queued" }]);
   });
 
   it("an amendment needs a parent in this organization; a refused parent leaves the upload ready", async () => {

@@ -4924,6 +4924,10 @@ export const fileUploads = pgTable(
     purgeIdx: index("file_upload_purge_idx")
       .on(t.purgeAfter)
       .where(sql`"purge_after" IS NOT NULL AND "purged_at" IS NULL`),
+    // BL-STAB-2d — the sweeper removes rows 90 days after their object (0131).
+    purgedIdx: index("file_upload_purged_idx")
+      .on(t.purgedAt)
+      .where(sql`"purged_at" IS NOT NULL`),
   }),
 );
 

@@ -3,7 +3,7 @@
  * storage, and how progress reads. Pure.
  */
 import { describe, expect, it } from "vitest";
-import { classifyPutFailure, describeUploadFailure, formatBytes, nextBackoffMs, progressSnapshot } from "@/lib/upload-client-logic";
+import { classifyPutFailure, describeUploadFailure, formatBytes, nextBackoffMs, progressSnapshot, PUT_GRACE_MS, putTimeoutMs } from "@/lib/upload-client-logic";
 
 const later = new Date(Date.now() + 10 * 60_000).toISOString();
 
@@ -21,6 +21,18 @@ describe("classifyPutFailure", () => {
   it("every outcome has a message a person can act on", () => {
     expect(describeUploadFailure("network_or_cors")).toMatch(/Admin → Jobs → File storage/);
     for (const code of ["renew", "retry", "fatal_signature", "fatal_too_large", "cancelled", "other"]) expect(describeUploadFailure(code).length).toBeGreaterThan(10);
+  });
+});
+
+describe("BL-STAB-2d — a PUT never outlives its link plus the grace", () => {
+  it("counts from when the link was issued, not this computer's clock, and stays under the sweep's 15 minutes", () => {
+    const issuedAt = 1_000_000;
+    // A 900 s link, asked 100 s after it was issued: 800 s of link plus the grace.
+    expect(putTimeoutMs(issuedAt, 900, issuedAt + 100_000)).toBe(800_000 + PUT_GRACE_MS);
+    expect(PUT_GRACE_MS).toBeLessThan(15 * 60_000);
+    // Long past: still a positive timeout, so the browser fails it at once rather than never.
+    expect(putTimeoutMs(issuedAt, 900, issuedAt + 10 * 3_600_000)).toBe(1_000);
+    expect(describeUploadFailure("too_slow")).toMatch(/too slow to finish while its link was valid/);
   });
 });
 
