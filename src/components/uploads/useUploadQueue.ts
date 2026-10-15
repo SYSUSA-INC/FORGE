@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cancelUploadAction } from "@/app/(app)/uploads/actions";
-import { uploadFile, type UploadPhase } from "@/lib/upload-client";
+import { checkArrivedUpload, uploadFile, type UploadPhase } from "@/lib/upload-client";
 import { progressSnapshot, type ProgressSnap } from "@/lib/upload-client-logic";
 import type { UploadPurpose } from "@/lib/upload-policy";
 
@@ -19,6 +19,8 @@ export type UploadItem<R, M = undefined> = {
   uploadId?: string;
   /** The file is in storage and checked; only filing it is left (a retry re-files it). */
   stored?: boolean;
+  /** The file is in storage but its check couldn't run: a retry checks it again (never re-sends it). */
+  arrived?: boolean;
   result?: R;
   error?: string;
 };
@@ -79,6 +81,18 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
   const attempt = useCallback(
     async (item: UploadItem<R, M>, controller: AbortController): Promise<Partial<UploadItem<R, M>>> => {
       let uploadId = item.stored ? item.uploadId : undefined;
+      if (!uploadId && item.arrived && item.uploadId) {
+        // BL-STAB-2e — sending it again would reserve the same file twice.
+        patch(item.id, { phase: "verifying", error: undefined });
+        const res = await checkArrivedUpload(item.uploadId);
+        if (!res.ok) {
+          return res.arrivedUploadId
+            ? { phase: "failed", error: res.error }
+            : { phase: "failed", error: res.error, arrived: false, uploadId: undefined };
+        }
+        uploadId = res.uploadId;
+        patch(item.id, { uploadId, stored: true, arrived: false, loaded: item.file.size });
+      }
       if (!uploadId) {
         let snap: ProgressSnap | null = null;
         let lastPaint = 0;
@@ -95,7 +109,11 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
             patch(item.id, { loaded, total, bytesPerSec: snap.bytesPerSec, etaSec: snap.etaSec });
           },
         });
-        if (!res.ok) return { phase: res.cancelled ? "cancelled" : "failed", error: res.error };
+        if (!res.ok) {
+          return res.arrivedUploadId
+            ? { phase: "failed", error: res.error, uploadId: res.arrivedUploadId, arrived: true }
+            : { phase: res.cancelled ? "cancelled" : "failed", error: res.error };
+        }
         uploadId = res.uploadId;
         patch(item.id, { uploadId, stored: true, loaded: item.file.size });
       }
@@ -187,7 +205,7 @@ export function useUploadQueue<R = never, M = undefined>(opts: {
       // A file in storage that was never filed (no claim, or its filing failed) is
       // deleted now rather than a day later by the sweeper; a filed one is left alone.
       const gone = items.find((it) => it.id === id);
-      if (gone?.stored && gone.uploadId && !running.current.has(id)) void cancelUploadAction(gone.uploadId).catch(() => undefined);
+      if ((gone?.stored || gone?.arrived) && gone.uploadId && !running.current.has(id)) void cancelUploadAction(gone.uploadId).catch(() => undefined);
       setItems((list) => list.filter((it) => it.id !== id));
     },
     clear() {

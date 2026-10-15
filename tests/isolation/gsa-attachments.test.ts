@@ -15,7 +15,7 @@ import { runDurableBatch } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
 import { claimUpload, completeUpload, createUploadIntent, releaseClaim } from "@/lib/uploads";
-import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { createTwoTenants, type TwoTenantFixture, withUploadPlans } from "../helpers/fixtures";
 
 const sessionUserStub = {
   id: "PLACEHOLDER",
@@ -69,15 +69,18 @@ const FIELDS: Omit<GsaCreateInput, "uploadIds"> = {
 
 describe("BL-STAB-2d — GSA attachments from direct uploads (runtime)", () => {
   let fx: TwoTenantFixture;
+  let plans: (() => Promise<void>) | null = null;
 
   beforeEach(async () => {
     fx = await createTwoTenants("gsa-attachments");
+    plans = await withUploadPlans(fx);
     sessionUserStub.id = fx.orgA.userId;
     sessionUserStub.organizationId = fx.orgA.organizationId;
     bg.runs.length = 0;
   });
   afterEach(async () => {
     vi.restoreAllMocks();
+    await plans?.();
     await fx.cleanup();
   });
 

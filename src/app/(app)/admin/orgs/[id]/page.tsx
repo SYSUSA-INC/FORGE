@@ -18,7 +18,7 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
 import { tenantAllowsEmail } from "@/lib/email-domain";
 import { listPendingApprovals } from "@/lib/invite-approval";
-import { getCurrentTier } from "@/lib/subscription-gates";
+import { getStorageBytesUsed, getCurrentTier } from "@/lib/subscription-gates";
 import { listActiveTiersAction, listOrgAdminsAction } from "./actions";
 import { TierAssignmentForm } from "./TierAssignmentForm";
 import { TransferOwnershipForm } from "./TransferOwnershipForm";
@@ -150,6 +150,8 @@ export default async function TenantDetailPage({
   const proposalCount = Number(proposalCountRow[0]?.n ?? 0);
   const artifactCount = Number(artifactRow[0]?.n ?? 0);
   const artifactBytes = Number(artifactRow[0]?.bytes ?? 0);
+  // BL-STAB-2e — the meter the plan's storage limit is checked against.
+  const storageBytes = await getStorageBytesUsed(org.id);
   const notificationRuleCount = Number(notificationRuleCountRow[0]?.n ?? 0);
   const auditLogLast30d = Number(auditLogCountRow[0]?.n ?? 0);
 
@@ -425,12 +427,12 @@ export default async function TenantDetailPage({
           <dl className="grid grid-cols-[180px_1fr] gap-y-2 font-mono text-[12px]">
             <Field
               label="Knowledge artifacts"
-              value={`${artifactCount} files`}
+              value={`${artifactCount} files · ${formatBytes(artifactBytes)}`}
             />
             <Field
               label="Storage used"
-              value={formatBytes(artifactBytes)}
-              accent={artifactBytes > 0 ? "violet" : undefined}
+              value={formatBytes(storageBytes)}
+              accent={storageBytes > 0 ? "violet" : undefined}
             />
             <Field
               label="Notification rules"
@@ -438,9 +440,11 @@ export default async function TenantDetailPage({
             />
           </dl>
           <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted/80">
-            Storage measured from <code>knowledge_artifact.file_size</code>{" "}
-            sums. Other AI-call costs surface in the platform audit log
-            (BL-18) and aren&apos;t aggregated here yet.
+            Storage used is what the plan&apos;s storage limit is checked
+            against: knowledge files, solicitation and companion-document
+            files, Word templates and uploads in progress. Other AI-call costs
+            surface in the platform audit log (BL-18) and aren&apos;t
+            aggregated here yet.
           </p>
         </Panel>
 

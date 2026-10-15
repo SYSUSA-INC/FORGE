@@ -39,6 +39,7 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceStorageQuota, QuotaExceededError } from "@/lib/subscription-gates";
 import { getStorageProvider, memoryStorageRefused, uploadTransport } from "@/lib/storage";
 import {
   assertKeyInOrg,
@@ -57,7 +58,19 @@ import {
   type UploadTransport,
   type UploadView,
 } from "@/lib/upload-policy";
-import { describeMismatch, familyMatches, sniffFormat } from "@/lib/upload-verify";
+import {
+  describeMismatch,
+  describeZipRejection,
+  familyMatches,
+  inspectZipDirectory,
+  locateCentralDirectory,
+  readZip64Eocd,
+  sniffFormat,
+  ZIP_LIMITS,
+  ZIP_MAX_DIRECTORY_BYTES,
+  ZIP_TAIL_BYTES,
+  type ZipRejection,
+} from "@/lib/upload-verify";
 
 export type UploadActor = { userId: string; email: string | null };
 
@@ -186,6 +199,17 @@ export async function createUploadIntent(i: {
   if (dailyCap > 0 && Number(counts?.ingress ?? 0) + i.size > dailyCap) {
     return { ok: false, code: "daily_cap", error: "This organization has reached its daily upload volume. Try again tomorrow." };
   }
+  // BL-STAB-2e — the plan's storage limit, over every stored file and every
+  // upload in progress, before a byte is sent (a file is counted once: here
+  // as a reservation, then as its record).
+  if (UPLOAD_POLICIES[i.purpose].countsTowardQuota) {
+    try {
+      await enforceStorageQuota(organizationId, i.size);
+    } catch (err) {
+      if (err instanceof QuotaExceededError) return { ok: false, code: "storage_quota", error: err.message };
+      throw err;
+    }
+  }
 
   const policy = resolvePolicy(i.purpose, process.env);
   const uploadId = randomUUID();
@@ -297,7 +321,12 @@ export async function completeUpload(i: { organizationId: string; actor: UploadA
   const first = (await storage.getRange(row.storageKey, 0, 8191)) ?? new Uint8Array(0);
   const sniff = sniffFormat(first);
   if (!familyMatches(row.declaredFormat, sniff)) {
-    return reject(row, i.actor, "type_mismatch", describeMismatch(row.declaredFormat, sniff));
+    return reject(row, i.actor, "type_mismatch", describeMismatch(row.declaredFormat, sniff, first));
+  }
+  if (row.declaredFormat === "docx" || row.declaredFormat === "xlsx" || row.declaredFormat === "pptx") {
+    const zip = await checkOfficeZip(row.storageKey, head.byteSize, row.declaredFormat);
+    if (zip === "unavailable") return { ok: false, code: "storage_unavailable", error: "Storage could not be checked; try again.", retryable: true };
+    if (!zip.ok) return reject(row, i.actor, "zip_rejected", zip.detail);
   }
 
   const now = new Date();
@@ -328,6 +357,40 @@ export async function completeUpload(i: { organizationId: string; actor: UploadA
     });
   }
   return { ok: true, upload: view(stored) };
+}
+
+/**
+ * BL-STAB-2e — an Office file's table of contents (its zip central
+ * directory), read with two ranged reads and never the whole file: within
+ * the zip limits, not password-protected, and the Office file it is named.
+ */
+async function checkOfficeZip(
+  key: string,
+  size: number,
+  format: "docx" | "xlsx" | "pptx",
+): Promise<{ ok: true } | { ok: false; detail: string } | "unavailable"> {
+  const refuse = (reason: ZipRejection | "unreadable") => ({ ok: false as const, detail: describeZipRejection(reason, format) });
+  const storage = getStorageProvider();
+  try {
+    const tailLength = Math.min(size, ZIP_TAIL_BYTES);
+    const tail = await storage.getRange(key, size - tailLength, size - 1);
+    if (!tail || tail.length !== tailLength) return refuse("unreadable");
+    let loc = locateCentralDirectory(tail, size);
+    if ("zip64RecordOffset" in loc) {
+      const rec = await storage.getRange(key, loc.zip64RecordOffset, loc.zip64RecordOffset + 55);
+      loc = rec ? readZip64Eocd(rec) : { error: "unreadable" };
+    }
+    if ("error" in loc) return refuse("unreadable");
+    if (loc.entries > ZIP_LIMITS.maxEntries || loc.size > ZIP_MAX_DIRECTORY_BYTES) return refuse("too_many_entries");
+    if (loc.offset + loc.size > size) return refuse("unreadable");
+    const cd = loc.size === 0 ? new Uint8Array(0) : await storage.getRange(key, loc.offset, loc.offset + loc.size - 1);
+    if (!cd || cd.length !== loc.size) return refuse("unreadable");
+    const inspected = inspectZipDirectory(cd, format, loc.entries);
+    return inspected.ok ? { ok: true } : refuse(inspected.reason);
+  } catch (err) {
+    log.warn("[uploads]", "storage read for the Office file check failed", { error: err });
+    return "unavailable";
+  }
 }
 
 export type ClaimedUpload = {
@@ -572,17 +635,8 @@ export async function cancelUpload(i: { organizationId: string; actor: UploadAct
   return { ok: true };
 }
 
-/** Bytes this organization has asked to upload but not yet filed or dropped, for the storage meter. */
-export async function getReservedUploadBytes(organizationId: string): Promise<number> {
-  const counted = UPLOAD_PURPOSES.filter((p) => UPLOAD_POLICIES[p].countsTowardQuota);
-  const [row] = await db
-    .select({
-      bytes: sql<number>`coalesce(sum(${fileUploads.declaredSize}) filter (where (${fileUploads.status} = 'pending' and ${fileUploads.urlExpiresAt} > now()) or ${fileUploads.status} in ('stored', 'claiming')), 0)`,
-    })
-    .from(fileUploads)
-    .where(and(eq(fileUploads.organizationId, organizationId), inArray(fileUploads.purpose, counted)));
-  return Number(row?.bytes ?? 0);
-}
+// The storage meter's reservations live with the meter (BL-STAB-2e).
+export { getReservedUploadBytes } from "@/lib/subscription-gates";
 
 /**
  * Read a stored file for parsing, refusing anything that is not this

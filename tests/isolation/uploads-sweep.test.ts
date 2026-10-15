@@ -18,7 +18,7 @@ import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
 import { cancelUpload, claimUpload, completeUpload, createUploadIntent, finishClaim, releaseClaim, sweepUploads } from "@/lib/uploads";
 import { PENDING_GRACE_MS, type UploadPurpose } from "@/lib/upload-policy";
-import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { createTwoTenants, type TwoTenantFixture, withUploadPlans } from "../helpers/fixtures";
 
 const TEXT = new TextEncoder().encode("Section C. The contractor shall staff the help desk.\n");
 const MINUTE = 60_000;
@@ -58,13 +58,16 @@ function raceBeforeUpdate(when: (values: Record<string, unknown>) => boolean, be
 
 describe("BL-STAB-2d — upload sweeper (runtime)", () => {
   let fx: TwoTenantFixture;
+  let plans: (() => Promise<void>) | null = null;
   const storage = () => getStorageProvider();
 
   beforeEach(async () => {
     fx = await createTwoTenants("uploads-sweep");
+    plans = await withUploadPlans(fx);
   });
   afterEach(async () => {
     vi.restoreAllMocks();
+    await plans?.();
     await fx.cleanup();
   });
 

@@ -19,18 +19,21 @@ import {
   peekStoredUploads,
   releaseClaim,
 } from "@/lib/uploads";
-import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { createTwoTenants, type TwoTenantFixture, withUploadPlans } from "../helpers/fixtures";
 
 const PDF = new TextEncoder().encode("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n");
 
 describe("BL-STAB-2b — upload ledger (runtime)", () => {
   let fx: TwoTenantFixture;
+  let plans: (() => Promise<void>) | null = null;
   const actorA = () => ({ userId: fx.orgA.userId, email: null });
 
   beforeEach(async () => {
     fx = await createTwoTenants("uploads");
+    plans = await withUploadPlans(fx);
   });
   afterEach(async () => {
+    await plans?.();
     await fx.cleanup();
   });
 

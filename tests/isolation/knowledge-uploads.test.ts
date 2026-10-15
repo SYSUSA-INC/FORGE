@@ -2,19 +2,19 @@
  * BL-STAB-2e — knowledge-base files upload straight to storage and are
  * read by a durable job (Postgres; memory storage stands in for R2;
  * background work is run by hand): a checked upload is saved once as an
- * artifact, under the storage limit, with the batch's kind, tags and
- * outcome; its text is read from storage within the read budget;
+ * artifact with the batch's kind, tags and outcome (the storage limit is
+ * checked when the upload starts: storage-quota.test.ts); its text is read from storage within the read budget;
  * Re-extract queues the same job; a filing that died gets its extraction
  * from the upload sweep.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { backgroundJobs, fileUploads, knowledgeArtifacts } from "@/db/schema";
 import { executeJob, queueMissingParse } from "@/lib/jobs";
 import { getStorageProvider } from "@/lib/storage";
 import { claimUpload, completeUpload, createUploadIntent, sweepUploads } from "@/lib/uploads";
-import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture, withUploadPlans } from "../helpers/fixtures";
 
 const sessionUserStub = {
   id: "PLACEHOLDER",
@@ -45,23 +45,23 @@ import { createKnowledgeArtifactFromUploadAction, reextractArtifactTextAction } 
 const NOTE = new TextEncoder().encode(
   ["Past performance: Help desk support for the VA, 2021-2025.", "Staffed 7 a.m. to 7 p.m. Eastern; 98% first-call resolution."].join("\n"),
 );
+
 const GIB = 1024 * 1024 * 1024;
 
 describe("BL-STAB-2e — knowledge files from direct uploads (runtime)", () => {
   let fx: TwoTenantFixture;
-  let tier: { cleanup: () => Promise<void> } | null = null;
+  let plans: (() => Promise<void>) | null = null;
   const org = () => fx.orgA.organizationId;
 
   beforeEach(async () => {
     fx = await createTwoTenants("knowledge-uploads");
     sessionUserStub.id = fx.orgA.userId;
     sessionUserStub.organizationId = fx.orgA.organizationId;
-    // Unlimited storage unless a test sets a limit.
-    tier = await createTierAndSubscribe({ organizationId: org(), slug: `ku-${fx.orgA.organizationId.slice(0, 8)}`, name: "Knowledge test" });
+    plans = await withUploadPlans(fx);
   });
   afterEach(async () => {
     vi.restoreAllMocks();
-    await tier?.cleanup();
+    await plans?.();
     await fx.cleanup();
   });
 
@@ -135,20 +135,6 @@ describe("BL-STAB-2e — knowledge files from direct uploads (runtime)", () => {
     expect((await db.select().from(knowledgeArtifacts).where(eq(knowledgeArtifacts.organizationId, fx.orgB.organizationId))).map((r) => r.id)).toEqual([fx.orgB.knowledgeArtifactId]);
   });
 
-  it("refuses a file over the storage limit and leaves the upload ready to retry", async () => {
-    await tier?.cleanup();
-    tier = await createTierAndSubscribe({ organizationId: org(), slug: `ku1-${fx.orgA.organizationId.slice(0, 8)}`, name: "One GB", quotas: { storageGb: 1 } });
-    // The tenant already holds exactly its limit.
-    await db.insert(knowledgeArtifacts).values({ organizationId: org(), kind: "other", source: "uploaded", title: "Big", fileName: "big.pdf", fileSize: GIB, status: "indexed" });
-    const { uploadId } = await storedUpload();
-    const res = await createKnowledgeArtifactFromUploadAction({ uploadId });
-    expect(res).toMatchObject({ ok: false, error: expect.stringMatching(/^Storage limit reached on the One GB tier/) });
-    const [ledger] = await db.select().from(fileUploads).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, uploadId)));
-    expect(ledger).toMatchObject({ status: "stored" });
-    // Only the fixture's artifact and the one at the limit.
-    expect(await db.select().from(knowledgeArtifacts).where(eq(knowledgeArtifacts.organizationId, org()))).toHaveLength(2);
-  });
-
   it("a file over its read budget is kept and marked; Re-extract queues the read again", async () => {
     const { uploadId } = await storedUpload();
     const res = await createKnowledgeArtifactFromUploadAction({ uploadId });
@@ -207,12 +193,16 @@ describe("BL-STAB-2e — knowledge files from direct uploads (runtime)", () => {
     expect((await jobsFor(read.id)).map((j) => j.status)).toEqual(["done"]);
     expect(await db.select().from(knowledgeArtifacts).where(and(eq(knowledgeArtifacts.organizationId, org()), eq(knowledgeArtifacts.id, read.id)))).toHaveLength(1);
 
-    // At its limit counting the saved artifact: the retry isn't refused for counting it twice.
-    await tier?.cleanup();
-    tier = await createTierAndSubscribe({ organizationId: org(), slug: `ku2-${fx.orgA.organizationId.slice(0, 8)}`, name: "One GB", quotas: { storageGb: 1 } });
-    const full = await saveThenDie("full.txt", false);
-    const [used] = await db.select({ total: sql<number>`coalesce(sum(${knowledgeArtifacts.fileSize}), 0)` }).from(knowledgeArtifacts).where(eq(knowledgeArtifacts.organizationId, org()));
-    await db.insert(knowledgeArtifacts).values({ organizationId: org(), kind: "other", source: "uploaded", title: "Filler", fileName: "filler.pdf", fileSize: GIB - Number(used!.total), status: "indexed" });
-    expect(await createKnowledgeArtifactFromUploadAction({ uploadId: full.uploadId })).toEqual({ ok: true, id: full.id });
+    // A full plan doesn't refuse the retry: the limit was checked when the upload started.
+    await plans?.();
+    plans = null;
+    const limited = await createTierAndSubscribe({ organizationId: org(), slug: `ku2-${org().slice(0, 8)}`, name: "One GB", quotas: { storageGb: 1 } });
+    try {
+      const full = await saveThenDie("full.txt", false);
+      await db.insert(knowledgeArtifacts).values({ organizationId: org(), kind: "other", source: "uploaded", title: "Filler", fileName: "filler.pdf", fileSize: GIB, status: "indexed" });
+      expect(await createKnowledgeArtifactFromUploadAction({ uploadId: full.uploadId })).toEqual({ ok: true, id: full.id });
+    } finally {
+      await limited.cleanup();
+    }
   });
 });

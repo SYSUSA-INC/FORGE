@@ -1,10 +1,14 @@
 import "server-only";
 
-import { and, count, eq, sql, sum } from "drizzle-orm";
+import { and, count, eq, inArray, ne, sql, sum } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  fileUploads,
   knowledgeArtifacts,
   memberships,
+  proposalTemplates,
+  solicitationDocuments,
+  solicitations,
   subscriptionTiers,
   tenantSubscriptions,
   tenantUsageCounters,
@@ -15,6 +19,7 @@ import { activeAddonEffects } from "@/lib/addons";
 import { applyAddonEffects } from "@/lib/addons-logic";
 import { applyAiBudget, type AiBudget } from "@/lib/ai-control";
 import { log } from "@/lib/log";
+import { UPLOAD_POLICIES, UPLOAD_PURPOSES } from "@/lib/upload-policy";
 import { TRIAL_PAUSED_FLAGS, pauseAiFlags, trialExpiredMessage, trialState, type TrialState } from "@/lib/trial-logic";
 
 /**
@@ -542,16 +547,46 @@ export async function getActiveMembershipCount(
 }
 
 /**
- * Sum of `knowledge_artifact.file_size` for the tenant — total bytes
- * stored. Used by `enforceStorageQuota` + admin dashboards.
+ * BL-STAB-2e — every file the tenant stores, in bytes: knowledge files,
+ * solicitation and companion-document files, Word templates, and uploads
+ * in progress (asked for and not yet expired, arrived, or being filed).
+ * One meter for `enforceStorageQuota` and the admin views; a filed upload
+ * counts once, as its record. (BL-16 B-3c counted knowledge files only.)
  */
 export async function getStorageBytesUsed(
   organizationId: string,
 ): Promise<number> {
+  const total = async (q: Promise<{ bytes: string | null }[]>) => Number((await q)[0]?.bytes ?? 0);
+  const parts = await Promise.all([
+    total(db.select({ bytes: sum(knowledgeArtifacts.fileSize) }).from(knowledgeArtifacts).where(eq(knowledgeArtifacts.organizationId, organizationId))),
+    total(
+      db
+        .select({ bytes: sum(solicitations.fileSize) })
+        .from(solicitations)
+        .where(and(eq(solicitations.organizationId, organizationId), ne(solicitations.storagePath, ""))),
+    ),
+    total(
+      db
+        .select({ bytes: sum(solicitationDocuments.fileSize) })
+        .from(solicitationDocuments)
+        .where(and(eq(solicitationDocuments.organizationId, organizationId), ne(solicitationDocuments.storagePath, ""))),
+    ),
+    total(db.select({ bytes: sum(proposalTemplates.docxFileSize) }).from(proposalTemplates).where(eq(proposalTemplates.organizationId, organizationId))),
+    getReservedUploadBytes(organizationId),
+  ]);
+  return parts.reduce((a, b) => a + b, 0);
+}
+
+/** Bytes this organization has asked to upload but not yet filed or dropped, for the storage meter. */
+export async function getReservedUploadBytes(organizationId: string): Promise<number> {
+  const counted = UPLOAD_PURPOSES.filter((p) => UPLOAD_POLICIES[p].countsTowardQuota);
   const [row] = await db
-    .select({ bytes: sum(knowledgeArtifacts.fileSize) })
-    .from(knowledgeArtifacts)
-    .where(eq(knowledgeArtifacts.organizationId, organizationId));
+    .select({
+      // A pending upload counts until the sweep would fail it (its link's life plus the grace in which the PUT may still land).
+      bytes: sql<number>`coalesce(sum(${fileUploads.declaredSize}) filter (where (${fileUploads.status} = 'pending' and ${fileUploads.purgeAfter} > now()) or ${fileUploads.status} in ('stored', 'claiming')), 0)`,
+    })
+    .from(fileUploads)
+    .where(and(eq(fileUploads.organizationId, organizationId), inArray(fileUploads.purpose, counted)));
   return Number(row?.bytes ?? 0);
 }
 
@@ -612,7 +647,13 @@ export async function enforceStorageQuota(
   try {
     const tier = await getCurrentTier(organizationId);
     if (!tier) {
-      throw new QuotaExceededError("storageGb", 0, 0, null);
+      throw new QuotaExceededError(
+        "storageGb",
+        0,
+        0,
+        null,
+        "This workspace has no plan assigned, so files can't be stored yet. A FORGE platform admin assigns one under Admin → Organizations.",
+      );
     }
     const limitGb = tier.effectiveQuotas.storageGb;
     if (limitGb === 0) return { usedBytes: 0, limitBytes: 0 };
