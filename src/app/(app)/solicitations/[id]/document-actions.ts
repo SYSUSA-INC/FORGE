@@ -156,8 +156,10 @@ export async function addSolicitationDocumentFromUploadAction(
   if ("alreadyClaimed" in claim) return { ok: true, id: claim.resourceId };
   const file = claim.claim;
 
+  // Whether this request created the record (a retry may find it saved).
+  let created = false;
   try {
-    await db
+    const inserted = await db
       .insert(solicitationDocuments)
       .values({
         id: file.resourceId,
@@ -172,7 +174,9 @@ export async function addSolicitationDocumentFromUploadAction(
         uploadedByUserId: user.id,
         sortOrder,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: solicitationDocuments.id });
+    created = inserted.length > 0;
   } catch (err) {
     log.error("[addSolicitationDocumentFromUploadAction]", "insert failed", { error: err });
     await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
@@ -182,7 +186,8 @@ export async function addSolicitationDocumentFromUploadAction(
   // BL-AIP-4c — a background_job row; the jobs cron re-runs it from
   // storage if this instance dies. Queued before the claim is finished
   // (BL-STAB-2d): the upload sweep finishes a filing that dies in between;
-  // a retry of a filing that died after queueing it doesn't parse it again.
+  // a retry that finds the record already saved parses it only if it never
+  // was, and a record this request created is always parsed.
   const parse = {
     organizationId,
     kind: "solicitation_document_parse" as const,
@@ -190,7 +195,7 @@ export async function addSolicitationDocumentFromUploadAction(
     payload: { solicitationId },
     requestedByUserId: user.id,
   };
-  if (!claim.rerun || !(await hasAnyJob(parse))) {
+  if (created || !(await hasAnyJob(parse))) {
     const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
     await runDurable("[addSolicitationDocumentFromUploadAction] parse", parse, bytes ? { bytes } : {});
   }

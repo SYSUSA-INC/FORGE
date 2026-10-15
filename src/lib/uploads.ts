@@ -44,6 +44,7 @@ import {
   assertKeyInOrg,
   expirySecondsFor,
   isKeyInOrg,
+  PENDING_GRACE_MS,
   PROXY_MAX_BYTES_ON_VERCEL,
   resolvePolicy,
   UPLOAD_POLICIES,
@@ -216,7 +217,7 @@ export async function createUploadIntent(i: {
     declaredSize: i.size,
     origin: (i.origin || "").slice(0, 256),
     urlExpiresAt,
-    purgeAfter: new Date(urlExpiresAt.getTime() + 15 * MINUTE),
+    purgeAfter: new Date(urlExpiresAt.getTime() + PENDING_GRACE_MS),
   });
   await recordAudit({
     organizationId,
@@ -503,7 +504,7 @@ export async function peekStoredUploads(i: {
   userId: string;
   uploadIds: string[];
   resourceType: UploadResourceType;
-}): Promise<{ ready: StoredUploadPreview[]; bad: { uploadId: string; reason: string }[] }> {
+}): Promise<{ ready: StoredUploadPreview[]; bad: { uploadId: string; fileName: string; reason: string }[] }> {
   const ids = Array.from(new Set(i.uploadIds)).slice(0, 50);
   const valid = ids.filter((id) => UUID.test(id));
   const rows = valid.length
@@ -516,22 +517,29 @@ export async function peekStoredUploads(i: {
   const purposes = purposesClaimableAs(i.resourceType);
   const now = Date.now();
   const ready: StoredUploadPreview[] = [];
-  const bad: { uploadId: string; reason: string }[] = [];
+  const bad: { uploadId: string; fileName: string; reason: string }[] = [];
   for (const id of ids) {
     const row = byId.get(id);
-    if (!row) bad.push({ uploadId: id, reason: "Upload not found." });
-    else if (!purposes.includes(row.purpose)) bad.push({ uploadId: id, reason: "This file was uploaded for something else." });
-    else if (row.status !== "stored") bad.push({ uploadId: id, reason: view(row).message || "This file is not ready to save." });
-    else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, reason: FAILURE_MESSAGES.unclaimed! });
+    if (!row) bad.push({ uploadId: id, fileName: "", reason: "Upload not found." });
+    else if (!purposes.includes(row.purpose)) bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was uploaded for something else." });
+    else if (row.status === "claimed") bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was already saved." });
+    else if (row.status !== "stored") bad.push({ uploadId: id, fileName: row.fileName, reason: view(row).message || "This file is not ready to save." });
+    else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, fileName: row.fileName, reason: FAILURE_MESSAGES.unclaimed! });
     else ready.push({ uploadId: id, fileName: row.fileName, size: row.storedSize ?? row.declaredSize, format: (row.detectedFormat || row.declaredFormat) as UploadFormat, contentType: row.contentType });
   }
   return { ready, bad };
 }
 
-/** Stop an upload the user no longer wants: delete what arrived and fail the row. */
+/**
+ * Stop an upload the user no longer wants: delete what arrived and fail
+ * the row. Never a file a record holds: a claim put back after its record
+ * was saved (the save landed but reported an error) keeps its file, and
+ * the upload sweep finishes that filing and queues its parse.
+ */
 export async function cancelUpload(i: { organizationId: string; actor: UploadActor; uploadId: string }): Promise<{ ok: true }> {
   const row = await loadOwn(i.organizationId, i.actor.userId, i.uploadId);
   if (!row || (row.status !== "pending" && row.status !== "stored")) return { ok: true };
+  if (row.resourceId && (await recordHoldsUpload(row))) return { ok: true };
   const [cancelled] = await db
     .update(fileUploads)
     .set({
@@ -541,7 +549,15 @@ export async function cancelUpload(i: { organizationId: string; actor: UploadAct
       purgeAfter: new Date(Math.max(Date.now(), row.urlExpiresAt.getTime() + 5 * MINUTE)),
       updatedAt: new Date(),
     })
-    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, row.id), inArray(fileUploads.status, ["pending", "stored"])))
+    .where(
+      and(
+        eq(fileUploads.organizationId, i.organizationId),
+        eq(fileUploads.id, row.id),
+        inArray(fileUploads.status, ["pending", "stored"]),
+        // Not claimed and put back meanwhile (a claim fixes the record id).
+        row.resourceId ? eq(fileUploads.resourceId, row.resourceId) : isNull(fileUploads.resourceId),
+      ),
+    )
     .returning();
   if (!cancelled) return { ok: true };
   await deleteObject(row.organizationId, row.storageKey);

@@ -102,7 +102,8 @@ export async function uploadFile(
   for (let link = 0; link < 2; link++) {
     const intent = await requestUploadAction({ purpose: opts.purpose, fileName: file.name, size: file.size });
     if (!intent.ok) return { ok: false, error: intent.error };
-    const issuedAt = Date.now();
+    // A monotonic clock: a clock correction mid-upload can't stretch the limit.
+    const issuedAt = performance.now();
     opts.onPhase?.("uploading");
     let put: PutResult | null = null;
     let renew = false;
@@ -114,7 +115,7 @@ export async function uploadFile(
           body: file,
           onProgress: opts.onProgress,
           signal: opts.signal,
-          timeoutMs: putTimeoutMs(issuedAt, intent.expiresInSeconds, Date.now()),
+          timeoutMs: putTimeoutMs(issuedAt, intent.expiresInSeconds, performance.now()),
         });
       } catch {
         return cancelled(intent.uploadId);
@@ -122,6 +123,12 @@ export async function uploadFile(
       if (put.status >= 200 && put.status < 300) break;
       if (put.timedOut) {
         await cancelUploadAction(intent.uploadId).catch(() => undefined);
+        // A retry started late in the link's life only had what was left of it:
+        // try once more on a fresh link before calling the connection too slow.
+        if (link === 0 && attempt > 1) {
+          renew = true;
+          break;
+        }
         return { ok: false, error: describeUploadFailure("too_slow") };
       }
       // Through the app, a retried PUT whose first answer was lost finds the

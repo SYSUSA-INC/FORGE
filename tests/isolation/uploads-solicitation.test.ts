@@ -110,6 +110,15 @@ describe("BL-STAB-2c — solicitations from direct uploads (runtime)", () => {
     const [ledger] = await db.select().from(fileUploads).where(and(eq(fileUploads.organizationId, org), eq(fileUploads.id, died.uploadId)));
     expect(ledger).toMatchObject({ status: "claimed", purgeAfter: null });
 
+    // The user deleted the record the dead attempt saved; the retry re-creates it and parses it.
+    const deleted = await storedUpload("deleted.txt");
+    const third = await claimUpload({ organizationId: org, userId: fx.orgA.userId, uploadId: deleted.uploadId, resourceType: "solicitation" });
+    if (!third.ok || !("claim" in third)) throw new Error("claim failed");
+    await db.insert(backgroundJobs).values({ organizationId: org, kind: "solicitation_parse", resourceId: third.claim.resourceId, status: "done" });
+    await db.update(fileUploads).set({ claimedAt: new Date(Date.now() - 3 * 60_000) }).where(and(eq(fileUploads.organizationId, org), eq(fileUploads.id, deleted.uploadId)));
+    expect(await createSolicitationFromUploadAction({ uploadId: deleted.uploadId })).toEqual({ ok: true, id: third.claim.resourceId });
+    expect((await jobsFor(third.claim.resourceId)).map((j) => j.status).sort()).toEqual(["done", "queued"]);
+
     // A retry after a refused save (claim put back, nothing queued) parses as usual.
     const refused = await storedUpload("refused.txt");
     const first = await claimUpload({ organizationId: org, userId: fx.orgA.userId, uploadId: refused.uploadId, resourceType: "solicitation" });

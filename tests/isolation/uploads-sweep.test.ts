@@ -13,11 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { backgroundJobs, fileUploads, solicitations, type FileUpload } from "@/db/schema";
-import { queueMissingParse } from "@/lib/jobs";
+import { enqueueJob, queueMissingParse } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
 import { cancelUpload, claimUpload, completeUpload, createUploadIntent, finishClaim, releaseClaim, sweepUploads } from "@/lib/uploads";
-import type { UploadPurpose } from "@/lib/upload-policy";
+import { PENDING_GRACE_MS, type UploadPurpose } from "@/lib/upload-policy";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const TEXT = new TextEncoder().encode("Section C. The contractor shall staff the help desk.\n");
@@ -137,6 +137,10 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     expect(await row(up)).toMatchObject({ status: "stored", resourceId: up.resourceId });
     await set(up, { purgeAfter: ago(MINUTE) });
 
+    // Removing it from the list (a cancel) never deletes the file its record holds.
+    await cancelUpload({ organizationId: up.organizationId, actor: { userId: up.userId, email: null }, uploadId: up.id });
+    expect(await row(up)).toMatchObject({ status: "stored", failureReason: "" });
+    expect(await kept(up.key)).toBe(true);
     // Queueing its parse fails once: the file stays and the next tick finishes it.
     vi.spyOn(log, "error").mockImplementation(() => undefined);
     const onPromoted = vi.fn(queueMissingParse).mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
@@ -328,6 +332,45 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     expect(sweep.pruned).toBeGreaterThanOrEqual(1);
     expect(await row(old)).toBeUndefined();
     expect(await row(recent)).toBeDefined();
+  });
+
+  it("finishes a dead filing only once its parse is queued, and two sweeps at once queue one parse", async () => {
+    const jobsFor = async (resourceId: string) =>
+      db.select({ status: backgroundJobs.status }).from(backgroundJobs).where(and(eq(backgroundJobs.organizationId, fx.orgA.organizationId), eq(backgroundJobs.resourceId, resourceId)));
+    // Died after saving its record, before queueing the parse; queueing fails once.
+    const dead = await claiming();
+    await db.insert(solicitations).values({ id: dead.resourceId, organizationId: dead.organizationId, title: "RFP", storagePath: dead.key, parseStatus: "uploaded" });
+    await set(dead, { claimedAt: ago(31 * MINUTE) });
+    vi.spyOn(log, "error").mockImplementation(() => undefined);
+    const failing = vi.fn(queueMissingParse).mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
+    await sweepUploads({ onPromoted: failing });
+    expect(await row(dead)).toMatchObject({ status: "claiming" });
+    expect(await jobsFor(dead.resourceId)).toEqual([]);
+    await sweepUploads({ onPromoted: failing });
+    expect(await row(dead)).toMatchObject({ status: "claimed", purgeAfter: null });
+    expect(await jobsFor(dead.resourceId)).toEqual([{ status: "queued" }]);
+
+    // Two cron runs at once (a duplicate delivery) on another dead filing: one parse.
+    const twice = await claiming();
+    await db.insert(solicitations).values({ id: twice.resourceId, organizationId: twice.organizationId, title: "RFP", storagePath: twice.key, parseStatus: "uploaded" });
+    await set(twice, { claimedAt: ago(31 * MINUTE) });
+    await Promise.all([sweepUploads({ onPromoted: queueMissingParse }), sweepUploads({ onPromoted: queueMissingParse })]);
+    expect(await jobsFor(twice.resourceId)).toEqual([{ status: "queued" }]);
+    // Any two callers at the same moment get the same open job.
+    const spec = { organizationId: fx.orgA.organizationId, kind: "solicitation_parse" as const, resourceId: randomUUID() };
+    const [a, b] = await Promise.all([enqueueJob(spec), enqueueJob(spec)]);
+    expect(a.job.id).toBe(b.job.id);
+    expect(await jobsFor(spec.resourceId)).toEqual([{ status: "queued" }]);
+  });
+
+  it("deletes an upload that never arrived only after the browser has stopped sending it", async () => {
+    const { organizationId, userId } = fx.orgA;
+    const intent = await createUploadIntent({ organizationId, actor: { userId, email: null }, purpose: "document", fileName: "big.pdf", size: 400 * 1024 * 1024, origin: "" });
+    if (!intent.ok) throw new Error(intent.error);
+    const up = await row({ id: intent.uploadId, organizationId });
+    expect(up!.purgeAfter!.getTime() - up!.urlExpiresAt.getTime()).toBe(PENDING_GRACE_MS);
+    // The link's life the browser counts from matches the one the server signed.
+    expect(Math.abs(up!.urlExpiresAt.getTime() - intent.expiresInSeconds * 1_000 - up!.createdAt.getTime())).toBeLessThan(5_000);
   });
 
   it("stops at its row cap and says more is due", async () => {

@@ -32,6 +32,14 @@ export type PurposePolicy = {
   claimableAs: readonly UploadResourceType[];
 };
 
+/**
+ * BL-STAB-2d — an upload that hasn't arrived this long after its link
+ * expires is failed and its key deleted by the upload sweep. The browser
+ * stops its PUT well before (`PUT_GRACE_MS` in upload-client-logic), so
+ * no file lands after the delete.
+ */
+export const PENDING_GRACE_MS = 15 * 60_000;
+
 /** Above this no upload is accepted: the `file_size` columns are 32-bit and R2 takes at most 5 GB in one PUT. */
 export const HARD_MAX_BYTES = 1024 * MiB;
 /** Uploads through the app (memory storage, or the proxy lever) on Vercel stop below its request cap. */

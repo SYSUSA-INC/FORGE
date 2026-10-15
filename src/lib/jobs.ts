@@ -95,7 +95,9 @@ export type JobsCronSummary = {
 /**
  * Insert a job row, or return the open (queued / running) row that
  * already exists for the same resource so a double click or a re-parse
- * during a parse never runs the same work twice.
+ * during a parse never runs the same work twice. BL-STAB-2d — the
+ * database keeps one open job per resource (0132), so two callers at the
+ * same moment get the same row rather than two.
  */
 export async function enqueueJob(
   spec: JobSpec,
@@ -125,9 +127,24 @@ export async function enqueueJob(
       requestedByUserId: spec.requestedByUserId ?? null,
       maxAttempts: spec.maxAttempts ?? JOB_MAX_ATTEMPTS,
     })
+    .onConflictDoNothing()
     .returning();
-  if (!job) throw new Error("Could not create background job.");
-  return { job, reused: false };
+  if (job) return { job, reused: false };
+  // Another caller queued it between our read and our insert: theirs is the job.
+  const [theirs] = await db
+    .select()
+    .from(backgroundJobs)
+    .where(
+      and(
+        eq(backgroundJobs.organizationId, organizationId),
+        eq(backgroundJobs.kind, spec.kind),
+        eq(backgroundJobs.resourceId, spec.resourceId),
+        inArray(backgroundJobs.status, ["queued", "running"]),
+      ),
+    )
+    .limit(1);
+  if (!theirs) throw new Error("Could not create background job.");
+  return { job: theirs, reused: true };
 }
 
 /**
@@ -148,6 +165,38 @@ export async function runDurable(
     );
   }
   return { jobId: job.id, reused };
+}
+
+/**
+ * BL-STAB-2d — run jobs a request has already recorded (a GSA email's
+ * attachments) one after another, in one background run, so a batch of
+ * large files never parses side by side in one instance. A job is started
+ * only within `budgetMs` of the first, so none is begun just before the
+ * instance's time runs out (it would sit `running` until the stuck window
+ * and lose an attempt); whatever isn't started stays queued for the jobs
+ * cron.
+ */
+export function runDurableBatch(
+  label: string,
+  queued: { jobId: string; organizationId: string; bytes?: Uint8Array }[],
+  opts: { budgetMs?: number; now?: () => number } = {},
+): void {
+  if (queued.length === 0) return;
+  const budgetMs = opts.budgetMs ?? 120_000;
+  const now = opts.now ?? Date.now;
+  runInBackground(label, async () => {
+    const startedAt = now();
+    for (const [i, q] of queued.entries()) {
+      if (now() - startedAt > budgetMs) {
+        log.info(label, "left the rest of the batch to the jobs cron", { organizationId: q.organizationId, left: queued.length - i });
+        return;
+      }
+      // One job's database error doesn't stop the rest; the cron retries it.
+      await executeJob(q.jobId, q.organizationId, { bytes: q.bytes, viaCron: false }).catch((err) =>
+        log.error(label, "batch job could not run", { jobId: q.jobId, organizationId: q.organizationId, error: err }),
+      );
+    }
+  });
 }
 
 const PARSE_KIND: Partial<Record<UploadResourceType, BackgroundJobKind>> = {

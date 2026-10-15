@@ -59,8 +59,10 @@ export async function createSolicitationFromUploadAction(input: {
   if ("alreadyClaimed" in claim) return { ok: true, id: claim.resourceId };
   const file = claim.claim;
 
+  // Whether this request created the record (a retry may find it saved).
+  let created = false;
   try {
-    await db
+    const inserted = await db
       .insert(solicitations)
       .values({
         id: file.resourceId,
@@ -77,7 +79,9 @@ export async function createSolicitationFromUploadAction(input: {
         amendmentNumber,
         opportunityId: parentOpportunityId,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: solicitations.id });
+    created = inserted.length > 0;
   } catch (err) {
     log.error("[createSolicitationFromUploadAction]", "insert failed", { error: err });
     await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
@@ -88,9 +92,11 @@ export async function createSolicitationFromUploadAction(input: {
   // the bytes in hand. A job already open for this record is reused. It
   // is queued before the claim is finished: a filing that dies in between
   // is finished by the upload sweep, which never sees a finished one. A
-  // retry of a filing that died after queueing it doesn't parse it again.
+  // retry that finds the record already saved parses it only if it never
+  // was; a record this request created (even one re-created after a
+  // delete) is always parsed.
   const parse = { organizationId, kind: "solicitation_parse" as const, resourceId: file.resourceId, requestedByUserId: user.id };
-  if (!claim.rerun || !(await hasAnyJob(parse))) {
+  if (created || !(await hasAnyJob(parse))) {
     const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
     await runDurable("[createSolicitationFromUploadAction] parse", parse, bytes ? { bytes } : {});
   }
