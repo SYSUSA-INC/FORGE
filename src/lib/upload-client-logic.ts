@@ -95,6 +95,8 @@ export function describeUploadFailure(code: string): string {
       return "Storage was busy and the upload did not finish. Try again.";
     case "cancelled":
       return "Upload cancelled.";
+    case "check_unanswered":
+      return "The file arrived, but FORGE didn't answer while checking it. Retry to check it again.";
     case "too_slow":
       return "The upload was too slow to finish while its link was valid. Try again on a faster connection, or split the file.";
     default:

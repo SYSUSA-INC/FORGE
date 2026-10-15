@@ -102,11 +102,32 @@ export function familyMatches(declared: UploadFormat, sniff: Sniff): boolean {
   }
 }
 
-/** A plain reason for a refused file, from what its bytes show. */
-export function describeMismatch(declared: UploadFormat, sniff: Sniff): string {
+/** "EncryptedPackage" as an OLE2 directory entry name (UTF-16LE). */
+const ENCRYPTED_PACKAGE = Array.from("EncryptedPackage").flatMap((c) => [c.charCodeAt(0), 0]);
+
+/**
+ * Whether these first bytes are a password-protected Office file. Word,
+ * Excel and PowerPoint write one as an OLE2 file holding an
+ * "EncryptedPackage" stream, not as a zip; its directory is usually in
+ * the first sectors.
+ */
+export function looksPasswordProtected(head: Uint8Array): boolean {
+  outer: for (let i = 0; i + ENCRYPTED_PACKAGE.length <= head.length; i++) {
+    for (let j = 0; j < ENCRYPTED_PACKAGE.length; j++) if (head[i + j] !== ENCRYPTED_PACKAGE[j]) continue outer;
+    return true;
+  }
+  return false;
+}
+
+/** A plain reason for a refused file, from what its bytes show (`head`: its first bytes, when at hand). */
+export function describeMismatch(declared: UploadFormat, sniff: Sniff, head?: Uint8Array): string {
+  const office = declared === "docx" || declared === "xlsx" || declared === "pptx";
   switch (sniff.family) {
     case "ole2":
-      return "This is an older Office format inside. Save it as .docx, .xlsx or .pptx and upload that.";
+      if (office && head && looksPasswordProtected(head)) return "This file is password-protected. Remove the password and upload it again.";
+      return office
+        ? "This file is password-protected or in an older Office format (.doc, .xls or .ppt). Remove the password, or save it as .docx, .xlsx or .pptx, and upload that."
+        : "This is an older Office format inside. Save it as .docx, .xlsx or .pptx and upload that.";
     case "executable":
       return "This file is a program, not a document.";
     case "html":
@@ -139,10 +160,17 @@ export const ZIP_LIMITS = {
   maxRatio: 1_000,
   ratioFloorBytes: 10 * 1024 * 1024,
 };
-const OFFICE_MARKER: Record<"docx" | "xlsx" | "pptx", string> = {
-  docx: "word/document.xml",
-  xlsx: "xl/workbook.xml",
-  pptx: "ppt/presentation.xml",
+/**
+ * The parts that make each Office file what it is, as FORGE's readers
+ * need them. A Word file's main part is named by its relationships (Word
+ * Online and the Open XML SDK write word/document2.xml), so any word/
+ * part will do; the Excel reader needs xl/workbook.xml by name; the
+ * PowerPoint reader reads ppt/slides/.
+ */
+const OFFICE_MARKER: Record<"docx" | "xlsx" | "pptx", (name: string) => boolean> = {
+  docx: (name) => name.startsWith("word/") && name.endsWith(".xml"),
+  xlsx: (name) => name === "xl/workbook.xml",
+  pptx: (name) => name.startsWith("ppt/") && name.endsWith(".xml"),
 };
 
 const u16 = (b: Uint8Array, at: number) => b[at]! | (b[at + 1]! << 8);
@@ -161,23 +189,29 @@ export function locateCentralDirectory(
   objectSize: number,
 ): ZipDirectoryLocation | { zip64RecordOffset: number } | { error: string } {
   const tailStart = objectSize - tail.length;
-  // The end record is the last "PK\x05\x06" whose comment runs exactly to the end.
-  for (let p = tail.length - 22; p >= 0; p--) {
-    if (u32(tail, p) !== 0x06054b50 || p + 22 + u16(tail, p + 20) !== tail.length) continue;
-    const entries = u16(tail, p + 10);
-    const size = u32(tail, p + 12);
-    const offset = u32(tail, p + 16);
-    if (entries === 0xffff || size === 0xffffffff || offset === 0xffffffff) {
-      const loc = p - 20;
-      if (loc < 0 || u32(tail, loc) !== 0x07064b50) return { error: "ZIP64 locator missing" };
-      const recordOffset = u64(tail, loc + 8);
-      if (recordOffset + 56 > tailStart + loc) return { error: "ZIP64 record out of range" };
-      return { zip64RecordOffset: recordOffset };
-    }
-    if (offset + size > tailStart + p) return { error: "directory out of range" };
-    return { offset, size, entries };
+  // The end record is the last "PK\x05\x06" whose comment runs exactly to the
+  // end; failing that (a few bytes appended by a download or a mail
+  // gateway), the last one whose comment fits, as zip readers take it.
+  const fits = (p: number, exact: boolean) =>
+    u32(tail, p) === 0x06054b50 && (exact ? p + 22 + u16(tail, p + 20) === tail.length : p + 22 + u16(tail, p + 20) <= tail.length);
+  let at = -1;
+  for (const exact of [true, false]) {
+    for (let p = tail.length - 22; p >= 0 && at < 0; p--) if (fits(p, exact)) at = p;
+    if (at >= 0) break;
   }
-  return { error: "no end-of-directory record" };
+  if (at < 0) return { error: "no end-of-directory record" };
+  const entries = u16(tail, at + 10);
+  const size = u32(tail, at + 12);
+  const offset = u32(tail, at + 16);
+  if (entries === 0xffff || size === 0xffffffff || offset === 0xffffffff) {
+    const loc = at - 20;
+    if (loc < 0 || u32(tail, loc) !== 0x07064b50) return { error: "ZIP64 locator missing" };
+    const recordOffset = u64(tail, loc + 8);
+    if (recordOffset + 56 > tailStart + loc) return { error: "ZIP64 record out of range" };
+    return { zip64RecordOffset: recordOffset };
+  }
+  if (offset + size > tailStart + at) return { error: "directory out of range" };
+  return { offset, size, entries };
 }
 
 /** The central directory's place from a ZIP64 end record (56 bytes or more). */
@@ -236,7 +270,7 @@ export function inspectZipDirectory(
     p = end;
   }
   if (declaredEntries !== undefined && entries !== declaredEntries) return { ok: false, reason: "truncated" };
-  if (!names.has("[Content_Types].xml") || !names.has(OFFICE_MARKER[expect])) return { ok: false, reason: "missing_marker" };
+  if (!names.has("[Content_Types].xml") || ![...names].some(OFFICE_MARKER[expect])) return { ok: false, reason: "missing_marker" };
   return { ok: true, entries, uncompressed: total };
 }
 

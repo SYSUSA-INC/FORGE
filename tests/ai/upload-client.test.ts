@@ -14,7 +14,7 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/app/(app)/uploads/actions", () => actions);
 
-import { uploadFile } from "@/lib/upload-client";
+import { checkArrivedUpload, uploadFile } from "@/lib/upload-client";
 import { PUT_GRACE_MS } from "@/lib/upload-client-logic";
 
 type Outcome = "timeout" | "error" | "ok";
@@ -87,6 +87,21 @@ describe("BL-STAB-2d — the browser's time limit on an upload", () => {
     expect(actions.cancelUploadAction).toHaveBeenCalledWith("upload-1");
     expect(actions.requestUploadAction).toHaveBeenCalledTimes(1);
   });
+
+  it("hands back an upload whose check couldn't run, so a retry checks it instead of sending it again", async () => {
+    FakeXHR.script = ["ok"];
+    actions.completeUploadAction.mockRejectedValue(new Error("Function timed out"));
+    const res = await uploadFile(file(), { purpose: "document" });
+    expect(res).toEqual({ ok: false, error: expect.stringMatching(/didn't answer while checking it/), arrivedUploadId: "upload-1" });
+    expect(actions.cancelUploadAction).not.toHaveBeenCalled();
+    actions.completeUploadAction.mockReset();
+    actions.completeUploadAction.mockResolvedValueOnce({ ok: true, upload: { uploadId: "upload-1", status: "stored" } });
+    expect(await checkArrivedUpload("upload-1")).toMatchObject({ ok: true, uploadId: "upload-1" });
+    // A refusal is final: nothing to retry.
+    actions.completeUploadAction.mockResolvedValueOnce({ ok: false, code: "rejected", error: "This file is password-protected.", retryable: false });
+    expect(await checkArrivedUpload("upload-1")).toEqual({ ok: false, error: "This file is password-protected." });
+    expect(actions.requestUploadAction).toHaveBeenCalledTimes(1);
+  }, 10_000);
 
   it("gives a retry that ran out of what was left of its link a fresh link", async () => {
     // The network drops, the retry runs out of the link's remaining time, the fresh link works.

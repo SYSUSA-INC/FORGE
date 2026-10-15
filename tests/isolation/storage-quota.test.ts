@@ -15,7 +15,7 @@ import { getStorageProvider } from "@/lib/storage";
 import { getStorageBytesUsed } from "@/lib/subscription-gates";
 import { claimUpload, completeUpload, createUploadIntent, finishClaim } from "@/lib/uploads";
 import { createTierAndSubscribe, createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
-import { forgeEntry, officeZip } from "../helpers/zip-fixtures";
+import { forgeEntry, officeZip, withZip64End } from "../helpers/zip-fixtures";
 
 const GIB = 1024 * 1024 * 1024;
 const MiB = 1024 * 1024;
@@ -66,6 +66,9 @@ describe("BL-STAB-2e — one storage meter and the Office zip check (runtime)", 
     if (!done.ok) throw new Error(done.error);
     const withUploads = before + 6_400 + 2 * TEXT.byteLength;
     expect(await getStorageBytesUsed(org())).toBe(withUploads);
+    // A pending upload whose link has expired may still land for a while: it counts until the sweep would fail it.
+    await db.update(fileUploads).set({ urlExpiresAt: new Date(Date.now() - 60_000), purgeAfter: new Date(Date.now() + 60_000) }).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, pending.uploadId)));
+    expect(await getStorageBytesUsed(org())).toBe(withUploads);
     // Filed: counted as its record instead of as an upload.
     const claim = await claimUpload({ organizationId: org(), userId: fx.orgA.userId, uploadId: up.uploadId, resourceType: "knowledge_artifact" });
     if (!claim.ok || !("claim" in claim)) throw new Error("claim failed");
@@ -93,6 +96,11 @@ describe("BL-STAB-2e — one storage meter and the Office zip check (runtime)", 
   it("refuses an Office file whose table of contents is a zip bomb or password-protected, and stores a real one", async () => {
     const real = await arrived("Proposal.docx", await officeZip("docx"));
     expect(await completeUpload({ organizationId: org(), actor: actor(), uploadId: real.uploadId })).toMatchObject({ ok: true, upload: { status: "stored" } });
+    // A ZIP64 end record (read with one more ranged read), and bytes appended after the end.
+    const z64 = await arrived("Large.docx", withZip64End(await officeZip("docx")));
+    expect(await completeUpload({ organizationId: org(), actor: actor(), uploadId: z64.uploadId })).toMatchObject({ ok: true });
+    const padded = await arrived("Mailed.docx", new Uint8Array([...(await officeZip("docx")), 0x0d, 0x0a]));
+    expect(await completeUpload({ organizationId: org(), actor: actor(), uploadId: padded.uploadId })).toMatchObject({ ok: true });
 
     const bomb = await arrived("Pricing.xlsx", forgeEntry(await officeZip("xlsx"), "xl/workbook.xml", { uncompressed: 50 * MiB, compressed: 10_000 }));
     expect(await completeUpload({ organizationId: org(), actor: actor(), uploadId: bomb.uploadId })).toMatchObject({

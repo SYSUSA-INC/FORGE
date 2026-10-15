@@ -321,7 +321,7 @@ export async function completeUpload(i: { organizationId: string; actor: UploadA
   const first = (await storage.getRange(row.storageKey, 0, 8191)) ?? new Uint8Array(0);
   const sniff = sniffFormat(first);
   if (!familyMatches(row.declaredFormat, sniff)) {
-    return reject(row, i.actor, "type_mismatch", describeMismatch(row.declaredFormat, sniff));
+    return reject(row, i.actor, "type_mismatch", describeMismatch(row.declaredFormat, sniff, first));
   }
   if (row.declaredFormat === "docx" || row.declaredFormat === "xlsx" || row.declaredFormat === "pptx") {
     const zip = await checkOfficeZip(row.storageKey, head.byteSize, row.declaredFormat);

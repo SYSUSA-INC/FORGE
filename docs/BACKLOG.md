@@ -657,6 +657,20 @@ mind. Bandage will come off but a true fix will stay."
         a part and 1 GB in all, and a 1,000× ratio above 10 MB; refused
         as `zip_rejected` with a plain reason; a storage error is
         retryable.
+      - **Review (7 of 15 upheld), fixed here:** a Word file whose main
+        part isn't word/document.xml (Word Online, the Open XML SDK) was
+        refused — any word/ part now counts (xl/workbook.xml stays, the
+        Excel reader needs it; any ppt/ part for PowerPoint); bytes
+        appended after the end record were refused as damaged — the last
+        end record that fits is taken, as zip readers do; real
+        password-protected Office files are OLE2, not zips — the
+        first-bytes check names them; a retry after a check that couldn't
+        run re-sent the file and reserved it twice — the upload is handed
+        back and Retry checks it again; a pending upload stopped counting
+        when its link expired though it could still land — it counts until
+        the sweep would fail it; tests for a file past the tail read, ZIP64
+        entries and end records, appended bytes; the admin table's meter.
+        Eight more guards mutation-checked.
       - **Tests:** `tests/ai/upload-verify-zip.test.ts` (real files,
         comments, each refusal, ZIP64, the messages; fixtures from
         `tests/helpers/zip-fixtures.ts`) and

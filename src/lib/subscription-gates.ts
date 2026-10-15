@@ -582,7 +582,8 @@ export async function getReservedUploadBytes(organizationId: string): Promise<nu
   const counted = UPLOAD_PURPOSES.filter((p) => UPLOAD_POLICIES[p].countsTowardQuota);
   const [row] = await db
     .select({
-      bytes: sql<number>`coalesce(sum(${fileUploads.declaredSize}) filter (where (${fileUploads.status} = 'pending' and ${fileUploads.urlExpiresAt} > now()) or ${fileUploads.status} in ('stored', 'claiming')), 0)`,
+      // A pending upload counts until the sweep would fail it (its link's life plus the grace in which the PUT may still land).
+      bytes: sql<number>`coalesce(sum(${fileUploads.declaredSize}) filter (where (${fileUploads.status} = 'pending' and ${fileUploads.purgeAfter} > now()) or ${fileUploads.status} in ('stored', 'claiming')), 0)`,
     })
     .from(fileUploads)
     .where(and(eq(fileUploads.organizationId, organizationId), inArray(fileUploads.purpose, counted)));

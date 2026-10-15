@@ -61,7 +61,28 @@ export type UploadPhase = "queued" | "uploading" | "verifying" | "saving" | "don
 
 export type UploadFileResult =
   | { ok: true; uploadId: string; upload: UploadView }
-  | { ok: false; error: string; cancelled?: boolean };
+  /**
+   * `arrivedUploadId`: the file reached storage but couldn't be checked yet
+   * (storage or FORGE didn't answer): retry with `checkArrivedUpload`
+   * rather than sending (and reserving) the file again.
+   */
+  | { ok: false; error: string; cancelled?: boolean; arrivedUploadId?: string };
+
+/**
+ * BL-STAB-2e — check a file that already reached storage (a retry after
+ * its check couldn't run). A refusal is final; a storage hiccup keeps the
+ * upload for another try.
+ */
+export async function checkArrivedUpload(uploadId: string): Promise<UploadFileResult> {
+  let done: Awaited<ReturnType<typeof completeUploadAction>>;
+  try {
+    done = await completeUploadAction(uploadId);
+  } catch {
+    return { ok: false, error: describeUploadFailure("check_unanswered"), arrivedUploadId: uploadId };
+  }
+  if (done.ok) return { ok: true, uploadId, upload: done.upload };
+  return done.retryable ? { ok: false, error: done.error, arrivedUploadId: uploadId } : { ok: false, error: done.error };
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -166,12 +187,12 @@ export async function uploadFile(
         return { ok: false, error: describeUploadFailure("other") };
       }
     }
-    let done = await completeUploadAction(intent.uploadId);
-    if (!done.ok && done.retryable) {
+    let done = await checkArrivedUpload(intent.uploadId);
+    if (!done.ok && done.arrivedUploadId) {
       await sleep(1_000);
-      done = await completeUploadAction(intent.uploadId);
+      done = await checkArrivedUpload(intent.uploadId);
     }
-    return done.ok ? { ok: true, uploadId: intent.uploadId, upload: done.upload } : { ok: false, error: done.error };
+    return done;
   }
   return { ok: false, error: describeUploadFailure("renew") };
 }

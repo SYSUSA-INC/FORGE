@@ -7,14 +7,16 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  describeMismatch,
   describeZipRejection,
   inspectZipDirectory,
   locateCentralDirectory,
   readZip64Eocd,
+  sniffFormat,
   ZIP_LIMITS,
   ZIP_TAIL_BYTES,
 } from "@/lib/upload-verify";
-import { directoryOf, forgeEntry, officeZip } from "../helpers/zip-fixtures";
+import { directoryOf, forgeEntry, officeZip, withZip64End, withZip64Sizes } from "../helpers/zip-fixtures";
 
 const MiB = 1024 * 1024;
 const tailOf = (zip: Uint8Array) => zip.subarray(Math.max(0, zip.length - ZIP_TAIL_BYTES));
@@ -34,6 +36,42 @@ describe("BL-STAB-2e — Office zip checks", () => {
       if (!("offset" in loc)) throw new Error("not located");
       expect(inspectZipDirectory(zip.subarray(loc.offset, loc.offset + loc.size), kind, loc.entries)).toEqual({ ok: true, entries, uncompressed: expect.any(Number) });
     }
+  });
+
+  it("passes real-world layouts: a renamed Word main part, slides only, bytes appended, a file past the tail, ZIP64", async () => {
+    // Word Online / the Open XML SDK: the main part named by its relationships.
+    expect(inspect(await officeZip("docx", { omitMarker: true, extra: { "word/document2.xml": "<document/>" } }))).toMatchObject({ ok: true });
+    expect(inspect(await officeZip("pptx", { omitMarker: true, extra: { "ppt/slides/slide1.xml": "<sld/>" } }), "pptx")).toMatchObject({ ok: true });
+    // A CRLF or sector padding appended after the end record.
+    const plain = await officeZip("docx");
+    for (const extra of [[0x0d, 0x0a], new Array(8).fill(0)]) {
+      const padded = new Uint8Array([...plain, ...extra]);
+      expect(locateCentralDirectory(tailOf(padded), padded.length)).toEqual(locateCentralDirectory(tailOf(plain), plain.length));
+    }
+    // Larger than the tail that is read: the directory is found from the tail alone.
+    const big = await officeZip("docx", { extra: { "word/media/big.bin": "x".repeat(100_000) } });
+    expect(big.length).toBeGreaterThan(ZIP_TAIL_BYTES);
+    const { cd, entries } = directoryOf(big);
+    expect(locateCentralDirectory(tailOf(big), big.length)).toEqual({ offset: cd.byteOffset - big.byteOffset, size: cd.length, entries });
+    // ZIP64 sizes in a directory entry's extra field, after another extra field.
+    const base = await officeZip("docx", { extra: { "word/media/a.bin": "a" } });
+    expect(inspect(withZip64Sizes(base, "word/media/a.bin", { uncompressed: 1, compressed: 1 }))).toMatchObject({ ok: true });
+    expect(inspect(withZip64Sizes(base, "word/media/a.bin", { uncompressed: 600 * MiB, compressed: 300 * MiB }))).toEqual({ ok: false, reason: "too_large" });
+    // A ZIP64 end record: followed to the same directory.
+    const z64 = withZip64End(plain);
+    const loc = locateCentralDirectory(tailOf(z64), z64.length);
+    if (!("zip64RecordOffset" in loc)) throw new Error("expected a ZIP64 record");
+    const real = directoryOf(plain);
+    expect(readZip64Eocd(z64.subarray(loc.zip64RecordOffset, loc.zip64RecordOffset + 56))).toEqual({ offset: real.cd.byteOffset - plain.byteOffset, size: real.cd.length, entries: real.entries });
+  });
+
+  it("names a password-protected Office file, which Office writes as an OLE2 file, not a zip", () => {
+    const ole2 = new Uint8Array(4096);
+    ole2.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    expect(describeMismatch("docx", sniffFormat(ole2), ole2)).toMatch(/password-protected or in an older Office format/);
+    ole2.set(Array.from("EncryptedPackage").flatMap((c) => [c.charCodeAt(0), 0]), 1024);
+    expect(describeMismatch("xlsx", sniffFormat(ole2), ole2)).toBe("This file is password-protected. Remove the password and upload it again.");
+    expect(describeMismatch("pdf", sniffFormat(ole2), ole2)).toMatch(/^This is an older Office format inside/);
   });
 
   it("refuses a file that isn't the Office file it is named", async () => {
