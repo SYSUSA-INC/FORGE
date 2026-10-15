@@ -137,6 +137,10 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     expect(await row(up)).toMatchObject({ status: "stored", resourceId: up.resourceId });
     await set(up, { purgeAfter: ago(MINUTE) });
 
+    // Removing it from the list (a cancel) never deletes the file its record holds.
+    await cancelUpload({ organizationId: up.organizationId, actor: { userId: up.userId, email: null }, uploadId: up.id });
+    expect(await row(up)).toMatchObject({ status: "stored", failureReason: "" });
+    expect(await kept(up.key)).toBe(true);
     // Queueing its parse fails once: the file stays and the next tick finishes it.
     vi.spyOn(log, "error").mockImplementation(() => undefined);
     const onPromoted = vi.fn(queueMissingParse).mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));

@@ -12,6 +12,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, backgroundJobs, fileUploads, opportunities, solicitations } from "@/db/schema";
 import { runDurableBatch } from "@/lib/jobs";
+import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
 import { claimUpload, completeUpload, createUploadIntent, releaseClaim } from "@/lib/uploads";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
@@ -179,6 +180,42 @@ describe("BL-STAB-2d — GSA attachments from direct uploads (runtime)", () => {
     expect(jobs).toEqual([{ status: "queued" }]);
   });
 
+  it("files an attachment whose insert landed though its answer was lost", async () => {
+    const one = await stored("One.txt", rfpText("ONE"));
+    const realInsert = db.insert.bind(db);
+    vi.spyOn(db, "insert").mockImplementation(((table: Parameters<typeof db.insert>[0]) => {
+      const builder = realInsert(table);
+      if (table !== solicitations) return builder;
+      const values = builder.values.bind(builder);
+      builder.values = ((v: never) => {
+        const q = values(v);
+        const onConflict = q.onConflictDoNothing.bind(q);
+        q.onConflictDoNothing = ((config?: never) => {
+          const r = onConflict(config);
+          const returning = r.returning.bind(r);
+          r.returning = ((fields?: never) =>
+            (async () => {
+              await returning(fields as never);
+              throw new Error("Connection terminated unexpectedly");
+            })()) as never;
+          return r;
+        }) as never;
+        return q;
+      }) as never;
+      return builder;
+    }) as never);
+    vi.spyOn(log, "warn").mockImplementation(() => undefined);
+
+    const res = await createOpportunityFromGsaAction({ ...FIELDS, uploadIds: [one.uploadId] });
+    if (!res.ok) throw new Error(res.error);
+    expect(res.attachmentsSkipped).toEqual([]);
+    expect(res.solicitationIds).toHaveLength(1);
+    const [ledger] = await db.select().from(fileUploads).where(and(eq(fileUploads.organizationId, fx.orgA.organizationId), eq(fileUploads.id, one.uploadId)));
+    expect(ledger).toMatchObject({ status: "claimed", purgeAfter: null });
+    const jobs = await db.select({ status: backgroundJobs.status }).from(backgroundJobs).where(and(eq(backgroundJobs.organizationId, fx.orgA.organizationId), eq(backgroundJobs.resourceId, res.solicitationIds[0]!)));
+    expect(jobs).toEqual([{ status: "queued" }]);
+  });
+
   it("files the rest when one file's record can't be saved, puts that upload back, and still audits the opportunity", async () => {
     const one = await stored("One.txt", rfpText("ONE"));
     const two = await stored("Two.txt", rfpText("TWO"));
@@ -210,7 +247,9 @@ describe("BL-STAB-2d — GSA attachments from direct uploads (runtime)", () => {
     const jobs = await db.select().from(backgroundJobs).where(and(eq(backgroundJobs.organizationId, fx.orgA.organizationId), inArray(backgroundJobs.resourceId, res.solicitationIds)));
     const ordered = res.solicitationIds.map((id) => jobs.find((j) => j.resourceId === id)!);
     bg.runs.length = 0;
-    runDurableBatch("test", ordered.map((j) => ({ jobId: j.id, organizationId: j.organizationId })), { budgetMs: 0 });
+    // A clock that reads 0 until the first job has started, then a minute later.
+    const reads = [0, 0];
+    runDurableBatch("test", ordered.map((j) => ({ jobId: j.id, organizationId: j.organizationId })), { budgetMs: 30_000, now: () => reads.shift() ?? 60_000 });
     await bg.runs[0]!();
     const after = await db.select().from(backgroundJobs).where(inArray(backgroundJobs.id, ordered.map((j) => j.id)));
     expect(ordered.map((j) => after.find((a) => a.id === j.id)!.status)).toEqual(["done", "queued"]);

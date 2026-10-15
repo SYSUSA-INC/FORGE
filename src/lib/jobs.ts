@@ -179,14 +179,15 @@ export async function runDurable(
 export function runDurableBatch(
   label: string,
   queued: { jobId: string; organizationId: string; bytes?: Uint8Array }[],
-  opts: { budgetMs?: number } = {},
+  opts: { budgetMs?: number; now?: () => number } = {},
 ): void {
   if (queued.length === 0) return;
   const budgetMs = opts.budgetMs ?? 120_000;
+  const now = opts.now ?? Date.now;
   runInBackground(label, async () => {
-    const startedAt = Date.now();
+    const startedAt = now();
     for (const [i, q] of queued.entries()) {
-      if (Date.now() - startedAt > budgetMs) {
+      if (now() - startedAt > budgetMs) {
         log.info(label, "left the rest of the batch to the jobs cron", { organizationId: q.organizationId, left: queued.length - i });
         return;
       }

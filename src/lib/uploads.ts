@@ -530,10 +530,16 @@ export async function peekStoredUploads(i: {
   return { ready, bad };
 }
 
-/** Stop an upload the user no longer wants: delete what arrived and fail the row. */
+/**
+ * Stop an upload the user no longer wants: delete what arrived and fail
+ * the row. Never a file a record holds: a claim put back after its record
+ * was saved (the save landed but reported an error) keeps its file, and
+ * the upload sweep finishes that filing and queues its parse.
+ */
 export async function cancelUpload(i: { organizationId: string; actor: UploadActor; uploadId: string }): Promise<{ ok: true }> {
   const row = await loadOwn(i.organizationId, i.actor.userId, i.uploadId);
   if (!row || (row.status !== "pending" && row.status !== "stored")) return { ok: true };
+  if (row.resourceId && (await recordHoldsUpload(row))) return { ok: true };
   const [cancelled] = await db
     .update(fileUploads)
     .set({
@@ -543,7 +549,15 @@ export async function cancelUpload(i: { organizationId: string; actor: UploadAct
       purgeAfter: new Date(Math.max(Date.now(), row.urlExpiresAt.getTime() + 5 * MINUTE)),
       updatedAt: new Date(),
     })
-    .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, row.id), inArray(fileUploads.status, ["pending", "stored"])))
+    .where(
+      and(
+        eq(fileUploads.organizationId, i.organizationId),
+        eq(fileUploads.id, row.id),
+        inArray(fileUploads.status, ["pending", "stored"]),
+        // Not claimed and put back meanwhile (a claim fixes the record id).
+        row.resourceId ? eq(fileUploads.resourceId, row.resourceId) : isNull(fileUploads.resourceId),
+      ),
+    )
     .returning();
   if (!cancelled) return { ok: true };
   await deleteObject(row.organizationId, row.storageKey);

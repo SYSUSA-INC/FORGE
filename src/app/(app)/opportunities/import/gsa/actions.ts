@@ -1,5 +1,6 @@
 "use server";
 
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -321,9 +322,21 @@ async function fileAttachment(i: {
         .onConflictDoNothing()
         .returning({ id: solicitations.id });
     } catch (err) {
-      log.error("[createOpportunityFromGsaAction]", "attachment insert failed", { error: err, organizationId, uploadId: file.uploadId });
-      await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
-      return { ok: false, reason: "Could not record the solicitation; add the file again." };
+      // The insert may have landed with only its answer lost: then the record
+      // on this opportunity is this file's, and the filing carries on.
+      const [landed] = await db
+        .select({ id: solicitations.id })
+        .from(solicitations)
+        .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, file.resourceId), eq(solicitations.opportunityId, i.opportunityId)))
+        .limit(1)
+        .catch(() => []);
+      if (!landed) {
+        log.error("[createOpportunityFromGsaAction]", "attachment insert failed", { error: err, organizationId, uploadId: file.uploadId });
+        await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
+        return { ok: false, reason: "Could not record the solicitation; add the file again." };
+      }
+      log.warn("[createOpportunityFromGsaAction]", "attachment insert reported an error after it landed", { error: err, organizationId, uploadId: file.uploadId });
+      inserted = [landed];
     }
     if (inserted.length === 0) {
       // An earlier attempt saved it, on its own opportunity: leave it there,

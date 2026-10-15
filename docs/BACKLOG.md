@@ -561,6 +561,14 @@ mind. Bandage will come off but a true fix will stay."
         being checked now cancels it on screens with no filing step; a
         stored, unfiled file removed from any upload list is deleted at
         once. 300 seconds per request.
+      - **Review of this PR (5 of 14 upheld):** removing a stored upload
+        from a list (a cancel) could delete the file of a record whose
+        save landed but reported an error — `cancelUpload` now never
+        touches a file a record holds (the sweep finishes that filing);
+        a GSA attachment whose insert landed with its answer lost was
+        shown "not filed" (adding it again would duplicate it) — it is
+        now filed; the batch-budget test no longer depends on the clock
+        (`runDurableBatch` takes one). Both guards mutation-checked.
       - **Third review of 2d-2's fixes (6 of 8 upheld), fixed here:**
         two sweeps at once (a duplicate cron delivery) could each queue a
         parse — the database now keeps one open job per record (migration
