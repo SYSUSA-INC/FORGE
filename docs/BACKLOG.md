@@ -74,7 +74,7 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
@@ -182,7 +182,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -594,8 +594,52 @@ mind. Bandage will come off but a true fix will stay."
         named and put back while the rest are filed and audited; the
         batch's budget; over 20 refused before anything is created. Five
         guards mutation-checked.
-    - **2e — knowledge corpus; extraction as a durable job; one storage
-      meter across every file type; Office zip checks.**
+    - **2e-1 — knowledge corpus uploads straight to storage; extraction
+      as a durable job.** ✅ shipped (PR #391).
+      - `createKnowledgeArtifactFromUploadAction` replaces the multipart
+        `uploadKnowledgeArtifactAction` and its 50 MB cap: the upload's
+        claim fixes the artifact id (a retry returns the same artifact),
+        the storage limit is checked before anything is saved (a refused
+        upload is put back, ready to retry), the batch's kind, tags and
+        outcome are kept, and the audit carries the upload id.
+      - Text extraction (`extractAndIndex`, moved unchanged to
+        `src/lib/knowledge-artifact-extract.ts`) runs as a
+        `knowledge_artifact_extract` job (migration 0133): the file is
+        read within its read budget from the verified stored copy, a
+        reported failure is final for the job, and the jobs cron retries
+        a run that died. The job is queued before the claim is finished;
+        the upload sweep queues it for a knowledge filing that died.
+        Re-extract checks the file with a HEAD (storage unreachable vs
+        gone) and queues the job.
+      - The Import corpus page stages files, then uploads them three at a
+        time on the shared upload list (progress, retry, cancel) with the
+        batch's settings; 300 seconds per request.
+      - **Review (8 of 11 upheld; duplicates merged):** a read the upload
+        sweep queued (the batch's choice unknown) skipped Auto-detect — it
+        now classifies as a suggestion only, never over a chosen kind; a
+        retry whose artifact an earlier attempt saved was counted against
+        the storage limit twice — it isn't checked again; Re-extract
+        promised a page that updates itself — the page now refreshes while
+        the read runs (and holds Run extraction meanwhile); the upload
+        list's header counted cancelled and waiting files as uploading;
+        the admin manual named the deleted action. Tests: the retry paths
+        (read only if never read; no second count) and Auto-detect applied
+        vs suggested. Five guards mutation-checked.
+      - **Final review of #390 (2 of 6 upheld), fixed here:** `enqueueJob`
+        could throw when its insert lost to a job that finished before it
+        was read back — it now reads and inserts again (three passes); the
+        browser's upload limit stopped counting while a laptop slept — it
+        now takes whichever of the two clocks has run longer. Both
+        mutation-checked.
+      - **Tests:** `tests/isolation/knowledge-uploads.test.ts` — saved
+        once with kind, tags and outcome and read from storage; the
+        auto-detected kind; another organization's upload refused; the
+        storage limit (upload put back); over the read budget (no
+        download) and Re-extract; storage unreachable vs gone; a died
+        filing's read queued by the sweep. Five guards mutation-checked.
+    - **2e-2 — Office zip checks; one storage meter across every file
+      type, checked when an upload starts.** ⏳ next (the meter needs the
+      owner's decision: design §15 question 2).
     - **2f — templates, chat attachments and contacts; files removed
       from storage when their record is deleted; a test that keeps any
       file out of a server action.**

@@ -4348,6 +4348,8 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "proposal_harvest",
   // BL-AIX Phase 0c — one row per section of a server-side auto-draft (drizzle/0113).
   "section_auto_draft",
+  // BL-STAB-2e — a knowledge-base file's text extraction (drizzle/0133).
+  "knowledge_artifact_extract",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [

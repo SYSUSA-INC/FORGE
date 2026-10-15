@@ -25,13 +25,17 @@ describe("classifyPutFailure", () => {
 });
 
 describe("BL-STAB-2d — a PUT never outlives its link plus the grace", () => {
-  it("counts from when the link was issued, not this computer's clock, and stays under the sweep's 15 minutes", () => {
-    const issuedAt = 1_000_000;
+  it("counts from when the link was issued on the clock that has run longer, and stays under the sweep's 15 minutes", () => {
+    const issuedAt = { mono: 1_000, wall: 1_700_000_000_000 };
     // A 900 s link, asked 100 s after it was issued: 800 s of link plus the grace.
-    expect(putTimeoutMs(issuedAt, 900, issuedAt + 100_000)).toBe(800_000 + PUT_GRACE_MS);
+    expect(putTimeoutMs(issuedAt, 900, { mono: 101_000, wall: issuedAt.wall + 100_000 })).toBe(800_000 + PUT_GRACE_MS);
+    // The computer slept 600 s (the monotonic clock stopped): the wall clock counts it.
+    expect(putTimeoutMs(issuedAt, 900, { mono: 101_000, wall: issuedAt.wall + 700_000 })).toBe(200_000 + PUT_GRACE_MS);
+    // The wall clock was set back 600 s: the monotonic clock counts the real time.
+    expect(putTimeoutMs(issuedAt, 900, { mono: 101_000, wall: issuedAt.wall - 500_000 })).toBe(800_000 + PUT_GRACE_MS);
     expect(PUT_GRACE_MS).toBeLessThan(15 * 60_000);
     // Long past: still a positive timeout, so the browser fails it at once rather than never.
-    expect(putTimeoutMs(issuedAt, 900, issuedAt + 10 * 3_600_000)).toBe(1_000);
+    expect(putTimeoutMs(issuedAt, 900, { mono: 10 * 3_600_000, wall: issuedAt.wall + 10 * 3_600_000 })).toBe(1_000);
     expect(describeUploadFailure("too_slow")).toMatch(/too slow to finish while its link was valid/);
   });
 });

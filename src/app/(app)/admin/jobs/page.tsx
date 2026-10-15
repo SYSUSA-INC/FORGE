@@ -27,6 +27,8 @@ const KIND_LABEL: Record<string, string> = {
   solicitation_parse: "Solicitation parse",
   solicitation_document_parse: "Companion document parse",
   proposal_harvest: "Proposal harvest",
+  section_auto_draft: "Section auto-draft",
+  knowledge_artifact_extract: "Knowledge file extraction",
 };
 
 export default async function BackgroundJobsPage({

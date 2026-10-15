@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { formatLimit, resolvePolicy } from "@/lib/upload-policy";
 import { ClassifyBackfillButton } from "./ClassifyBackfillButton";
 import { CorpusList } from "./CorpusList";
 import { CorpusUploader } from "./CorpusUploader";
@@ -16,12 +17,16 @@ import { TagManager } from "./TagManager";
 import { getEmbeddingsStatusAction } from "./embed-actions";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-2e — room for saving uploaded files and starting their extraction from this page.
+export const maxDuration = 300;
 
 export default async function CorpusImportPage() {
   // Every action below re-gates, but the route's protection should be
   // visible in the route file itself (BL-TENANT-AUDIT 2026-09).
   await requireAuth();
   await requireCurrentOrg();
+  // The per-file limit as this deployment sets it (UPLOAD_MAX_FILE_MB), handed to the browser's own check.
+  const maxBytes = resolvePolicy("document", process.env).maxBytes;
   const [artifacts, embedStatus, classifyCandidateCount, tagUsage] =
     await Promise.all([
       listKnowledgeArtifactsAction(),
@@ -59,8 +64,8 @@ export default async function CorpusImportPage() {
       <SemanticSearchClient initialStatus={embedStatus} />
 
       <div className="mt-4">
-        <Panel title="Upload" eyebrow="Multi-file · 50 MB each">
-          <CorpusUploader />
+        <Panel title="Upload" eyebrow={`Multi-file · up to ${formatLimit(maxBytes)} each`}>
+          <CorpusUploader maxBytes={maxBytes} />
         </Panel>
       </div>
 

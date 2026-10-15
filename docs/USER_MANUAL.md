@@ -760,7 +760,7 @@ Two surfaces live here:
 
 ### 8.1 Drop anything in the corpus
 
-Go to **Knowledge base → Import corpus**. Drag files onto the dropzone or click to pick. Up to 50 MB per file. Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD, images. Each file becomes a **knowledge artifact** with a kind tag (proposal, rfp, contract, etc.), file metadata, and indexed plain text.
+Go to **Knowledge base → Import corpus**. Drag files onto the dropzone or click to pick, choose the batch's kind, tags and outcome, then press **Upload**. Files go straight to secure storage, three at a time, each with its own progress bar, **Cancel** and **Retry**; up to the site's per-file limit (500 MB by default). Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD/CSV, images. Each file becomes a **knowledge artifact** with a kind tag (proposal, rfp, contract, etc.), file metadata, and plain text that FORGE reads in the background — the artifact shows "uploaded", then "indexed" a moment later (refresh the list), or "failed" with the reason. A file too large to read automatically (for example a PDF over 150 MB) is kept and marked so; split it to have it read. **Re-extract** on an artifact's page reads it again the same way. Your organization's storage limit is checked as each file is saved.
 
 **Outcome.** For past proposals and debriefs, pick how the pursuit ended (won / lost / no-bid / withdrawn) in the **Outcome** field before uploading, or change it later from the dropdown on the artifact row. The Brain favours content from won pursuits when it drafts and slightly demotes lost ones, so labelling your history is the fastest way to make its suggestions sound like your winners. Knowledge entries promoted from a labelled artifact inherit the label; you can also set it in the entry editor.
 

@@ -1,25 +1,14 @@
 "use client";
 
-import {
-  type ChangeEvent,
-  type DragEvent,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { type ChangeEvent, type DragEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  uploadKnowledgeArtifactAction,
-  type ArtifactUploadResult,
-} from "./actions";
+import { UploadQueue } from "@/components/uploads/UploadQueue";
+import { useUploadQueue } from "@/components/uploads/useUploadQueue";
+import { acceptFor, formatLimit } from "@/lib/upload-policy";
+import { createKnowledgeArtifactFromUploadAction } from "./actions";
 
-type QueueItem = {
-  id: string; // local-only id for UI
-  file: File;
-  status: "queued" | "uploading" | "done" | "failed";
-  error?: string;
-  artifactId?: string;
-};
+/** What a batch is saved with, fixed when its Upload is pressed. */
+type BatchMeta = { kind: string; tags: string; outcome: string };
 
 const ARTIFACT_KINDS: { id: string; label: string }[] = [
   { id: "auto", label: "Auto-detect" },
@@ -40,24 +29,44 @@ const ARTIFACT_KINDS: { id: string; label: string }[] = [
   { id: "other", label: "Other" },
 ];
 
-const ACCEPT_ATTR =
-  "application/pdf,.pdf," +
-  ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document," +
-  ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet," +
-  ".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation," +
-  ".txt,.md,text/plain,text/markdown," +
-  ".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif";
-
-export function CorpusUploader() {
+/**
+ * BL-STAB-2e — files go from the browser straight to storage (no request
+ * cap; up to the deployment's per-file limit), three at a time, each with
+ * progress, retry and cancel, and each is saved as a knowledge artifact as
+ * soon as it is checked; its text is read in the background. Files wait in
+ * the list until Upload is pressed, so a batch keeps the kind, tags and
+ * outcome chosen for it.
+ */
+export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
   const router = useRouter();
-  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [staged, setStaged] = useState<File[]>([]);
   const [defaultKind, setDefaultKind] = useState<string>("auto");
   const [defaultTags, setDefaultTags] = useState<string>("");
   // BL-AIP-4 — outcome provenance for historical proposals / debriefs.
   const [defaultOutcome, setDefaultOutcome] = useState<string>("none");
   const [dragOver, setDragOver] = useState(false);
-  const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const queue = useUploadQueue<string, BatchMeta>({
+    purpose: "document",
+    concurrency: 3,
+    maxBytes,
+    claim: async ({ uploadId, meta }) => {
+      const res = await createKnowledgeArtifactFromUploadAction({
+        uploadId,
+        ...(meta.kind !== "auto" ? { kind: meta.kind } : {}),
+        tags: meta.tags,
+        ...(meta.outcome !== "none" ? { outcome: meta.outcome } : {}),
+      });
+      return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
+    },
+  });
+  // Show the new artifacts once a batch has finished.
+  const doneCount = queue.items.filter((it) => it.phase === "done").length;
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !queue.busy && doneCount > 0) router.refresh();
+    wasBusy.current = queue.busy;
+  }, [queue.busy, doneCount, router]);
 
   function pickFiles() {
     inputRef.current?.click();
@@ -66,15 +75,7 @@ export function CorpusUploader() {
   function addFiles(files: FileList | File[] | null) {
     if (!files) return;
     const arr = Array.from(files).filter((f) => f.size > 0);
-    if (arr.length === 0) return;
-    setQueue((prev) => [
-      ...prev,
-      ...arr.map((f) => ({
-        id: crypto.randomUUID(),
-        file: f,
-        status: "queued" as const,
-      })),
-    ]);
+    if (arr.length > 0) setStaged((prev) => [...prev, ...arr]);
   }
 
   function onDrop(e: DragEvent) {
@@ -89,60 +90,19 @@ export function CorpusUploader() {
   }
 
   function uploadAll() {
-    const queued = queue.filter((q) => q.status === "queued");
-    if (queued.length === 0) return;
-
-    startTransition(async () => {
-      // Sequentially upload to keep memory + connection load reasonable.
-      for (const item of queued) {
-        setQueue((prev) =>
-          prev.map((q) =>
-            q.id === item.id ? { ...q, status: "uploading" } : q,
-          ),
-        );
-
-        const fd = new FormData();
-        fd.append("file", item.file);
-        if (defaultKind && defaultKind !== "auto") {
-          fd.append("kind", defaultKind);
-        }
-        if (defaultTags.trim()) fd.append("tags", defaultTags.trim());
-        if (defaultOutcome && defaultOutcome !== "none") {
-          fd.append("outcome", defaultOutcome);
-        }
-
-        let res: ArtifactUploadResult;
-        try {
-          res = await uploadKnowledgeArtifactAction(fd);
-        } catch (err) {
-          res = {
-            ok: false,
-            error: err instanceof Error ? err.message : "Upload failed",
-          };
-        }
-
-        setQueue((prev) =>
-          prev.map((q) =>
-            q.id === item.id
-              ? res.ok
-                ? { ...q, status: "done", artifactId: res.id }
-                : { ...q, status: "failed", error: res.error }
-              : q,
-          ),
-        );
-      }
-      router.refresh();
-    });
+    if (staged.length === 0) return;
+    const meta: BatchMeta = { kind: defaultKind, tags: defaultTags.trim(), outcome: defaultOutcome };
+    queue.add(staged.map((file) => ({ file, meta })));
+    setStaged([]);
   }
 
   function clearDone() {
-    setQueue((prev) => prev.filter((q) => q.status !== "done"));
+    for (const it of queue.items) if (it.phase === "done") queue.remove(it.id);
   }
 
-  const queuedCount = queue.filter((q) => q.status === "queued").length;
-  const uploadingCount = queue.filter((q) => q.status === "uploading").length;
-  const doneCount = queue.filter((q) => q.status === "done").length;
-  const failedCount = queue.filter((q) => q.status === "failed").length;
+  const failedCount = queue.items.filter((it) => it.phase === "failed").length;
+  const waitingCount = staged.length + queue.items.filter((it) => it.phase === "queued").length;
+  const activeCount = queue.items.filter((it) => it.phase === "uploading" || it.phase === "verifying" || it.phase === "saving").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -211,7 +171,7 @@ export function CorpusUploader() {
           Drop files here
         </div>
         <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
-          PDF · DOCX · XLSX · PPTX · TXT · Image &nbsp;·&nbsp; up to 50 MB each
+          PDF · DOCX · XLSX · PPTX · TXT · CSV · Image &nbsp;·&nbsp; up to {formatLimit(maxBytes)} each
         </div>
         <button
           type="button"
@@ -227,27 +187,26 @@ export function CorpusUploader() {
           ref={inputRef}
           type="file"
           multiple
-          accept={ACCEPT_ATTR}
+          accept={acceptFor("document")}
           className="sr-only"
           onChange={onPick}
         />
       </div>
 
-      {queue.length > 0 ? (
+      {staged.length > 0 || queue.items.length > 0 ? (
         <div className="rounded-xl border border-layer/10 bg-layer/[0.015]">
           <div className="flex items-center justify-between border-b border-layer/10 p-3">
             <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-              Queue · {queuedCount} pending · {uploadingCount} uploading ·{" "}
-              {doneCount} done · {failedCount} failed
+              {waitingCount} waiting · {activeCount} uploading · {doneCount} done · {failedCount} failed
             </div>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={uploadAll}
-                disabled={pending || queuedCount === 0}
+                disabled={staged.length === 0}
                 className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
               >
-                {pending ? "Uploading…" : `Upload ${queuedCount}`}
+                {`Upload ${staged.length}`}
               </button>
               <button
                 type="button"
@@ -259,47 +218,29 @@ export function CorpusUploader() {
               </button>
             </div>
           </div>
-          <ul className="divide-y divide-layer/5">
-            {queue.map((q) => (
-              <li
-                key={q.id}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-3 py-2 font-mono text-[11px]"
-              >
-                <div className="truncate text-text">{q.file.name}</div>
-                <div className="text-muted">
-                  {Math.max(1, Math.round(q.file.size / 1024))} KB
-                </div>
-                <StatusPill status={q.status} error={q.error} />
-              </li>
-            ))}
-          </ul>
+          {staged.length > 0 ? (
+            <ul className="divide-y divide-layer/5">
+              {staged.map((f, i) => (
+                <li key={`${f.name}_${f.size}_${i}`} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-3 py-2 font-mono text-[11px]">
+                  <div className="truncate text-text">{f.name}</div>
+                  <div className="text-muted">{Math.max(1, Math.round(f.size / 1024))} KB</div>
+                  <button
+                    type="button"
+                    className="text-muted hover:text-text"
+                    aria-label={`Remove ${f.name}`}
+                    onClick={() => setStaged((prev) => prev.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="p-3">
+            <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
+          </div>
         </div>
       ) : null}
     </div>
-  );
-}
-
-function StatusPill({
-  status,
-  error,
-}: {
-  status: QueueItem["status"];
-  error?: string;
-}) {
-  const tone =
-    status === "done"
-      ? "bg-emerald-500/15 text-emerald-300"
-      : status === "uploading"
-        ? "bg-amber-500/15 text-amber-200"
-        : status === "failed"
-          ? "bg-rose-500/15 text-rose-300"
-          : "bg-layer/5 text-muted";
-  return (
-    <span
-      className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-widest ${tone}`}
-      title={error}
-    >
-      {status === "failed" && error ? error.slice(0, 40) : status}
-    </span>
   );
 }
