@@ -229,3 +229,19 @@ export async function opportunityExists(
     .limit(1);
   return !!rows[0] && rows[0].id === id && organizationId.length > 0;
 }
+
+/**
+ * BL-STAB-2e — an unlimited plan for both organizations, for tests that
+ * upload files: uploads are refused for a workspace with no plan (the
+ * storage limit is checked when an upload starts). Returns the cleanup.
+ */
+export async function withUploadPlans(fx: TwoTenantFixture): Promise<() => Promise<void>> {
+  const plans = await Promise.all(
+    [fx.orgA.organizationId, fx.orgB.organizationId].map((organizationId) =>
+      createTierAndSubscribe({ organizationId, slug: `up-${organizationId.replace(/-/g, "").slice(0, 28)}`, name: "Unlimited uploads" }),
+    ),
+  );
+  return async () => {
+    for (const plan of plans) await plan.cleanup();
+  };
+}

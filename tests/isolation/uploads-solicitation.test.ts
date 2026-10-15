@@ -13,7 +13,7 @@ import { backgroundJobs, fileUploads, solicitations } from "@/db/schema";
 import { executeJob } from "@/lib/jobs";
 import { getStorageProvider } from "@/lib/storage";
 import { claimUpload, completeUpload, createUploadIntent, receiveProxyUpload, releaseClaim } from "@/lib/uploads";
-import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { createTwoTenants, type TwoTenantFixture, withUploadPlans } from "../helpers/fixtures";
 
 const sessionUserStub = {
   id: "PLACEHOLDER",
@@ -48,14 +48,17 @@ const RFP = new TextEncoder().encode(
 
 describe("BL-STAB-2c — solicitations from direct uploads (runtime)", () => {
   let fx: TwoTenantFixture;
+  let plans: (() => Promise<void>) | null = null;
   const actorA = () => ({ userId: fx.orgA.userId, email: null });
 
   beforeEach(async () => {
     fx = await createTwoTenants("uploads-sol");
+    plans = await withUploadPlans(fx);
     sessionUserStub.id = fx.orgA.userId;
     sessionUserStub.organizationId = fx.orgA.organizationId;
   });
   afterEach(async () => {
+    await plans?.();
     await fx.cleanup();
   });
 

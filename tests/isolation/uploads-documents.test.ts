@@ -14,7 +14,7 @@ import { backgroundJobs, fileUploads, solicitationDocuments, solicitations } fro
 import { executeJob } from "@/lib/jobs";
 import { getStorageProvider } from "@/lib/storage";
 import { completeUpload, createUploadIntent } from "@/lib/uploads";
-import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+import { createTwoTenants, type TwoTenantFixture, withUploadPlans } from "../helpers/fixtures";
 
 const sessionUserStub = {
   id: "PLACEHOLDER",
@@ -46,14 +46,17 @@ const PWS = new TextEncoder().encode(
 
 describe("BL-STAB-2d — companion documents from direct uploads (runtime)", () => {
   let fx: TwoTenantFixture;
+  let plans: (() => Promise<void>) | null = null;
   const actorA = () => ({ userId: fx.orgA.userId, email: null });
 
   beforeEach(async () => {
     fx = await createTwoTenants("uploads-docs");
+    plans = await withUploadPlans(fx);
     sessionUserStub.id = fx.orgA.userId;
     sessionUserStub.organizationId = fx.orgA.organizationId;
   });
   afterEach(async () => {
+    await plans?.();
     await fx.cleanup();
   });
 

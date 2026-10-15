@@ -22,10 +22,6 @@ import {
 } from "@/lib/knowledge-classify";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
 import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
-import {
-  enforceStorageQuota,
-  QuotaExceededError,
-} from "@/lib/subscription-gates";
 import { log } from "@/lib/log";
 
 
@@ -78,27 +74,8 @@ export async function createKnowledgeArtifactFromUploadAction(input: {
   if ("alreadyClaimed" in claim) return { ok: true, id: claim.resourceId };
   const file = claim.claim;
 
-  // BL-16 Phase B-3c — refuse the file when the tenant is at or over its
-  // storage limit. Live-measured from SUM(file_size) so deleting an
-  // artifact frees space immediately. The upload stays, ready to retry. A
-  // retry whose artifact an earlier attempt already saved is counted
-  // already: it isn't checked again.
-  const savedBefore =
-    claim.rerun &&
-    (
-      await db
-        .select({ id: knowledgeArtifacts.id })
-        .from(knowledgeArtifacts)
-        .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, file.resourceId)))
-        .limit(1)
-    ).length > 0;
-  try {
-    if (!savedBefore) await enforceStorageQuota(organizationId, file.size);
-  } catch (err) {
-    await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
-    if (err instanceof QuotaExceededError) return { ok: false, error: err.message };
-    throw err;
-  }
+  // The storage limit was checked when the upload started (BL-STAB-2e: one
+  // meter over every stored file and upload in progress).
 
   const format = detectFormat(file.contentType, file.fileName);
   // BL-AIP-4 — a historical proposal (or debrief) can be labelled won /
