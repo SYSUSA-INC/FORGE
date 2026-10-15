@@ -8,7 +8,7 @@
  * from the upload sweep.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { backgroundJobs, fileUploads, knowledgeArtifacts } from "@/db/schema";
 import { executeJob, queueMissingParse } from "@/lib/jobs";
@@ -34,6 +34,11 @@ vi.mock("@/lib/auth-helpers", () => ({
 }));
 // Extraction is run by hand below, from storage, as the jobs cron would.
 vi.mock("@/lib/background", () => ({ runInBackground: () => undefined, backgroundIsDurable: () => false }));
+// A confident classifier, so Auto-detect's effect shows.
+vi.mock("@/lib/knowledge-classify", () => ({
+  CLASSIFY_CONFIDENCE_THRESHOLD: 0.7,
+  classifyArtifactKind: async () => ({ ok: true, stubbed: false, kind: "proposal", confidence: 0.95, reasoning: "Reads as a proposal." }),
+}));
 
 import { createKnowledgeArtifactFromUploadAction, reextractArtifactTextAction } from "@/app/(app)/knowledge-base/import/actions";
 
@@ -121,6 +126,8 @@ describe("BL-STAB-2e — knowledge files from direct uploads (runtime)", () => {
     expect(row).toMatchObject({ kind: "note", outcomeLabel: "none", tags: [] });
     const [job] = await jobsFor(res.id);
     expect(job!.payload).toEqual({ wasAutoKind: true });
+    // Auto-detect: the classifier's confident answer replaces the file-type guess.
+    expect(await runExtraction(res.id)).toMatchObject({ status: "indexed", kind: "proposal", aiSuggestedKind: "proposal" });
 
     // The same person's upload in another organization.
     const foreign = await storedUpload("theirs.txt", NOTE, fx.orgA.userId, fx.orgB.organizationId);
@@ -177,6 +184,35 @@ describe("BL-STAB-2e — knowledge files from direct uploads (runtime)", () => {
     await db.update(fileUploads).set({ claimedAt: new Date(Date.now() - 31 * 60_000) }).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, uploadId)));
     await sweepUploads({ onPromoted: queueMissingParse });
     expect((await jobsFor(claim.claim.resourceId)).map((j) => [j.kind, j.status])).toEqual([["knowledge_artifact_extract", "queued"]]);
-    expect(await runExtraction(claim.claim.resourceId)).toMatchObject({ status: "indexed" });
+    // The batch's choice isn't known here: the classifier only suggests.
+    expect(await runExtraction(claim.claim.resourceId)).toMatchObject({ status: "indexed", kind: "note", aiSuggestedKind: "proposal" });
+  });
+
+  it("a retry of a filing whose artifact was saved finishes it, reads it only if it never was, and isn't counted twice", async () => {
+    const saveThenDie = async (name: string, withJob: boolean) => {
+      const { uploadId, key } = await storedUpload(name);
+      const claim = await claimUpload({ organizationId: org(), userId: fx.orgA.userId, uploadId, resourceType: "knowledge_artifact" });
+      if (!claim.ok || !("claim" in claim)) throw new Error("claim failed");
+      await db.insert(knowledgeArtifacts).values({ id: claim.claim.resourceId, organizationId: org(), kind: "note", source: "uploaded", title: name, fileName: name, fileSize: NOTE.byteLength, contentType: "text/plain", storagePath: key, status: withJob ? "indexed" : "uploaded" });
+      if (withJob) await db.insert(backgroundJobs).values({ organizationId: org(), kind: "knowledge_artifact_extract", resourceId: claim.claim.resourceId, status: "done" });
+      // Older than the takeover window: the retry takes the claim over.
+      await db.update(fileUploads).set({ claimedAt: new Date(Date.now() - 3 * 60_000) }).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, uploadId)));
+      return { uploadId, id: claim.claim.resourceId };
+    };
+    const unread = await saveThenDie("unread.txt", false);
+    expect(await createKnowledgeArtifactFromUploadAction({ uploadId: unread.uploadId })).toEqual({ ok: true, id: unread.id });
+    expect((await jobsFor(unread.id)).map((j) => j.status)).toEqual(["queued"]);
+    const read = await saveThenDie("read.txt", true);
+    expect(await createKnowledgeArtifactFromUploadAction({ uploadId: read.uploadId })).toEqual({ ok: true, id: read.id });
+    expect((await jobsFor(read.id)).map((j) => j.status)).toEqual(["done"]);
+    expect(await db.select().from(knowledgeArtifacts).where(and(eq(knowledgeArtifacts.organizationId, org()), eq(knowledgeArtifacts.id, read.id)))).toHaveLength(1);
+
+    // At its limit counting the saved artifact: the retry isn't refused for counting it twice.
+    await tier?.cleanup();
+    tier = await createTierAndSubscribe({ organizationId: org(), slug: `ku2-${fx.orgA.organizationId.slice(0, 8)}`, name: "One GB", quotas: { storageGb: 1 } });
+    const full = await saveThenDie("full.txt", false);
+    const [used] = await db.select({ total: sql<number>`coalesce(sum(${knowledgeArtifacts.fileSize}), 0)` }).from(knowledgeArtifacts).where(eq(knowledgeArtifacts.organizationId, org()));
+    await db.insert(knowledgeArtifacts).values({ organizationId: org(), kind: "other", source: "uploaded", title: "Filler", fileName: "filler.pdf", fileSize: GIB - Number(used!.total), status: "indexed" });
+    expect(await createKnowledgeArtifactFromUploadAction({ uploadId: full.uploadId })).toEqual({ ok: true, id: full.id });
   });
 });

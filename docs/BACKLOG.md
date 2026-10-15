@@ -614,6 +614,17 @@ mind. Bandage will come off but a true fix will stay."
       - The Import corpus page stages files, then uploads them three at a
         time on the shared upload list (progress, retry, cancel) with the
         batch's settings; 300 seconds per request.
+      - **Review (8 of 11 upheld; duplicates merged):** a read the upload
+        sweep queued (the batch's choice unknown) skipped Auto-detect — it
+        now classifies as a suggestion only, never over a chosen kind; a
+        retry whose artifact an earlier attempt saved was counted against
+        the storage limit twice — it isn't checked again; Re-extract
+        promised a page that updates itself — the page now refreshes while
+        the read runs (and holds Run extraction meanwhile); the upload
+        list's header counted cancelled and waiting files as uploading;
+        the admin manual named the deleted action. Tests: the retry paths
+        (read only if never read; no second count) and Auto-detect applied
+        vs suggested. Five guards mutation-checked.
       - **Final review of #390 (2 of 6 upheld), fixed here:** `enqueueJob`
         could throw when its insert lost to a job that finished before it
         was read back — it now reads and inserts again (three passes); the

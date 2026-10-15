@@ -101,6 +101,8 @@ export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
   }
 
   const failedCount = queue.items.filter((it) => it.phase === "failed").length;
+  const waitingCount = staged.length + queue.items.filter((it) => it.phase === "queued").length;
+  const activeCount = queue.items.filter((it) => it.phase === "uploading" || it.phase === "verifying" || it.phase === "saving").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -195,7 +197,7 @@ export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
         <div className="rounded-xl border border-layer/10 bg-layer/[0.015]">
           <div className="flex items-center justify-between border-b border-layer/10 p-3">
             <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-              {staged.length} waiting · {queue.items.length - doneCount - failedCount} uploading · {doneCount} done · {failedCount} failed
+              {waitingCount} waiting · {activeCount} uploading · {doneCount} done · {failedCount} failed
             </div>
             <div className="flex gap-2">
               <button

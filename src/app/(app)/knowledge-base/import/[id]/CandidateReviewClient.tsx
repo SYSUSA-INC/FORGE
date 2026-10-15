@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
@@ -52,6 +52,21 @@ export function CandidateReviewClient({
   const [filter, setFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
   >("pending");
+  // BL-STAB-2e — after Re-extract, refresh while the background read runs:
+  // until it has been seen extracting and has finished, or two minutes.
+  const [watch, setWatch] = useState<{ until: number; sawExtracting: boolean } | null>(null);
+  const extracting = artifactStatus === "extracting_text" || artifactStatus === "uploaded";
+  useEffect(() => {
+    if (!watch) return;
+    if (extracting && !watch.sawExtracting) setWatch({ ...watch, sawExtracting: true });
+    if ((watch.sawExtracting && !extracting) || Date.now() > watch.until) {
+      setWatch(null);
+      setNotice(watch.sawExtracting && !extracting ? `Re-extraction ${artifactStatus === "failed" ? "failed; see the status above" : "finished"}.` : "Re-extraction is taking a while; reload the page to see when it finishes.");
+      return;
+    }
+    const timer = setTimeout(() => router.refresh(), 3_000);
+    return () => clearTimeout(timer);
+  }, [watch, extracting, artifactStatus, router]);
 
   const pendingCandidates = candidates.filter((c) => c.decision === "pending");
   const approvedCandidates = candidates.filter(
@@ -107,8 +122,9 @@ export function CandidateReviewClient({
         setError(res.error);
         return;
       }
-      // BL-STAB-2e — extraction runs in the background now; the status and text update here when it lands.
-      setNotice("Re-extraction started. The text and status update on this page when it finishes.");
+      // BL-STAB-2e — extraction runs in the background now; this page refreshes until it lands.
+      setNotice("Re-extraction started; this page refreshes while it runs.");
+      setWatch({ until: Date.now() + 120_000, sawExtracting: false });
       router.refresh();
     });
   }
@@ -140,7 +156,9 @@ export function CandidateReviewClient({
   const canRun =
     artifactStatus === "indexed" &&
     rawTextChars > 0 &&
-    !pending;
+    !pending &&
+    // Not on the old text while a re-extraction is under way.
+    watch === null;
 
   return (
     <Panel

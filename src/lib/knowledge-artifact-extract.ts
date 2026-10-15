@@ -32,7 +32,13 @@ export async function extractAndIndex(
   contentType: string,
   fileName: string,
   organizationId: string,
-  wasAutoKind: boolean = false,
+  /**
+   * The batch's kind was Auto-detect (the classifier may replace the
+   * file-type guess); `"suggest"` when the choice isn't known (a read the
+   * upload sweep queued for a filing that died): the classifier's answer
+   * is stored as a suggestion only, never applied over a chosen kind.
+   */
+  wasAutoKind: boolean | "suggest" = false,
 ): Promise<void> {
   await db
     .update(knowledgeArtifacts)
@@ -132,7 +138,7 @@ export async function extractAndIndex(
       });
       if (classified.ok && !classified.stubbed) {
         const shouldApply =
-          classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD;
+          wasAutoKind === true && classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD;
         await db
           .update(knowledgeArtifacts)
           .set({

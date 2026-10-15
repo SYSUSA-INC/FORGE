@@ -80,9 +80,20 @@ export async function createKnowledgeArtifactFromUploadAction(input: {
 
   // BL-16 Phase B-3c — refuse the file when the tenant is at or over its
   // storage limit. Live-measured from SUM(file_size) so deleting an
-  // artifact frees space immediately. The upload stays, ready to retry.
+  // artifact frees space immediately. The upload stays, ready to retry. A
+  // retry whose artifact an earlier attempt already saved is counted
+  // already: it isn't checked again.
+  const savedBefore =
+    claim.rerun &&
+    (
+      await db
+        .select({ id: knowledgeArtifacts.id })
+        .from(knowledgeArtifacts)
+        .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, file.resourceId)))
+        .limit(1)
+    ).length > 0;
   try {
-    await enforceStorageQuota(organizationId, file.size);
+    if (!savedBefore) await enforceStorageQuota(organizationId, file.size);
   } catch (err) {
     await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
     if (err instanceof QuotaExceededError) return { ok: false, error: err.message };

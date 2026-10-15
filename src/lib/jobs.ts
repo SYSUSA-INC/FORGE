@@ -569,7 +569,9 @@ async function handleKnowledgeArtifactExtract(job: BackgroundJob, ctx: JobContex
   const loaded = await loadUploadBytes(job, row, ctx.bytes);
   if (!loaded.ok) return failed(loaded.message);
 
-  const wasAutoKind = (job.payload as { wasAutoKind?: unknown } | null)?.wasAutoKind === true;
+  // A read the upload sweep queued doesn't know the batch's choice: classify, but only suggest.
+  const auto = (job.payload as { wasAutoKind?: unknown } | null)?.wasAutoKind;
+  const wasAutoKind = auto === true ? true : auto === false ? false : "suggest";
   await extractAndIndex(row.id, loaded.bytes, format, row.contentType, row.fileName, organizationId, wasAutoKind);
 
   const [after] = await db
