@@ -361,6 +361,12 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     const [a, b] = await Promise.all([enqueueJob(spec), enqueueJob(spec)]);
     expect(a.job.id).toBe(b.job.id);
     expect(await jobsFor(spec.resourceId)).toEqual([{ status: "queued" }]);
+    // An insert that lost to a job which then finished before it could be read back tries again.
+    const lost = { ...spec, resourceId: randomUUID() };
+    vi.spyOn(db, "insert").mockImplementationOnce((() => ({ values: () => ({ onConflictDoNothing: () => ({ returning: async () => [] }) }) })) as never);
+    const retried = await enqueueJob(lost);
+    expect(retried.reused).toBe(false);
+    expect(await jobsFor(lost.resourceId)).toEqual([{ status: "queued" }]);
   });
 
   it("deletes an upload that never arrived only after the browser has stopped sending it", async () => {

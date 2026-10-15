@@ -30,6 +30,7 @@ import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   backgroundJobs,
+  knowledgeArtifacts,
   solicitationDocuments,
   solicitations,
   type BackgroundJob,
@@ -45,6 +46,7 @@ import {
 } from "@/lib/jobs-policy";
 import { log } from "@/lib/log";
 import { handleSectionAutoDraft } from "@/lib/auto-draft-job";
+import { extractAndIndex } from "@/lib/knowledge-artifact-extract";
 import { harvestProposal } from "@/lib/proposal-harvest";
 import { parseSolicitationDocumentFromBytes } from "@/lib/solicitation-document-parse";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
@@ -103,48 +105,39 @@ export async function enqueueJob(
   spec: JobSpec,
 ): Promise<{ job: BackgroundJob; reused: boolean }> {
   const { organizationId } = spec;
-  const [open] = await db
-    .select()
-    .from(backgroundJobs)
-    .where(
-      and(
-        eq(backgroundJobs.organizationId, organizationId),
-        eq(backgroundJobs.kind, spec.kind),
-        eq(backgroundJobs.resourceId, spec.resourceId),
-        inArray(backgroundJobs.status, ["queued", "running"]),
-      ),
-    )
-    .limit(1);
-  if (open) return { job: open, reused: true };
+  // Read, then insert. An insert that loses a race (the index keeps one
+  // open job per resource) reads the winner back on the next pass; if that
+  // job already finished in between, the next insert goes through.
+  for (let pass = 0; pass < 3; pass++) {
+    const [open] = await db
+      .select()
+      .from(backgroundJobs)
+      .where(
+        and(
+          eq(backgroundJobs.organizationId, organizationId),
+          eq(backgroundJobs.kind, spec.kind),
+          eq(backgroundJobs.resourceId, spec.resourceId),
+          inArray(backgroundJobs.status, ["queued", "running"]),
+        ),
+      )
+      .limit(1);
+    if (open) return { job: open, reused: true };
 
-  const [job] = await db
-    .insert(backgroundJobs)
-    .values({
-      organizationId,
-      kind: spec.kind,
-      resourceId: spec.resourceId,
-      payload: spec.payload ?? {},
-      requestedByUserId: spec.requestedByUserId ?? null,
-      maxAttempts: spec.maxAttempts ?? JOB_MAX_ATTEMPTS,
-    })
-    .onConflictDoNothing()
-    .returning();
-  if (job) return { job, reused: false };
-  // Another caller queued it between our read and our insert: theirs is the job.
-  const [theirs] = await db
-    .select()
-    .from(backgroundJobs)
-    .where(
-      and(
-        eq(backgroundJobs.organizationId, organizationId),
-        eq(backgroundJobs.kind, spec.kind),
-        eq(backgroundJobs.resourceId, spec.resourceId),
-        inArray(backgroundJobs.status, ["queued", "running"]),
-      ),
-    )
-    .limit(1);
-  if (!theirs) throw new Error("Could not create background job.");
-  return { job: theirs, reused: true };
+    const [job] = await db
+      .insert(backgroundJobs)
+      .values({
+        organizationId,
+        kind: spec.kind,
+        resourceId: spec.resourceId,
+        payload: spec.payload ?? {},
+        requestedByUserId: spec.requestedByUserId ?? null,
+        maxAttempts: spec.maxAttempts ?? JOB_MAX_ATTEMPTS,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (job) return { job, reused: false };
+  }
+  throw new Error("Could not create background job.");
 }
 
 /**
@@ -202,6 +195,7 @@ export function runDurableBatch(
 const PARSE_KIND: Partial<Record<UploadResourceType, BackgroundJobKind>> = {
   solicitation: "solicitation_parse",
   solicitation_document: "solicitation_document_parse",
+  knowledge_artifact: "knowledge_artifact_extract",
 };
 
 /** Whether this resource has ever had a job of this kind, whatever became of it. */
@@ -412,6 +406,7 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   solicitation_document_parse: handleSolicitationDocumentParse,
   proposal_harvest: handleProposalHarvest,
   section_auto_draft: handleSectionAutoDraft,
+  knowledge_artifact_extract: handleKnowledgeArtifactExtract,
 };
 
 /**
@@ -539,6 +534,50 @@ async function handleSolicitationDocumentParse(job: BackgroundJob, ctx: JobConte
   if (after?.parseStatus === "failed") {
     throw new JobPermanentError(after.parseError || "Parse failed.");
   }
+}
+
+/**
+ * BL-STAB-2e — read a knowledge-base file's text (and, for an
+ * auto-detected kind, classify it). The read is budgeted and verified like
+ * a solicitation parse; extraction records its outcome on the artifact,
+ * and a reported failure is final for this job (Re-extract queues a new one).
+ */
+async function handleKnowledgeArtifactExtract(job: BackgroundJob, ctx: JobContext): Promise<void> {
+  const organizationId = job.organizationId;
+  const [row] = await db
+    .select({
+      id: knowledgeArtifacts.id,
+      storagePath: knowledgeArtifacts.storagePath,
+      fileSize: knowledgeArtifacts.fileSize,
+      fileName: knowledgeArtifacts.fileName,
+      contentType: knowledgeArtifacts.contentType,
+    })
+    .from(knowledgeArtifacts)
+    .where(and(eq(knowledgeArtifacts.id, job.resourceId), eq(knowledgeArtifacts.organizationId, organizationId)))
+    .limit(1);
+  if (!row) throw new JobPermanentError("Knowledge artifact no longer exists.");
+
+  const failed = async (message: string) => {
+    await db
+      .update(knowledgeArtifacts)
+      .set({ status: "failed", statusError: message, updatedAt: new Date() })
+      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, row.id)));
+    throw new JobPermanentError(message);
+  };
+  const format = detectFormat(row.contentType, row.fileName);
+  if (!format) return failed("Unrecognized file format; it can't be read.");
+  const loaded = await loadUploadBytes(job, row, ctx.bytes);
+  if (!loaded.ok) return failed(loaded.message);
+
+  const wasAutoKind = (job.payload as { wasAutoKind?: unknown } | null)?.wasAutoKind === true;
+  await extractAndIndex(row.id, loaded.bytes, format, row.contentType, row.fileName, organizationId, wasAutoKind);
+
+  const [after] = await db
+    .select({ status: knowledgeArtifacts.status, statusError: knowledgeArtifacts.statusError })
+    .from(knowledgeArtifacts)
+    .where(and(eq(knowledgeArtifacts.id, row.id), eq(knowledgeArtifacts.organizationId, organizationId)))
+    .limit(1);
+  if (after?.status === "failed") throw new JobPermanentError(after.statusError || "Text extraction failed.");
 }
 
 async function handleProposalHarvest(job: BackgroundJob): Promise<void> {

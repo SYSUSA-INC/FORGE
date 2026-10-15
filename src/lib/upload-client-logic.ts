@@ -41,14 +41,19 @@ export function classifyPutFailure(i: { status: number; bodyText: string; expire
  */
 export const PUT_GRACE_MS = PENDING_GRACE_MS - 5 * 60_000;
 
+/** A moment on both of the browser's clocks: `performance.now()` and `Date.now()`. */
+export type ClockReading = { mono: number; wall: number };
+
 /**
  * How long a PUT may still run: the link's life counted from when it was
- * issued plus the grace, at least a second. Callers pass a monotonic
- * clock (`performance.now()`), so neither a wrong clock on this computer
- * nor one corrected mid-upload matters.
+ * issued plus the grace, at least a second. Time passed is the larger of
+ * the two clocks' readings: the monotonic one can't be moved by a clock
+ * correction, and the wall clock keeps counting while the computer
+ * sleeps (where the monotonic one may stop). Neither can stretch the limit.
  */
-export function putTimeoutMs(issuedAt: number, expiresInSeconds: number, now: number): number {
-  return Math.max(1_000, issuedAt + expiresInSeconds * 1_000 + PUT_GRACE_MS - now);
+export function putTimeoutMs(issuedAt: ClockReading, expiresInSeconds: number, now: ClockReading): number {
+  const elapsed = Math.max(now.mono - issuedAt.mono, now.wall - issuedAt.wall);
+  return Math.max(1_000, expiresInSeconds * 1_000 + PUT_GRACE_MS - elapsed);
 }
 
 /** Wait before retry number `attempt` (1-based): 1 s, 4 s, 10 s, then give up (null). */

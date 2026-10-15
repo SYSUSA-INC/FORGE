@@ -15,29 +15,19 @@ import {
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
-import {
-  detectFormat,
-  extractTextFromDocx,
-  extractTextFromPlainText,
-  extractTextFromPptx,
-  extractTextFromXlsx,
-  type ExtractFormat,
-} from "@/lib/text-extract";
-import { extractTextFromPdf } from "@/lib/solicitation-extract";
-import { extractTextFromImageViaVision } from "@/lib/image-ocr";
-import type { AIDocumentMedia } from "@/lib/ai";
+import { detectFormat, type ExtractFormat } from "@/lib/text-extract";
 import {
   classifyArtifactKind,
   CLASSIFY_CONFIDENCE_THRESHOLD,
 } from "@/lib/knowledge-classify";
+import { hasAnyJob, runDurable } from "@/lib/jobs";
+import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
 import {
   enforceStorageQuota,
   QuotaExceededError,
 } from "@/lib/subscription-gates";
 import { log } from "@/lib/log";
 
-const MAX_BYTES = 50 * 1024 * 1024; // 50 MB cap; corpus runs bigger than solicitations.
-const RAW_TEXT_CAP = 500_000;
 
 export type ArtifactUploadResult =
   | { ok: true; id: string }
@@ -65,282 +55,112 @@ function defaultKindFromFormat(
   }
 }
 
-export async function uploadKnowledgeArtifactAction(
-  formData: FormData,
-): Promise<ArtifactUploadResult> {
+/**
+ * BL-STAB-2e — save a file uploaded straight to storage as a knowledge
+ * artifact. The upload ledger's claim fixes the artifact's id, so a retry
+ * returns the same artifact; the storage limit is checked before anything
+ * is saved; the text is read by a durable job (retried by the jobs cron),
+ * queued before the claim is finished. The page passes the batch's kind,
+ * tags and outcome.
+ */
+export async function createKnowledgeArtifactFromUploadAction(input: {
+  uploadId: string;
+  kind?: string;
+  tags?: string;
+  title?: string;
+  outcome?: string;
+}): Promise<ArtifactUploadResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return { ok: false, error: "Pick a file to upload." };
-  }
-  if (file.size === 0) return { ok: false, error: "File is empty." };
-  if (file.size > MAX_BYTES) {
-    return {
-      ok: false,
-      error: `File is larger than ${MAX_BYTES / 1024 / 1024} MB. Split or compress before uploading.`,
-    };
-  }
+  const claim = await claimUpload({ organizationId, userId: user.id, uploadId: String(input?.uploadId ?? ""), resourceType: "knowledge_artifact" });
+  if (!claim.ok) return { ok: false, error: claim.error };
+  if ("alreadyClaimed" in claim) return { ok: true, id: claim.resourceId };
+  const file = claim.claim;
 
-  // BL-16 Phase B-3c — refuse the upload when the tenant is at or
-  // over its storage limit. Live-measured from SUM(file_size) so
-  // deleting an artifact frees space immediately.
+  // BL-16 Phase B-3c — refuse the file when the tenant is at or over its
+  // storage limit. Live-measured from SUM(file_size) so deleting an
+  // artifact frees space immediately. The upload stays, ready to retry.
   try {
     await enforceStorageQuota(organizationId, file.size);
   } catch (err) {
-    if (err instanceof QuotaExceededError) {
-      return { ok: false, error: err.message };
-    }
+    await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
+    if (err instanceof QuotaExceededError) return { ok: false, error: err.message };
     throw err;
   }
 
-  const format = detectFormat(file.type, file.name);
-  if (!format) {
-    return {
-      ok: false,
-      error:
-        "Unsupported file type. Accepted: PDF, DOCX, XLSX, PPTX, TXT/MD, or image.",
-    };
-  }
-
-  // Optional fields posted alongside the file.
-  const rawKind = (formData.get("kind") as string | null)?.trim() || "";
-  const rawTags = (formData.get("tags") as string | null) || "";
-  const rawTitle = (formData.get("title") as string | null) || "";
+  const format = detectFormat(file.contentType, file.fileName);
   // BL-AIP-4 — a historical proposal (or debrief) can be labelled won /
   // lost at upload so retrieval's outcome boost has data on day one.
-  const rawOutcome = (formData.get("outcome") as string | null)?.trim() || "";
-  const outcomeLabel: KnowledgeOutcomeLabel = isOutcomeLabel(rawOutcome)
-    ? rawOutcome
-    : "none";
-
-  const kind = isValidKind(rawKind)
-    ? (rawKind as KnowledgeArtifactKind)
-    : defaultKindFromFormat(format);
-  const tags = rawTags
+  const rawOutcome = typeof input?.outcome === "string" ? input.outcome.trim() : "";
+  const outcomeLabel: KnowledgeOutcomeLabel = isOutcomeLabel(rawOutcome) ? rawOutcome : "none";
+  const rawKind = typeof input?.kind === "string" ? input.kind.trim() : "";
+  const kind = isValidKind(rawKind) ? (rawKind as KnowledgeArtifactKind) : defaultKindFromFormat(format);
+  const tags = (typeof input?.tags === "string" ? input.tags : "")
     .split(/[,;\n]+/)
     .map((t) => t.trim())
     .filter(Boolean)
     .slice(0, 32);
-  const title = (rawTitle || stripExt(file.name)).slice(0, 256);
+  const title = ((typeof input?.title === "string" && input.title.trim()) || stripExt(file.fileName)).slice(0, 256);
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const contentType = file.type || guessContentType(format);
-
-  // Insert immediately so the user sees an entry. Storage + extraction
-  // happens after.
-  const [row] = await db
-    .insert(knowledgeArtifacts)
-    .values({
-      organizationId,
-      kind,
-      source: "uploaded",
-      title,
-      tags,
-      fileName: file.name,
-      fileSize: file.size,
-      contentType,
-      status: "uploaded",
-      outcomeLabel,
-      uploadedByUserId: user.id,
-    })
-    .returning({ id: knowledgeArtifacts.id });
-  if (!row) return { ok: false, error: "Could not record artifact." };
-
-  // Persist bytes.
+  let created = false;
   try {
-    const storage = getStorageProvider();
-    const key = `org/${organizationId}/knowledge/${row.id}/${file.name}`;
-    const stored = await storage.put({
-      key,
-      bytes,
-      contentType,
-    });
-    await db
-      .update(knowledgeArtifacts)
-      .set({ storagePath: stored.storagePath, updatedAt: new Date() })
-      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, row.id)));
-  } catch (err) {
-    log.error("[uploadKnowledgeArtifact]", "storage", { error: err });
-    await db
-      .update(knowledgeArtifacts)
-      .set({
-        status: "failed",
-        statusError:
-          err instanceof Error ? err.message : "Storage write failed.",
-        updatedAt: new Date(),
+    const inserted = await db
+      .insert(knowledgeArtifacts)
+      .values({
+        id: file.resourceId,
+        organizationId,
+        kind,
+        source: "uploaded",
+        title,
+        tags,
+        fileName: file.fileName,
+        fileSize: file.size,
+        contentType: file.contentType,
+        storagePath: file.storageKey,
+        status: "uploaded",
+        outcomeLabel,
+        uploadedByUserId: user.id,
       })
-      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, row.id)));
-    return {
-      ok: false,
-      error: "Saved metadata but failed to store the file bytes.",
-    };
+      .onConflictDoNothing()
+      .returning({ id: knowledgeArtifacts.id });
+    created = inserted.length > 0;
+  } catch (err) {
+    log.error("[createKnowledgeArtifactFromUploadAction]", "insert failed", { error: err });
+    await releaseClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
+    return { ok: false, error: "Could not record the artifact; try again." };
   }
 
-  // Extract text inline (fast for most formats; images skip — Phase 10c
-  // will run the AI vision pass async).
-  //
-  // BL-10 Phase A: when the user picked "Auto-detect", the kind we
-  // wrote at insert time is the file-extension heuristic from
-  // defaultKindFromFormat. After extraction, classifyArtifactKind
-  // gives a content-based answer that supersedes the heuristic when
-  // confidence is high enough. We pass `wasAutoKind` so the
-  // classifier only runs in the auto path.
-  const wasAutoKind = !isValidKind(rawKind);
-  await extractAndIndex(
-    row.id,
-    bytes,
-    format,
-    contentType,
-    file.name,
+  // BL-10 Phase A — with "Auto-detect", the kind above is the file-type
+  // guess; after extraction the classifier may replace it. Queued before
+  // the claim is finished (the upload sweep finishes a filing that dies in
+  // between); a retry that finds the artifact saved reads it only if it
+  // never was.
+  const extract = {
     organizationId,
-    wasAutoKind,
-  );
+    kind: "knowledge_artifact_extract" as const,
+    resourceId: file.resourceId,
+    payload: { wasAutoKind: !isValidKind(rawKind) },
+    requestedByUserId: user.id,
+  };
+  if (created || !(await hasAnyJob(extract))) {
+    const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: file.storageKey });
+    await runDurable("[createKnowledgeArtifactFromUploadAction] extract", extract, bytes ? { bytes } : {});
+  }
+  await finishClaim({ organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt });
 
   await recordAudit({
     organizationId,
     actor: { userId: user.id, email: user.email },
     action: "knowledge_artifact.upload",
     resourceType: "knowledge_artifact",
-    resourceId: row.id,
-    metadata: {
-      kind,
-      fileName: file.name,
-      fileSize: file.size,
-      format,
-      outcomeLabel,
-    },
+    resourceId: file.resourceId,
+    metadata: { uploadId: file.uploadId, kind, fileName: file.fileName, fileSize: file.size, format, outcomeLabel },
   });
 
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");
-  return { ok: true, id: row.id };
-}
-
-async function extractAndIndex(
-  id: string,
-  bytes: Uint8Array,
-  format: ExtractFormat,
-  contentType: string,
-  fileName: string,
-  organizationId: string,
-  wasAutoKind: boolean = false,
-): Promise<void> {
-  await db
-    .update(knowledgeArtifacts)
-    .set({
-      status: "extracting_text",
-      statusError: "",
-      updatedAt: new Date(),
-    })
-    .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
-
-  let rawText = "";
-  try {
-    switch (format) {
-      case "pdf":
-        rawText = await extractTextFromPdf(bytes);
-        break;
-      case "docx":
-        rawText = await extractTextFromDocx(bytes);
-        break;
-      case "xlsx":
-        rawText = await extractTextFromXlsx(bytes);
-        break;
-      case "pptx":
-        rawText = await extractTextFromPptx(bytes);
-        break;
-      case "text":
-        rawText = await extractTextFromPlainText(bytes);
-        break;
-      case "image": {
-        // Phase 10g: hand the image to Claude vision. Returns plain
-        // text the corpus can index + Brain Extraction can mine.
-        // Falls back gracefully when AI provider isn't configured —
-        // the artifact still lands but with an explanatory note.
-        const ocr = await extractTextFromImageViaVision({
-          organizationId,
-          bytes,
-          mediaType: (contentType || "image/png") as AIDocumentMedia,
-          fileName,
-        });
-        if (ocr.ok) {
-          rawText = ocr.text;
-        } else {
-          rawText = "";
-          await db
-            .update(knowledgeArtifacts)
-            .set({
-              statusError: ocr.error,
-              updatedAt: new Date(),
-            })
-            .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
-        }
-        break;
-      }
-    }
-  } catch (err) {
-    log.error("[knowledge-artifact extract]", "error", { error: err });
-    await db
-      .update(knowledgeArtifacts)
-      .set({
-        status: "failed",
-        statusError:
-          err instanceof Error
-            ? `Text extraction failed: ${err.message}`
-            : "Text extraction failed.",
-        updatedAt: new Date(),
-      })
-      .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
-    return;
-  }
-
-  await db
-    .update(knowledgeArtifacts)
-    .set({
-      rawText: rawText.slice(0, RAW_TEXT_CAP),
-      status: "indexed",
-      indexedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
-
-  // BL-10 Phase A — AI kind classification on auto-detect uploads.
-  // Best-effort: any failure here logs and leaves the heuristic kind in
-  // place. Skipped in stub mode, skipped on empty text.
-  //
-  // BL-10 Phase B-1 — ALSO persist the classifier output to the new
-  // ai_suggested_kind / ai_classification_confidence /
-  // ai_classification_reasoning columns regardless of whether we
-  // applied it. UI uses these to surface low-confidence suggestions
-  // as accept-able pills.
-  if (wasAutoKind && rawText.trim().length > 0) {
-    try {
-      const classified = await classifyArtifactKind({
-        organizationId,
-        fileName,
-        contentType,
-        rawText,
-      });
-      if (classified.ok && !classified.stubbed) {
-        const shouldApply =
-          classified.confidence >= CLASSIFY_CONFIDENCE_THRESHOLD;
-        await db
-          .update(knowledgeArtifacts)
-          .set({
-            ...(shouldApply ? { kind: classified.kind } : {}),
-            aiSuggestedKind: classified.kind,
-            aiClassificationConfidence: classified.confidence,
-            aiClassificationReasoning: classified.reasoning,
-            updatedAt: new Date(),
-          })
-          .where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.id, id)));
-      }
-    } catch (err) {
-      log.error("[knowledge-artifact classify]", "error", { error: err });
-    }
-  }
+  return { ok: true, id: file.resourceId };
 }
 
 export type ListedArtifact = {
@@ -610,23 +430,6 @@ function stripExt(s: string): string {
   return s.replace(/\.[^./]+$/, "");
 }
 
-function guessContentType(format: ExtractFormat): string {
-  switch (format) {
-    case "pdf":
-      return "application/pdf";
-    case "docx":
-      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    case "xlsx":
-      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    case "pptx":
-      return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-    case "image":
-      return "image/png";
-    case "text":
-      return "text/plain";
-  }
-}
-
 /**
  * Phase 10g: re-run text extraction on an existing artifact.
  *
@@ -636,12 +439,13 @@ function guessContentType(format: ExtractFormat): string {
  *   - Vision OCR produced a poor result and the user wants to retry.
  *   - A future format extractor improves and we want to re-process.
  *
- * Loads bytes from the storage provider and calls the same
- * extractAndIndex used at upload time. Idempotent — safe to re-run.
+ * BL-STAB-2e — checks the file is in storage (without downloading it),
+ * then queues the same extraction job an upload runs; a job already open
+ * for the artifact is reused. The page shows the result when it lands.
  */
 export async function reextractArtifactTextAction(
   artifactId: string,
-): Promise<{ ok: true; chars: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; queued: true } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
@@ -663,17 +467,6 @@ export async function reextractArtifactTextAction(
         "No file bytes in storage for this artifact. Re-upload the original.",
     };
   }
-
-  const storage = getStorageProvider();
-  const obj = await storage.get(artifact.storagePath);
-  if (!obj) {
-    return {
-      ok: false,
-      error:
-        "Storage no longer has the file bytes (likely after a redeploy of the memory-mode stub). Re-upload to retry.",
-    };
-  }
-
   const format = detectFormat(artifact.contentType, artifact.fileName);
   if (!format) {
     return {
@@ -682,21 +475,28 @@ export async function reextractArtifactTextAction(
     };
   }
 
-  await extractAndIndex(
-    artifact.id,
-    obj.bytes,
-    format,
-    artifact.contentType,
-    artifact.fileName,
-    organizationId,
-  );
+  // A storage error is not a missing file: say which it was.
+  let head: Awaited<ReturnType<ReturnType<typeof getStorageProvider>["head"]>>;
+  try {
+    head = await getStorageProvider().head(artifact.storagePath);
+  } catch (err) {
+    log.warn("[reextractArtifactTextAction]", "storage check failed", { error: err });
+    return { ok: false, error: "File storage could not be reached just now. Try Re-extract again in a minute." };
+  }
+  if (!head) {
+    return {
+      ok: false,
+      error:
+        "Storage no longer has the file bytes (likely after a redeploy of the memory-mode stub). Re-upload to retry.",
+    };
+  }
 
-  // Reload to return the new char count.
-  const [updated] = await db
-    .select({ rawText: knowledgeArtifacts.rawText })
-    .from(knowledgeArtifacts)
-    .where(eq(knowledgeArtifacts.id, artifactId))
-    .limit(1);
+  const bytes = await inlineBytesForMemoryMode({ organizationId, storagePath: artifact.storagePath });
+  await runDurable(
+    "[reextractArtifactTextAction] extract",
+    { organizationId, kind: "knowledge_artifact_extract", resourceId: artifact.id, payload: { wasAutoKind: false }, requestedByUserId: actor.id },
+    bytes ? { bytes } : {},
+  );
 
   await recordAudit({
     organizationId,
@@ -704,12 +504,12 @@ export async function reextractArtifactTextAction(
     action: "knowledge_artifact.reextract",
     resourceType: "knowledge_artifact",
     resourceId: artifactId,
-    metadata: { chars: updated?.rawText?.length ?? 0, format },
+    metadata: { format },
   });
 
   revalidatePath(`/knowledge-base/import/${artifactId}`);
   revalidatePath("/knowledge-base/import");
-  return { ok: true, chars: updated?.rawText?.length ?? 0 };
+  return { ok: true, queued: true };
 }
 
 /**

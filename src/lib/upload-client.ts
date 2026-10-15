@@ -102,8 +102,9 @@ export async function uploadFile(
   for (let link = 0; link < 2; link++) {
     const intent = await requestUploadAction({ purpose: opts.purpose, fileName: file.name, size: file.size });
     if (!intent.ok) return { ok: false, error: intent.error };
-    // A monotonic clock: a clock correction mid-upload can't stretch the limit.
-    const issuedAt = performance.now();
+    // Both clocks: neither a clock correction nor a sleep mid-upload can stretch the limit.
+    const clock = () => ({ mono: performance.now(), wall: Date.now() });
+    const issuedAt = clock();
     opts.onPhase?.("uploading");
     let put: PutResult | null = null;
     let renew = false;
@@ -115,7 +116,7 @@ export async function uploadFile(
           body: file,
           onProgress: opts.onProgress,
           signal: opts.signal,
-          timeoutMs: putTimeoutMs(issuedAt, intent.expiresInSeconds, performance.now()),
+          timeoutMs: putTimeoutMs(issuedAt, intent.expiresInSeconds, clock()),
         });
       } catch {
         return cancelled(intent.uploadId);

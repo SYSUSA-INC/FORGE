@@ -107,11 +107,8 @@ export function CandidateReviewClient({
         setError(res.error);
         return;
       }
-      setNotice(
-        res.chars === 0
-          ? "Re-extracted — no text was produced. Check the artifact contents."
-          : `Re-extracted ${res.chars.toLocaleString()} characters.`,
-      );
+      // BL-STAB-2e — extraction runs in the background now; the status and text update here when it lands.
+      setNotice("Re-extraction started. The text and status update on this page when it finishes.");
       router.refresh();
     });
   }
