@@ -7,9 +7,9 @@
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { customerContacts } from "@/db/schema";
+import { auditLogs, customerContacts } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { agencyKey } from "@/lib/crm-logic";
 import {
@@ -53,6 +53,32 @@ export async function findImportDuplicates(input: { organizationId: string; peop
 
 export type ImportBatch = { id: string; part: number; parts: number };
 
+/**
+ * BL-STAB-2f — a part sent again after its answer was lost: its audit row
+ * says what it did, so that is the answer and nothing is written twice
+ * (re-run, its people would be counted as duplicates the same import made).
+ */
+async function partAlreadyImported(organizationId: string, batch: ImportBatch): Promise<ImportCommit | null> {
+  const [row] = await db
+    .select({ metadata: auditLogs.metadata })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.organizationId, organizationId),
+        // An import runs in minutes; the day bounds the scan to the organization's recent rows.
+        gt(auditLogs.createdAt, sql`now() - interval '1 day'`),
+        eq(auditLogs.action, "crm.contact.import"),
+        sql`${auditLogs.metadata}->>'importId' = ${batch.id}`,
+        sql`${auditLogs.metadata}->>'part' = ${String(batch.part)}`,
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+  const m = row.metadata as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return { ok: true, created: n(m.created), updated: n(m.updated), skipped: n(m.skipped) };
+}
+
 export type ImportCommit = { ok: true; created: number; updated: number; skipped: number } | { ok: false; error: string };
 
 /**
@@ -69,6 +95,10 @@ export async function commitContactImport(input: {
   batch?: ImportBatch;
 }): Promise<ImportCommit> {
   const { organizationId } = input;
+  if (input.batch) {
+    const done = await partAlreadyImported(organizationId, input.batch);
+    if (done) return done;
+  }
   const clean = dedupeWithinImport(
     input.rows
       .slice(0, IMPORT_LIMITS.maxRows)

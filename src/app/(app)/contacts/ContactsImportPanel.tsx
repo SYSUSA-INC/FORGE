@@ -5,6 +5,7 @@ import { chunkByBytes } from "@/lib/action-body";
 import { CONTACT_ROLE_LABELS } from "@/lib/crm-logic";
 import {
   IMPORT_LIMITS,
+  decodeImportFile,
   dedupeWithinImport,
   parseImport,
   summarizeImport,
@@ -23,7 +24,7 @@ type Preview = {
   skipped: ImportSkip[];
   unmappedHeaders: string[];
   summary: ImportSummary;
-  truncated: boolean;
+  stoppedAt: number | null;
 };
 
 /** An import sent in parts; a part that failed is sent again from where it stopped. */
@@ -65,9 +66,10 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
       setError(`That file is ${formatLimit(picked.size)}; contacts files up to ${formatLimit(IMPORT_LIMITS.maxFileBytes)} are read. Split it and import the parts.`);
       return;
     }
-    picked.text().then(
-      (value) => {
-        setFile({ name: picked.name, size: picked.size, text: value });
+    // Decoded here, not with Blob.text(): some address-book exports are UTF-16.
+    picked.arrayBuffer().then(
+      (buf) => {
+        setFile({ name: picked.name, size: picked.size, text: decodeImportFile(new Uint8Array(buf)) });
         reset();
       },
       () => setError("Could not read that file."),
@@ -100,7 +102,7 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
         skipped,
         unmappedHeaders: parsed.unmappedHeaders,
         summary: summarizeImport(rows, found, skipped),
-        truncated: parsed.truncated,
+        stoppedAt: parsed.stoppedAt,
       });
     });
   }
@@ -128,11 +130,11 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
             run.skipped += res.skipped;
           } else failure = res.error;
         } catch {
-          failure = "FORGE didn't answer.";
+          failure = "FORGE didn't answer, so the last part may already be saved.";
         }
         if (failure) {
           setSending({ ...run, next: i });
-          // Sending a part again never adds anyone twice: people already written are duplicates now.
+          // A part sent again adds nobody twice, and one that was saved answers with what it did.
           return setError(`${i > 0 ? `Imported so far: ${counts(run)}. ` : ""}${failure} Press Import to send the rest.`);
         }
       }
@@ -224,9 +226,9 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
       {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
       {preview ? (
         <>
-          {preview.truncated ? (
+          {preview.stoppedAt !== null ? (
             <p className="font-mono text-[10px] text-amber-200">
-              This file has more than {IMPORT_LIMITS.maxRows} contacts: the first {IMPORT_LIMITS.maxRows} are shown and will be imported. Import the rest as a separate file.
+              This file holds more than {IMPORT_LIMITS.maxRows} contacts; one import takes {IMPORT_LIMITS.maxRows}. Reading stopped at {preview.format === "vcard" ? "card" : "line"} {preview.stoppedAt}: import from there on as a separate file{preview.format === "vcard" ? "" : " (with the header row)"}.
             </p>
           ) : null}
           {preview.unmappedHeaders.length > 0 ? (

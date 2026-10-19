@@ -14,6 +14,7 @@ import {
   mergeDraftedItems,
   nextGoldWindow,
   GOLD_MAX_TEXT_CHARS,
+  goldTextRefusal,
   GOLD_WINDOW_CHARS,
 } from "@/lib/gold-set-logic";
 
@@ -132,5 +133,12 @@ describe("BL-AIX Phase 1e-2 — drafting windows and merging", () => {
       ["eval_factor", "Past performance", 3],
     ]);
     expect(items.find((i) => i.kind === "page_limit")?.value).toBe("25 pages");
+  });
+
+  it("BL-STAB-2f — refuses text past the document's limit by saying how much fits, never 'split it'", () => {
+    expect(goldTextRefusal(GOLD_MAX_TEXT_CHARS)).toBeNull();
+    expect(goldTextRefusal(2_500_000)).toBe("This is 2,500,000 characters; a gold-set document holds 2,000,000 in all. Keep only the parts the review needs.");
+    expect(goldTextRefusal(600_000, 500_000)).toMatch(/\(500,000 more fit in this one\)/);
+    expect(goldTextRefusal(50, 0)).toBe("This document is full: a gold-set document holds 2,000,000 characters in all.");
   });
 });

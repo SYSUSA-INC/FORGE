@@ -23,6 +23,7 @@ import {
   GOLD_MAX_FILE_BYTES,
   GOLD_MAX_FILES,
   GOLD_MAX_TEXT_CHARS,
+  goldTextRefusal,
   goldProgress,
   joinGoldFiles,
   type GoldItemStatus,
@@ -180,11 +181,11 @@ export async function appendGoldDocText(input: { docId: string; name: string; te
   const name = input.name.trim().slice(0, 200) || "Pasted attachment";
   const text = input.text.trim();
   if (text.length < 50) return { ok: false, error: "Paste the attachment's text." };
-  const rawText = `${got.doc.rawText}\n\n===== ${name} =====\n${text}`;
+  const header = `\n\n===== ${name} =====\n`;
   // BL-STAB-2f — refused, not cut: the end of the text was dropped without a word.
-  if (rawText.length > GOLD_MAX_TEXT_CHARS) {
-    return { ok: false, error: `This would take the document past ${GOLD_MAX_TEXT_CHARS.toLocaleString("en-US")} characters; add only the part the review needs.` };
-  }
+  const refusal = goldTextRefusal(text.length, GOLD_MAX_TEXT_CHARS - got.doc.rawText.length - header.length);
+  if (refusal) return { ok: false, error: refusal };
+  const rawText = `${got.doc.rawText}${header}${text}`;
   await db
     .update(extractionGoldDocs)
     .set({

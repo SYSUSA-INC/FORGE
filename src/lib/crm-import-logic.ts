@@ -38,9 +38,19 @@ export type ParsedImport = {
   rows: ImportRow[];
   skipped: ImportSkip[];
   unmappedHeaders: string[];
-  /** The file holds more contacts than one import takes: only the first `maxRows` were read. */
-  truncated: boolean;
+  /**
+   * The file holds more contacts than one import takes: the CSV line (or
+   * vCard card) of the first contact not read, where a second import
+   * starts. Null when every contact was read.
+   */
+  stoppedAt: number | null;
 };
+
+/** A contacts file's text: UTF-8, or UTF-16 when it starts with that byte-order mark (some address-book exports do). */
+export function decodeImportFile(bytes: Uint8Array): string {
+  const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le" : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : "utf-8";
+  return new TextDecoder(encoding).decode(bytes);
+}
 
 export function detectImportFormat(text: string, fileName = ""): ImportFormat {
   if (/\.vcf$/i.test(fileName) || /^\s*BEGIN:VCARD/im.test(text)) return "vcard";
@@ -197,7 +207,7 @@ export function sanitizeImportRow(row: Partial<ImportRow> & { line?: number }): 
 export function parseContactsCsv(text: string): ParsedImport {
   const table = csvRows(text);
   const header = table.next();
-  if (header.done) return { format: "csv", rows: [], skipped: [], unmappedHeaders: [], truncated: false };
+  if (header.done) return { format: "csv", rows: [], skipped: [], unmappedHeaders: [], stoppedAt: null };
   const { map, unmapped } = mapCsvHeaders(header.value);
   if (map.name === undefined || map.agency === undefined) {
     return {
@@ -205,25 +215,35 @@ export function parseContactsCsv(text: string): ParsedImport {
       rows: [],
       skipped: [{ line: 1, reason: `The header row needs a name column and an agency column (found: ${header.value.filter((h) => h.trim()).join(", ") || "none"}).` }],
       unmappedHeaders: unmapped,
-      truncated: false,
+      stoppedAt: null,
     };
   }
   const rows: ImportRow[] = [];
   const skipped: ImportSkip[] = [];
+  const earlier = personSeen();
   let line = 1;
-  let truncated = false;
+  let stoppedAt: number | null = null;
   for (const cells of table) {
     line += 1;
-    if (rows.length >= IMPORT_LIMITS.maxRows) {
-      truncated = true;
-      break;
-    }
     const get = (f: Field) => (map[f] === undefined ? "" : (cells[map[f]!] ?? ""));
     const built = buildRow(line, { name: get("name"), agency: get("agency"), office: get("office"), title: get("title"), role: get("role"), email: get("email"), phone: get("phone"), notes: get("notes"), nextTouchAt: get("nextTouchAt") });
-    if ("reason" in built) skipped.push(built);
-    else rows.push(built);
+    if ("reason" in built) {
+      skipped.push(built);
+      continue;
+    }
+    const again = earlier(built);
+    if (again) {
+      skipped.push(again);
+      continue;
+    }
+    // One import's worth of people read: the rest of the file isn't parsed.
+    if (rows.length >= IMPORT_LIMITS.maxRows) {
+      stoppedAt = line;
+      break;
+    }
+    rows.push(built);
   }
-  return { format: "csv", rows, skipped, unmappedHeaders: unmapped, truncated };
+  return { format: "csv", rows, skipped, unmappedHeaders: unmapped, stoppedAt };
 }
 
 const unescapeVcard = (v: string) => v.replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1").trim();
@@ -234,12 +254,10 @@ export function parseVcards(text: string): ParsedImport {
   const cards = unfolded.split(/^BEGIN:VCARD[^\n]*\n/im).slice(1);
   const rows: ImportRow[] = [];
   const skipped: ImportSkip[] = [];
-  let truncated = false;
+  const earlier = personSeen();
+  let stoppedAt: number | null = null;
   cards.forEach((card, idx) => {
-    if (rows.length >= IMPORT_LIMITS.maxRows) {
-      truncated = true;
-      return;
-    }
+    if (stoppedAt !== null) return;
     const props = new Map<string, string[]>();
     for (const line of card.split("\n")) {
       if (!line.trim() || /^END:VCARD/i.test(line)) continue;
@@ -262,10 +280,13 @@ export function parseVcards(text: string): ParsedImport {
       notes: (props.get("NOTE") ?? []).join("\n"),
       nextTouchAt: "",
     });
-    if ("reason" in built) skipped.push({ line: idx + 1, reason: `Card ${idx + 1}: ${built.reason}` });
+    if ("reason" in built) return void skipped.push({ line: idx + 1, reason: `Card ${idx + 1}: ${built.reason}` });
+    const again = earlier(built);
+    if (again) return void skipped.push(again);
+    if (rows.length >= IMPORT_LIMITS.maxRows) stoppedAt = idx + 1;
     else rows.push(built);
   });
-  return { format: "vcard", rows, skipped, unmappedHeaders: [], truncated };
+  return { format: "vcard", rows, skipped, unmappedHeaders: [], stoppedAt };
 }
 
 export function parseImport(text: string, fileName = ""): ParsedImport {
@@ -297,21 +318,28 @@ export function detectDuplicates(rows: readonly ImportPerson[], existing: readon
   return out;
 }
 
-/** The same person twice in one file (same email, or same agency and name): the first row wins. */
-export function dedupeWithinImport(rows: readonly ImportRow[]): { rows: ImportRow[]; dropped: ImportSkip[] } {
+/** A check for the same person twice in one file (same email, or same agency and name): the first wins, later ones are skips. */
+function personSeen(): (r: ImportRow) => ImportSkip | null {
   const seenEmail = new Set<string>();
   const seenName = new Set<string>();
+  return (r) => {
+    const k = rowKeys(r);
+    if ((k.email && seenEmail.has(k.email)) || seenName.has(k.name)) return { line: r.line, reason: `${r.name} appears earlier in the file.` };
+    if (k.email) seenEmail.add(k.email);
+    seenName.add(k.name);
+    return null;
+  };
+}
+
+/** The same person twice in one file (same email, or same agency and name): the first row wins. */
+export function dedupeWithinImport(rows: readonly ImportRow[]): { rows: ImportRow[]; dropped: ImportSkip[] } {
+  const earlier = personSeen();
   const kept: ImportRow[] = [];
   const dropped: ImportSkip[] = [];
   for (const r of rows) {
-    const k = rowKeys(r);
-    if ((k.email && seenEmail.has(k.email)) || seenName.has(k.name)) {
-      dropped.push({ line: r.line, reason: `${r.name} appears earlier in the file.` });
-      continue;
-    }
-    if (k.email) seenEmail.add(k.email);
-    seenName.add(k.name);
-    kept.push(r);
+    const again = earlier(r);
+    if (again) dropped.push(again);
+    else kept.push(r);
   }
   return { rows: kept, dropped };
 }

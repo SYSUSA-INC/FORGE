@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   IMPORT_LIMITS,
+  decodeImportFile,
   dedupeWithinImport,
   detectDuplicates,
   detectImportFormat,
@@ -151,20 +152,47 @@ describe("crm import logic", () => {
     expect(IMPORT_LIMITS.maxRows).toBe(500);
   });
 
-  it("BL-STAB-2f — says when a file holds more than one import takes, and stops reading there", () => {
+  it("BL-STAB-2f — says where reading stopped when a file holds more people than one import takes", () => {
     const line = (i: number) => `Person ${i},Army,,,p${i}@army.mil`;
     const exact = ["Name,Agency,Office,Title,Email", ...Array.from({ length: 500 }, (_, i) => line(i))].join("\n");
-    expect(parseContactsCsv(exact)).toMatchObject({ truncated: false });
+    expect(parseContactsCsv(exact)).toMatchObject({ stoppedAt: null });
     expect(parseContactsCsv(exact).rows).toHaveLength(500);
-    // A broken quote after the cut would swallow the rest of the file: it is never reached.
+    // A trailing line that isn't a contact (an export footer) leaves nothing unread.
+    expect(parseContactsCsv(`${exact}\nExported by Outlook\n,,HQ`)).toMatchObject({ stoppedAt: null, skipped: [{ line: 502 }, { line: 503 }] });
+    // The 501st person is where the next import starts; a broken quote after it is never reached.
     const over = `${exact}\n${line(500)}\n"unterminated,Army\n${"x,y\n".repeat(1_000)}`;
     const parsed = parseContactsCsv(over);
-    expect(parsed.truncated).toBe(true);
+    expect(parsed.stoppedAt).toBe(502);
     expect(parsed.rows).toHaveLength(500);
     expect(parsed.rows.at(-1)!.line).toBe(501);
-    const cards = Array.from({ length: 501 }, (_, i) => `BEGIN:VCARD\nFN:Person ${i}\nORG:Army\nEND:VCARD`).join("\n");
-    expect(parseVcards(cards)).toMatchObject({ truncated: true });
+    // People listed twice count once: 480 people over 520 lines are all read.
+    const repeats = ["Name,Agency,Office,Title,Email", ...Array.from({ length: 480 }, (_, i) => line(i)), ...Array.from({ length: 40 }, (_, i) => line(i))].join("\n");
+    expect(parseContactsCsv(repeats)).toMatchObject({ stoppedAt: null });
+    expect(parseContactsCsv(repeats).rows).toHaveLength(480);
+    expect(parseContactsCsv(repeats).skipped).toHaveLength(40);
+    const card = (i: number, org = "Army") => `BEGIN:VCARD\nFN:Person ${i}\nORG:${org}\nEND:VCARD`;
+    const cards = Array.from({ length: 501 }, (_, i) => card(i)).join("\n");
+    expect(parseVcards(cards)).toMatchObject({ stoppedAt: 501 });
     expect(parseVcards(cards).rows).toHaveLength(500);
+    expect(parseVcards(`${Array.from({ length: 500 }, (_, i) => card(i)).join("\n")}\n${card(500, "")}`)).toMatchObject({ stoppedAt: null });
+  });
+
+  it("BL-STAB-2f — reads a UTF-16 export (with its byte-order mark) as well as UTF-8", () => {
+    const text = "Name,Agency\nAna Rivera,Navy\n";
+    const utf16 = (bigEndian: boolean) => {
+      const out = new Uint8Array(2 + text.length * 2);
+      out.set(bigEndian ? [0xfe, 0xff] : [0xff, 0xfe]);
+      for (let i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        out[2 + i * 2] = bigEndian ? c >> 8 : c & 0xff;
+        out[3 + i * 2] = bigEndian ? c & 0xff : c >> 8;
+      }
+      return out;
+    };
+    expect(decodeImportFile(utf16(false))).toBe(text);
+    expect(decodeImportFile(utf16(true))).toBe(text);
+    expect(decodeImportFile(new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(text)]))).toBe(text);
+    expect(parseContactsCsv(decodeImportFile(utf16(false))).rows.map((r) => r.name)).toEqual(["Ana Rivera"]);
   });
 
   it("BL-STAB-2f — strips control characters Postgres would refuse, keeping line breaks in notes", () => {

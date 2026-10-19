@@ -89,7 +89,8 @@ describe("BL-AIX Phase 1e — extraction gold set (runtime)", () => {
 
     // BL-STAB-2f — text that would pass the limit is refused, not cut off unseen.
     const tooMuch = await appendGoldDocText({ docId: id, name: "Huge", text: "y".repeat(GOLD_MAX_TEXT_CHARS) });
-    expect(tooMuch).toMatchObject({ ok: false, error: expect.stringMatching(/past 2,000,000 characters/) });
+    // The limit is the document's, so the answer says how much still fits rather than "split it".
+    expect(tooMuch).toMatchObject({ ok: false, error: expect.stringMatching(/a gold-set document holds 2,000,000 in all \([\d,]+ more fit in this one\)/) });
     expect((await getGoldDoc(id))?.doc.rawText).not.toContain("===== Huge =====");
   });
 

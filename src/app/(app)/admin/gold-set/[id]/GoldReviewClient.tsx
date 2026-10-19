@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { pasteRefusal } from "@/lib/action-body";
-import { GOLD_KIND_LABEL, GOLD_KINDS, GOLD_MAX_TEXT_CHARS, type GoldKind, type TextHit } from "@/lib/gold-set-logic";
+import { GOLD_KIND_LABEL, GOLD_KINDS, goldTextRefusal, type GoldKind, type TextHit } from "@/lib/gold-set-logic";
 import {
   addGoldItemAction,
   appendGoldDocTextAction,
@@ -153,7 +153,7 @@ export function GoldReviewClient({
               className="aur-btn aur-btn-ghost text-[11px]"
               disabled={pending}
               onClick={() => {
-                const refusal = pasteRefusal(paste.text, GOLD_MAX_TEXT_CHARS, "Add it in parts.");
+                const refusal = goldTextRefusal(paste.text.length) ?? pasteRefusal(paste.text, Number.POSITIVE_INFINITY, "Add it in parts.");
                 if (refusal) return setError(refusal);
                 run(() => appendGoldDocTextAction({ docId, ...paste }), () => setPaste({ name: "", text: "" }));
               }}

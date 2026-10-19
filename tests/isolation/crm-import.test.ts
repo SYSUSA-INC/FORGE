@@ -132,6 +132,19 @@ describe("BL-FB-X-CRM Slice 3 — import and history cache", () => {
     expect(parts.map((m) => m.part ?? null).sort()).toEqual([2, 3, null, null]);
     for (const m of parts.filter((p) => p.part === undefined)) expect(m).not.toHaveProperty("importId");
 
+    // A part sent again (its answer was lost) answers with what it did and writes nothing.
+    const resendId = crypto.randomUUID();
+    const part = [{ name: "Ivy Jones", agency: "Army" }, { name: "Jo King", agency: "Army" }];
+    const first = await commitContactImport({ organizationId: fx.orgA.organizationId, rows: part, duplicates: "skip", actor: actorA, batch: { id: resendId, part: 1, parts: 1 } });
+    expect(first).toEqual({ ok: true, created: 2, updated: 0, skipped: 0 });
+    const contactsAfter = (await listContacts({ organizationId: fx.orgA.organizationId })).length;
+    expect(await commitContactImport({ organizationId: fx.orgA.organizationId, rows: part, duplicates: "update", actor: actorA, batch: { id: resendId, part: 1, parts: 1 } })).toEqual(first);
+    expect(await listContacts({ organizationId: fx.orgA.organizationId })).toHaveLength(contactsAfter);
+    const resendAudits = (await db.select({ metadata: auditLogs.metadata }).from(auditLogs).where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "crm.contact.import")))).filter((a) => (a.metadata as Record<string, unknown>).importId === resendId);
+    expect(resendAudits).toHaveLength(1);
+    // Another organization's import with the same id and part is its own.
+    expect(await commitContactImport({ organizationId: fx.orgB.organizationId, rows: part.slice(0, 1), duplicates: "skip", actor: { userId: fx.orgB.userId }, batch: { id: resendId, part: 1, parts: 1 } })).toEqual({ ok: true, created: 1, updated: 0, skipped: 0 });
+
     // At most one import's worth of people is checked per call.
     const many = Array.from({ length: 600 }, (_, i) => ({ name: `P ${i}`, agency: "Army", email: "" }));
     const check = await findImportDuplicates({ organizationId: fx.orgA.organizationId, people: many });
