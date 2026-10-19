@@ -14,7 +14,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { stripExt } from "@/lib/solicitation-parse";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
-import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseStoredFiles } from "@/lib/uploads";
+import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseOrphanedClaims, releaseStoredFiles } from "@/lib/uploads";
 import { log } from "@/lib/log";
 
 export type UploadResult =
@@ -222,6 +222,9 @@ export async function deleteSolicitationAction(
     [...ownFiles, ...documentFiles].map((f) => f.storagePath),
     "deleted",
   );
+  // Anything filed into the tree after the look above went with it too.
+  await releaseOrphanedClaims(organizationId, "solicitation");
+  await releaseOrphanedClaims(organizationId, "solicitation_document");
 
   await recordAudit({
     organizationId,

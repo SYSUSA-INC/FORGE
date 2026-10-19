@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, fileUploads } from "@/db/schema";
+import { auditLogs, fileUploads, solicitations } from "@/db/schema";
 import { getStorageProvider } from "@/lib/storage";
 import {
   cancelUpload,
@@ -130,6 +130,8 @@ describe("BL-STAB-2b — upload ledger (runtime)", () => {
     const again = await claimUpload({ organizationId: fx.orgA.organizationId, userId: fx.orgA.userId, uploadId, resourceType: "solicitation" });
     expect(again).toMatchObject({ ok: true, rerun: true, claim: { resourceId: first.claim.resourceId } });
 
+    // The record is saved, then the claim finished (a kept file no record holds would be released).
+    await db.insert(solicitations).values({ id: first.claim.resourceId, organizationId: fx.orgA.organizationId, title: "RFP", storagePath: first.claim.storageKey, parseStatus: "uploaded" });
     await finishClaim({ organizationId: fx.orgA.organizationId, uploadId });
     const [row] = await db.select().from(fileUploads).where(and(eq(fileUploads.organizationId, fx.orgA.organizationId), eq(fileUploads.id, uploadId)));
     expect(row).toMatchObject({ status: "claimed", purgeAfter: null, resourceType: "solicitation" });

@@ -289,6 +289,7 @@ describe("BL-STAB-2d — upload sweeper (runtime)", () => {
     await set(chat, { purgeAfter: ago(MINUTE) });
     // A file a record keeps, even with a deletion date it should never have.
     const filed = await claiming();
+    await db.insert(solicitations).values({ id: filed.resourceId, organizationId: filed.organizationId, title: "RFP", storagePath: filed.key, parseStatus: "uploaded" });
     await finishClaim({ organizationId: filed.organizationId, uploadId: filed.id });
     expect((await row(filed))!.purgeAfter).toBeNull();
     await set(filed, { purgeAfter: ago(MINUTE) });

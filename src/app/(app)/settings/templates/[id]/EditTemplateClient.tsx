@@ -428,7 +428,7 @@ export function EditTemplateClient({
                   key={k}
                   type="button"
                   onClick={() => switchKind(k)}
-                  disabled={uploading || k === kind}
+                  disabled={uploading || queue.busy || k === kind}
                   className={`rounded-full px-2.5 py-0.5 font-mono uppercase tracking-widest transition-colors disabled:opacity-100 ${
                     kind === k
                       ? "bg-teal-400/15 text-teal"

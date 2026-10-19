@@ -531,7 +531,26 @@ export async function finishClaim(i: { organizationId: string; uploadId: string;
     .set({ status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() })
     .where(and(eq(fileUploads.organizationId, i.organizationId), heldClaim(i)))
     .returning();
-  if (row && UPLOAD_POLICIES[row.purpose].transient) await deleteObject(row.organizationId, row.storageKey);
+  if (!row) return;
+  if (UPLOAD_POLICIES[row.purpose].transient) await deleteObject(row.organizationId, row.storageKey);
+  else await releaseIfUnheld(row);
+}
+
+/**
+ * BL-STAB-2f — a kept upload just marked `claimed` whose record no longer
+ * holds it (the record was deleted, cleared or replaced while the filing
+ * was finishing: its own release skipped the row mid-claim) is released
+ * now, so it is deleted rather than kept for good. Either order of the two
+ * requests ends with the file released.
+ */
+async function releaseIfUnheld(row: Pick<FileUpload, "id" | "organizationId" | "resourceType" | "resourceId" | "storageKey">): Promise<boolean> {
+  if (!row.resourceId || (await recordHoldsUpload(row))) return false;
+  const released = await db
+    .update(fileUploads)
+    .set({ status: "released", failureReason: "deleted", purgeAfter: new Date(), updatedAt: new Date() })
+    .where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), eq(fileUploads.status, "claimed")))
+    .returning({ id: fileUploads.id });
+  return released.length > 0;
 }
 
 /**
@@ -696,6 +715,72 @@ export async function releaseStoredFile(i: { organizationId: string; storagePath
       error: new Error(`release failed (${err instanceof Error ? err.name : "error"})`),
     });
     return "skipped";
+  }
+}
+
+/**
+ * BL-STAB-2f — after a delete: release every kept upload of this kind
+ * whose record no longer exists in this organization. It catches what a
+ * delete's own list missed (an amendment or document filed between the
+ * delete's look and the delete itself) and files left behind by deletes
+ * made before files were released.
+ */
+export async function releaseOrphanedClaims(
+  organizationId: string,
+  resourceType: "solicitation" | "solicitation_document" | "knowledge_artifact",
+): Promise<number> {
+  const record =
+    resourceType === "solicitation"
+      ? sql`select 1 from ${solicitations} where ${solicitations.organizationId} = ${organizationId} and ${solicitations.id} = ${fileUploads.resourceId}`
+      : resourceType === "solicitation_document"
+        ? sql`select 1 from ${solicitationDocuments} where ${solicitationDocuments.organizationId} = ${organizationId} and ${solicitationDocuments.id} = ${fileUploads.resourceId}`
+        : sql`select 1 from ${knowledgeArtifacts} where ${knowledgeArtifacts.organizationId} = ${organizationId} and ${knowledgeArtifacts.id} = ${fileUploads.resourceId}`;
+  try {
+    const released = await db
+      .update(fileUploads)
+      .set({ status: "released", failureReason: "deleted", purgeAfter: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(fileUploads.organizationId, organizationId),
+          eq(fileUploads.resourceType, resourceType),
+          eq(fileUploads.status, "claimed"),
+          isNotNull(fileUploads.resourceId),
+          sql`not exists (${record})`,
+        ),
+      )
+      .returning({ id: fileUploads.id });
+    return released.length;
+  } catch (err) {
+    log.error("[uploads]", "could not release uploads whose records are gone", { organizationId, resourceType, error: err });
+    return 0;
+  }
+}
+
+/**
+ * BL-STAB-2f — release every file filed for this template that it no
+ * longer holds: what a replace or clear just superseded, and anything an
+ * earlier attempt that died left behind. A file mid-claim is untouched.
+ */
+export async function releaseSupersededTemplateFiles(organizationId: string, templateId: string): Promise<number> {
+  const holds = sql`coalesce((select ${proposalTemplates.docxStoragePath} from ${proposalTemplates} where ${proposalTemplates.organizationId} = ${organizationId} and ${proposalTemplates.id} = ${templateId}), '')`;
+  try {
+    const released = await db
+      .update(fileUploads)
+      .set({ status: "released", failureReason: "replaced", purgeAfter: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(fileUploads.organizationId, organizationId),
+          eq(fileUploads.resourceType, "proposal_template"),
+          eq(fileUploads.resourceId, templateId),
+          eq(fileUploads.status, "claimed"),
+          sql`${fileUploads.storageKey} <> ${holds}`,
+        ),
+      )
+      .returning({ id: fileUploads.id });
+    return released.length;
+  } catch (err) {
+    log.error("[uploads]", "could not release a template's superseded files", { organizationId, error: err });
+    return 0;
   }
 }
 
@@ -947,7 +1032,10 @@ export async function sweepUploads(
         .set({ status: "claimed", purgeAfter: claimedPurgeAfter, updatedAt: new Date() })
         .where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), eq(fileUploads.status, from), lte(fileUploads.purgeAfter, now)))
         .returning({ id: fileUploads.id });
-      if (moved) out.promoted += 1;
+      if (moved) {
+        out.promoted += 1;
+        await releaseIfUnheld(row);
+      }
     }
     for (const [organizationId, ids] of byOrganization(unfiled)) {
       const failed = await db
@@ -1007,6 +1095,8 @@ export async function sweepUploads(
       )
       .returning({ id: fileUploads.id });
     if (moved.length > 0) out[held ? "promoted" : "abandoned"] += 1;
+    // Its record may have been deleted between the check and the promotion.
+    if (moved.length > 0 && held) await releaseIfUnheld(row);
   }
 
   // 4. Delete what is due.

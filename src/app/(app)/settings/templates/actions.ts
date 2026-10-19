@@ -12,7 +12,7 @@ import {
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { scanDocxForVariables } from "@/lib/docx-template";
-import { claimUpload, failClaim, finishClaim, getVerifiedObject, releaseClaim, releaseStoredFile } from "@/lib/uploads";
+import { claimUpload, failClaim, finishClaim, getVerifiedObject, releaseClaim, releaseStoredFile, releaseSupersededTemplateFiles } from "@/lib/uploads";
 import { STARTER_TEMPLATES } from "@/lib/template-types";
 import { templateAuthoringRefusal } from "@/lib/template-gate";
 import { log } from "@/lib/log";
@@ -484,9 +484,20 @@ export async function attachTemplateDocxFromUploadAction(
       )
       .returning({ id: proposalTemplates.id });
   } catch (err) {
-    log.error("[attachTemplateDocxFromUploadAction]", "template update failed", { error: err });
-    await releaseClaim(held);
-    return { ok: false, error: "Could not save the template; try again." };
+    // The update may have landed with only its answer lost: then it is saved.
+    const [now] = await db
+      .select({ docxStoragePath: proposalTemplates.docxStoragePath })
+      .from(proposalTemplates)
+      .where(and(eq(proposalTemplates.id, templateId), eq(proposalTemplates.organizationId, organizationId)))
+      .limit(1)
+      .catch(() => []);
+    if (now?.docxStoragePath !== file.storageKey) {
+      log.error("[attachTemplateDocxFromUploadAction]", "template update failed", { error: err });
+      await releaseClaim(held);
+      return { ok: false, error: "Could not save the template; try again." };
+    }
+    log.warn("[attachTemplateDocxFromUploadAction]", "template update reported an error after it landed", { error: err });
+    updated = [{ id: templateId }];
   }
   if (updated.length === 0) {
     // Another change to the file landed first (a second tab): this upload stays ready to try again.
@@ -495,6 +506,8 @@ export async function attachTemplateDocxFromUploadAction(
   }
   // Released before the claim is finished: a filing that dies in between is finished by the sweep, which never sees the old file.
   const replaced = previous && previous !== file.storageKey ? await releaseStoredFile({ organizationId, storagePath: previous, reason: "replaced" }) : "skipped";
+  // And anything an earlier attempt that died left filed on this template.
+  await releaseSupersededTemplateFiles(organizationId, templateId);
   await finishClaim(held);
 
   await recordAudit({
@@ -558,6 +571,7 @@ export async function clearTemplateDocxAction(
     .returning({ id: proposalTemplates.id });
   if (cleared.length === 0) return { ok: false, error: "The template's file changed meanwhile. Reload the page and try again." };
   const file = tpl.docxStoragePath ? await releaseStoredFile({ organizationId, storagePath: tpl.docxStoragePath, reason: "deleted" }) : "skipped";
+  await releaseSupersededTemplateFiles(organizationId, id);
   await recordAudit({
     organizationId,
     actor: { userId: actor.id, email: actor.email },
