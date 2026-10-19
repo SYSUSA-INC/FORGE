@@ -45,6 +45,7 @@ import { recordChangeDecisionsAction } from "./change-decision-actions";
 import { SectionPresence } from "./SectionPresence";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
 import { THEME } from "@/lib/theme-colors";
+import type { ChatReadBudgets } from "@/lib/chat-attachments-logic";
 
 type Section = {
   id: string;
@@ -218,6 +219,7 @@ export function SectionsClient({
   initialMessageId = null,
   voiceAuthorIds = [],
   houseStyle = false,
+  chatReadBudgets,
 }: {
   proposalId: string;
   sections: Section[];
@@ -232,6 +234,8 @@ export function SectionsClient({
   voiceAuthorIds?: string[];
   /** BL-FB-GEN-VOICE Slice 2 — whether the organization has a house style. */
   houseStyle?: boolean;
+  /** BL-STAB-2f — what the chat reads of each attachment format, from the server's settings. */
+  chatReadBudgets?: ChatReadBudgets;
 }) {
   const [expanded, setExpanded] = useState<string | null>(
     (initialSectionId && sections.some((s) => s.id === initialSectionId) ? initialSectionId : null) ?? sections[0]?.id ?? null,
@@ -255,6 +259,7 @@ export function SectionsClient({
             initialMessageId={s.id === initialSectionId ? initialMessageId : null}
             voiceOn={!!s.authorUserId && voiceAuthorIds.includes(s.authorUserId)}
             houseStyle={houseStyle}
+            chatReadBudgets={chatReadBudgets}
           />
         ))}
       </ul>
@@ -343,6 +348,7 @@ function SectionRow({
   initialMessageId = null,
   voiceOn = false,
   houseStyle = false,
+  chatReadBudgets,
 }: {
   proposalId: string;
   section: Section;
@@ -357,6 +363,7 @@ function SectionRow({
   /** BL-FB-GEN-VOICE Slice 2 — the section's author has an enabled voice profile. */
   voiceOn?: boolean;
   houseStyle?: boolean;
+  chatReadBudgets?: ChatReadBudgets;
 }) {
   // BL-9 Slice 2b — collab config (undefined when feature flag is off).
   // Memoized via inline call: the inputs (section.id, currentUser) are
@@ -872,6 +879,7 @@ function SectionRow({
                   initialTab={initialChatOpen ? "chat" : undefined}
                   initialMessageId={initialMessageId}
                   onRead={markChatRead}
+                  readBudgets={chatReadBudgets}
                 />
                 {!sideBySide ? helperPanels : null}
               </div>

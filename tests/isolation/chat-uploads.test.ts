@@ -33,6 +33,18 @@ vi.mock("@/lib/auth-helpers", () => ({
   requireCurrentOrg: async () => ({ user: sessionUserStub, organizationId: sessionUserStub.organizationId, isImpersonating: false }),
   getSessionUser: async () => sessionUserStub,
 }));
+// A failure after the attachment row is written (a dropped connection), when switched on.
+const fault = vi.hoisted(() => ({ afterInsert: false }));
+vi.mock("@/lib/audit-log", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/audit-log")>();
+  return {
+    ...real,
+    recordAudit: async (...args: Parameters<typeof real.recordAudit>) => {
+      if (fault.afterInsert && args[0].action === "section_chat.attach") throw new Error("connection reset");
+      return real.recordAudit(...args);
+    },
+  };
+});
 
 import { attachChatDocumentAction } from "@/app/(app)/proposals/[id]/sections/ai/chat-actions";
 
@@ -57,6 +69,7 @@ describe("BL-STAB-2f — chat attachments from direct uploads (runtime)", () => 
     sectionB = b!.id;
   });
   afterEach(async () => {
+    fault.afterInsert = false;
     vi.restoreAllMocks();
     delete process.env.UPLOAD_PARSE_SCALE;
     await plans?.();
@@ -202,6 +215,25 @@ describe("BL-STAB-2f — chat attachments from direct uploads (runtime)", () => 
     expect(await ledger(uploadId)).toMatchObject({ status: "stored" });
     const res = await attachChatDocumentAction({ sectionId: sectionA, uploadId });
     expect(res.ok).toBe(true);
+  });
+
+  it("a save that landed is reported as saved, whatever failed after it", async () => {
+    const { uploadId, key } = await storedUpload();
+    fault.afterInsert = true;
+    const res = await attachChatDocumentAction({ sectionId: sectionA, uploadId });
+    if (!res.ok) throw new Error(res.error);
+    expect(await rowsIn(sectionA)).toHaveLength(1);
+    // Finished, not put back for a second attachment.
+    expect(await ledger(uploadId)).toMatchObject({ status: "claimed", resourceId: res.attachment.id });
+    expect(await getStorageProvider().head(key)).toBeNull();
+  });
+
+  it("an upload another request is still reading is reported as busy, to be asked again", async () => {
+    const { uploadId } = await storedUpload();
+    const claim = await claimUpload({ organizationId: org(), userId: fx.orgA.userId, uploadId, resourceType: "section_chat_attachment" });
+    if (!claim.ok || !("claim" in claim)) throw new Error("claim failed");
+    expect(await attachChatDocumentAction({ sectionId: sectionA, uploadId })).toEqual({ ok: false, error: "This file is already being saved.", busy: true });
+    expect(await ledger(uploadId)).toMatchObject({ status: "claiming" });
   });
 
   it("an attempt that died after saving is finished by the retry without a second row", async () => {

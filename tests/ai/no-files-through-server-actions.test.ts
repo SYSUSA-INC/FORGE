@@ -5,10 +5,13 @@
  * (src/lib/upload-client.ts) and actions file them by upload id
  * (src/lib/uploads.ts). Two route handlers read a request body as a
  * file on purpose, each held under Vercel's cap; they are listed here
- * with the reason, and a new one fails this test until it is.
+ * with the reason, and a new one fails this test until it is. What this
+ * can't see (an action that hands a form entry to a helper unlooked-at)
+ * is left to review: see AGENTS.md.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { DICTATION_LIMITS } from "@/lib/dictation";
 import { PROXY_MAX_BYTES_ON_VERCEL } from "@/lib/upload-policy";
@@ -25,21 +28,25 @@ function sourceFiles(dir: string): string[] {
 
 const rel = (file: string) => path.relative(ROOT, file).split(path.sep).join("/");
 
-function withoutComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+const printer = ts.createPrinter({ removeComments: true });
+
+/** The code without its comments, parsed (a "/*" inside a string can't hide anything). */
+function withoutComments(src: string, fileName = "file.tsx"): string {
+  return printer.printFile(ts.createSourceFile(fileName, src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX));
 }
 
 const USE_SERVER = /^\s*["']use server["'];?\s*$/m;
 
 const FILE_SHAPES: [RegExp, string][] = [
   [/\binstanceof\s+(File|Blob)\b/, "checks for a File or Blob"],
-  [/:\s*(File|Blob)\b|\b(File|Blob)\[\]|<(File|Blob)>/, "takes a File or Blob"],
-  [/\.(arrayBuffer|stream|blob)\(\)/, "reads bytes from a body"],
+  // A parameter, cast, union, list or generic of File / Blob.
+  [/(?::|\bas\b|\||<|,)\s*(?:File|Blob)\b|\b(?:File|Blob)\s*(?:\||\[\]|>)/, "takes a File or Blob"],
+  [/\.(arrayBuffer|stream|blob|bytes)\(\)/, "reads bytes from a body"],
 ];
 
 /** What in a server-action file looks like a file coming through it. */
-function fileShapes(src: string): string[] {
-  const code = withoutComments(src);
+function fileShapes(src: string, fileName?: string): string[] {
+  const code = withoutComments(src, fileName);
   if (!USE_SERVER.test(code)) return [];
   return FILE_SHAPES.filter(([re]) => re.test(code)).map(([, what]) => what);
 }
@@ -56,7 +63,7 @@ describe("BL-STAB-2f — files go to storage, not through server actions", () =>
 
   it("no server action takes a file", () => {
     const found = files
-      .map((f) => ({ file: rel(f), shapes: fileShapes(readFileSync(f, "utf8")) }))
+      .map((f) => ({ file: rel(f), shapes: fileShapes(readFileSync(f, "utf8"), f) }))
       .filter((r) => r.shapes.length > 0);
     // Upload with uploadFile() and pass the upload id; see docs/ADMIN_MANUAL.md (Uploads).
     expect(found).toEqual([]);
@@ -71,13 +78,21 @@ export async function attachChatDocumentAction(formData: FormData) {
 }`;
     expect(fileShapes(before)).toEqual(["checks for a File or Blob", "reads bytes from a body"]);
     expect(fileShapes(`"use server";\nexport async function upload(files: File[]) {}`)).toEqual(["takes a File or Blob"]);
+    // The usual way to read a form's file, and the other ways to type one.
+    expect(fileShapes(`"use server";\nexport async function a(fd: FormData) { const f = fd.get("file") as File; return f.name; }`)).toEqual(["takes a File or Blob"]);
+    expect(fileShapes(`"use server";\nexport async function a(i: { file: string | File }) {}`)).toEqual(["takes a File or Blob"]);
+    expect(fileShapes(`"use server";\nexport async function a(f: null | Blob) {}`)).toEqual(["takes a File or Blob"]);
+    expect(fileShapes(`"use server";\nexport async function a(fs: Array<File>) {}`)).toEqual(["takes a File or Blob"]);
+    // A comment opener inside a string doesn't hide the code after it.
+    expect(fileShapes(`"use server";\nconst ACCEPT = "image/*";\nexport async function a(f: File) {}\n/** done */`)).toEqual(["takes a File or Blob"]);
     // A form of text fields is fine, and so is a client file.
     expect(fileShapes(`"use server";\nexport async function save(form: FormData) { return String(form.get("note") ?? ""); }`)).toEqual([]);
     expect(fileShapes(`"use client";\nexport function pick(f: File) { return f.arrayBuffer(); }`)).toEqual([]);
+    expect(fileShapes(`"use server";\nexport async function a(row: FileUpload, list: FileList | null) { return "File: " + row.id; }`)).toEqual([]);
   });
 
   it("only the listed route handlers read a body as a file, each under Vercel's request cap", () => {
-    const routes = files.filter((f) => /\/route\.ts$/.test(f) && READS_BODY.test(withoutComments(readFileSync(f, "utf8"))));
+    const routes = files.filter((f) => /\/route\.ts$/.test(f) && READS_BODY.test(withoutComments(readFileSync(f, "utf8"), f)));
     expect(routes.map(rel).sort()).toEqual(Object.keys(BODY_ROUTES).sort());
     const vercelCap = 4_500_000;
     expect(DICTATION_LIMITS.maxBytes).toBeLessThan(vercelCap - 64 * 1024);

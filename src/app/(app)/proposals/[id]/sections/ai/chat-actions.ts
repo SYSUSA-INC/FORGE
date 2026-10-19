@@ -64,7 +64,7 @@ export type { ChatAttachmentView } from "@/lib/section-chat-attachments";
 export async function attachChatDocumentAction(input: {
   sectionId: string;
   uploadId: string;
-}): Promise<{ ok: true; attachment: ChatAttachmentView } | { ok: false; error: string }> {
+}): Promise<{ ok: true; attachment: ChatAttachmentView } | { ok: false; error: string; busy?: true }> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   try {
@@ -74,7 +74,8 @@ export async function attachChatDocumentAction(input: {
       uploadId: String(input?.uploadId ?? ""),
       actor: { userId: user.id, email: user.email },
     });
-    return res.ok ? res : { ok: false, error: res.error };
+    // `busy`: another request is still reading this upload; asking again later returns what it saved.
+    return res.ok ? res : res.code === "busy" ? { ok: false, error: res.error, busy: true } : { ok: false, error: res.error };
   } catch (err) {
     log.error("[attachChatDocumentAction]", "error", { error: err });
     return { ok: false, error: "Could not attach the file; try again." };

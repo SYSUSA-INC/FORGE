@@ -23,9 +23,15 @@ import {
   type ChatAttachmentView,
   type ChatMessage,
 } from "./chat-actions";
-import { CHAT_ATTACHMENT_ACCEPT, CHAT_ATTACHMENT_LIMITS, chatAttachPrecheck, describeChars } from "@/lib/chat-attachments-logic";
+import {
+  CHAT_ATTACHMENT_ACCEPT,
+  CHAT_ATTACHMENT_LIMITS,
+  chatAttachPrecheck,
+  describeChars,
+  type ChatReadBudgets,
+} from "@/lib/chat-attachments-logic";
 import { cancelUploadAction } from "@/app/(app)/uploads/actions";
-import { uploadFile } from "@/lib/upload-client";
+import { checkArrivedUpload, uploadFile } from "@/lib/upload-client";
 import { formatLimit } from "@/lib/upload-policy";
 import {
   describeUnread,
@@ -199,6 +205,8 @@ type Props = {
   initialMessageId?: string | null;
   /** BL-FB-CHAT-MULTI Slice 2 — tells the section header the thread has been read. */
   onRead?: () => void;
+  /** BL-STAB-2f — what the chat reads of each attachment format (the server's settings). */
+  readBudgets?: ChatReadBudgets;
 };
 
 /** The routes cap the live body at 60k characters. */
@@ -239,6 +247,7 @@ export function AiAssistantPanel({
   initialOpen = false,
   initialMessageId = null,
   onRead,
+  readBudgets,
 }: Props) {
   const [open, setOpen] = useState(initialOpen);
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab ?? "generate");
@@ -652,7 +661,17 @@ export function AiAssistantPanel({
   // BL-STAB-2f — the file uploads straight to storage, then the server
   // reads it; an upload that won't be attached is deleted at once.
   async function attachFile(file: File) {
-    const refusal = chatAttachPrecheck(file, attachments.length);
+    setChatError(null);
+    let attached = attachments.length;
+    if (attached >= CHAT_ATTACHMENT_LIMITS.maxPerSection) {
+      // The thread is shared: a teammate may have removed one since the list was loaded.
+      const fresh = await listChatAttachmentsAction(sectionId).catch(() => null);
+      if (fresh?.ok) {
+        setAttachments(fresh.attachments);
+        attached = fresh.attachments.length;
+      }
+    }
+    const refusal = chatAttachPrecheck(file, attached, readBudgets);
     if (refusal) {
       setChatError(refusal);
       return;
@@ -661,43 +680,84 @@ export function AiAssistantPanel({
     attachAbortRef.current = ac;
     setAttachBusy(true);
     setAttachStep("Uploading…");
-    setChatError(null);
-    let uploadId: string | null = null;
     try {
-      const up = await uploadFile(file, {
+      let up = await uploadFile(file, {
         purpose: "chat_attachment",
         signal: ac.signal,
         onPhase: (phase) => setAttachStep(phase === "verifying" ? "Checking…" : "Uploading…"),
         onProgress: (loaded, total) => setAttachStep(`Uploading ${Math.floor((loaded / Math.max(1, total)) * 100)}%`),
       });
+      if (!up.ok && up.arrivedUploadId) {
+        // The file is in storage but its check didn't answer: check it again rather than send it again.
+        setAttachStep("Checking…");
+        up = await checkArrivedUpload(up.arrivedUploadId);
+        if (!up.ok && up.arrivedUploadId) {
+          void cancelUploadAction(up.arrivedUploadId).catch(() => undefined);
+          setChatError("The file reached storage, but FORGE couldn't check it. Attach it again.");
+          return;
+        }
+      }
       if (!up.ok) {
-        if (up.arrivedUploadId) void cancelUploadAction(up.arrivedUploadId).catch(() => undefined);
         if (!up.cancelled) setChatError(up.error);
         return;
       }
-      uploadId = up.uploadId;
       setAttachStep("Reading…");
-      const res = await attachChatDocumentAction({ sectionId, uploadId });
+      const res = await fileChatUpload(up.uploadId, ac.signal);
+      if (res === "pending" || res === "unanswered") {
+        // Cancelling now would do nothing to a file a read still holds; it lands on its own.
+        setChatError(
+          res === "pending"
+            ? "FORGE is still reading this file. It will be in the list when you reload the page; don't attach it again."
+            : "FORGE didn't answer while attaching the file. Reload the page to see whether it attached before attaching it again.",
+        );
+        return;
+      }
       if (!res.ok) {
-        void cancelUploadAction(uploadId).catch(() => undefined);
+        // Not attached: the file goes now rather than a day later (a file an attachment holds is never deleted).
+        void cancelUploadAction(up.uploadId).catch(() => undefined);
         setChatError(res.error);
         return;
       }
-      setAttachments((list) => (list.some((a) => a.id === res.attachment.id) ? list : [...list, res.attachment]));
+      const attachment = res.attachment;
+      setAttachments((list) => (list.some((a) => a.id === attachment.id) ? list : [...list, attachment]));
     } catch {
-      // A filing still running on the server keeps its file (cancel never takes a held one).
-      if (uploadId) void cancelUploadAction(uploadId).catch(() => undefined);
-      setChatError("FORGE didn't answer while attaching the file. Reopen the chat to see whether it attached.");
+      setChatError("Could not reach FORGE to upload the file. Check your connection and try again.");
     } finally {
       if (attachAbortRef.current === ac) attachAbortRef.current = null;
       setAttachBusy(false);
       setAttachStep(null);
     }
   }
+  /**
+   * BL-STAB-2f — file an upload as an attachment. Asking again with the
+   * same upload never attaches it twice, so an answer lost on the way (or
+   * one still being read by an earlier request) is asked for again, for
+   * about a minute: "pending" if it is still being read after that,
+   * "unanswered" if FORGE never answered.
+   */
+  async function fileChatUpload(uploadId: string, signal: AbortSignal) {
+    let reading = false;
+    for (const wait of [0, 2_000, 5_000, 10_000, 20_000, 30_000]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      if (signal.aborted) break;
+      let res: Awaited<ReturnType<typeof attachChatDocumentAction>>;
+      try {
+        res = await attachChatDocumentAction({ sectionId, uploadId });
+      } catch {
+        continue;
+      }
+      if (res.ok || !res.busy) return res;
+      reading = true;
+    }
+    return reading ? ("pending" as const) : ("unanswered" as const);
+  }
   async function removeAttachment(id: string) {
     const res = await removeChatAttachmentAction(id);
     if (!res.ok) {
-      setChatError(res.error);
+      // A teammate may have removed it already: the fresh list says.
+      const fresh = await listChatAttachmentsAction(sectionId).catch(() => null);
+      if (fresh?.ok) setAttachments(fresh.attachments);
+      if (!fresh?.ok || fresh.attachments.some((a) => a.id === id)) setChatError(res.error);
       return;
     }
     setAttachments((list) => list.filter((a) => a.id !== id));

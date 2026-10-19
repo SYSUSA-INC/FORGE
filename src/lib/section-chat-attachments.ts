@@ -58,7 +58,7 @@ async function sectionForOrg(organizationId: string, sectionId: string): Promise
  * same file always fails); the others are about the conversation, so the
  * same file may attach later.
  */
-export type AttachRefusal = "unreadable" | "not_found" | "limit" | "unsaved";
+export type AttachRefusal = "unreadable" | "not_found" | "limit" | "unsaved" | "busy";
 
 export type AttachResult = { ok: true; attachment: ChatAttachmentView } | { ok: false; error: string; code: AttachRefusal };
 
@@ -149,8 +149,8 @@ export async function attachChatDocument(input: {
       ...(input.uploadId ? { uploadId: input.uploadId } : {}),
     },
   });
-  // Read back the way the list reads it, so a retry's answer is the same.
-  const view = await attachmentView({ organizationId, sectionId: input.sectionId, id: row.id });
+  // Read back the way the list reads it, so a retry's answer is the same (it is saved either way).
+  const view = await attachmentView({ organizationId, sectionId: input.sectionId, id: row.id }).catch(() => null);
   return {
     ok: true,
     attachment: view ?? {
@@ -172,7 +172,9 @@ export async function attachChatDocument(input: {
  * deleted; only its text is kept. A refusal about the conversation (the
  * section, the five-document limit) leaves the upload for a retry; a file
  * that can't be read is failed and deleted. A retry after a lost answer
- * returns the attachment it saved, never a second one.
+ * returns the attachment it saved, never a second one; a save that landed
+ * is reported as saved, whatever failed after it. `busy`: another request
+ * is still reading this upload, so asking again later is the way on.
  */
 export async function attachChatUpload(input: {
   organizationId: string;
@@ -190,7 +192,7 @@ export async function attachChatUpload(input: {
     uploadId: input.uploadId,
     resourceType: "section_chat_attachment",
   });
-  if (!claim.ok) return { ok: false, error: claim.error, code: "unsaved" };
+  if (!claim.ok) return { ok: false, error: claim.error, code: claim.busy ? "busy" : "unsaved" };
   if ("alreadyClaimed" in claim) {
     const saved = await attachmentView({ organizationId, sectionId, id: claim.resourceId });
     return saved
@@ -203,14 +205,18 @@ export async function attachChatUpload(input: {
     await failClaim({ ...held, reason: "claim_failed", detail: error });
     return { ok: false, error, code: "unreadable" };
   };
+  // The attachment this upload saved, if it did: then the upload is finished, never put back for a second one.
+  const landed = async (): Promise<AttachResult | null> => {
+    const saved = await attachmentView({ organizationId, sectionId, id: file.resourceId }).catch(() => null);
+    if (!saved) return null;
+    await finishClaim(held).catch((err) => log.warn("[chat-attachments]", "finishing the claim failed; the upload sweep finishes it", { organizationId, error: err }));
+    return { ok: true, attachment: saved };
+  };
 
   if (claim.rerun) {
     // An earlier attempt may have saved it and died before finishing: no second read.
-    const saved = await attachmentView({ organizationId, sectionId, id: file.resourceId });
-    if (saved) {
-      await finishClaim(held);
-      return { ok: true, attachment: saved };
-    }
+    const saved = await landed();
+    if (saved) return saved;
   }
   // Checked before the file is read into memory.
   const budget = parseBudgetBytes(file.format, process.env);
@@ -246,13 +252,21 @@ export async function attachChatUpload(input: {
       actor: input.actor,
     });
   } catch (err) {
+    const saved = await landed();
+    if (saved) return saved;
     log.error("[chat-attachments]", "attach failed", { organizationId, error: err });
     await releaseClaim(held);
     return { ok: false, error: "Could not attach the file; try again.", code: "unsaved" };
   }
-  if (res.ok) await finishClaim(held);
-  else if (res.code === "unreadable") return fail(res.error);
-  else await releaseClaim(held);
+  if (res.ok) {
+    await finishClaim(held).catch((err) => log.warn("[chat-attachments]", "finishing the claim failed; the upload sweep finishes it", { organizationId, error: err }));
+    return res;
+  }
+  if (res.code === "unreadable") return fail(res.error);
+  // Refused for the conversation, yet another attempt at this upload may have saved it meanwhile.
+  const saved = await landed();
+  if (saved) return saved;
+  await releaseClaim(held);
   return res;
 }
 

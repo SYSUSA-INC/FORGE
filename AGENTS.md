@@ -42,6 +42,10 @@
   covers common shapes; flag anything ambiguous)
 - Auth gates inverted or missing on admin / super-admin routes
 - Cron handlers without `Authorization: Bearer ${CRON_SECRET}` check
+- A file reaching a server action in a shape the no-files test can't
+  see: a `FormData` entry handed to a helper unlooked-at, or a file's
+  bytes, base64 or whole text sent as an argument (upload it with
+  `uploadFile()` instead; see convention 11)
 - Hard-coded `#RRGGBB` colours or `rgba(...)` palette values in
   components (use Tailwind tokens or `THEME` from
   `src/lib/theme-colors.ts`; see `docs/DESIGN_SYSTEM.md`)
@@ -56,8 +60,9 @@
 - Fresh-DB migration failures (Fresh-DB migration verification catches)
 - Tenant-scoped queries without `organizationId` (Multi-tenant
   isolation check catches statically)
-- A file passed through a server action (`File`/`Blob` arguments or
-  reading a body's bytes): `tests/ai/no-files-through-server-actions.test.ts`
+- A `File`/`Blob` parameter, cast or `instanceof` check, or
+  `.arrayBuffer()`/`.blob()`/`.stream()`/`.bytes()`, written in a
+  `"use server"` file: `tests/ai/no-files-through-server-actions.test.ts`
   fails the Runtime isolation tests gate
 
 ## Conventions to follow when authoring

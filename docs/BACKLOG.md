@@ -767,6 +767,26 @@ mind. Bandage will come off but a true fix will stay."
         download, a swapped file, storage down, a retry after a save that
         died, Save to Knowledge's size); pure limits and the browser
         check in `tests/ai/chat-attachments.test.ts`.
+      - **Review (9 of 17 upheld, all fixed here):** a save that landed
+        but reported an error after it (the read-back, the audit, finishing
+        the claim) was put back and the person told to retry, which
+        attached the file twice — a landed save now counts as saved, and a
+        refusal racing a retry that saved it does too; a lost answer made
+        the panel delete the upload and point at a reopen that doesn't
+        reload — it now asks again with the same upload (never attached
+        twice), waits while another request is still reading it (`busy`
+        from `claimUpload`), and says when to reload; a file that arrived
+        but went unchecked is checked again, not deleted under a "retry"
+        message; the browser checks against the server's read budgets
+        (`UPLOAD_PARSE_SCALE` applies; they were the unscaled ones); a
+        full list is reloaded before refusing a sixth (a teammate may have
+        removed one), and a chip already removed elsewhere goes; an image
+        gets the format refusal, not "attach a shorter excerpt"; the
+        no-files test parses the code (a "/*" in a string hid code after
+        it) and catches `as File`, unions, generics and `.bytes()`;
+        AGENTS.md now says what the test can't see (a form entry handed to
+        a helper) and asks reviewers to flag it. 22 guards
+        mutation-checked.
     - **2f-3 — contacts import parsed in the browser and sent in chunks;
       size guards on text pastes; BL-STAB-2 marked shipped.** ⏳ next.
 - **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a shipped

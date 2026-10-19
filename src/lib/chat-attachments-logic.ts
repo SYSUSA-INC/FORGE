@@ -5,7 +5,7 @@
  * Unit-tested.
  */
 import type { ExtractFormat } from "@/lib/text-extract";
-import { acceptFor, formatFromName, formatSizeAgainst, parseBudgetBytes, UPLOAD_POLICIES } from "@/lib/upload-policy";
+import { acceptFor, formatFromName, formatSizeAgainst, parseBudgetBytes, UPLOAD_POLICIES, type UploadFormat } from "@/lib/upload-policy";
 
 export const CHAT_ATTACHMENT_LIMITS = {
   /** Upload cap (BL-STAB-2f: the upload policy's, now that files go straight to storage). */
@@ -32,18 +32,25 @@ export function chatTooLargeToReadMessage(bytes: number, budget: number): string
   return `This file is ${size}; the chat reads files of this type up to ${limit}. Attach a shorter excerpt.`;
 }
 
+/** What the chat reads of each format it takes. The server passes its own (`UPLOAD_PARSE_SCALE` applies); the default is the unscaled budget. */
+export type ChatReadBudgets = Partial<Record<UploadFormat, number>>;
+
+export function chatReadBudgets(env: Record<string, string | undefined> = {}): ChatReadBudgets {
+  return Object.fromEntries(UPLOAD_POLICIES.chat_attachment.formats.map((f) => [f, parseBudgetBytes(f, env)]));
+}
+
 /**
  * BL-STAB-2f — why a picked file can't be attached, said in the browser
- * before it uploads (the server checks again, with its own read budget);
- * null when it can go.
+ * before it uploads (the server checks again); null when it can go.
  */
-export function chatAttachPrecheck(file: { name: string; size: number }, attached: number): string | null {
+export function chatAttachPrecheck(file: { name: string; size: number }, attached: number, budgets: ChatReadBudgets = chatReadBudgets()): string | null {
   if (attached >= CHAT_ATTACHMENT_LIMITS.maxPerSection) {
     return `Up to ${CHAT_ATTACHMENT_LIMITS.maxPerSection} documents per conversation; remove one first.`;
   }
   const named = formatFromName(file.name);
-  if (!named.ok) return null; // the upload's own check says what is wrong with it
-  const budget = parseBudgetBytes(named.format);
+  const budget = named.ok ? budgets[named.format] : undefined;
+  // Not a format the chat takes: the upload's own check says what is wrong with it.
+  if (budget === undefined) return null;
   return file.size > budget ? chatTooLargeToReadMessage(file.size, budget) : null;
 }
 

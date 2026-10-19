@@ -7,6 +7,7 @@ import {
   CHAT_ATTACHMENT_ACCEPT,
   CHAT_ATTACHMENT_LIMITS,
   chatAttachPrecheck,
+  chatReadBudgets,
   describeChars,
   excerpt,
   isChatAttachmentFormat,
@@ -75,7 +76,17 @@ describe("chat attachment logic", () => {
     expect(chatAttachPrecheck({ name: "pricing.xlsx", size: xlsxBudget }, 0)).toBeNull();
     expect(chatAttachPrecheck({ name: "pricing.xlsx", size: xlsxBudget + 1 }, 0)).not.toBeNull();
     expect(chatAttachPrecheck({ name: "pricing.xlsx", size: 45 * 1024 * 1024 }, 0)).toMatch(/is 45 MB; the chat reads files of this type up to 40 MB/);
-    // The upload's own check names what is wrong with other files.
+    // The upload's own check names what is wrong with other files (an image is not "too large", it isn't taken).
     expect(chatAttachPrecheck({ name: "old.doc", size: 1_000 }, 0)).toBeNull();
+    expect(chatAttachPrecheck({ name: "photo.png", size: 6 * 1024 * 1024 }, 0)).toBeNull();
+  });
+
+  it("BL-STAB-2f — the browser checks against the server's read budgets", () => {
+    const MiB = 1024 * 1024;
+    const doubled = chatReadBudgets({ UPLOAD_PARSE_SCALE: "2" });
+    expect(doubled).toEqual({ pdf: 300 * MiB, docx: 200 * MiB, xlsx: 80 * MiB, pptx: 300 * MiB, text: 50 * MiB });
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: 45 * MiB }, 0, doubled)).toBeNull();
+    const halved = chatReadBudgets({ UPLOAD_PARSE_SCALE: "0.5" });
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: 21 * MiB }, 0, halved)).toMatch(/up to 20 MB/);
   });
 });
