@@ -3,6 +3,7 @@
 import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { KnowledgeKind } from "@/db/schema";
+import { pasteRefusal } from "@/lib/action-body";
 import { createKnowledgeEntryAction } from "../actions";
 
 const KINDS: { key: KnowledgeKind; label: string; description: string }[] = [
@@ -48,6 +49,9 @@ export function NewEntryForm() {
       .split(/[,\n]/)
       .map((t) => t.trim())
       .filter(Boolean);
+    // BL-STAB-2f — said here: a body too large to send would fail with no explanation.
+    const refusal = pasteRefusal(body, Number.POSITIVE_INFINITY, "Upload long documents through Knowledge import instead.");
+    if (refusal) return setError(refusal);
     startTransition(async () => {
       const res = await createKnowledgeEntryAction({ kind, title, body, tags });
       if (!res.ok) return setError(res.error);

@@ -180,10 +180,15 @@ export async function appendGoldDocText(input: { docId: string; name: string; te
   const name = input.name.trim().slice(0, 200) || "Pasted attachment";
   const text = input.text.trim();
   if (text.length < 50) return { ok: false, error: "Paste the attachment's text." };
+  const rawText = `${got.doc.rawText}\n\n===== ${name} =====\n${text}`;
+  // BL-STAB-2f — refused, not cut: the end of the text was dropped without a word.
+  if (rawText.length > GOLD_MAX_TEXT_CHARS) {
+    return { ok: false, error: `This would take the document past ${GOLD_MAX_TEXT_CHARS.toLocaleString("en-US")} characters; add only the part the review needs.` };
+  }
   await db
     .update(extractionGoldDocs)
     .set({
-      rawText: `${got.doc.rawText}\n\n===== ${name} =====\n${text}`.slice(0, GOLD_MAX_TEXT_CHARS),
+      rawText,
       files: [...got.doc.files, { name, chars: text.length }],
       ...reopened(got.doc),
       updatedAt: new Date(),

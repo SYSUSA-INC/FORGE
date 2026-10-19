@@ -6,13 +6,22 @@
  * polling without a notice ID is refused, and the adds are audited.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, complianceItems, solicitations } from "@/db/schema";
 import { seedComplianceItemsFromRequirements } from "@/lib/compliance-seed";
 import { addManualQa, listSolicitationQa, pollSolicitationQa } from "@/lib/solicitation-qa";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
+
+const sessionUserStub = { id: "PLACEHOLDER", email: "a@test", name: "Capture Lead", image: null as null, isSuperadmin: false as const, organizationId: "PLACEHOLDER", role: "admin" as const };
+vi.mock("@/lib/auth-helpers", () => ({
+  requireAuth: async () => sessionUserStub,
+  requireCurrentOrg: async () => ({ user: sessionUserStub, organizationId: sessionUserStub.organizationId, isImpersonating: false }),
+  getSessionUser: async () => sessionUserStub,
+}));
+
+import { addManualQaAction } from "@/app/(app)/solicitations/[id]/qa-actions";
 
 const QA_TEXT = `Q1: Does Section L.5.2.1 require resumes for all key personnel?
 A1: No. Section L.5.2.1 is amended: resumes are required for the program manager and the technical lead only.
@@ -86,6 +95,16 @@ describe("BL-FB-SOL-QA — contracting-officer Q&A", () => {
     // The same text again stores nothing twice; unparsable text is refused.
     expect(await addManualQa({ organizationId: fx.orgA.organizationId, solicitationId: solicitationA, text: QA_TEXT, actor })).toEqual({ ok: true, added: 0, duplicates: 3, flagged: 0 });
     expect((await addManualQa({ organizationId: fx.orgA.organizationId, solicitationId: solicitationA, text: "The offeror shall comply.", actor })).ok).toBe(false);
+
+    // BL-STAB-2f — a paste over what is read at once is refused, not cut (answers past the cut were lost).
+    sessionUserStub.id = fx.orgA.userId;
+    sessionUserStub.organizationId = fx.orgA.organizationId;
+    const long = `${QA_TEXT}\n${"Q9: Is this padding?\nA9: Yes.\n".repeat(8_000)}`;
+    expect(long.length).toBeGreaterThan(200_000);
+    expect(await addManualQaAction(solicitationA, long)).toEqual({
+      ok: false,
+      error: `This is ${long.length.toLocaleString("en-US")} characters; FORGE reads up to 200,000 at a time. Paste the questions and answers in parts.`,
+    });
 
     // No notice ID: polling is refused before SAM.gov is called.
     const poll = await pollSolicitationQa({ organizationId: fx.orgA.organizationId, solicitationId: solicitationA, actor });

@@ -8,8 +8,8 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordRead } from "@/lib/audit-log";
 import { deleteContact, logTouch, saveContact, type ContactInput, type TouchInput } from "@/lib/crm";
 import { agencyProcurementHistory, cachedAgencyHistory, type AgencyProcurementHistory } from "@/lib/crm-history";
-import { commitContactImport, previewContactImport, type ImportCommit, type ImportPreview } from "@/lib/crm-import";
-import type { ImportRow } from "@/lib/crm-import-logic";
+import { commitContactImport, findImportDuplicates, type DuplicateCheck, type ImportBatch, type ImportCommit } from "@/lib/crm-import";
+import type { ImportPerson, ImportRow } from "@/lib/crm-import-logic";
 
 function revalidateCrm(contactId?: string | null) {
   revalidatePath("/contacts");
@@ -60,15 +60,33 @@ export async function cachedAgencyHistoryAction(agency: string): Promise<AgencyP
   return cachedAgencyHistory({ organizationId, agency: String(agency ?? "") });
 }
 
-/** BL-FB-X-CRM Slice 3 — parse a pasted or uploaded CSV / vCard and mark the people we already have. Writes nothing. */
-export async function previewContactImportAction(input: { text: string; fileName?: string }): Promise<ImportPreview> {
+/**
+ * BL-FB-X-CRM Slice 3 — mark the people we already have, for the import
+ * preview. BL-STAB-2f — the browser parses the file and sends only who
+ * is in it (name, agency, email). Writes nothing.
+ */
+export async function findImportDuplicatesAction(input: { people: Partial<ImportPerson>[] }): Promise<DuplicateCheck> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  return previewContactImport({ organizationId, text: String(input.text ?? ""), fileName: typeof input.fileName === "string" ? input.fileName : "" });
+  return findImportDuplicates({ organizationId, people: Array.isArray(input?.people) ? input.people : [] });
 }
 
-/** BL-FB-X-CRM Slice 3 — write the previewed rows; duplicates skipped or updated. Audited. */
-export async function commitContactImportAction(input: { rows: Partial<ImportRow>[]; duplicates: "skip" | "update" }): Promise<ImportCommit> {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A part number the audit can carry; anything else is dropped. */
+function importBatch(raw: unknown): ImportBatch | undefined {
+  const b = raw as Partial<ImportBatch> | null | undefined;
+  if (!b || typeof b.id !== "string" || !UUID.test(b.id)) return undefined;
+  const ok = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 1_000;
+  return ok(b.part) && ok(b.parts) && b.part <= b.parts ? { id: b.id, part: b.part, parts: b.parts } : undefined;
+}
+
+/**
+ * BL-FB-X-CRM Slice 3 — write the previewed rows; duplicates skipped or
+ * updated. Audited. BL-STAB-2f — a large import arrives in parts (one
+ * call each, each audited with the import's id and its part number).
+ */
+export async function commitContactImportAction(input: { rows: Partial<ImportRow>[]; duplicates: "skip" | "update"; batch?: ImportBatch }): Promise<ImportCommit> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const res = await commitContactImport({
@@ -76,6 +94,7 @@ export async function commitContactImportAction(input: { rows: Partial<ImportRow
     rows: Array.isArray(input.rows) ? input.rows : [],
     duplicates: input.duplicates === "update" ? "update" : "skip",
     actor: { userId: actor.id, email: actor.email },
+    batch: importBatch(input.batch),
   });
   if (res.ok) revalidateCrm();
   return res;

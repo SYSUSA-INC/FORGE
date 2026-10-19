@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { opportunities, opportunityActivities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { PASTE_KEPT_CHARS, PASTE_MAX_CHARS } from "@/lib/action-body";
 import { recordAudit } from "@/lib/audit-log";
 import { aiExtractEbuy } from "@/lib/ebuy-extract";
 import type { EbuyExtractionResult } from "@/lib/ai-prompts";
@@ -28,7 +29,7 @@ export async function parseEbuyTextAction(
   if (!rawText || rawText.trim().length === 0) {
     return { ok: false, error: "Paste the eBuy RFQ body before extracting." };
   }
-  if (rawText.length > 200_000) {
+  if (rawText.length > PASTE_MAX_CHARS) {
     return {
       ok: false,
       error:
@@ -126,7 +127,7 @@ export async function createOpportunityFromEbuyAction(
       userId: actor.id,
       kind: "note",
       title: "Created from eBuy paste",
-      body: input.rawText.slice(0, 50_000),
+      body: input.rawText.slice(0, PASTE_KEPT_CHARS),
       metadata: { source: "ebuy-paste" },
     });
 

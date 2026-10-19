@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
-import { focusMoved, focusParagraph, pickFocus, shouldRefresh } from "@/lib/research-signals";
+import { focusMoved, focusParagraph, pickFocus, RESEARCH_TEXT_MAX_CHARS, shouldRefresh } from "@/lib/research-signals";
 import { THEME } from "@/lib/theme-colors";
 import {
   researchForSectionAction,
@@ -51,7 +51,7 @@ export function ResearchRail({
     setPending(true);
     setError(null);
     try {
-      const res = await researchForSectionAction(sectionId, { text: currentText, focus: currentFocus });
+      const res = await researchForSectionAction(sectionId, { text: currentText.slice(0, RESEARCH_TEXT_MAX_CHARS), focus: currentFocus });
       if (id !== inflightRef.current) return;
       if (!res.ok) {
         setError(res.error);

@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import { UploadQueue } from "@/components/uploads/UploadQueue";
 import { useUploadQueue } from "@/components/uploads/useUploadQueue";
+import { PASTE_KEPT_CHARS, PASTE_MAX_CHARS, pasteRefusal } from "@/lib/action-body";
 import { acceptFor, formatLimit } from "@/lib/upload-policy";
 import {
   createOpportunityFromGsaAction,
@@ -65,8 +66,17 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
 
   function parse() {
     setError(null);
+    // BL-STAB-2f — said here: a paste too large to send would fail with no explanation.
+    const refusal = pasteRefusal(rawText, PASTE_MAX_CHARS, "Trim it to the email body (upload a full RFP as a solicitation instead).");
+    if (refusal) return setError(refusal);
     startParse(async () => {
-      const res = await parseGsaTextAction(rawText);
+      let res: Awaited<ReturnType<typeof parseGsaTextAction>>;
+      try {
+        res = await parseGsaTextAction(rawText);
+      } catch {
+        setError("FORGE didn't answer. Try Extract again.");
+        return;
+      }
       if (!res.ok) {
         setError(res.error);
         return;
@@ -111,7 +121,8 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
       let res: Awaited<ReturnType<typeof createOpportunityFromGsaAction>>;
       try {
         res = await createOpportunityFromGsaAction({
-          text: rawText,
+          // The opportunity keeps this much of the email; the rest isn't sent.
+          text: rawText.slice(0, PASTE_KEPT_CHARS),
           title: fields.title,
           noticeType: fields.noticeType,
           solicitationNumber: fields.solicitationNumber,

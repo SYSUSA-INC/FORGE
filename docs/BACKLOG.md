@@ -787,8 +787,44 @@ mind. Bandage will come off but a true fix will stay."
         AGENTS.md now says what the test can't see (a form entry handed to
         a helper) and asks reviewers to flag it. 22 guards
         mutation-checked.
-    - **2f-3 — contacts import parsed in the browser and sent in chunks;
-      size guards on text pastes; BL-STAB-2 marked shipped.** ⏳ next.
+    - **2f-3 — contacts import parsed in the browser and sent in parts;
+      pasted text measured before it is sent; BL-STAB-2 shipped.** 🔄 in
+      review (this PR).
+      - Contacts: the file (up to 50 MB, was cut silently at 2,000,000
+        characters and then refused above ~1 MB by the request limit) is
+        read and parsed in the browser and never sent.
+        `findImportDuplicatesAction` gets only name, agency and email
+        (replacing `previewContactImportAction`, which took the text);
+        the rows are written in parts of at most 600 KB
+        (`chunkByBytes`), each re-checked and audited on its own with
+        `importId`, `part` and `parts`; an import that stops part-way
+        continues from the failed part (a part sent twice adds nobody
+        twice). A file of more than 500 contacts says so (it was cut
+        without a word) and its parse stops there; control characters
+        are stripped (a NUL made the insert fail); at most 100 skipped
+        lines are listed.
+      - Pasted text (`src/lib/action-body.ts`: `pasteRefusal`,
+        `TEXT_ACTION_MAX_BYTES`, `PASTE_MAX_CHARS`): GSA and eBuy email
+        pastes, pasted Q&A, gold-set text, the SBA 8(a) CSV paste and
+        knowledge entries are measured in the browser first. GSA and eBuy
+        send only the 50,000 characters an opportunity keeps. Pasted Q&A
+        over 200,000 characters is refused (answers past the cut were
+        dropped); gold-set text that would pass 2,000,000 characters is
+        refused (it was cut and reported as added); a team note over
+        4,000 characters is refused in the chat (it was cut on save); the
+        research rail sends the 60,000 characters it reads. The parse and
+        create calls answer a lost connection with a message.
+      - Deliberate exceptions, each under Vercel's 4.5 MB request cap and
+        pinned by the no-files test: dictation (4 MB of audio, never
+        stored) and the upload proxy (4 MB on Vercel).
+      - **Tests:** `tests/ai/action-body.test.ts` (measuring, refusals,
+        parts, a worst-case 500-contact import under the limit),
+        `tests/ai/crm-import-logic.test.ts` (the 500-contact cut said and
+        not read past; control characters),
+        `tests/isolation/crm-import.test.ts` (the duplicate check per
+        tenant; tampered rows re-checked; a part's audit),
+        `tests/isolation/solicitation-qa.test.ts` and
+        `tests/isolation/gold-set.test.ts` (refused, not cut).
 - **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a shipped
   (PR #375); 10b in progress.
   - **Symptom (owner, 2026-10-10):** NAICS 541519 + "ServiceNow" listed 10

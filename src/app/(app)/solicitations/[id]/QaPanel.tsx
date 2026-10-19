@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { SamKeyNotice } from "@/components/ui/SamKeyNotice";
 import type { samKeyNotice } from "@/lib/samgov-key-logic";
+import { PASTE_MAX_CHARS, pasteRefusal } from "@/lib/action-body";
 import { describeQa } from "@/lib/solicitation-qa-logic";
 import { addManualQaAction, pollSolicitationQaAction, type SolicitationQaView } from "./qa-actions";
 
@@ -62,8 +63,16 @@ export function QaPanel({
     if (!text.trim()) return;
     setError(null);
     setNotice(null);
+    const refusal = pasteRefusal(text, PASTE_MAX_CHARS, "Paste the questions and answers in parts.");
+    if (refusal) return setError(refusal);
     startTransition(async () => {
-      const res = await addManualQaAction(solicitationId, text);
+      let res: Awaited<ReturnType<typeof addManualQaAction>>;
+      try {
+        res = await addManualQaAction(solicitationId, text);
+      } catch {
+        setError("FORGE didn't answer. Check the Q&A list before pasting again.");
+        return;
+      }
       if (!res.ok) {
         setError(res.error);
         return;

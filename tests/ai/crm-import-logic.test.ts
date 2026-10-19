@@ -150,4 +150,28 @@ describe("crm import logic", () => {
     expect(summarizeImport(rows, dups, twice.dropped)).toEqual({ total: 2, fresh: 0, duplicates: 2, agencies: 1, skipped: 2 });
     expect(IMPORT_LIMITS.maxRows).toBe(500);
   });
+
+  it("BL-STAB-2f — says when a file holds more than one import takes, and stops reading there", () => {
+    const line = (i: number) => `Person ${i},Army,,,p${i}@army.mil`;
+    const exact = ["Name,Agency,Office,Title,Email", ...Array.from({ length: 500 }, (_, i) => line(i))].join("\n");
+    expect(parseContactsCsv(exact)).toMatchObject({ truncated: false });
+    expect(parseContactsCsv(exact).rows).toHaveLength(500);
+    // A broken quote after the cut would swallow the rest of the file: it is never reached.
+    const over = `${exact}\n${line(500)}\n"unterminated,Army\n${"x,y\n".repeat(1_000)}`;
+    const parsed = parseContactsCsv(over);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.rows).toHaveLength(500);
+    expect(parsed.rows.at(-1)!.line).toBe(501);
+    const cards = Array.from({ length: 501 }, (_, i) => `BEGIN:VCARD\nFN:Person ${i}\nORG:Army\nEND:VCARD`).join("\n");
+    expect(parseVcards(cards)).toMatchObject({ truncated: true });
+    expect(parseVcards(cards).rows).toHaveLength(500);
+  });
+
+  it("BL-STAB-2f — strips control characters Postgres would refuse, keeping line breaks in notes", () => {
+    expect(sanitizeImportRow({ name: "Eve\u0000 Stone\u0007", agency: "Army\u001b", notes: "line one\u0000\nline\ttwo" })).toMatchObject({
+      name: "Eve Stone",
+      agency: "Army",
+      notes: "line one\nline\ttwo",
+    });
+  });
 });

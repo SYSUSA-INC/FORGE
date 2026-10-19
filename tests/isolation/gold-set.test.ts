@@ -17,6 +17,7 @@ import {
   searchGoldDocText,
   setGoldDocApproved,
 } from "@/lib/gold-set";
+import { GOLD_MAX_TEXT_CHARS } from "@/lib/gold-set-logic";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 const RFP = [
@@ -85,6 +86,11 @@ describe("BL-AIX Phase 1e — extraction gold set (runtime)", () => {
     const after = await getGoldDoc(id);
     expect(after?.doc.status).toBe("in_review");
     expect(after?.doc.rawText).toContain("===== Attachment 3 (scan) =====");
+
+    // BL-STAB-2f — text that would pass the limit is refused, not cut off unseen.
+    const tooMuch = await appendGoldDocText({ docId: id, name: "Huge", text: "y".repeat(GOLD_MAX_TEXT_CHARS) });
+    expect(tooMuch).toMatchObject({ ok: false, error: expect.stringMatching(/past 2,000,000 characters/) });
+    expect((await getGoldDoc(id))?.doc.rawText).not.toContain("===== Huge =====");
   });
 
   it("keeps one document per notice and searches its text", async () => {

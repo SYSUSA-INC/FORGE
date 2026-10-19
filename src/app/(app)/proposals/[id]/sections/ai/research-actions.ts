@@ -4,6 +4,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { setSectionCustomerVoice } from "@/lib/customer-voice-signals";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { gatherResearchForSection, type ResearchRailResult } from "@/lib/research-rail";
+import { RESEARCH_TEXT_MAX_CHARS } from "@/lib/research-signals";
 
 export type { CustomerVoiceCoverage, ResearchRailResult } from "@/lib/research-rail";
 
@@ -26,8 +27,6 @@ export type ResearchActionResult =
   | { ok: true; data: ResearchRailResult }
   | { ok: false; error: string };
 
-/** Section text the rail may send; the route caps live bodies the same way. */
-const MAX_TEXT_CHARS = 60_000;
 
 /**
  * BL-AIP-6 — research-while-you-write lookup for one section. Called on
@@ -53,7 +52,7 @@ export async function researchForSectionAction(
   const data = await gatherResearchForSection({
     organizationId,
     sectionId,
-    text: (input.text ?? "").slice(0, MAX_TEXT_CHARS),
+    text: (input.text ?? "").slice(0, RESEARCH_TEXT_MAX_CHARS),
     focus: (input.focus ?? "").slice(0, 2_000),
   });
   if (!data) return { ok: false, error: "Section not found." };

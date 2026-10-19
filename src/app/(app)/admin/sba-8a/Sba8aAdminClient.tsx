@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { pasteRefusal } from "@/lib/action-body";
 import { CERT_SPECS } from "@/lib/sba-8a";
 import {
   importSba8aCsvAction,
@@ -168,8 +169,17 @@ export function Sba8aAdminClient({
   function importCsv() {
     setCsvError(null);
     setCsvResult(null);
+    // BL-STAB-2f — said here: a paste too large to send would fail with no explanation.
+    const refusal = pasteRefusal(csv, Number.POSITIVE_INFINITY, "Split the CSV (keep the header row on each part) and import the parts one after another.");
+    if (refusal) return setCsvError(refusal);
     startCsv(async () => {
-      const res = await importSba8aCsvAction(csv);
+      let res: Awaited<ReturnType<typeof importSba8aCsvAction>>;
+      try {
+        res = await importSba8aCsvAction(csv);
+      } catch {
+        setCsvError("FORGE didn't answer. Check the import runs below before importing again.");
+        return;
+      }
       if (!res.ok) {
         setCsvError(res.error);
         return;

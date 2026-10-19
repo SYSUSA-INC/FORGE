@@ -9,6 +9,7 @@ import {
   unarchiveKnowledgeEntryAction,
   updateKnowledgeEntryAction,
 } from "../actions";
+import { pasteRefusal } from "@/lib/action-body";
 
 const KINDS: KnowledgeKind[] = [
   "capability",
@@ -74,6 +75,9 @@ export function EditEntryClient({
       .split(/[,\n]/)
       .map((t) => t.trim())
       .filter(Boolean);
+    // BL-STAB-2f — said here: a body too large to send would fail with no explanation.
+    const refusal = pasteRefusal(body, Number.POSITIVE_INFINITY, "Upload long documents through Knowledge import instead.");
+    if (refusal) return setError(refusal);
     startTransition(async () => {
       const res = await updateKnowledgeEntryAction(id, {
         kind,
