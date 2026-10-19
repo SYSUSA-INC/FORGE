@@ -87,6 +87,7 @@ import {
   getDocxToPdfProviderStatus,
 } from "@/lib/docx-to-pdf";
 import { log } from "@/lib/log";
+import { getVerifiedObject } from "@/lib/uploads";
 
 export type PdfRenderResult =
   | {
@@ -171,7 +172,7 @@ export async function renderProposalPdfAction(
     const [t] = await db
       .select()
       .from(proposalTemplates)
-      .where(eq(proposalTemplates.id, propRow.proposal.templateId))
+      .where(and(eq(proposalTemplates.id, propRow.proposal.templateId), eq(proposalTemplates.organizationId, organizationId)))
       .limit(1);
     template = t ?? null;
   }
@@ -397,7 +398,7 @@ export async function renderProposalDocxAction(
   const [template] = await db
     .select()
     .from(proposalTemplates)
-    .where(eq(proposalTemplates.id, propRow.proposal.templateId))
+    .where(and(eq(proposalTemplates.id, propRow.proposal.templateId), eq(proposalTemplates.organizationId, organizationId)))
     .limit(1);
   if (!template) return { ok: false, error: "Template not found." };
 
@@ -433,14 +434,8 @@ export async function renderProposalDocxAction(
   // memory stub and the bytes are gone (post-deploy), surface a clear
   // error rather than crashing.
   const storage = getStorageProvider();
-  const templateObj = await storage.get(template.docxStoragePath);
-  if (!templateObj) {
-    return {
-      ok: false,
-      error:
-        "Template file bytes are no longer in storage — re-upload the .docx on the template settings page. (Memory storage doesn't survive redeploys.)",
-    };
-  }
+  const templateObj = await readTemplateFile(organizationId, template.docxStoragePath);
+  if (!templateObj.ok) return { ok: false, error: templateObj.error };
 
   // Render. Synchronous + cheap (docxtemplater runs in-memory).
   const result = renderProposalToDocx({
@@ -585,7 +580,7 @@ export async function renderProposalDocxAsPdfAction(
   const [template] = await db
     .select()
     .from(proposalTemplates)
-    .where(eq(proposalTemplates.id, propRow.proposal.templateId))
+    .where(and(eq(proposalTemplates.id, propRow.proposal.templateId), eq(proposalTemplates.organizationId, organizationId)))
     .limit(1);
   if (!template) return { ok: false, error: "Template not found." };
   if (template.kind !== "docx") {
@@ -618,14 +613,8 @@ export async function renderProposalDocxAsPdfAction(
 
   // Pull the template .docx bytes and render the proposal-as-docx.
   const storage = getStorageProvider();
-  const templateObj = await storage.get(template.docxStoragePath);
-  if (!templateObj) {
-    return {
-      ok: false,
-      error:
-        "Template file bytes are no longer in storage — re-upload the .docx on the template settings page.",
-    };
-  }
+  const templateObj = await readTemplateFile(organizationId, template.docxStoragePath);
+  if (!templateObj.ok) return { ok: false, error: templateObj.error };
 
   const docxResult = renderProposalToDocx({
     template,
@@ -966,7 +955,7 @@ export async function getProposalExportCapabilityAction(
     .from(proposals)
     .innerJoin(
       proposalTemplates,
-      eq(proposalTemplates.id, proposals.templateId),
+      and(eq(proposalTemplates.id, proposals.templateId), eq(proposalTemplates.organizationId, proposals.organizationId)),
     )
     .where(
       and(
@@ -983,5 +972,27 @@ export async function getProposalExportCapabilityAction(
     hasDocxTemplate: row.kind === "docx" && row.docxStoragePath !== "",
     hasHtmlTemplate: row.kind === "html",
     templateName: row.name,
+  };
+}
+
+/**
+ * BL-STAB-2f — a template's .docx for a render: this organization's file,
+ * the one checked at upload (size and ETag), never one swapped since.
+ */
+async function readTemplateFile(organizationId: string, storagePath: string): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; error: string }> {
+  let read: Awaited<ReturnType<typeof getVerifiedObject>>;
+  try {
+    read = await getVerifiedObject({ organizationId, storagePath });
+  } catch (err) {
+    log.warn("[readTemplateFile]", "storage read failed", { organizationId, error: err });
+    return { ok: false, error: "File storage could not be reached just now. Try the export again in a minute." };
+  }
+  if (read.ok) return { ok: true, bytes: read.bytes };
+  return {
+    ok: false,
+    error:
+      read.reason === "changed"
+        ? "The template file changed after it was uploaded; upload it again on the template settings page."
+        : "Template file bytes are no longer in storage — re-upload the .docx on the template settings page.",
   };
 }

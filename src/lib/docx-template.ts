@@ -15,21 +15,13 @@
  * scanning, which gives us the same continuous text the templater sees.
  */
 
-const DOCX_MEDIA_TYPES = [
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-];
-
-export function isLikelyDocx(contentType: string, fileName: string): boolean {
-  if (DOCX_MEDIA_TYPES.includes((contentType || "").toLowerCase())) return true;
-  return fileName.toLowerCase().endsWith(".docx");
-}
-
 export type DocxScanResult = {
   variables: string[];
   /** Paths inside the zip that contained at least one placeholder. */
   parts: string[];
   warnings: string[];
+  /** BL-STAB-2f — set when the file can't be read as a .docx at all (the upload is refused). */
+  unreadable?: string;
 };
 
 /**
@@ -45,13 +37,8 @@ export async function scanDocxForVariables(
   try {
     zip = await JSZip.loadAsync(bytes);
   } catch (err) {
-    return {
-      variables: [],
-      parts: [],
-      warnings: [
-        `Could not read the file as a .docx — is it actually a Word document? (${err instanceof Error ? err.message : "unknown error"})`,
-      ],
-    };
+    const unreadable = `Could not read the file as a .docx — is it actually a Word document? (${err instanceof Error ? err.message : "unknown error"})`;
+    return { variables: [], parts: [], warnings: [unreadable], unreadable };
   }
 
   // Targets we care about — the rest of the zip is styles/relationships.
@@ -73,7 +60,13 @@ export async function scanDocxForVariables(
   for (const path of targets) {
     const file = zip.file(path);
     if (!file) continue;
-    const xml = await file.async("string");
+    let xml: string;
+    try {
+      xml = await file.async("string");
+    } catch (err) {
+      const unreadable = `Part of the .docx is damaged and can't be read (${err instanceof Error ? err.message : "unknown error"}). Save it again from Word and upload that.`;
+      return { variables: [], parts: [], warnings: [unreadable], unreadable };
+    }
     // Strip XML tags so split runs collapse into continuous text.
     const text = xml.replace(/<[^>]+>/g, "");
     // Pull every {placeholder}. Reject obviously malformed ones (whitespace

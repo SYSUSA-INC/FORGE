@@ -2,10 +2,13 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { templateAuthoringRefusal } from "@/lib/template-gate";
+import { resolvePolicy } from "@/lib/upload-policy";
 import { getTemplateForEditAction } from "../actions";
 import { EditTemplateClient } from "./EditTemplateClient";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-2f — room for reading and scanning an uploaded template (up to 50 MB) from this page.
+export const maxDuration = 300;
 
 export default async function EditTemplatePage({
   params,
@@ -32,6 +35,7 @@ export default async function EditTemplatePage({
       <EditTemplateClient
         id={t.id}
         locked={locked}
+        maxBytes={resolvePolicy("template_docx", process.env).maxBytes}
         initial={{
           name: t.name,
           description: t.description,

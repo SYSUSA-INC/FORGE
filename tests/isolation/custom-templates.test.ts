@@ -38,7 +38,7 @@ import {
   setTemplateKindAction,
   unarchiveTemplateAction,
   updateTemplateAction,
-  uploadTemplateDocxAction,
+  attachTemplateDocxFromUploadAction,
 } from "@/app/(app)/settings/templates/actions";
 import { TEMPLATE_AUTHORING_REFUSAL } from "@/lib/template-gate";
 
@@ -79,7 +79,7 @@ describe("BL-16 customTemplates — authoring is gated, use is not", () => {
     expect(await updateTemplateAction(made.id, { name: "Renamed" })).toEqual(refused);
     expect(await setTemplateKindAction(made.id, "html")).toEqual(refused);
     expect(await clearTemplateDocxAction(made.id)).toEqual(refused);
-    expect(await uploadTemplateDocxAction(made.id, new FormData())).toEqual(refused);
+    expect(await attachTemplateDocxFromUploadAction(made.id, "00000000-0000-0000-0000-000000000000")).toEqual(refused);
 
     const [row] = await db
       .select({ name: proposalTemplates.name, description: proposalTemplates.description, kind: proposalTemplates.kind })

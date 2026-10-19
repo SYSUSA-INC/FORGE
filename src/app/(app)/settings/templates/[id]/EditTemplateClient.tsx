@@ -11,12 +11,16 @@ import type {
 } from "@/db/schema";
 import { SECTION_KIND_LABELS } from "@/lib/proposal-types";
 import { KNOWN_TEMPLATE_VARIABLES } from "@/lib/docx-template";
+import { UploadQueue } from "@/components/uploads/UploadQueue";
+import { useUploadQueue } from "@/components/uploads/useUploadQueue";
+import { acceptFor, formatLimit } from "@/lib/upload-policy";
 import {
+  attachTemplateDocxFromUploadAction,
   clearTemplateDocxAction,
   setDefaultTemplateAction,
   setTemplateKindAction,
   updateTemplateAction,
-  uploadTemplateDocxAction,
+  type DocxUploadResult,
 } from "../actions";
 
 const SECTION_KINDS: ProposalSectionKind[] = [
@@ -54,11 +58,14 @@ export function EditTemplateClient({
   id,
   initial,
   locked,
+  maxBytes,
 }: {
   id: string;
   initial: Initial;
   /** BL-16 customTemplates — why the plan refuses edits; null when allowed. */
   locked: string | null;
+  /** BL-STAB-2f — the per-file limit for Word templates. */
+  maxBytes: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -92,31 +99,42 @@ export function EditTemplateClient({
   const [docxError, setDocxError] = useState<string | null>(null);
   const [docxNotice, setDocxNotice] = useState<string | null>(null);
 
+  // BL-STAB-2f — the file goes from the browser straight to storage (progress,
+  // retry, cancel), then is attached to this template and scanned.
+  const queue = useUploadQueue<Extract<DocxUploadResult, { ok: true }>>({
+    purpose: "template_docx",
+    concurrency: 1,
+    maxBytes,
+    claim: async ({ uploadId }) => {
+      const res = await attachTemplateDocxFromUploadAction(id, uploadId);
+      return res.ok ? { ok: true, result: res } : { ok: false, error: res.error };
+    },
+    onItemDone: (item) => {
+      if (item.phase === "done" && item.result) applyAttached(item.result);
+    },
+  });
+
   function handleDocxFile(file: File | null | undefined) {
-    if (!file) return;
+    if (!file || queue.busy) return;
     setDocxError(null);
     setDocxNotice(null);
     setDocxWarnings([]);
-    const fd = new FormData();
-    fd.append("file", file);
-    startUploading(async () => {
-      const res = await uploadTemplateDocxAction(id, fd);
-      if (!res.ok) {
-        setDocxError(res.error);
-        return;
-      }
-      setKind("docx");
-      setDocxFileName(res.fileName);
-      setDocxFileSize(res.fileSize);
-      setDocxUploadedAt(new Date().toISOString());
-      setVariablesDetected(res.variables);
-      setDocxWarnings(res.warnings);
-      setDocxNotice(
-        res.variables.length > 0
-          ? `Uploaded — found ${res.variables.length} placeholder${res.variables.length === 1 ? "" : "s"}.`
-          : "Uploaded. No placeholders detected — see warnings below.",
-      );
-    });
+    queue.clear();
+    queue.add([{ file, meta: undefined }]);
+  }
+
+  function applyAttached(res: Extract<DocxUploadResult, { ok: true }>) {
+    setKind("docx");
+    setDocxFileName(res.fileName);
+    setDocxFileSize(res.fileSize);
+    setDocxUploadedAt(new Date().toISOString());
+    setVariablesDetected(res.variables);
+    setDocxWarnings(res.warnings);
+    setDocxNotice(
+      res.variables.length > 0
+        ? `Uploaded — found ${res.variables.length} placeholder${res.variables.length === 1 ? "" : "s"}.`
+        : "Uploaded. No placeholders detected — see warnings below.",
+    );
   }
 
   async function clearDocx() {
@@ -430,11 +448,13 @@ export function EditTemplateClient({
               docxUploadedAt={docxUploadedAt}
               variablesDetected={variablesDetected}
               docxWarnings={docxWarnings}
-              uploading={uploading}
+              uploading={uploading || queue.busy}
               error={docxError}
               notice={docxNotice}
               onFile={handleDocxFile}
               onClear={clearDocx}
+              limit={formatLimit(maxBytes)}
+              queue={<UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />}
             />
           ) : (
             <details className="flex flex-col gap-3" open>
@@ -661,6 +681,8 @@ function DocxPanel({
   notice,
   onFile,
   onClear,
+  limit,
+  queue,
 }: {
   docxFileName: string;
   docxFileSize: number;
@@ -672,6 +694,10 @@ function DocxPanel({
   notice: string | null;
   onFile: (f: File | null | undefined) => void;
   onClear: () => void;
+  /** The per-file limit, as people read it ("50 MB"). */
+  limit: string;
+  /** The upload in progress: progress, retry, cancel. */
+  queue: React.ReactNode;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -746,7 +772,7 @@ function DocxPanel({
               Drop a Word template here
             </div>
             <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
-              .docx · 25 MB cap · header / footer / cover / TOC / graphics
+              .docx · up to {limit} · header / footer / cover / TOC / graphics
               all preserved
             </div>
             <button
@@ -765,11 +791,13 @@ function DocxPanel({
         <input
           ref={inputRef}
           type="file"
-          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept={acceptFor("template_docx")}
           className="sr-only"
           onChange={(e) => onFile(e.target.files?.[0])}
         />
       </div>
+
+      {queue}
 
       {error ? (
         <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">

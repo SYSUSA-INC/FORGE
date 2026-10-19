@@ -94,6 +94,8 @@ const FAILURE_MESSAGES: Record<string, string> = {
   unclaimed: "The upload was not saved within a day and was removed. Upload it again.",
   claim_incomplete: "Saving the file didn't finish within a day, and it was removed. Upload it again.",
   claim_failed: "The file could not be read.",
+  deleted: "This file was removed with the record it was saved on. Upload it again.",
+  replaced: "This file was replaced by a newer one. Upload it again.",
 };
 
 function view(row: FileUpload): UploadView {
@@ -479,8 +481,13 @@ export async function claimUpload(i: {
   const current = await loadOwn(i.organizationId, i.userId, i.uploadId);
   if (!current) return { ok: false, error: "Upload not found." };
   if (!purposes.includes(current.purpose)) return { ok: false, error: "This file was uploaded for something else." };
-  if (current.status === "claimed" && current.resourceType === i.resourceType && current.resourceId) {
+  // A caller that names its record (a template's file) only continues a claim made for that record.
+  const sameRecord = !i.resourceId || current.resourceId === i.resourceId;
+  if (current.status === "claimed" && current.resourceType === i.resourceType && current.resourceId && sameRecord) {
     return { ok: true, alreadyClaimed: true, resourceId: current.resourceId };
+  }
+  if (current.status === "claimed" || (current.status === "claiming" && !sameRecord)) {
+    return { ok: false, error: "This file was already saved on another record." };
   }
   if (current.status === "claiming" && current.resourceType === i.resourceType && current.claimedAt && now.getTime() - current.claimedAt.getTime() > STALE_CLAIM_MS) {
     // An earlier attempt died mid-claim: take it over, keeping its record id.
@@ -637,6 +644,84 @@ export async function cancelUpload(i: { organizationId: string; actor: UploadAct
 
 // The storage meter's reservations live with the meter (BL-STAB-2e).
 export { getReservedUploadBytes } from "@/lib/subscription-gates";
+
+export type ReleaseOutcome = "released" | "deleted" | "skipped";
+
+/**
+ * BL-STAB-2f — a record that held a file was deleted, or its file was
+ * replaced: let the file go. An upload-ledger file is marked `released`
+ * and the jobs cron's sweep deletes it within minutes (after checking no
+ * record holds it); a file stored before the ledger has no row and is
+ * deleted now, best-effort, unless another record still names it. A row
+ * mid-claim is left alone (a live request holds it). Never throws: it runs
+ * after the record's own change. Logs never carry the key (a pre-ledger
+ * key ends with the file's name).
+ */
+export async function releaseStoredFile(i: { organizationId: string; storagePath: string; reason: "deleted" | "replaced" }): Promise<ReleaseOutcome> {
+  const { organizationId, storagePath } = i;
+  if (!storagePath) return "skipped";
+  if (!isKeyInOrg(organizationId, storagePath)) {
+    log.error("[uploads]", "refused to release a storage key outside the organization", { organizationId });
+    return "skipped";
+  }
+  try {
+    const [row] = await db
+      .select({ id: fileUploads.id, status: fileUploads.status })
+      .from(fileUploads)
+      .where(and(eq(fileUploads.organizationId, organizationId), eq(fileUploads.storageKey, storagePath)))
+      .limit(1);
+    if (row) {
+      const released = await db
+        .update(fileUploads)
+        .set({ status: "released", failureReason: i.reason, purgeAfter: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(fileUploads.organizationId, organizationId),
+            eq(fileUploads.id, row.id),
+            inArray(fileUploads.status, ["claimed", "stored"]),
+            isNull(fileUploads.purgedAt),
+          ),
+        )
+        .returning({ id: fileUploads.id });
+      return released.length > 0 ? "released" : "skipped";
+    }
+    // Stored before the upload ledger: delete it now, unless another record still names it.
+    if (await anyRecordNamesKey(organizationId, storagePath)) return "skipped";
+    await getStorageProvider().delete(storagePath);
+    return "deleted";
+  } catch (err) {
+    log.error("[uploads]", "could not release a stored file", {
+      organizationId,
+      reason: i.reason,
+      error: new Error(`release failed (${err instanceof Error ? err.name : "error"})`),
+    });
+    return "skipped";
+  }
+}
+
+/** Release every file in `storagePaths` (a deleted solicitation's whole tree); counts by outcome. */
+export async function releaseStoredFiles(organizationId: string, storagePaths: string[], reason: "deleted" | "replaced"): Promise<Record<ReleaseOutcome, number>> {
+  const counts: Record<ReleaseOutcome, number> = { released: 0, deleted: 0, skipped: 0 };
+  for (const storagePath of Array.from(new Set(storagePaths.filter(Boolean)))) {
+    counts[await releaseStoredFile({ organizationId, storagePath, reason })] += 1;
+  }
+  return counts;
+}
+
+/** Whether any record of this organization still names this storage key. */
+async function anyRecordNamesKey(organizationId: string, key: string): Promise<boolean> {
+  const hits = await Promise.all([
+    db.select({ id: solicitations.id }).from(solicitations).where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.storagePath, key))).limit(1),
+    db
+      .select({ id: solicitationDocuments.id })
+      .from(solicitationDocuments)
+      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.storagePath, key)))
+      .limit(1),
+    db.select({ id: knowledgeArtifacts.id }).from(knowledgeArtifacts).where(and(eq(knowledgeArtifacts.organizationId, organizationId), eq(knowledgeArtifacts.storagePath, key))).limit(1),
+    db.select({ id: proposalTemplates.id }).from(proposalTemplates).where(and(eq(proposalTemplates.organizationId, organizationId), eq(proposalTemplates.docxStoragePath, key))).limit(1),
+  ]);
+  return hits.some((h) => h.length > 0);
+}
 
 /**
  * Read a stored file for parsing, refusing anything that is not this
@@ -927,7 +1012,16 @@ export async function sweepUploads(
   // 4. Delete what is due.
   if (!outOfTime()) {
     const purgeable = await db
-      .select({ id: fileUploads.id, organizationId: fileUploads.organizationId, purpose: fileUploads.purpose, storageKey: fileUploads.storageKey, purgeAttempts: fileUploads.purgeAttempts })
+      .select({
+        id: fileUploads.id,
+        organizationId: fileUploads.organizationId,
+        purpose: fileUploads.purpose,
+        status: fileUploads.status,
+        resourceType: fileUploads.resourceType,
+        resourceId: fileUploads.resourceId,
+        storageKey: fileUploads.storageKey,
+        purgeAttempts: fileUploads.purgeAttempts,
+      })
       .from(fileUploads)
       .where(
         and(
@@ -947,6 +1041,15 @@ export async function sweepUploads(
         log.error("[uploads]", "an upload's storage key is not the one built for it; its object was not deleted", { organizationId: row.organizationId, uploadId: row.id });
         await db.update(fileUploads).set({ purgeAfter: null, updatedAt: new Date() }).where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), isNull(fileUploads.purgedAt)));
         out.purgeErrors += 1;
+        continue;
+      }
+      // BL-STAB-2f — a released file a record still holds (a release that raced a save) is kept.
+      if (row.status === "released" && row.resourceId && (await recordHoldsUpload(row))) {
+        log.error("[uploads]", "a released upload's record still holds its file; kept", { organizationId: row.organizationId, uploadId: row.id });
+        await db
+          .update(fileUploads)
+          .set({ status: "claimed", purgeAfter: null, failureReason: "", updatedAt: new Date() })
+          .where(and(eq(fileUploads.organizationId, row.organizationId), eq(fileUploads.id, row.id), eq(fileUploads.status, "released")));
         continue;
       }
       try {
