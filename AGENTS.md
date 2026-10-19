@@ -56,6 +56,9 @@
 - Fresh-DB migration failures (Fresh-DB migration verification catches)
 - Tenant-scoped queries without `organizationId` (Multi-tenant
   isolation check catches statically)
+- A file passed through a server action (`File`/`Blob` arguments or
+  reading a body's bytes): `tests/ai/no-files-through-server-actions.test.ts`
+  fails the Runtime isolation tests gate
 
 ## Conventions to follow when authoring
 
@@ -79,6 +82,11 @@ When writing code yourself (Claude, Cursor, etc.):
 9. **One PR at a time.** Strict serial.
 10. **Strict serial — don't bypass gates.** Every check has a reason;
     don't suggest disabling one to ship faster.
+11. **Files go to storage, never through a server action.** The
+    browser uploads with `uploadFile()` (`src/lib/upload-client.ts`)
+    and the action files it by upload id: `claimUpload`, read it with
+    `getVerifiedObject`, then `finishClaim` / `releaseClaim` /
+    `failClaim` with the claim's `claimedAt` (`src/lib/uploads.ts`).
 
 ## Where to look
 

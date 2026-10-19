@@ -74,7 +74,7 @@ describe("BL-FB-CHAT-UPLOAD — chat attachments", () => {
       bytes: enc.encode("hello world"),
       actor: { userId: fx.orgB.userId },
     });
-    expect(foreign).toEqual({ ok: false, error: "Section not found." });
+    expect(foreign).toEqual({ ok: false, error: "Section not found.", code: "not_found" });
 
     // Empty, unsupported, unreadable.
     expect((await attachChatDocument({ organizationId: fx.orgA.organizationId, sectionId: sectionA, fileName: "e.txt", contentType: "text/plain", bytes: new Uint8Array(), actor })).ok).toBe(false);

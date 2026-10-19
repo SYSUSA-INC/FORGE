@@ -23,7 +23,10 @@ import {
   type ChatAttachmentView,
   type ChatMessage,
 } from "./chat-actions";
-import { CHAT_ATTACHMENT_ACCEPT, describeChars } from "@/lib/chat-attachments-logic";
+import { CHAT_ATTACHMENT_ACCEPT, CHAT_ATTACHMENT_LIMITS, chatAttachPrecheck, describeChars } from "@/lib/chat-attachments-logic";
+import { cancelUploadAction } from "@/app/(app)/uploads/actions";
+import { uploadFile } from "@/lib/upload-client";
+import { formatLimit } from "@/lib/upload-policy";
 import {
   describeUnread,
   filterMembers,
@@ -307,6 +310,10 @@ export function AiAssistantPanel({
   // BL-FB-CHAT-UPLOAD — reference documents scoped to this conversation.
   const [attachments, setAttachments] = useState<ChatAttachmentView[]>([]);
   const [attachBusy, setAttachBusy] = useState(false);
+  const [attachStep, setAttachStep] = useState<string | null>(null);
+  // An upload still running when the panel goes stops (and is deleted).
+  const attachAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => attachAbortRef.current?.abort(), []);
   // BL-FB-CHAT-MULTI Slice 2 — where the "new since you looked" line
   // goes (fixed at load so it does not jump while reading), the message
   // being answered, whether the model reads the team's notes, and the
@@ -642,23 +649,49 @@ export function AiAssistantPanel({
   }
 
   // BL-FB-CHAT-UPLOAD — attach / remove / save reference documents.
+  // BL-STAB-2f — the file uploads straight to storage, then the server
+  // reads it; an upload that won't be attached is deleted at once.
   async function attachFile(file: File) {
+    const refusal = chatAttachPrecheck(file, attachments.length);
+    if (refusal) {
+      setChatError(refusal);
+      return;
+    }
+    const ac = new AbortController();
+    attachAbortRef.current = ac;
     setAttachBusy(true);
+    setAttachStep("Uploading…");
     setChatError(null);
+    let uploadId: string | null = null;
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("sectionId", sectionId);
-      const res = await attachChatDocumentAction(fd);
+      const up = await uploadFile(file, {
+        purpose: "chat_attachment",
+        signal: ac.signal,
+        onPhase: (phase) => setAttachStep(phase === "verifying" ? "Checking…" : "Uploading…"),
+        onProgress: (loaded, total) => setAttachStep(`Uploading ${Math.floor((loaded / Math.max(1, total)) * 100)}%`),
+      });
+      if (!up.ok) {
+        if (up.arrivedUploadId) void cancelUploadAction(up.arrivedUploadId).catch(() => undefined);
+        if (!up.cancelled) setChatError(up.error);
+        return;
+      }
+      uploadId = up.uploadId;
+      setAttachStep("Reading…");
+      const res = await attachChatDocumentAction({ sectionId, uploadId });
       if (!res.ok) {
+        void cancelUploadAction(uploadId).catch(() => undefined);
         setChatError(res.error);
         return;
       }
-      setAttachments((list) => [...list, res.attachment]);
-    } catch (err) {
-      setChatError(err instanceof Error ? err.message : "Could not attach the file.");
+      setAttachments((list) => (list.some((a) => a.id === res.attachment.id) ? list : [...list, res.attachment]));
+    } catch {
+      // A filing still running on the server keeps its file (cancel never takes a held one).
+      if (uploadId) void cancelUploadAction(uploadId).catch(() => undefined);
+      setChatError("FORGE didn't answer while attaching the file. Reopen the chat to see whether it attached.");
     } finally {
+      if (attachAbortRef.current === ac) attachAbortRef.current = null;
       setAttachBusy(false);
+      setAttachStep(null);
     }
   }
   async function removeAttachment(id: string) {
@@ -1279,9 +1312,9 @@ export function AiAssistantPanel({
             ))}
             <label
               className={`aur-chip cursor-pointer normal-case tracking-normal hover:text-text ${attachBusy ? "opacity-60" : ""}`}
-              title="Attach a PDF, Word, Excel, PowerPoint or text file as a reference for this conversation (kept with the thread, not sent to the Brain)"
+              title={`Attach a PDF, Word, Excel, PowerPoint or text file (up to ${formatLimit(CHAT_ATTACHMENT_LIMITS.maxBytes)}) as a reference for this conversation. Its text is kept with the thread, not sent to the Brain; the file itself is deleted once read.`}
             >
-              {attachBusy ? "Reading…" : "📎 Attach a document"}
+              {attachBusy ? (attachStep ?? "Reading…") : "📎 Attach a document"}
               <input
                 type="file"
                 className="hidden"

@@ -252,15 +252,21 @@ export function parseBudgetBytes(format: UploadFormat, env: Record<string, strin
   return Math.floor(PARSE_BUDGET_MIB[format] * scale * MiB);
 }
 
-export function tooLargeToReadMessage(bytes: number, budget: number, format?: UploadFormat): string {
+/** A file's size against a limit, as a message compares them. */
+export function formatSizeAgainst(bytes: number, limit: number): [string, string] {
   // One decimal when whole megabytes would make the two look equal.
-  const digits = Math.round(bytes / MiB) === Math.round(budget / MiB) ? 1 : 0;
+  const digits = Math.round(bytes / MiB) === Math.round(limit / MiB) ? 1 : 0;
   const mb = (n: number) => `${(n / MiB).toFixed(digits)} MB`;
+  return [mb(bytes), mb(limit)];
+}
+
+export function tooLargeToReadMessage(bytes: number, budget: number, format?: UploadFormat): string {
+  const [size, limit] = formatSizeAgainst(bytes, budget);
   const advice =
     format === "image"
       ? "save it smaller (a lower resolution or a JPEG) and upload that to have it read"
       : "split it (for example by volume) and upload the parts to have it read";
-  return `Stored (${mb(bytes)}). FORGE reads files of this type up to ${mb(budget)} automatically; ${advice}.`;
+  return `Stored (${size}). FORGE reads files of this type up to ${limit} automatically; ${advice}.`;
 }
 
 /** A size limit as the upload errors state it ("500 MB"), for labels. */

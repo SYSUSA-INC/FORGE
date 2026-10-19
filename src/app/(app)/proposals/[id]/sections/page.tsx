@@ -20,6 +20,8 @@ import { AutoDraftButton } from "./ai/AutoDraftButton";
 import { SectionsClient } from "./SectionsClient";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-2f — room for reading a chat attachment (up to 50 MB) in the attach action.
+export const maxDuration = 300;
 
 export default async function ProposalSectionsPage({
   params,

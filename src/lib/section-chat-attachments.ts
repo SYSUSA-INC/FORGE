@@ -4,8 +4,9 @@
  * A file dropped into a section's chat is reduced to its text and kept
  * with that section's conversation: the chat reads it as reference,
  * the Brain never sees it, and "Save to Knowledge" is the one way out
- * (a text-only artifact, embedded like a pasted one). Every query
- * carries organizationId. Server-only; callers own auth.
+ * (a text-only artifact, embedded like a pasted one). The file itself
+ * reaches the server as an upload (BL-STAB-2f) and is deleted once read.
+ * Every query carries organizationId. Server-only; callers own auth.
  */
 import "server-only";
 
@@ -20,11 +21,13 @@ import {
   type KnowledgeArtifactKind,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
-import { CHAT_ATTACHMENT_LIMITS, isChatAttachmentFormat } from "@/lib/chat-attachments-logic";
+import { CHAT_ATTACHMENT_LIMITS, chatTooLargeToReadMessage, isChatAttachmentFormat } from "@/lib/chat-attachments-logic";
 import { embedArtifact } from "@/lib/knowledge-artifact-embed";
 import { log } from "@/lib/log";
 import { extractTextFromAny } from "@/lib/solicitation-extract";
 import { detectFormat, type ExtractFormat } from "@/lib/text-extract";
+import { parseBudgetBytes, utf8ByteLength } from "@/lib/upload-policy";
+import { claimUpload, failClaim, finishClaim, getVerifiedObject, releaseClaim } from "@/lib/uploads";
 
 type Actor = { userId: string | null; email?: string | null };
 
@@ -50,7 +53,16 @@ async function sectionForOrg(organizationId: string, sectionId: string): Promise
   return row ?? null;
 }
 
-export type AttachResult = { ok: true; attachment: ChatAttachmentView } | { ok: false; error: string };
+/**
+ * Why an attachment was refused: `unreadable` is the file itself (the
+ * same file always fails); the others are about the conversation, so the
+ * same file may attach later.
+ */
+export type AttachRefusal = "unreadable" | "not_found" | "limit" | "unsaved";
+
+export type AttachResult = { ok: true; attachment: ChatAttachmentView } | { ok: false; error: string; code: AttachRefusal };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function attachChatDocument(input: {
   organizationId: string;
@@ -59,41 +71,51 @@ export async function attachChatDocument(input: {
   contentType: string;
   bytes: Uint8Array;
   actor: Actor;
+  /** BL-STAB-2f — the id an upload's claim fixed: a retry finds the row it saved instead of adding another. */
+  id?: string;
+  uploadId?: string;
 }): Promise<AttachResult> {
   const { organizationId } = input;
   const fileName = input.fileName.trim().slice(0, 256) || "document";
-  if (input.bytes.length === 0) return { ok: false, error: "File is empty." };
+  if (!UUID.test(input.sectionId)) return { ok: false, error: "Section not found.", code: "not_found" };
+  if (input.id) {
+    // Before the limit: a retry of the fifth attachment is not a sixth.
+    const saved = await attachmentView({ organizationId, sectionId: input.sectionId, id: input.id });
+    if (saved) return { ok: true, attachment: saved };
+  }
+  if (input.bytes.length === 0) return { ok: false, error: "File is empty.", code: "unreadable" };
   if (input.bytes.length > CHAT_ATTACHMENT_LIMITS.maxBytes) {
-    return { ok: false, error: `File is larger than ${CHAT_ATTACHMENT_LIMITS.maxBytes / 1024 / 1024} MB.` };
+    return { ok: false, error: `File is larger than ${CHAT_ATTACHMENT_LIMITS.maxBytes / 1024 / 1024} MB.`, code: "unreadable" };
   }
   const section = await sectionForOrg(organizationId, input.sectionId);
-  if (!section) return { ok: false, error: "Section not found." };
+  if (!section) return { ok: false, error: "Section not found.", code: "not_found" };
 
   const [{ n }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(sectionChatAttachments)
     .where(and(eq(sectionChatAttachments.organizationId, organizationId), eq(sectionChatAttachments.sectionId, input.sectionId)));
   if (Number(n) >= CHAT_ATTACHMENT_LIMITS.maxPerSection) {
-    return { ok: false, error: `Up to ${CHAT_ATTACHMENT_LIMITS.maxPerSection} documents per conversation; remove one first.` };
+    return { ok: false, error: `Up to ${CHAT_ATTACHMENT_LIMITS.maxPerSection} documents per conversation; remove one first.`, code: "limit" };
   }
 
   const format = detectFormat(input.contentType, fileName);
   if (!isChatAttachmentFormat(format)) {
-    return { ok: false, error: "Attach a PDF, Word, Excel, PowerPoint or text file. Images go through Knowledge import." };
+    return { ok: false, error: "Attach a PDF, Word, Excel, PowerPoint or text file. Images go through Knowledge import.", code: "unreadable" };
   }
   let text = "";
   try {
     text = (await extractTextFromAny(input.bytes, input.contentType, fileName)).text;
   } catch (err) {
     log.warn("[chat-attachments]", "extraction failed", { organizationId, fileName, error: err });
-    return { ok: false, error: "Could not read this file." };
+    return { ok: false, error: "Could not read this file.", code: "unreadable" };
   }
   const clean = text.replace(/\u0000/g, "").trim().slice(0, CHAT_ATTACHMENT_LIMITS.maxTextChars);
-  if (!clean) return { ok: false, error: "No readable text in this file." };
+  if (!clean) return { ok: false, error: "No readable text in this file.", code: "unreadable" };
 
   const [row] = await db
     .insert(sectionChatAttachments)
     .values({
+      ...(input.id ? { id: input.id } : {}),
       organizationId,
       proposalId: section.proposalId,
       sectionId: input.sectionId,
@@ -104,8 +126,13 @@ export async function attachChatDocument(input: {
       text: clean,
       chars: clean.length,
     })
+    .onConflictDoNothing()
     .returning({ id: sectionChatAttachments.id, createdAt: sectionChatAttachments.createdAt, contentType: sectionChatAttachments.contentType });
-  if (!row) return { ok: false, error: "Could not record the attachment." };
+  if (!row) {
+    // A retry of the same upload saved it first (and wrote its audit).
+    const saved = input.id ? await attachmentView({ organizationId, sectionId: input.sectionId, id: input.id }) : null;
+    return saved ? { ok: true, attachment: saved } : { ok: false, error: "Could not record the attachment.", code: "unsaved" };
+  }
 
   await recordAudit({
     organizationId,
@@ -113,11 +140,20 @@ export async function attachChatDocument(input: {
     action: "section_chat.attach",
     resourceType: "proposal_section",
     resourceId: input.sectionId,
-    metadata: { proposalId: section.proposalId, attachmentId: row.id, fileName, fileSize: input.bytes.length, chars: clean.length },
+    metadata: {
+      proposalId: section.proposalId,
+      attachmentId: row.id,
+      fileName,
+      fileSize: input.bytes.length,
+      chars: clean.length,
+      ...(input.uploadId ? { uploadId: input.uploadId } : {}),
+    },
   });
+  // Read back the way the list reads it, so a retry's answer is the same.
+  const view = await attachmentView({ organizationId, sectionId: input.sectionId, id: row.id });
   return {
     ok: true,
-    attachment: {
+    attachment: view ?? {
       id: row.id,
       fileName,
       contentType: row.contentType,
@@ -130,9 +166,98 @@ export async function attachChatDocument(input: {
   };
 }
 
-export async function listChatAttachments(input: { organizationId: string; sectionId: string }): Promise<ChatAttachmentView[]> {
-  const { organizationId } = input;
-  const rows = await db
+/**
+ * BL-STAB-2f — attach a file the browser uploaded straight to storage
+ * (the chat's 50 MB, not a request's ~4.5 MB). The file is read once and
+ * deleted; only its text is kept. A refusal about the conversation (the
+ * section, the five-document limit) leaves the upload for a retry; a file
+ * that can't be read is failed and deleted. A retry after a lost answer
+ * returns the attachment it saved, never a second one.
+ */
+export async function attachChatUpload(input: {
+  organizationId: string;
+  sectionId: string;
+  uploadId: string;
+  actor: { userId: string; email?: string | null };
+}): Promise<AttachResult> {
+  const { organizationId, sectionId } = input;
+  if (!UUID.test(sectionId) || !(await sectionForOrg(organizationId, sectionId))) {
+    return { ok: false, error: "Section not found.", code: "not_found" };
+  }
+  const claim = await claimUpload({
+    organizationId,
+    userId: input.actor.userId,
+    uploadId: input.uploadId,
+    resourceType: "section_chat_attachment",
+  });
+  if (!claim.ok) return { ok: false, error: claim.error, code: "unsaved" };
+  if ("alreadyClaimed" in claim) {
+    const saved = await attachmentView({ organizationId, sectionId, id: claim.resourceId });
+    return saved
+      ? { ok: true, attachment: saved }
+      : { ok: false, error: "This file's attachment is not in this conversation (it was removed, or attached elsewhere); attach the file again.", code: "not_found" };
+  }
+  const file = claim.claim;
+  const held = { organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt };
+  const fail = async (error: string): Promise<AttachResult> => {
+    await failClaim({ ...held, reason: "claim_failed", detail: error });
+    return { ok: false, error, code: "unreadable" };
+  };
+
+  if (claim.rerun) {
+    // An earlier attempt may have saved it and died before finishing: no second read.
+    const saved = await attachmentView({ organizationId, sectionId, id: file.resourceId });
+    if (saved) {
+      await finishClaim(held);
+      return { ok: true, attachment: saved };
+    }
+  }
+  // Checked before the file is read into memory.
+  const budget = parseBudgetBytes(file.format, process.env);
+  if (file.size > budget) return fail(chatTooLargeToReadMessage(file.size, budget));
+
+  let read: Awaited<ReturnType<typeof getVerifiedObject>>;
+  try {
+    read = await getVerifiedObject({ organizationId, storagePath: file.storageKey });
+  } catch (err) {
+    log.warn("[chat-attachments]", "storage read failed", { organizationId, error: err });
+    await releaseClaim(held);
+    return { ok: false, error: "File storage could not be reached just now. Try again in a minute.", code: "unsaved" };
+  }
+  if (!read.ok) {
+    return fail(
+      read.reason === "changed"
+        ? "The stored file changed after it was uploaded; attach it again."
+        : "The uploaded file is no longer in storage; attach it again.",
+    );
+  }
+
+  let res: AttachResult;
+  try {
+    res = await attachChatDocument({
+      organizationId,
+      sectionId,
+      id: file.resourceId,
+      uploadId: file.uploadId,
+      fileName: file.fileName,
+      // The type the server chose for the upload, never the browser's guess.
+      contentType: file.contentType,
+      bytes: read.bytes,
+      actor: input.actor,
+    });
+  } catch (err) {
+    log.error("[chat-attachments]", "attach failed", { organizationId, error: err });
+    await releaseClaim(held);
+    return { ok: false, error: "Could not attach the file; try again.", code: "unsaved" };
+  }
+  if (res.ok) await finishClaim(held);
+  else if (res.code === "unreadable") return fail(res.error);
+  else await releaseClaim(held);
+  return res;
+}
+
+function selectViews() {
+  return db
     .select({
       id: sectionChatAttachments.id,
       fileName: sectionChatAttachments.fileName,
@@ -145,10 +270,11 @@ export async function listChatAttachments(input: { organizationId: string; secti
       authorEmail: users.email,
     })
     .from(sectionChatAttachments)
-    .leftJoin(users, eq(users.id, sectionChatAttachments.userId))
-    .where(and(eq(sectionChatAttachments.organizationId, organizationId), eq(sectionChatAttachments.sectionId, input.sectionId)))
-    .orderBy(asc(sectionChatAttachments.createdAt), asc(sectionChatAttachments.id));
-  return rows.map((r) => ({
+    .leftJoin(users, eq(users.id, sectionChatAttachments.userId));
+}
+
+function toView(r: Awaited<ReturnType<typeof selectViews>>[number]): ChatAttachmentView {
+  return {
     id: r.id,
     fileName: r.fileName,
     contentType: r.contentType,
@@ -157,7 +283,29 @@ export async function listChatAttachments(input: { organizationId: string; secti
     createdAt: r.createdAt.toISOString(),
     authorName: r.authorName || r.authorEmail || null,
     savedArtifactId: r.savedArtifactId,
-  }));
+  };
+}
+
+async function attachmentView(input: { organizationId: string; sectionId: string; id: string }): Promise<ChatAttachmentView | null> {
+  const { organizationId } = input;
+  const [row] = await selectViews()
+    .where(
+      and(
+        eq(sectionChatAttachments.organizationId, organizationId),
+        eq(sectionChatAttachments.sectionId, input.sectionId),
+        eq(sectionChatAttachments.id, input.id),
+      ),
+    )
+    .limit(1);
+  return row ? toView(row) : null;
+}
+
+export async function listChatAttachments(input: { organizationId: string; sectionId: string }): Promise<ChatAttachmentView[]> {
+  const { organizationId } = input;
+  const rows = await selectViews()
+    .where(and(eq(sectionChatAttachments.organizationId, organizationId), eq(sectionChatAttachments.sectionId, input.sectionId)))
+    .orderBy(asc(sectionChatAttachments.createdAt), asc(sectionChatAttachments.id));
+  return rows.map(toView);
 }
 
 /** The texts the chat prompt carries, oldest first. */
@@ -252,7 +400,8 @@ export async function saveChatAttachmentToKnowledge(input: {
       title: row.fileName.replace(/\.[a-z0-9]{1,5}$/i, "").slice(0, 256) || "Chat attachment",
       tags: ["chat-attachment"],
       fileName: row.fileName,
-      fileSize: row.fileSize,
+      // BL-STAB-2f — the bytes it holds (the text; the file was deleted once read): the storage meter counts this.
+      fileSize: utf8ByteLength(row.text),
       contentType: row.contentType,
       storagePath: "",
       rawText: row.text,

@@ -7,7 +7,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { expandSlashCommand } from "@/lib/chat-commands";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
-  attachChatDocument,
+  attachChatUpload,
   listChatAttachments,
   removeChatAttachment,
   saveChatAttachmentToKnowledge,
@@ -58,27 +58,26 @@ export type { ChatAttachmentView } from "@/lib/section-chat-attachments";
 /**
  * BL-FB-CHAT-UPLOAD — attach a document to this section's conversation.
  * Any member who can chat may attach; the text stays with the thread.
+ * BL-STAB-2f — the browser uploads the file straight to storage first;
+ * this files that upload (no file passes through a server action).
  */
-export async function attachChatDocumentAction(
-  formData: FormData,
-): Promise<{ ok: true; attachment: ChatAttachmentView } | { ok: false; error: string }> {
+export async function attachChatDocumentAction(input: {
+  sectionId: string;
+  uploadId: string;
+}): Promise<{ ok: true; attachment: ChatAttachmentView } | { ok: false; error: string }> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  const file = formData.get("file");
-  const sectionId = String(formData.get("sectionId") ?? "");
-  if (!(file instanceof File)) return { ok: false, error: "Pick a file to attach." };
   try {
-    return await attachChatDocument({
+    const res = await attachChatUpload({
       organizationId,
-      sectionId,
-      fileName: file.name,
-      contentType: file.type,
-      bytes: new Uint8Array(await file.arrayBuffer()),
+      sectionId: String(input?.sectionId ?? ""),
+      uploadId: String(input?.uploadId ?? ""),
       actor: { userId: user.id, email: user.email },
     });
+    return res.ok ? res : { ok: false, error: res.error };
   } catch (err) {
     log.error("[attachChatDocumentAction]", "error", { error: err });
-    return { ok: false, error: err instanceof Error ? err.message : "Could not attach the file." };
+    return { ok: false, error: "Could not attach the file; try again." };
   }
 }
 
