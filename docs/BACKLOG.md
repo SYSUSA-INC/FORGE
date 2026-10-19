@@ -716,6 +716,21 @@ mind. Bandage will come off but a true fix will stay."
         ten guards fail a test when broken; the tenth (not releasing the
         file just attached) is backed by the release never touching a row
         mid-claim, which the retry test covers.
+      - **Review (5 of 11 upheld), fixed here:** a filing that finished
+        after its record was deleted, cleared or replaced kept its file for
+        good (the delete skipped the row mid-claim) — `finishClaim`, and
+        the sweep's promotions, now release a kept upload no record holds;
+        a document or amendment filed between a solicitation delete's look
+        and the delete was cascaded without its file — every delete of a
+        solicitation, document or knowledge file now also releases that
+        kind's uploads whose records are gone (`releaseOrphanedClaims`,
+        which also clears files left by deletes made before this PR); a
+        template save that landed but reported an error is now kept, and
+        any file an earlier attempt left on a template is released at its
+        next replace or clear (`releaseSupersededTemplateFiles`); the
+        Word/HTML switch is held while a Word file uploads; a test for an
+        upload mid-claim for another template. Six more guards
+        mutation-checked.
       - **Follow-ups:** purge a deleted organization's storage prefix;
         reconcile pre-ledger objects a failed delete left behind; render
         files left behind when a proposal is deleted.

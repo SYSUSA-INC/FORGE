@@ -16,7 +16,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { isCompanionDocumentType } from "@/lib/document-type-name";
-import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseStoredFile } from "@/lib/uploads";
+import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseOrphanedClaims, releaseStoredFile } from "@/lib/uploads";
 import { runInBackground } from "@/lib/background";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
@@ -252,6 +252,7 @@ export async function deleteSolicitationDocumentAction(
   if (deleted.length === 0) return { ok: false, error: "Document not found." };
   // BL-STAB-2f — the document's file leaves storage with it (the jobs cron deletes it).
   const file = await releaseStoredFile({ organizationId, storagePath: deleted[0]!.storagePath, reason: "deleted" });
+  await releaseOrphanedClaims(organizationId, "solicitation_document");
 
   // Remerge after deletion so the parent requirements stay accurate.
   runInBackground("[deleteSolicitationDocumentAction] remerge", () =>

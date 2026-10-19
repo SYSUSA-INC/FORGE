@@ -124,6 +124,54 @@ describe("BL-STAB-2f — Word templates from direct uploads (runtime)", () => {
     expect(await kept(up.key)).toBe(true);
   });
 
+  it("a save that landed but reported an error is kept, and a file an earlier attempt left on the template is released", async () => {
+    const id = await newTemplate("Lost answer");
+    // An earlier attempt filed this file on the template, then died before the template held it.
+    const leftover = await uploaded(await docx("{organizationName}"), "Leftover.docx");
+    const left = await claimUpload({ organizationId: org(), userId: fx.orgA.userId, uploadId: leftover.uploadId, resourceType: "proposal_template", resourceId: id });
+    if (!left.ok || !("claim" in left)) throw new Error("claim failed");
+    await db.update(fileUploads).set({ status: "claimed" }).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, leftover.uploadId)));
+
+    const up = await uploaded(await docx("{organizationName}"));
+    // The template update commits, but its answer is lost.
+    const realUpdate = db.update.bind(db);
+    let failed = false;
+    vi.spyOn(db, "update").mockImplementation(((table: Parameters<typeof db.update>[0]) => {
+      if (table === proposalTemplates && !failed) {
+        failed = true;
+        return {
+          set: (values: never) => ({
+            where: (cond: never) => ({
+              returning: async (cols: never) => {
+                await realUpdate(proposalTemplates).set(values).where(cond).returning(cols);
+                throw new Error("Connection terminated unexpectedly");
+              },
+            }),
+          }),
+        };
+      }
+      return realUpdate(table);
+    }) as never);
+    vi.spyOn((await import("@/lib/log")).log, "warn").mockImplementation(() => undefined);
+    expect(await attachTemplateDocxFromUploadAction(id, up.uploadId)).toMatchObject({ ok: true });
+    expect(await template(id)).toMatchObject({ docxStoragePath: up.key });
+    expect(await status(up.uploadId)).toEqual({ status: "claimed", failureReason: "" });
+    expect(await status(leftover.uploadId)).toEqual({ status: "released", failureReason: "replaced" });
+  });
+
+  it("an upload mid-claim for one template can't be taken over for another", async () => {
+    const one = await newTemplate("Mid-claim one");
+    const two = await newTemplate("Mid-claim two");
+    const up = await uploaded(await docx("{organizationName}"));
+    const claim = await claimUpload({ organizationId: org(), userId: fx.orgA.userId, uploadId: up.uploadId, resourceType: "proposal_template", resourceId: one });
+    if (!claim.ok || !("claim" in claim)) throw new Error("claim failed");
+    await db.update(fileUploads).set({ claimedAt: new Date(Date.now() - 3 * 60_000) }).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, up.uploadId)));
+    expect(await attachTemplateDocxFromUploadAction(two, up.uploadId)).toEqual({ ok: false, error: "This file was already saved on another record." });
+    expect(await template(two)).toMatchObject({ docxStoragePath: "" });
+    const [row] = await db.select().from(fileUploads).where(and(eq(fileUploads.organizationId, org()), eq(fileUploads.id, up.uploadId)));
+    expect(row).toMatchObject({ status: "claiming", resourceId: one });
+  });
+
   it("leaves the upload ready to retry when another change to the template's file lands first", async () => {
     const id = await newTemplate("Two tabs");
     const up = await uploaded(await docx("{organizationName}"));

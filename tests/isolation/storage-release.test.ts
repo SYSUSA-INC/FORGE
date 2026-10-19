@@ -149,6 +149,30 @@ describe("BL-STAB-2f — deleted records leave storage (runtime)", () => {
     expect(audits.find((a) => a.action === "solicitation.document.delete")?.metadata).toMatchObject({ fileReleased: true });
   });
 
+  it("a filing that finishes after its record was deleted, or a file a delete's own list missed, is still released", async () => {
+    const org = fx.orgA.organizationId;
+    const [parent] = await db.insert(solicitations).values({ organizationId: org, title: "RFP", parseStatus: "parsed" }).returning({ id: solicitations.id });
+    // The document is saved, then deleted while its filing is still finishing.
+    const late = await filed("solicitation_document");
+    await db.insert(solicitationDocuments).values({ id: late.id, organizationId: org, solicitationId: parent!.id, documentType: "pws", fileName: "PWS.txt", storagePath: late.key, parseStatus: "parsed" });
+    expect(await deleteSolicitationDocumentAction(late.id)).toEqual({ ok: true });
+    expect(await ledger([late.uploadId])).toEqual({ [late.uploadId]: ["claiming", ""] });
+    await finish(late);
+    expect(await ledger([late.uploadId])).toEqual({ [late.uploadId]: ["released", "deleted"] });
+
+    // A filed document whose record went without its file being released (a delete before
+    // files were released, or one filed between a delete's look and the delete).
+    const missed = await filed("solicitation_document");
+    await db.insert(solicitationDocuments).values({ id: missed.id, organizationId: org, solicitationId: parent!.id, documentType: "pws", fileName: "SOW.txt", storagePath: missed.key, parseStatus: "parsed" });
+    await finish(missed);
+    await db.delete(solicitationDocuments).where(and(eq(solicitationDocuments.organizationId, org), eq(solicitationDocuments.id, missed.id)));
+    // Another organization's orphan is not this delete's to release.
+    const theirs = await filed("solicitation_document", "B");
+    await db.update(fileUploads).set({ status: "claimed", purgeAfter: null }).where(and(eq(fileUploads.organizationId, fx.orgB.organizationId), eq(fileUploads.id, theirs.uploadId)));
+    expect(await deleteSolicitationAction(parent!.id)).toEqual({ ok: true });
+    expect(await ledger([missed.uploadId, theirs.uploadId])).toEqual({ [missed.uploadId]: ["released", "deleted"], [theirs.uploadId]: ["claimed", ""] });
+  });
+
   it("never deletes a file a record still holds, another record names, or another organization owns", async () => {
     const org = fx.orgA.organizationId;
     // A release that raced a save: the record still holds the file, so the sweep keeps it.
