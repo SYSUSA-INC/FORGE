@@ -11,13 +11,11 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
-import { getStorageProvider } from "@/lib/storage";
-import { isLikelyDocx, scanDocxForVariables } from "@/lib/docx-template";
+import { scanDocxForVariables } from "@/lib/docx-template";
+import { claimUpload, failClaim, finishClaim, getVerifiedObject, releaseClaim, releaseStoredFile } from "@/lib/uploads";
 import { STARTER_TEMPLATES } from "@/lib/template-types";
 import { templateAuthoringRefusal } from "@/lib/template-gate";
 import { log } from "@/lib/log";
-
-const DOCX_MAX_BYTES = 25 * 1024 * 1024;
 
 export type TemplateRow = {
   id: string;
@@ -395,95 +393,109 @@ export type DocxUploadResult =
     }
   | { ok: false; error: string };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * Upload a .docx as the source-of-truth for a template. We store the
- * bytes via the storage provider, scan for {placeholder} variables,
- * and surface any warnings (broken splits, no placeholders found).
- *
- * The actual rendering happens in Phase 12b — for now we just persist
- * the file + the detected variable list so the editor UI can show
- * the user which placeholders FORGE will substitute on render.
+ * BL-STAB-2f — attach a .docx the browser uploaded straight to storage as
+ * a template's source file (up to the policy's 50 MB, not a request's
+ * ~4.5 MB), and scan it for {placeholder} variables. The claim names the
+ * template, so a retry continues it and a file never moves to another
+ * template; a file that can't be read as a .docx is refused and deleted;
+ * the file it replaces is released (never the one just attached), and
+ * only if no other change to the template landed meanwhile.
  */
-export async function uploadTemplateDocxAction(
+export async function attachTemplateDocxFromUploadAction(
   templateId: string,
-  formData: FormData,
+  uploadId: string,
 ): Promise<DocxUploadResult> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   await requireOrgAdmin(organizationId);
   const refusal = await templateAuthoringRefusal(organizationId);
   if (refusal) return { ok: false, error: refusal };
+  if (typeof templateId !== "string" || !UUID.test(templateId)) return { ok: false, error: "Template not found." };
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return { ok: false, error: "Pick a Word file (.docx) to upload." };
-  }
-  if (file.size === 0) return { ok: false, error: "File is empty." };
-  if (file.size > DOCX_MAX_BYTES) {
-    return {
-      ok: false,
-      error: `Template is larger than ${DOCX_MAX_BYTES / 1024 / 1024} MB. Trim or compress before uploading.`,
-    };
-  }
-  if (!isLikelyDocx(file.type, file.name)) {
-    return {
-      ok: false,
-      error: "Only .docx (Word) templates are supported. Save as Word format and re-upload.",
-    };
-  }
-
-  // Confirm the template exists in this org.
   const [tpl] = await db
-    .select({ id: proposalTemplates.id })
+    .select({
+      docxStoragePath: proposalTemplates.docxStoragePath,
+      docxFileName: proposalTemplates.docxFileName,
+      docxFileSize: proposalTemplates.docxFileSize,
+      variablesDetected: proposalTemplates.variablesDetected,
+    })
     .from(proposalTemplates)
-    .where(
-      and(
-        eq(proposalTemplates.id, templateId),
-        eq(proposalTemplates.organizationId, organizationId),
-      ),
-    )
+    .where(and(eq(proposalTemplates.id, templateId), eq(proposalTemplates.organizationId, organizationId)))
     .limit(1);
   if (!tpl) return { ok: false, error: "Template not found." };
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const claim = await claimUpload({
+    organizationId,
+    userId: actor.id,
+    uploadId: String(uploadId ?? ""),
+    resourceType: "proposal_template",
+    resourceId: templateId,
+  });
+  if (!claim.ok) return { ok: false, error: claim.error };
+  if ("alreadyClaimed" in claim) {
+    // A repeat after the file was attached: answer with what the template holds.
+    return { ok: true, variables: tpl.variablesDetected, warnings: [], fileName: tpl.docxFileName, fileSize: tpl.docxFileSize };
+  }
+  const file = claim.claim;
+  const held = { organizationId, uploadId: file.uploadId, claimedAt: file.claimedAt };
 
-  // Scan for placeholders BEFORE storing — if the file is corrupt,
-  // we'd rather fail fast with a clear error.
-  const scan = await scanDocxForVariables(bytes);
-
-  // Persist bytes via the storage provider.
-  const storage = getStorageProvider();
-  const key = `org/${organizationId}/template/${templateId}/${file.name}`;
-  let storagePath = "";
+  let read: Awaited<ReturnType<typeof getVerifiedObject>>;
   try {
-    const stored = await storage.put({
-      key,
-      bytes,
-      contentType:
-        file.type ||
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
-    storagePath = stored.storagePath;
+    read = await getVerifiedObject({ organizationId, storagePath: file.storageKey });
   } catch (err) {
-    log.error("[uploadTemplateDocx]", "storage", { error: err });
-    return {
-      ok: false,
-      error: "Saved scan results, but storing the file bytes failed. Try again.",
-    };
+    log.warn("[attachTemplateDocxFromUploadAction]", "storage read failed", { error: err });
+    await releaseClaim(held);
+    return { ok: false, error: "File storage could not be reached just now. Try again in a minute." };
+  }
+  if (!read.ok) {
+    await failClaim({ ...held, reason: "claim_failed", detail: "The stored file could not be read." });
+    return { ok: false, error: "The uploaded file could not be read from storage; upload it again." };
+  }
+  const scan = await scanDocxForVariables(read.bytes);
+  if (scan.unreadable) {
+    await failClaim({ ...held, reason: "claim_failed", detail: scan.unreadable });
+    return { ok: false, error: scan.unreadable };
   }
 
-  await db
-    .update(proposalTemplates)
-    .set({
-      kind: "docx",
-      docxStoragePath: storagePath,
-      docxFileName: file.name,
-      docxFileSize: file.size,
-      docxUploadedAt: new Date(),
-      variablesDetected: scan.variables,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(proposalTemplates.organizationId, organizationId), eq(proposalTemplates.id, templateId)));
+  // The file it replaces. A retry may find this upload's own file already attached.
+  const previous = tpl.docxStoragePath;
+  let updated: { id: string }[];
+  try {
+    updated = await db
+      .update(proposalTemplates)
+      .set({
+        kind: "docx",
+        docxStoragePath: file.storageKey,
+        docxFileName: file.fileName,
+        docxFileSize: file.size,
+        docxUploadedAt: new Date(),
+        variablesDetected: scan.variables,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(proposalTemplates.organizationId, organizationId),
+          eq(proposalTemplates.id, templateId),
+          eq(proposalTemplates.docxStoragePath, previous),
+        ),
+      )
+      .returning({ id: proposalTemplates.id });
+  } catch (err) {
+    log.error("[attachTemplateDocxFromUploadAction]", "template update failed", { error: err });
+    await releaseClaim(held);
+    return { ok: false, error: "Could not save the template; try again." };
+  }
+  if (updated.length === 0) {
+    // Another change to the file landed first (a second tab): this upload stays ready to try again.
+    await releaseClaim(held);
+    return { ok: false, error: "The template's file changed while this one was being saved. Reload the page and try again." };
+  }
+  // Released before the claim is finished: a filing that dies in between is finished by the sweep, which never sees the old file.
+  const replaced = previous && previous !== file.storageKey ? await releaseStoredFile({ organizationId, storagePath: previous, reason: "replaced" }) : "skipped";
+  await finishClaim(held);
 
   await recordAudit({
     organizationId,
@@ -492,28 +504,24 @@ export async function uploadTemplateDocxAction(
     resourceType: "template",
     resourceId: templateId,
     metadata: {
-      fileName: file.name,
+      uploadId: file.uploadId,
+      fileName: file.fileName,
       fileSize: file.size,
       variableCount: scan.variables.length,
+      replaced: replaced !== "skipped",
     },
   });
 
   revalidatePath("/settings/templates");
   revalidatePath(`/settings/templates/${templateId}`);
-
-  return {
-    ok: true,
-    variables: scan.variables,
-    warnings: scan.warnings,
-    fileName: file.name,
-    fileSize: file.size,
-  };
+  return { ok: true, variables: scan.variables, warnings: scan.warnings, fileName: file.fileName, fileSize: file.size };
 }
 
 /**
  * Remove the uploaded .docx for a template (e.g. user wants to switch
  * to a different file). Resets fields but leaves the kind alone so the
- * user stays in docx mode.
+ * user stays in docx mode. BL-STAB-2f — the file is released (the jobs
+ * cron deletes it), and only if no other change to it landed meanwhile.
  */
 export async function clearTemplateDocxAction(
   id: string,
@@ -524,7 +532,13 @@ export async function clearTemplateDocxAction(
   const refusal = await templateAuthoringRefusal(organizationId);
   if (refusal) return { ok: false, error: refusal };
 
-  await db
+  const [tpl] = await db
+    .select({ docxStoragePath: proposalTemplates.docxStoragePath })
+    .from(proposalTemplates)
+    .where(and(eq(proposalTemplates.id, id), eq(proposalTemplates.organizationId, organizationId)))
+    .limit(1);
+  if (!tpl) return { ok: false, error: "Template not found." };
+  const cleared = await db
     .update(proposalTemplates)
     .set({
       docxStoragePath: "",
@@ -538,14 +552,19 @@ export async function clearTemplateDocxAction(
       and(
         eq(proposalTemplates.id, id),
         eq(proposalTemplates.organizationId, organizationId),
+        eq(proposalTemplates.docxStoragePath, tpl.docxStoragePath),
       ),
-    );
+    )
+    .returning({ id: proposalTemplates.id });
+  if (cleared.length === 0) return { ok: false, error: "The template's file changed meanwhile. Reload the page and try again." };
+  const file = tpl.docxStoragePath ? await releaseStoredFile({ organizationId, storagePath: tpl.docxStoragePath, reason: "deleted" }) : "skipped";
   await recordAudit({
     organizationId,
     actor: { userId: actor.id, email: actor.email },
     action: "template.clear_docx",
     resourceType: "template",
     resourceId: id,
+    metadata: { fileReleased: file !== "skipped" },
   });
   revalidatePath("/settings/templates");
   revalidatePath(`/settings/templates/${id}`);

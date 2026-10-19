@@ -21,7 +21,7 @@ import {
   CLASSIFY_CONFIDENCE_THRESHOLD,
 } from "@/lib/knowledge-classify";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
-import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
+import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseStoredFile } from "@/lib/uploads";
 import { log } from "@/lib/log";
 
 
@@ -342,20 +342,25 @@ export async function deleteKnowledgeArtifactAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  await db
+  const deleted = await db
     .delete(knowledgeArtifacts)
     .where(
       and(
         eq(knowledgeArtifacts.id, id),
         eq(knowledgeArtifacts.organizationId, organizationId),
       ),
-    );
+    )
+    .returning({ storagePath: knowledgeArtifacts.storagePath });
+  if (deleted.length === 0) return { ok: false, error: "Artifact not found." };
+  // BL-STAB-2f — the artifact's file leaves storage with it (the jobs cron deletes it).
+  const file = await releaseStoredFile({ organizationId, storagePath: deleted[0]!.storagePath, reason: "deleted" });
   await recordAudit({
     organizationId,
     actor: { userId: actor.id, email: actor.email },
     action: "knowledge_artifact.delete",
     resourceType: "knowledge_artifact",
     resourceId: id,
+    metadata: { fileReleased: file !== "skipped" },
   });
   revalidatePath("/knowledge-base");
   revalidatePath("/knowledge-base/import");

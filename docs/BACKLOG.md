@@ -74,7 +74,7 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392; 2f-1 (files removed on delete, Word templates) shipped in PR #393) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
@@ -182,7 +182,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -679,9 +679,49 @@ mind. Bandage will come off but a true fix will stay."
         plan; a bomb, a password and a storage error at upload). Upload
         tests give their organizations a plan (`withUploadPlans`). Nine
         guards mutation-checked.
-    - **2f — templates, chat attachments and contacts; files removed
-      from storage when their record is deleted; a test that keeps any
-      file out of a server action.**
+    - **2f-1 — files removed from storage when their record is deleted;
+      Word templates upload straight to storage.** ✅ shipped (PR #393).
+      - `releaseStoredFile` / `releaseStoredFiles`: an upload-ledger file
+        is marked `released` (`deleted` / `replaced`) and the sweep deletes
+        it, after checking no record still holds it (a release that raced
+        a save is reverted); a pre-ledger file is deleted at once,
+        best-effort, unless another record names it; a key outside the
+        organization is refused; a row mid-claim is left alone.
+      - Wired into `deleteSolicitationAction` (the whole amendment tree,
+        to any depth, and every companion document; a not-found answer
+        and the missing `solicitation.delete` audit),
+        `deleteSolicitationDocumentAction`, `deleteKnowledgeArtifactAction`
+        (not found answered, not audited) and `clearTemplateDocxAction`.
+        Archives keep files.
+      - Templates (design §6 E): `attachTemplateDocxFromUploadAction`
+        replaces the multipart `uploadTemplateDocxAction` (25 MB, ~4.5 MB
+        on Vercel → 50 MB): the claim names the template, so an upload
+        filed for one template can't be attached to another
+        (`claimUpload` now matches a named record on repeats and
+        takeovers); the file is read back verified; a file that can't be
+        opened as a .docx is refused and deleted (`scanDocxForVariables`
+        reports `unreadable`); the template update is a compare-and-swap
+        on the previous file, and the previous file is released before
+        the claim is finished, never the one just attached. Renders read
+        the template through `getVerifiedObject`, and their template
+        lookups are now scoped to the company. The editor uses the shared
+        upload list; 300 seconds per request.
+      - **Tests:** `tests/isolation/storage-release.test.ts` (a three-level
+        amendment tree with a document and a pre-ledger file; the sweep
+        deleting released files but not a held one; another record's or
+        organization's key never deleted; a released upload can't be
+        filed again) and `tests/isolation/template-uploads.test.ts`
+        (attach, scan, replace, repeat, a retry whose save landed, two
+        tabs, another template's upload, a damaged .docx, clear). Nine of
+        ten guards fail a test when broken; the tenth (not releasing the
+        file just attached) is backed by the release never touching a row
+        mid-claim, which the retry test covers.
+      - **Follow-ups:** purge a deleted organization's storage prefix;
+        reconcile pre-ledger objects a failed delete left behind; render
+        files left behind when a proposal is deleted.
+    - **2f-2 — chat attachments and contacts off the transport cap;
+      text-paste guards; a test that keeps any file out of a server
+      action; BL-STAB-2 marked shipped.** ⏳ next.
 - **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a shipped
   (PR #375); 10b in progress.
   - **Symptom (owner, 2026-10-10):** NAICS 541519 + "ServiceNow" listed 10

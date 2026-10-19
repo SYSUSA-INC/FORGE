@@ -1,11 +1,12 @@
 "use server";
 
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   opportunities,
   opportunityActivities,
+  solicitationDocuments,
   solicitations,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
@@ -13,7 +14,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { getStorageProvider } from "@/lib/storage";
 import { stripExt } from "@/lib/solicitation-parse";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
-import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim } from "@/lib/uploads";
+import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseStoredFiles } from "@/lib/uploads";
 import { log } from "@/lib/log";
 
 export type UploadResult =
@@ -176,20 +177,68 @@ export async function reparseSolicitationAction(
   return { ok: true };
 }
 
+/**
+ * Delete a solicitation with its amendments (to any depth) and companion
+ * documents, which the database removes with it. BL-STAB-2f — their
+ * stored files are released (the jobs cron deletes them), and the delete
+ * is audited.
+ */
 export async function deleteSolicitationAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  await db
-    .delete(solicitations)
-    .where(
-      and(
-        eq(solicitations.id, id),
-        eq(solicitations.organizationId, organizationId),
-      ),
-    );
+  const [root] = await db
+    .select({ id: solicitations.id, fileName: solicitations.fileName, opportunityId: solicitations.opportunityId })
+    .from(solicitations)
+    .where(and(eq(solicitations.id, id), eq(solicitations.organizationId, organizationId)))
+    .limit(1);
+  if (!root) return { ok: false, error: "Solicitation not found." };
+
+  // The tree the delete removes: amendments of amendments too.
+  const treeIds = [root.id];
+  for (let frontier = [root.id]; frontier.length > 0; ) {
+    const children = await db
+      .select({ id: solicitations.id })
+      .from(solicitations)
+      .where(and(eq(solicitations.organizationId, organizationId), inArray(solicitations.parentSolicitationId, frontier)));
+    frontier = children.map((c) => c.id).filter((c) => !treeIds.includes(c));
+    treeIds.push(...frontier);
+  }
+  const [ownFiles, documentFiles] = await Promise.all([
+    db
+      .select({ storagePath: solicitations.storagePath })
+      .from(solicitations)
+      .where(and(eq(solicitations.organizationId, organizationId), inArray(solicitations.id, treeIds))),
+    db
+      .select({ storagePath: solicitationDocuments.storagePath })
+      .from(solicitationDocuments)
+      .where(and(eq(solicitationDocuments.organizationId, organizationId), inArray(solicitationDocuments.solicitationId, treeIds))),
+  ]);
+
+  await db.delete(solicitations).where(and(eq(solicitations.id, id), eq(solicitations.organizationId, organizationId)));
+  const files = await releaseStoredFiles(
+    organizationId,
+    [...ownFiles, ...documentFiles].map((f) => f.storagePath),
+    "deleted",
+  );
+
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "solicitation.delete",
+    resourceType: "solicitation",
+    resourceId: id,
+    metadata: {
+      fileName: root.fileName,
+      amendments: treeIds.length - 1,
+      documents: documentFiles.length,
+      filesReleased: files.released + files.deleted,
+      opportunityId: root.opportunityId,
+    },
+  });
   revalidatePath("/solicitations");
+  if (root.opportunityId) revalidatePath(`/opportunities/${root.opportunityId}`);
   return { ok: true };
 }
 
