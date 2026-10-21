@@ -117,7 +117,7 @@ export default async function BillingPage({
           <div className="font-display text-xl font-semibold text-text">
             {current?.tierName || "(no plan)"}
           </div>
-          <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
+          <div className="mt-1 font-mono text-[11px] uppercase tracking-label text-muted">
             {current?.status || "—"}
           </div>
           {current?.currentPeriodEnd ? (
@@ -203,7 +203,7 @@ export default async function BillingPage({
                             </span>
                           ) : null}
                         </div>
-                        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                        <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                           {t.slug}
                         </div>
                       </div>

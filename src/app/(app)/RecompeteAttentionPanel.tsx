@@ -59,7 +59,7 @@ export async function RecompeteAttentionPanel({ organizationId }: { organization
                       {confidenceLabel(f.confidence)} · {Math.round(f.score * 100)}%
                     </span>
                   </div>
-                  <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+                  <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-label text-muted">
                     {it.agency || "—"} · bid before as “{f.title}”
                   </div>
                   {f.lessons ? (

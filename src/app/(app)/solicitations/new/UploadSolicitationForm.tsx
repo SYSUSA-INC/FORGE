@@ -75,7 +75,7 @@ export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
           }`}
         >
           <div className="font-display text-2xl font-semibold text-text">{queue.busy ? "Uploading…" : "Drop a file here"}</div>
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">or click to browse</div>
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">or click to browse</div>
           <button
             type="button"
             disabled={queue.busy}
@@ -103,7 +103,7 @@ export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
 
         <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
 
-        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+        <div className="font-mono text-[10px] uppercase tracking-label text-subtle">
           The file goes straight to secure storage, then text extraction and the AI parse run in the background.
         </div>
       </div>

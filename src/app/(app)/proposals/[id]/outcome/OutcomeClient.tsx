@@ -760,7 +760,7 @@ function SidebarPanel({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-layer/5 pb-1.5 last:border-b-0">
-      <span className="text-[10px] uppercase tracking-[0.22em] text-subtle">
+      <span className="text-[10px] uppercase tracking-label text-subtle">
         {label}
       </span>
       <span className="text-right text-text">{value}</span>

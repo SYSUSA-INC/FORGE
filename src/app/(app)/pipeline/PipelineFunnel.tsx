@@ -115,7 +115,7 @@ export function PipelineFunnel({
           visual weights stay comparable. */}
       {data.closed.length > 0 ? (
         <div className="mt-6 border-t border-layer/10 pt-4">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             Outcomes
             {data.winRate !== null ? (
               <span className="ml-2 text-muted">

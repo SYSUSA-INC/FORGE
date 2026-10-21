@@ -1,5 +1,6 @@
 /**
- * BL-UI-THEME — FORGE "Boardroom Navy" palette for JavaScript.
+ * BL-UI-THEME — the FORGE palette for JavaScript (BL-UI-ENABLENOW: the
+ * EnableNow design system's values; see src/app/globals.css).
  *
  * Two exports, two jobs:
  *
@@ -12,7 +13,7 @@
  *  - `THEME_HEX` — literal hex for contexts that have no access to the
  *    page's variables: HTML emails, the PDF renderer's template
  *    defaults, values stored in the database. These are the dark-theme
- *    values (the email shell is navy) and are tested against the
+ *    values (the email shell is dark) and are tested against the
  *    `[data-theme="dark"]` block in globals.css.
  *
  * Both are keyed by ROLE (cobalt / cobaltLight / cobaltDeep, text / muted
@@ -61,24 +62,24 @@ export const THEME: Record<ThemeColor, string> = Object.fromEntries(
 
 /** Literal hex (dark-theme values) for emails, PDFs and stored data. */
 export const THEME_HEX: Record<ThemeColor, string> = {
-  canvas: "#0B1220",
-  paper: "#111A2B",
-  bone: "#182338",
-  concrete: "#243452",
+  canvas: "#050608",
+  paper: "#0B1019",
+  bone: "#121722",
+  concrete: "#1C2638",
   layer: "#FFFFFF",
-  text: "#EEF2F8",
-  muted: "#A3B1C6",
-  subtle: "#6B7A93",
-  faint: "#4B586E",
-  cobalt: "#4C8DFF",
-  cobaltLight: "#6AA1FF",
-  cobaltDeep: "#2F6FE0",
+  text: "#FFFFFF",
+  muted: "#8F9BB0",
+  subtle: "#626B7D",
+  faint: "#40506B",
+  cobalt: "#4583FF",
+  cobaltLight: "#A3BFF9",
+  cobaltDeep: "#2E5CE9",
   brass: "#D3A84C",
   brassLight: "#DDB864",
   brassDeep: "#B98C36",
-  green: "#3FB88A",
-  greenLight: "#63C7A1",
-  greenDeep: "#2F9A72",
+  green: "#5FC584",
+  greenLight: "#86D9A0",
+  greenDeep: "#2F9E66",
   red: "#E0606E",
   redLight: "#E77D89",
   redDeep: "#C24957",
@@ -138,7 +139,7 @@ const VAR_RE = /^rgb\((var\(--c-[a-z0-9-]+\))\)$/;
 /**
  * Add alpha to a THEME value or a hex literal, for inline styles.
  *   withAlpha(THEME.cobalt, 0.15)      → "rgb(var(--c-cobalt-500) / 0.15)"
- *   withAlpha(THEME_HEX.cobalt, 0.15)  → "rgba(76, 141, 255, 0.15)"
+ *   withAlpha(THEME_HEX.cobalt, 0.15)  → "rgba(69, 131, 255, 0.15)"
  */
 export function withAlpha(color: string, alpha: number): string {
   const a = Math.min(1, Math.max(0, alpha));

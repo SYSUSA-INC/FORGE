@@ -115,7 +115,7 @@ export function SearchClient({
 
       {orgNaicsList.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             Your NAICS
           </span>
           {orgNaicsList.map((code) => (
@@ -202,7 +202,7 @@ export function SearchClient({
                       <div className="font-display text-[14px] font-semibold text-text">
                         {e.legalBusinessName}
                       </div>
-                      <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+                      <div className="mt-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
                         UEI {e.ueiSAM}
                         {e.cageCode ? ` · CAGE ${e.cageCode}` : ""}
                         {e.primaryNaics ? ` · NAICS ${e.primaryNaics}` : ""}

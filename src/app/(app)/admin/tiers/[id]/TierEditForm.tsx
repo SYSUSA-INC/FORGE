@@ -202,7 +202,7 @@ export function TierEditForm({
       </div>
 
       <fieldset className="rounded-md border border-layer/10 p-3">
-        <legend className="px-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Stripe binding
         </legend>
         <p className="mb-3 font-mono text-[10px] text-muted">
@@ -235,7 +235,7 @@ export function TierEditForm({
       </fieldset>
 
       <fieldset className="rounded-md border border-layer/10 p-3">
-        <legend className="px-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Feature flags
         </legend>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -258,7 +258,7 @@ export function TierEditForm({
       </fieldset>
 
       <fieldset className="rounded-md border border-layer/10 p-3">
-        <legend className="px-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Quotas (0 = unlimited)
         </legend>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

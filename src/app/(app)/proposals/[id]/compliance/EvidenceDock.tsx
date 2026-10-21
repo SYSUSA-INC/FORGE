@@ -104,7 +104,7 @@ export function EvidenceDock({
           setOpen(next);
           if (next) loadIfNeeded();
         }}
-        className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted hover:text-text"
+        className="font-mono text-[10px] uppercase tracking-label text-muted hover:text-text"
       >
         {open ? "▼" : "▶"} Evidence ({evidence.length})
       </button>

@@ -66,7 +66,7 @@ export function EvaluationForm({
     <form className="flex flex-col gap-5" onSubmit={onSubmit}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-center">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-label text-muted">
             Rollup score
           </div>
           <div
@@ -74,12 +74,12 @@ export function EvaluationForm({
             style={{ color: verdictColor }}
           >
             {rollup}
-            <span className="ml-2 text-[13px] font-mono font-normal uppercase tracking-[0.22em]">
+            <span className="ml-2 text-[13px] font-mono font-normal uppercase tracking-label">
               / 100
             </span>
           </div>
           <div
-            className="mt-1 font-mono text-[11px] uppercase tracking-[0.22em]"
+            className="mt-1 font-mono text-[11px] uppercase tracking-label"
             style={{ color: verdictColor }}
           >
             {verdict}

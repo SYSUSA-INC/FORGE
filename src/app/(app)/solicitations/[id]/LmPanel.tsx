@@ -18,10 +18,10 @@ export function LmPanel({ lm }: { lm: LmStructure }) {
       <div className="flex flex-col gap-5">
         {l ? (
           <div className="flex flex-col gap-3">
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Section L · what to submit</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-label text-subtle">Section L · what to submit</h3>
             {l.volumes.length > 0 ? (
               <table className="w-full font-body text-[12px]">
-                <thead className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+                <thead className="font-mono text-[10px] uppercase tracking-label text-subtle">
                   <tr>
                     <th className="py-1 text-left">Volume</th>
                     <th className="py-1 text-right">Pages</th>
@@ -50,7 +50,7 @@ export function LmPanel({ lm }: { lm: LmStructure }) {
         ) : null}
         {m ? (
           <div className="flex flex-col gap-2">
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Section M · how it is evaluated</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-label text-subtle">Section M · how it is evaluated</h3>
             <p className="font-body text-[12px] text-text" title={m.basisQuote || undefined}>
               Award basis: <strong>{basisLabel(m.basis)}</strong>
             </p>
@@ -89,7 +89,7 @@ function RuleList({ title, rules }: { title: string; rules: { rule: string; sour
   if (rules.length === 0) return null;
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">{title}</div>
+      <div className="font-mono text-[10px] uppercase tracking-label text-subtle">{title}</div>
       <ul className="mt-1 flex flex-col gap-0.5 font-body text-[12px] text-text">
         {rules.map((r, i) => (
           <li key={i}>

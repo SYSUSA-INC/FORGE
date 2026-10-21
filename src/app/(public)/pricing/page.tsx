@@ -91,7 +91,7 @@ export default async function PricingPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 md:py-20">
       <div className="text-center">
-        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-teal">
+        <div className="font-mono text-[10px] uppercase tracking-label text-teal">
           FORGE pricing
         </div>
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-text md:text-4xl">
@@ -134,7 +134,7 @@ export default async function PricingPage() {
                       "var(--g-brand-bar)",
                   }}
                 />
-                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
+                <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                   {tier.slug}
                 </div>
                 <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-text">
@@ -222,7 +222,7 @@ export default async function PricingPage() {
       {addons.length > 0 ? (
         <section className="mt-16">
           <div className="text-center">
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-teal">Add-ons</div>
+            <div className="font-mono text-[10px] uppercase tracking-label text-teal">Add-ons</div>
             <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-text">Add what your plan doesn&apos;t include.</h2>
             <p className="mx-auto mt-2 max-w-2xl font-body text-[14px] leading-relaxed text-muted">
               Add-ons sit on top of any plan, bill monthly on the same invoice, and can be changed or removed any time under Settings → Billing.
@@ -235,7 +235,7 @@ export default async function PricingPage() {
                   <h3 className="font-display text-[15px] font-semibold text-text">{a.name}</h3>
                   <div className="font-display text-[15px] text-text">{a.stripePriceId || a.priceMonthlyCents > 0 ? formatMonthlyPrice(a.priceMonthlyCents) : "Contact sales"}</div>
                 </div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">{describeAddon(a)}</div>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">{describeAddon(a)}</div>
                 {a.description ? <p className="mt-2 font-body text-[12.5px] leading-relaxed text-muted">{a.description}</p> : null}
               </div>
             ))}

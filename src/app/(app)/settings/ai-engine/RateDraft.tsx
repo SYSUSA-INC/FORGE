@@ -48,7 +48,7 @@ export function RateDraft({
 
   return (
     <div className="mt-1">
-      <button type="button" className="text-[10px] uppercase tracking-[0.2em] text-subtle hover:text-text" onClick={() => setOpen(!open)}>
+      <button type="button" className="text-[10px] uppercase tracking-label text-subtle hover:text-text" onClick={() => setOpen(!open)}>
         {open ? "Hide draft" : mine ? `Your rating ${mine.overall}/5 · edit` : "Read & rate"}
       </button>
       {open ? (

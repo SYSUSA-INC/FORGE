@@ -115,7 +115,7 @@ export default async function ProposalReviewsPage({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span
-                            className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em]"
+                            className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
                             style={{
                               color: colorHex,
                               backgroundColor: `${colorHex}1A`,

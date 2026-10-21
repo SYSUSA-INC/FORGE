@@ -120,7 +120,7 @@ export default async function DashboardPage() {
             <div className="font-display text-2xl font-semibold text-text">
               {snap.nextDue.title}
             </div>
-            <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+            <div className="mt-1 font-mono text-[11px] uppercase tracking-label text-muted">
               {snap.nextDue.agency || "—"}{" "}
               <span className="text-subtle">
                 · due {snap.nextDue.responseDueDate.toISOString().slice(0, 10)}

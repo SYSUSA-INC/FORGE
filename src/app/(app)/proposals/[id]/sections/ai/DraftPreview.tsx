@@ -48,7 +48,7 @@ export function DraftPreview({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-indigo-400/30 bg-indigo-400/5 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-indigo-300">
+        <span className="font-mono text-[10px] uppercase tracking-label text-indigo-300">
           Edits preview · {summary.label}
           {streaming ? " · streaming…" : ""}
         </span>

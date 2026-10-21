@@ -15,7 +15,7 @@ export default async function HelpLayout({
     <div className="mx-auto w-full max-w-4xl">
       <div className="mb-6 flex items-baseline justify-between">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-label text-muted">
             FORGE · Help
           </div>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-text">

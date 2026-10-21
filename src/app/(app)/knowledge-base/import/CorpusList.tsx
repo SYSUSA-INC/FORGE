@@ -109,7 +109,7 @@ export function CorpusList({ artifacts }: { artifacts: ListedArtifact[] }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <span className="font-mono text-[10px] uppercase tracking-label text-muted">
           Group by
         </span>
         <div className="flex gap-1">
@@ -452,7 +452,7 @@ function EmptyKindTargets({
   if (missing.length === 0) return null;
   return (
     <div className="rounded-lg border border-dashed border-layer/10 p-2">
-      <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+      <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
         Empty kinds — drop here to reclassify
       </div>
       <div className="flex flex-wrap gap-1">

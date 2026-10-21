@@ -24,11 +24,11 @@ export function PageHeader({
     <section className="mb-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
-            <span className="aur-brand-dot h-1.5 w-1.5 rounded-full" />
+          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-label text-muted">
+            <span className="aur-diamond" />
             {eyebrow}
           </div>
-          <h1 className="mt-3 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-text md:text-5xl">
+          <h1 className="mt-3 font-display text-4xl font-normal leading-[1.08] tracking-headline text-text md:text-5xl">
             {title}
           </h1>
           {subtitle ? (
@@ -99,10 +99,10 @@ function MetaTile({
 
   const body = (
     <>
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </div>
-      <div className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${tone}`}>
+      <div className={`mt-1 font-display text-2xl font-normal tabular-nums tracking-title ${tone}`}>
         {value}
       </div>
     </>
@@ -116,7 +116,7 @@ function MetaTile({
         title={`View ${label.toLowerCase()}`}
       >
         {body}
-        <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-muted/60 transition-colors group-hover:text-cobalt-300">
+        <div className="mt-1 font-mono text-[9px] uppercase tracking-label text-muted/60 transition-colors group-hover:text-cobalt-300">
           View →
         </div>
       </Link>

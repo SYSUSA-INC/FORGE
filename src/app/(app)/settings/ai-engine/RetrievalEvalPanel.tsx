@@ -93,7 +93,7 @@ export function RetrievalEvalPanel({
         </p>
       ) : (
         <table className="w-full font-mono text-[11px]">
-          <thead className="text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <thead className="text-[10px] uppercase tracking-label text-subtle">
             <tr>
               <th className="py-1 text-left">When</th>
               <th className="py-1 text-left">Ranking</th>
@@ -145,7 +145,7 @@ function RunRow({ run, open, onToggle }: { run: RetrievalRunRow; open: boolean; 
               if (!run.summary[mode]) return null;
               return (
                 <div key={mode} className="mb-2">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-subtle">
+                  <div className="text-[10px] uppercase tracking-label text-subtle">
                     {MODE_LABEL[mode]}: not in the top 8 ({misses.length})
                   </div>
                   <ul className="mt-1 flex flex-col gap-0.5 text-muted">

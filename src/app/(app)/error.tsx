@@ -43,7 +43,7 @@ export default function AppError({
 
   return (
     <div className="mx-auto mt-10 max-w-xl rounded-lg border border-layer/10 bg-layer/[0.02] p-6">
-      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         Something went wrong
       </div>
       <h1 className="mt-2 font-display text-xl font-semibold text-text">

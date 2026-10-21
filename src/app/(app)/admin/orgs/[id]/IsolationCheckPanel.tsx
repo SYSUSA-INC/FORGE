@@ -65,7 +65,7 @@ export function IsolationCheckPanel({ organizationId }: Props) {
     <section className="flex flex-col gap-3 rounded-md border border-layer/10 bg-layer/[0.02] p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <h3 className="font-stencil text-[12px] uppercase tracking-[0.25em] text-text">
+          <h3 className="font-stencil text-[12px] uppercase tracking-label text-text">
             Runtime isolation check
           </h3>
           <p className="font-mono text-[10px] text-muted">

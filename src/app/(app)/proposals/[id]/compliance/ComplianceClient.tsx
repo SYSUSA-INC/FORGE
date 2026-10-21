@@ -142,7 +142,7 @@ export function ComplianceClient({
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setCatFilter("all")}
-          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
             catFilter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
               : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -158,7 +158,7 @@ export function ComplianceClient({
             <button
               key={c.key}
               onClick={() => setCatFilter(c.key)}
-              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -765,7 +765,7 @@ function ItemRowCard({
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[auto_1fr_auto]">
           <div className="flex flex-col gap-1 md:w-32">
             <span
-              className="rounded-md px-2 py-0.5 text-center font-mono text-[10px] uppercase tracking-[0.22em]"
+              className="rounded-md px-2 py-0.5 text-center font-mono text-[10px] uppercase tracking-label"
               style={{
                 color: catColor,
                 backgroundColor: `${catColor}1A`,
@@ -1123,7 +1123,7 @@ function ComplianceHeatmap({
       <table className="w-full border-collapse text-[11px]">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-[#0d1117] px-3 py-2 text-left font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-[#0d1117] px-3 py-2 text-left font-mono text-[10px] uppercase tracking-label text-muted">
               Requirement
             </th>
             {cols.map((s) => (

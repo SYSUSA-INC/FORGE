@@ -98,7 +98,7 @@ export default async function TiersPage() {
                     <span className="font-display text-base font-semibold text-text">
                       {t.name}
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                    <span className="font-mono text-[10px] uppercase tracking-label text-muted">
                       {t.slug}
                     </span>
                     {!t.active ? (
@@ -121,7 +121,7 @@ export default async function TiersPage() {
 
                 <dl className="mt-3 grid grid-cols-1 gap-2 font-mono text-[11px] md:grid-cols-2">
                   <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                    <div className="text-[10px] uppercase tracking-label text-muted">
                       Features
                     </div>
                     <div className="mt-1 text-text">
@@ -129,7 +129,7 @@ export default async function TiersPage() {
                     </div>
                   </div>
                   <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                    <div className="text-[10px] uppercase tracking-label text-muted">
                       Quotas
                     </div>
                     <div className="mt-1 text-text">

@@ -108,7 +108,7 @@ export function WinThemesPanel({
             className="rounded-md border border-layer/10 bg-layer/[0.02] p-3"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+              <span className="font-mono text-[10px] uppercase tracking-label text-subtle">
                 Theme {i + 1}
               </span>
               <button

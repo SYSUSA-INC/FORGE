@@ -58,7 +58,7 @@ export function CoveragePanel({
         <table className="w-full border-collapse font-mono text-[11px]">
           <thead>
             <tr className="border-b border-layer/10">
-              <th className="px-3 py-2 text-left font-normal uppercase tracking-[0.2em] text-subtle">Section</th>
+              <th className="px-3 py-2 text-left font-normal uppercase tracking-label text-subtle">Section</th>
               {reviewers.map((r) => (
                 <th key={r.userId} className="px-2 py-2 text-center font-normal text-muted" title={r.email}>
                   <span className={r.userId === currentUserId ? "text-text" : ""}>{(r.name ?? r.email.split("@")[0]) || "?"}</span>

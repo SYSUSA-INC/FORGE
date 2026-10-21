@@ -178,7 +178,7 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
 
       {summary.recent.length > 0 ? (
         <div className="mt-4 border-t border-layer/5 pt-4">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             Recently joined
           </div>
           <ul className="space-y-1">
@@ -490,7 +490,7 @@ function PendingPanel({
                       </span>
                     ) : null}
                   </div>
-                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
                     {roleLabel(i.role)} · invited {new Date(i.invitedAt).toLocaleDateString()}
                   </div>
                 </div>

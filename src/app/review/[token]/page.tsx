@@ -58,7 +58,7 @@ function Brand() {
       </div>
       <div>
         <div className="font-display text-base font-semibold text-text">FORGE</div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="font-mono text-[10px] uppercase tracking-label text-muted">
           Opportunity review
         </div>
       </div>

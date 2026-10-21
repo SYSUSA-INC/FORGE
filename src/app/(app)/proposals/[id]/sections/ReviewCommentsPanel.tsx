@@ -50,7 +50,7 @@ export function ReviewCommentsPanel({
   return (
     <div className="rounded-lg border border-amber-400/30 bg-amber-400/5">
       <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200">
+        <span className="font-mono text-[10px] uppercase tracking-label text-amber-200">
           ✎ Open review comments · {visible.length}
         </span>
         <span className="font-mono text-[10px] text-muted">Resolve here once the text answers them</span>

@@ -25,7 +25,7 @@ export function NonProdBanner() {
     <div
       role="status"
       aria-label={`${label} environment — not production`}
-      className="sticky top-0 z-40 flex h-6 w-full items-center justify-center gap-2 border-b border-amber-400/40 bg-amber-400/15 px-3 font-mono text-[10px] uppercase tracking-[0.25em] text-amber-200"
+      className="sticky top-0 z-40 flex h-6 w-full items-center justify-center gap-2 border-b border-amber-400/40 bg-amber-400/15 px-3 font-mono text-[10px] uppercase tracking-label text-amber-200"
     >
       <span aria-hidden>⚠</span>
       <span>{label} — not production · data here is disposable</span>

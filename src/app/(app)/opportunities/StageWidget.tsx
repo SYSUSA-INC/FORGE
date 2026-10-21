@@ -60,7 +60,7 @@ export function StageWidget({
     >
       <div className="flex items-center justify-between">
         <div
-          className="rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em]"
+          className="rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label"
           style={{
             color,
             backgroundColor: `${color}1A`,
@@ -81,7 +81,7 @@ export function StageWidget({
         <div className="font-display text-[14px] font-semibold text-text leading-tight">
           {spellOut}
         </div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+        <div className="font-mono text-[10px] uppercase tracking-label text-muted">
           {descriptiveLabel}
         </div>
       </div>

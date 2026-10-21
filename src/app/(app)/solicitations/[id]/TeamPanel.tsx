@@ -137,7 +137,7 @@ export function TeamPanel({
                 key={role}
                 className="rounded-lg border border-layer/10 bg-layer/[0.02] p-2"
               >
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200">
+                <div className="font-mono text-[10px] uppercase tracking-label text-amber-200">
                   {SOLICITATION_ROLE_LABELS[role]}
                 </div>
                 <ul className="mt-1 flex flex-col gap-1">
@@ -186,7 +186,7 @@ export function TeamPanel({
       )}
 
       <div className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
-        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Add teammate
         </div>
         <div className="grid grid-cols-1 gap-2">

@@ -500,7 +500,7 @@ function CandidateCard({
 
       {candidate.sourceExcerpt ? (
         <details className="mt-3 rounded-lg border border-layer/10 bg-layer/[0.015] px-3 py-2">
-          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-label text-muted">
             Evidence (source excerpt)
           </summary>
           <pre className="mt-2 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted">

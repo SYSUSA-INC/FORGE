@@ -86,7 +86,7 @@ export function AwardRow({
               </span>
             ) : null}
           </div>
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
             {[award.awardingSubAgency, award.awardingAgency]
               .filter(Boolean)
               .join(" · ") || "—"}
@@ -125,7 +125,7 @@ export function AwardRow({
                 type="button"
                 onClick={onWatch}
                 disabled={watched}
-                className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-[0.18em] disabled:text-emerald-300"
+                className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label disabled:text-emerald-300"
                 title={watched ? "Already on watchlist" : "Save to watchlist"}
               >
                 {watched ? "★ Saved" : "☆ Save"}

@@ -49,7 +49,7 @@ export function ItarRestrictedToggle({ organizationId, initialValue }: Props) {
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             ITAR restriction
           </span>
           <p className="font-mono text-[10px] text-subtle">

@@ -106,7 +106,7 @@ export function GettingStartedClient({ state }: { state: OnboardingState }) {
         eyebrow="Set up FORGE from your SAM.gov registration"
         accent="violet"
         actions={
-          <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-subtle md:inline">
+          <span className="hidden font-mono text-[10px] uppercase tracking-label text-subtle md:inline">
             Admins only · goes away once complete
           </span>
         }
@@ -192,7 +192,7 @@ export function GettingStartedClient({ state }: { state: OnboardingState }) {
             ) : proposal ? (
               <div className="mt-2 space-y-3">
                 {meta ? (
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+                  <p className="font-mono text-[10px] uppercase tracking-label text-subtle">
                     {meta.fallback
                       ? meta.stubbed
                         ? "AI in stub mode · built from the registration only"
@@ -360,7 +360,7 @@ function StepHeader({ n, title, done }: { n: number; title: string; done: boolea
         {done ? "✓" : n}
       </span>
       <span className="min-w-0 flex-1 font-display text-[13px] font-semibold text-text">{title}</span>
-      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">{done ? "Done" : "Open"}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-subtle">{done ? "Done" : "Open"}</span>
     </div>
   );
 }

@@ -145,7 +145,7 @@ export function OpportunitiesClient({
           }`}
         >
           <div className="flex items-center justify-between">
-            <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
+            <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label text-muted">
               All
             </div>
             <div className="font-display text-2xl font-semibold leading-none tabular-nums text-text">
@@ -155,7 +155,7 @@ export function OpportunitiesClient({
           <div className="font-display text-[14px] font-semibold text-text leading-tight">
             Everything
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-label text-muted">
             All stages
           </div>
         </button>
@@ -239,13 +239,13 @@ function OppRow({ o }: { o: Opp }) {
         <div className="truncate font-display text-[14px] font-semibold text-text">
           {o.title}
         </div>
-        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-label text-muted">
           {o.agency || "—"}
           {o.solicitationNumber ? ` · ${o.solicitationNumber}` : ""}
         </div>
       </Link>
       <span
-        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em]"
+        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{
           color: o.stageColor,
           backgroundColor: `${o.stageColor}1A`,

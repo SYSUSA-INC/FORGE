@@ -273,7 +273,7 @@ function AwardRow({
               </span>
             ) : null}
           </div>
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
             {[award.awardingSubAgency, award.awardingAgency]
               .filter(Boolean)
               .join(" · ") || "—"}

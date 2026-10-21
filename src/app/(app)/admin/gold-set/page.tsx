@@ -58,7 +58,7 @@ export default async function GoldSetPage() {
             <p className="font-mono text-[11px] text-muted">No documents yet.</p>
           ) : (
             <table className="w-full font-mono text-[11px]">
-              <thead className="text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <thead className="text-[10px] uppercase tracking-label text-subtle">
                 <tr>
                   <th className="py-1 text-left">Document</th>
                   <th className="py-1 text-left">Status</th>

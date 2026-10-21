@@ -458,7 +458,7 @@ export function EditTemplateClient({
             />
           ) : (
             <details className="flex flex-col gap-3" open>
-              <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-label text-muted">
                 Legacy HTML/CSS panels — kept for templates created before
                 Word-template support
               </summary>
@@ -735,7 +735,7 @@ function DocxPanel({
             <div className="font-display text-lg font-semibold text-text">
               {docxFileName}
             </div>
-            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
               {Math.max(1, Math.round(docxFileSize / 1024))} KB · uploaded{" "}
               {docxUploadedAt
                 ? new Date(docxUploadedAt).toLocaleDateString()
@@ -771,7 +771,7 @@ function DocxPanel({
             <div className="font-display text-2xl font-semibold text-text">
               Drop a Word template here
             </div>
-            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
               .docx · up to {limit} · header / footer / cover / TOC / graphics
               all preserved
             </div>
@@ -812,7 +812,7 @@ function DocxPanel({
 
       {variablesDetected.length > 0 ? (
         <div className="rounded-lg border border-layer/10 bg-layer/[0.015] p-4">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-label text-muted">
             Detected placeholders
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -877,7 +877,7 @@ function DocxPanel({
       ) : null}
 
       <details className="rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
-        <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-label text-muted">
           Available placeholders ({KNOWN_TEMPLATE_VARIABLES.length}) — drop
           these into your Word template using <code>&#123;variableName&#125;</code>
         </summary>

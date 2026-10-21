@@ -44,7 +44,7 @@ export function ReviewSummaryPanel({ reviewId, summary, summaryAt }: { reviewId:
   const list = (title: string, items: string[], box = false) =>
     items.length ? (
       <div>
-        <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">{title}</div>
+        <div className="font-mono text-[9px] uppercase tracking-label text-subtle">{title}</div>
         <ul className="mt-1 flex flex-col gap-0.5">
           {items.map((m, i) => (
             <li key={i} className="font-body text-[12px] leading-relaxed text-text">
@@ -85,7 +85,7 @@ export function ReviewSummaryPanel({ reviewId, summary, summaryAt }: { reviewId:
           <p className="font-display text-[14px] font-semibold leading-snug text-text">{summary.headline}</p>
           {summary.themes.length ? (
             <div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">Themes</div>
+              <div className="font-mono text-[9px] uppercase tracking-label text-subtle">Themes</div>
               <ul className="mt-1 flex flex-col gap-1.5">
                 {summary.themes.map((t, i) => (
                   <li key={i} className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">

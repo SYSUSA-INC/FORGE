@@ -14,6 +14,11 @@ import type { Config } from "tailwindcss";
  * and numbered stops, so both `text-emerald` and `text-emerald-300`
  * resolve.
  *
+ * BL-UI-ENABLENOW — the values behind the variables follow the EnableNow
+ * design system (see globals.css); this file only names them. The radius
+ * scale below is EnableNow's too (3 / 5 / 9 / 14 px), so `rounded-lg`
+ * on a card renders the 5px corner without touching the component.
+ *
  * Semantic mapping (legacy names kept so no component has to change):
  *   teal / cobalt / sky      → cobalt (primary)
  *   gold / hazard / amber    → brass (signature + attention)
@@ -57,6 +62,10 @@ const config: Config = {
         // light one. `bg-layer/5`, `border-layer/10` replace the old
         // white-alpha layer classes so depth reads in both themes.
         layer: v("layer"),
+        // The primary-button fill (EnableNow blue-600 on every ground) and
+        // the live signal green (the office clocks).
+        action: v("action"),
+        signal: { ...green, live: v("signal"), soft: v("signal-soft") },
 
         cobalt,
         brass,
@@ -72,29 +81,52 @@ const config: Config = {
         hazard: brass,
         amber: brass,
         emerald: green,
-        signal: green,
         rose: red,
         blood: red,
         violet: indigo,
         magenta: plum,
       },
       fontFamily: {
-        display: ["var(--font-display)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        stencil: ["var(--font-stencil)", "Inter", "sans-serif"],
-        mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "SF Mono", "Menlo", "monospace"],
-        body: ["var(--font-body)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "Host Grotesk", "Arial", "ui-sans-serif", "system-ui", "sans-serif"],
+        stencil: ["var(--font-stencil)", "Host Grotesk", "Arial", "sans-serif"],
+        mono: ["var(--font-mono)", "Geist Mono", "ui-monospace", "SF Mono", "Menlo", "monospace"],
+        body: ["var(--font-body)", "Host Grotesk", "Arial", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      // EnableNow radii: s 3px (controls), m 5px (cards), glass 9px, l 14px.
+      borderRadius: {
+        sm: "3px",
+        DEFAULT: "3px",
+        md: "5px",
+        lg: "5px",
+        xl: "9px",
+        "2xl": "14px",
+        "3xl": "14px",
+      },
+      // EnableNow tracking: labels 0.06em, meta 0.04em; titles tighten.
+      // `widest` / `wider` (FORGE's mono label classes) follow the labels.
+      letterSpacing: {
+        label: "0.06em",
+        meta: "0.04em",
+        widest: "0.06em",
+        wider: "0.04em",
+        title: "-0.032em",
+        headline: "-0.042em",
+      },
+      // EnableNow has no drop shadows on the page: hairlines carry the
+      // structure, and only what floats (menus, dialogs) gets the float
+      // shadow. The old glow names stay so components keep compiling.
       boxShadow: {
-        glow: "0 0 32px rgb(var(--c-cobalt-500) / 0.22)",
-        "glow-teal": "0 0 32px rgb(var(--c-cobalt-500) / 0.26)",
-        "glow-emerald": "0 0 32px rgb(var(--c-green-500) / 0.18)",
-        "glow-gold": "0 0 32px rgb(var(--c-brass-500) / 0.22)",
-        "glow-magenta": "0 0 32px rgb(var(--c-plum-500) / 0.18)",
-        card: "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 8px 24px rgb(var(--c-shadow) / var(--shadow-a))",
-        "card-lg": "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 16px 48px rgb(var(--c-shadow) / var(--shadow-a-lg))",
-        brut: "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 8px 24px rgb(var(--c-shadow) / var(--shadow-a))",
-        "brut-sm": "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 4px 12px rgb(var(--c-shadow) / var(--shadow-a))",
-        "brut-lg": "0 1px 0 rgb(var(--c-layer) / 0.04) inset, 0 16px 48px rgb(var(--c-shadow) / var(--shadow-a-lg))",
+        glow: "none",
+        "glow-teal": "none",
+        "glow-emerald": "none",
+        "glow-gold": "none",
+        "glow-magenta": "none",
+        card: "0 1px 2px rgb(var(--c-shadow) / var(--shadow-a))",
+        "card-lg": "var(--shadow-float)",
+        brut: "0 1px 2px rgb(var(--c-shadow) / var(--shadow-a))",
+        "brut-sm": "0 1px 2px rgb(var(--c-shadow) / var(--shadow-a))",
+        "brut-lg": "var(--shadow-float)",
+        float: "var(--shadow-float)",
       },
       animation: {
         aurora: "aurora 18s ease-in-out infinite",

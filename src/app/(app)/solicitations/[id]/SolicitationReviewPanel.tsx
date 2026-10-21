@@ -443,7 +443,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
     <div className="flex flex-col gap-4">
       {result.summary ? (
         <div>
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Summary
           </div>
           <p className="whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">
@@ -455,7 +455,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {result.sectionL.length > 0 ? (
           <div>
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
               Section L · Instructions
             </div>
             <ul className="flex list-disc flex-col gap-1 pl-4 font-body text-[13px] text-text">
@@ -467,7 +467,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
         ) : null}
         {result.sectionM.length > 0 ? (
           <div>
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
               Section M · Evaluation
             </div>
             <ul className="flex list-disc flex-col gap-1 pl-4 font-body text-[13px] text-text">
@@ -481,7 +481,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
 
       {result.evaluationFactors.length > 0 ? (
         <div>
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Evaluation factors
           </div>
           <ul className="flex flex-col gap-1">
@@ -509,7 +509,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
 
       {result.requirements.length > 0 ? (
         <div>
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Requirements ({result.requirements.length})
           </div>
           <ul className="flex flex-col gap-1.5">
@@ -550,7 +550,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
 
       {result.flaggedQuestions.length > 0 ? (
         <div>
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Questions flagged during review
           </div>
           <ul className="flex list-disc flex-col gap-1 pl-4 font-body text-[12px] text-text">
@@ -734,7 +734,7 @@ function QuestionList({ questions }: { questions: SolicitationQuestion[] }) {
 
       {Array.from(byCategory.entries()).map(([category, list]) => (
         <div key={category}>
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-cobalt">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-cobalt">
             {CATEGORY_LABEL[category as SolicitationQuestion["category"]] ??
               category}{" "}
             · {list.length}

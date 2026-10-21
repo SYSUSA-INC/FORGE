@@ -122,7 +122,7 @@ export function ResearchRail({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
       >
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-indigo-300">
+        <span className="font-mono text-[10px] uppercase tracking-label text-indigo-300">
           ⌕ Research while you write
           {data ? ` · ${counts}` : ""}
           {pending ? " · looking…" : ""}
@@ -311,7 +311,7 @@ function Group({
 }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.2em]" style={{ color: tone }}>
+      <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-label" style={{ color: tone }}>
         <span>{title}</span>
         {trailing}
       </div>

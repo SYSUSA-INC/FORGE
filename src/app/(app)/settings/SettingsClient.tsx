@@ -441,7 +441,7 @@ function EntityBanner({ org, className }: { org: OrgProfile; className?: string 
 
   return (
     <section className={`aur-card px-6 py-5 ${className ?? ""}`}>
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         Registered entity
       </div>
       <div className="mt-1 font-display text-3xl font-semibold tracking-tight text-text">
@@ -460,7 +460,7 @@ function EntityBanner({ org, className }: { org: OrgProfile; className?: string 
 function BannerTag({ k, v }: { k: string; v: string }) {
   return (
     <div className="rounded-md border border-layer/10 bg-layer/[0.03] px-3 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[9px] uppercase tracking-label text-muted">
         {k}
       </div>
       <div className="mt-0.5 font-mono text-[13px] font-medium text-text">{v}</div>

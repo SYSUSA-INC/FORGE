@@ -364,7 +364,7 @@ function CandidateCard({ candidate: c }: { candidate: ScoutCandidateView }) {
           c.title
         )}
       </div>
-      <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+      <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-label text-muted">
         {[c.agency, c.noticeType, c.setAside, c.naicsCode ? `NAICS ${c.naicsCode}` : "", c.incumbent ? `incumbent ${c.incumbent}` : ""]
           .filter(Boolean)
           .join(" · ") || "—"}

@@ -25,7 +25,7 @@ export function HeatGrid({
   return (
     <div className="font-mono text-[10px]">
       {(title || legend) && (
-        <div className="mb-2 flex items-center justify-between uppercase tracking-[0.2em] text-muted">
+        <div className="mb-2 flex items-center justify-between uppercase tracking-label text-muted">
           <span>{title}</span>
           {legend ? <span>{legend}</span> : null}
         </div>

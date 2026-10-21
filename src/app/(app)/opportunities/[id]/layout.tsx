@@ -85,11 +85,11 @@ export default async function OpportunityDetailLayout({
           className="h-2 w-2 rounded-full"
           style={{ backgroundColor: stageColor }}
         />
-        <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+        <div className="font-mono text-[11px] uppercase tracking-label text-muted">
           Current stage
         </div>
         <div
-          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-[0.22em]"
+          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-label"
           style={{
             color: stageColor,
             backgroundColor: `${stageColor}1A`,

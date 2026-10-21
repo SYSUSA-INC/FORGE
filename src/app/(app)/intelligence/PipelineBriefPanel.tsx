@@ -79,7 +79,7 @@ export function PipelineBriefPanel({ initial }: { initial: StoredBrief | null })
           </div>
           {brief.nextActions.length > 0 ? (
             <div>
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
                 Priorities this week
               </div>
               <ul className="list-disc space-y-0.5 pl-5 font-body text-[13px] text-text">
@@ -91,7 +91,7 @@ export function PipelineBriefPanel({ initial }: { initial: StoredBrief | null })
           ) : null}
           {brief.signals.length > 0 ? (
             <div>
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
                 Risks
               </div>
               <ul className="list-disc space-y-0.5 pl-5 font-body text-[13px] text-text">
@@ -101,7 +101,7 @@ export function PipelineBriefPanel({ initial }: { initial: StoredBrief | null })
               </ul>
             </div>
           ) : null}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-layer/10 pt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-layer/10 pt-3 font-mono text-[10px] uppercase tracking-label text-subtle">
             <span>
               {brief.stubbed ? <StubModeBanner variant="inline" /> : null}
               <span className="text-muted">Model:</span>{" "}

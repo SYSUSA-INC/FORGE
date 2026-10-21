@@ -32,7 +32,7 @@ export function CommandCenterStageGrid({
         className="flex flex-col gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 text-left transition-colors hover:border-layer/30"
       >
         <div className="flex items-center justify-between">
-          <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-muted">
+          <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label text-muted">
             All
           </div>
           <span aria-hidden className="text-muted">→</span>
@@ -40,7 +40,7 @@ export function CommandCenterStageGrid({
         <div className="font-display text-[14px] font-semibold text-text leading-tight">
           Open dashboard
         </div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+        <div className="font-mono text-[10px] uppercase tracking-label text-muted">
           Drill into the pipeline
         </div>
       </Link>
@@ -69,7 +69,7 @@ export function CommandCenterStageGrid({
           >
             <div className="flex items-center justify-between">
               <div
-                className="rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em]"
+                className="rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label"
                 style={{
                   color: s.color,
                   backgroundColor: `${s.color}1A`,
@@ -92,7 +92,7 @@ export function CommandCenterStageGrid({
               <div className="font-display text-[14px] font-semibold text-text leading-tight">
                 {spellOut}
               </div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                 {s.label}
               </div>
             </div>

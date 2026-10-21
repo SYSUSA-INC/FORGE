@@ -54,7 +54,7 @@ export async function ImpersonationBanner() {
     >
       <div className="flex min-w-0 items-center gap-2 font-mono text-[11px]">
         <span aria-hidden>🚨</span>
-        <span className="uppercase tracking-[0.18em] font-semibold">
+        <span className="uppercase tracking-label font-semibold">
           Impersonating
         </span>
         <span className="rounded bg-black/30 px-1.5 py-0.5">

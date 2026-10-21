@@ -173,7 +173,7 @@ function WatchlistRowView({
         <button
           type="button"
           onClick={onRemove}
-          className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-[0.18em] text-rose-300 hover:text-rose-200"
+          className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label text-rose-300 hover:text-rose-200"
         >
           Remove
         </button>
@@ -257,7 +257,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`-mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
+      className={`-mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
         active
           ? "border-teal-400 text-text"
           : "border-transparent text-muted hover:text-text"

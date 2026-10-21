@@ -68,7 +68,7 @@ export function SemanticSearchClient({
   return (
     <div className="rounded-xl border border-layer/10 bg-layer/[0.015] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="font-mono text-[10px] uppercase tracking-label text-muted">
           Semantic search
           {initialStatus.stub ? (
             <StubModeBanner variant="pill" className="ml-2" />
@@ -138,7 +138,7 @@ export function SemanticSearchClient({
             </div>
           ) : (
             <>
-              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-label text-muted">
                 <span>
                   {hits.length} match{hits.length === 1 ? "" : "es"}
                 </span>

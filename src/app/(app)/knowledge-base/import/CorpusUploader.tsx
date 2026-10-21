@@ -170,7 +170,7 @@ export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
         <div className="font-display text-2xl font-semibold text-text">
           Drop files here
         </div>
-        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
           PDF · DOCX · XLSX · PPTX · TXT · CSV · Image &nbsp;·&nbsp; up to {formatLimit(maxBytes)} each
         </div>
         <button
@@ -196,7 +196,7 @@ export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
       {staged.length > 0 || queue.items.length > 0 ? (
         <div className="rounded-xl border border-layer/10 bg-layer/[0.015]">
           <div className="flex items-center justify-between border-b border-layer/10 p-3">
-            <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+            <div className="font-mono text-[11px] uppercase tracking-label text-muted">
               {waitingCount} waiting · {activeCount} uploading · {doneCount} done · {failedCount} failed
             </div>
             <div className="flex gap-2">

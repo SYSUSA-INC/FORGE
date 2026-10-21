@@ -76,7 +76,7 @@ export function SourceRequestTriageClient({
         <button
           type="button"
           onClick={() => setFilter("all")}
-          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
             filter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
               : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -93,7 +93,7 @@ export function SourceRequestTriageClient({
               key={s}
               type="button"
               onClick={() => setFilter(s)}
-              className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -238,7 +238,7 @@ function RequestRow({
         <div className="border-t border-layer/10 px-3 py-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                 Description
               </div>
               <div className="mt-1 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">
@@ -246,7 +246,7 @@ function RequestRow({
               </div>
             </div>
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                 Sample paste
               </div>
               <div className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-layer/10 bg-canvas px-2 py-1.5 font-mono text-[11px] text-text">
@@ -257,7 +257,7 @@ function RequestRow({
 
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[200px_1fr]">
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <span className="font-mono text-[10px] uppercase tracking-label text-muted">
                 Status
               </span>
               <select
@@ -275,7 +275,7 @@ function RequestRow({
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <span className="font-mono text-[10px] uppercase tracking-label text-muted">
                 Platform notes (visible to customer)
               </span>
               <textarea

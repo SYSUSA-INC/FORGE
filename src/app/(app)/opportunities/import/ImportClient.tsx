@@ -501,7 +501,7 @@ function OpportunityRow({
               ))}
             </div>
           ) : null}
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
             {noticeAgency(o) || "—"}
           </div>
           <div className="mt-1 font-mono text-[11px] text-muted">

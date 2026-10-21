@@ -162,7 +162,7 @@ export function ProposalsClient({
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setStageFilter("all")}
-          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
             stageFilter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
               : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -178,7 +178,7 @@ export function ProposalsClient({
             <button
               key={s.key}
               onClick={() => setStageFilter(s.key)}
-              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -243,7 +243,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`relative -mb-px px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
+      className={`relative -mb-px px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
         active
           ? "border-b-2 border-teal text-text"
           : "border-b-2 border-transparent text-muted hover:text-text"
@@ -272,13 +272,13 @@ function ProposalRowItem({ p }: { p: ProposalRow }) {
         <div className="truncate font-display text-[14px] font-semibold text-text">
           {p.title}
         </div>
-        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-label text-muted">
           {p.oppAgency || "—"}
           {p.oppSolicitation ? ` · ${p.oppSolicitation}` : ""}
         </div>
       </div>
       <span
-        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em]"
+        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{
           color: p.stageColor,
           backgroundColor: `${p.stageColor}1A`,

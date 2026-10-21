@@ -169,7 +169,7 @@ export default async function ProposalCompliancePage({
             }}
           />
         </div>
-        <div className="mt-1 text-center font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+        <div className="mt-1 text-center font-mono text-[11px] uppercase tracking-label text-muted">
           {stats.percent}% weighted completion ({stats.na} N/A excluded)
         </div>
       </Panel>
@@ -239,7 +239,7 @@ function Stat({
 }) {
   return (
     <div className="aur-card px-4 py-3">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </div>
       <div

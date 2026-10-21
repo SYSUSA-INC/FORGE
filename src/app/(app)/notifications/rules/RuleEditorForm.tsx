@@ -471,7 +471,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
                     key={key}
                     onClick={() => toggleChannel(key)}
                     disabled={disabled}
-                    className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+                    className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                       active && !disabled
                         ? "border-teal-400 bg-teal-400/10 text-text"
                         : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -753,7 +753,7 @@ function RoleChecklist({
               type="button"
               key={r}
               onClick={() => onToggle(r)}
-              className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"

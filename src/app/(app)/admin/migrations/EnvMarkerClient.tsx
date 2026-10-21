@@ -35,7 +35,7 @@ export function EnvMarkerClient({ status }: { status: EnvMarkerStatus }) {
 
   return (
     <div className="mt-4 rounded-md border border-amber-400/30 bg-amber-400/[0.04] p-3">
-      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-amber-200">
         Relabel marker (cutover only)
       </div>
       <p className="font-body text-[12px] leading-relaxed text-muted">

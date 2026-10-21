@@ -120,7 +120,7 @@ export function LossNarrativePanel({
               </ul>
             </div>
           ) : null}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-layer/10 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-layer/10 pt-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             {result.stubbed ? <StubModeBanner variant="inline" /> : null}
             <span>
               <span className="text-muted">Provider:</span>{" "}

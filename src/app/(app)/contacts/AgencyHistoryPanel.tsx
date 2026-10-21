@@ -53,7 +53,7 @@ export function AgencyHistoryPanel({ agency, compact }: { agency: string; compac
   return (
     <div className={compact ? "border-t border-layer/10 px-4 py-2" : ""}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">What {agency} buys · USAspending</span>
+        <span className="font-mono text-[10px] uppercase tracking-label text-muted">What {agency} buys · USAspending</span>
         {data ? (
           <>
             <span className={`font-mono text-[10px] ${data.stale ? "text-amber-200" : "text-subtle"}`} title={new Date(data.fetchedAt).toLocaleString()}>
@@ -97,7 +97,7 @@ function History({ data }: { data: Loaded }) {
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted">Who wins there</div>
+          <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">Who wins there</div>
           <ul className="space-y-0.5 font-mono text-[11px]">
             {s.topRecipients.map((r) => (
               <li key={r.name} className="flex justify-between gap-2">
@@ -110,7 +110,7 @@ function History({ data }: { data: Loaded }) {
           </ul>
         </div>
         <div>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted">In which NAICS</div>
+          <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">In which NAICS</div>
           {s.naicsMix.length === 0 ? (
             <p className="font-mono text-[11px] text-muted">No NAICS on these awards.</p>
           ) : (
@@ -125,7 +125,7 @@ function History({ data }: { data: Loaded }) {
           )}
         </div>
         <div>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted">Offices seen</div>
+          <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">Offices seen</div>
           {s.subAgencies.length === 0 ? (
             <p className="font-mono text-[11px] text-muted">—</p>
           ) : (

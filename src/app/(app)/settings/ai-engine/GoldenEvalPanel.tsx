@@ -120,7 +120,7 @@ export function GoldenEvalPanel({
         </p>
       ) : (
         <table className="w-full font-mono text-[11px]">
-          <thead className="text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <thead className="text-[10px] uppercase tracking-label text-subtle">
             <tr>
               <th className="py-1 text-left">When</th>
               <th className="py-1 text-left">Prompt</th>

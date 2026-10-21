@@ -117,7 +117,7 @@ export function AuditLogClient({
       {/* Filters */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.5fr_1fr_1fr_auto_auto] md:items-end">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             Search
           </span>
           <input
@@ -131,7 +131,7 @@ export function AuditLogClient({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             Actor
           </span>
           <select
@@ -148,7 +148,7 @@ export function AuditLogClient({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             Resource
           </span>
           <select
@@ -164,7 +164,7 @@ export function AuditLogClient({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             From
           </span>
           <input
@@ -175,7 +175,7 @@ export function AuditLogClient({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             To
           </span>
           <input
@@ -219,7 +219,7 @@ export function AuditLogClient({
       {/* Table */}
       <div className="overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.02]">
         <table className="w-full min-w-[800px] text-left">
-          <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-label text-subtle">
             <tr>
               <th className="px-3 py-2 font-normal">Time</th>
               <th className="px-3 py-2 font-normal">Actor</th>

@@ -127,7 +127,7 @@ export function MigrationsClient({
       ) : null}
 
       <div className="rounded-lg border border-layer/10 bg-layer/[0.02]">
-        <div className="border-b border-layer/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+        <div className="border-b border-layer/10 px-3 py-2 font-mono text-[10px] uppercase tracking-label text-subtle">
           Migrations
         </div>
         <ul className="flex flex-col">

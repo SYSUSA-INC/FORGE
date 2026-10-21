@@ -172,7 +172,7 @@ export default async function ProductionErrorsPage({
                 ) : null}
 
                 <details className="mt-2">
-                  <summary className="cursor-pointer select-none font-mono text-[10px] uppercase tracking-[0.2em] text-muted hover:text-text">
+                  <summary className="cursor-pointer select-none font-mono text-[10px] uppercase tracking-label text-muted hover:text-text">
                     Stack ({r.fingerprint.slice(0, 12)})
                   </summary>
                   <pre className="mt-2 max-h-96 overflow-auto rounded-md bg-black/30 p-3 font-mono text-[10px] leading-relaxed text-text">

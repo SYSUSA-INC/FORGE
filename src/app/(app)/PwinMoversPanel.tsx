@@ -64,7 +64,7 @@ export async function PwinMoversPanel({
                       {STAGE_LABELS[m.stage as OpportunityStage] ?? m.stage} · {m.confidence} confidence · {m.days}d
                     </span>
                   </div>
-                  <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+                  <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-label text-muted">
                     {m.agency || "—"}
                   </div>
                   {m.reasons.length > 0 ? (

@@ -69,7 +69,7 @@ export async function DraftInsightsPanel({
         {/* Per-section-kind breakdown */}
         {data.kindStats.length > 0 ? (
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">
+            <span className="font-mono text-[9px] uppercase tracking-label text-subtle">
               By section type
             </span>
             <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">

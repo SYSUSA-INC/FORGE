@@ -170,7 +170,7 @@ export function SourceRequestPanel({
 
       {own.length > 0 ? (
         <div className="mt-5">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             Your previous requests
           </div>
           <ul className="flex flex-col gap-1.5">
@@ -228,7 +228,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <span className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
         {required ? <span className="ml-1 text-rose">*</span> : null}
       </span>

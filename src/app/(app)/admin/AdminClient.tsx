@@ -237,7 +237,7 @@ export function AdminClient({
             key={t.key}
             type="button"
             onClick={() => openTab(t.key)}
-            className={`relative -mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
+            className={`relative -mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
               tab === t.key
                 ? "border-teal-400 text-text"
                 : "border-transparent text-muted hover:text-text"
@@ -273,7 +273,7 @@ function OverviewTab({ stats }: { stats: Stats }) {
 function StatTile({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="aur-card px-4 py-3">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </div>
       <div className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-text">
@@ -825,7 +825,7 @@ function OrgRowItem({
               </span>
             ) : null}
           </div>
-          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
             {org.slug} · {org.memberCount}{" "}
             {org.memberCount === 1 ? "member" : "members"} · created{" "}
             {new Date(org.createdAt).toLocaleDateString()}
@@ -858,7 +858,7 @@ function OrgRowItem({
 
       {org.pendingAdminInvites.length > 0 ? (
         <div className="mt-3 rounded-md border border-gold/30 bg-gold/5 px-3 py-2">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">
+          <div className="font-mono text-[10px] uppercase tracking-label text-gold">
             Pending admin invitation
           </div>
           <ul className="mt-1 flex flex-col gap-1">
