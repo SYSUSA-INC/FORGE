@@ -156,7 +156,7 @@ export function ProtestViabilityPanel({
             >
               {TIER_LABEL[tier]}
             </span>
-            <p className="font-body text-[13px] leading-relaxed text-foreground">
+            <p className="font-body text-[13px] leading-relaxed text-text">
               {check.summary}
             </p>
           </div>
@@ -194,7 +194,7 @@ export function ProtestViabilityPanel({
                           {g.strength}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="font-mono text-[11px] text-foreground">
+                          <div className="font-mono text-[11px] text-text">
                             {g.groundType}
                           </div>
                           <div className="mt-0.5 font-body text-[12px] leading-relaxed text-muted">

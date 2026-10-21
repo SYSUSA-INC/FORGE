@@ -77,7 +77,7 @@ export default async function SolicitationsListPage() {
           {
             label: "Linked to opp",
             value: String(linked).padStart(2, "0"),
-            accent: linked > 0 ? "magenta" : undefined,
+            accent: linked > 0 ? "cobalt" : undefined,
           },
           {
             label: "Parse errors",
@@ -134,7 +134,7 @@ export default async function SolicitationsListPage() {
                           {STATUS_LABEL[r.parseStatus] ?? r.parseStatus}
                         </span>
                         {r.opportunityId ? (
-                          <span className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-magenta border border-magenta/40 bg-magenta/10">
+                          <span className="rounded border border-cobalt/30 bg-cobalt/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-cobalt-200">
                             opp linked
                           </span>
                         ) : null}

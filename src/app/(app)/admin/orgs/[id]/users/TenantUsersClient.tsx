@@ -273,7 +273,7 @@ export function TenantUsersClient({
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px]">
-                    <span className="text-muted/70">
+                    <span className="text-subtle">
                       Joined {formatDate(m.joinedAt)}
                     </span>
                   </div>

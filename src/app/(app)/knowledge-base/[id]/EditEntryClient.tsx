@@ -311,7 +311,7 @@ function QualityScorePanel({
           );
         })}
       </ul>
-      <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted/80">
+      <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted">
         Score re-computes on every save. Low signals show how to
         improve: longer body, structured paragraphs / bullets, dates,
         agency mentions, etc.

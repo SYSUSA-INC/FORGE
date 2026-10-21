@@ -65,6 +65,8 @@ const config: Config = {
         // The primary-button fill (EnableNow blue-600 on every ground) and
         // the live signal green (the office clocks).
         action: v("action"),
+        // Labels, links, focus and the diamond: blue-600 on paper, blue-200 on dark.
+        accent: v("accent"),
         signal: { ...green, live: v("signal"), soft: v("signal-soft") },
 
         cobalt,
@@ -91,6 +93,14 @@ const config: Config = {
         stencil: ["var(--font-stencil)", "Host Grotesk", "Arial", "sans-serif"],
         mono: ["var(--font-mono)", "Geist Mono", "ui-monospace", "SF Mono", "Menlo", "monospace"],
         body: ["var(--font-body)", "Host Grotesk", "Arial", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      // EnableNow sets three weights: 300 signs, 400 text and headings,
+      // 500 small titles and UI. 600 and heavier fold into 500 everywhere.
+      fontWeight: {
+        semibold: "500",
+        bold: "500",
+        extrabold: "500",
+        black: "500",
       },
       // EnableNow radii: s 3px (controls), m 5px (cards), glass 9px, l 14px.
       borderRadius: {

@@ -175,30 +175,30 @@ export default async function ProductionErrorsPage({
                   <summary className="cursor-pointer select-none font-mono text-[10px] uppercase tracking-label text-muted hover:text-text">
                     Stack ({r.fingerprint.slice(0, 12)})
                   </summary>
-                  <pre className="mt-2 max-h-96 overflow-auto rounded-md bg-black/30 p-3 font-mono text-[10px] leading-relaxed text-text">
+                  <pre className="mt-2 max-h-96 overflow-auto rounded-md border border-layer/10 bg-bone p-3 font-mono text-[10px] leading-relaxed text-text">
                     {r.stack || "(no stack captured)"}
                   </pre>
                 </details>
 
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10px] text-muted md:grid-cols-4">
                   <div>
-                    <dt className="text-muted/70">First seen</dt>
+                    <dt className="text-subtle">First seen</dt>
                     <dd className="text-text tabular-nums">
                       {formatTime(r.firstSeenAt)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted/70">Last seen</dt>
+                    <dt className="text-subtle">Last seen</dt>
                     <dd className="text-text tabular-nums">
                       {formatTime(r.lastSeenAt)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted/70">Tenant</dt>
+                    <dt className="text-subtle">Tenant</dt>
                     <dd className="text-text">{r.orgName ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted/70">Release</dt>
+                    <dt className="text-subtle">Release</dt>
                     <dd className="text-text tabular-nums">
                       {r.releaseSha ? r.releaseSha.slice(0, 7) : "—"}
                     </dd>

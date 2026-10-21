@@ -78,7 +78,7 @@ export default async function MigrationsPage() {
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] md:grid-cols-3">
           <div>
-            <dt className="text-muted/70">Auto-apply</dt>
+            <dt className="text-subtle">Auto-apply</dt>
             <dd
               className={
                 autoApplyEnabled ? "text-emerald-300" : "text-amber-300"
@@ -88,7 +88,7 @@ export default async function MigrationsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-muted/70">Pre-apply snapshot</dt>
+            <dt className="text-subtle">Pre-apply snapshot</dt>
             <dd
               className={
                 neonSnapshotsEnabled ? "text-emerald-300" : "text-muted"
@@ -100,7 +100,7 @@ export default async function MigrationsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-muted/70">Destructive blockers</dt>
+            <dt className="text-subtle">Destructive blockers</dt>
             <dd
               className={
                 destructiveBlockers.length > 0 ? "text-rose" : "text-emerald-300"
@@ -179,19 +179,19 @@ export default async function MigrationsPage() {
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px] md:grid-cols-4">
           <div>
-            <dt className="text-muted/70">Runtime label</dt>
+            <dt className="text-subtle">Runtime label</dt>
             <dd className="text-text">{runtimeEnv ?? "— (unset)"}</dd>
           </div>
           <div>
-            <dt className="text-muted/70">Database marker</dt>
+            <dt className="text-subtle">Database marker</dt>
             <dd className="text-text">{marker?.expectedEnv ?? "— (not recorded)"}</dd>
           </div>
           <div>
-            <dt className="text-muted/70">First seen</dt>
+            <dt className="text-subtle">First seen</dt>
             <dd className="text-muted">{fmt(marker?.firstSeenAt ?? null)}</dd>
           </div>
           <div>
-            <dt className="text-muted/70">Last verified</dt>
+            <dt className="text-subtle">Last verified</dt>
             <dd className="text-muted">{fmt(marker?.lastVerifiedAt ?? null)}</dd>
           </div>
         </dl>

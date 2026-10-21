@@ -253,7 +253,7 @@ export default async function TenantActivityPage({
                       {r.resourceType ? ` · ${r.resourceType}` : ""}
                       {r.resourceId ? ` ${r.resourceId.slice(0, 8)}…` : ""}
                     </span>
-                    <span className="tabular-nums text-muted/70">
+                    <span className="tabular-nums text-subtle">
                       {relativeTime(new Date(r.createdAt))}
                     </span>
                   </li>
@@ -350,7 +350,7 @@ function HealthRow({
         </span>
       </div>
       {hint ? (
-        <div className="mt-1 font-mono text-[10px] text-muted/70">{hint}</div>
+        <div className="mt-1 font-mono text-[10px] text-subtle">{hint}</div>
       ) : null}
       {link ? (
         <div className="mt-2 font-mono text-[10px]">

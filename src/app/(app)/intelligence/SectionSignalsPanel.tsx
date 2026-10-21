@@ -94,7 +94,7 @@ export async function SectionSignalsPanel({
                     key={row.kind}
                     className="border-b border-layer/5 last:border-b-0"
                   >
-                    <td className="py-2 pr-3 text-foreground">
+                    <td className="py-2 pr-3 text-text">
                       {KIND_LABELS[row.kind]}
                     </td>
                     <td className="py-2 pr-3 text-right">

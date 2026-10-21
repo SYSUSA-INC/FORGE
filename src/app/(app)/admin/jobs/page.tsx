@@ -181,21 +181,21 @@ export default async function BackgroundJobsPage({
                 </div>
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10px] text-muted md:grid-cols-4">
                   <div>
-                    <dt className="text-muted/70">Resource</dt>
+                    <dt className="text-subtle">Resource</dt>
                     <dd className="text-text">{r.resourceId.slice(0, 8)}…</dd>
                   </div>
                   <div>
-                    <dt className="text-muted/70">Attempts</dt>
+                    <dt className="text-subtle">Attempts</dt>
                     <dd className="text-text tabular-nums">
                       {r.attempts} / {r.maxAttempts}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted/70">Created</dt>
+                    <dt className="text-subtle">Created</dt>
                     <dd className="text-text tabular-nums">{formatTime(r.createdAt)}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted/70">{r.finishedAt ? "Finished" : "Started"}</dt>
+                    <dt className="text-subtle">{r.finishedAt ? "Finished" : "Started"}</dt>
                     <dd className="text-text tabular-nums">
                       {formatTime(r.finishedAt ?? r.startedAt)}
                     </dd>

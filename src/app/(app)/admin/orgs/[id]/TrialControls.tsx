@@ -80,7 +80,7 @@ export function TrialControls({
         )}
       </div>
       {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
-      <p className="font-mono text-[10px] leading-relaxed text-muted/80">
+      <p className="font-mono text-[10px] leading-relaxed text-muted">
         Audited as <code>tenant.trial_start</code> / <code>tenant.trial_extend</code> / <code>tenant.trial_convert</code> in the tenant&apos;s log. Stripe-paying workspaces can&apos;t be put on a trial; a Stripe checkout ends a trial by itself.
       </p>
     </div>

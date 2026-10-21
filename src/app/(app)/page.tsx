@@ -69,7 +69,7 @@ export default async function DashboardPage() {
           {
             label: "In review",
             value: String(snap.proposalsInReview).padStart(2, "0"),
-            accent: snap.proposalsInReview > 0 ? "magenta" : undefined,
+            accent: snap.proposalsInReview > 0 ? "violet" : undefined,
           },
           {
             label: "Next deadline",

@@ -20,9 +20,9 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
         title="Active AI provider"
         eyebrow="Picked by AI_PROVIDER env var; falls back to stub if unconfigured"
       >
-        <div className="aur-card-elevated px-4 py-3">
+        <div className="aur-card px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="font-display text-[15px] font-semibold text-foreground">
+            <span className="font-display text-[15px] font-semibold text-text">
               {PROVIDER_LABELS[status.active.name] ?? status.active.name}
             </span>
             {status.active.name === "stub" ? (
@@ -36,7 +36,7 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
             )}
           </div>
           <div className="mt-1 font-mono text-[11px] text-muted">
-            Default model: <span className="text-foreground">{status.defaultModel}</span>
+            Default model: <span className="text-text">{status.defaultModel}</span>
           </div>
           <div className="mt-1 font-mono text-[11px] text-muted">
             {status.active.reason}
@@ -46,7 +46,7 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
               {status.fallback ? (
                 <>
                   Fallback on outage:{" "}
-                  <span className="text-foreground">
+                  <span className="text-text">
                     {PROVIDER_LABELS[status.fallback.name] ?? status.fallback.name}
                   </span>
                 </>
@@ -67,7 +67,7 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
                 key={p.name}
                 className="flex items-baseline justify-between font-body text-[13px]"
               >
-                <span className="text-foreground">
+                <span className="text-text">
                   {PROVIDER_LABELS[p.name] ?? p.name}
                 </span>
                 <span
@@ -96,11 +96,11 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
         </p>
         <ul className="mt-3 space-y-2">
           {status.features.map((f) => (
-            <li key={f.key} className="aur-card-elevated px-4 py-3">
+            <li key={f.key} className="aur-card px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-display text-[14px] font-semibold text-foreground">
+                    <span className="font-display text-[14px] font-semibold text-text">
                       {f.name}
                     </span>
                     {f.live ? (
@@ -131,9 +131,9 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
       </Panel>
 
       <Panel title="Embeddings" eyebrow="Vector index for the Brain">
-        <div className="aur-card-elevated px-4 py-3">
+        <div className="aur-card px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="font-display text-[14px] font-semibold text-foreground">
+            <span className="font-display text-[14px] font-semibold text-text">
               OpenAI text-embedding-3-small
             </span>
             {status.embeddingsConfigured ? (

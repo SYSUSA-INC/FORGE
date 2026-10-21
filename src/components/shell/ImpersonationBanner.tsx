@@ -57,7 +57,7 @@ export async function ImpersonationBanner() {
         <span className="uppercase tracking-label font-semibold">
           Impersonating
         </span>
-        <span className="rounded bg-black/30 px-1.5 py-0.5">
+        <span className="rounded bg-layer/10 px-1.5 py-0.5">
           {target?.name ?? "unknown tenant"}
         </span>
         <span className="hidden md:inline text-layer/80">

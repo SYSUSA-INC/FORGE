@@ -146,7 +146,7 @@ export default async function TiersPage() {
                     </span>
                   </span>
                   <div className="flex items-center gap-3">
-                    <span className="text-muted/70">
+                    <span className="text-subtle">
                       sort_order {t.sortOrder}
                     </span>
                     <Link

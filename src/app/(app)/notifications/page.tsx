@@ -23,7 +23,7 @@ export default async function NotificationsPage() {
           {
             label: "Unread",
             value: String(unreadCount),
-            accent: unreadCount > 0 ? "magenta" : undefined,
+            accent: unreadCount > 0 ? "cobalt" : undefined,
           },
         ]}
       />

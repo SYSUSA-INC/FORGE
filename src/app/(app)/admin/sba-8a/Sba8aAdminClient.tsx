@@ -252,7 +252,7 @@ export function Sba8aAdminClient({
                       View →
                     </a>
                   ) : (
-                    <span className="text-muted/40">—</span>
+                    <span className="text-subtle">—</span>
                   )}
                 </td>
               </tr>
@@ -323,7 +323,7 @@ export function Sba8aAdminClient({
           </button>
         </div>
 
-        <p className="mt-2 font-mono text-[11px] text-muted/70">
+        <p className="mt-2 font-mono text-[11px] text-subtle">
           Current retention: <strong className="text-text">{retentionMonths} months</strong>.
           Graduated firms with cert exit date older than this get pruned
           on every cron run.
@@ -446,7 +446,7 @@ export function Sba8aAdminClient({
               <code>{debug.keys.length ? debug.keys.join(", ") : "(none)"}</code>
             </div>
             <div className="mb-1">Raw response sample (first 1 KB):</div>
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-black/30 p-2 text-amber-50">
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded border border-layer/10 bg-bone p-2 text-text">
               {debug.sample}
             </pre>
             {debug.trace.length > 0 ? (
@@ -454,7 +454,7 @@ export function Sba8aAdminClient({
                 <div className="mb-1 font-display text-[11px] font-semibold text-amber-200">
                   Per-entity normalize trace (first {debug.trace.length}):
                 </div>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-black/30 p-2 text-amber-50">
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded border border-layer/10 bg-bone p-2 text-text">
                   {JSON.stringify(debug.trace, null, 2)}
                 </pre>
               </div>

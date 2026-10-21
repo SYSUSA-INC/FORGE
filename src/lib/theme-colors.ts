@@ -69,10 +69,10 @@ export const THEME_HEX: Record<ThemeColor, string> = {
   layer: "#FFFFFF",
   text: "#FFFFFF",
   muted: "#8F9BB0",
-  subtle: "#626B7D",
+  subtle: "#768094",
   faint: "#40506B",
-  cobalt: "#4583FF",
-  cobaltLight: "#A3BFF9",
+  cobalt: "#B8C9FF",
+  cobaltLight: "#4583FF",
   cobaltDeep: "#2E5CE9",
   brass: "#D3A84C",
   brassLight: "#DDB864",
@@ -112,7 +112,7 @@ export const CHART_SERIES: readonly string[] = [
  * same thing on every screen. Twelve hues a viewer can tell apart.
  */
 export const PRESENCE_PALETTE: readonly string[] = [
-  THEME_HEX.cobalt,
+  "#2953D7", // the brand blue (THEME_HEX.cobalt is the pale dark-theme accent)
   THEME_HEX.brass,
   THEME_HEX.green,
   THEME_HEX.plum,
@@ -139,7 +139,7 @@ const VAR_RE = /^rgb\((var\(--c-[a-z0-9-]+\))\)$/;
 /**
  * Add alpha to a THEME value or a hex literal, for inline styles.
  *   withAlpha(THEME.cobalt, 0.15)      → "rgb(var(--c-cobalt-500) / 0.15)"
- *   withAlpha(THEME_HEX.cobalt, 0.15)  → "rgba(69, 131, 255, 0.15)"
+ *   withAlpha(THEME_HEX.cobalt, 0.15)  → "rgba(184, 201, 255, 0.15)"
  */
 export function withAlpha(color: string, alpha: number): string {
   const a = Math.min(1, Math.max(0, alpha));
