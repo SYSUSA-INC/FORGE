@@ -78,11 +78,11 @@ Effort key:
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
-| 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-2) |
+| 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-8; owner decisions 2026-10-21 recorded) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | 🔄 PR #387 |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | ⏳ queued, right after BL-STAB-2c (owner, 2026-10-08) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1131,7 +1131,8 @@ mind. Bandage will come off but a true fix will stay."
     and re-encryption counts it apart, with the advice to restore the
     value rather than remove keys.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
-  data.** ⏳ queued (added 2026-10-08).
+  data.** 🔄 next (added 2026-10-08; owner, 2026-10-21: next, now
+  that BL-STAB-2 has shipped).
   - **Ask (owner):** "We need to enforce some security gates for
     signup, MFA mandatory, Email validation, mobile phone validation,
     and Cloudflare implementation to ensure we are protecting the
@@ -1193,6 +1194,23 @@ mind. Bandage will come off but a true fix will stay."
       The label comes with a confidence and the evidence for it.
     - The user confirms or changes the labels, then each file is filed
       and parsed on its own path.
+  - **Owner decisions (2026-10-21):**
+    - **Order:** after BL-STAB-8 (see below).
+    - **Amendments** in a batch are filed as child solicitations, as
+      Add amendment does: each has its own parse, number and dates, is
+      compared with the base, and joins the base's opportunity. They
+      are filed after the base, in number order.
+    - **Q&A files, pricing sheets and forms** get their own companion
+      document types. Pricing sheets and forms are stored and readable
+      but not swept for requirements. Q&A answers are read into the Q&A
+      panel with today's reader and are removed with their file;
+      BL-STAB-5 improves the reader.
+    - **Labels** come from rules first: the file name plus text signals
+      (Sections L/M, SF-30/SF-1449 headers, Q&A markers, price
+      columns), each with a quoted line as evidence. An AI check runs
+      only when the rules are weak or disagree. Without AI, the label
+      says it is rule-based. The user confirms every label before
+      anything is filed.
 - **BL-STAB-4 — Amendments one at a time.** 🔄 4a shipped (PR #368).
   - **Ask:** Upload several amendments in one go.
   - **4a — several at once (shipped, PR #368):** Add amendment takes several files;
