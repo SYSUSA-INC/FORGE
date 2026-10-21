@@ -187,7 +187,7 @@ export function CommandPalette({ isOrgAdmin, isSuperadmin, hasWorkspace }: NavVi
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[10vh]">
-      <div onClick={close} aria-hidden className="absolute inset-0 bg-canvas/70 backdrop-blur-sm" />
+      <div onClick={close} aria-hidden className="aur-scrim absolute inset-0" />
       <div
         role="dialog"
         aria-modal="true"

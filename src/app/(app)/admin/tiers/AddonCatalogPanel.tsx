@@ -48,7 +48,7 @@ export function AddonCatalogPanel({ addons, activeGrants }: { addons: AddonCatal
                       <span>{formatMonthlyPrice(a.priceMonthlyCents)}</span>
                       <span>{a.stripePriceId ? `Stripe ${a.stripePriceId}` : "Not sold by card (grant only)"}</span>
                       <span>Active grants: <span className="text-text tabular-nums">{activeGrants[a.id] ?? 0}</span></span>
-                      <span className="text-muted/70">sort_order {a.sortOrder}</span>
+                      <span className="text-subtle">sort_order {a.sortOrder}</span>
                     </div>
                   </div>
                   <button type="button" onClick={() => setEditing(a.id)} className="aur-btn aur-btn-ghost text-[11px]">

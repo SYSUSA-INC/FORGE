@@ -49,12 +49,12 @@ export function IntegrationsTab({
               {items.map((i) => (
                 <li
                   key={i.key}
-                  className="aur-card-elevated px-4 py-3"
+                  className="aur-card px-4 py-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-display text-[14px] font-semibold text-foreground">
+                        <span className="font-display text-[14px] font-semibold text-text">
                           {i.name}
                         </span>
                         <StatusPill configured={i.configured} />

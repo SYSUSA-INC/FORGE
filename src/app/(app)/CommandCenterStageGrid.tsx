@@ -79,10 +79,7 @@ export function CommandCenterStageGrid({
                 {s.shortLabel}
               </div>
               <div
-                className="font-display text-2xl font-semibold leading-none tabular-nums"
-                style={{
-                  color: stat.count > 0 ? "var(--text)" : "var(--muted)",
-                }}
+                className={`font-display text-2xl font-semibold leading-none tabular-nums ${stat.count > 0 ? "text-text" : "text-muted"}`}
               >
                 {stat.count}
               </div>

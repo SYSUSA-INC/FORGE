@@ -187,7 +187,7 @@ function ThreadCard({
       {/* Quoted snippet */}
       {thread.quoted && (
         <blockquote
-          className="border-l-2 border-yellow-400/40 pl-2 font-mono text-[10px] italic"
+          className="border-l-2 border-brass/40 pl-2 font-mono text-[10px] italic"
           style={{ color: THEME.brassLight }}
         >
           &ldquo;{thread.quoted}&rdquo;

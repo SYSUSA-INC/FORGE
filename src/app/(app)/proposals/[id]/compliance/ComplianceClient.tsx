@@ -1123,7 +1123,7 @@ function ComplianceHeatmap({
       <table className="w-full border-collapse text-[11px]">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-[#0d1117] px-3 py-2 text-left font-mono text-[10px] uppercase tracking-label text-muted">
+            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-paper px-3 py-2 text-left font-mono text-[10px] uppercase tracking-label text-muted">
               Requirement
             </th>
             {cols.map((s) => (
@@ -1150,7 +1150,7 @@ function ComplianceHeatmap({
         <tbody>
           {items.map((item) => (
             <tr key={item.id} className="border-t border-layer/[0.04] hover:bg-layer/[0.02]">
-              <td className="sticky left-0 z-10 bg-[#0d1117] px-3 py-2 font-body text-[12px] text-text">
+              <td className="sticky left-0 z-10 bg-paper px-3 py-2 font-body text-[12px] text-text">
                 <div className="flex items-center gap-1.5">
                   {item.number ? (
                     <span className="shrink-0 font-mono text-[10px] text-muted">
@@ -1291,7 +1291,7 @@ function PreflightBar({
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-[11px]">
         <span className="text-muted">
-          Mapped <span className="text-foreground">{mapped}</span>
+          Mapped <span className="text-text">{mapped}</span>
         </span>
         <span className="text-muted">
           Unmapped <span className="text-amber-200">{unmapped}</span>
@@ -1387,7 +1387,7 @@ function AIAssessmentRow({
         </span>
       </div>
       {assessment.gap ? (
-        <div className="mt-1 font-body text-[12px] leading-relaxed text-foreground">
+        <div className="mt-1 font-body text-[12px] leading-relaxed text-text">
           <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">
             Gap:{" "}
           </span>

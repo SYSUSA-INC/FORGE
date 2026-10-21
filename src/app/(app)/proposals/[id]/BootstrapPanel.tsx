@@ -99,21 +99,21 @@ export function BootstrapPanel({
           </ul>
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10px] text-muted md:grid-cols-4">
             <div>
-              <dt className="text-muted/70">Due date</dt>
+              <dt className="text-subtle">Due date</dt>
               <dd className="text-text">
                 {record.dueDate ?? "not stated"}
                 {applied?.dueDateSet ? " · set" : ""}
               </dd>
             </div>
             <div>
-              <dt className="text-muted/70">Themes proposed</dt>
+              <dt className="text-subtle">Themes proposed</dt>
               <dd className="text-text">
                 {record.proposedThemes.length}
                 {applied?.themesSeeded ? " · seeded" : record.proposedThemes.length ? " · kept yours" : ""}
               </dd>
             </div>
             <div>
-              <dt className="text-muted/70">Applied</dt>
+              <dt className="text-subtle">Applied</dt>
               <dd className="text-text">
                 {applied
                   ? `${applied.sectionsInserted} added · ${applied.sectionsUpdated} refreshed · ${applied.sectionsRemoved} removed · ${applied.sectionsKept} kept`
@@ -121,7 +121,7 @@ export function BootstrapPanel({
               </dd>
             </div>
             <div>
-              <dt className="text-muted/70">Mode</dt>
+              <dt className="text-subtle">Mode</dt>
               <dd className="text-text">{applied?.mode ?? "—"}</dd>
             </div>
           </dl>
@@ -130,7 +130,7 @@ export function BootstrapPanel({
               {record.proposedThemes.map((t) => (
                 <li key={t.title}>
                   <span className="text-text">{t.title}</span> — {t.statement}
-                  {t.rationale ? <span className="text-muted/70"> ({t.rationale})</span> : null}
+                  {t.rationale ? <span className="text-subtle"> ({t.rationale})</span> : null}
                 </li>
               ))}
             </ul>

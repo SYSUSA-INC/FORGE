@@ -425,7 +425,7 @@ export function AwardsSearchClient({
         <div className="mt-3">
           <label className="aur-label">
             Socio-economic set-aside
-            <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-muted/60">
+            <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-subtle">
               (leave empty for full + open)
             </span>
           </label>

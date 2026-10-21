@@ -79,7 +79,7 @@ export function StubModeBanner({
               <>
                 {" "}
                 Set{" "}
-                <code className="rounded bg-black/30 px-1 text-[12px] text-amber-200">
+                <code className="rounded bg-layer/10 px-1 text-[12px] text-amber-200">
                   {envVar}
                 </code>{" "}
                 to flip this feature live.

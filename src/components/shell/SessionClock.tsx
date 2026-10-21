@@ -14,7 +14,7 @@ export function SessionClock() {
   }, []);
 
   return (
-    <div className="hidden items-center gap-2 rounded-full border border-layer/10 bg-layer/5 px-3 py-1 font-mono text-[11px] tracking-widest text-muted md:flex">
+    <div className="hidden items-center gap-2 font-mono text-[11px] tracking-meta text-muted md:flex">
       {/* EnableNow's live signal: the green of its office clocks. */}
       <span className="h-1.5 w-1.5 animate-pulseSoft rotate-45 bg-signal-live" aria-hidden />
       <span>UTC {now ?? "--:--:--"}</span>

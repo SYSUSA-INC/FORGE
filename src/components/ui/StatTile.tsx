@@ -15,15 +15,6 @@ export function StatTile({
   accent?: "paper" | "hazard" | "blood" | "signal" | "ink" | "cobalt" | "plum" | "violet" | "emerald" | "gold" | "rose" | "magenta";
   icon?: ReactNode;
 }) {
-  const glow =
-    accent === "hazard" || accent === "gold"
-      ? "shadow-glow-gold"
-      : accent === "signal" || accent === "emerald"
-        ? "shadow-glow-emerald"
-        : accent === "cobalt" || accent === "violet" || accent === "plum" || accent === "magenta"
-          ? "shadow-glow"
-          : "";
-
   const accentColor =
     accent === "hazard" || accent === "gold"
       ? "text-gold"
@@ -31,14 +22,16 @@ export function StatTile({
         ? "text-rose"
         : accent === "signal" || accent === "emerald"
           ? "text-emerald"
-          : accent === "cobalt" || accent === "violet"
-            ? "text-violet"
-            : accent === "plum" || accent === "magenta"
-              ? "text-magenta"
-              : "text-text";
+          : accent === "cobalt"
+            ? "text-cobalt"
+            : accent === "violet"
+              ? "text-violet"
+              : accent === "plum" || accent === "magenta"
+                ? "text-magenta"
+                : "text-text";
 
   return (
-    <div className={`aur-card p-4 ${glow}`}>
+    <div className="aur-card p-4">
       <div className="flex items-start justify-between">
         <span className="font-mono text-[10px] uppercase tracking-label text-muted">
           {label}

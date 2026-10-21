@@ -107,11 +107,11 @@ function SendForReviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm"
+      className="aur-scrim fixed inset-0 z-50 grid place-items-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-layer/10 bg-[#0c1424] p-5 shadow-2xl"
+        className="aur-card-elevated w-full max-w-md p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">

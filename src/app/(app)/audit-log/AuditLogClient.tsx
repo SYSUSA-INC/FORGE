@@ -294,7 +294,7 @@ export function AuditLogClient({
                           <div className="mt-2 font-mono text-[10px] uppercase tracking-widest text-subtle">
                             metadata
                           </div>
-                          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 font-mono text-[10px] text-text">
+                          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border border-layer/10 bg-bone p-2 font-mono text-[10px] text-text">
                             {Object.keys(r.metadata).length === 0
                               ? "(empty)"
                               : JSON.stringify(r.metadata, null, 2)}

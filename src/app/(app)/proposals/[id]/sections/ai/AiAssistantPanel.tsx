@@ -1260,7 +1260,7 @@ export function AiAssistantPanel({
                         ? "bg-teal/10 text-text"
                         : msg.role === "note"
                           ? "border border-indigo-400/20 bg-indigo-400/5 text-text"
-                          : "border border-layer/10 bg-layer/[0.03] text-foreground"
+                          : "border border-layer/10 bg-layer/[0.03] text-text"
                     } ${msg.id && msg.id === focusMessageId ? "ring-2 ring-amber-400/60" : ""}`}
                   >
                     {/* Slice 2 — the message this one answers; click to jump to it */}
@@ -1515,7 +1515,7 @@ export function AiAssistantPanel({
               }}
               placeholder="Ask about this section… (Enter to send, Shift+Enter for newline, / for commands, @ to mention a teammate)"
               rows={2}
-              className="flex-1 resize-none rounded-md border border-layer/10 bg-layer/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-muted/50 focus:border-teal/40 focus:outline-none"
+              className="flex-1 resize-none rounded-md border border-layer/10 bg-layer/[0.04] px-3 py-2 font-body text-[12px] text-text placeholder:text-subtle focus:border-teal/40 focus:outline-none"
             />
             {/* BL-FB-CHAT-VOICE — click to dictate, click again to stop */}
             <button

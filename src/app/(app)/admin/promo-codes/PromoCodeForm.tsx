@@ -111,7 +111,7 @@ export function PromoCodeForm({
             required
             placeholder="LAUNCH25"
           />
-          <span className="font-mono text-[10px] text-muted/70">
+          <span className="font-mono text-[10px] text-subtle">
             Case-sensitive. Letters / digits / underscore / hyphen only.
           </span>
         </label>

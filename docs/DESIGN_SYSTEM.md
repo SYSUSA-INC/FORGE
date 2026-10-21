@@ -32,10 +32,11 @@ first paint. Every component is written once; the variables do the work.
 | Family | Role | EnableNow source |
 |---|---|---|
 | **Surfaces** (`canvas`, `paper`, `bone`, `concrete`) | Page, cards, quiet panels, cool panels | white, white, slate-25, slate-50 · dark: dark-ground, dark-wash, dark-cool, slate-700 |
-| **Ink** (`text`, `muted`, `subtle`, `faint`) | Body, secondary, tertiary, hairline-grade | slate-800, -600, -500, -300 · dark: white, slate-400, -500, -600 |
-| **Cobalt** (primary) | Actions, links, focus, selection, "in progress" | The brand blue scale: 500 = blue-600 `#2953d7` (dark: blue-400) |
+| **Ink** (`text`, `muted`, `subtle`, `faint`) | Body, secondary, tertiary, hairline-grade | slate-800, -500, -500, -300 (EnableNow has two text tiers on paper) · dark: white, slate-400, `#768094` (between slate-400 and -500, so it still reads), slate-600 |
+| **Accent** (`accent`) | Eyebrows, links, the focus ring, the diamond | Brand Blue `#2953d7` · dark: blue-200 `#b8c9ff` (EnableNow's dark accent) |
+| **Cobalt** (primary) | Actions, links, focus, selection, "in progress" | The brand blue scale: 500 = blue-600 `#2953d7` (dark: blue-200 `#b8c9ff`, with Bright Blue `#4583ff` at 400) |
 | **Green** | Success, won, complete | Supporting teal-700 `#096f64` (dark: signal-300 `#a7e7b5`) |
-| **Signal** (`signal-live`) | Something live (the header clock) | signal-300 |
+| **Signal** (`signal-live`, `signal-soft`) | Something live (the header clock and live marker) | teal-700 on light (signal-300 vanishes on white) · dark: signal-300; `signal-soft` is signal-100 |
 | **Brass** | Attention, warning, partial | FORGE's own: EnableNow has no amber |
 | **Red** | Danger, lost, blocked, mandatory | FORGE's own |
 | **Indigo** | Analysis and review stages, AI suggestions | FORGE's own: EnableNow's indigo-600 is too close to the brand blue to tell apart |
@@ -77,7 +78,12 @@ other.**
 (dark on the light theme, light on the dark theme), `400` is a solid mid
 tone or gradient start, `500` (`DEFAULT`) is a readable solid on the
 canvas, `600`/`700` are deep. So `bg-emerald-500/15 text-emerald-300`
-reads correctly on both themes without a `dark:` variant anywhere.
+reads correctly on both themes without a `dark:` variant anywhere. On the
+light theme every family's 500 reads as text on paper (cobalt, green,
+brass, red, indigo and plum all measure 6:1 or better; `muted` 5.4:1).
+
+The owner's palette (the EnableNow colours by name, with the token each
+one maps to) is in `CLAUDE.md` at the repository root.
 
 **`layer` is the ink for translucent layers**: EnableNow navy (blue-900)
 on light, white on dark. `border-layer/10` lands on EnableNow's hairline
@@ -98,13 +104,17 @@ not have to change:
 | `red`, `red-200…700` | `rose`, `rose-NNN`, `blood` |
 | `indigo`, `indigo-200…700` | `violet`, `violet-NNN` |
 | `plum`, `plum-300…600` | `magenta` |
-| `canvas`, `paper`, `bone`, `concrete`, `text`, `muted`, `subtle`, `faint`, `layer`, `action` | `ink` (= canvas) |
+| `canvas`, `paper`, `bone`, `concrete`, `text`, `muted`, `subtle`, `faint`, `layer`, `action`, `accent` | `ink` (= canvas) |
 
 Utility classes in `globals.css`:
 
 - **Cards:** `aur-card` (paper, hairline, 5px), `aur-card-flat` (the bone
   wash), `aur-card-elevated` (the float shadow, for what lifts off the
-  page).
+  page: dialogs, menus, the palette).
+- **Dialogs:** `aur-scrim` is the one backdrop behind a dialog, menu sheet
+  or palette (the page frosted under paper); the panel on it is
+  `aur-card-elevated`. Code and log blocks sit on `bg-bone` with a
+  hairline, never a black slab.
 - **Buttons:** EnableNow's three: `aur-btn-primary` (solid action blue),
   `aur-btn` (the light button), `aur-btn-ghost` (text). Also
   `aur-btn-danger`.
@@ -134,13 +144,18 @@ Utility classes in `globals.css`:
    for `aur-card-elevated` only for something that floats over the page.
 6. **Type roles.** Headings are `font-normal` (400) with
    `tracking-title` or `tracking-headline`; small titles and UI are
-   `font-medium` (500). Mono labels use `tracking-label`, not wide
-   arbitrary tracking.
-7. **Adding a colour:** add the `--c-*` triplet(s) to **both** blocks in
+   `font-medium` (500). EnableNow has no heavier weight, so
+   `font-semibold` and `font-bold` resolve to 500 (`tailwind.config.ts`)
+   and Geist Mono is never given a synthetic bold. Mono labels use
+   `tracking-label`, not wide arbitrary tracking.
+7. **Two ink tiers.** Text is `text-text` or `text-muted` (`text-subtle`
+   for the least important line). Don't fade ink with an alpha
+   (`text-muted/70`): on paper it drops below a readable contrast.
+8. **Adding a colour:** add the `--c-*` triplet(s) to **both** blocks in
    `globals.css`, the Tailwind entry in `tailwind.config.ts`, and, if
    JavaScript needs it, the role in `THEME_VAR_MAP` plus its `THEME_HEX`
    value. Run `npx vitest run tests/design`.
-8. **Theme switching:** `ThemeToggle` (`src/components/shell/`) sets
+9. **Theme switching:** `ThemeToggle` (`src/components/shell/`) sets
    `data-theme` and `localStorage["forge.theme"]`; the inline script in
    `app/layout.tsx` re-applies it before paint. Never branch on the
    theme in a component; put the difference in the variables.

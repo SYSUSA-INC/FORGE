@@ -69,7 +69,7 @@ export function MobileNav({
       <div
         onClick={() => setOpen(false)}
         aria-hidden
-        className={`fixed inset-0 z-40 bg-canvas/70 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${
+        className={`aur-scrim fixed inset-0 z-40 transition-opacity duration-200 lg:hidden ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       />

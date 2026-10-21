@@ -12,13 +12,7 @@ export default function ResetPasswordPage({
 
   return (
     <div className="grid min-h-[calc(100vh-3.5rem)] place-items-center px-4 py-12">
-      <div className="aur-card-elevated w-full max-w-md overflow-hidden">
-        <div
-          className="h-[2px] w-full"
-          style={{
-            background: "var(--g-brand-bar)",
-          }}
-        />
+      <div className="aur-card w-full max-w-md overflow-hidden">
         <div className="px-8 py-10">
           {done ? (
             <>

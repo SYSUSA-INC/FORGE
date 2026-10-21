@@ -352,7 +352,7 @@ export function EvidenceDock({
                                 className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
                               >
                                 <div className="flex items-start justify-between gap-2">
-                                  <div className="line-clamp-3 flex-1 font-body text-[11px] text-foreground">
+                                  <div className="line-clamp-3 flex-1 font-body text-[11px] text-text">
                                     {p}
                                   </div>
                                   <button

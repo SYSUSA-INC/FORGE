@@ -99,7 +99,7 @@ export function TenantAddonsPanel({
                 <span>{formatMonthlyPrice(g.priceMonthlyCents * g.quantity)}</span>
                 <span>since {date(g.startsAt)}</span>
                 {g.endsAt ? <span>{g.status === "canceled" ? "serves until" : "ends"} {date(g.endsAt)}</span> : null}
-                {g.note ? <span className="text-muted/80">“{g.note}”</span> : null}
+                {g.note ? <span className="text-muted">“{g.note}”</span> : null}
               </div>
             </li>
           ))}
@@ -124,7 +124,7 @@ export function TenantAddonsPanel({
               {pending ? "Saving…" : "Grant"}
             </button>
           </div>
-          <p className="font-mono text-[10px] leading-relaxed text-muted/80">
+          <p className="font-mono text-[10px] leading-relaxed text-muted">
             Audited as <code>tenant.addon.grant</code> / <code>tenant.addon.revoke</code> in the tenant&apos;s audit log. Leave the date empty for an open-ended grant.
           </p>
         </form>

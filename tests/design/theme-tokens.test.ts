@@ -54,7 +54,9 @@ describe("theme tokens — CSS", () => {
     expect(LIGHT.get("layer")).toBe("12 31 89");
     expect(DARK.get("layer")).toBe("255 255 255");
     expect(LIGHT.get("cobalt-500")).toBe("41 83 215");
-    expect(DARK.get("cobalt-500")).toBe("69 131 255");
+    expect(DARK.get("cobalt-500")).toBe("184 201 255");
+    expect(LIGHT.get("accent")).toBe("41 83 215");
+    expect(DARK.get("accent")).toBe("184 201 255");
     expect(LIGHT.get("action")).toBe(DARK.get("action"));
   });
 });

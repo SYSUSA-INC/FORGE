@@ -70,9 +70,9 @@
   --c-shadow: 12 31 89;
   --shadow-a: 0.06;
   --shadow-a-lg: 0.14;
-  /* Type (EnableNow ink slate-800; slate-600 / -500 / -300 below it) */
+  /* Type (EnableNow ink slate-800; its muted slate-500 for both lower tiers; slate-300 faint) */
   --c-text: 24 27 35;
-  --c-muted: 64 80 107;
+  --c-muted: 98 107 125;
   --c-subtle: 98 107 125;
   --c-faint: 170 180 200;
   /* Cobalt — primary: EnableNow's brand blue scale (500 = blue-600) */
@@ -85,13 +85,15 @@
   /* The action colour for primary buttons: blue-600, hover blue-700, in both themes. */
   --c-action: 41 83 215;
   --c-action-hover: 25 65 190;
-  /* Brass — attention (FORGE's own; EnableNow has no amber) */
-  --c-brass-200: 110 82 24;
-  --c-brass-300: 138 103 32;
+  /* The accent for labels, links, focus and the diamond (EnableNow --color-accent). */
+  --c-accent: 41 83 215;
+  /* Brass — attention (FORGE's own; EnableNow has no amber). Deep enough to read as text (6.4:1). */
+  --c-brass-200: 88 66 18;
+  --c-brass-300: 104 78 22;
   --c-brass-400: 211 168 76;
-  --c-brass-500: 166 124 42;
-  --c-brass-600: 138 103 32;
-  --c-brass-700: 110 82 24;
+  --c-brass-500: 120 90 28;
+  --c-brass-600: 104 78 22;
+  --c-brass-700: 88 66 18;
   /* Green — success: EnableNow's supporting teal-700 (500), deepened for text on a tint */
   --c-green-200: 5 70 64;
   --c-green-300: 7 90 81;
@@ -103,23 +105,23 @@
   --c-red-200: 126 46 56;
   --c-red-300: 158 58 70;
   --c-red-400: 224 96 110;
-  --c-red-500: 194 73 87;
-  --c-red-600: 158 58 70;
-  --c-red-700: 126 46 56;
+  --c-red-500: 158 58 70;
+  --c-red-600: 126 46 56;
+  --c-red-700: 100 36 45;
   /* Indigo — analysis / review (FORGE's own: EnableNow's indigo-600 is too close to the brand blue to tell apart) */
   --c-indigo-200: 60 70 140;
   --c-indigo-300: 75 88 175;
   --c-indigo-400: 128 144 232;
-  --c-indigo-500: 95 111 209;
-  --c-indigo-600: 75 88 175;
-  --c-indigo-700: 60 70 140;
+  --c-indigo-500: 75 88 175;
+  --c-indigo-600: 60 70 140;
+  --c-indigo-700: 48 56 112;
   /* Plum — pink team (FORGE's own) */
   --c-plum-300: 111 74 126;
   --c-plum-400: 185 132 204;
-  --c-plum-500: 142 95 163;
-  --c-plum-600: 111 74 126;
-  /* Live signal: EnableNow signal-300 / signal-100 (the office clocks, the badge) */
-  --c-signal: 167 231 181;
+  --c-plum-500: 111 74 126;
+  --c-plum-600: 88 59 100;
+  /* Live signal: EnableNow teal-700 on paper (signal-300 vanishes on white); signal-100 */
+  --c-signal: 9 111 100;
   --c-signal-soft: 229 255 232;
 
   /* Gradients — referenced from inline styles as var(--g-*) so no
@@ -147,21 +149,23 @@
   --shadow-a: 0.35;
   --shadow-a-lg: 0.45;
 
-  /* White ink; slate-400 muted; slate-500 / -600 below it */
+  /* White ink; slate-400 muted; a tier between slate-400 and -500 that still reads (4.8:1); slate-600 faint */
   --c-text: 255 255 255;
   --c-muted: 143 155 176;
-  --c-subtle: 98 107 125;
+  --c-subtle: 118 128 148;
   --c-faint: 64 80 107;
 
-  /* Accent on dark grounds: blue-100 / -200 / -300 for text, blue-400 solid */
-  --c-cobalt-200: 220 229 255;
-  --c-cobalt-300: 184 201 255;
-  --c-cobalt-400: 163 191 249;
-  --c-cobalt-500: 69 131 255;
+  /* Accent on dark grounds: EnableNow's blue-200 (its dark --color-accent and focus)
+     as the readable default, blue-50 / -100 for text on a tint, blue-400 solid. */
+  --c-cobalt-200: 238 243 255;
+  --c-cobalt-300: 220 229 255;
+  --c-cobalt-400: 69 131 255;
+  --c-cobalt-500: 184 201 255;
   --c-cobalt-600: 46 92 233;
   --c-cobalt-700: 41 83 215;
   --c-action: 41 83 215;
   --c-action-hover: 25 65 190;
+  --c-accent: 184 201 255;
 
   --c-brass-200: 240 221 170;
   --c-brass-300: 230 201 126;
@@ -239,8 +243,13 @@
   }
 
   *:focus-visible {
-    outline: 2px solid rgb(var(--c-cobalt-500));
+    outline: 2px solid rgb(var(--c-accent));
     outline-offset: 2px;
+  }
+
+  /* Geist Mono ships Regular only: never smear it with a synthetic bold. */
+  .font-mono, code, kbd, pre, samp {
+    font-synthesis-weight: none;
   }
 }
 
@@ -257,6 +266,11 @@
   }
 
   /* Lifts off the page (dialogs, popovers): the one place a card floats. */
+  /* The one backdrop behind a dialog, menu sheet or palette: the page
+     frosted under paper, on both themes. */
+  .aur-scrim {
+    @apply bg-canvas/70 backdrop-blur-sm;
+  }
   .aur-card-elevated {
     @apply relative border border-layer/10 bg-paper;
     border-radius: 5px;
@@ -275,7 +289,7 @@
   /* Three buttons, as EnableNow has: primary (solid blue), light (wash),
      ghost (text). Square-ish 3px corners; a 2px lift on hover. */
   .aur-btn {
-    @apply inline-flex items-center justify-center gap-2 border border-layer/15 bg-bone px-3.5 py-1.5 font-display text-sm font-medium text-text transition-all hover:border-layer/25 hover:bg-paper;
+    @apply inline-flex items-center justify-center gap-2 border border-layer/15 bg-bone px-3.5 py-1.5 font-display text-sm font-medium text-text transition-all enabled:hover:border-layer/25 enabled:hover:bg-paper;
     border-radius: 3px;
   }
 
@@ -285,7 +299,7 @@
     border-color: rgb(var(--c-action));
     border-radius: 3px;
   }
-  .aur-btn-primary:hover {
+  .aur-btn-primary:not(:disabled):hover {
     background: rgb(var(--c-action-hover));
     border-color: rgb(var(--c-action-hover));
   }
@@ -301,7 +315,11 @@
 
   .aur-btn:not(:disabled):hover,
   .aur-btn-primary:not(:disabled):hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+  }
+  .aur-btn:disabled,
+  .aur-btn-primary:disabled {
+    cursor: not-allowed;
   }
 
   .brut-btn { @apply aur-btn; }
@@ -359,13 +377,13 @@
   .aur-brand-dot { background: var(--g-brand-bar); }
   /* The top chrome sits on a plain hairline (no coloured top line). */
   .aur-topline {
-    box-shadow: inset 0 -1px 0 rgb(var(--c-layer) / 0.1);
+    box-shadow: none;
   }
 
   /* The diamond: EnableNow's one recurring mark, for "this one is on"
      (the current nav item, the selected tab). */
   .aur-diamond {
-    @apply inline-block h-1.5 w-1.5 flex-none rotate-45 bg-cobalt;
+    @apply inline-block h-1.5 w-1.5 flex-none rotate-45 bg-accent;
   }
 
   .aur-ring { position: relative; }
@@ -487,7 +505,7 @@ mark {
 }
 .tiptap-prose p.is-editor-empty:first-child::before {
   content: attr(data-placeholder); float: left;
-  color: rgb(var(--c-subtle) / 0.7); pointer-events: none;
+  color: rgb(var(--c-subtle)); pointer-events: none;
   height: 0; font-style: italic;
 }
 
@@ -506,7 +524,6 @@ mark {
   color: rgb(var(--c-red-500));
   background-color: rgb(var(--c-red-400) / 0.08);
   border-radius: 2px;
-  opacity: 0.80;
   cursor: default;
 }
 /* Pulse for the "track" toolbar recording indicator */

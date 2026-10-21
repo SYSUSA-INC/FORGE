@@ -104,11 +104,11 @@ export function SnapshotDiffViewer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="aur-scrim fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-lg border border-layer/10 bg-canvas p-4 shadow-2xl"
+        className="aur-card-elevated flex max-h-[85vh] w-full max-w-3xl flex-col gap-3 overflow-hidden p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">

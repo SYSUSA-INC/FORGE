@@ -72,7 +72,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           />
 
           <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-label text-muted">
-            <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-emerald" />
+            <span className="h-1.5 w-1.5 animate-pulseSoft rotate-45 bg-signal-live" aria-hidden />
             <span className="hidden sm:inline">FORGE · Live</span>
             <span className="sm:hidden">FORGE</span>
           </div>

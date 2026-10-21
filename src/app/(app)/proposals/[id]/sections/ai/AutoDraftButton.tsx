@@ -91,12 +91,12 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(false)}>
+        <div className="aur-scrim fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
           <div className="aur-card-elevated max-h-[90vh] w-full max-w-2xl overflow-y-auto px-5 py-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-label text-subtle">Auto-draft</div>
-                <h2 className="mt-1 font-display text-[18px] font-semibold text-foreground">Auto-draft full proposal</h2>
+                <h2 className="mt-1 font-display text-[18px] font-semibold text-text">Auto-draft full proposal</h2>
                 <p className="mt-1 font-body text-[13px] leading-relaxed text-muted">
                   Drafts every empty section on the server, with citations, grounded in your won proposals. You can close this
                   window — the run carries on and the sections fill in as each draft lands.
@@ -135,7 +135,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
               <ul className="mt-4 divide-y divide-layer/5">
                 {progress.sections.map((s) => (
                   <li key={s.sectionId} className="flex items-start justify-between gap-3 py-2">
-                    <div className="min-w-0 flex-1 font-body text-[13px] text-foreground">{titleOf(s.sectionId)}</div>
+                    <div className="min-w-0 flex-1 font-body text-[13px] text-text">{titleOf(s.sectionId)}</div>
                     <div className={`max-w-[60%] text-right font-mono text-[11px] ${STATE_TONE[s.status]}`}>
                       {s.note || STATE_LABEL[s.status]}
                       {s.truncated ? <span className="ml-1 text-gold">· cut off at the length limit</span> : null}

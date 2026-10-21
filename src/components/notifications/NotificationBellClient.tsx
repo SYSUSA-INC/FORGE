@@ -59,7 +59,7 @@ export function NotificationBellClient({
       >
         <BellIcon />
         {unread > 0 ? (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-[1rem] place-items-center rounded-full bg-magenta px-1 font-mono text-[9px] font-semibold text-white">
+          <span className="absolute -right-1 -top-1 grid h-4 min-w-[1rem] place-items-center rounded-full bg-action px-1 font-mono text-[10px] text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
