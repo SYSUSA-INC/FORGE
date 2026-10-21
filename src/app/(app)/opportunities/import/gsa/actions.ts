@@ -10,6 +10,7 @@ import {
   type SolicitationType,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { PASTE_KEPT_CHARS, PASTE_MAX_CHARS } from "@/lib/action-body";
 import { recordAudit } from "@/lib/audit-log";
 import { aiExtractGsa } from "@/lib/gsa-extract";
 import type { GsaExtractionResult } from "@/lib/ai-prompts";
@@ -49,7 +50,7 @@ export async function parseGsaTextAction(
   if (!rawText || rawText.trim().length === 0) {
     return { ok: false, error: "Paste the GSA email body before extracting." };
   }
-  if (rawText.length > 200_000) {
+  if (rawText.length > PASTE_MAX_CHARS) {
     return {
       ok: false,
       error:
@@ -215,7 +216,7 @@ export async function createOpportunityFromGsaAction(
       userId: actor.id,
       kind: "note",
       title: "Created from GSA email paste",
-      body: rawText.slice(0, 50_000),
+      body: rawText.slice(0, PASTE_KEPT_CHARS),
       metadata: {
         source: "gsa-paste",
         noticeType,

@@ -8,6 +8,9 @@
  * and its contradictions are surfaced as-is. Pure, tested.
  */
 
+/** Section text the rail reads; BL-STAB-2f — the browser sends no more (a request carries at most 1 MB). */
+export const RESEARCH_TEXT_MAX_CHARS = 60_000;
+
 const STOPWORDS = new Set([
   "the", "and", "for", "that", "with", "this", "from", "shall", "should", "must", "will",
   "offeror", "offerors", "contractor", "contractors", "government", "provide", "provides",

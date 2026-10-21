@@ -10,6 +10,7 @@ import {
   parseEbuyTextAction,
 } from "./actions";
 import type { EbuyExtractionResult } from "@/lib/ai-prompts";
+import { PASTE_KEPT_CHARS, PASTE_MAX_CHARS, pasteRefusal } from "@/lib/action-body";
 
 type FormFields = EbuyExtractionResult;
 
@@ -44,8 +45,17 @@ export function EbuyPasteClient() {
 
   function parse() {
     setError(null);
+    // BL-STAB-2f — said here: a paste too large to send would fail with no explanation.
+    const refusal = pasteRefusal(rawText, PASTE_MAX_CHARS, "Trim it to the RFQ body (upload a full RFP as a solicitation instead).");
+    if (refusal) return setError(refusal);
     startParsing(async () => {
-      const res = await parseEbuyTextAction(rawText);
+      let res: Awaited<ReturnType<typeof parseEbuyTextAction>>;
+      try {
+        res = await parseEbuyTextAction(rawText);
+      } catch {
+        setError("FORGE didn't answer. Try Extract again.");
+        return;
+      }
       if (!res.ok) {
         setError(res.error);
         return;
@@ -60,10 +70,18 @@ export function EbuyPasteClient() {
   function create() {
     setError(null);
     startCreating(async () => {
-      const res = await createOpportunityFromEbuyAction({
-        ...fields,
-        rawText,
-      });
+      let res: Awaited<ReturnType<typeof createOpportunityFromEbuyAction>>;
+      try {
+        res = await createOpportunityFromEbuyAction({
+          ...fields,
+          // The opportunity keeps this much of the RFQ; the rest isn't sent.
+          rawText: rawText.slice(0, PASTE_KEPT_CHARS),
+        });
+      } catch {
+        // It may have been created before the answer was lost: look before trying again.
+        setError("FORGE didn't answer. Check Opportunities for this one before creating it again.");
+        return;
+      }
       if (!res.ok) {
         setError(res.error);
         return;

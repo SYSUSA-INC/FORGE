@@ -34,6 +34,7 @@ import { cancelUploadAction } from "@/app/(app)/uploads/actions";
 import { checkArrivedUpload, uploadFile } from "@/lib/upload-client";
 import { formatLimit } from "@/lib/upload-policy";
 import {
+  CHAT_NOTE_MAX_CHARS,
   describeUnread,
   filterMembers,
   insertMention,
@@ -820,6 +821,11 @@ export function AiAssistantPanel({
   async function postNote() {
     const msg = chatInput.trim();
     if (!msg || chatPending) return;
+    // BL-STAB-2f — said, not cut: the server keeps the first 4,000 characters of a note.
+    if (msg.length > CHAT_NOTE_MAX_CHARS) {
+      setChatError(`A note is up to ${CHAT_NOTE_MAX_CHARS.toLocaleString("en-US")} characters (this one is ${msg.length.toLocaleString("en-US")}); shorten it or post it in parts.`);
+      return;
+    }
     setChatInput("");
     setChatError(null);
     const answering = replyTo;

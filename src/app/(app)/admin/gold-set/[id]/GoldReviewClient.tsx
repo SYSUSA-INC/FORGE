@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
-import { GOLD_KIND_LABEL, GOLD_KINDS, type GoldKind, type TextHit } from "@/lib/gold-set-logic";
+import { pasteRefusal } from "@/lib/action-body";
+import { GOLD_KIND_LABEL, GOLD_KINDS, goldTextRefusal, type GoldKind, type TextHit } from "@/lib/gold-set-logic";
 import {
   addGoldItemAction,
   appendGoldDocTextAction,
@@ -51,7 +52,12 @@ export function GoldReviewClient({
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) => {
     setError(null);
     startTransition(async () => {
-      const res = await fn();
+      let res: { ok: boolean; error?: string };
+      try {
+        res = await fn();
+      } catch {
+        res = { ok: false, error: "FORGE didn't answer. Reload the page to see what was saved." };
+      }
       if (!res.ok) {
         setError(res.error ?? "Something went wrong.");
         return;
@@ -146,7 +152,11 @@ export function GoldReviewClient({
               type="button"
               className="aur-btn aur-btn-ghost text-[11px]"
               disabled={pending}
-              onClick={() => run(() => appendGoldDocTextAction({ docId, ...paste }), () => setPaste({ name: "", text: "" }))}
+              onClick={() => {
+                const refusal = goldTextRefusal(paste.text.length) ?? pasteRefusal(paste.text, Number.POSITIVE_INFINITY, "Add it in parts.");
+                if (refusal) return setError(refusal);
+                run(() => appendGoldDocTextAction({ docId, ...paste }), () => setPaste({ name: "", text: "" }));
+              }}
             >
               Add text
             </button>

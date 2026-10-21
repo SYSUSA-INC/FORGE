@@ -28,6 +28,19 @@ export const GOLD_KIND_LABEL: Record<GoldKind, string> = {
 
 /** Text kept per document; a 300-page RFP is about 1M characters. */
 export const GOLD_MAX_TEXT_CHARS = 2_000_000;
+
+/**
+ * BL-STAB-2f — why text can't go into a gold-set document, or null. The
+ * limit is the whole document's, so the advice is to keep less, never to
+ * split it. `room` is what the document has left (all of it when new).
+ */
+export function goldTextRefusal(chars: number, room: number = GOLD_MAX_TEXT_CHARS): string | null {
+  if (chars <= room) return null;
+  const max = GOLD_MAX_TEXT_CHARS.toLocaleString("en-US");
+  if (room <= 0) return `This document is full: a gold-set document holds ${max} characters in all.`;
+  const left = room < GOLD_MAX_TEXT_CHARS ? ` (${room.toLocaleString("en-US")} more fit in this one)` : "";
+  return `This is ${chars.toLocaleString("en-US")} characters; a gold-set document holds ${max} in all${left}. Keep only the parts the review needs.`;
+}
 /** Attachments downloaded per notice, and the size of each. */
 export const GOLD_MAX_FILES = 15;
 export const GOLD_MAX_FILE_BYTES = 25 * 1024 * 1024;

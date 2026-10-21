@@ -74,7 +74,7 @@ Effort key:
 | 3at | **BL-AIX Phase 2c-1 review fixes** — from two adversarial review rounds of PR #357: a verdict follows the extracted wording (holds across re-parse, merges and deleted documents), image and scanned-PDF re-parses keep verdicts, a rejection carries across an opportunity's amendments (loader, diff, radar, verify screen, bulk confirm), and verify-screen state fixes | P0 | S | ✅ shipped (PR #358) |
 | 3au | **BL-STAB-1** — Solicitation parses no longer fail on a malformed answer: the gateway decodes lists sent as JSON text, the front matter no longer asks for a requirement list (the full-text sweep owns them), fields degrade one by one, key dates are saved, validation errors say what was wrong in production | P0 | S | ✅ shipped (PR #359) |
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
-| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392; 2f-1 (files removed on delete, Word templates) shipped in PR #393 and #394; 2f-2 (chat attachments) in review) |
+| 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | 🔄 in progress (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392; 2f-1 (files removed on delete, Word templates) shipped in PR #393 and #394; 2f-2 (chat attachments) shipped in PR #395; 2f-3 (contacts import in parts, paste guards; the last phase) in review) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
@@ -182,7 +182,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in review) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · 🔄 BL-STAB-2 in progress (2a shipped in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in review) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -737,7 +737,7 @@ mind. Bandage will come off but a true fix will stay."
         reconcile pre-ledger objects a failed delete left behind; render
         files left behind when a proposal is deleted.
     - **2f-2 — chat attachments upload straight to storage; a test keeps
-      any file out of a server action.** 🔄 in review (this PR).
+      any file out of a server action.** ✅ shipped (PR #395).
       - `attachChatDocumentAction({ sectionId, uploadId })` replaces the
         multipart action (20 MB on paper, ~4.5 MB on Vercel → the chat
         policy's 50 MB). `attachChatUpload` checks the section before
@@ -787,8 +787,58 @@ mind. Bandage will come off but a true fix will stay."
         AGENTS.md now says what the test can't see (a form entry handed to
         a helper) and asks reviewers to flag it. 22 guards
         mutation-checked.
-    - **2f-3 — contacts import parsed in the browser and sent in chunks;
-      size guards on text pastes; BL-STAB-2 marked shipped.** ⏳ next.
+    - **2f-3 — contacts import parsed in the browser and sent in parts;
+      pasted text measured before it is sent; the last phase (BL-STAB-2 is
+      marked shipped once it merges).** 🔄 in review (this PR).
+      - Contacts: the file (up to 50 MB, was cut silently at 2,000,000
+        characters and then refused above ~1 MB by the request limit) is
+        read and parsed in the browser and never sent.
+        `findImportDuplicatesAction` gets only name, agency and email
+        (replacing `previewContactImportAction`, which took the text);
+        the rows are written in parts of at most 600 KB
+        (`chunkByBytes`), each re-checked and audited on its own with
+        `importId`, `part` and `parts`; an import that stops part-way
+        continues from the failed part (a part sent twice adds nobody
+        twice, and one that was saved answers with what it did). A file
+        of more than 500 people says where reading stopped, so the rest
+        can be a second import (it was cut without a word); people listed
+        twice count once; the CSV parse stops there. UTF-16 exports are
+        read (with their byte-order mark); control characters are
+        stripped (a NUL made the insert fail); at most 100 skipped lines
+        are listed.
+      - Pasted text (`src/lib/action-body.ts`: `pasteRefusal`,
+        `TEXT_ACTION_MAX_BYTES`, `PASTE_MAX_CHARS`): GSA and eBuy email
+        pastes, pasted Q&A, gold-set text, the SBA 8(a) CSV paste and
+        knowledge entries are measured in the browser first. GSA and eBuy
+        send only the 50,000 characters an opportunity keeps. Pasted Q&A
+        over 200,000 characters is refused (answers past the cut were
+        dropped); gold-set text that would pass 2,000,000 characters is
+        refused (it was cut and reported as added); a team note over
+        4,000 characters is refused in the chat (it was cut on save); the
+        research rail sends the 60,000 characters it reads. The parse and
+        create calls answer a lost connection with a message.
+      - Deliberate exceptions, each under Vercel's 4.5 MB request cap and
+        pinned by the no-files test: dictation (4 MB of audio, never
+        stored) and the upload proxy (4 MB on Vercel).
+      - **Tests:** `tests/ai/action-body.test.ts` (measuring, refusals,
+        parts, a worst-case 500-contact import under the limit),
+        `tests/ai/crm-import-logic.test.ts` (the 500-contact cut said and
+        not read past; control characters),
+        `tests/isolation/crm-import.test.ts` (the duplicate check per
+        tenant; tampered rows re-checked; a part's audit),
+        `tests/isolation/solicitation-qa.test.ts` and
+        `tests/isolation/gold-set.test.ts` (refused, not cut).
+      - **Review (6 of 16 upheld, all fixed here):** a UTF-16 export no
+        longer parsed (`Blob.text()` reads UTF-8 only; `decodeImportFile`
+        follows the byte-order mark); "more than 500 contacts" showed for
+        exactly 500 and a trailing footer line, and counted people listed
+        twice (the parse now counts each person once and names the line
+        where reading stopped); a resent part whose answer was lost
+        reported its own people as duplicates (it now answers with its
+        recorded counts, found by `importId` and `part`); the gold-set
+        refusal advised splitting text that could never fit (the limit is
+        the document's: `goldTextRefusal` says how much still fits); the
+        summary rows omitted 2f-3.
 - **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a shipped
   (PR #375); 10b in progress.
   - **Symptom (owner, 2026-10-10):** NAICS 541519 + "ServiceNow" listed 10

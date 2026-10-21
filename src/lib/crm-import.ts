@@ -1,36 +1,30 @@
 /**
- * BL-FB-X-CRM Slice 3 — importing contacts against Postgres: preview a
- * CSV or vCard against what the tenant already has, then create the new
- * people in one insert and skip or update the duplicates. Server-only;
- * callers own auth; the import is audited once with its counts.
+ * BL-FB-X-CRM Slice 3 — importing contacts against Postgres: mark which
+ * people the tenant already has, then create the new ones in one insert
+ * and skip or update the duplicates. Server-only; callers own auth.
+ * BL-STAB-2f — the browser parses the file; rows arrive in chunks that
+ * fit one request, each re-checked here and audited with its counts.
  */
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { customerContacts } from "@/db/schema";
+import { auditLogs, customerContacts } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { agencyKey } from "@/lib/crm-logic";
 import {
   IMPORT_LIMITS,
   dedupeWithinImport,
   detectDuplicates,
-  parseImport,
   sanitizeImportRow,
-  summarizeImport,
   type DuplicateMatch,
-  type ImportFormat,
+  type ImportPerson,
   type ImportRow,
-  type ImportSkip,
-  type ImportSummary,
 } from "@/lib/crm-import-logic";
 
 type Actor = { userId: string | null; email?: string | null };
 
-export type ImportPreviewRow = ImportRow & { duplicate: DuplicateMatch | null };
-export type ImportPreview =
-  | { ok: true; format: ImportFormat; rows: ImportPreviewRow[]; skipped: ImportSkip[]; unmappedHeaders: string[]; summary: ImportSummary }
-  | { ok: false; error: string };
+export type DuplicateCheck = { ok: true; matches: (DuplicateMatch | null)[] } | { ok: false; error: string };
 
 async function existingContacts(organizationId: string) {
   return db
@@ -39,25 +33,50 @@ async function existingContacts(organizationId: string) {
     .where(eq(customerContacts.organizationId, organizationId));
 }
 
-/** Parse the pasted or uploaded text and mark the rows the tenant already has. Nothing is written. */
-export async function previewContactImport(input: { organizationId: string; text: string; fileName?: string }): Promise<ImportPreview> {
+/**
+ * Which of these people the tenant already has (by email, else by agency
+ * and name), one answer per person in order; a person who can't be a
+ * contact gets none. For the preview; nothing is written.
+ */
+export async function findImportDuplicates(input: { organizationId: string; people: readonly Partial<ImportPerson>[] }): Promise<DuplicateCheck> {
   const { organizationId } = input;
-  const text = input.text ?? "";
-  if (!text.trim()) return { ok: false, error: "Paste a CSV or choose a .csv / .vcf file first." };
-  if (text.length > IMPORT_LIMITS.maxChars) return { ok: false, error: "That file is too large (2 MB of text at most)." };
-  const parsed = parseImport(text, input.fileName ?? "");
-  const { rows, dropped } = dedupeWithinImport(parsed.rows);
-  const skipped = [...parsed.skipped, ...dropped];
-  if (rows.length === 0) return { ok: false, error: skipped[0]?.reason ?? "No contacts found: each row needs a name and an agency." };
-  const duplicates = detectDuplicates(rows, await existingContacts(organizationId));
-  return {
-    ok: true,
-    format: parsed.format,
-    rows: rows.map((r, i) => ({ ...r, duplicate: duplicates.get(i) ?? null })),
-    skipped,
-    unmappedHeaders: parsed.unmappedHeaders,
-    summary: summarizeImport(rows, duplicates, skipped),
-  };
+  const people = input.people.slice(0, IMPORT_LIMITS.maxRows).map((p) => sanitizeImportRow({ name: p?.name, agency: p?.agency, email: p?.email }));
+  const valid = people.flatMap((p, i) => (p ? [{ p, i }] : []));
+  if (valid.length === 0) return { ok: true, matches: people.map(() => null) };
+  const found = detectDuplicates(valid.map((v) => v.p), await existingContacts(organizationId));
+  const matches: (DuplicateMatch | null)[] = people.map(() => null);
+  valid.forEach((v, k) => {
+    matches[v.i] = found.get(k) ?? null;
+  });
+  return { ok: true, matches };
+}
+
+export type ImportBatch = { id: string; part: number; parts: number };
+
+/**
+ * BL-STAB-2f — a part sent again after its answer was lost: its audit row
+ * says what it did, so that is the answer and nothing is written twice
+ * (re-run, its people would be counted as duplicates the same import made).
+ */
+async function partAlreadyImported(organizationId: string, batch: ImportBatch): Promise<ImportCommit | null> {
+  const [row] = await db
+    .select({ metadata: auditLogs.metadata })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.organizationId, organizationId),
+        // An import runs in minutes; the day bounds the scan to the organization's recent rows.
+        gt(auditLogs.createdAt, sql`now() - interval '1 day'`),
+        eq(auditLogs.action, "crm.contact.import"),
+        sql`${auditLogs.metadata}->>'importId' = ${batch.id}`,
+        sql`${auditLogs.metadata}->>'part' = ${String(batch.part)}`,
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+  const m = row.metadata as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return { ok: true, created: n(m.created), updated: n(m.updated), skipped: n(m.skipped) };
 }
 
 export type ImportCommit = { ok: true; created: number; updated: number; skipped: number } | { ok: false; error: string };
@@ -67,8 +86,19 @@ export type ImportCommit = { ok: true; created: number; updated: number; skipped
  * or updated with the file's non-empty fields. Rows are re-normalised and
  * duplicates re-detected here; the client's view is never trusted.
  */
-export async function commitContactImport(input: { organizationId: string; rows: readonly Partial<ImportRow>[]; duplicates: "skip" | "update"; actor: Actor }): Promise<ImportCommit> {
+export async function commitContactImport(input: {
+  organizationId: string;
+  rows: readonly Partial<ImportRow>[];
+  duplicates: "skip" | "update";
+  actor: Actor;
+  /** BL-STAB-2f — this call's part of a larger import, for the audit trail. */
+  batch?: ImportBatch;
+}): Promise<ImportCommit> {
   const { organizationId } = input;
+  if (input.batch) {
+    const done = await partAlreadyImported(organizationId, input.batch);
+    if (done) return done;
+  }
   const clean = dedupeWithinImport(
     input.rows
       .slice(0, IMPORT_LIMITS.maxRows)
@@ -132,7 +162,7 @@ export async function commitContactImport(input: { organizationId: string; rows:
     actor: input.actor,
     action: "crm.contact.import",
     resourceType: "customer_contact",
-    metadata: { rows: clean.length, created, updated, skipped, duplicates: input.duplicates },
+    metadata: { rows: clean.length, created, updated, skipped, duplicates: input.duplicates, ...(input.batch ? { importId: input.batch.id, part: input.batch.part, parts: input.batch.parts } : {}) },
   });
   return { ok: true, created, updated, skipped };
 }

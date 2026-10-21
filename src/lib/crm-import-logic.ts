@@ -3,11 +3,17 @@
  * usual headers or a vCard export (Outlook, Google, Apple) becomes rows
  * the import can preview; duplicates against what the tenant already has
  * are found by email, then by agency and name. No I/O here; crm-import.ts
- * owns the database.
+ * owns the database. BL-STAB-2f — the file is read and parsed in the
+ * browser (it never travels to the server); only rows do, in chunks.
  */
 import { CONTACT_LIMITS, agencyKey, normalizeRole, type ContactRole } from "@/lib/crm-logic";
 
-export const IMPORT_LIMITS = { maxRows: 500, maxChars: 2_000_000 } as const;
+export const IMPORT_LIMITS = {
+  /** Contacts in one import. */
+  maxRows: 500,
+  /** A file the browser will read (it is parsed there, never uploaded). */
+  maxFileBytes: 50 * 1024 * 1024,
+} as const;
 
 export type ImportFormat = "csv" | "vcard";
 
@@ -27,7 +33,24 @@ export type ImportRow = {
 };
 
 export type ImportSkip = { line: number; reason: string };
-export type ParsedImport = { format: ImportFormat; rows: ImportRow[]; skipped: ImportSkip[]; unmappedHeaders: string[] };
+export type ParsedImport = {
+  format: ImportFormat;
+  rows: ImportRow[];
+  skipped: ImportSkip[];
+  unmappedHeaders: string[];
+  /**
+   * The file holds more contacts than one import takes: the CSV line (or
+   * vCard card) of the first contact not read, where a second import
+   * starts. Null when every contact was read.
+   */
+  stoppedAt: number | null;
+};
+
+/** A contacts file's text: UTF-8, or UTF-16 when it starts with that byte-order mark (some address-book exports do). */
+export function decodeImportFile(bytes: Uint8Array): string {
+  const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le" : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : "utf-8";
+  return new TextDecoder(encoding).decode(bytes);
+}
 
 export function detectImportFormat(text: string, fileName = ""): ImportFormat {
   if (/\.vcf$/i.test(fileName) || /^\s*BEGIN:VCARD/im.test(text)) return "vcard";
@@ -65,17 +88,20 @@ export function mapCsvHeaders(headers: readonly string[]): { map: Partial<Record
   return { map, unmapped };
 }
 
-/** RFC 4180-ish: quoted cells, doubled quotes, CR LF; blank lines dropped. */
-export function parseCsvTable(text: string): string[][] {
-  const rows: string[][] = [];
+/**
+ * RFC 4180-ish: quoted cells, doubled quotes, CR LF; blank lines dropped.
+ * Row by row, so a reader can stop early (a large file isn't parsed whole).
+ */
+export function* csvRows(text: string): Generator<string[]> {
   let cur: string[] = [];
   let cell = "";
   let inQuotes = false;
-  const endRow = () => {
+  const endRow = (): string[] | null => {
     cur.push(cell);
     cell = "";
-    if (cur.some((c) => c.trim().length > 0)) rows.push(cur);
+    const row = cur.some((c) => c.trim().length > 0) ? cur : null;
     cur = [];
+    return row;
   };
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]!;
@@ -93,14 +119,24 @@ export function parseCsvTable(text: string): string[][] {
       cur.push(cell);
       cell = "";
     } else if (ch === "\r") continue;
-    else if (ch === "\n") endRow();
-    else cell += ch;
+    else if (ch === "\n") {
+      const row = endRow();
+      if (row) yield row;
+    } else cell += ch;
   }
-  if (cell.length > 0 || cur.length > 0) endRow();
-  return rows;
+  if (cell.length > 0 || cur.length > 0) {
+    const row = endRow();
+    if (row) yield row;
+  }
 }
 
-const clip = (v: string | undefined, n: number) => (v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+export function parseCsvTable(text: string): string[][] {
+  return [...csvRows(text)];
+}
+
+/** Control characters a contact never needs (Postgres refuses NUL in text); tab and line breaks stay. */
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const clip = (v: string | undefined, n: number) => (v ?? "").replace(CONTROL, "").replace(/\s+/g, " ").trim().slice(0, n);
 
 /** A role from an explicit role column, else from the title: "Contracting Officer" → contracting_officer. */
 export function guessRole(roleText: string, title: string): ContactRole {
@@ -147,7 +183,7 @@ function buildRow(line: number, raw: RawRow): ImportRow | ImportSkip {
     role: guessRole(raw.role, raw.title),
     email: clip(raw.email, CONTACT_LIMITS.email).toLowerCase(),
     phone: clip(raw.phone.replace(/^tel:/i, ""), CONTACT_LIMITS.phone),
-    notes: raw.notes.replace(/\r\n?/g, "\n").trim().slice(0, CONTACT_LIMITS.notes),
+    notes: raw.notes.replace(CONTROL, "").replace(/\r\n?/g, "\n").trim().slice(0, CONTACT_LIMITS.notes),
     nextTouchAt: normalizeImportDate(raw.nextTouchAt),
   };
 }
@@ -169,27 +205,45 @@ export function sanitizeImportRow(row: Partial<ImportRow> & { line?: number }): 
 }
 
 export function parseContactsCsv(text: string): ParsedImport {
-  const table = parseCsvTable(text);
-  if (table.length === 0) return { format: "csv", rows: [], skipped: [], unmappedHeaders: [] };
-  const { map, unmapped } = mapCsvHeaders(table[0]!);
+  const table = csvRows(text);
+  const header = table.next();
+  if (header.done) return { format: "csv", rows: [], skipped: [], unmappedHeaders: [], stoppedAt: null };
+  const { map, unmapped } = mapCsvHeaders(header.value);
   if (map.name === undefined || map.agency === undefined) {
     return {
       format: "csv",
       rows: [],
-      skipped: [{ line: 1, reason: `The header row needs a name column and an agency column (found: ${table[0]!.filter((h) => h.trim()).join(", ") || "none"}).` }],
+      skipped: [{ line: 1, reason: `The header row needs a name column and an agency column (found: ${header.value.filter((h) => h.trim()).join(", ") || "none"}).` }],
       unmappedHeaders: unmapped,
+      stoppedAt: null,
     };
   }
   const rows: ImportRow[] = [];
   const skipped: ImportSkip[] = [];
-  for (let i = 1; i < table.length && rows.length < IMPORT_LIMITS.maxRows; i++) {
-    const cells = table[i]!;
+  const earlier = personSeen();
+  let line = 1;
+  let stoppedAt: number | null = null;
+  for (const cells of table) {
+    line += 1;
     const get = (f: Field) => (map[f] === undefined ? "" : (cells[map[f]!] ?? ""));
-    const built = buildRow(i + 1, { name: get("name"), agency: get("agency"), office: get("office"), title: get("title"), role: get("role"), email: get("email"), phone: get("phone"), notes: get("notes"), nextTouchAt: get("nextTouchAt") });
-    if ("reason" in built) skipped.push(built);
-    else rows.push(built);
+    const built = buildRow(line, { name: get("name"), agency: get("agency"), office: get("office"), title: get("title"), role: get("role"), email: get("email"), phone: get("phone"), notes: get("notes"), nextTouchAt: get("nextTouchAt") });
+    if ("reason" in built) {
+      skipped.push(built);
+      continue;
+    }
+    const again = earlier(built);
+    if (again) {
+      skipped.push(again);
+      continue;
+    }
+    // One import's worth of people read: the rest of the file isn't parsed.
+    if (rows.length >= IMPORT_LIMITS.maxRows) {
+      stoppedAt = line;
+      break;
+    }
+    rows.push(built);
   }
-  return { format: "csv", rows, skipped, unmappedHeaders: unmapped };
+  return { format: "csv", rows, skipped, unmappedHeaders: unmapped, stoppedAt };
 }
 
 const unescapeVcard = (v: string) => v.replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1").trim();
@@ -200,8 +254,10 @@ export function parseVcards(text: string): ParsedImport {
   const cards = unfolded.split(/^BEGIN:VCARD[^\n]*\n/im).slice(1);
   const rows: ImportRow[] = [];
   const skipped: ImportSkip[] = [];
+  const earlier = personSeen();
+  let stoppedAt: number | null = null;
   cards.forEach((card, idx) => {
-    if (rows.length >= IMPORT_LIMITS.maxRows) return;
+    if (stoppedAt !== null) return;
     const props = new Map<string, string[]>();
     for (const line of card.split("\n")) {
       if (!line.trim() || /^END:VCARD/i.test(line)) continue;
@@ -224,10 +280,13 @@ export function parseVcards(text: string): ParsedImport {
       notes: (props.get("NOTE") ?? []).join("\n"),
       nextTouchAt: "",
     });
-    if ("reason" in built) skipped.push({ line: idx + 1, reason: `Card ${idx + 1}: ${built.reason}` });
+    if ("reason" in built) return void skipped.push({ line: idx + 1, reason: `Card ${idx + 1}: ${built.reason}` });
+    const again = earlier(built);
+    if (again) return void skipped.push(again);
+    if (rows.length >= IMPORT_LIMITS.maxRows) stoppedAt = idx + 1;
     else rows.push(built);
   });
-  return { format: "vcard", rows, skipped, unmappedHeaders: [] };
+  return { format: "vcard", rows, skipped, unmappedHeaders: [], stoppedAt };
 }
 
 export function parseImport(text: string, fileName = ""): ParsedImport {
@@ -238,10 +297,11 @@ export type ExistingContactLike = { id: string; name: string; email: string; age
 export type DuplicateMatch = { existingId: string; existingName: string; by: "email" | "name" };
 
 const nameKey = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-const rowKeys = (r: { name: string; agency: string; email: string }) => ({ email: r.email.trim().toLowerCase(), name: `${agencyKey(r.agency)}|${nameKey(r.name)}` });
+export type ImportPerson = { name: string; agency: string; email: string };
+const rowKeys = (r: ImportPerson) => ({ email: r.email.trim().toLowerCase(), name: `${agencyKey(r.agency)}|${nameKey(r.name)}` });
 
 /** Rows that are already in the tenant's contacts: by email first, else by agency and name. Keyed by row index. */
-export function detectDuplicates(rows: readonly ImportRow[], existing: readonly ExistingContactLike[]): Map<number, DuplicateMatch> {
+export function detectDuplicates(rows: readonly ImportPerson[], existing: readonly ExistingContactLike[]): Map<number, DuplicateMatch> {
   const byEmail = new Map<string, ExistingContactLike>();
   const byName = new Map<string, ExistingContactLike>();
   for (const e of existing) {
@@ -258,21 +318,28 @@ export function detectDuplicates(rows: readonly ImportRow[], existing: readonly 
   return out;
 }
 
-/** The same person twice in one file (same email, or same agency and name): the first row wins. */
-export function dedupeWithinImport(rows: readonly ImportRow[]): { rows: ImportRow[]; dropped: ImportSkip[] } {
+/** A check for the same person twice in one file (same email, or same agency and name): the first wins, later ones are skips. */
+function personSeen(): (r: ImportRow) => ImportSkip | null {
   const seenEmail = new Set<string>();
   const seenName = new Set<string>();
+  return (r) => {
+    const k = rowKeys(r);
+    if ((k.email && seenEmail.has(k.email)) || seenName.has(k.name)) return { line: r.line, reason: `${r.name} appears earlier in the file.` };
+    if (k.email) seenEmail.add(k.email);
+    seenName.add(k.name);
+    return null;
+  };
+}
+
+/** The same person twice in one file (same email, or same agency and name): the first row wins. */
+export function dedupeWithinImport(rows: readonly ImportRow[]): { rows: ImportRow[]; dropped: ImportSkip[] } {
+  const earlier = personSeen();
   const kept: ImportRow[] = [];
   const dropped: ImportSkip[] = [];
   for (const r of rows) {
-    const k = rowKeys(r);
-    if ((k.email && seenEmail.has(k.email)) || seenName.has(k.name)) {
-      dropped.push({ line: r.line, reason: `${r.name} appears earlier in the file.` });
-      continue;
-    }
-    if (k.email) seenEmail.add(k.email);
-    seenName.add(k.name);
-    kept.push(r);
+    const again = earlier(r);
+    if (again) dropped.push(again);
+    else kept.push(r);
   }
   return { rows: kept, dropped };
 }

@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { pasteRefusal } from "@/lib/action-body";
+import { goldTextRefusal } from "@/lib/gold-set-logic";
 import { createGoldDocFromNoticeAction, createGoldDocFromTextAction } from "./actions";
 
 /** BL-AIX Phase 1e — add a public RFP to the gold set by notice ID, or by pasting its text. */
@@ -16,11 +18,23 @@ export function AddGoldDocForm() {
 
   function submit() {
     setError(null);
+    // BL-STAB-2f — said here: a paste too large to send would fail with no explanation.
+    const refusal =
+      mode === "paste"
+        ? (goldTextRefusal(text.length) ?? pasteRefusal(text, Number.POSITIVE_INFINITY, "Save the first part here, then add the rest with Add text on the document's page."))
+        : null;
+    if (refusal) return setError(refusal);
     startTransition(async () => {
-      const res =
-        mode === "notice"
-          ? await createGoldDocFromNoticeAction(noticeId)
-          : await createGoldDocFromTextAction({ title, text, noticeId: noticeId || undefined });
+      let res: Awaited<ReturnType<typeof createGoldDocFromTextAction>>;
+      try {
+        res =
+          mode === "notice"
+            ? await createGoldDocFromNoticeAction(noticeId)
+            : await createGoldDocFromTextAction({ title, text, noticeId: noticeId || undefined });
+      } catch {
+        setError("FORGE didn't answer. Check the gold set before adding it again.");
+        return;
+      }
       if (!res.ok) {
         setError(res.error);
         return;
