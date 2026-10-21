@@ -78,6 +78,7 @@ Effort key:
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
+| 3aw-2 | **BL-STAB-11** — The platform admin home, a tenant's admin page and a tenant's activity page failed with a server error ("malformed array literal") once a cross-domain invite was waiting or anyone had acted in the tenant: a list was handed to Postgres where an array was expected; `inArray` now, and a test stops the shape coming back | P0 | S | 🔄 in review (this PR) |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-8; owner decisions 2026-10-21 recorded) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
@@ -183,7 +184,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · 🔄 BL-STAB-11 in review · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -1268,6 +1269,26 @@ mind. Bandage will come off but a true fix will stay."
       compliance rows are flagged (as BL-FB-SOL-QA does today).
     - Suggestions say what the response should change because of each
       answer.
+- **BL-STAB-11 — Superadmin pages fail with "malformed array literal".**
+  🔄 in review.
+  - **Found (2026-10-21):** loading every page in both themes for the
+    colour review. `/admin/orgs/[id]/activity` failed for any tenant with
+    activity; `/admin` and `/admin/orgs/[id]` failed whenever a
+    cross-domain invite was waiting for approval from someone whose
+    domain another tenant owns.
+  - **Cause:** both pages looked names up with
+    `` sql`${column} = ANY(${values})` ``. Drizzle does not bind a
+    JavaScript array as a Postgres array: it writes one parameter per
+    element in parentheses, so Postgres received `= ANY(($1))` (or
+    `ANY(($1, $2))`) and rejected it on the first element.
+  - **Fix:** `inArray(column, values)` in both places, which renders
+    `in ($1, $2)`, and `false` for an empty list.
+  - **Guard:** `tests/ai/sql-array-binding.test.ts` reads every `sql`
+    template in `src` and fails on an `ANY(${…})` or `ALL(${…})` whose
+    operand is not a column of a schema table (an array column such as
+    `knowledgeArtifacts.tags` is the one correct use). It also pins how
+    Drizzle renders both shapes, so a Drizzle upgrade that changes it
+    shows up there.
 
 ### BL-AIX — AI platform, next generation (2026-10-04)
 **Priority:** P0  ·  **Effort:** XL (phased, one PR per slice)  ·  **Status:** ✅ Phase 0a shipped (PR #335) · ✅ Phase 0b shipped (PR #336) · ✅ Phase 0c-1 shipped (PR #337) · ✅ Phase 0c-2 shipped (PR #338) · ✅ Phase 0d-1 shipped (PR #339) · ✅ Phase 0d-2 shipped (PR #340) · ✅ Phase 1a shipped (PR #341) · ✅ Phase 1b shipped (PR #342) · ✅ Phase 1c shipped (PR #343) · ✅ Phase 1d shipped (PR #344) · ✅ Phase 1e-1 shipped (PR #345) · ✅ Phase 1e-2 shipped (PR #346) · ✅ Phase 1e-3 shipped (PR #347) · ✅ Phase 1f shipped (PR #348) · ✅ Phase 1g-1 shipped (PR #349) · ✅ Phase 1g-2 shipped (PR #350) · ✅ Phase 1h-1 shipped (PR #351) · ✅ Phase 1h-2 shipped (PR #352) · ✅ Phase 1i-1 shipped (PR #353) · ✅ Phase 1i-2 shipped (PR #354) · ✅ Phase 2a shipped (PR #355) · ✅ Phase 2b shipped (PR #356) · ✅ Phase 2c-1 shipped (PR #357) · ✅ 2c-1 review fixes shipped (PR #358) · ⏸ the rest parked (owner, 2026-10-08: stabilization first — see BL-STAB)
