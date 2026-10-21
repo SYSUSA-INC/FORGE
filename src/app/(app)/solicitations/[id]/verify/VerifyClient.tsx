@@ -246,7 +246,7 @@ function AddForm({ solicitationId, pending, run }: { solicitationId: string; pen
   const [ref, setRef] = useState("");
   return (
     <div className="flex flex-col gap-2 rounded-md border border-dashed border-layer/20 px-3 py-2">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Add a requirement the extraction missed</div>
+      <div className="font-mono text-[10px] uppercase tracking-label text-subtle">Add a requirement the extraction missed</div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

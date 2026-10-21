@@ -111,7 +111,7 @@ export default async function NotificationRulesPage() {
         <Panel title="Rules" eyebrow={`${activeCount} active of ${total}`}>
           <div className="overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.02]">
             <table className="w-full min-w-[800px] text-left">
-              <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-label text-subtle">
                 <tr>
                   <th className="px-3 py-2 font-normal">Name</th>
                   <th className="px-3 py-2 font-normal">Trigger</th>

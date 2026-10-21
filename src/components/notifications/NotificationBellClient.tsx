@@ -68,7 +68,7 @@ export function NotificationBellClient({
       {open ? (
         <div className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-lg border border-layer/10 bg-canvas shadow-card">
           <div className="flex items-center justify-between border-b border-layer/10 px-4 py-2.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            <span className="font-mono text-[10px] uppercase tracking-label text-muted">
               Notifications
             </span>
             <span className="font-mono text-[10px] text-subtle">
@@ -138,7 +138,7 @@ export function NotificationBellClient({
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="block border-t border-layer/10 px-4 py-2.5 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-teal hover:bg-layer/[0.04]"
+            className="block border-t border-layer/10 px-4 py-2.5 text-center font-mono text-[10px] uppercase tracking-label text-teal hover:bg-layer/[0.04]"
           >
             View all{pending ? " · …" : ""}
           </Link>

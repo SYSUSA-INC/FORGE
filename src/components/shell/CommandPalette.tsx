@@ -232,12 +232,12 @@ export function CommandPalette({ isOrgAdmin, isSuperadmin, hasWorkspace }: NavVi
               <RowList rows={rows} active={active} onHover={setActive} onPick={activate} asking={asking} />
             )}
             {searching && rows.length > 0 ? (
-              <p className="px-4 pt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Searching…</p>
+              <p className="px-4 pt-1 font-mono text-[10px] uppercase tracking-label text-subtle">Searching…</p>
             ) : null}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-layer/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-layer/10 px-4 py-2 font-mono text-[10px] uppercase tracking-label text-subtle">
           <span>↑↓ move</span>
           <span>↵ open · ask</span>
           <span>esc close</span>
@@ -272,7 +272,7 @@ function RowList({
         return (
           <li key={row.type === "ask" ? "ask" : row.type === "record" ? `r-${row.record.id}` : `c-${row.command.id}`}>
             {header ? (
-              <p className="px-4 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">{header}</p>
+              <p className="px-4 pb-1 pt-2 font-mono text-[10px] uppercase tracking-label text-subtle">{header}</p>
             ) : null}
             <button
               type="button"
@@ -302,7 +302,7 @@ function RowList({
                 </>
               ) : row.type === "record" ? (
                 <>
-                  <span className="w-24 shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-muted">
+                  <span className="w-24 shrink-0 font-mono text-[10px] uppercase tracking-label text-muted">
                     {PALETTE_KIND_LABELS[row.record.kind]}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -314,7 +314,7 @@ function RowList({
                 </>
               ) : (
                 <>
-                  <span className="w-24 shrink-0 truncate font-mono text-[10px] uppercase tracking-[0.15em] text-muted">
+                  <span className="w-24 shrink-0 truncate font-mono text-[10px] uppercase tracking-label text-muted">
                     {row.command.group}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-body text-sm text-text">{row.command.label}</span>
@@ -335,7 +335,7 @@ function AnswerPanel({ view, onBack, onClose }: { view: BrainAnswerView; onBack:
   const confidencePct = Math.round(view.confidence * 100);
   return (
     <div className="max-h-[60vh] overflow-y-auto px-4 py-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+      <div className="mb-2 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-label text-subtle">
         <span className="rounded-md border border-violet/40 bg-violet/10 px-2 py-0.5 text-text">Brain answer</span>
         {view.extractive ? (
           <span className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-amber-200">
@@ -379,7 +379,7 @@ function SourceList({
 }) {
   return (
     <div className="mt-3">
-      <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">{title}</p>
+      <p className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">{title}</p>
       <ul className="space-y-1">
         {sources.map((s) => (
           <li key={s.n}>
@@ -391,7 +391,7 @@ function SourceList({
               <span className="flex items-center gap-2">
                 <span className="font-mono text-[10px] text-muted">[{s.n}]</span>
                 <span className="truncate font-body text-sm text-text">{s.title}</span>
-                <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-subtle">
+                <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-label text-subtle">
                   {s.source === "entry" ? s.kind.replace(/_/g, " ") : "document"}
                   {s.outcomeLabel === "won" ? " · won" : s.outcomeLabel === "lost" ? " · lost" : ""}
                 </span>

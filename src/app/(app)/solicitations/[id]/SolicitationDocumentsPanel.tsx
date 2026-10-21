@@ -179,7 +179,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
       <div className="mb-4 flex flex-col gap-2">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <label className="font-mono text-[9px] uppercase tracking-[0.2em] text-subtle">
+            <label className="font-mono text-[9px] uppercase tracking-label text-subtle">
               Files (several at once)
             </label>
             <input

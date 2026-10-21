@@ -121,7 +121,7 @@ export async function OutcomeInsightsPanel() {
         title="Outcome insights"
         eyebrow="Win/loss + debriefs"
         actions={
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             {total} outcome{total === 1 ? "" : "s"} captured
           </span>
         }
@@ -295,7 +295,7 @@ function Stat({
 }) {
   return (
     <div className="aur-card px-4 py-3">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </div>
       <div

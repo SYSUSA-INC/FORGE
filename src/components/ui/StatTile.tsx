@@ -40,12 +40,12 @@ export function StatTile({
   return (
     <div className={`aur-card p-4 ${glow}`}>
       <div className="flex items-start justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <span className="font-mono text-[10px] uppercase tracking-label text-muted">
           {label}
         </span>
         {icon ? <span className="text-muted">{icon}</span> : null}
       </div>
-      <div className={`mt-3 font-display text-3xl font-semibold tabular-nums tracking-tight ${accentColor}`}>
+      <div className={`mt-3 font-display text-3xl font-normal tabular-nums tracking-title ${accentColor}`}>
         {value}
       </div>
       <div className="mt-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-muted">

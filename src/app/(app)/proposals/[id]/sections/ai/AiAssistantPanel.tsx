@@ -84,7 +84,7 @@ function SourceLegend({
   const cited = new Set(stats.citedSources);
   return (
     <div className="mt-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-label text-muted">
         <span>
           Sources · {cited.size}/{sources.length} cited
           {stubbed ? " · stub embeddings" : ""}
@@ -879,7 +879,7 @@ export function AiAssistantPanel({
       {/* Header + tabs */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-teal">
+          <span className="font-mono text-[10px] uppercase tracking-label text-teal">
             ✨ AI assist
           </span>
           <div className="flex gap-1 rounded border border-layer/10 p-0.5">
@@ -934,7 +934,7 @@ export function AiAssistantPanel({
           /* ── A/B comparison view ── */
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-teal">
+              <span className="font-mono text-[10px] uppercase tracking-label text-teal">
                 A/B Compare
               </span>
               <span className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] text-teal">
@@ -1107,7 +1107,7 @@ export function AiAssistantPanel({
           </>
         ) : (
           <>
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-teal">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-teal">
               {MODES.find((m) => m.key === result.mode)?.label} preview ·{" "}
               {result.text.split(/\s+/).filter(Boolean).length} words
               {guidance ? (

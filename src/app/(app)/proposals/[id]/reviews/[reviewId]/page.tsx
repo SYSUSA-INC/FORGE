@@ -173,7 +173,7 @@ export default async function ReviewDetailPage({
             ← All reviews
           </Link>
           <span
-            className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em]"
+            className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
             style={{
               color: colorHex,
               backgroundColor: `${colorHex}1A`,
@@ -219,7 +219,7 @@ export default async function ReviewDetailPage({
 
       {r.instructions ? (
         <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/5 px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-indigo-300">Instructions to reviewers</div>
+          <div className="font-mono text-[10px] uppercase tracking-label text-indigo-300">Instructions to reviewers</div>
           <p className="mt-1 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">{r.instructions}</p>
         </div>
       ) : null}

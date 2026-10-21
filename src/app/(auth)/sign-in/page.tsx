@@ -47,7 +47,7 @@ export default async function SignInPage({
               <div className="font-display text-[15px] font-semibold tracking-tight text-text">
                 FORGE
               </div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                 Proposal Ops
               </div>
             </div>
@@ -76,7 +76,7 @@ export default async function SignInPage({
 
           <div className="relative my-6 flex items-center">
             <span className="h-px flex-1 bg-layer/10" />
-            <span className="px-3 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            <span className="px-3 font-mono text-[10px] uppercase tracking-label text-muted">
               or
             </span>
             <span className="h-px flex-1 bg-layer/10" />

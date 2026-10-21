@@ -113,7 +113,7 @@ export function SnapshotDiffViewer({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5">
-            <h3 className="font-mono text-[12px] uppercase tracking-[0.2em] text-text">
+            <h3 className="font-mono text-[12px] uppercase tracking-label text-text">
               Snapshot diff
             </h3>
             <p className="font-mono text-[10px] text-muted">

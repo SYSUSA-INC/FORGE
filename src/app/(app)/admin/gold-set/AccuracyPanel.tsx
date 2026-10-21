@@ -94,7 +94,7 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
         <p className="font-mono text-[11px] text-muted">No runs yet.</p>
       ) : (
         <table className="w-full font-mono text-[11px]">
-          <thead className="text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <thead className="text-[10px] uppercase tracking-label text-subtle">
             <tr>
               <th className="py-1 text-left">When</th>
               <th className="py-1 text-left" title="Requirement sweep / AI review / Sections L and M">Prompts · model</th>

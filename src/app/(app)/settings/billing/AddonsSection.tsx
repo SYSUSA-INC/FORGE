@@ -71,7 +71,7 @@ export async function AddonsSection({
                       </span>
                     ) : null}
                   </div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">{describeAddon(a)}</div>
+                  <div className="font-mono text-[10px] uppercase tracking-label text-muted">{describeAddon(a)}</div>
                 </div>
                 <div className="font-display text-[14px] text-text">{formatMonthlyPrice(a.priceMonthlyCents)}</div>
               </div>

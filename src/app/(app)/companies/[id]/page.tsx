@@ -73,7 +73,7 @@ export default async function CompanyDetailPage({
           style={{ backgroundColor: relColor }}
         />
         <div
-          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-[0.22em]"
+          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-label"
           style={{
             color: relColor,
             backgroundColor: `${relColor}1A`,

@@ -59,7 +59,7 @@ export async function CustomerHistoryPanel({
       }
       actions={
         modelPwin ? (
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             Model PWin{" "}
             <span className="text-text">{modelPwin.pwin}%</span>
             <span className="ml-1 lowercase">({modelPwin.confidence} confidence)</span>
@@ -121,7 +121,7 @@ export async function CustomerHistoryPanel({
       {seenBefore ? (
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <div>
-            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
               What they buy from us
             </div>
             {h.naicsMix.length === 0 && h.setAsideMix.length === 0 ? (
@@ -145,7 +145,7 @@ export async function CustomerHistoryPanel({
           </div>
 
           <div>
-            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
               Evaluator priorities (past Section M)
             </div>
             {h.evaluatorPriorities.length === 0 ? (
@@ -172,7 +172,7 @@ export async function CustomerHistoryPanel({
           </div>
 
           <div>
-            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
               Your record
             </div>
             {h.recentPursuits.length === 0 ? (
@@ -208,7 +208,7 @@ export async function CustomerHistoryPanel({
 
       {market ? (
         <div className="mt-4 border-t border-layer/10 pt-3">
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
             Market view · USAspending · last {market.yearsBack} years
             {naicsCode ? ` · NAICS ${naicsCode}` : ""}
           </div>
@@ -261,7 +261,7 @@ function Stat({
           : "text-text";
   return (
     <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted">{label}</div>
+      <div className="font-mono text-[9px] uppercase tracking-label text-muted">{label}</div>
       <div className={`mt-0.5 truncate font-display text-[18px] font-semibold ${color}`}>{value}</div>
       {sub ? <div className="mt-0.5 truncate font-mono text-[10px] text-muted">{sub}</div> : null}
     </div>

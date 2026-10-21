@@ -72,7 +72,7 @@ export function VoiceCheckPanel({
   return (
     <div className={`rounded-lg border ${frame}`}>
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-        <span className={`font-mono text-[10px] uppercase tracking-[0.22em] ${accent}`}>
+        <span className={`font-mono text-[10px] uppercase tracking-label ${accent}`}>
           ✦ Voice · {findings === null ? `${VOICE_LIMITS.checkMinWords}+ words to compare with ${profile.author}` : voiceCheckSummary(findings, profile.author)}
         </span>
         <span className="font-mono text-[10px] text-muted">{open ? "▾" : "▸"}</span>

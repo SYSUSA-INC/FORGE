@@ -69,7 +69,7 @@ export function StartImpersonationForm({
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-amber-400/30 bg-amber-400/[0.04] p-3">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-300">
+      <div className="font-mono text-[10px] uppercase tracking-label text-amber-300">
         Assume identity of {organizationName}
       </div>
       <p className="font-mono text-[11px] text-muted">

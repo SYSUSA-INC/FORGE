@@ -60,7 +60,7 @@ export function SavedSearchesClient({ rows }: { rows: SavedSearchRow[] }) {
             type="button"
             key={f}
             onClick={() => setFilter(f)}
-            className={`-mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] transition-colors ${
+            className={`-mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
               filter === f
                 ? "border-teal-400 text-text"
                 : "border-transparent text-muted hover:text-text"
@@ -128,14 +128,14 @@ function SavedSearchRowView({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
               {row.kind}
             </span>
             <span className="truncate font-display text-[13px] text-text">
               {row.name}
             </span>
             {row.shared ? (
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-200">
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-emerald-200">
                 Shared
               </span>
             ) : null}
@@ -169,7 +169,7 @@ function SavedSearchRowView({
               <button
                 type="button"
                 onClick={onRemove}
-                className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-[0.18em] text-rose-300 hover:text-rose-200"
+                className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label text-rose-300 hover:text-rose-200"
               >
                 Delete
               </button>

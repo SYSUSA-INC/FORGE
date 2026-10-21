@@ -3,17 +3,21 @@
 import { useEffect, useState } from "react";
 
 export function SessionClock() {
-  const [now, setNow] = useState<string>(() => formatTime(new Date()));
+  // Set after mount: the server's second and the browser's never match,
+  // and a time rendered on both was a hydration mismatch on every page.
+  const [now, setNow] = useState<string | null>(null);
 
   useEffect(() => {
+    setNow(formatTime(new Date()));
     const id = setInterval(() => setNow(formatTime(new Date())), 1000);
     return () => clearInterval(id);
   }, []);
 
   return (
     <div className="hidden items-center gap-2 rounded-full border border-layer/10 bg-layer/5 px-3 py-1 font-mono text-[11px] tracking-widest text-muted md:flex">
-      <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-violet" aria-hidden />
-      <span>UTC {now}</span>
+      {/* EnableNow's live signal: the green of its office clocks. */}
+      <span className="h-1.5 w-1.5 animate-pulseSoft rotate-45 bg-signal-live" aria-hidden />
+      <span>UTC {now ?? "--:--:--"}</span>
     </div>
   );
 }

@@ -22,7 +22,7 @@ export function TMinus({
 
   return (
     <div className={`relative border-2 border-ink ${tone}`}>
-      <div className="flex items-center justify-between border-b-2 border-current/70 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em]">
+      <div className="flex items-center justify-between border-b-2 border-current/70 px-3 py-1 font-mono text-[10px] uppercase tracking-label">
         <span>{label}</span>
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 animate-blink bg-current" />
@@ -42,7 +42,7 @@ function Cell({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-4 py-3 text-center">
       <div className="brut-stencil text-6xl">{value}</div>
-      <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.3em] opacity-70">{label}</div>
+      <div className="mt-1 font-mono text-[9px] uppercase tracking-label opacity-70">{label}</div>
     </div>
   );
 }

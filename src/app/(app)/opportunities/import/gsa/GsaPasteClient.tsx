@@ -415,7 +415,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <span className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
         {required ? <span className="ml-1 text-rose">*</span> : null}
       </span>

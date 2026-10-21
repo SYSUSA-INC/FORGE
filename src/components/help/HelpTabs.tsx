@@ -21,7 +21,7 @@ function Tab({ href, label, active }: { href: string; label: string; active: boo
   return (
     <Link
       href={href}
-      className={`relative inline-flex items-center px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+      className={`relative inline-flex items-center px-4 py-3 font-mono text-[11px] uppercase tracking-label transition-colors ${
         active ? "text-text" : "text-muted hover:text-text"
       }`}
     >

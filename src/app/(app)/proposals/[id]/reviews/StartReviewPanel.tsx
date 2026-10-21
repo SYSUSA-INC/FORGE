@@ -162,7 +162,7 @@ export function StartReviewPanel({
                       </label>
                       {isSelected && sections.length > 0 ? (
                         <div className="mt-2">
-                          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+                          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
                             Sections · {scope.length === 0 ? "whole proposal" : `${scope.length} of ${sections.length}`}
                           </div>
                           <div className="flex flex-wrap gap-1">

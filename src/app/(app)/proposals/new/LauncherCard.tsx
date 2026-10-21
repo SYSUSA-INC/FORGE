@@ -16,7 +16,7 @@ export function LauncherCard({
 }) {
   return (
     <div className="aur-card flex flex-col p-5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-teal">
+      <div className="font-mono text-[10px] uppercase tracking-label text-teal">
         {eyebrow}
       </div>
       <div className="mt-1 font-display text-[18px] font-semibold text-text">

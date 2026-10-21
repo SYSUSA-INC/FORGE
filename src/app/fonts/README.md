@@ -1,40 +1,41 @@
 # Vendored web fonts
 
-`next build` must not depend on fonts.googleapis.com (BL-QC-fonts). These are the
-latin-subset variable WOFF2 files Google Fonts serves for the families FORGE uses;
-`next/font/local` in `src/app/layout.tsx` hashes and emits them to
-`/_next/static/media/` exactly as the Google loader did, so the rendered fonts are
-byte-identical to before.
+`next build` must not depend on fonts.googleapis.com (BL-QC-fonts). `next/font/local`
+in `src/app/layout.tsx` hashes these files and emits them to `/_next/static/media/`.
+
+BL-UI-ENABLENOW (2026-10-21): FORGE uses the EnableNow design system's two families.
+The files are the Google Fonts latin subsets that the EnableNow site self-hosts
+(its `/assets/fonts/fonts.css` maps Host Grotesk 300, 400 and 500 to the same
+variable file, and Geist Mono 400 to its own).
 
 | File | Family / axes | Source URL | Fetched | Bytes | SHA-256 |
 |---|---|---|---|---|---|
-| `inter-latin-wght.woff2` | Inter v20 (Google Fonts), latin, wght 100–900 | https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2 | 2026-09-23 | 48432 | `c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4` |
-| `jetbrains-mono-latin-wght-400-600.woff2` | JetBrains Mono v24 (Google Fonts), latin, wght 400–600 | https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwgknk-4.woff2 | 2026-09-23 | 31340 | `2c32b9b3ee358c119e210f6f5195f9bd34894d78a785ff2e95d60e718e400af4` |
+| `host-grotesk-latin-wght.woff2` | Host Grotesk v1.003, latin, variable wght 300–800 | https://enablenow-website.vercel.app/assets/fonts/enablenow-8.woff2 | 2026-10-21 | 20296 | `ce9c9db8a488852eb7e4a52f51fd8ce0c93ef61a8d3bfa054b509ec92958dcfe` |
+| `geist-mono-latin-400.woff2` | Geist Mono v1.701, latin, Regular 400 | https://enablenow-website.vercel.app/assets/fonts/enablenow-6.woff2 | 2026-10-21 | 9864 | `3f98383b122fe015a48536cd4a1cda855a201718923ffe74931a01597107b9b5` |
+
+The family, version and copyright above are read from each file's `name` table.
 
 ## Licences
 
 Both families are under the SIL Open Font License 1.1. The licence texts ship next to
-the fonts, as the OFL requires: `OFL-Inter.txt` (Copyright (c) 2016 The Inter Project
-Authors) and `OFL-JetBrainsMono.txt` (Copyright 2020 The JetBrains Mono Project
+the fonts, as the OFL requires: `OFL-HostGrotesk.txt` (Copyright 2023 The Host
+Grotesk Project Authors) and `OFL-GeistMono.txt` (Copyright 2024 The Geist Project
 Authors). Do not rename the font families.
 
-## Why these files
+## How they are used
 
-Before this change `src/app/layout.tsx` made four `next/font/google` calls (three
-Inter weight sets and one JetBrains Mono set). Google serves the same variable file
-for every Inter weight request, so one Inter file covers display, body and stencil;
-`globals.css` aliases `--font-body` and `--font-stencil` to `--font-display`.
+One Host Grotesk file covers display, body and stencil; `globals.css` aliases
+`--font-body` and `--font-stencil` to `--font-display`. Geist Mono ships Regular only,
+as EnableNow uses it: heavier mono text is synthesised by the browser.
 
 ## Refreshing
 
-1. Request the CSS the way the Next loader does, with a Chrome user agent:
-   `curl -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36' 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap'`
-   (and `family=JetBrains+Mono:wght@400;500;600`).
-2. Take the `src: url(...)` under the `/* latin */` block and download it.
-3. Update this table and the manifest in `tests/fonts/vendored-fonts.test.ts`.
+1. Download the files above (or the `/* latin */` subsets from
+   `https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@300..800` and
+   `family=Geist+Mono`, requested with a Chrome user agent).
+2. Update this table and the manifest in `tests/fonts/vendored-fonts.test.ts`.
 
 ## Coverage
 
 Latin only (U+0000–00FF plus common punctuation and currency). Characters outside
-that range fall back to the system sans or mono, which is what the preloaded latin
-subset did before as well.
+that range fall back to Arial or the system mono.

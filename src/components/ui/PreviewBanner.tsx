@@ -22,7 +22,7 @@ export function PreviewBanner({
           !
         </span>
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-300">
+          <div className="font-mono text-[10px] uppercase tracking-label text-amber-300">
             {title}
           </div>
           <p className="mt-1 font-body text-[13px] leading-relaxed text-text">

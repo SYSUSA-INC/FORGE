@@ -93,7 +93,7 @@ export function StageAdvancePanel({
 
         {next && nextDef ? (
           <div className="rounded-md border border-teal-400/30 bg-teal-400/5 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+            <div className="font-mono text-[10px] uppercase tracking-label text-muted">
               Next
             </div>
             <div className="mt-1 font-display text-[14px] font-semibold text-text">
@@ -119,7 +119,7 @@ export function StageAdvancePanel({
         )}
 
         <div className="flex flex-col gap-2">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+          <div className="font-mono text-[10px] uppercase tracking-label text-muted">
             Close-out
           </div>
           <div className="grid grid-cols-2 gap-2">

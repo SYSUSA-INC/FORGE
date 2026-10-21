@@ -60,7 +60,7 @@ export function TonePanel({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
       >
-        <span className={`font-mono text-[10px] uppercase tracking-[0.22em] ${accent}`}>
+        <span className={`font-mono text-[10px] uppercase tracking-label ${accent}`}>
           ✎ Tone · {toneSummary(report)}
         </span>
         <span className="font-mono text-[10px] text-muted">{open ? "▾" : "▸"}</span>

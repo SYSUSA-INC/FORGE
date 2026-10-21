@@ -162,7 +162,7 @@ export function ProposalScanPanel({
           {/* Section issues */}
           {scan.sectionIssues.length > 0 ? (
             <div>
-              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Section issues ({scan.sectionIssues.length})
               </div>
               <ul className="space-y-2">
@@ -202,7 +202,7 @@ export function ProposalScanPanel({
           {/* Theme coverage */}
           {scan.sectionThemeCoverage && scan.sectionThemeCoverage.length > 0 ? (
             <div>
-              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Win-theme coverage
               </div>
               <ul className="space-y-1.5">
@@ -251,7 +251,7 @@ export function ProposalScanPanel({
           {/* Contradictions */}
           {scan.contradictions && scan.contradictions.length > 0 ? (
             <div>
-              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Cross-volume contradictions ({scan.contradictions.length})
               </div>
               <ul className="space-y-2">
@@ -299,7 +299,7 @@ export function ProposalScanPanel({
           {/* Recommendations */}
           {scan.topRecommendations.length > 0 ? (
             <div>
-              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Top recommendations
               </div>
               <ol className="space-y-1">

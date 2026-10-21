@@ -82,7 +82,8 @@ Effort key:
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | 🔄 PR #387 |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped) |
+| 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | 🔄 in review (this PR) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1183,6 +1184,27 @@ mind. Bandage will come off but a true fix will stay."
       elsewhere; moving the nameservers to Cloudflare is an operator
       step. The code side (Turnstile, origin lock, headers) is built
       meanwhile.
+  - **Owner decisions (2026-10-21), for 8a:**
+    - **Rollout:** every session ends once at release; everyone signs in
+      again with their password and sets up an authenticator before
+      anything opens, so an old or stolen session cannot enrol.
+    - **Google / Microsoft sign-ins** also need FORGE's own second
+      factor (every user).
+    - **Lost authenticator and recovery codes:** a platform superadmin
+      resets the MFA with a written reason; the person is emailed, every
+      session ends, and they enrol again at the next sign-in.
+    - **Sessions:** signed out after 8 hours without use and after 24
+      hours at most (today they last 30 days and renew on every use).
+  - **Found while mapping (2026-10-21), to fix with or before 8a:** in
+    invite-only mode a password user's first Google/Microsoft sign-in
+    deletes their account (Auth.js fires `createUser` on the link-by-email
+    path); a disabled user gets in on a first Google/Microsoft link, and
+    disabling or resetting a password does not end open sessions;
+    Google/Entra link to an existing account by email alone and Entra
+    accepts any tenant; accepting an invite overwrites an existing
+    account's password and self sign-up can overwrite an unverified one;
+    password sign-in has no rate limit and the limiter fails open;
+    `safeRedirectTarget` lets `/\evil.com` through.
 - **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
   BL-STAB-2.
   - **Ask:** Upload several files at once; FORGE decides what each is
@@ -2874,6 +2896,46 @@ added to the sysusa.com tenant by its own admins).
 members (listed, never auto-removed); notifying the requesting tenant
 admin by email on approve / deny (they see the status on `/users`);
 subdomain matching (`mail.acme.com` is a separate domain).
+
+---
+
+### BL-UI-ENABLENOW — The EnableNow look
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 in review (this PR)
+
+Owner request (2026-10-21): "Look at this color palette
+https://enablenow-website.vercel.app/design-system#colour and this
+website https://enablenow-website.vercel.app/, can you make this platform
+look pretty like this one using the colors provided including supporting
+colors." The palette, type and component values were read from the live
+site (its CSS variables and design-system page), not approximated.
+
+**Delivered:**
+- **Palette** (`globals.css`, both themes): EnableNow's slate neutrals and
+  white paper; its brand blue scale as `cobalt` (the action colour is
+  blue-600 `#2953d7` on every ground, `--c-action`); its supporting
+  teal-700 and signal greens as success; its dark theme (dark-ground,
+  dark-wash, dark-cool). Brass (attention), red (danger), indigo
+  (review) and plum (pink team) have no EnableNow equivalent and keep
+  FORGE's values. `border-layer/10` now lands on EnableNow's hairline.
+- **Type:** Host Grotesk and Geist Mono, self-hosted with their OFL
+  licences (Inter and JetBrains Mono removed). Headings are Regular with
+  EnableNow's tight tracking; mono labels use its 0.06em tracking (a
+  codemod replaced the wide `tracking-[0.2em]`-style classes with
+  `tracking-label`). A latent cascade bug that left every page on the
+  fallback font in dev (the `:root` fallbacks tied with next/font's
+  class) is fixed with a zero-specificity `:where(:root)` block.
+- **Shape:** EnableNow's radius scale (3 / 5 / 9 / 14 px) in the Tailwind
+  config; cards are paper with a hairline and no shadow; its three
+  buttons (solid primary, light, ghost) with a 1px lift; sans inputs on
+  the strong hairline; the float shadow only for what floats; the page
+  backdrop washes and grid removed.
+- **Marks:** the diamond (`aur-diamond`) marks the current nav item and
+  the page eyebrow; the active nav is a pale blue tint (the gradients
+  and brass rail are gone); the header clock pulses in the signal green.
+- **Fix on the way:** the header clock rendered the time on the server
+  and in the browser, a hydration mismatch on every page; it now renders
+  after mount.
+- **Docs:** `docs/DESIGN_SYSTEM.md` rewritten for the EnableNow system.
 
 ---
 

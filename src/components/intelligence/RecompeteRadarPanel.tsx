@@ -167,7 +167,7 @@ function Note({ label, text, empty }: { label: string; text: string; empty: stri
   if (!text && !empty) return null;
   return (
     <div>
-      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-muted">{label}</div>
+      <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">{label}</div>
       {text ? (
         <p className="line-clamp-4 whitespace-pre-line font-body text-[12px] leading-relaxed text-text">
           {text}

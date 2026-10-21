@@ -587,7 +587,7 @@ function bumpStats(
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <span className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </span>
       {children}

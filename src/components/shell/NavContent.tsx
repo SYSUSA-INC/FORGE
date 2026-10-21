@@ -261,7 +261,7 @@ export function NavContent({
                   aria-label={g.label}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                     groupActive
-                      ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
+                      ? "bg-cobalt-400/10 text-text"
                       : "text-muted hover:bg-layer/[0.05] hover:text-text"
                   }`}
                 >
@@ -287,7 +287,7 @@ export function NavContent({
                 aria-label={g.label}
                 className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm transition-colors ${
                   groupActive
-                    ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.4)]"
+                    ? "bg-cobalt-400/10 text-text"
                     : "text-muted hover:bg-layer/[0.05] hover:text-text"
                 }`}
               >
@@ -329,7 +329,7 @@ export function NavContent({
           <div className="font-display text-[15px] font-semibold tracking-tight">
             FORGE
           </div>
-          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
+          <div className="mt-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
             {meta.subtitle}
           </div>
         </div>
@@ -348,7 +348,7 @@ export function NavContent({
 
       {workspaces.length > 1 ? (
         <div className="border-b border-layer/10 px-3 py-2">
-          <div className="mb-1 px-1 font-mono text-[9px] uppercase tracking-[0.25em] text-subtle">
+          <div className="mb-1 px-1 font-mono text-[9px] uppercase tracking-label text-subtle">
             Workspace
           </div>
           <div
@@ -380,7 +380,7 @@ export function NavContent({
                 : "border-amber-400/30 bg-amber-400/[0.06] hover:border-amber-400/50"
             }`}
           >
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-200">
+            <div className="font-mono text-[10px] uppercase tracking-label text-amber-200">
               No active workspace
             </div>
             <div className="mt-0.5 font-body text-[12px] leading-snug text-muted">
@@ -409,18 +409,14 @@ export function NavContent({
                 onClick={onNavigate}
                 className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   active
-                    ? "bg-layer/10 text-text shadow-[inset_0_0_0_1px_rgb(var(--c-cobalt-500)/0.35)]"
-                    : "text-muted hover:bg-layer/[0.04] hover:text-text"
+                    ? "bg-cobalt-400/10 text-text"
+                    : "text-muted hover:bg-bone hover:text-text"
                 }`}
               >
-                {active && (
-                  <span className="absolute -left-3 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-cobalt via-cobalt-300 to-brass" />
-                )}
+                {active && <span className="aur-diamond absolute -left-1 top-1/2 -translate-y-1/2" />}
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
-                    active
-                      ? "bg-gradient-to-br from-cobalt/30 to-brass/15 text-text"
-                      : "bg-layer/5 text-muted"
+                    active ? "bg-cobalt-400/15 text-cobalt" : "bg-layer/5 text-muted"
                   }`}
                 >
                   {g.icon}
@@ -442,14 +438,12 @@ export function NavContent({
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                   groupActive
                     ? "text-text"
-                    : "text-muted hover:bg-layer/[0.04] hover:text-text"
+                    : "text-muted hover:bg-bone hover:text-text"
                 }`}
               >
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
-                    groupActive
-                      ? "bg-gradient-to-br from-teal/30 to-emerald/20 text-text"
-                      : "bg-layer/5 text-muted"
+                    groupActive ? "bg-cobalt-400/15 text-cobalt" : "bg-layer/5 text-muted"
                   }`}
                 >
                   {g.icon}
@@ -481,10 +475,11 @@ export function NavContent({
                           onClick={onNavigate}
                           className={`relative block rounded-md px-2 py-1.5 text-[13px] transition-colors ${
                             active
-                              ? "bg-layer/10 text-text"
-                              : "text-muted hover:bg-layer/[0.04] hover:text-text"
+                              ? "bg-cobalt-400/10 text-text"
+                              : "text-muted hover:bg-bone hover:text-text"
                           }`}
                         >
+                          {active && <span className="aur-diamond mr-2 align-middle" />}
                           {c.label}
                         </Link>
                       </li>
@@ -544,7 +539,7 @@ function WorkspaceSwitchLink({
         aria-current={active ? "true" : undefined}
         className={`flex h-9 w-9 items-center justify-center rounded-md border font-mono text-[11px] font-bold transition-colors ${
           active
-            ? "border-cobalt/40 bg-gradient-to-br from-cobalt/30 to-brass/15 text-text"
+            ? "border-cobalt/40 bg-cobalt-400/10 text-cobalt"
             : "border-layer/10 text-muted hover:border-layer/20 hover:bg-layer/[0.05] hover:text-text"
         }`}
       >
@@ -557,7 +552,7 @@ function WorkspaceSwitchLink({
       href={m.home}
       onClick={choose}
       aria-current={active ? "true" : undefined}
-      className={`block truncate rounded-md border px-2 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
+      className={`block truncate rounded-md border px-2 py-1.5 text-center font-mono text-[10px] uppercase tracking-label transition-colors ${
         active
           ? "border-cobalt/40 bg-cobalt/10 text-text"
           : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20 hover:text-text"

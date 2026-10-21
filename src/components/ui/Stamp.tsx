@@ -20,7 +20,7 @@ export function Stamp({
 
   return (
     <span
-      className={`inline-flex select-none items-center justify-center border-[3px] px-2.5 py-1 font-display text-[11px] font-black uppercase tracking-[0.18em] opacity-90 ${color} ${className}`}
+      className={`inline-flex select-none items-center justify-center border-[3px] px-2.5 py-1 font-display text-[11px] font-black uppercase tracking-label opacity-90 ${color} ${className}`}
       style={{ transform: `rotate(${angle}deg)` }}
     >
       <span className="pr-1">✦</span>

@@ -71,7 +71,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             user={navUser}
           />
 
-          <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
+          <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-label text-muted">
             <span className="h-1.5 w-1.5 animate-pulseSoft rounded-full bg-emerald" />
             <span className="hidden sm:inline">FORGE · Live</span>
             <span className="sm:hidden">FORGE</span>
@@ -106,7 +106,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <main className="relative min-h-[calc(100vh-3.5rem)] flex-1 overflow-x-hidden px-4 py-6 md:px-6 md:py-8 lg:px-10">
           {children}
           <footer className="mt-16 border-t border-layer/10 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+            <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-label text-subtle">
               <span>
                 FORGE · Framework for Optimized Response Generation &amp; Execution
               </span>

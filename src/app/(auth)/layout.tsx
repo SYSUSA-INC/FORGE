@@ -13,7 +13,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <div className="font-display text-[15px] font-semibold tracking-tight text-text">
               FORGE
             </div>
-            <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
+            <div className="mt-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
               Proposal Ops
             </div>
           </div>

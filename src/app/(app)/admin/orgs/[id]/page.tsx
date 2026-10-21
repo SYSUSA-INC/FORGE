@@ -507,7 +507,7 @@ export default async function TenantDetailPage({
             initialApprovedExternalDomains={org.approvedExternalDomains}
           />
           <div className="mt-4 border-t border-layer/10 pt-3">
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-muted">
               Members from other domains ({externalMembers.length})
             </div>
             {externalMembers.length === 0 ? (

@@ -164,7 +164,7 @@ export function ProtestViabilityPanel({
           {/* Grounds list */}
           {check.grounds.length > 0 ? (
             <div className="border-t border-layer/5 pt-4">
-              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-muted">
                 Identified grounds ({check.grounds.length})
               </div>
               <ul className="space-y-2">
@@ -208,7 +208,7 @@ export function ProtestViabilityPanel({
 
                       {expanded && g.controllingCases.length > 0 ? (
                         <div className="border-t border-layer/5 px-3 pb-3 pt-2">
-                          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-subtle">
+                          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-subtle">
                             Controlling cases
                           </div>
                           <ul className="space-y-2">

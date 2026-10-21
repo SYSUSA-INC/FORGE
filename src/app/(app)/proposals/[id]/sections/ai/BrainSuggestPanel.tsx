@@ -44,7 +44,7 @@ export function BrainSuggestPanel({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
       >
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-violet-300">
+        <span className="font-mono text-[10px] uppercase tracking-label text-violet-300">
           ✦ Suggest from Brain
         </span>
         <span className="font-mono text-[10px] text-muted">

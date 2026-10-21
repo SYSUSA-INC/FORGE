@@ -58,7 +58,7 @@ export function AIEngineTab({ status }: { status: AIEngineStatus }) {
         </div>
 
         <div className="mt-4">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             All providers
           </div>
           <ul className="space-y-1">

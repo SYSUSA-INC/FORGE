@@ -153,7 +153,7 @@ export default async function PromoCodesPage() {
 function RowField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+      <div className="text-[10px] uppercase tracking-label text-muted">
         {label}
       </div>
       <div className="mt-1 text-text">{value}</div>

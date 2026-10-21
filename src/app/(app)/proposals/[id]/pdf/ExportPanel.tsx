@@ -355,7 +355,7 @@ export function ExportPanel({
         ) : null}
 
         <div className="border-t border-layer/10 pt-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-subtle">
+          <div className="font-mono text-[10px] uppercase tracking-label text-subtle">
             Recent renders
           </div>
           {initialRenders.length === 0 ? (

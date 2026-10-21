@@ -156,7 +156,7 @@ export function MentionTextarea({
       />
       {open && filtered.length > 0 ? (
         <div className="absolute left-0 top-full z-30 mt-1 w-72 overflow-hidden rounded-md border border-layer/10 bg-canvas shadow-card">
-          <div className="border-b border-layer/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+          <div className="border-b border-layer/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-label text-subtle">
             Tag a teammate
           </div>
           <ul className="max-h-64 overflow-y-auto">

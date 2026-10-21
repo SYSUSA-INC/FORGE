@@ -49,9 +49,13 @@ describe("theme tokens — CSS", () => {
 
   it("the two themes actually differ where they should", () => {
     expect(LIGHT.get("canvas")).not.toBe(DARK.get("canvas"));
-    expect(LIGHT.get("layer")).toBe("15 27 45");
+    // BL-UI-ENABLENOW: hairlines in EnableNow navy (blue-900); the brand
+    // blue (blue-600) on paper, blue-400 on the dark ground.
+    expect(LIGHT.get("layer")).toBe("12 31 89");
     expect(DARK.get("layer")).toBe("255 255 255");
-    expect(DARK.get("cobalt-500")).toBe("76 141 255");
+    expect(LIGHT.get("cobalt-500")).toBe("41 83 215");
+    expect(DARK.get("cobalt-500")).toBe("69 131 255");
+    expect(LIGHT.get("action")).toBe(DARK.get("action"));
   });
 });
 

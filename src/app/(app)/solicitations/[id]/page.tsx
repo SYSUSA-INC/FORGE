@@ -468,7 +468,7 @@ export default async function SolicitationDetail({
             {/* BL-AIX Phase 0d — say plainly what the sweep didn't read. */}
             {coverageNotes.length > 0 ? (
               <div className="mb-3 rounded-md border border-gold/40 bg-gold/10 px-3 py-2">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">Not everything was read</div>
+                <div className="font-mono text-[10px] uppercase tracking-label text-gold">Not everything was read</div>
                 <ul className="mt-1 flex flex-col gap-1 font-body text-[12px] leading-relaxed text-text">
                   {coverageNotes.map((n) => (
                     <li key={n}>{n}</li>
@@ -619,7 +619,7 @@ export default async function SolicitationDetail({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-layer/5 pb-1.5 last:border-b-0">
-      <dt className="text-[10px] uppercase tracking-[0.22em] text-subtle">
+      <dt className="text-[10px] uppercase tracking-label text-subtle">
         {label}
       </dt>
       <dd className="text-right text-text">{value || "—"}</dd>

@@ -16,21 +16,22 @@ import "./globals.css";
 // Keep these calls below the globals.css import so the generated
 // `.variable` classes come after the `:root` fallbacks in the cascade.
 
-// One Inter file covers display, body and stencil: globals.css aliases
-// --font-body and --font-stencil to --font-display. Variable wght axis.
-const inter = localFont({
-  src: "./fonts/inter-latin-wght.woff2",
-  weight: "100 900",
+// BL-UI-ENABLENOW — the EnableNow design system's two families: Host
+// Grotesk carries every word (one variable file, wght 300–800, serves
+// display, body and stencil: globals.css aliases --font-body and
+// --font-stencil to --font-display); Geist Mono carries labels, numbers,
+// times and metadata, Regular only as EnableNow ships it.
+const sans = localFont({
+  src: "./fonts/host-grotesk-latin-wght.woff2",
+  weight: "300 800",
   style: "normal",
   display: "swap",
   variable: "--font-display",
 });
 
-// The file Google serves for wght@400;500;600 is instanced to that range;
-// declare it so heavier mono keeps today's synthetic-bold rendering.
 const mono = localFont({
-  src: "./fonts/jetbrains-mono-latin-wght-400-600.woff2",
-  weight: "400 600",
+  src: "./fonts/geist-mono-latin-400.woff2",
+  weight: "400",
   style: "normal",
   display: "swap",
   variable: "--font-mono",
@@ -51,7 +52,7 @@ const THEME_BOOT_SCRIPT =
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>

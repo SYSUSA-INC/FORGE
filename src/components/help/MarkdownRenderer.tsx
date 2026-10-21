@@ -33,7 +33,7 @@ export function MarkdownRenderer({ source }: { source: string }) {
           </h3>
         ),
         h4: ({ children }) => (
-          <h4 className="mt-6 font-mono text-[11px] uppercase tracking-[0.25em] text-muted">
+          <h4 className="mt-6 font-mono text-[11px] uppercase tracking-label text-muted">
             {children}
           </h4>
         ),
@@ -115,7 +115,7 @@ export function MarkdownRenderer({ source }: { source: string }) {
           </td>
         ),
         img: ({ src, alt }) => (
-          <span className="mt-4 block rounded-lg border border-dashed border-layer/15 bg-layer/[0.02] p-6 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-subtle">
+          <span className="mt-4 block rounded-lg border border-dashed border-layer/15 bg-layer/[0.02] p-6 text-center font-mono text-[11px] uppercase tracking-label text-subtle">
             screenshot · {alt || src}
           </span>
         ),

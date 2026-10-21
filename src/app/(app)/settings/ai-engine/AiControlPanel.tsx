@@ -113,7 +113,7 @@ function BudgetPanel(p: AiControlPanelProps) {
       </div>
 
       <div className="mt-4">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+        <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
           Tokens per day · this month
         </div>
         {p.daily.length === 0 ? (

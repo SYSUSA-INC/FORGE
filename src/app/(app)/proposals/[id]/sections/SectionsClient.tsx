@@ -739,7 +739,7 @@ function SectionRow({
               {section.title}
             </span>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-label text-muted">
             <span>{SECTION_KIND_LABELS[section.kind]}</span>
             <span>·</span>
             <span>{words} words</span>

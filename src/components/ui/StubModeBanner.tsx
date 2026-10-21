@@ -30,7 +30,7 @@ export function StubModeBanner({
   if (variant === "inline") {
     return (
       <span
-        className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-amber-300 ${className}`}
+        className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-label text-amber-300 ${className}`}
       >
         <span aria-hidden>●</span>
         <span>stub mode</span>
@@ -70,7 +70,7 @@ export function StubModeBanner({
           !
         </span>
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-300">
+          <div className="font-mono text-[10px] uppercase tracking-label text-amber-300">
             Stub mode
           </div>
           <p className="mt-1 font-body text-[13px] leading-relaxed text-text">
@@ -88,7 +88,7 @@ export function StubModeBanner({
           </p>
           <Link
             href="/settings/integrations"
-            className="mt-1 inline-block font-mono text-[11px] uppercase tracking-[0.18em] text-amber-300 underline decoration-dotted underline-offset-2 hover:text-amber-200"
+            className="mt-1 inline-block font-mono text-[11px] uppercase tracking-label text-amber-300 underline decoration-dotted underline-offset-2 hover:text-amber-200"
           >
             Settings → Integrations →
           </Link>

@@ -356,7 +356,7 @@ function CompetitorCard({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </div>
       <div className="mt-0.5 whitespace-pre-wrap font-mono text-[12px] text-text">

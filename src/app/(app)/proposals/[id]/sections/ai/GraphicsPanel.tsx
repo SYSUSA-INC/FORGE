@@ -64,7 +64,7 @@ export function GraphicsPanel({
     <div className="rounded-lg border border-plum-400/20 bg-plum-400/5">
       <div className="flex items-center justify-between gap-2 px-3 py-2">
         <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 text-left">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-plum-300">
+          <span className="font-mono text-[10px] uppercase tracking-label text-plum-300">
             ▦ Graphics
             {suggestions ? ` · ${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"}` : ""}
           </span>

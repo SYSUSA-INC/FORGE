@@ -95,7 +95,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
           <div className="aur-card-elevated max-h-[90vh] w-full max-w-2xl overflow-y-auto px-5 py-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">Auto-draft</div>
+                <div className="font-mono text-[10px] uppercase tracking-label text-subtle">Auto-draft</div>
                 <h2 className="mt-1 font-display text-[18px] font-semibold text-foreground">Auto-draft full proposal</h2>
                 <p className="mt-1 font-body text-[13px] leading-relaxed text-muted">
                   Drafts every empty section on the server, with citations, grounded in your won proposals. You can close this

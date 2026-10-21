@@ -69,7 +69,7 @@ export function HeaderWorkspace({
   return (
     <div className="ml-4 hidden min-w-0 flex-1 items-center gap-3 md:flex">
       <span
-        className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.2em] ${
+        className={`rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-label ${
           workspace === "platform"
             ? "border-violet/40 bg-violet/10 text-text"
             : "border-cobalt/40 bg-cobalt/10 text-text"

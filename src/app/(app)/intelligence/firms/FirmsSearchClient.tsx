@@ -427,7 +427,7 @@ function FirmRowView({
         type="button"
         onClick={onWatch}
         disabled={watched}
-        className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-[0.18em] disabled:text-emerald-300"
+        className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label disabled:text-emerald-300"
         title={watched ? "Already on watchlist" : "Save to watchlist"}
       >
         {watched ? "★ Saved" : "☆ Save"}
@@ -439,7 +439,7 @@ function FirmRowView({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+      <span className="font-mono text-[10px] uppercase tracking-label text-muted">
         {label}
       </span>
       {children}

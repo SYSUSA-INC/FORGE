@@ -60,7 +60,7 @@ export function PipelineFilters({
               key={w.key}
               type="button"
               onClick={() => setParam("days", w.key)}
-              className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -81,7 +81,7 @@ export function PipelineFilters({
               type="button"
               onClick={() => setParam("mode", m.key)}
               title={m.help}
-              className={`rounded px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`rounded px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "bg-layer/10 text-text"
                   : "text-muted hover:text-text"

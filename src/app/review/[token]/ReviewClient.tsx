@@ -95,7 +95,7 @@ export function ReviewClient({
   return (
     <div className="mt-6 flex flex-col gap-4">
       <div className="rounded-xl border border-layer/10 bg-layer/[0.02] p-5">
-        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="font-mono text-[10px] uppercase tracking-label text-muted">
           Review requested by {state.sender.name}
           {state.sender.email ? ` · ${state.sender.email}` : ""} —{" "}
           {state.organizationName}

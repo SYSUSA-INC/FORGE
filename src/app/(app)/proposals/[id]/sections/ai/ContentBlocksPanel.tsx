@@ -63,7 +63,7 @@ export function ContentBlocksPanel({
   return (
     <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/5">
       <button type="button" onClick={toggle} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-300">
+        <span className="font-mono text-[10px] uppercase tracking-label text-emerald-300">
           ▣ Insert a content block{blocks ? ` · ${blocks.length}` : ""}
         </span>
         <span className="font-mono text-[10px] text-muted">{open ? "▾" : "▸"}</span>

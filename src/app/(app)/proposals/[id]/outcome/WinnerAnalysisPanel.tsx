@@ -126,7 +126,7 @@ export function WinnerAnalysisPanel({
 
       {/* ── Agency Feedback (from debrief — source of truth for gaps/strengths) ── */}
       <div className="mt-4">
-        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+        <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Agency feedback (from debrief)
         </div>
         {hasDebrief ? (
@@ -164,7 +164,7 @@ export function WinnerAnalysisPanel({
 
       {/* ── AI Competitive Analysis ── */}
       <div className="mt-5 border-t border-layer/5 pt-4">
-        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+        <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Competitive intelligence (AI)
         </div>
         <p className="font-body text-[12px] leading-relaxed text-muted">
@@ -210,7 +210,7 @@ export function WinnerAnalysisPanel({
                 <button
                   type="button"
                   onClick={() => setShowSources((v) => !v)}
-                  className="font-mono text-[10px] uppercase tracking-[0.2em] text-subtle hover:text-foreground"
+                  className="font-mono text-[10px] uppercase tracking-label text-subtle hover:text-foreground"
                 >
                   {showSources ? "Hide" : "Show"}{" "}
                   {analysis.sourceUsaspending.length} USAspending source
@@ -260,7 +260,7 @@ function AgencySection({
   return (
     <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
       <div
-        className={`mb-1 font-mono text-[10px] uppercase tracking-[0.18em] ${tone}`}
+        className={`mb-1 font-mono text-[10px] uppercase tracking-label ${tone}`}
       >
         {label}
       </div>
@@ -283,7 +283,7 @@ function AiSection({
   return (
     <div>
       <div
-        className={`font-mono text-[10px] uppercase tracking-[0.2em] ${tone}`}
+        className={`font-mono text-[10px] uppercase tracking-label ${tone}`}
       >
         {label}
       </div>

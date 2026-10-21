@@ -73,7 +73,7 @@ export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) 
       {/* Header row */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             Track changes
           </span>
           <ModeBadge mode={mode} />

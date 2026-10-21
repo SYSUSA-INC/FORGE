@@ -57,7 +57,7 @@ export function CommentsSidebar({ editor, ydoc, visible, currentUserId }: Props)
   return (
     <div className="flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+        <span className="font-mono text-[10px] uppercase tracking-label text-muted">
           Comments {threads.length > 0 ? `· ${threads.length}` : ""}
         </span>
         {resolvedCount > 0 && (

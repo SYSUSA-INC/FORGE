@@ -74,7 +74,7 @@ export async function SectionSignalsPanel({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full font-body text-[13px]">
             <thead>
-              <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-[0.2em] text-subtle">
+              <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-label text-subtle">
                 <th className="pb-2 pr-3">Section kind</th>
                 <th className="pb-2 pr-3 text-right">Won — pass rate</th>
                 <th className="pb-2 pr-3 text-right">Lost — pass rate</th>

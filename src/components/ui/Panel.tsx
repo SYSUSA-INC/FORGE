@@ -47,12 +47,12 @@ export function Panel({
         <header className="flex items-center justify-between gap-4 border-b border-layer/10 px-5 py-3">
           <div className="min-w-0">
             {eyebrow ? (
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                 {eyebrow}
               </div>
             ) : null}
             {title ? (
-              <div className="font-display text-[13px] font-semibold tracking-tight text-text">
+              <div className="font-display text-[14px] font-medium tracking-tight text-text">
                 {title}
               </div>
             ) : null}

@@ -102,7 +102,7 @@ export function CompaniesClient({
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setRelFilter("all")}
-          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+          className={`rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
             relFilter === "all"
               ? "border-teal-400 bg-teal-400/10 text-text"
               : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -118,7 +118,7 @@ export function CompaniesClient({
             <button
               key={r.key}
               onClick={() => setRelFilter(r.key)}
-              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-[0.2em] transition-colors ${
+              className={`flex items-center gap-2 rounded-md border px-3 py-1 font-mono text-[11px] uppercase tracking-label transition-colors ${
                 active
                   ? "border-teal-400 bg-teal-400/10 text-text"
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
@@ -189,7 +189,7 @@ function CompanyRowItem({
         <div className="truncate font-display text-[14px] font-semibold text-text">
           {c.name}
         </div>
-        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-label text-muted">
           {c.uei ? `UEI ${c.uei}` : "—"}
           {c.cageCode ? ` · CAGE ${c.cageCode}` : ""}
           {c.primaryNaics ? ` · NAICS ${c.primaryNaics}` : ""}
@@ -208,7 +208,7 @@ function CompanyRowItem({
         ) : null}
       </div>
       <span
-        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em]"
+        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{
           color: relColor,
           backgroundColor: `${relColor}1A`,
