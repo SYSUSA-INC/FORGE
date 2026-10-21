@@ -450,7 +450,11 @@ export async function claimUpload(i: {
   uploadId: string;
   resourceType: UploadResourceType;
   resourceId?: string;
-}): Promise<{ ok: true; claim: ClaimedUpload; rerun: boolean } | { ok: true; alreadyClaimed: true; resourceId: string } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; claim: ClaimedUpload; rerun: boolean }
+  | { ok: true; alreadyClaimed: true; resourceId: string }
+  | { ok: false; error: string; busy?: true }
+> {
   if (!UUID.test(i.uploadId)) return { ok: false, error: "Upload not found." };
   const purposes = purposesClaimableAs(i.resourceType);
   if (purposes.length === 0) return { ok: false, error: "This file can't be saved here." };
@@ -505,7 +509,8 @@ export async function claimUpload(i: {
       .returning();
     if (taken) return { ok: true, claim: claimed(taken), rerun: true };
   }
-  if (current.status === "claiming") return { ok: false, error: "This file is already being saved." };
+  // Another request holds a fresh claim: asking again later finds the result.
+  if (current.status === "claiming") return { ok: false, error: "This file is already being saved.", busy: true };
   if (current.status === "stored") return { ok: false, error: FAILURE_MESSAGES.unclaimed! };
   if (current.status === "pending") return { ok: false, error: "The file has not finished uploading." };
   return { ok: false, error: view(current).message || "This upload can no longer be used." };

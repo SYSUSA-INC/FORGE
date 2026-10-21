@@ -42,6 +42,10 @@
   covers common shapes; flag anything ambiguous)
 - Auth gates inverted or missing on admin / super-admin routes
 - Cron handlers without `Authorization: Bearer ${CRON_SECRET}` check
+- A file reaching a server action in a shape the no-files test can't
+  see: a `FormData` entry handed to a helper unlooked-at, or a file's
+  bytes, base64 or whole text sent as an argument (upload it with
+  `uploadFile()` instead; see convention 11)
 - Hard-coded `#RRGGBB` colours or `rgba(...)` palette values in
   components (use Tailwind tokens or `THEME` from
   `src/lib/theme-colors.ts`; see `docs/DESIGN_SYSTEM.md`)
@@ -56,6 +60,10 @@
 - Fresh-DB migration failures (Fresh-DB migration verification catches)
 - Tenant-scoped queries without `organizationId` (Multi-tenant
   isolation check catches statically)
+- A `File`/`Blob` parameter, cast or `instanceof` check, or
+  `.arrayBuffer()`/`.blob()`/`.stream()`/`.bytes()`, written in a
+  `"use server"` file: `tests/ai/no-files-through-server-actions.test.ts`
+  fails the Runtime isolation tests gate
 
 ## Conventions to follow when authoring
 
@@ -79,6 +87,11 @@ When writing code yourself (Claude, Cursor, etc.):
 9. **One PR at a time.** Strict serial.
 10. **Strict serial — don't bypass gates.** Every check has a reason;
     don't suggest disabling one to ship faster.
+11. **Files go to storage, never through a server action.** The
+    browser uploads with `uploadFile()` (`src/lib/upload-client.ts`)
+    and the action files it by upload id: `claimUpload`, read it with
+    `getVerifiedObject`, then `finishClaim` / `releaseClaim` /
+    `failClaim` with the claim's `claimedAt` (`src/lib/uploads.ts`).
 
 ## Where to look
 

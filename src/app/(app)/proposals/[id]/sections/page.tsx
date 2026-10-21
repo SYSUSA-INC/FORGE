@@ -17,9 +17,12 @@ import type { SectionReviewComment } from "@/lib/review-comments";
 import { unreadChatCounts } from "@/lib/section-chat";
 import { getHouseStyle, voiceAuthorIds } from "@/lib/voice";
 import { AutoDraftButton } from "./ai/AutoDraftButton";
+import { chatReadBudgets } from "@/lib/chat-attachments-logic";
 import { SectionsClient } from "./SectionsClient";
 
 export const dynamic = "force-dynamic";
+// BL-STAB-2f — room for reading a chat attachment (up to 50 MB) in the attach action.
+export const maxDuration = 300;
 
 export default async function ProposalSectionsPage({
   params,
@@ -165,6 +168,7 @@ export default async function ProposalSectionsPage({
         }}
         voiceAuthorIds={voiceAuthors}
         houseStyle={style.houseStyle.trim().length > 0}
+        chatReadBudgets={chatReadBudgets(process.env)}
       />
     </Panel>
   );

@@ -4,13 +4,17 @@
 import { describe, expect, it } from "vitest";
 import {
   ATTACHMENTS_INSTRUCTION,
+  CHAT_ATTACHMENT_ACCEPT,
   CHAT_ATTACHMENT_LIMITS,
+  chatAttachPrecheck,
+  chatReadBudgets,
   describeChars,
   excerpt,
   isChatAttachmentFormat,
   renderAttachmentsBlock,
   splitBudget,
 } from "@/lib/chat-attachments-logic";
+import { acceptFor, parseBudgetBytes, UPLOAD_POLICIES } from "@/lib/upload-policy";
 
 describe("chat attachment logic", () => {
   it("accepts document formats and refuses images", () => {
@@ -55,5 +59,34 @@ describe("chat attachment logic", () => {
     expect(describeChars(640)).toBe("640 chars");
     expect(describeChars(1_234)).toBe("1.2k chars");
     expect(describeChars(48_900)).toBe("49k chars");
+  });
+
+  it("BL-STAB-2f — takes its limits from the upload policy and checks a file before it uploads", () => {
+    expect(CHAT_ATTACHMENT_LIMITS.maxBytes).toBe(UPLOAD_POLICIES.chat_attachment.maxBytes);
+    expect(CHAT_ATTACHMENT_LIMITS.maxBytes).toBe(50 * 1024 * 1024);
+    expect(CHAT_ATTACHMENT_ACCEPT).toBe(acceptFor("chat_attachment"));
+    expect(CHAT_ATTACHMENT_ACCEPT).toContain(".csv");
+    expect(CHAT_ATTACHMENT_ACCEPT).not.toContain(".png");
+
+    expect(chatAttachPrecheck({ name: "sow.pdf", size: 1_000 }, 4)).toBeNull();
+    expect(chatAttachPrecheck({ name: "sow.pdf", size: 1_000 }, 5)).toMatch(/Up to 5 documents/);
+    // Within the 50 MB upload limit but over what the chat reads of a spreadsheet.
+    const xlsxBudget = parseBudgetBytes("xlsx");
+    expect(xlsxBudget).toBeLessThan(CHAT_ATTACHMENT_LIMITS.maxBytes);
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: xlsxBudget }, 0)).toBeNull();
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: xlsxBudget + 1 }, 0)).not.toBeNull();
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: 45 * 1024 * 1024 }, 0)).toMatch(/is 45 MB; the chat reads files of this type up to 40 MB/);
+    // The upload's own check names what is wrong with other files (an image is not "too large", it isn't taken).
+    expect(chatAttachPrecheck({ name: "old.doc", size: 1_000 }, 0)).toBeNull();
+    expect(chatAttachPrecheck({ name: "photo.png", size: 6 * 1024 * 1024 }, 0)).toBeNull();
+  });
+
+  it("BL-STAB-2f — the browser checks against the server's read budgets", () => {
+    const MiB = 1024 * 1024;
+    const doubled = chatReadBudgets({ UPLOAD_PARSE_SCALE: "2" });
+    expect(doubled).toEqual({ pdf: 300 * MiB, docx: 200 * MiB, xlsx: 80 * MiB, pptx: 300 * MiB, text: 50 * MiB });
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: 45 * MiB }, 0, doubled)).toBeNull();
+    const halved = chatReadBudgets({ UPLOAD_PARSE_SCALE: "0.5" });
+    expect(chatAttachPrecheck({ name: "pricing.xlsx", size: 21 * MiB }, 0, halved)).toMatch(/up to 20 MB/);
   });
 });
