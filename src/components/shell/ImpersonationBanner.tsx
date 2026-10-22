@@ -48,8 +48,8 @@ export async function ImpersonationBanner() {
       className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 text-text md:px-6"
       style={{
         background:
-          `linear-gradient(90deg, ${withAlpha(THEME.redDeep, 0.45)}, ${withAlpha(THEME.redDeep, 0.65)}, ${withAlpha(THEME.redDeep, 0.45)})`,
-        borderColor: withAlpha(THEME.red, 0.55),
+          withAlpha(THEME.red, 0.12),
+        borderColor: withAlpha(THEME.red, 0.45),
       }}
     >
       <div className="flex min-w-0 items-center gap-2 font-mono text-[11px]">
@@ -60,13 +60,13 @@ export async function ImpersonationBanner() {
         <span className="rounded bg-layer/10 px-1.5 py-0.5">
           {target?.name ?? "unknown tenant"}
         </span>
-        <span className="hidden md:inline text-layer/80">
+        <span className="hidden md:inline text-muted">
           · reason:{" "}
           <span className="italic">
             {truncate(session.reason, 90)}
           </span>
         </span>
-        <span className="hidden lg:inline text-layer/70">
+        <span className="hidden lg:inline text-muted">
           · expires in {minutesRemaining}m
         </span>
       </div>
