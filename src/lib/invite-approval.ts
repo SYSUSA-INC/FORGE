@@ -10,7 +10,7 @@
  */
 import "server-only";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, organizations, users } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
@@ -320,7 +320,7 @@ export async function listPendingApprovals(filter: {
     const homes = await db
       .select({ id: organizations.id, name: organizations.name })
       .from(organizations)
-      .where(sql`${organizations.id} = ANY(${homeIds}::uuid[])`);
+      .where(inArray(organizations.id, homeIds));
     for (const h of homes) homeNames.set(h.id, h.name);
   }
 

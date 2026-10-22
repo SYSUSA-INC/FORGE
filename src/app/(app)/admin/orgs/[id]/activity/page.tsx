@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -145,7 +145,7 @@ export default async function TenantActivityPage({
     ? await db
         .select({ email: users.email, name: users.name })
         .from(users)
-        .where(sql`${users.email} = ANY(${actorEmails})`)
+        .where(inArray(users.email, actorEmails))
     : [];
   const nameByEmail = new Map(
     userRows
