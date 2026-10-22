@@ -70,9 +70,9 @@
   --c-shadow: 12 31 89;
   --shadow-a: 0.06;
   --shadow-a-lg: 0.14;
-  /* Type (EnableNow ink slate-800; its muted slate-500 for both lower tiers; slate-300 faint) */
+  /* Type (EnableNow ink slate-800; muted slate-600 (chips on a tint stay AA), subtle slate-500; slate-300 faint) */
   --c-text: 24 27 35;
-  --c-muted: 98 107 125;
+  --c-muted: 64 80 107;
   --c-subtle: 98 107 125;
   --c-faint: 170 180 200;
   /* Cobalt — primary: EnableNow's brand blue scale (500 = blue-600) */
@@ -112,9 +112,9 @@
   --c-indigo-200: 60 70 140;
   --c-indigo-300: 75 88 175;
   --c-indigo-400: 128 144 232;
-  --c-indigo-500: 75 88 175;
-  --c-indigo-600: 60 70 140;
-  --c-indigo-700: 48 56 112;
+  --c-indigo-500: 91 69 176;
+  --c-indigo-600: 75 56 150;
+  --c-indigo-700: 60 45 120;
   /* Plum — pink team (FORGE's own) */
   --c-plum-300: 111 74 126;
   --c-plum-400: 185 132 204;
@@ -155,12 +155,12 @@
   --c-subtle: 118 128 148;
   --c-faint: 64 80 107;
 
-  /* Accent on dark grounds: EnableNow's blue-200 (its dark --color-accent and focus)
-     as the readable default, blue-50 / -100 for text on a tint, blue-400 solid. */
-  --c-cobalt-200: 238 243 255;
-  --c-cobalt-300: 220 229 255;
-  --c-cobalt-400: 69 131 255;
-  --c-cobalt-500: 184 201 255;
+  /* The cobalt scale stays saturated on dark (500 = Bright Blue); text accents use
+     --c-accent, EnableNow's blue-200 dark accent. */
+  --c-cobalt-200: 220 229 255;
+  --c-cobalt-300: 184 201 255;
+  --c-cobalt-400: 163 191 249;
+  --c-cobalt-500: 69 131 255;
   --c-cobalt-600: 46 92 233;
   --c-cobalt-700: 41 83 215;
   --c-action: 41 83 215;
@@ -265,12 +265,12 @@
     border-radius: 5px;
   }
 
-  /* Lifts off the page (dialogs, popovers): the one place a card floats. */
   /* The one backdrop behind a dialog, menu sheet or palette: the page
      frosted under paper, on both themes. */
   .aur-scrim {
     @apply bg-canvas/70 backdrop-blur-sm;
   }
+  /* Lifts off the page (dialogs, popovers): the one place a card floats. */
   .aur-card-elevated {
     @apply relative border border-layer/10 bg-paper;
     border-radius: 5px;
@@ -289,7 +289,7 @@
   /* Three buttons, as EnableNow has: primary (solid blue), light (wash),
      ghost (text). Square-ish 3px corners; a 2px lift on hover. */
   .aur-btn {
-    @apply inline-flex items-center justify-center gap-2 border border-layer/15 bg-bone px-3.5 py-1.5 font-display text-sm font-medium text-text transition-all enabled:hover:border-layer/25 enabled:hover:bg-paper;
+    @apply inline-flex items-center justify-center gap-2 border border-layer/15 bg-bone px-3.5 py-1.5 font-display text-sm font-medium text-text transition-all;
     border-radius: 3px;
   }
 
@@ -313,6 +313,10 @@
     border-radius: 3px;
   }
 
+  .aur-btn:not(:disabled):hover {
+    border-color: rgb(var(--c-layer) / 0.25);
+    background-color: rgb(var(--c-paper));
+  }
   .aur-btn:not(:disabled):hover,
   .aur-btn-primary:not(:disabled):hover {
     transform: translateY(-2px);

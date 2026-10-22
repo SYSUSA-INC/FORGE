@@ -134,7 +134,7 @@ export default async function SolicitationsListPage() {
                           {STATUS_LABEL[r.parseStatus] ?? r.parseStatus}
                         </span>
                         {r.opportunityId ? (
-                          <span className="rounded border border-cobalt/30 bg-cobalt/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-cobalt-200">
+                          <span className="rounded border border-cobalt/30 bg-cobalt/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-accent">
                             opp linked
                           </span>
                         ) : null}

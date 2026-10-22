@@ -437,7 +437,7 @@ export function Sba8aAdminClient({
           </div>
         ) : null}
         {debug ? (
-          <div className="mt-3 rounded border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2 font-mono text-[10px] text-amber-100">
+          <div className="mt-3 rounded border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2 font-mono text-[10px] text-amber-300">
             <div className="mb-2 font-display text-[12px] font-semibold text-amber-200">
               Diagnostic: zero rows but SAM accepted the request
             </div>

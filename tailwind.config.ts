@@ -30,7 +30,9 @@ import type { Config } from "tailwindcss";
 const v = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`;
 
 const scale = (family: string, stops: number[], defaultStop: number) => {
-  const out: Record<string, string> = { DEFAULT: v(`${family}-${defaultStop}`) };
+  const out: Record<string, string> = {
+    DEFAULT: v(`${family}-${defaultStop}`),
+  };
   for (const s of stops) out[String(s)] = v(`${family}-${s}`);
   return out;
 };
@@ -47,52 +49,80 @@ const plum = scale("plum", [300, 400, 500, 600], 500);
 const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
+    // `theme.colors`, not `extend.colors`: extending merges with Tailwind's
+    // stock palette, so an undefined stop (`amber-100`) rendered stock hex.
+    colors: {
+      transparent: "transparent",
+      current: "currentColor",
+      inherit: "inherit",
+      white: "rgb(255 255 255 / <alpha-value>)",
+      black: "rgb(0 0 0 / <alpha-value>)",
+      canvas: v("canvas"),
+      ink: v("canvas"),
+      paper: v("paper"),
+      bone: v("bone"),
+      concrete: v("concrete"),
+      text: v("text"),
+      muted: v("muted"),
+      subtle: v("subtle"),
+      faint: v("faint"),
+      // Translucent-layer ink: white on the dark theme, navy on the
+      // light one. `bg-layer/5`, `border-layer/10` replace the old
+      // white-alpha layer classes so depth reads in both themes.
+      layer: v("layer"),
+      // The primary-button fill (EnableNow blue-600 on every ground) and
+      // the live signal green (the office clocks).
+      action: v("action"),
+      // Labels, links, focus and the diamond: blue-600 on paper, blue-200 on dark.
+      accent: v("accent"),
+      signal: { ...green, live: v("signal"), soft: v("signal-soft") },
+
+      cobalt,
+      brass,
+      green,
+      red,
+      indigo,
+      plum,
+
+      // Legacy semantic aliases (see header).
+      teal: cobalt,
+      sky: { ...cobalt, DEFAULT: v("cobalt-200") },
+      gold: brass,
+      hazard: brass,
+      amber: brass,
+      emerald: green,
+      rose: red,
+      blood: red,
+      violet: indigo,
+      magenta: plum,
+    },
     extend: {
-      colors: {
-        canvas: v("canvas"),
-        ink: v("canvas"),
-        paper: v("paper"),
-        bone: v("bone"),
-        concrete: v("concrete"),
-        text: v("text"),
-        muted: v("muted"),
-        subtle: v("subtle"),
-        faint: v("faint"),
-        // Translucent-layer ink: white on the dark theme, navy on the
-        // light one. `bg-layer/5`, `border-layer/10` replace the old
-        // white-alpha layer classes so depth reads in both themes.
-        layer: v("layer"),
-        // The primary-button fill (EnableNow blue-600 on every ground) and
-        // the live signal green (the office clocks).
-        action: v("action"),
-        // Labels, links, focus and the diamond: blue-600 on paper, blue-200 on dark.
-        accent: v("accent"),
-        signal: { ...green, live: v("signal"), soft: v("signal-soft") },
-
-        cobalt,
-        brass,
-        green,
-        red,
-        indigo,
-        plum,
-
-        // Legacy semantic aliases (see header).
-        teal: cobalt,
-        sky: { ...cobalt, DEFAULT: v("cobalt-200") },
-        gold: brass,
-        hazard: brass,
-        amber: brass,
-        emerald: green,
-        rose: red,
-        blood: red,
-        violet: indigo,
-        magenta: plum,
-      },
       fontFamily: {
-        display: ["var(--font-display)", "Host Grotesk", "Arial", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: [
+          "var(--font-display)",
+          "Host Grotesk",
+          "Arial",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         stencil: ["var(--font-stencil)", "Host Grotesk", "Arial", "sans-serif"],
-        mono: ["var(--font-mono)", "Geist Mono", "ui-monospace", "SF Mono", "Menlo", "monospace"],
-        body: ["var(--font-body)", "Host Grotesk", "Arial", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: [
+          "var(--font-mono)",
+          "Geist Mono",
+          "ui-monospace",
+          "SF Mono",
+          "Menlo",
+          "monospace",
+        ],
+        body: [
+          "var(--font-body)",
+          "Host Grotesk",
+          "Arial",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
       },
       // EnableNow sets three weights: 300 signs, 400 text and headings,
       // 500 small titles and UI. 600 and heavier fold into 500 everywhere.
