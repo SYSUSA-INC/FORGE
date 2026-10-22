@@ -102,7 +102,7 @@ export default async function TiersPage() {
                       {t.slug}
                     </span>
                     {!t.active ? (
-                      <span className="rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-rose">
+                      <span className="rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-rose">
                         Retired
                       </span>
                     ) : null}

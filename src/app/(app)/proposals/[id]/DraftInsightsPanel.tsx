@@ -1,5 +1,6 @@
 import { Panel } from "@/components/ui/Panel";
 import { getDraftInsightsAction } from "./draft-insights-actions";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 const KIND_LABELS: Record<string, string> = {
   executive_summary: "Exec. Summary",
@@ -14,14 +15,14 @@ function fractionBadge(fraction: number | null) {
   if (fraction === null) return null;
   const pct = Math.round(fraction * 100);
   const color =
-    pct >= 70 ? "#10B981" : pct >= 40 ? "#FBBF24" : "#F87171";
+    pct >= 70 ? THEME.green : pct >= 40 ? THEME.brass : THEME.red;
   return (
     <span
       className="rounded px-1.5 py-0.5 font-mono text-[10px]"
       style={{
         color,
-        backgroundColor: `${color}1A`,
-        border: `1px solid ${color}40`,
+        backgroundColor: withAlpha(color, 0.1),
+        border: `1px solid ${withAlpha(color, 0.25)}`,
       }}
     >
       {pct}%
@@ -69,7 +70,7 @@ export async function DraftInsightsPanel({
         {/* Per-section-kind breakdown */}
         {data.kindStats.length > 0 ? (
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-label text-subtle">
+            <span className="font-mono text-[10px] uppercase tracking-label text-subtle">
               By section type
             </span>
             <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
@@ -83,7 +84,7 @@ export async function DraftInsightsPanel({
                   </span>
                   <div className="flex items-center gap-1.5">
                     {fractionBadge(s.avgAcceptedFraction)}
-                    <span className="font-mono text-[9px] text-subtle">
+                    <span className="font-mono text-[10px] text-subtle">
                       ×{s.draftCount}
                     </span>
                   </div>

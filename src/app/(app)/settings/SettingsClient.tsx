@@ -460,7 +460,7 @@ function EntityBanner({ org, className }: { org: OrgProfile; className?: string 
 function BannerTag({ k, v }: { k: string; v: string }) {
   return (
     <div className="rounded-md border border-layer/10 bg-layer/[0.03] px-3 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-label text-muted">
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         {k}
       </div>
       <div className="mt-0.5 font-mono text-[13px] font-medium text-text">{v}</div>
@@ -622,7 +622,7 @@ function VehiclesPanel({
               {customs.map((v) => (
                 <span key={v.id} className="aur-chip inline-flex items-center gap-2">
                   <span>{v.name}</span>
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-muted">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
                     {v.category === "dow" ? "DoW" : "Civilian"}
                   </span>
                   <button

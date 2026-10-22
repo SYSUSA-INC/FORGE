@@ -348,7 +348,7 @@ export function NavContent({
 
       {workspaces.length > 1 ? (
         <div className="border-b border-layer/10 px-3 py-2">
-          <div className="mb-1 px-1 font-mono text-[9px] uppercase tracking-label text-subtle">
+          <div className="mb-1 px-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Workspace
           </div>
           <div

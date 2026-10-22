@@ -9,6 +9,7 @@ import { STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
 import { OpportunityTabs } from "./OpportunityTabs";
 import { DeleteOpportunityButton } from "./DeleteOpportunityButton";
 import { SendForReviewButton } from "./review/SendForReviewButton";
+import { withAlpha } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -92,8 +93,8 @@ export default async function OpportunityDetailLayout({
           className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-label"
           style={{
             color: stageColor,
-            backgroundColor: `${stageColor}1A`,
-            border: `1px solid ${stageColor}40`,
+            backgroundColor: withAlpha(stageColor, 0.1),
+            border: `1px solid ${withAlpha(stageColor, 0.25)}`,
           }}
         >
           {stageLabel}

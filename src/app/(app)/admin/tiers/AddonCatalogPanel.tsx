@@ -39,8 +39,8 @@ export function AddonCatalogPanel({ addons, activeGrants }: { addons: AddonCatal
                     <div className="flex flex-wrap items-baseline gap-2">
                       <span className="font-display text-[14px] font-semibold text-text">{a.name}</span>
                       <span className="font-mono text-[10px] uppercase tracking-label text-muted">{a.slug}</span>
-                      <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">{ADDON_KIND_LABELS[a.kind]}</span>
-                      {!a.active ? <span className="rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-rose">Retired</span> : null}
+                      <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">{ADDON_KIND_LABELS[a.kind]}</span>
+                      {!a.active ? <span className="rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-rose">Retired</span> : null}
                     </div>
                     <div className="mt-1 font-mono text-[11px] text-text">{describeAddon(a)}</div>
                     {a.description ? <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted">{a.description}</p> : null}

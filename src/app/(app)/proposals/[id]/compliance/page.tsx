@@ -25,6 +25,7 @@ import {
 } from "@/lib/compliance-types";
 import { listProposalTeamCandidates } from "../../actions";
 import { ComplianceClient } from "./ComplianceClient";
+import { THEME } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -146,17 +147,17 @@ export default async function ProposalCompliancePage({
           <Stat
             label="Complete"
             value={stats.complete}
-            color="#10B981"
+            color={THEME.green}
           />
           <Stat
             label="Partial"
             value={stats.partial}
-            color="#F59E0B"
+            color={THEME.brass}
           />
           <Stat
             label="Not addressed"
             value={stats.notAddressed}
-            color="#F43F5E"
+            color={THEME.red}
           />
         </div>
         <div className="mt-4 rounded-full bg-layer/5">
@@ -165,7 +166,7 @@ export default async function ProposalCompliancePage({
             style={{
               width: `${stats.percent}%`,
               background:
-                "linear-gradient(90deg, #F43F5E 0%, #F59E0B 50%, #10B981 100%)",
+                `linear-gradient(90deg, ${THEME.red} 0%, ${THEME.brass} 50%, ${THEME.green} 100%)`,
             }}
           />
         </div>

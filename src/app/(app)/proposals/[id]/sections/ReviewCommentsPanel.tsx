@@ -61,7 +61,7 @@ export function ReviewCommentsPanel({
           const parsed = parseReviewBody(c.body);
           return (
             <li key={c.id} className="rounded border border-layer/10 bg-layer/[0.02] p-2">
-              <div className="flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-wider text-muted">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-muted">
                 <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5">{REVIEW_COLOR_LABELS[c.color]}</span>
                 {/* BL-FB-X-COLOR-TEAM Slice 3 — carried forward unresolved from an earlier round */}
                 {c.carriedFrom ? (

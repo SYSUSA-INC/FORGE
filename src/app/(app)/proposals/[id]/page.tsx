@@ -28,6 +28,7 @@ import {
   listRecentRendersAction,
 } from "./pdf/actions";
 import { listProposalTeamCandidates } from "../actions";
+import { withAlpha } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -152,11 +153,11 @@ export default async function ProposalOverviewPage({
                   {s.title}
                 </span>
                 <span
-                  className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                  className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                   style={{
                     color: SECTION_STATUS_COLORS[s.status],
-                    backgroundColor: `${SECTION_STATUS_COLORS[s.status]}1A`,
-                    border: `1px solid ${SECTION_STATUS_COLORS[s.status]}40`,
+                    backgroundColor: withAlpha(SECTION_STATUS_COLORS[s.status], 0.1),
+                    border: `1px solid ${withAlpha(SECTION_STATUS_COLORS[s.status], 0.25)}`,
                   }}
                 >
                   {SECTION_STATUS_LABELS[s.status]}

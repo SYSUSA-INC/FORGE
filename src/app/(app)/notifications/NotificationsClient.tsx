@@ -14,6 +14,7 @@ import {
   markNotificationsReadAction,
   type NotificationRow,
 } from "./actions";
+import { withAlpha } from "@/lib/theme-colors";
 
 type Filter = "unread" | "all";
 
@@ -108,8 +109,8 @@ export function NotificationsClient({ initial }: { initial: NotificationRow[] })
                     className="grid h-7 w-7 shrink-0 place-items-center rounded-md font-display text-sm"
                     style={{
                       color: accent,
-                      backgroundColor: `${accent}1A`,
-                      border: `1px solid ${accent}50`,
+                      backgroundColor: withAlpha(accent, 0.1),
+                      border: `1px solid ${withAlpha(accent, 0.31)}`,
                     }}
                     aria-hidden
                   >

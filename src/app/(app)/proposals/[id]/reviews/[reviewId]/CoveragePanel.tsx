@@ -62,7 +62,7 @@ export function CoveragePanel({
               {reviewers.map((r) => (
                 <th key={r.userId} className="px-2 py-2 text-center font-normal text-muted" title={r.email}>
                   <span className={r.userId === currentUserId ? "text-text" : ""}>{(r.name ?? r.email.split("@")[0]) || "?"}</span>
-                  {whole.has(r.userId) ? <div className="text-[9px] uppercase tracking-widest text-subtle">all</div> : null}
+                  {whole.has(r.userId) ? <div className="text-[10px] uppercase tracking-widest text-subtle">all</div> : null}
                 </th>
               ))}
             </tr>
@@ -74,7 +74,7 @@ export function CoveragePanel({
                 <tr key={s.id} className={`border-b border-layer/5 ${bare ? "bg-amber-400/5" : ""}`}>
                   <td className="px-3 py-1.5 text-text">
                     §{s.ordering}. {s.title}
-                    {bare ? <span className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 text-[9px] uppercase tracking-widest text-amber-200">no reviewer</span> : null}
+                    {bare ? <span className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 text-[10px] uppercase tracking-widest text-amber-200">no reviewer</span> : null}
                   </td>
                   {reviewers.map((r) => {
                     const scoped = sectionAssignments.some((a) => a.userId === r.userId && a.sectionId === s.id);

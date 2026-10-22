@@ -229,7 +229,7 @@ function FieldRow({ field }: { field: ScalarFieldDiff }) {
       <td className="py-2 pr-3 text-right">
         {isChange ? (
           <span
-            className="rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
             style={{
               color: THEME.brass,
               background: withAlpha(THEME.brass, 0.08),
@@ -239,7 +239,7 @@ function FieldRow({ field }: { field: ScalarFieldDiff }) {
             CHANGED
           </span>
         ) : (
-          <span className="font-mono text-[9px] uppercase tracking-wider text-subtle">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">
             unchanged
           </span>
         )}
@@ -260,7 +260,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
       >
         <div className="flex items-start gap-3">
           <span
-            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
             style={{ color: tone.color, border: `1px solid ${tone.border}` }}
           >
             {tone.label}
@@ -286,7 +286,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
       >
         <div className="flex items-start gap-3">
           <span
-            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
             style={{ color: tone.color, border: `1px solid ${tone.border}` }}
           >
             {tone.label}
@@ -315,14 +315,14 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
       >
         <div className="flex items-start gap-3">
           <span
-            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
             style={{ color: tone.color, border: `1px solid ${tone.border}` }}
           >
             {tone.label}
           </span>
           <div className="min-w-0 flex-1 space-y-2">
             <div className="rounded border border-rose/30 bg-rose/[0.05] px-2 py-1.5">
-              <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-rose/80">
+              <div className="mb-0.5 font-mono text-[10px] uppercase tracking-wider text-rose/80">
                 Before
               </div>
               <div className="font-body text-[12px] text-text">
@@ -334,7 +334,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
               </div>
             </div>
             <div className="rounded border border-emerald/30 bg-emerald/[0.05] px-2 py-1.5">
-              <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald/80">
+              <div className="mb-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald/80">
                 After
               </div>
               <div className="font-body text-[12px] text-text">
@@ -363,7 +363,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
     >
       <div className="flex items-start gap-3">
         <span
-          className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+          className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
           style={{ color: tone.color, border: `1px solid ${tone.border}` }}
         >
           {tone.label}

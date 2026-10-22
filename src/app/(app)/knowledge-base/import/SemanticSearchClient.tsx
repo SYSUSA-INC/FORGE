@@ -8,7 +8,7 @@ import {
   semanticSearchAction,
   type SearchHit,
 } from "./embed-actions";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 export function SemanticSearchClient({
   initialStatus,
@@ -73,7 +73,7 @@ export function SemanticSearchClient({
           {initialStatus.stub ? (
             <StubModeBanner variant="pill" className="ml-2" />
           ) : (
-            <span className="ml-2 rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] text-emerald">
+            <span className="ml-2 rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald">
               live · {initialStatus.provider}
             </span>
           )}
@@ -171,16 +171,16 @@ function SearchHitCard({ hit, query }: { hit: SearchHit; query: string }) {
           >
             {hit.artifactTitle || hit.artifactFileName || "Untitled artifact"}
           </Link>
-          <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+          <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
             {hit.artifactKind.replace(/_/g, " ")}
           </span>
         </div>
         <span
-          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+          className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
           style={{
             color: simColor(sim),
-            backgroundColor: `${simColor(sim)}1A`,
-            border: `1px solid ${simColor(sim)}40`,
+            backgroundColor: withAlpha(simColor(sim), 0.1),
+            border: `1px solid ${withAlpha(simColor(sim), 0.25)}`,
           }}
           title={`Cosine similarity ${sim.toFixed(3)}`}
         >

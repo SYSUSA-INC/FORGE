@@ -17,6 +17,7 @@ import {
   OUTCOME_TYPE_COLORS,
   OUTCOME_TYPE_LABELS,
 } from "@/lib/proposal-outcome-types";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 const TOP_REASON_LIMIT = 5;
 const RECENT_LESSONS_LIMIT = 5;
@@ -132,7 +133,7 @@ export async function OutcomeInsightsPanel() {
             value={
               decisive === 0 ? "—" : `${Math.round(winRate * 100)}%`
             }
-            color={winRate >= 0.4 ? "#10B981" : winRate >= 0.2 ? "#F59E0B" : "#EF4444"}
+            color={winRate >= 0.4 ? THEME.green : winRate >= 0.2 ? THEME.brass : THEME.red}
             sub={
               decisive === 0
                 ? "no decisive yet"
@@ -152,7 +153,7 @@ export async function OutcomeInsightsPanel() {
           <Stat
             label="No-bid / withdrawn"
             value={String(totals.no_bid + totals.withdrawn)}
-            color="#64748B"
+            color={THEME.muted}
             sub={
               totals.withdrawn
                 ? `${totals.no_bid} no-bid · ${totals.withdrawn} withdrawn`
@@ -199,8 +200,8 @@ export async function OutcomeInsightsPanel() {
                     className="rounded px-1.5 py-0.5 uppercase tracking-widest"
                     style={{
                       color: OUTCOME_TYPE_COLORS[l.outcomeType],
-                      backgroundColor: `${OUTCOME_TYPE_COLORS[l.outcomeType]}1A`,
-                      border: `1px solid ${OUTCOME_TYPE_COLORS[l.outcomeType]}50`,
+                      backgroundColor: withAlpha(OUTCOME_TYPE_COLORS[l.outcomeType], 0.1),
+                      border: `1px solid ${withAlpha(OUTCOME_TYPE_COLORS[l.outcomeType], 0.31)}`,
                     }}
                   >
                     {OUTCOME_TYPE_LABELS[l.outcomeType]}

@@ -78,7 +78,7 @@ export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) 
           </span>
           <ModeBadge mode={mode} />
           {!isOwner && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-subtle">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">
               · read-only
             </span>
           )}
@@ -89,14 +89,14 @@ export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) 
             <button
               type="button"
               onClick={acceptAll}
-              className="rounded border border-emerald/30 bg-emerald/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald hover:bg-emerald/20 transition-colors"
+              className="rounded border border-emerald/30 bg-emerald/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald hover:bg-emerald/20 transition-colors"
             >
               Accept all
             </button>
             <button
               type="button"
               onClick={rejectAll}
-              className="rounded border border-rose/30 bg-rose/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
+              className="rounded border border-rose/30 bg-rose/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
             >
               Reject all
             </button>
@@ -152,7 +152,7 @@ function ModeBadge({ mode }: { mode: EditorMode }) {
   };
   return (
     <span
-      className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+      className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider"
       style={STYLE[mode]}
     >
       {mode}
@@ -188,7 +188,7 @@ function ChangeRow({
           </span>
           <span className="font-mono text-[10px] text-subtle">·</span>
           <span
-            className="rounded px-1 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+            className="rounded px-1 py-0.5 font-mono text-[10px] uppercase tracking-wider"
             style={
               isInsert
                 ? {
@@ -205,7 +205,7 @@ function ChangeRow({
           >
             {isInsert ? "+insert" : "−delete"}
           </span>
-          <span className="font-mono text-[9px] text-subtle">{timeAgo}</span>
+          <span className="font-mono text-[10px] text-subtle">{timeAgo}</span>
         </div>
         {canResolve && (
           <div className="flex shrink-0 items-center gap-1">
@@ -213,7 +213,7 @@ function ChangeRow({
               type="button"
               onClick={() => onAccept(change.id)}
               title="Accept this change"
-              className="rounded border border-emerald/30 bg-emerald/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald hover:bg-emerald/20 transition-colors"
+              className="rounded border border-emerald/30 bg-emerald/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald hover:bg-emerald/20 transition-colors"
             >
               ✓
             </button>
@@ -221,7 +221,7 @@ function ChangeRow({
               type="button"
               onClick={() => onReject(change.id)}
               title="Reject this change"
-              className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
+              className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
             >
               ✕
             </button>

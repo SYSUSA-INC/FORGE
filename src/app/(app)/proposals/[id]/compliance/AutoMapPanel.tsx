@@ -8,7 +8,7 @@ import {
   runComplianceAutoMapAction,
   type AutoMapSuggestion,
 } from "./actions";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 type SectionLite = { id: string; title: string; ordering: number };
 
@@ -215,11 +215,11 @@ export function AutoMapPanel({
                           {s.itemNumber || "(no #)"}
                         </span>
                         <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+                          className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
                           style={{
                             color: conf.color,
-                            background: `${conf.color}1a`,
-                            border: `1px solid ${conf.color}40`,
+                            background: withAlpha(conf.color, 0.1),
+                            border: `1px solid ${withAlpha(conf.color, 0.25)}`,
                           }}
                         >
                           {conf.label}
@@ -262,7 +262,7 @@ export function AutoMapPanel({
                           ))}
                         </select>
                         {chosenId !== s.suggestedSectionId ? (
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-amber-300">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300">
                             overridden
                           </span>
                         ) : null}

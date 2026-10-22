@@ -458,13 +458,13 @@ function OpportunityRow({
               {o.title}
             </span>
             {o.alreadyImported ? (
-              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 Already imported
               </span>
             ) : null}
             {o.recompete ? (
               <span
-                className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                   o.recompete.outcome === "lost"
                     ? "bg-rose/15 text-rose"
                     : "bg-emerald-400/15 text-emerald-300"
@@ -479,7 +479,7 @@ function OpportunityRow({
               </span>
             ) : null}
             {o.type ? (
-              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 {o.type}
               </span>
             ) : null}

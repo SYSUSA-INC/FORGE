@@ -5,6 +5,7 @@ import { solicitations } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  uploaded: "#9BC9D9",
-  parsing: "#A78BFA",
-  parsed: "#10B981",
-  failed: "#EF4444",
+  uploaded: THEME.cobalt,
+  parsing: THEME.indigo,
+  parsed: THEME.green,
+  failed: THEME.red,
 };
 
 export default async function SolicitationsListPage() {
@@ -111,7 +112,7 @@ export default async function SolicitationsListPage() {
         <Panel title="All uploads">
           <ul className="flex flex-col gap-1.5">
             {rows.map((r) => {
-              const color = STATUS_COLOR[r.parseStatus] ?? "#9BC9D9";
+              const color = STATUS_COLOR[r.parseStatus] ?? THEME.cobalt;
               return (
                 <li key={r.id}>
                   <Link
@@ -124,11 +125,11 @@ export default async function SolicitationsListPage() {
                           {r.title || r.fileName || "Untitled"}
                         </span>
                         <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                           style={{
                             color,
-                            backgroundColor: `${color}1A`,
-                            border: `1px solid ${color}50`,
+                            backgroundColor: withAlpha(color, 0.1),
+                            border: `1px solid ${withAlpha(color, 0.31)}`,
                           }}
                         >
                           {STATUS_LABEL[r.parseStatus] ?? r.parseStatus}

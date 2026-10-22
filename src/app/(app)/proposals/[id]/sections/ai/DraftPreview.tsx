@@ -106,7 +106,7 @@ function PreviewRow({
   if (op.kind === "equal") {
     return (
       <li className="flex items-baseline gap-2 rounded border border-layer/10 px-2 py-1 font-body text-[11px] text-muted">
-        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider">kept</span>
+        <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider">kept</span>
         <span className="line-clamp-1 min-w-0">{op.before}</span>
       </li>
     );
@@ -123,7 +123,7 @@ function PreviewRow({
       <label className="flex cursor-pointer items-start gap-2">
         <input type="checkbox" checked={taken} disabled={disabled} onChange={onToggle} className="mt-1 accent-teal" />
         <span className="min-w-0 flex-1">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-muted">{label}</span>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</span>
           <span className="block whitespace-pre-wrap font-body text-[12px] leading-relaxed text-text">
             {op.kind === "insert" ? (
               <ins className="text-emerald-300 no-underline">{op.after}</ins>

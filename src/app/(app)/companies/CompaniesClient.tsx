@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { CompanyRelationship } from "@/db/schema";
+import { withAlpha } from "@/lib/theme-colors";
 
 type CompanyRow = {
   id: string;
@@ -199,7 +200,7 @@ function CompanyRowItem({
             {c.sbaCertifications.slice(0, 4).map((s) => (
               <span
                 key={s}
-                className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+                className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted"
               >
                 {s}
               </span>
@@ -211,8 +212,8 @@ function CompanyRowItem({
         className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{
           color: relColor,
-          backgroundColor: `${relColor}1A`,
-          border: `1px solid ${relColor}40`,
+          backgroundColor: withAlpha(relColor, 0.1),
+          border: `1px solid ${withAlpha(relColor, 0.25)}`,
         }}
       >
         {relLabel}

@@ -8,6 +8,7 @@ import {
   evaluationRollup,
 } from "@/lib/evaluation-types";
 import { saveEvaluationAction } from "../evaluation-actions";
+import { THEME } from "@/lib/theme-colors";
 
 export function EvaluationForm({
   opportunityId,
@@ -44,7 +45,7 @@ export function EvaluationForm({
   const verdict =
     rollup >= 70 ? "Strong pursue" : rollup >= 50 ? "Watch" : "Consider no-bid";
   const verdictColor =
-    rollup >= 70 ? "#10B981" : rollup >= 50 ? "#F59E0B" : "#F43F5E";
+    rollup >= 70 ? THEME.green : rollup >= 50 ? THEME.brass : THEME.red;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();

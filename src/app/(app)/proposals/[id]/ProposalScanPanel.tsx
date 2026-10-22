@@ -176,7 +176,7 @@ export function ProposalScanPanel({
                         {issue.sectionTitle}
                       </span>
                       <span
-                        className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                         style={{
                           color: SEVERITY_COLOR[issue.severity] ?? THEME.muted,
                           background: withAlpha(SEVERITY_COLOR[issue.severity] ?? THEME.muted, 0.1),
@@ -218,7 +218,7 @@ export function ProposalScanPanel({
                       {c.reinforced.map((t) => (
                         <span
                           key={t}
-                          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                           style={{
                             color: THEME.green,
                             backgroundColor: withAlpha(THEME.green, 0.1),
@@ -231,7 +231,7 @@ export function ProposalScanPanel({
                       {c.missing.map((t) => (
                         <span
                           key={t}
-                          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                           style={{
                             color: THEME.red,
                             backgroundColor: withAlpha(THEME.red, 0.1),
@@ -267,7 +267,7 @@ export function ProposalScanPanel({
                         {c.section2Title}
                       </div>
                       <span
-                        className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                         style={{
                           color: SEVERITY_COLOR[c.severity] ?? THEME.muted,
                           background: withAlpha(SEVERITY_COLOR[c.severity] ?? THEME.muted, 0.1),

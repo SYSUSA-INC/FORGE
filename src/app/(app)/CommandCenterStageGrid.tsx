@@ -6,6 +6,7 @@ import {
   spellOutStageCode,
   type StageStat,
 } from "./opportunities/stage-stats";
+import { withAlpha } from "@/lib/theme-colors";
 
 /**
  * Read-only counterpart to the StageWidget grid on /opportunities.
@@ -32,7 +33,7 @@ export function CommandCenterStageGrid({
         className="flex flex-col gap-2 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 text-left transition-colors hover:border-layer/30"
       >
         <div className="flex items-center justify-between">
-          <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label text-muted">
+          <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
             All
           </div>
           <span aria-hidden className="text-muted">→</span>
@@ -69,11 +70,11 @@ export function CommandCenterStageGrid({
           >
             <div className="flex items-center justify-between">
               <div
-                className="rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label"
+                className="rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label"
                 style={{
                   color: s.color,
-                  backgroundColor: `${s.color}1A`,
-                  border: `1px solid ${s.color}40`,
+                  backgroundColor: withAlpha(s.color, 0.1),
+                  border: `1px solid ${withAlpha(s.color, 0.25)}`,
                 }}
               >
                 {s.shortLabel}

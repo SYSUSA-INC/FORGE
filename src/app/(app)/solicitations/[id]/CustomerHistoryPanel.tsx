@@ -188,7 +188,7 @@ export async function CustomerHistoryPanel({
                       {p.title}
                     </Link>
                     <span
-                      className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                      className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                         p.outcome === "won"
                           ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
                           : p.outcome === "lost"
@@ -261,7 +261,7 @@ function Stat({
           : "text-text";
   return (
     <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-label text-muted">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-label text-muted">{label}</div>
       <div className={`mt-0.5 truncate font-display text-[18px] font-semibold ${color}`}>{value}</div>
       {sub ? <div className="mt-0.5 truncate font-mono text-[10px] text-muted">{sub}</div> : null}
     </div>

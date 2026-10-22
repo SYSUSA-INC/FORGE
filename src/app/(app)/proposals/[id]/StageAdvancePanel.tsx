@@ -6,6 +6,7 @@ import { Panel } from "@/components/ui/Panel";
 import type { ProposalStage } from "@/db/schema";
 import { STAGES, STAGE_COLORS, advanceStage } from "@/lib/proposal-types";
 import { advanceProposalStageAction } from "../actions";
+import { withAlpha } from "@/lib/theme-colors";
 
 export function StageAdvancePanel({
   proposalId,
@@ -59,7 +60,7 @@ export function StageAdvancePanel({
             return (
               <span key={s.key} className="flex items-center gap-1">
                 <span
-                  className={`rounded-md px-2 py-1 font-mono text-[9px] uppercase tracking-widest transition-colors ${
+                  className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
                     isCurrent
                       ? "text-text"
                       : reached
@@ -70,14 +71,14 @@ export function StageAdvancePanel({
                     isCurrent
                       ? {
                           color: STAGE_COLORS[s.key],
-                          backgroundColor: `${STAGE_COLORS[s.key]}1A`,
-                          border: `1px solid ${STAGE_COLORS[s.key]}60`,
+                          backgroundColor: withAlpha(STAGE_COLORS[s.key], 0.1),
+                          border: `1px solid ${withAlpha(STAGE_COLORS[s.key], 0.38)}`,
                         }
                       : {
                           backgroundColor: reached
-                            ? `${STAGE_COLORS[s.key]}12`
+                            ? withAlpha(STAGE_COLORS[s.key], 0.07)
                             : "transparent",
-                          border: `1px solid ${reached ? `${STAGE_COLORS[s.key]}30` : "rgba(255,255,255,0.1)"}`,
+                          border: `1px solid ${reached ? withAlpha(STAGE_COLORS[s.key], 0.19) : "rgba(255,255,255,0.1)"}`,
                         }
                   }
                 >

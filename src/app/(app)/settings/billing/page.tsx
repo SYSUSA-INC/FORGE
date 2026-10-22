@@ -198,7 +198,7 @@ export default async function BillingPage({
                         <div className="font-display text-[15px] font-semibold text-text">
                           {t.name}
                           {isCurrent ? (
-                            <span className="ml-2 rounded border border-teal/40 bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">
+                            <span className="ml-2 rounded border border-teal/40 bg-teal/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-teal">
                               Current
                             </span>
                           ) : null}

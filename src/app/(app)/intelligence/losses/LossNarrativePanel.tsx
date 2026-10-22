@@ -87,7 +87,7 @@ export function LossNarrativePanel({
                   {ins.explanation}
                 </p>
                 <p className="mt-1.5 font-body text-[12px] leading-relaxed text-text">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-teal">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
                     Action
                   </span>{" "}
                   {ins.action}
@@ -98,7 +98,7 @@ export function LossNarrativePanel({
                       <a
                         key={id}
                         href={`#pattern-${encodeURIComponent(id)}`}
-                        className="rounded border border-layer/10 px-1.5 py-0.5 font-mono text-[9px] text-muted hover:border-layer/30 hover:text-text"
+                        className="rounded border border-layer/10 px-1.5 py-0.5 font-mono text-[10px] text-muted hover:border-layer/30 hover:text-text"
                       >
                         {id}
                       </a>
@@ -110,7 +110,7 @@ export function LossNarrativePanel({
           </ol>
           {result.narrative.caveats.length > 0 ? (
             <div className="rounded-md border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2">
-              <div className="font-mono text-[9px] uppercase tracking-widest text-amber-200">
+              <div className="font-mono text-[10px] uppercase tracking-widest text-amber-200">
                 Caveats
               </div>
               <ul className="mt-1 list-disc space-y-0.5 pl-4 font-body text-[12px] leading-relaxed text-muted">

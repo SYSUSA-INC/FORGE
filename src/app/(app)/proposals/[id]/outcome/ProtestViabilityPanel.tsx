@@ -9,7 +9,7 @@ import {
   type ProtestCheckRow,
 } from "./protest-actions";
 import type { ProtestGround, ProtestRiskTier } from "@/db/schema";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 const TIER_LABEL: Record<ProtestRiskTier, string> = {
   none: "None",
@@ -150,8 +150,8 @@ export function ProtestViabilityPanel({
               className="shrink-0 rounded px-2 py-1 font-mono text-[11px] uppercase tracking-widest"
               style={{
                 color: tierColor,
-                backgroundColor: `${tierColor}1A`,
-                border: `1px solid ${tierColor}50`,
+                backgroundColor: withAlpha(tierColor, 0.1),
+                border: `1px solid ${withAlpha(tierColor, 0.31)}`,
               }}
             >
               {TIER_LABEL[tier]}
@@ -184,11 +184,11 @@ export function ProtestViabilityPanel({
                         className="flex w-full items-start gap-3 px-3 py-2.5 text-left"
                       >
                         <span
-                          className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                           style={{
                             color: gc,
-                            backgroundColor: `${gc}1A`,
-                            border: `1px solid ${gc}50`,
+                            backgroundColor: withAlpha(gc, 0.1),
+                            border: `1px solid ${withAlpha(gc, 0.31)}`,
                           }}
                         >
                           {g.strength}

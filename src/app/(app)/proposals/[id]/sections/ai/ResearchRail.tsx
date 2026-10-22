@@ -174,7 +174,7 @@ export function ResearchRail({
               {data.unaddressed.map((r) => (
                 <li key={r.id} className="font-body text-[11px] leading-relaxed text-text">
                   <span className="font-mono text-[10px] text-muted">[{r.number || "?"}]</span> {r.text}
-                  <span className="ml-1 font-mono text-[9px] text-muted">
+                  <span className="ml-1 font-mono text-[10px] text-muted">
                     · missing: {r.missingTerms.join(", ")}
                   </span>
                 </li>
@@ -223,7 +223,7 @@ export function ResearchRail({
                   {data.customerVoice.missing.map((m) => (
                     <li key={m.phrase} className="flex flex-wrap items-center gap-1.5" title={m.sample}>
                       <span className="aur-chip normal-case tracking-normal text-text">{m.phrase}</span>
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-muted">{m.source}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{m.source}</span>
                     </li>
                   ))}
                 </>
@@ -235,7 +235,7 @@ export function ResearchRail({
             <Group title="Contradictions from the last scan" tone={THEME.red}>
               {data.contradictions.map((c, i) => (
                 <li key={i} className="font-body text-[11px] leading-relaxed text-text">
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
                     {c.severity} · vs {c.otherSectionTitle}
                   </span>
                   <div>
@@ -267,11 +267,11 @@ export function ResearchRail({
                       <span className="truncate font-display text-[12px] font-semibold text-text">
                         {h.title}
                         {h.outcomeLabel && h.outcomeLabel !== "none" ? (
-                          <span className="ml-1 font-mono text-[9px] uppercase tracking-wider text-muted">
+                          <span className="ml-1 font-mono text-[10px] uppercase tracking-wider text-muted">
                             {h.outcomeLabel}
                           </span>
                         ) : null}
-                        <span className="ml-1 font-mono text-[9px] text-muted">
+                        <span className="ml-1 font-mono text-[10px] text-muted">
                           {Math.round(Math.max(0, Math.min(1, h.similarity)) * 100)}%
                         </span>
                       </span>

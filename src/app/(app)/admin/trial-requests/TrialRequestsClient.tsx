@@ -34,7 +34,7 @@ export function TrialRequestsClient({ pending, decided }: { pending: TrialReques
           <ul className="flex flex-col gap-2 font-mono text-[11px]">
             {decided.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
-                <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase tracking-widest ${r.status === "approved" ? "bg-emerald/15 text-emerald" : "bg-layer/10 text-muted"}`}>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${r.status === "approved" ? "bg-emerald/15 text-emerald" : "bg-layer/10 text-muted"}`}>
                   {r.status}
                 </span>
                 <span className="text-text">{r.company}</span>

@@ -245,7 +245,7 @@ export function AmendmentsPanel({
                   </div>
                 </div>
                 <span
-                  className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${STATUS_CLASS[a.parseStatus] ?? STATUS_CLASS.uploaded}`}
+                  className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${STATUS_CLASS[a.parseStatus] ?? STATUS_CLASS.uploaded}`}
                 >
                   {STATUS_LABEL[a.parseStatus] ?? a.parseStatus}
                 </span>

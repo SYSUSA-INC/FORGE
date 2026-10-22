@@ -41,12 +41,12 @@ export function SectionPresence({ sectionId }: { sectionId: string }) {
   const label = presenceLabel(viewers.map((v) => v.name));
   return (
     <span
-      className="inline-flex items-center gap-1 rounded border border-emerald/40 bg-emerald/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-emerald"
+      className="inline-flex items-center gap-1 rounded border border-emerald/40 bg-emerald/10 px-1.5 py-0.5 text-[10px] normal-case tracking-widest text-emerald"
       title={`${label} — they have this section open now.`}
     >
       <span className="flex -space-x-1">
         {viewers.slice(0, 3).map((v) => (
-          <span key={v.userId} className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-emerald/40 bg-canvas text-[8px] text-text">
+          <span key={v.userId} className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-emerald/40 bg-canvas text-[10px] text-text">
             {initials(v.name)}
           </span>
         ))}

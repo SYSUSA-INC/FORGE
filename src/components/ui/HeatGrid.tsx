@@ -40,14 +40,14 @@ export function HeatGrid({
         {cols.map((c) => (
           <div
             key={c}
-            className="px-1 py-1 text-center text-[9px] font-semibold uppercase tracking-widest text-muted"
+            className="px-1 py-1 text-center text-[10px] font-semibold uppercase tracking-widest text-muted"
           >
             {c}
           </div>
         ))}
         {rows.map((r, ri) => (
           <div key={r} className="contents">
-            <div className="px-2 py-1.5 text-right text-[9px] font-semibold uppercase tracking-widest text-muted">
+            <div className="px-2 py-1.5 text-right text-[10px] font-semibold uppercase tracking-widest text-muted">
               {r}
             </div>
             {cols.map((c, ci) => (
@@ -66,7 +66,7 @@ export function HeatGrid({
           </div>
         ))}
       </div>
-      <div className="mt-2 flex items-center gap-1 text-[9px] uppercase tracking-widest text-muted">
+      <div className="mt-2 flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted">
         <span>Low</span>
         <span className="h-2 w-4 rounded bg-violet/15" />
         <span className="h-2 w-4 rounded bg-violet/30" />

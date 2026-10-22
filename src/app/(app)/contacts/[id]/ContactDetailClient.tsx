@@ -128,7 +128,7 @@ export function ContactDetailClient({ contact, touches, owners, opportunities }:
                 {touches.map((t) => (
                   <li key={t.id} className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
-                      <span className="rounded bg-layer/5 px-1.5 py-0.5 text-[9px] uppercase tracking-widest">{TOUCH_KIND_LABELS[normalizeTouchKind(t.kind)]}</span>
+                      <span className="rounded bg-layer/5 px-1.5 py-0.5 text-[10px] uppercase tracking-widest">{TOUCH_KIND_LABELS[normalizeTouchKind(t.kind)]}</span>
                       <span>{new Date(t.occurredAt).toLocaleDateString()}</span>
                       {t.loggedBy ? <span>by {t.loggedBy}</span> : null}
                       {t.opportunityId ? (

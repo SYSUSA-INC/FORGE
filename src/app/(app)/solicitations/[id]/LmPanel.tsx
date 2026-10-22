@@ -108,7 +108,7 @@ function Where({ source }: { source?: RequirementSource }) {
   if (source.quote === "none") {
     return (
       <span
-        className="ml-2 rounded border border-gold/40 bg-gold/10 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-gold"
+        className="ml-2 rounded border border-gold/40 bg-gold/10 px-1 py-0.5 font-mono text-[10px] uppercase tracking-widest text-gold"
         title="This wording was not found in the document; check it against the source."
       >
         not found in source

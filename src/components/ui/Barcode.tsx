@@ -26,7 +26,7 @@ export function Barcode({
           />
         ))}
       </div>
-      <span className="font-mono text-[9px] uppercase tracking-label text-ink/70">{value}</span>
+      <span className="font-mono text-[10px] uppercase tracking-label text-ink/70">{value}</span>
     </div>
   );
 }

@@ -76,7 +76,7 @@ export function TemplatesList({ templates }: { templates: TemplateRow[] }) {
                       </Link>
                       {t.isDefault ? (
                         <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                          className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                           style={{
                             color: t.brandPrimary,
                             backgroundColor: `${t.brandPrimary}1A`,

@@ -519,7 +519,7 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
                 className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 <span
-                  className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                  className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                     r.kind === "shall"
                       ? "border border-rose/40 bg-rose/10 text-rose"
                       : r.kind === "should"
@@ -645,7 +645,7 @@ function MatrixView({
             >
               <div className="flex items-start gap-3">
                 <span
-                  className={`mt-0.5 shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${CELL_TONE[cell.status]}`}
+                  className={`mt-0.5 shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${CELL_TONE[cell.status]}`}
                 >
                   {CELL_LABEL[cell.status]}
                 </span>

@@ -624,7 +624,7 @@ export function EditTemplateClient({
               {seed.map((s, i) => (
                 <span
                   key={i}
-                  className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                  className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                   style={{
                     color: brandAccent,
                     backgroundColor: `${brandAccent}14`,

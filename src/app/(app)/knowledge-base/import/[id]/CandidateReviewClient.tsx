@@ -369,16 +369,16 @@ function CandidateCard({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest ${KIND_TONES[candidate.kind]}`}
+            className={`rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest ${KIND_TONES[candidate.kind]}`}
           >
             {KIND_LABELS[candidate.kind]}
           </span>
           {isApproved ? (
-            <span className="rounded bg-emerald-400/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-emerald">
+            <span className="rounded bg-emerald-400/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald">
               ✓ Approved
             </span>
           ) : isRejected ? (
-            <span className="rounded bg-rose-400/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-rose">
+            <span className="rounded bg-rose-400/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-rose">
               Rejected
             </span>
           ) : null}
@@ -488,7 +488,7 @@ function CandidateCard({
               {candidate.tags.map((t) => (
                 <span
                   key={t}
-                  className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] text-muted"
+                  className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] text-muted"
                 >
                   {t}
                 </span>

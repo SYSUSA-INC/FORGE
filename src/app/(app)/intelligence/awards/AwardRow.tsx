@@ -51,23 +51,23 @@ export function AwardRow({
               {award.awardId}
             </span>
             {recompete ? (
-              <span className="rounded bg-amber-400/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-300">
+              <span className="rounded bg-amber-400/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-300">
                 Recompete soon
               </span>
             ) : null}
             {award.awardType ? (
-              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 {award.awardType}
               </span>
             ) : null}
             {setAside ? (
-              <span className="rounded bg-teal-400/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">
+              <span className="rounded bg-teal-400/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-teal">
                 {setAside}
               </span>
             ) : null}
             {chip ? (
               <span
-                className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                   chip.status === "graduated"
                     ? "bg-amber-500/15 text-amber-200"
                     : chip.status === "active"

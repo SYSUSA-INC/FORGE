@@ -74,7 +74,7 @@ export function VoicePanel({ profile, samples, authorName }: { profile: Profile;
 
       {profile?.traits.length ? (
         <div className="mt-3">
-          <div className="font-mono text-[9px] uppercase tracking-label text-subtle">How {authorName} writes</div>
+          <div className="font-mono text-[10px] uppercase tracking-label text-subtle">How {authorName} writes</div>
           <ul className="mt-1 flex flex-wrap gap-1.5">
             {profile.traits.map((t) => (
               <li key={t} className="rounded border border-plum-400/40 bg-plum-400/10 px-2 py-0.5 font-body text-[11px] text-plum-300">
@@ -82,7 +82,7 @@ export function VoicePanel({ profile, samples, authorName }: { profile: Profile;
               </li>
             ))}
           </ul>
-          <button type="button" onClick={() => setShowGuidance((v) => !v)} className="mt-2 font-mono text-[9px] uppercase tracking-widest text-subtle hover:text-text">
+          <button type="button" onClick={() => setShowGuidance((v) => !v)} className="mt-2 font-mono text-[10px] uppercase tracking-widest text-subtle hover:text-text">
             {showGuidance ? "Hide" : "Show"} what the AI is told
           </button>
           {showGuidance ? <pre className="mt-1 whitespace-pre-wrap rounded-md border border-layer/10 bg-layer/[0.02] p-3 font-mono text-[11px] leading-relaxed text-muted">{profile.guidance}</pre> : null}

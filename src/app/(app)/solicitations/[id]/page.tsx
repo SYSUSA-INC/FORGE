@@ -40,7 +40,7 @@ import { listSolicitationQa } from "@/lib/solicitation-qa";
 import { getSamKeyStatus } from "@/lib/samgov-key";
 import { samKeyNotice } from "@/lib/samgov-key-logic";
 import { normalizeRef } from "@/lib/solicitation-qa-logic";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 // BL-STAB-2c — room for filing an upload and starting its parse from this page.
@@ -319,8 +319,8 @@ export default async function SolicitationDetail({
           className="rounded px-1.5 py-0.5 uppercase tracking-widest"
           style={{
             color: statusColor,
-            backgroundColor: `${statusColor}1A`,
-            border: `1px solid ${statusColor}50`,
+            backgroundColor: withAlpha(statusColor, 0.1),
+            border: `1px solid ${withAlpha(statusColor, 0.31)}`,
           }}
         >
           {STATUS_LABEL[s.parseStatus] ?? s.parseStatus}
@@ -500,11 +500,11 @@ export default async function SolicitationDetail({
                       className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
                     >
                       <span
-                        className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                         style={{
                           color,
-                          backgroundColor: `${color}1A`,
-                          border: `1px solid ${color}50`,
+                          backgroundColor: withAlpha(color, 0.1),
+                          border: `1px solid ${withAlpha(color, 0.31)}`,
                         }}
                       >
                         {r.kind}
@@ -525,14 +525,14 @@ export default async function SolicitationDetail({
                             </span>
                           ) : null}
                           {r.review && r.review.status !== "confirmed" ? (
-                            <span className="font-mono text-[8px] uppercase tracking-widest text-emerald" title="Changed by your team on the verify screen">
+                            <span className="font-mono text-[10px] uppercase tracking-widest text-emerald" title="Changed by your team on the verify screen">
                               {r.review.status}
                             </span>
                           ) : null}
                           {r.source?.quote === "none" && !r.review ? (
                             /* BL-AIX Phase 2a — the document doesn't say this word for word */
                             <span
-                              className="rounded border border-gold/40 bg-gold/10 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-gold"
+                              className="rounded border border-gold/40 bg-gold/10 px-1 py-0.5 font-mono text-[10px] uppercase tracking-widest text-gold"
                               title="This wording was not found in the document. It may be paraphrased, merged from two clauses or misread; check it against the source."
                             >
                               not found in source
@@ -541,7 +541,7 @@ export default async function SolicitationDetail({
                           {r.ref && qaRefs.has(normalizeRef(r.ref)) ? (
                             /* BL-FB-SOL-QA — a contracting-officer answer refines this clause */
                             <span
-                              className="rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-amber-200"
+                              className="rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-200"
                               title="A contracting-officer answer refines this requirement — see Q&A above"
                             >
                               amended by Q&A
@@ -549,11 +549,11 @@ export default async function SolicitationDetail({
                           ) : null}
                           {sourceDoc ? (
                             <span
-                              className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest"
+                              className="rounded px-1 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                               style={{
                                 color: THEME.muted,
-                                backgroundColor: "#9BC9D91A",
-                                border: "1px solid #9BC9D930",
+                                backgroundColor: withAlpha(THEME.cobalt, 0.1),
+                                border: `1px solid ${withAlpha(THEME.cobalt, 0.19)}`,
                               }}
                               title={sourceDoc.fileName}
                             >

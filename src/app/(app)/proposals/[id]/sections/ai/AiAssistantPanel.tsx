@@ -125,7 +125,7 @@ function SourceLegend({
                   <span>{s.label}</span>
                 )}
                 {s.outcomeLabel && s.outcomeLabel !== "none" ? (
-                  <span className="ml-1 font-mono text-[9px] uppercase tracking-wider text-muted">
+                  <span className="ml-1 font-mono text-[10px] uppercase tracking-wider text-muted">
                     {s.outcomeLabel}
                   </span>
                 ) : null}
@@ -937,7 +937,7 @@ export function AiAssistantPanel({
               <span className="font-mono text-[10px] uppercase tracking-label text-teal">
                 A/B Compare
               </span>
-              <span className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] text-teal">
+              <span className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[10px] text-teal">
                 {abResult.recommended === "b" ? "Alt. recommended" : "Standard recommended"}
               </span>
             </div>
@@ -960,7 +960,7 @@ export function AiAssistantPanel({
                         {v === "b" ? " (alt.)" : " (standard)"}
                       </span>
                       {isRecommended ? (
-                        <span className="font-mono text-[9px] text-teal">★ rec.</span>
+                        <span className="font-mono text-[10px] text-teal">★ rec.</span>
                       ) : null}
                     </div>
                     <div className="max-h-[220px] overflow-y-auto whitespace-pre-wrap rounded border border-layer/10 bg-canvas px-2 py-1.5 font-body text-[12px] leading-relaxed text-text">
@@ -980,7 +980,7 @@ export function AiAssistantPanel({
             <button
               type="button"
               onClick={() => { setAbResult(null); setAbError(null); }}
-              className="self-start font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
+              className="self-start font-mono text-[10px] uppercase tracking-wider text-muted hover:text-text"
             >
               Discard comparison
             </button>
@@ -1075,7 +1075,7 @@ export function AiAssistantPanel({
                   <button
                     type="button"
                     onClick={cancelDraft}
-                    className="font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
+                    className="font-mono text-[10px] uppercase tracking-wider text-muted hover:text-text"
                   >
                     Stop
                   </button>
@@ -1245,11 +1245,11 @@ export function AiAssistantPanel({
                   {i === unread.index && unread.count > 0 ? (
                     <div className="my-1 flex w-full items-center gap-2 self-stretch" role="separator" aria-label={describeUnread(unread.count)}>
                       <span className="h-px flex-1 bg-amber-400/40" />
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-amber-200">{describeUnread(unread.count)}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200">{describeUnread(unread.count)}</span>
                       <span className="h-px flex-1 bg-amber-400/40" />
                     </div>
                   ) : null}
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-muted">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
                     {msg.role === "assistant"
                       ? "AI"
                       : `${msg.isMine === false && msg.authorName ? msg.authorName : "You"}${msg.role === "note" ? " · note to team" : ""}`}
@@ -1271,7 +1271,7 @@ export function AiAssistantPanel({
                         className="mb-1.5 flex w-full items-baseline gap-1.5 rounded border-l-2 border-indigo-400/50 bg-layer/[0.04] px-2 py-1 text-left font-body text-[11px] text-muted hover:text-text"
                         title="Jump to the message this answers"
                       >
-                        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-indigo-300">↩ {msg.replyTo.authorName || "a teammate"}</span>
+                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-indigo-300">↩ {msg.replyTo.authorName || "a teammate"}</span>
                         <span className="min-w-0 truncate">
                           <MentionText body={replyPreview(msg.replyTo.content)} resolver={resolver} />
                         </span>
@@ -1293,7 +1293,7 @@ export function AiAssistantPanel({
                         <button
                           type="button"
                           onClick={() => applyChatSuggestion(msg.content)}
-                          className="font-mono text-[9px] uppercase tracking-wider text-teal hover:text-teal/80"
+                          className="font-mono text-[10px] uppercase tracking-wider text-teal hover:text-teal/80"
                           title={canApplyTracked ? "Apply as tracked changes by FORGE AI" : "Replace the section with this text"}
                         >
                           {canApplyTracked ? "Apply as tracked changes ↑" : "Apply to section ↑"}
@@ -1303,7 +1303,7 @@ export function AiAssistantPanel({
                           <button
                             type="button"
                             onClick={() => onSuggestion({ text: msg.content, streaming: false, explicit: true })}
-                            className="font-mono text-[9px] uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
+                            className="font-mono text-[10px] uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
                             title="Show this reply as edits to the draft, paragraph by paragraph"
                           >
                             Preview as edits →
@@ -1320,7 +1320,7 @@ export function AiAssistantPanel({
                             setReplyTo(msg);
                             chatInputRef.current?.focus();
                           }}
-                          className="font-mono text-[9px] uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
+                          className="font-mono text-[10px] uppercase tracking-wider text-indigo-300 hover:text-indigo-200"
                           title="Reply to this message (as a note, or as a question to the AI)"
                         >
                           ↩ Reply
@@ -1451,7 +1451,7 @@ export function AiAssistantPanel({
           {/* Slice 2 — what the next Send or Note answers */}
           {replyTo ? (
             <div className="flex items-center gap-2 rounded-md border border-indigo-400/30 bg-indigo-400/5 px-2 py-1 font-body text-[11px] text-muted">
-              <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-indigo-300">↩ Replying to {replyTo.isMine === false && replyTo.authorName ? replyTo.authorName : "yourself"}</span>
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-indigo-300">↩ Replying to {replyTo.isMine === false && replyTo.authorName ? replyTo.authorName : "yourself"}</span>
               <span className="min-w-0 flex-1 truncate">
                 <MentionText body={replyPreview(replyTo.content)} resolver={resolver} />
               </span>
@@ -1583,7 +1583,7 @@ export function AiAssistantPanel({
           ) : null}
           {/* BL-FB-CHAT-SLASH — the commands, one click to start one */}
           {!chatInput ? (
-            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-subtle">
+            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-subtle">
               <span>Commands</span>
               {CHAT_COMMANDS.map((c) => (
                 <button
@@ -1612,7 +1612,7 @@ export function AiAssistantPanel({
                   if (!res.ok) setChatError(res.error);
                 });
               }}
-              className="self-start font-mono text-[9px] uppercase tracking-wider text-muted hover:text-text"
+              className="self-start font-mono text-[10px] uppercase tracking-wider text-muted hover:text-text"
             >
               Clear chat
             </button>

@@ -111,11 +111,11 @@ export default async function LossIntelligencePage() {
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${sev.cls}`}
+                          className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${sev.cls}`}
                         >
                           {sev.label}
                         </span>
-                        <span className="font-mono text-[9px] uppercase tracking-widest text-muted">
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
                           {KIND_LABEL[p.kind]}
                         </span>
                         <span className="font-display text-[13px] font-semibold text-text">

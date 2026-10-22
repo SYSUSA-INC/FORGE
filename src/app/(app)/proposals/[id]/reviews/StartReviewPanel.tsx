@@ -158,7 +158,7 @@ export function StartReviewPanel({
                       <label className="flex cursor-pointer items-center gap-2">
                         <input type="checkbox" className="accent-teal-400" checked={isSelected} onChange={() => toggle(r.id)} />
                         <span className="min-w-0 truncate font-mono text-[12px] text-text">{r.name ?? r.email}</span>
-                        <span className="ml-auto rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">{r.role}</span>
+                        <span className="ml-auto rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">{r.role}</span>
                       </label>
                       {isSelected && sections.length > 0 ? (
                         <div className="mt-2">

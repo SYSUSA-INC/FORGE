@@ -76,7 +76,7 @@ export function ScoutClient({
                 >
                   <GradeMark grade={c.grade} />
                   <span
-                    className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                    className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                       c.status === "imported"
                         ? "border-emerald/40 bg-emerald/10 text-emerald-300"
                         : "border-layer/15 bg-layer/[0.04] text-muted"
@@ -270,14 +270,14 @@ function RecBadge({ candidate }: { candidate: ScoutCandidateView }) {
   const r = candidate.recommendation;
   if (!r) {
     return (
-      <span className="rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+      <span className="rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
         {candidate.stubbed ? "Scored (AI stub)" : candidate.triageQueued ? "AI triage queued" : "Scored · not triaged"}
       </span>
     );
   }
   return (
     <span
-      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${REC_CLASS[r]}`}
+      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${REC_CLASS[r]}`}
       title="The AI's recommendation and how sure it is of it — not a chance of winning."
     >
       {SCOUT_RECOMMENDATION_LABELS[r]}
@@ -341,7 +341,7 @@ function CandidateCard({ candidate: c }: { candidate: ScoutCandidateView }) {
         <RecBadge candidate={c} />
         <span className="font-mono text-[10px] uppercase tracking-widest text-muted">Fit {c.fitScore}</span>
         {c.source === "watchlist_award" ? (
-          <span className="rounded border border-violet/40 bg-violet/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-text">
+          <span className="rounded border border-violet/40 bg-violet/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-text">
             Expiring award
           </span>
         ) : null}

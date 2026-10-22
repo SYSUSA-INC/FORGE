@@ -338,7 +338,7 @@ export function PlatformAuditLogClient({
                     <td className="px-3 py-2 font-mono text-[11px] text-cobalt">
                       {r.action}
                       {r.category === "read" ? (
-                        <span className="ml-2 rounded border border-layer/15 px-1 py-0.5 font-mono text-[9px] uppercase tracking-widest text-subtle">
+                        <span className="ml-2 rounded border border-layer/15 px-1 py-0.5 font-mono text-[10px] uppercase tracking-widest text-subtle">
                           read
                         </span>
                       ) : null}

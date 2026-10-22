@@ -5,6 +5,7 @@ import {
   type FunnelData,
   type FunnelStageStat,
 } from "./funnel-stats";
+import { withAlpha } from "@/lib/theme-colors";
 
 /**
  * Pipeline funnel visualization. One trapezoid-ish row per active
@@ -74,7 +75,7 @@ export function PipelineFunnel({
                   className="absolute inset-y-0 left-0 transition-[width] duration-200"
                   style={{
                     width: `${widthPct}%`,
-                    background: `linear-gradient(90deg, ${stat.color}55, ${stat.color}25)`,
+                    background: `linear-gradient(90deg, ${withAlpha(stat.color, 0.33)}, ${withAlpha(stat.color, 0.15)})`,
                     borderRight:
                       stat.count > 0 ? `2px solid ${stat.color}` : undefined,
                   }}
@@ -146,7 +147,7 @@ export function PipelineFunnel({
                       className="absolute inset-y-0 left-0 transition-[width] duration-200"
                       style={{
                         width: `${widthPct}%`,
-                        background: `${stat.color}30`,
+                        background: withAlpha(stat.color, 0.19),
                         borderRight:
                           stat.count > 0
                             ? `2px solid ${stat.color}`

@@ -101,7 +101,7 @@ export function GraphicsPanel({
           {(suggestions ?? []).map((s) => (
             <div key={`${s.kind}-${s.title}`} className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-plum-300">
+                <span className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-plum-300">
                   {GRAPHIC_KIND_LABELS[s.kind]}
                 </span>
                 <span className="font-display text-[13px] font-semibold text-text">{s.title}</span>
@@ -124,7 +124,7 @@ export function GraphicsPanel({
                 <button type="button" onClick={() => downloadSvg(s)} className="aur-btn aur-btn-ghost text-[11px]">
                   Download SVG
                 </button>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-subtle">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">
                   {s.nodes.length} nodes · {s.edges.length} links
                 </span>
               </div>

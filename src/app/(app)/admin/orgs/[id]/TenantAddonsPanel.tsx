@@ -85,8 +85,8 @@ export function TenantAddonsPanel({
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
                   <span className="text-text">{g.name}</span>
                   {g.quantity > 1 ? <span className="text-muted">×{g.quantity}</span> : null}
-                  <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-muted">{g.source === "stripe" ? "Stripe" : "Granted"}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-[9px] uppercase tracking-widest ${g.live ? "bg-emerald/15 text-emerald" : "bg-layer/10 text-muted"}`}>{g.live ? "Live" : g.status === "canceled" ? "Ended" : "Not counting"}</span>
+                  <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted">{g.source === "stripe" ? "Stripe" : "Granted"}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${g.live ? "bg-emerald/15 text-emerald" : "bg-layer/10 text-muted"}`}>{g.live ? "Live" : g.status === "canceled" ? "Ended" : "Not counting"}</span>
                 </div>
                 {g.status === "active" ? (
                   <button type="button" onClick={() => revoke(g)} disabled={pending} className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60">

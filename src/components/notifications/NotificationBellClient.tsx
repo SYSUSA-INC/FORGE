@@ -12,6 +12,7 @@ import {
   NOTIFICATION_KIND_ICONS,
 } from "@/lib/notification-types";
 import { BellIcon } from "./NotificationBell";
+import { withAlpha } from "@/lib/theme-colors";
 
 export function NotificationBellClient({
   unread,
@@ -103,8 +104,8 @@ export function NotificationBellClient({
                         className="grid h-6 w-6 shrink-0 place-items-center rounded font-display text-xs"
                         style={{
                           color,
-                          backgroundColor: `${color}1A`,
-                          border: `1px solid ${color}50`,
+                          backgroundColor: withAlpha(color, 0.1),
+                          border: `1px solid ${withAlpha(color, 0.31)}`,
                         }}
                         aria-hidden
                       >

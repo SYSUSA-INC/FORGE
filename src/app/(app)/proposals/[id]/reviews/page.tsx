@@ -21,6 +21,7 @@ import {
   listReviewsForProposal,
 } from "./actions";
 import { StartReviewPanel } from "./StartReviewPanel";
+import { withAlpha } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -118,40 +119,40 @@ export default async function ProposalReviewsPage({
                             className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
                             style={{
                               color: colorHex,
-                              backgroundColor: `${colorHex}1A`,
-                              border: `1px solid ${colorHex}40`,
+                              backgroundColor: withAlpha(colorHex, 0.1),
+                              border: `1px solid ${withAlpha(colorHex, 0.25)}`,
                             }}
                           >
                             {REVIEW_COLOR_LABELS[r.color]}
                           </span>
                           <span
-                            className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                            className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                             style={{
                               color: statusColor,
-                              backgroundColor: `${statusColor}1A`,
-                              border: `1px solid ${statusColor}40`,
+                              backgroundColor: withAlpha(statusColor, 0.1),
+                              border: `1px solid ${withAlpha(statusColor, 0.25)}`,
                             }}
                           >
                             {STATUS_LABELS[r.status]}
                           </span>
                           {r.verdict ? (
                             <span
-                              className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                              className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                               style={{
                                 color: VERDICT_COLORS[r.verdict],
-                                backgroundColor: `${VERDICT_COLORS[r.verdict]}1A`,
-                                border: `1px solid ${VERDICT_COLORS[r.verdict]}40`,
+                                backgroundColor: withAlpha(VERDICT_COLORS[r.verdict], 0.1),
+                                border: `1px solid ${withAlpha(VERDICT_COLORS[r.verdict], 0.25)}`,
                               }}
                             >
                               Final: {VERDICT_LABELS[r.verdict]}
                             </span>
                           ) : overall ? (
                             <span
-                              className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                              className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                               style={{
                                 color: VERDICT_COLORS[overall],
-                                backgroundColor: `${VERDICT_COLORS[overall]}1A`,
-                                border: `1px solid ${VERDICT_COLORS[overall]}40`,
+                                backgroundColor: withAlpha(VERDICT_COLORS[overall], 0.1),
+                                border: `1px solid ${withAlpha(VERDICT_COLORS[overall], 0.25)}`,
                               }}
                             >
                               Trending: {VERDICT_LABELS[overall]}

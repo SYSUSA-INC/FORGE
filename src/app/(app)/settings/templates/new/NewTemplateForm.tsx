@@ -69,7 +69,7 @@ export function NewTemplateForm({ starters }: { starters: StarterPreview[] }) {
                       style={{ background: s.brandAccent }}
                       aria-hidden
                     />
-                    <span className="ml-auto rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                    <span className="ml-auto rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                       {s.sectionCount} sections
                     </span>
                   </div>

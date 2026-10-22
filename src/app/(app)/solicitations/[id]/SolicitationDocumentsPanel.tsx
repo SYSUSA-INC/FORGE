@@ -179,7 +179,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
       <div className="mb-4 flex flex-col gap-2">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <label className="font-mono text-[9px] uppercase tracking-label text-subtle">
+            <label className="font-mono text-[10px] uppercase tracking-label text-subtle">
               Files (several at once)
             </label>
             <input
@@ -267,7 +267,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
                 className="flex items-center gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
               >
                 {/* Type badge */}
-                <span className="shrink-0 rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                <span className="shrink-0 rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                   {DOC_TYPE_LABELS[doc.documentType] ?? doc.documentType}
                 </span>
 
@@ -289,7 +289,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
 
                 {/* Status badge */}
                 <span
-                  className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${PARSE_STATUS_CLASS[doc.parseStatus] ?? PARSE_STATUS_CLASS.uploaded}`}
+                  className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${PARSE_STATUS_CLASS[doc.parseStatus] ?? PARSE_STATUS_CLASS.uploaded}`}
                 >
                   {doc.parseStatus}
                 </span>

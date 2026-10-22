@@ -236,7 +236,7 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
           ) : null}
           <div className="max-h-[320px] overflow-y-auto rounded-md border border-layer/10">
             <table className="w-full text-left font-body text-[12px]">
-              <thead className="sticky top-0 bg-canvas font-mono text-[9px] uppercase tracking-widest text-muted">
+              <thead className="sticky top-0 bg-canvas font-mono text-[10px] uppercase tracking-widest text-muted">
                 <tr>
                   <th className="px-3 py-1.5">Name</th>
                   <th className="px-3 py-1.5">Agency</th>
@@ -260,11 +260,11 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
                     <td className="px-3 py-1.5 font-mono text-[10px] text-muted">{r.email || "—"}</td>
                     <td className="px-3 py-1.5">
                       {r.duplicate ? (
-                        <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-200" title={`Matches ${r.duplicate.existingName} by ${r.duplicate.by}`}>
+                        <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-200" title={`Matches ${r.duplicate.existingName} by ${r.duplicate.by}`}>
                           already known · {r.duplicate.by}
                         </span>
                       ) : (
-                        <span className="rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-emerald-300">new</span>
+                        <span className="rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-300">new</span>
                       )}
                     </td>
                   </tr>

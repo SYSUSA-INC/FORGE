@@ -184,7 +184,7 @@ function Meter({
     <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-display text-[14px] font-semibold text-text">{title}</span>
-        <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${STATUS_CLASS[burn.status]}`}>
+        <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${STATUS_CLASS[burn.status]}`}>
           {STATUS_LABEL[burn.status]}
         </span>
         <span className="ml-auto font-mono text-[11px] tabular-nums text-muted">
