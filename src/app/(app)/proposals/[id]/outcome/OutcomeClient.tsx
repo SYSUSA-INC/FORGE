@@ -208,8 +208,8 @@ function OutcomePanel({
           className="rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest"
           style={{
             color: OUTCOME_TYPE_COLORS[outcomeType],
-            backgroundColor: `${OUTCOME_TYPE_COLORS[outcomeType]}1A`,
-            border: `1px solid ${OUTCOME_TYPE_COLORS[outcomeType]}60`,
+            backgroundColor: withAlpha(OUTCOME_TYPE_COLORS[outcomeType], 0.1),
+            border: `1px solid ${withAlpha(OUTCOME_TYPE_COLORS[outcomeType], 0.38)}`,
           }}
         >
           {OUTCOME_TYPE_LABELS[outcomeType]}
@@ -233,10 +233,10 @@ function OutcomePanel({
                       ? OUTCOME_TYPE_COLORS[t]
                       : withAlpha(THEME.muted, 0.8),
                     backgroundColor: selected
-                      ? `${OUTCOME_TYPE_COLORS[t]}1A`
+                      ? withAlpha(OUTCOME_TYPE_COLORS[t], 0.1)
                       : "rgba(255, 255, 255, 0.04)",
                     border: selected
-                      ? `1px solid ${OUTCOME_TYPE_COLORS[t]}80`
+                      ? `1px solid ${withAlpha(OUTCOME_TYPE_COLORS[t], 0.5)}`
                       : "1px solid rgba(255, 255, 255, 0.10)",
                   }}
                 >

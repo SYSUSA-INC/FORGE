@@ -10,7 +10,7 @@ import {
   type AvailableEvidence,
   type EvidenceRow,
 } from "./actions";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 const KIND_LABELS: Record<ComplianceEvidenceKind, string> = {
   past_performance: "Past performance",
@@ -119,11 +119,11 @@ export function EvidenceDock({
                 className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
               >
                 <span
-                  className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+                  className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
                   style={{
                     color,
-                    background: `${color}1a`,
-                    border: `1px solid ${color}40`,
+                    background: withAlpha(color, 0.1),
+                    border: `1px solid ${withAlpha(color, 0.25)}`,
                   }}
                 >
                   {KIND_LABELS[e.kind]}
@@ -276,7 +276,7 @@ export function EvidenceDock({
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="rounded bg-layer/5 px-1 py-0.5 font-mono text-[9px] uppercase text-muted">
+                                <span className="rounded bg-layer/5 px-1 py-0.5 font-mono text-[10px] uppercase text-muted">
                                   {k.kind}
                                 </span>
                                 <span className="truncate font-mono text-[11px] text-text">

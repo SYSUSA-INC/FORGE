@@ -101,7 +101,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
       {view.canSave ? (
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-label text-subtle">New SAM.gov API key</span>
+            <span className="font-mono text-[10px] uppercase tracking-label text-subtle">New SAM.gov API key</span>
             <span className="flex items-center gap-2">
               {/* Not a password: no browser or password-manager suggestions, which fill the box with something else (BL-STAB-7b). */}
               <input

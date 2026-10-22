@@ -9,6 +9,7 @@ import { SendForReviewButton } from "./[id]/review/SendForReviewButton";
 import { formatDollarRange, formatDollars } from "@/lib/money";
 import { StageWidget, spellOutStageCode } from "./StageWidget";
 import { formatDueProximity, type StageStat } from "./stage-stats";
+import { withAlpha } from "@/lib/theme-colors";
 
 type Opp = {
   id: string;
@@ -145,7 +146,7 @@ export function OpportunitiesClient({
           }`}
         >
           <div className="flex items-center justify-between">
-            <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label text-muted">
+            <div className="rounded-sm border border-layer/15 bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
               All
             </div>
             <div className="font-display text-2xl font-semibold leading-none tabular-nums text-text">
@@ -248,8 +249,8 @@ function OppRow({ o }: { o: Opp }) {
         className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{
           color: o.stageColor,
-          backgroundColor: `${o.stageColor}1A`,
-          border: `1px solid ${o.stageColor}40`,
+          backgroundColor: withAlpha(o.stageColor, 0.1),
+          border: `1px solid ${withAlpha(o.stageColor, 0.25)}`,
         }}
       >
         {o.stageLabel}

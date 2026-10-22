@@ -45,7 +45,7 @@ export function StatTile({
         {delta ? (
           <span className="flex items-center gap-1.5">
             <span
-              className={`rounded-sm px-1 py-0.5 text-[9px] ${delta.up ? "bg-emerald/15 text-emerald" : "bg-rose/15 text-rose"}`}
+              className={`rounded-sm px-1 py-0.5 text-[10px] ${delta.up ? "bg-emerald/15 text-emerald" : "bg-rose/15 text-rose"}`}
             >
               {delta.up ? "▲" : "▼"}
             </span>

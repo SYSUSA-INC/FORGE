@@ -42,7 +42,7 @@ function Cell({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-4 py-3 text-center">
       <div className="brut-stencil text-6xl">{value}</div>
-      <div className="mt-1 font-mono text-[9px] uppercase tracking-label opacity-70">{label}</div>
+      <div className="mt-1 font-mono text-[10px] uppercase tracking-label opacity-70">{label}</div>
     </div>
   );
 }

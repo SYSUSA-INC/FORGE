@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 type OutcomeLabel = "none" | "won" | "lost" | "no_bid" | "withdrawn";
 
@@ -176,18 +176,18 @@ export function KnowledgeBaseClient({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1">
                       <span
-                        className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                         style={{
                           color,
-                          backgroundColor: `${color}1A`,
-                          border: `1px solid ${color}50`,
+                          backgroundColor: withAlpha(color, 0.1),
+                          border: `1px solid ${withAlpha(color, 0.31)}`,
                         }}
                       >
                         {KIND_LABEL[e.kind] ?? e.kind}
                       </span>
                       {e.outcomeLabel !== "none" ? (
                         <span
-                          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${OUTCOME_TONES[e.outcomeLabel]}`}
+                          className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${OUTCOME_TONES[e.outcomeLabel]}`}
                           title={`Came from a proposal that was ${OUTCOME_LABELS[e.outcomeLabel]}.`}
                         >
                           {OUTCOME_LABELS[e.outcomeLabel]}
@@ -214,7 +214,7 @@ export function KnowledgeBaseClient({
                       {e.tags.slice(0, 6).map((t) => (
                         <span
                           key={t}
-                          className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+                          className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted"
                         >
                           #{t}
                         </span>

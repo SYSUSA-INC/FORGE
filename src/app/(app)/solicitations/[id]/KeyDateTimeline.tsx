@@ -130,7 +130,7 @@ export function KeyDateTimeline({
           style={{ left: `${todayPct.toFixed(1)}%` }}
         />
         <span
-          className="absolute -top-4 font-mono text-[9px] -translate-x-1/2 text-muted"
+          className="absolute -top-4 font-mono text-[10px] -translate-x-1/2 text-muted"
           style={{ left: `${todayPct.toFixed(1)}%` }}
         >
           today
@@ -173,7 +173,7 @@ export function KeyDateTimeline({
             >
               {/* Type badge */}
               <span
-                className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                 style={{
                   color: typeStyle.color,
                   background: typeStyle.bg,

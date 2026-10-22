@@ -8,6 +8,7 @@ import {
   assignReviewerAction,
   unassignReviewerAction,
 } from "../actions";
+import { withAlpha } from "@/lib/theme-colors";
 
 type Assignment = {
   userId: string;
@@ -88,17 +89,17 @@ export function ReviewerList({
                   <div className="flex items-center gap-2">
                     {a.submittedAt && a.verdict && verdictColor ? (
                       <span
-                        className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                         style={{
                           color: verdictColor,
-                          backgroundColor: `${verdictColor}1A`,
-                          border: `1px solid ${verdictColor}40`,
+                          backgroundColor: withAlpha(verdictColor, 0.1),
+                          border: `1px solid ${withAlpha(verdictColor, 0.25)}`,
                         }}
                       >
                         {VERDICT_LABELS[a.verdict as "pass" | "conditional" | "fail"]}
                       </span>
                     ) : (
-                      <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                      <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                         Pending
                       </span>
                     )}

@@ -1,4 +1,5 @@
 "use client";
+import { withAlpha } from "@/lib/theme-colors";
 
 /**
  * One tile in the stage widget grid on /opportunities. Replaces the
@@ -53,18 +54,18 @@ export function StageWidget({
         active
           ? {
               borderColor: color,
-              backgroundColor: `${color}10`,
+              backgroundColor: withAlpha(color, 0.06),
             }
           : undefined
       }
     >
       <div className="flex items-center justify-between">
         <div
-          className="rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-label"
+          className="rounded-sm px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label"
           style={{
             color,
-            backgroundColor: `${color}1A`,
-            border: `1px solid ${color}40`,
+            backgroundColor: withAlpha(color, 0.1),
+            border: `1px solid ${withAlpha(color, 0.25)}`,
           }}
         >
           {shortLabel}

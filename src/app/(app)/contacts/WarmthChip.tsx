@@ -11,7 +11,7 @@ const TONE: Record<ReturnType<typeof warmthLabel>, string> = {
 export function WarmthChip({ score }: { score: number }) {
   const label = warmthLabel(score);
   return (
-    <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${TONE[label]}`} title="Relationship warmth: recency and frequency of contact, weighted by role">
+    <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${TONE[label]}`} title="Relationship warmth: recency and frequency of contact, weighted by role">
       {label} {score}
     </span>
   );

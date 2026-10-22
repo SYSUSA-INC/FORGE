@@ -153,7 +153,7 @@ function BlockRow({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="truncate font-display text-[12px] font-semibold text-text">{block.title}</span>
-          <span className="font-mono text-[9px] uppercase tracking-widest text-muted">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
             {block.version > 0 ? `v${block.version} · ` : ""}used {block.reuseCount}×
           </span>
           {block.tags.slice(0, 4).map((t) => (

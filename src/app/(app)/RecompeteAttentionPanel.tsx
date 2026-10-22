@@ -44,7 +44,7 @@ export async function RecompeteAttentionPanel({ organizationId }: { organization
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+                      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                         lost
                           ? "border-rose/40 bg-rose/10 text-rose"
                           : "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"

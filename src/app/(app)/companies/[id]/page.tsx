@@ -12,6 +12,7 @@ import {
 } from "@/lib/company-types";
 import { CompanyForm } from "../CompanyForm";
 import { CompanyDetailActions } from "./CompanyDetailActions";
+import { withAlpha } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +77,8 @@ export default async function CompanyDetailPage({
           className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-label"
           style={{
             color: relColor,
-            backgroundColor: `${relColor}1A`,
-            border: `1px solid ${relColor}40`,
+            backgroundColor: withAlpha(relColor, 0.1),
+            border: `1px solid ${withAlpha(relColor, 0.25)}`,
           }}
         >
           {relLabel}

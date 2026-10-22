@@ -160,7 +160,7 @@ export function TeamPanel({
                             {a.notes}
                           </div>
                         ) : null}
-                        <div className="mt-1 font-mono text-[9px] uppercase tracking-widest text-subtle">
+                        <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-subtle">
                           assigned {new Date(a.assignedAt).toLocaleDateString()}
                           {a.assignedByName
                             ? ` by ${a.assignedByName}`

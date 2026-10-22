@@ -66,7 +66,7 @@ export async function AddonsSection({
                   <div className="font-display text-[14px] font-semibold text-text">
                     {a.name}
                     {held > 0 ? (
-                      <span className="ml-2 rounded border border-teal/40 bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">
+                      <span className="ml-2 rounded border border-teal/40 bg-teal/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-teal">
                         Active{held > 1 ? ` ×${held}` : ""}
                       </span>
                     ) : null}

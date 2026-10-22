@@ -185,7 +185,7 @@ export function SourceRequestPanel({
                       {r.sourceName}
                     </span>
                     <span
-                      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${STATUS_TONES[r.status]}`}
+                      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${STATUS_TONES[r.status]}`}
                     >
                       {STATUS_LABELS[r.status]}
                     </span>
@@ -195,7 +195,7 @@ export function SourceRequestPanel({
                   </div>
                   {r.platformNotes ? (
                     <div className="mt-1 rounded border border-layer/10 bg-layer/[0.02] px-2 py-1 font-mono text-[10px] leading-relaxed text-text">
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-teal">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
                         FORGE team:
                       </span>{" "}
                       {r.platformNotes}

@@ -820,7 +820,7 @@ function OrgRowItem({
           <div className="truncate font-display text-[13px] font-semibold text-text">
             {org.name}
             {org.disabled ? (
-              <span className="ml-2 rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-rose">
+              <span className="ml-2 rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-rose">
                 Disabled
               </span>
             ) : null}
@@ -1152,22 +1152,22 @@ function UserRowItem({
           <div className="truncate text-[13px] font-semibold text-text">
             {u.name ?? u.email}
             {isSelf ? (
-              <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 You
               </span>
             ) : null}
             {u.isSuperadmin ? (
-              <span className="ml-2 rounded bg-teal/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal">
+              <span className="ml-2 rounded bg-teal/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-teal">
                 Superadmin
               </span>
             ) : null}
             {u.disabled ? (
-              <span className="ml-2 rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-rose">
+              <span className="ml-2 rounded bg-rose/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-rose">
                 Disabled
               </span>
             ) : null}
             {!u.verified ? (
-              <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 Unverified
               </span>
             ) : null}

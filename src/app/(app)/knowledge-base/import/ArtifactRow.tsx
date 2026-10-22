@@ -86,16 +86,16 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
           <span className="truncate font-display text-[14px] font-semibold text-text">
             {artifact.title || artifact.fileName || "Untitled"}
           </span>
-          <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+          <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
             {formatKind(artifact.kind)}
           </span>
           <span
-            className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${statusTone}`}
+            className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${statusTone}`}
           >
             {artifact.status.replace(/_/g, " ")}
           </span>
           {artifact.archivedAt ? (
-            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
               archived
             </span>
           ) : null}
@@ -110,7 +110,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
             {artifact.tags.map((t) => (
               <span
                 key={t}
-                className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] text-muted"
+                className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] text-muted"
               >
                 {t}
               </span>

@@ -10,6 +10,7 @@
 
 import { useState, useTransition } from "react";
 import { setItarRestrictedAction } from "./actions";
+import { THEME } from "@/lib/theme-colors";
 
 type Props = {
   organizationId: string;
@@ -72,11 +73,11 @@ export function ItarRestrictedToggle({ organizationId, initialValue }: Props) {
       </div>
       {current && (
         <span
-          className="self-start rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+          className="self-start rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider"
           style={{
             background: "rgba(248, 113, 113, 0.10)",
             border: "1px solid rgba(248, 113, 113, 0.35)",
-            color: "#F87171",
+            color: THEME.red,
           }}
         >
           ITAR-restricted

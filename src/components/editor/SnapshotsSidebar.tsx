@@ -139,7 +139,7 @@ export function SnapshotsSidebar({
         <span className="font-mono text-[10px] uppercase tracking-label text-muted">
           Snapshots
         </span>
-        <span className="font-mono text-[9px] text-subtle">
+        <span className="font-mono text-[10px] text-subtle">
           {snapshots.length} total
         </span>
       </div>
@@ -229,7 +229,7 @@ function SnapshotRow({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <span
-            className="rounded px-1 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+            className="rounded px-1 py-0.5 font-mono text-[10px] uppercase tracking-wider"
             style={
               isAuto
                 ? {
@@ -255,7 +255,7 @@ function SnapshotRow({
             type="button"
             onClick={onDiff}
             title="Compare this snapshot to the current text"
-            className="rounded border border-violet/30 bg-violet/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-violet hover:bg-violet/20 transition-colors"
+            className="rounded border border-violet/30 bg-violet/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-violet hover:bg-violet/20 transition-colors"
           >
             Diff
           </button>
@@ -265,7 +265,7 @@ function SnapshotRow({
                 type="button"
                 onClick={onRestore}
                 title="Restore this snapshot (current text saved first)"
-                className="rounded border border-teal/30 bg-teal/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-teal hover:bg-teal/20 transition-colors"
+                className="rounded border border-teal/30 bg-teal/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-teal hover:bg-teal/20 transition-colors"
               >
                 Restore
               </button>
@@ -273,7 +273,7 @@ function SnapshotRow({
                 type="button"
                 onClick={onDelete}
                 title="Delete this snapshot"
-                className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
+                className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
               >
                 ✕
               </button>
@@ -281,7 +281,7 @@ function SnapshotRow({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1.5 font-mono text-[9px] text-subtle">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] text-subtle">
         <span>{author}</span>
         <span>·</span>
         <span>{created}</span>

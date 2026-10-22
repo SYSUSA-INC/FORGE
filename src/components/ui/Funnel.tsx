@@ -158,7 +158,7 @@ export function FunnelLegend({ stages }: { stages: FunnelStage[] }) {
               <div className="font-display text-lg font-semibold tabular-nums">
                 {s.count}
               </div>
-              <div className="font-mono text-[9px] uppercase tracking-widest text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
                 items
               </div>
             </div>

@@ -97,7 +97,7 @@ function History({ data }: { data: Loaded }) {
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">Who wins there</div>
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-muted">Who wins there</div>
           <ul className="space-y-0.5 font-mono text-[11px]">
             {s.topRecipients.map((r) => (
               <li key={r.name} className="flex justify-between gap-2">
@@ -110,7 +110,7 @@ function History({ data }: { data: Loaded }) {
           </ul>
         </div>
         <div>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">In which NAICS</div>
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-muted">In which NAICS</div>
           {s.naicsMix.length === 0 ? (
             <p className="font-mono text-[11px] text-muted">No NAICS on these awards.</p>
           ) : (
@@ -125,7 +125,7 @@ function History({ data }: { data: Loaded }) {
           )}
         </div>
         <div>
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">Offices seen</div>
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-muted">Offices seen</div>
           {s.subAgencies.length === 0 ? (
             <p className="font-mono text-[11px] text-muted">—</p>
           ) : (
@@ -152,7 +152,7 @@ function History({ data }: { data: Loaded }) {
                 <span className="text-text">{a.recipientName}</span>
                 <span>{formatMoney(a.amount)}</span>
                 {a.naicsCode ? <span>NAICS {a.naicsCode}</span> : null}
-                {a.setAsideCode ? <span className="rounded border border-indigo-400/20 bg-indigo-400/5 px-1 text-[9px] uppercase tracking-widest text-indigo-300">{a.setAsideCode}</span> : null}
+                {a.setAsideCode ? <span className="rounded border border-indigo-400/20 bg-indigo-400/5 px-1 text-[10px] uppercase tracking-widest text-indigo-300">{a.setAsideCode}</span> : null}
                 {a.endDate ? <span>ends {a.endDate}</span> : null}
               </div>
               {a.description ? <p className="mt-0.5 line-clamp-2 font-body text-[11px] leading-relaxed text-muted">{a.description}</p> : null}

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startImpersonationAction } from "./impersonation-actions";
+import { THEME } from "@/lib/theme-colors";
 
 /**
  * BL-15 Phase B-3b — start-impersonation form.
@@ -110,7 +111,7 @@ export function StartImpersonationForm({
           onClick={submit}
           disabled={pending || reason.trim().length < 8}
           className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
-          style={{ background: "linear-gradient(180deg,#FBBF24,#B45309)" }}
+          style={{ background: `linear-gradient(180deg, ${THEME.brass}, ${THEME.brassDeep})` }}
         >
           {pending ? "Starting…" : "Start session"}
         </button>

@@ -483,7 +483,7 @@ function PendingPanel({
                     {i.email}
                     {i.awaitingApproval ? (
                       <span
-                        className="ml-2 rounded border border-gold/40 bg-gold/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-gold"
+                        className="ml-2 rounded border border-gold/40 bg-gold/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-gold"
                         title="The invitee is from another email domain. A platform admin must approve this before any link exists."
                       >
                         Awaiting platform approval
@@ -631,13 +631,13 @@ function MembersPanel({
                 <div className="truncate text-[13px] font-semibold text-text">
                   {m.name ?? m.email}
                   {isSelf ? (
-                    <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                    <span className="ml-2 rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                       You
                     </span>
                   ) : null}
                   {m.externalDomain ? (
                     <span
-                      className="ml-2 rounded border border-gold/40 bg-gold/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-gold"
+                      className="ml-2 rounded border border-gold/40 bg-gold/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-gold"
                       title="This member's email domain is neither owned by nor approved for this workspace. Only a platform admin can change the workspace's domains."
                     >
                       External domain

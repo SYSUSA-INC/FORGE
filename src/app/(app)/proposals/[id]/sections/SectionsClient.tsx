@@ -44,7 +44,7 @@ import {
 import { recordChangeDecisionsAction } from "./change-decision-actions";
 import { SectionPresence } from "./SectionPresence";
 import { triggerProposalScanIfStaleAction } from "../scan-actions";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 import type { ChatReadBudgets } from "@/lib/chat-attachments-logic";
 
 type Section = {
@@ -714,7 +714,7 @@ function SectionRow({
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+            <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
               {section.ordering}
             </span>
             {/* BL-FB-SCAN-CONTINUOUS — health dot per section */}
@@ -729,7 +729,7 @@ function SectionRow({
             {/* BL-AIP-6b — open review comments on this section */}
             {section.reviewComments.length > 0 ? (
               <span
-                className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-200"
+                className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-200"
                 title={describeOpenComments(section.reviewComments)}
               >
                 ✎ {section.reviewComments.length}
@@ -761,7 +761,7 @@ function SectionRow({
             {/* BL-FB-CHAT-MULTI Slice 2 — teammates wrote in the thread since you looked */}
             {chatUnread > 0 ? (
               <span
-                className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-amber-200"
+                className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10px] normal-case tracking-widest text-amber-200"
                 title={`${chatUnread} chat message${chatUnread === 1 ? "" : "s"} from teammates since you last looked`}
               >
                 💬 {chatUnread} new
@@ -770,24 +770,24 @@ function SectionRow({
             {/* BL-FB-GEN-VOICE Slice 2 — what the drafter and chat write this section in */}
             {voiceOn ? (
               <span
-                className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-plum-300"
+                className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 text-[10px] normal-case tracking-widest text-plum-300"
                 title={`The drafter and chat write this section in ${section.authorName ?? section.authorEmail ?? "the author"}'s voice${houseStyle ? ", under the team's house style" : ""}.`}
               >
                 ✦ in {(section.authorName ?? section.authorEmail ?? "the author").split(/[\s@]/)[0]}&apos;s voice
               </span>
             ) : houseStyle ? (
-              <span className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 text-[9px] normal-case tracking-widest text-plum-300" title="The drafter and chat follow the team's house style for this section.">
+              <span className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 text-[10px] normal-case tracking-widest text-plum-300" title="The drafter and chat follow the team's house style for this section.">
                 ✦ house style
               </span>
             ) : null}
           </div>
         </div>
         <span
-          className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+          className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
           style={{
             color: SECTION_STATUS_COLORS[section.status],
-            backgroundColor: `${SECTION_STATUS_COLORS[section.status]}1A`,
-            border: `1px solid ${SECTION_STATUS_COLORS[section.status]}40`,
+            backgroundColor: withAlpha(SECTION_STATUS_COLORS[section.status], 0.1),
+            border: `1px solid ${withAlpha(SECTION_STATUS_COLORS[section.status], 0.25)}`,
           }}
         >
           {SECTION_STATUS_LABELS[section.status]}
@@ -909,7 +909,7 @@ function SectionRow({
                     {liveCap !== null ? <PageBudgetRing words={words} cap={liveCap} size={12} /> : null}
                     {dirty ? (
                       <span
-                        className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-200"
+                        className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-amber-200"
                         title="Changes in this section have not been saved"
                       >
                         unsaved
@@ -1044,7 +1044,7 @@ function ScanDot({
       className="inline-block h-2 w-2 shrink-0 rounded-full"
       style={{
         background: color,
-        boxShadow: `0 0 0 1px ${color}55`,
+        boxShadow: `0 0 0 1px ${withAlpha(color, 0.33)}`,
       }}
     />
   );
@@ -1071,11 +1071,11 @@ function ThemeBadge({
       : `${reinforced}/${total} win theme${total === 1 ? "" : "s"} reinforced`;
   return (
     <span
-      className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] tabular-nums tracking-widest"
+      className="shrink-0 rounded px-1 py-0.5 font-mono text-[10px] tabular-nums tracking-widest"
       style={{
         color,
-        backgroundColor: `${color}1A`,
-        border: `1px solid ${color}50`,
+        backgroundColor: withAlpha(color, 0.1),
+        border: `1px solid ${withAlpha(color, 0.31)}`,
       }}
       title={title}
     >

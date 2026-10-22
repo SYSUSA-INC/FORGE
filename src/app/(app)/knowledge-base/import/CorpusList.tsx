@@ -389,7 +389,7 @@ function TagSubBucket({
           </span>
           <span className="font-mono text-[11px] text-text">#{tag}</span>
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-widest text-subtle">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
           {rows.length}
         </span>
       </button>
@@ -421,7 +421,7 @@ function UntaggedSubBucket({ rows }: { rows: ListedArtifact[] }) {
             (untagged)
           </span>
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-widest text-subtle">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
           {rows.length}
         </span>
       </button>

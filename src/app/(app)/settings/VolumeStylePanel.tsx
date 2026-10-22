@@ -92,7 +92,7 @@ export function VolumeStylePanel({
       {status.kind === "ok" ? <div className="mt-2 rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">Saved. Drafts and chat in {VOLUME_LABELS[volume]} sections follow it.</div> : null}
       {guidance ? (
         <div className="mt-3">
-          <button type="button" onClick={() => setShowGuidance((v) => !v)} className="font-mono text-[9px] uppercase tracking-widest text-subtle hover:text-text">
+          <button type="button" onClick={() => setShowGuidance((v) => !v)} className="font-mono text-[10px] uppercase tracking-widest text-subtle hover:text-text">
             {showGuidance ? "Hide" : "Show"} what the AI is told
           </button>
           {showGuidance ? <pre className="mt-1 whitespace-pre-wrap rounded-md border border-layer/10 bg-layer/[0.02] p-3 font-mono text-[11px] leading-relaxed text-muted">{guidance}</pre> : null}

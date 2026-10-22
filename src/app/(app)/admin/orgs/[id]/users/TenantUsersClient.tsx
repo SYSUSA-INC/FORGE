@@ -244,7 +244,7 @@ export function TenantUsersClient({
                       <div className="font-display text-[13px] font-semibold text-text">
                         {m.name || m.email}
                         {m.isPrimaryAdmin ? (
-                          <span className="ml-2 rounded bg-violet/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-violet">
+                          <span className="ml-2 rounded bg-violet/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-violet">
                             Primary admin
                           </span>
                         ) : null}

@@ -19,6 +19,7 @@ import {
   runIsolationCheckAction,
   type IsolationCheckSummary,
 } from "./isolation-check-actions";
+import { THEME } from "@/lib/theme-colors";
 
 type Props = {
   organizationId: string;
@@ -122,7 +123,7 @@ function ResultRow({ result }: { result: IsolationCheckSummary }) {
           <span className="font-mono text-[10px] text-text">
             {formatTimestamp(result.triggeredAt)}
           </span>
-          <span className="font-mono text-[9px] text-subtle">
+          <span className="font-mono text-[10px] text-subtle">
             · {result.passedChecks} pass · {result.failedChecks} fail
             {result.skippedChecks > 0
               ? ` · ${result.skippedChecks} skipped`
@@ -131,13 +132,13 @@ function ResultRow({ result }: { result: IsolationCheckSummary }) {
         </div>
       </div>
       {result.notes && (
-        <p className="font-mono text-[9px] text-subtle">{result.notes}</p>
+        <p className="font-mono text-[10px] text-subtle">{result.notes}</p>
       )}
       <ul className="flex flex-col gap-0.5 pl-2">
         {result.details.map((d, idx) => (
           <li
             key={`${d.table}-${idx}`}
-            className="font-mono text-[9px] text-muted"
+            className="font-mono text-[10px] text-muted"
           >
             <span
               className={
@@ -179,26 +180,26 @@ function StatusBadge({ tone }: { tone: "pass" | "fail" | "neutral" }) {
     pass: {
       bg: "rgba(74, 222, 128, 0.10)",
       border: "1px solid rgba(74, 222, 128, 0.30)",
-      color: "#4ADE80",
+      color: THEME.green,
       label: "PASS",
     },
     fail: {
       bg: "rgba(248, 113, 113, 0.12)",
       border: "1px solid rgba(248, 113, 113, 0.40)",
-      color: "#F87171",
+      color: THEME.red,
       label: "FAIL",
     },
     neutral: {
       bg: "rgba(148, 163, 184, 0.10)",
       border: "1px solid rgba(148, 163, 184, 0.30)",
-      color: "#94A3B8",
+      color: THEME.muted,
       label: "N/A",
     },
   };
   const s = STYLE[tone];
   return (
     <span
-      className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+      className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider"
       style={{ background: s.bg, border: s.border, color: s.color }}
     >
       {s.label}

@@ -75,7 +75,7 @@ export function ChecklistPanel({
                   {item.hint ? <span className="block font-body text-[11px] text-subtle">{item.hint}</span> : null}
                   {state?.note && noteFor !== item.key ? <span className="mt-1 block whitespace-pre-wrap font-mono text-[11px] text-muted">{state.note}</span> : null}
                 </span>
-                <span className="shrink-0 font-mono text-[9px] uppercase tracking-widest text-subtle" title="Other reviewers who ticked this">
+                <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-subtle" title="Other reviewers who ticked this">
                   {others > 0 ? `+${others}` : ""}
                 </span>
               </label>
@@ -100,7 +100,7 @@ export function ChecklistPanel({
                 ) : (
                   <button
                     type="button"
-                    className="mt-1 font-mono text-[9px] uppercase tracking-widest text-subtle hover:text-text"
+                    className="mt-1 font-mono text-[10px] uppercase tracking-widest text-subtle hover:text-text"
                     onClick={() => {
                       setNoteFor(item.key);
                       setNoteDraft(state?.note ?? "");

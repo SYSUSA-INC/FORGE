@@ -21,6 +21,7 @@ import {
 } from "./actions";
 import { AutoMapPanel } from "./AutoMapPanel";
 import { EvidenceDock } from "./EvidenceDock";
+import { withAlpha } from "@/lib/theme-colors";
 
 type CategoryDef = {
   key: ComplianceCategory;
@@ -768,8 +769,8 @@ function ItemRowCard({
               className="rounded-md px-2 py-0.5 text-center font-mono text-[10px] uppercase tracking-label"
               style={{
                 color: catColor,
-                backgroundColor: `${catColor}1A`,
-                border: `1px solid ${catColor}40`,
+                backgroundColor: withAlpha(catColor, 0.1),
+                border: `1px solid ${withAlpha(catColor, 0.25)}`,
               }}
             >
               {categoryLabels[item.category]}
@@ -791,7 +792,7 @@ function ItemRowCard({
                 className="mt-1 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 font-body text-[11px] leading-relaxed text-text"
                 title={item.amendedByQa.question || "Contracting-officer answer"}
               >
-                <span className="mr-1.5 font-mono text-[9px] uppercase tracking-widest text-amber-200">Amended by Q&A</span>
+                <span className="mr-1.5 font-mono text-[10px] uppercase tracking-widest text-amber-200">Amended by Q&A</span>
                 {item.amendedByQa.answer.slice(0, 240)}
                 {item.amendedByQa.answer.length > 240 ? "…" : ""}{" "}
                 <a href={`/solicitations/${item.amendedByQa.solicitationId}`} className="text-teal underline">
@@ -816,11 +817,11 @@ function ItemRowCard({
                 <span className="flex items-center gap-1">
                   <span>Owner: {item.ownerName ?? item.ownerEmail}</span>
                   <span
-                    className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider"
+                    className="rounded px-1 py-0.5 font-mono text-[10px] uppercase tracking-wider"
                     style={{
                       color: ownerStatusColors[ownerStatus],
-                      backgroundColor: `${ownerStatusColors[ownerStatus]}1A`,
-                      border: `1px solid ${ownerStatusColors[ownerStatus]}40`,
+                      backgroundColor: withAlpha(ownerStatusColors[ownerStatus], 0.1),
+                      border: `1px solid ${withAlpha(ownerStatusColors[ownerStatus], 0.25)}`,
                     }}
                   >
                     {ownerStatusLabels[ownerStatus]}
@@ -846,11 +847,11 @@ function ItemRowCard({
 
           <div className="flex flex-col items-end gap-2">
             <span
-              className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+              className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
               style={{
                 color: stColor,
-                backgroundColor: `${stColor}1A`,
-                border: `1px solid ${stColor}40`,
+                backgroundColor: withAlpha(stColor, 0.1),
+                border: `1px solid ${withAlpha(stColor, 0.25)}`,
               }}
             >
               {statusLabels[item.status]}
@@ -860,15 +861,15 @@ function ItemRowCard({
                 <button
                   key={s.key}
                   type="button"
-                  className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted transition-colors hover:border-layer/30 hover:text-text"
+                  className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted transition-colors hover:border-layer/30 hover:text-text"
                   disabled={pending || s.key === item.status}
                   onClick={() => quickStatus(s.key)}
                   style={
                     s.key === item.status
                       ? {
                           color: s.color,
-                          borderColor: `${s.color}60`,
-                          backgroundColor: `${s.color}1A`,
+                          borderColor: withAlpha(s.color, 0.38),
+                          backgroundColor: withAlpha(s.color, 0.1),
                         }
                       : undefined
                   }
@@ -883,15 +884,15 @@ function ItemRowCard({
                   <button
                     key={s.key}
                     type="button"
-                    className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest text-muted transition-colors hover:border-layer/30 hover:text-text"
+                    className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted transition-colors hover:border-layer/30 hover:text-text"
                     disabled={pending || s.key === ownerStatus}
                     onClick={() => quickOwnerStatus(s.key)}
                     style={
                       s.key === ownerStatus
                         ? {
                             color: s.color,
-                            borderColor: `${s.color}60`,
-                            backgroundColor: `${s.color}1A`,
+                            borderColor: withAlpha(s.color, 0.38),
+                            backgroundColor: withAlpha(s.color, 0.1),
                           }
                         : undefined
                     }
@@ -1135,7 +1136,7 @@ function ComplianceHeatmap({
                 <div className="max-w-[80px] truncate text-center uppercase tracking-wider">
                   §{s.ordering}
                 </div>
-                <div className="max-w-[80px] truncate text-center text-[9px] text-subtle">
+                <div className="max-w-[80px] truncate text-center text-[10px] text-subtle">
                   {s.title}
                 </div>
               </th>
@@ -1179,7 +1180,7 @@ function ComplianceHeatmap({
                   <td key={s.id} className="px-2 py-2 text-center">
                     <div
                       className="mx-auto h-5 w-5 rounded"
-                      style={{ backgroundColor: `${color}CC` }}
+                      style={{ backgroundColor: withAlpha(color, 0.8) }}
                       title={`${statusLabels[item.status]}${item.notes ? ` — ${item.notes.slice(0, 80)}` : ""}`}
                     />
                   </td>
@@ -1191,7 +1192,7 @@ function ComplianceHeatmap({
                     <div
                       className="mx-auto h-5 w-5 rounded"
                       style={{
-                        backgroundColor: `${statusColors[item.status]}CC`,
+                        backgroundColor: withAlpha(statusColors[item.status], 0.8),
                       }}
                       title={statusLabels[item.status]}
                     />
@@ -1210,7 +1211,7 @@ function ComplianceHeatmap({
             <div key={s} className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
               <div
                 className="h-3 w-3 rounded"
-                style={{ backgroundColor: `${statusColors[s]}CC` }}
+                style={{ backgroundColor: withAlpha(statusColors[s], 0.8) }}
               />
               {statusLabels[s]}
             </div>
@@ -1371,17 +1372,17 @@ function AIAssessmentRow({
       <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest">
         <span className="text-teal-300">Pre-flight</span>
         <span
-          className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+          className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
           style={{
             color: sColor,
-            backgroundColor: `${sColor}1A`,
-            border: `1px solid ${sColor}40`,
+            backgroundColor: withAlpha(sColor, 0.1),
+            border: `1px solid ${withAlpha(sColor, 0.25)}`,
           }}
         >
           {statusLabels[assessment.suggestedStatus]}
         </span>
         <span
-          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${CONFIDENCE_TONES[assessment.confidence]}`}
+          className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${CONFIDENCE_TONES[assessment.confidence]}`}
         >
           {assessment.confidence} confidence
         </span>

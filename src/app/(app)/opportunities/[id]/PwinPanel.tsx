@@ -51,7 +51,7 @@ export async function PwinPanel({
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <span
-              className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${conf.cls}`}
+              className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${conf.cls}`}
             >
               {conf.label}
             </span>
@@ -111,7 +111,7 @@ export async function PwinPanel({
                     />
                   </div>
                 </div>
-                <span className="w-[140px] truncate text-right font-mono text-[9px] text-muted">
+                <span className="w-[140px] truncate text-right font-mono text-[10px] text-muted">
                   {f.detail}
                 </span>
               </li>

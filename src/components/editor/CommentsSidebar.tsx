@@ -64,7 +64,7 @@ export function CommentsSidebar({ editor, ydoc, visible, currentUserId }: Props)
           <button
             type="button"
             onClick={() => setShowResolved((v) => !v)}
-            className="rounded border border-layer/10 bg-layer/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted hover:bg-layer/10 transition-colors"
+            className="rounded border border-layer/10 bg-layer/[0.04] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted hover:bg-layer/10 transition-colors"
           >
             {showResolved
               ? `Hide ${resolvedCount} resolved`
@@ -136,17 +136,17 @@ function ThreadCard({
             {thread.createdByName || "Unknown"}
           </span>
           <span className="font-mono text-[10px] text-subtle">·</span>
-          <span className="font-mono text-[9px] text-subtle">
+          <span className="font-mono text-[10px] text-subtle">
             {formatTimeAgo(thread.createdAt)}
           </span>
           {thread.resolved && (
-            <span className="ml-1 rounded border border-emerald/30 bg-emerald/10 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald">
+            <span className="ml-1 rounded border border-emerald/30 bg-emerald/10 px-1 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
               resolved
             </span>
           )}
           {thread.orphaned && (
             <span
-              className="ml-1 rounded px-1 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+              className="ml-1 rounded px-1 py-0.5 font-mono text-[10px] uppercase tracking-wider"
               style={{
                 background: withAlpha(THEME.brass, 0.10),
                 border: `1px solid ${withAlpha(THEME.brass, 0.30)}`,
@@ -164,7 +164,7 @@ function ThreadCard({
               type="button"
               onClick={focusInDoc}
               title="Find this comment's text in the editor"
-              className="rounded px-1.5 py-0.5 font-mono text-[9px] text-muted hover:bg-layer/[0.08] hover:text-text transition-colors"
+              className="rounded px-1.5 py-0.5 font-mono text-[10px] text-muted hover:bg-layer/[0.08] hover:text-text transition-colors"
             >
               jump
             </button>
@@ -173,7 +173,7 @@ function ThreadCard({
             type="button"
             onClick={toggleResolved}
             title={thread.resolved ? "Re-open this thread" : "Mark resolved"}
-            className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors ${
+            className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
               thread.resolved
                 ? "border-layer/15 bg-layer/[0.04] text-muted hover:bg-layer/10"
                 : "border-emerald/30 bg-emerald/10 text-emerald hover:bg-emerald/20"
@@ -206,7 +206,7 @@ function ThreadCard({
                 {m.authorName}
                 {m.authorId === currentUserId ? " (you)" : ""}
               </span>
-              <span className="text-[9px] text-subtle">
+              <span className="text-[10px] text-subtle">
                 · {formatTimeAgo(m.ts)}
               </span>
             </div>

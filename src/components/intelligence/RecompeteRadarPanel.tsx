@@ -68,7 +68,7 @@ function MatchCard({ m }: { m: RecompeteMatch }) {
     <li className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${
+          className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
             lost
               ? "border-rose/40 bg-rose/10 text-rose"
               : "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
@@ -91,7 +91,7 @@ function MatchCard({ m }: { m: RecompeteMatch }) {
         {m.signals.map((s) => (
           <span
             key={`${s.kind}-${s.label}`}
-            className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+            className="rounded border border-layer/10 bg-layer/[0.03] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted"
           >
             {s.label}
           </span>
@@ -167,7 +167,7 @@ function Note({ label, text, empty }: { label: string; text: string; empty: stri
   if (!text && !empty) return null;
   return (
     <div>
-      <div className="mb-1 font-mono text-[9px] uppercase tracking-label text-muted">{label}</div>
+      <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-muted">{label}</div>
       {text ? (
         <p className="line-clamp-4 whitespace-pre-line font-body text-[12px] leading-relaxed text-text">
           {text}

@@ -34,8 +34,8 @@ export function NextTouchBadge({ nextTouchAt }: { nextTouchAt: string | null }) 
   const s = nextTouchStatus(nextTouchAt);
   if (s.state === "none") return <span className="font-mono text-[10px] text-subtle">no follow-up set</span>;
   const date = new Date(nextTouchAt!).toLocaleDateString();
-  if (s.state === "overdue") return <span className="rounded border border-rose/40 bg-rose/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-rose">overdue · {date}</span>;
-  if (s.state === "due_soon") return <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-200">due {date}</span>;
+  if (s.state === "overdue") return <span className="rounded border border-rose/40 bg-rose/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-rose">overdue · {date}</span>;
+  if (s.state === "due_soon") return <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-200">due {date}</span>;
   return <span className="font-mono text-[10px] text-muted">next {date}</span>;
 }
 
@@ -188,7 +188,7 @@ export function ContactsClient({
                           {[c.title, c.office].filter(Boolean).join(" · ")}
                         </span>
                         <div className="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
-                          <span className="rounded bg-layer/5 px-1.5 py-0.5 text-[9px] uppercase tracking-widest">{CONTACT_ROLE_LABELS[c.role]}</span>
+                          <span className="rounded bg-layer/5 px-1.5 py-0.5 text-[10px] uppercase tracking-widest">{CONTACT_ROLE_LABELS[c.role]}</span>
                           <span>{describeRecency(c.lastTouchAt)}</span>
                           <NextTouchBadge nextTouchAt={c.nextTouchAt} />
                           {c.ownerName ? <span>owner {c.ownerName}</span> : null}

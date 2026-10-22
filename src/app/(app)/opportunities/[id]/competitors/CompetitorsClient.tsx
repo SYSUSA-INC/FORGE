@@ -228,7 +228,7 @@ function CompetitorCard({
           <div className="font-display text-[14px] font-semibold text-text">
             {competitor.name}
             {competitor.isIncumbent ? (
-              <span className="ml-2 rounded bg-gold/20 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-gold">
+              <span className="ml-2 rounded bg-gold/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-gold">
                 Incumbent
               </span>
             ) : null}

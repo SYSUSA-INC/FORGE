@@ -215,7 +215,7 @@ export function SearchClient({
                           {e.sbaCertifications.map((s) => (
                             <span
                               key={s}
-                              className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted"
+                              className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted"
                             >
                               {s}
                             </span>

@@ -42,7 +42,7 @@ export function StageStrip({
                 zIndex: active ? 20 : 10 - i,
               }}
             >
-              <span className="font-mono text-[9px] uppercase tracking-widest opacity-80">
+              <span className="font-mono text-[10px] uppercase tracking-widest opacity-80">
                 Stage {i + 1}
               </span>
               <span className="line-clamp-1">{s.label}</span>

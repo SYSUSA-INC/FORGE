@@ -198,7 +198,7 @@ function RequestRow({
               {request.sourceName || "(untitled)"}
             </span>
             <span
-              className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${STATUS_TONES[request.status]}`}
+              className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${STATUS_TONES[request.status]}`}
             >
               {STATUS_LABELS[request.status]}
             </span>

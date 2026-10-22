@@ -6,7 +6,7 @@ import {
   brainSuggestForSectionAction,
   type BrainHit,
 } from "./brain-actions";
-import { THEME } from "@/lib/theme-colors";
+import { withAlpha, THEME } from "@/lib/theme-colors";
 
 export function BrainSuggestPanel({
   sectionId,
@@ -132,11 +132,11 @@ function HitRow({
         </div>
         <div className="flex items-center gap-1">
           <span
-            className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+            className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
             style={{
               color: simColor(sim),
-              backgroundColor: `${simColor(sim)}1A`,
-              border: `1px solid ${simColor(sim)}40`,
+              backgroundColor: withAlpha(simColor(sim), 0.1),
+              border: `1px solid ${withAlpha(simColor(sim), 0.25)}`,
             }}
             title={`${(sim * 100).toFixed(1)}% similarity`}
           >
@@ -181,13 +181,13 @@ function SourceTag({ hit }: { hit: BrainHit }) {
       boilerplate: "Boilerplate",
     };
     return (
-      <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-emerald-300">
+      <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-300">
         {labels[hit.entryKind ?? "capability"]} · curated
       </span>
     );
   }
   return (
-    <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+    <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
       {hit.artifactKind?.replace(/_/g, " ") ?? "artifact"}
     </span>
   );

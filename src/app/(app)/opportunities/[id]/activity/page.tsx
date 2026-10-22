@@ -14,6 +14,7 @@ import {
 } from "@/lib/evaluation-types";
 import { AddActivityForm } from "./AddActivityForm";
 import { DeleteActivityButton } from "./DeleteActivityButton";
+import { withAlpha } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -79,11 +80,11 @@ export default async function OpportunityActivityPage({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className="rounded-md px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+                        className="rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest"
                         style={{
                           color,
-                          backgroundColor: `${color}1A`,
-                          border: `1px solid ${color}40`,
+                          backgroundColor: withAlpha(color, 0.1),
+                          border: `1px solid ${withAlpha(color, 0.25)}`,
                         }}
                       >
                         {label}

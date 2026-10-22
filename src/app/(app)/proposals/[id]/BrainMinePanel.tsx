@@ -175,7 +175,7 @@ function Stat({
 }) {
   return (
     <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-widest text-subtle">
+      <div className="font-mono text-[10px] uppercase tracking-widest text-subtle">
         {label}
       </div>
       <div

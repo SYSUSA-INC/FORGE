@@ -263,12 +263,12 @@ function AwardRow({
               {award.awardId}
             </span>
             {award.alreadyImported ? (
-              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 Already imported
               </span>
             ) : null}
             {award.awardType ? (
-              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                 {award.awardType}
               </span>
             ) : null}

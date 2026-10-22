@@ -213,13 +213,13 @@ export function CommentsPanel({
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="flex flex-wrap items-center gap-1">
-                    <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-muted">
+                    <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
                       {sec
                         ? `§${sec.ordering} · ${sec.title}`
                         : "General"}
                     </span>
                     {c.carriedFrom ? (
-                      <span className="rounded border border-indigo-400/20 bg-indigo-400/5 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-indigo-300" title="Carried forward from an earlier round">
+                      <span className="rounded border border-indigo-400/20 bg-indigo-400/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-indigo-300" title="Carried forward from an earlier round">
                         from {c.carriedFrom}
                       </span>
                     ) : null}

@@ -136,7 +136,7 @@ export function WinThemesPanel({
                 className="aur-input min-h-[72px] resize-y text-[12px]"
                 maxLength={360}
               />
-              <div className="text-right font-mono text-[9px] text-subtle">
+              <div className="text-right font-mono text-[10px] text-subtle">
                 {t.statement.length}/360
               </div>
             </div>

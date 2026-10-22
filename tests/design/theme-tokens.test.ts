@@ -250,6 +250,7 @@ describe("theme tokens — no literals in themed paths", () => {
       /\bbg-black\/\d/,
       /\bbg-\[#[0-9a-f]{6}\]/i,
       /\btext-muted\/\d+/,
+      /\btext-\[[89]px\]/,
     ];
     const offenders: string[] = [];
     for (const p of walk(join(ROOT, "src"))) {

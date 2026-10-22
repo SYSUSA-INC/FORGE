@@ -153,12 +153,12 @@ export function QaPanel({
             <li key={q.id} className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
               {q.question ? (
                 <p className="font-body text-[12px] leading-relaxed text-muted">
-                  <span className="mr-1.5 font-mono text-[9px] uppercase tracking-widest text-subtle">Q{q.ordinal}</span>
+                  <span className="mr-1.5 font-mono text-[10px] uppercase tracking-widest text-subtle">Q{q.ordinal}</span>
                   {q.question}
                 </p>
               ) : null}
               <p className="mt-0.5 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">{q.answer}</p>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-subtle">
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-subtle">
                 <span>
                   {q.source === "attachment" ? `SAM.gov · ${q.sourceRef}` : q.source === "description" ? "SAM.gov · notice description" : `pasted${q.addedByName ? ` by ${q.addedByName}` : ""}`}
                 </span>

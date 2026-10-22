@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { ProposalStage } from "@/db/schema";
 import { STAGES } from "@/lib/proposal-types";
+import { withAlpha } from "@/lib/theme-colors";
 
 type ProposalRow = {
   id: string;
@@ -281,8 +282,8 @@ function ProposalRowItem({ p }: { p: ProposalRow }) {
         className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{
           color: p.stageColor,
-          backgroundColor: `${p.stageColor}1A`,
-          border: `1px solid ${p.stageColor}40`,
+          backgroundColor: withAlpha(p.stageColor, 0.1),
+          border: `1px solid ${withAlpha(p.stageColor, 0.25)}`,
         }}
       >
         {p.stageLabel}

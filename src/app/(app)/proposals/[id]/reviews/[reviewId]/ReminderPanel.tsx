@@ -104,7 +104,7 @@ export function ReminderPanel({
             </div>
           ) : null}
           <div className="mt-3 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
-            <div className="font-mono text-[9px] uppercase tracking-widest text-subtle">Next reminder</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-subtle">Next reminder</div>
             {next ? (
               <>
                 <div className="mt-1 font-mono text-[12px] text-text">{next.toISOString().slice(0, 10)} · 08:00 UTC</div>
