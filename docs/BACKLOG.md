@@ -83,7 +83,8 @@ Effort key:
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | 🔄 PR #387 |
-| 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | 🔄 in review (this PR) |
+| 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
+| 3bd | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 in review (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2921,7 +2922,7 @@ subdomain matching (`mail.acme.com` is a separate domain).
 ---
 
 ### BL-UI-ENABLENOW — The EnableNow look
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 in review (this PR)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (#398)
 
 Owner request (2026-10-21): "Look at this color palette
 https://enablenow-website.vercel.app/design-system#colour and this
@@ -2959,6 +2960,27 @@ site (its CSS variables and design-system page), not approximated.
 - **Docs:** `docs/DESIGN_SYSTEM.md` rewritten for the EnableNow system.
 
 ---
+
+
+### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 in review (this PR)
+
+Follow-up to BL-UI-ENABLENOW after a both-theme sweep of every page.
+
+**Delivered:**
+- One accent token (`accent`) for labels, links, focus and the diamond;
+  `cobalt`/`action` stay for fills and in-progress status.
+- Light `muted` is slate-600 so tinted chips stay AA; dark cobalt scale
+  stays saturated; light indigo moved toward violet so it reads apart
+  from the brand blue.
+- Leftover chrome (faded ink, black scrims, hex backgrounds) replaced by
+  tokens and `.aur-scrim`; `.aur-btn` hover now works on links.
+- Colours moved to `theme.colors` (no merge with Tailwind's stock
+  palette) and a test fails on any undefined family/stop or `[#hex]`
+  colour class.
+
+**Next (serial):** B codemods (hex-alpha on `THEME.*`, off-palette status
+hex, mono 8/9px), C shared components, D HTML emails.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)

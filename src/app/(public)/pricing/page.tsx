@@ -125,15 +125,8 @@ export default async function PricingPage() {
             return (
               <div
                 key={tier.id}
-                className="aur-card-elevated relative flex flex-col overflow-hidden p-6"
+                className="aur-card relative flex flex-col overflow-hidden p-6"
               >
-                <div
-                  className="absolute inset-x-0 top-0 h-[2px]"
-                  style={{
-                    background:
-                      "var(--g-brand-bar)",
-                  }}
-                />
                 <div className="font-mono text-[10px] uppercase tracking-label text-muted">
                   {tier.slug}
                 </div>

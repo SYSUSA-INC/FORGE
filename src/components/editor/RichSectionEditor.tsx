@@ -606,7 +606,7 @@ export function RichSectionEditor({
       </div>
       {/* Inline composer for new comment threads on the current selection */}
       {useComments && composerOpen ? (
-        <div className="flex items-end gap-1.5 rounded-md border border-yellow-400/30 bg-yellow-400/[0.04] p-2">
+        <div className="flex items-end gap-1.5 rounded-md border border-brass/30 bg-brass/[0.04] p-2">
           <textarea
             autoFocus
             value={draftComment}

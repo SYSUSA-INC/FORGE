@@ -266,7 +266,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
             {tone.label}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="font-body text-[12px] text-foreground">{r.text}</div>
+            <div className="font-body text-[12px] text-text">{r.text}</div>
             <div className="mt-0.5 flex gap-3 font-mono text-[10px] text-muted">
               <span>{r.kind.toUpperCase()}</span>
               {r.ref ? <span>{r.ref}</span> : null}
@@ -292,7 +292,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
             {tone.label}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="font-body text-[12px] text-foreground/80 line-through decoration-rose/50">
+            <div className="font-body text-[12px] text-muted line-through decoration-rose/50">
               {r.text}
             </div>
             <div className="mt-0.5 flex gap-3 font-mono text-[10px] text-muted">
@@ -325,7 +325,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
               <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-rose/80">
                 Before
               </div>
-              <div className="font-body text-[12px] text-foreground/90">
+              <div className="font-body text-[12px] text-text">
                 {before.text}
               </div>
               <div className="mt-0.5 flex gap-3 font-mono text-[10px] text-muted">
@@ -337,7 +337,7 @@ function RequirementRow({ req }: { req: RequirementDiff }) {
               <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald/80">
                 After
               </div>
-              <div className="font-body text-[12px] text-foreground">
+              <div className="font-body text-[12px] text-text">
                 {after.text}
               </div>
               <div className="mt-0.5 flex gap-3 font-mono text-[10px] text-muted">

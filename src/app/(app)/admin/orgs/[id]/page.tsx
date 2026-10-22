@@ -372,7 +372,7 @@ export default async function TenantDetailPage({
               </>
             ) : null}
           </dl>
-          <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted/80">
+          <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted">
             Tier defaults set in <code>subscription_tier</code>; any
             per-tenant changes live in <code>tenant_subscription.custom_overrides</code>.
             Effective values shown above apply both layers.
@@ -439,7 +439,7 @@ export default async function TenantDetailPage({
               value={String(notificationRuleCount)}
             />
           </dl>
-          <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted/80">
+          <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted">
             Storage used is what the plan&apos;s storage limit is checked
             against: knowledge files, solicitation and companion-document
             files, Word templates and uploads in progress. Other AI-call costs
@@ -468,7 +468,7 @@ export default async function TenantDetailPage({
               ))}
             </ul>
           )}
-          <div className="mt-3 font-mono text-[10px] text-muted/80">
+          <div className="mt-3 font-mono text-[10px] text-muted">
             <Link
               href={`/platform/audit-log?tenant=${org.id}`}
               className="underline-offset-2 hover:underline"

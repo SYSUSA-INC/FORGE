@@ -160,13 +160,13 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
         {ROLES.map((r) => (
           <div
             key={r.value}
-            className="aur-card-elevated px-3 py-2"
+            className="aur-card px-3 py-2"
             title={r.description}
           >
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
               {r.label}
             </div>
-            <div className="mt-1 font-display text-[20px] font-semibold text-foreground">
+            <div className="mt-1 font-display text-[20px] font-semibold text-text">
               {String(summary.byRole[r.value] ?? 0).padStart(2, "0")}
             </div>
             <div className="mt-1 line-clamp-2 font-body text-[11px] leading-snug text-muted">
@@ -188,7 +188,7 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
                 className="flex items-center justify-between font-body text-[13px]"
               >
                 <span>
-                  <span className="text-foreground">{m.name || m.email}</span>
+                  <span className="text-text">{m.name || m.email}</span>
                   {m.name ? (
                     <span className="ml-2 text-muted">{m.email}</span>
                   ) : null}
@@ -622,11 +622,7 @@ function MembersPanel({
                 />
               ) : (
                 <span
-                  className="grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-bold text-white"
-                  style={{
-                    background:
-                      "var(--g-brand)",
-                  }}
+                  className="aur-brand-mark grid h-9 w-9 place-items-center rounded-full font-mono text-[11px] font-medium text-white"
                 >
                   {initials}
                 </span>

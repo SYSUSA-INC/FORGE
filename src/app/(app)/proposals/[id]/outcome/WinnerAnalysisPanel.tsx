@@ -196,7 +196,7 @@ export function WinnerAnalysisPanel({
           <div className="mt-4 space-y-4">
             <AiSection
               label="Competitor profile"
-              tone="text-foreground"
+              tone="text-text"
               body={analysis.winnerProfileSummary}
             />
             <AiSection
@@ -210,7 +210,7 @@ export function WinnerAnalysisPanel({
                 <button
                   type="button"
                   onClick={() => setShowSources((v) => !v)}
-                  className="font-mono text-[10px] uppercase tracking-label text-subtle hover:text-foreground"
+                  className="font-mono text-[10px] uppercase tracking-label text-subtle hover:text-text"
                 >
                   {showSources ? "Hide" : "Show"}{" "}
                   {analysis.sourceUsaspending.length} USAspending source
@@ -223,7 +223,7 @@ export function WinnerAnalysisPanel({
                         key={a.piid}
                         className="font-mono text-[11px] leading-relaxed text-muted"
                       >
-                        <span className="text-foreground">{a.piid}</span>
+                        <span className="text-text">{a.piid}</span>
                         {" · "}
                         {a.agency}
                         {a.value ? ` · ${a.value}` : ""}
@@ -264,7 +264,7 @@ function AgencySection({
       >
         {label}
       </div>
-      <div className="whitespace-pre-wrap font-body text-[13px] leading-relaxed text-foreground">
+      <div className="whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">
         {body}
       </div>
     </div>
@@ -287,7 +287,7 @@ function AiSection({
       >
         {label}
       </div>
-      <div className="mt-1 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-foreground">
+      <div className="mt-1 whitespace-pre-wrap font-body text-[13px] leading-relaxed text-text">
         {body || "(no content)"}
       </div>
     </div>

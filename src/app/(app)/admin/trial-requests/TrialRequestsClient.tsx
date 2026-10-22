@@ -43,7 +43,7 @@ export function TrialRequestsClient({ pending, decided }: { pending: TrialReques
                   {r.decidedAt ? new Date(r.decidedAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : ""}
                   {r.decidedBy ? ` by ${r.decidedBy}` : ""}
                 </span>
-                {r.status === "declined" && r.declineReason ? <span className="text-muted/80">“{r.declineReason}”</span> : null}
+                {r.status === "declined" && r.declineReason ? <span className="text-muted">“{r.declineReason}”</span> : null}
                 {r.createdOrganizationId ? (
                   <Link href={`/admin/orgs/${r.createdOrganizationId}`} className="text-indigo-300 underline-offset-2 hover:underline">
                     Workspace →

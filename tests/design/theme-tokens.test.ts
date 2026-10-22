@@ -50,11 +50,14 @@ describe("theme tokens — CSS", () => {
   it("the two themes actually differ where they should", () => {
     expect(LIGHT.get("canvas")).not.toBe(DARK.get("canvas"));
     // BL-UI-ENABLENOW: hairlines in EnableNow navy (blue-900); the brand
-    // blue (blue-600) on paper, blue-400 on the dark ground.
+    // blue (blue-600) on paper, Bright Blue (blue-400) on the dark ground; the
+    // text accent on dark is blue-200 (--c-accent).
     expect(LIGHT.get("layer")).toBe("12 31 89");
     expect(DARK.get("layer")).toBe("255 255 255");
     expect(LIGHT.get("cobalt-500")).toBe("41 83 215");
     expect(DARK.get("cobalt-500")).toBe("69 131 255");
+    expect(LIGHT.get("accent")).toBe("41 83 215");
+    expect(DARK.get("accent")).toBe("184 201 255");
     expect(LIGHT.get("action")).toBe(DARK.get("action"));
   });
 });
@@ -92,7 +95,7 @@ describe("theme tokens — JavaScript palette", () => {
 });
 
 describe("theme tokens — Tailwind config", () => {
-  const colors = (tailwindConfig.theme?.extend?.colors ?? {}) as Record<
+  const colors = (tailwindConfig.theme?.colors ?? {}) as Record<
     string,
     string | Record<string, string>
   >;
@@ -115,7 +118,9 @@ describe("theme tokens — Tailwind config", () => {
 
   it("every colour resolves to a declared --c-* variable with an alpha slot", () => {
     const values: string[] = [];
-    for (const entry of Object.values(colors)) {
+    const KEYWORDS = ["transparent", "current", "inherit", "white", "black"];
+    for (const [name, entry] of Object.entries(colors)) {
+      if (KEYWORDS.includes(name)) continue;
       if (typeof entry === "string") values.push(entry);
       else values.push(...Object.values(entry));
     }
@@ -207,5 +212,34 @@ describe("theme tokens — no literals in themed paths", () => {
     const paths = walk(join(ROOT, "src"));
     const offenders = paths.filter((p) => WHITE_ALPHA.test(readFileSync(p, "utf8")));
     expect(offenders.map((p) => p.replace(ROOT + "/", ""))).toEqual([]);
+  });
+
+  it("no colour class names an undefined family or stop, or an arbitrary hex", () => {
+    const colors = (tailwindConfig.theme?.colors ?? {}) as Record<
+      string,
+      string | Record<string, string>
+    >;
+    const PREFIX =
+      "(?:text|bg|border(?:-[xytrblse])?|ring(?:-offset)?|divide|placeholder|from|via|to|fill|stroke|outline|decoration|caret|accent|shadow)";
+    const NAMED = new RegExp(
+      `(?<![\\w-])(?:[a-z0-9-]+:)*${PREFIX}-([a-z]+)-(\\d{2,3})(?:\\/[\\w.\\[\\]]+)?(?![\\w-])`,
+      "g",
+    );
+    const ARB = new RegExp(`(?<![\\w-])(?:[a-z0-9-]+:)*${PREFIX}-\\[#[0-9a-fA-F]{3,8}\\]`, "g");
+    const STOCK = new Set(
+      "slate gray zinc neutral stone red orange amber yellow lime green emerald teal cyan sky blue indigo violet purple fuchsia pink rose".split(" "),
+    );
+    const offenders: string[] = [];
+    for (const p of walk(join(ROOT, "src"))) {
+      const src = readFileSync(p, "utf8");
+      for (const m of src.matchAll(NAMED)) {
+        const [cls, fam, stop] = m;
+        const entry = colors[fam];
+        if (!entry && !STOCK.has(fam)) continue;
+        if (typeof entry !== "object" || entry[stop] === undefined) offenders.push(`${p.replace(ROOT + "/", "")}: ${cls}`);
+      }
+      for (const m of src.matchAll(ARB)) offenders.push(`${p.replace(ROOT + "/", "")}: ${m[0]}`);
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
   });
 });

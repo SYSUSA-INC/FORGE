@@ -89,7 +89,7 @@ export function MarkdownRenderer({ source }: { source: string }) {
           );
         },
         pre: ({ children }) => (
-          <pre className="mt-4 overflow-x-auto rounded-lg border border-layer/10 bg-black/30 p-4">
+          <pre className="mt-4 overflow-x-auto rounded-lg border border-layer/10 bg-bone p-4">
             {children}
           </pre>
         ),

@@ -70,8 +70,7 @@ export function StageWidget({
           {shortLabel}
         </div>
         <div
-          className="font-display text-2xl font-semibold leading-none tabular-nums"
-          style={{ color: count > 0 ? "var(--text)" : "var(--muted)" }}
+          className={`font-display text-2xl font-semibold leading-none tabular-nums ${count > 0 ? "text-text" : "text-muted"}`}
         >
           {count}
         </div>
@@ -89,8 +88,7 @@ export function StageWidget({
       <div className="mt-auto flex flex-col gap-1 font-mono text-[10px]">
         {valueRange ? (
           <span
-            className="font-display text-[12px] font-medium tabular-nums"
-            style={{ color: "var(--text)" }}
+            className="font-display text-[12px] font-medium tabular-nums text-text"
             title="Sum of opportunity value low–high across this stage"
           >
             {valueRange}

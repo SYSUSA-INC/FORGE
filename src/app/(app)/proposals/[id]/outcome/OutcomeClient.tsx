@@ -841,7 +841,7 @@ function DebriefRequestPanel({ proposalId }: { proposalId: string }) {
             </span>
             <span>Verify FAR cite against actual solicitation before sending</span>
           </div>
-          <pre className="max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-layer/10 bg-layer/[0.02] p-4 font-mono text-[11px] leading-relaxed text-foreground">
+          <pre className="max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-layer/10 bg-layer/[0.02] p-4 font-mono text-[11px] leading-relaxed text-text">
             {letter}
           </pre>
           <div className="mt-2 flex gap-2">

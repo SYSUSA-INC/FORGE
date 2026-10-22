@@ -121,7 +121,7 @@ export default async function PipelinePage({
           {
             label: "Active",
             value: String(activeCount).padStart(2, "0"),
-            accent: activeCount > 0 ? "magenta" : undefined,
+            accent: activeCount > 0 ? "cobalt" : undefined,
             href: drillHref(windowKey, "active", undefined, mode),
           },
           {

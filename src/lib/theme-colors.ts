@@ -69,7 +69,7 @@ export const THEME_HEX: Record<ThemeColor, string> = {
   layer: "#FFFFFF",
   text: "#FFFFFF",
   muted: "#8F9BB0",
-  subtle: "#626B7D",
+  subtle: "#768094",
   faint: "#40506B",
   cobalt: "#4583FF",
   cobaltLight: "#A3BFF9",

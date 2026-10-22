@@ -40,10 +40,7 @@ export function UserMenu({ user }: { user: UserLike | null }) {
         />
       ) : (
         <span
-          className="grid h-7 w-7 place-items-center rounded-full font-mono text-[10px] font-bold text-white"
-          style={{
-            background: "var(--g-brand)",
-          }}
+          className="aur-brand-mark grid h-7 w-7 place-items-center rounded-full font-mono text-[10px] font-medium text-white"
         >
           {initials}
         </span>

@@ -49,10 +49,7 @@ function Brand() {
   return (
     <div className="flex items-center gap-3">
       <div
-        className="grid h-10 w-10 place-items-center rounded-lg font-display text-lg font-bold text-white"
-        style={{
-          background: "var(--g-brand)",
-        }}
+        className="aur-brand-mark grid h-10 w-10 place-items-center rounded-lg font-display text-lg font-medium text-white"
       >
         F
       </div>

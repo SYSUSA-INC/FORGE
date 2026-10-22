@@ -24,7 +24,7 @@ export function PageHeader({
     <section className="mb-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-label text-muted">
+          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-label text-accent">
             <span className="aur-diamond" />
             {eyebrow}
           </div>
@@ -82,20 +82,13 @@ function MetaTile({
         ? "text-rose"
         : accent === "signal" || accent === "emerald"
           ? "text-emerald"
-          : accent === "cobalt" || accent === "violet"
-            ? "text-violet"
-            : accent === "plum" || accent === "magenta"
-              ? "text-magenta"
-              : "text-text";
-
-  const glow =
-    accent === "hazard" || accent === "gold"
-      ? "shadow-glow-gold"
-      : accent === "signal" || accent === "emerald"
-        ? "shadow-glow-emerald"
-        : accent === "cobalt" || accent === "violet" || accent === "plum" || accent === "magenta"
-          ? "shadow-glow"
-          : "";
+          : accent === "cobalt"
+            ? "text-cobalt"
+            : accent === "violet"
+              ? "text-violet"
+              : accent === "plum" || accent === "magenta"
+                ? "text-magenta"
+                : "text-text";
 
   const body = (
     <>
@@ -112,16 +105,16 @@ function MetaTile({
     return (
       <Link
         href={href}
-        className={`aur-card group block px-4 py-3 transition-colors hover:border-cobalt-400/40 hover:bg-layer/[0.04] ${glow}`}
+        className={`aur-card group block px-4 py-3 transition-colors hover:border-cobalt-400/40 hover:bg-layer/[0.04]`}
         title={`View ${label.toLowerCase()}`}
       >
         {body}
-        <div className="mt-1 font-mono text-[9px] uppercase tracking-label text-muted/60 transition-colors group-hover:text-cobalt-300">
+        <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-subtle transition-colors group-hover:text-accent">
           View →
         </div>
       </Link>
     );
   }
 
-  return <div className={`aur-card px-4 py-3 ${glow}`}>{body}</div>;
+  return <div className={`aur-card px-4 py-3`}>{body}</div>;
 }

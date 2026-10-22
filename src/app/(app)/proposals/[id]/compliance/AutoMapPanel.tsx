@@ -234,7 +234,7 @@ export function AutoMapPanel({
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 truncate font-body text-[12px] text-foreground">
+                      <div className="mt-1 truncate font-body text-[12px] text-text">
                         {s.itemText}
                       </div>
                       <div className="mt-1 font-mono text-[10px] italic leading-relaxed text-muted">

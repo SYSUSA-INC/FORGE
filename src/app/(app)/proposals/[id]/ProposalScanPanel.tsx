@@ -155,7 +155,7 @@ export function ProposalScanPanel({
           ) : null}
 
           {/* Summary */}
-          <p className="font-body text-[13px] leading-relaxed text-foreground">
+          <p className="font-body text-[13px] leading-relaxed text-text">
             {scan.summary}
           </p>
 
@@ -306,7 +306,7 @@ export function ProposalScanPanel({
                 {scan.topRecommendations.map((rec, i) => (
                   <li
                     key={i}
-                    className="flex gap-2 font-body text-[12px] leading-relaxed text-foreground"
+                    className="flex gap-2 font-body text-[12px] leading-relaxed text-text"
                   >
                     <span className="shrink-0 font-mono text-[10px] text-muted">
                       {i + 1}.
