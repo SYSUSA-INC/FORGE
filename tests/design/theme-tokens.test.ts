@@ -242,4 +242,20 @@ describe("theme tokens — no literals in themed paths", () => {
     }
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
+
+  it("no retired ink or scrim classes remain in the app", () => {
+    const BANNED = [
+      /\btext-foreground\b/,
+      /var\(--(?:text|muted)\)/,
+      /\bbg-black\/\d/,
+      /\bbg-\[#[0-9a-f]{6}\]/i,
+      /\btext-muted\/\d+/,
+    ];
+    const offenders: string[] = [];
+    for (const p of walk(join(ROOT, "src"))) {
+      const src = readFileSync(p, "utf8");
+      for (const re of BANNED) if (re.test(src)) offenders.push(`${p.replace(ROOT + "/", "")}: ${re}`);
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
 });

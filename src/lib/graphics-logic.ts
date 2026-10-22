@@ -4,11 +4,11 @@
  * A diagram is a small spec (kind, nodes, edges) that the model proposes
  * from the section's own text — or, without a live provider, that a
  * heuristic mines from it. This module validates a spec, draws it as a
- * self-contained SVG (print colours from THEME_HEX, no external fonts
+ * self-contained SVG (print colours from PRINT_HEX, no external fonts
  * or scripts), writes the equivalent Mermaid block and packs the SVG
  * as a data URI the editor's image node can carry. Unit-tested.
  */
-import { THEME_HEX } from "@/lib/theme-colors";
+import { PRINT_HEX } from "@/lib/theme-colors";
 
 export type GraphicKind = "architecture" | "process" | "org" | "timeline";
 export type GraphicNode = { id: string; label: string; group?: string };
@@ -311,11 +311,11 @@ function arrowSvg(a: Box, b: Box, stroke: string, label?: string): string {
 
 /** A self-contained SVG of the spec, print colours, no scripts or external assets. */
 export function renderDiagramSvg(spec: GraphicSpec): string {
-  const stroke = THEME_HEX.cobaltDeep;
-  const fill = THEME_HEX.layer;
-  const text = THEME_HEX.canvas;
-  const accent = THEME_HEX.brass;
-  const muted = THEME_HEX.subtle;
+  const stroke = PRINT_HEX.stroke;
+  const fill = PRINT_HEX.paper;
+  const text = PRINT_HEX.ink;
+  const accent = PRINT_HEX.accent;
+  const muted = PRINT_HEX.muted;
   const boxes = new Map<string, Box>();
   let width = 0;
   let height = 0;
@@ -374,7 +374,7 @@ export function renderDiagramSvg(spec: GraphicSpec): string {
     tiers.forEach((g, ti) => {
       const y = PAD + 24 + ti * (BOX_H + GAP);
       extras.push(
-        `<rect x="${PAD}" y="${y - 10}" width="${width - PAD * 2}" height="${BOX_H + 20}" rx="8" fill="${THEME_HEX.cobalt}" fill-opacity="0.06" stroke="none"/>`,
+        `<rect x="${PAD}" y="${y - 10}" width="${width - PAD * 2}" height="${BOX_H + 20}" rx="8" fill="${PRINT_HEX.band}" fill-opacity="0.06" stroke="none"/>`,
         `<text x="${PAD + 10}" y="${y + BOX_H / 2}" dominant-baseline="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="${muted}">${esc(g.toUpperCase())}</text>`,
       );
       spec.nodes

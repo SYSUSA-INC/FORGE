@@ -60,6 +60,19 @@ export const THEME: Record<ThemeColor, string> = Object.fromEntries(
   Object.entries(THEME_VAR_MAP).map(([k, name]) => [k, v(name)]),
 ) as Record<ThemeColor, string>;
 
+/**
+ * Fixed colours for print and exported SVGs (white ground). They do not
+ * follow either theme, so a theme re-tune cannot wash out a diagram.
+ */
+export const PRINT_HEX = {
+  ink: "#181B23",
+  muted: "#626B7D",
+  paper: "#FFFFFF",
+  stroke: "#2E5CE9",
+  band: "#4583FF",
+  accent: "#B98C36",
+} as const;
+
 /** Literal hex (dark-theme values) for emails, PDFs and stored data. */
 export const THEME_HEX: Record<ThemeColor, string> = {
   canvas: "#050608",
