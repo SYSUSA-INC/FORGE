@@ -1,0 +1,2006 @@
+{
+ "totals": {
+  "hexAlphaOnVar": 106,
+  "undefinedTokens": 36,
+  "heavyWeight": 229,
+  "monoTiny": 238,
+  "whiteBlack": 31,
+  "hexLiteral": 258,
+  "gradient": 28,
+  "offScaleStop": 3,
+  "arbitraryColor": 3,
+  "glowShadow": 14,
+  "tailwindDefaultFamily": 3
+ },
+ "files": {
+  "src/app/(app)/CommandCenterStageGrid.tsx": {
+   "hexAlphaOnVar": [
+    "${s.color}1A",
+    "${s.color}40"
+   ],
+   "undefinedTokens": [
+    "var(--text)",
+    "var(--muted)"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/GettingStartedClient.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/RecompeteAttentionPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/AdminClient.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/errors/page.tsx": {
+   "whiteBlack": [
+    "bg-black/30"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/jobs/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/migrations/MigrationsClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/migrations/actions.ts": {
+   "hexLiteral": [
+    "#203"
+   ]
+  },
+  "src/app/(app)/admin/migrations/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/orgs/[id]/IsolationCheckPanel.tsx": {
+   "hexLiteral": [
+    "#4ADE80",
+    "#F87171",
+    "#94A3B8"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/orgs/[id]/ItarRestrictedToggle.tsx": {
+   "hexLiteral": [
+    "#F87171"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/orgs/[id]/StartImpersonationForm.tsx": {
+   "hexLiteral": [
+    "#FBBF24",
+    "#B45309"
+   ],
+   "gradient": [
+    "linear-gradient("
+   ]
+  },
+  "src/app/(app)/admin/orgs/[id]/TenantAddonsPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/orgs/[id]/activity/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/orgs/[id]/users/TenantUsersClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/promo-codes/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/sba-8a/Sba8aAdminClient.tsx": {
+   "offScaleStop": [
+    "text-amber-100",
+    "text-amber-50",
+    "text-amber-50"
+   ],
+   "whiteBlack": [
+    "bg-black/30",
+    "bg-black/30"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/admin/source-requests/SourceRequestTriageClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/tiers/AddonCatalogPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/tiers/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/trial-requests/TrialRequestsClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/admin/usage/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/audit-log/AuditLogClient.tsx": {
+   "whiteBlack": [
+    "bg-black/40"
+   ]
+  },
+  "src/app/(app)/companies/CompaniesClient.tsx": {
+   "hexAlphaOnVar": [
+    "${relColor}1A",
+    "${relColor}40"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/companies/[id]/page.tsx": {
+   "hexAlphaOnVar": [
+    "${relColor}1A",
+    "${relColor}40"
+   ]
+  },
+  "src/app/(app)/companies/search/SearchClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/contacts/AgencyHistoryPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/contacts/ContactsClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/contacts/ContactsImportPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/contacts/WarmthChip.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/contacts/[id]/ContactDetailClient.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/error.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/help/layout.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/intelligence/OutcomeInsightsPanel.tsx": {
+   "hexLiteral": [
+    "#10B981",
+    "#F59E0B",
+    "#EF4444",
+    "#64748B"
+   ],
+   "hexAlphaOnVar": [
+    "${OUTCOME_TYPE_COLORS[l.outcomeType]}1A",
+    "${OUTCOME_TYPE_COLORS[l.outcomeType]}50"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/intelligence/ProviderStatusPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/intelligence/SectionSignalsPanel.tsx": {
+   "undefinedTokens": [
+    "text-foreground"
+   ]
+  },
+  "src/app/(app)/intelligence/awards/AwardRow.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-bold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/intelligence/awards/AwardsSearchClient.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/intelligence/losses/LossNarrativePanel.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/intelligence/losses/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/knowledge-base/KnowledgeBaseClient.tsx": {
+   "hexAlphaOnVar": [
+    "${color}1A",
+    "${color}50"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/knowledge-base/[id]/EditEntryClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/knowledge-base/[id]/VersionHistoryPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/knowledge-base/import/ArtifactRow.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/knowledge-base/import/CorpusList.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/knowledge-base/import/CorpusUploader.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/knowledge-base/import/SemanticSearchClient.tsx": {
+   "hexAlphaOnVar": [
+    "${simColor(sim)}1A",
+    "${simColor(sim)}40"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/knowledge-base/import/[id]/CandidateReviewClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/knowledge-base/new/NewEntryForm.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/knowledge-base/usaspending/UsaspendingImportClient.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-bold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/notifications/NotificationsClient.tsx": {
+   "hexAlphaOnVar": [
+    "${accent}1A",
+    "${accent}50"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/opportunities/OpportunitiesClient.tsx": {
+   "hexAlphaOnVar": [
+    "${o.stageColor}1A",
+    "${o.stageColor}40"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/StageWidget.tsx": {
+   "hexAlphaOnVar": [
+    "${color}10",
+    "${color}1A",
+    "${color}40"
+   ],
+   "undefinedTokens": [
+    "var(--text)",
+    "var(--muted)",
+    "var(--text)"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/OpportunityDocsAndAIClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/PwinPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/activity/page.tsx": {
+   "hexAlphaOnVar": [
+    "${color}1A",
+    "${color}40"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/competitors/CompetitorsClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/evaluation/EvaluationForm.tsx": {
+   "hexLiteral": [
+    "#10B981",
+    "#F59E0B",
+    "#F43F5E"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/layout.tsx": {
+   "hexAlphaOnVar": [
+    "${stageColor}1A",
+    "${stageColor}40"
+   ]
+  },
+  "src/app/(app)/opportunities/[id]/review/SendForReviewButton.tsx": {
+   "arbitraryColor": [
+    "bg-[#0c1424]"
+   ],
+   "hexLiteral": [
+    "#0c1424"
+   ],
+   "whiteBlack": [
+    "bg-black/60"
+   ],
+   "glowShadow": [
+    "shadow-2xl"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/opportunities/import/ImportClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/import/source-requests/SourceRequestPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/opportunities/scout/ScoutClient.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/pipeline/PipelineFunnel.tsx": {
+   "hexAlphaOnVar": [
+    "${stat.color}55",
+    "${stat.color}25",
+    "${stat.color}30"
+   ],
+   "gradient": [
+    "linear-gradient("
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/platform/audit-log/PlatformAuditLogClient.tsx": {
+   "whiteBlack": [
+    "bg-black/40"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/ProposalsClient.tsx": {
+   "hexAlphaOnVar": [
+    "${p.stageColor}1A",
+    "${p.stageColor}40"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/BrainMinePanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/DraftInsightsPanel.tsx": {
+   "hexLiteral": [
+    "#10B981",
+    "#FBBF24",
+    "#F87171"
+   ],
+   "hexAlphaOnVar": [
+    "${color}1A",
+    "${color}40"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/ProposalScanPanel.tsx": {
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/StageAdvancePanel.tsx": {
+   "hexAlphaOnVar": [
+    "${STAGE_COLORS[s.key]}1A",
+    "${STAGE_COLORS[s.key]}60",
+    "${STAGE_COLORS[s.key]}12",
+    "${reached ? `${STAGE_COLORS[s.key]}30"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/WinThemesPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/compliance/AutoMapPanel.tsx": {
+   "hexAlphaOnVar": [
+    "${conf.color}1a",
+    "${conf.color}40"
+   ],
+   "undefinedTokens": [
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/compliance/ComplianceClient.tsx": {
+   "arbitraryColor": [
+    "bg-[#0d1117]",
+    "bg-[#0d1117]"
+   ],
+   "hexLiteral": [
+    "#0d1117",
+    "#0d1117"
+   ],
+   "hexAlphaOnVar": [
+    "${catColor}1A",
+    "${catColor}40",
+    "${ownerStatusColors[ownerStatus]}1A",
+    "${ownerStatusColors[ownerStatus]}40",
+    "${stColor}1A",
+    "${stColor}40",
+    "${s.color}60",
+    "${s.color}1A",
+    "${s.color}60",
+    "${s.color}1A",
+    "${color}CC",
+    "${statusColors[item.status]}CC",
+    "${statusColors[s]}CC",
+    "${sColor}1A",
+    "${sColor}40"
+   ],
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[8px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[8px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/compliance/EvidenceDock.tsx": {
+   "hexAlphaOnVar": [
+    "${color}1a",
+    "${color}40"
+   ],
+   "undefinedTokens": [
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/compliance/page.tsx": {
+   "hexLiteral": [
+    "#10B981",
+    "#F59E0B",
+    "#F43F5E",
+    "#F43F5E",
+    "#F59E0B",
+    "#10B981"
+   ],
+   "gradient": [
+    "linear-gradient("
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/layout.tsx": {
+   "hexAlphaOnVar": [
+    "${stageColor}1A",
+    "${stageColor}40"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/outcome/OutcomeClient.tsx": {
+   "hexAlphaOnVar": [
+    "${OUTCOME_TYPE_COLORS[outcomeType]}1A",
+    "${OUTCOME_TYPE_COLORS[outcomeType]}60",
+    "${OUTCOME_TYPE_COLORS[t]}1A",
+    "${OUTCOME_TYPE_COLORS[t]}80"
+   ],
+   "undefinedTokens": [
+    "text-foreground"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/outcome/ProtestViabilityPanel.tsx": {
+   "hexAlphaOnVar": [
+    "${tierColor}1A",
+    "${tierColor}50",
+    "${gc}1A",
+    "${gc}50"
+   ],
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/outcome/WinnerAnalysisPanel.tsx": {
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground",
+    "text-foreground",
+    "text-foreground",
+    "text-foreground"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/page.tsx": {
+   "hexAlphaOnVar": [
+    "${SECTION_STATUS_COLORS[s.status]}1A",
+    "${SECTION_STATUS_COLORS[s.status]}40"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/pdf/ExportPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/StartReviewPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/ChecklistPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/CommentsPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/CoveragePanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/ReminderPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/ReviewSummaryPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/ReviewerList.tsx": {
+   "hexAlphaOnVar": [
+    "${verdictColor}1A",
+    "${verdictColor}40"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/[reviewId]/page.tsx": {
+   "hexAlphaOnVar": [
+    "${colorHex}1A",
+    "${colorHex}40",
+    "${statusColor}1A",
+    "${statusColor}40",
+    "${VERDICT_COLORS[r.verdict]}1A",
+    "${VERDICT_COLORS[r.verdict]}40"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/reviews/page.tsx": {
+   "hexAlphaOnVar": [
+    "${colorHex}1A",
+    "${colorHex}40",
+    "${statusColor}1A",
+    "${statusColor}40",
+    "${VERDICT_COLORS[r.verdict]}1A",
+    "${VERDICT_COLORS[r.verdict]}40",
+    "${VERDICT_COLORS[overall]}1A",
+    "${VERDICT_COLORS[overall]}40"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ReviewCommentsPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/SectionPresence.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[8px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/SectionsClient.tsx": {
+   "hexAlphaOnVar": [
+    "${SECTION_STATUS_COLORS[section.status]}1A",
+    "${SECTION_STATUS_COLORS[section.status]}40",
+    "${color}55",
+    "${color}1A",
+    "${color}50"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/AiAssistantPanel.tsx": {
+   "undefinedTokens": [
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/AutoDraftButton.tsx": {
+   "whiteBlack": [
+    "bg-black/60"
+   ],
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/BrainSuggestPanel.tsx": {
+   "hexAlphaOnVar": [
+    "${simColor(sim)}1A",
+    "${simColor(sim)}40"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/ContentBlocksPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/DraftPreview.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/GraphicsPanel.tsx": {
+   "whiteBlack": [
+    "bg-white"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/[id]/sections/ai/ResearchRail.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/proposals/new/LauncherCard.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/settings/AIEngineTab.tsx": {
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground",
+    "text-foreground",
+    "text-foreground",
+    "text-foreground",
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/settings/HouseStylePanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/IntegrationsTab.tsx": {
+   "undefinedTokens": [
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/settings/SettingsClient.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/VoicePanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/VolumeStylePanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/ai-engine/AiControlPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/billing/AddonsSection.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/billing/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/integrations/SamGovKeyPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/templates/TemplatesList.tsx": {
+   "hexAlphaOnVar": [
+    "${t.brandPrimary}80",
+    "${t.brandPrimary}0D",
+    "${t.brandPrimary}1A",
+    "${t.brandPrimary}50"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/templates/[id]/EditTemplateClient.tsx": {
+   "hexLiteral": [
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125",
+    "#123",
+    "#125"
+   ],
+   "hexAlphaOnVar": [
+    "${brandPrimary}1A",
+    "${brandPrimary}50",
+    "${brandPrimary}40",
+    "${brandPrimary}06",
+    "${brandAccent}14",
+    "${brandAccent}40"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/settings/templates/new/NewTemplateForm.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/AmendmentsPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/CustomerHistoryPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/KeyDateTimeline.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/LmPanel.tsx": {
+   "monoTiny": [
+    "text-[8px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/QaPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/SolicitationDocumentsPanel.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/SolicitationReviewPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/TeamPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/diff/DiffView.tsx": {
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground",
+    "text-foreground",
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/solicitations/[id]/page.tsx": {
+   "hexAlphaOnVar": [
+    "${statusColor}1A",
+    "${statusColor}50",
+    "${color}1A",
+    "${color}50"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[8px]",
+    "text-[8px]",
+    "text-[8px]",
+    "text-[8px]"
+   ]
+  },
+  "src/app/(app)/solicitations/new/UploadSolicitationForm.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/solicitations/new/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(app)/solicitations/page.tsx": {
+   "hexLiteral": [
+    "#9BC9D9",
+    "#A78BFA",
+    "#10B981",
+    "#EF4444",
+    "#9BC9D9"
+   ],
+   "hexAlphaOnVar": [
+    "${color}1A",
+    "${color}50"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(app)/users/UsersClient.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "undefinedTokens": [
+    "text-foreground",
+    "text-foreground"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-bold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/app/(auth)/forgot-password/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(auth)/layout.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "glowShadow": [
+    "shadow-glow"
+   ],
+   "heavyWeight": [
+    "font-bold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(auth)/request-trial/page.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/app/(auth)/reset-password/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(auth)/sign-in/page.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "glowShadow": [
+    "shadow-glow"
+   ],
+   "heavyWeight": [
+    "font-bold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(auth)/sign-up/page.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "glowShadow": [
+    "shadow-glow"
+   ],
+   "heavyWeight": [
+    "font-bold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(auth)/verify-email/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(public)/layout.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "glowShadow": [
+    "shadow-glow"
+   ],
+   "heavyWeight": [
+    "font-bold",
+    "font-semibold"
+   ]
+  },
+  "src/app/(public)/pricing/page.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/global-error.tsx": {
+   "hexLiteral": [
+    "#1c1c1f",
+    "#fafafa",
+    "#666",
+    "#888",
+    "#1c1c1f",
+    "#1c1c1f",
+    "#fff"
+   ]
+  },
+  "src/app/globals.css": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "gradient": [
+    "linear-gradient(",
+    "linear-gradient(",
+    "linear-gradient(",
+    "linear-gradient(",
+    "linear-gradient(",
+    "linear-gradient(",
+    "linear-gradient(",
+    "linear-gradient("
+   ]
+  },
+  "src/app/layout.tsx": {
+   "hexLiteral": [
+    "#264"
+   ]
+  },
+  "src/app/not-found.tsx": {
+   "heavyWeight": [
+    "font-bold",
+    "font-bold",
+    "font-bold"
+   ]
+  },
+  "src/app/review/[token]/ReviewClient.tsx": {
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/app/review/[token]/page.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-bold",
+    "font-semibold"
+   ]
+  },
+  "src/components/auth/SsoButtons.tsx": {
+   "hexLiteral": [
+    "#4285F4",
+    "#34A853",
+    "#FBBC05",
+    "#EA4335",
+    "#F25022",
+    "#7FBA00",
+    "#00A4EF",
+    "#FFB900"
+   ]
+  },
+  "src/components/auth/UserMenu.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "heavyWeight": [
+    "font-bold",
+    "font-semibold"
+   ]
+  },
+  "src/components/crm/AgencyContactsPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/components/editor/CommentsSidebar.tsx": {
+   "tailwindDefaultFamily": [
+    "border-yellow-400"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/components/editor/RichSectionEditor.tsx": {
+   "tailwindDefaultFamily": [
+    "border-yellow-400",
+    "bg-yellow-400"
+   ]
+  },
+  "src/components/editor/SnapshotDiffViewer.tsx": {
+   "whiteBlack": [
+    "bg-black/70"
+   ],
+   "glowShadow": [
+    "shadow-2xl"
+   ]
+  },
+  "src/components/editor/SnapshotsSidebar.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/components/editor/TrackChangesSidebar.tsx": {
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/components/editor/extensions/TrackChanges.ts": {
+   "hexLiteral": [
+    "#888",
+    "#4ADE80",
+    "#F87171",
+    "#888"
+   ]
+  },
+  "src/components/help/HelpTabs.tsx": {
+   "gradient": [
+    "bg-gradient-to-r"
+   ]
+  },
+  "src/components/help/MarkdownRenderer.tsx": {
+   "whiteBlack": [
+    "bg-black/30"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-semibold",
+    "font-semibold"
+   ]
+  },
+  "src/components/intelligence/RecompeteRadarPanel.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/components/notifications/NotificationBellClient.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "hexAlphaOnVar": [
+    "${color}1A",
+    "${color}50"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/shell/EndImpersonationButton.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/components/shell/ImpersonationBanner.tsx": {
+   "whiteBlack": [
+    "bg-black/30"
+   ],
+   "gradient": [
+    "linear-gradient("
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/components/shell/NavContent.tsx": {
+   "whiteBlack": [
+    "text-white",
+    "text-white",
+    "text-white",
+    "text-white"
+   ],
+   "glowShadow": [
+    "shadow-glow",
+    "shadow-glow"
+   ],
+   "heavyWeight": [
+    "font-bold",
+    "font-bold",
+    "font-semibold",
+    "font-bold",
+    "font-bold",
+    "font-bold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/BarMeter.tsx": {
+   "gradient": [
+    "bg-gradient-to-r",
+    "bg-gradient-to-r",
+    "bg-gradient-to-r",
+    "bg-gradient-to-r",
+    "bg-gradient-to-r"
+   ]
+  },
+  "src/components/ui/Barcode.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/Funnel.tsx": {
+   "gradient": [
+    "linear-gradient("
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/GanttRow.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "gradient": [
+    "bg-gradient-to-r"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/components/ui/HeatGrid.tsx": {
+   "whiteBlack": [
+    "text-white",
+    "text-white",
+    "text-white"
+   ],
+   "gradient": [
+    "bg-gradient-to-br",
+    "bg-gradient-to-br",
+    "bg-gradient-to-r",
+    "bg-gradient-to-r"
+   ],
+   "heavyWeight": [
+    "font-semibold",
+    "font-semibold",
+    "font-bold"
+   ],
+   "monoTiny": [
+    "text-[9px]",
+    "text-[9px]",
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/PageHeader.tsx": {
+   "glowShadow": [
+    "shadow-glow-gold",
+    "shadow-glow-emerald",
+    "shadow-glow"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/Panel.tsx": {
+   "gradient": [
+    "bg-gradient-to-r"
+   ]
+  },
+  "src/components/ui/PreviewBanner.tsx": {
+   "heavyWeight": [
+    "font-bold"
+   ]
+  },
+  "src/components/ui/StageStrip.tsx": {
+   "whiteBlack": [
+    "text-white"
+   ],
+   "gradient": [
+    "bg-gradient-to-br"
+   ],
+   "heavyWeight": [
+    "font-semibold"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/Stamp.tsx": {
+   "heavyWeight": [
+    "font-black"
+   ]
+  },
+  "src/components/ui/StatTile.tsx": {
+   "glowShadow": [
+    "shadow-glow-gold",
+    "shadow-glow-emerald",
+    "shadow-glow"
+   ],
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/components/ui/StatusPill.tsx": {
+   "heavyWeight": [
+    "font-semibold"
+   ]
+  },
+  "src/components/ui/StubModeBanner.tsx": {
+   "whiteBlack": [
+    "bg-black/30"
+   ],
+   "heavyWeight": [
+    "font-bold"
+   ]
+  },
+  "src/components/ui/TMinus.tsx": {
+   "monoTiny": [
+    "text-[9px]"
+   ]
+  },
+  "src/db/schema.ts": {
+   "hexLiteral": [
+    "#2DD4BF",
+    "#EC4899"
+   ]
+  },
+  "src/lib/compliance-crosswalk-render.ts": {
+   "hexLiteral": [
+    "#dcfce7",
+    "#166534",
+    "#fef3c7",
+    "#854d0e",
+    "#fee2e2",
+    "#991b1b",
+    "#e5e7eb",
+    "#374151",
+    "#111",
+    "#111",
+    "#555",
+    "#111",
+    "#ccc",
+    "#555",
+    "#1f2937",
+    "#fff",
+    "#1f2937",
+    "#ccc",
+    "#fafafa",
+    "#555",
+    "#555",
+    "#4338ca",
+    "#999",
+    "#777",
+    "#166534",
+    "#854d0e",
+    "#991b1b",
+    "#374151",
+    "#777"
+   ]
+  },
+  "src/lib/email.ts": {
+   "hexLiteral": [
+    "#0b1220",
+    "#EEF2F8",
+    "#0b1220",
+    "#111A2B",
+    "#4C8DFF",
+    "#3FB88A",
+    "#D3A84C",
+    "#4C8DFF",
+    "#D3A84C",
+    "#fff",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#6B7A93",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93",
+    "#A3B1C6",
+    "#6B7A93",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93",
+    "#A3B1C6",
+    "#6B7A93",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93",
+    "#A3B1C6",
+    "#6B7A93",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93",
+    "#A3B1C6",
+    "#4C8DFF",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93",
+    "#A3B1C6",
+    "#4C8DFF",
+    "#4C8DFF",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#0b1220",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#3FB88A",
+    "#D3A84C",
+    "#EEF2F8",
+    "#6B7A93",
+    "#6B7A93",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#EEF2F8",
+    "#4C8DFF",
+    "#0b1220",
+    "#6B7A93"
+   ],
+   "gradient": [
+    "linear-gradient(",
+    "linear-gradient("
+   ]
+  },
+  "src/lib/notification-email.ts": {
+   "hexLiteral": [
+    "#6B7A93",
+    "#4C8DFF",
+    "#0b1220",
+    "#EEF2F8",
+    "#A3B1C6",
+    "#EEF2F8",
+    "#A3B1C6"
+   ]
+  },
+  "src/lib/pdf-template-render.ts": {
+   "hexLiteral": [
+    "#111",
+    "#2DD4BF",
+    "#666",
+    "#2DD4BF",
+    "#444",
+    "#999",
+    "#f0f0f0",
+    "#999",
+    "#f5f5f5",
+    "#f5f5f5",
+    "#ddd",
+    "#2DD4BF",
+    "#EC4899"
+   ]
+  },
+  "src/lib/proposal-outcome-types.ts": {
+   "hexLiteral": [
+    "#10B981",
+    "#EF4444",
+    "#64748B",
+    "#94A3B8"
+   ]
+  },
+  "src/lib/stripe-dunning-email.ts": {
+   "hexLiteral": [
+    "#4C8DFF",
+    "#0b1220",
+    "#94a3b8"
+   ]
+  },
+  "src/lib/template-types.ts": {
+   "hexLiteral": [
+    "#1F3A6E",
+    "#111",
+    "#666",
+    "#666",
+    "#ccc",
+    "#ccc"
+   ]
+  },
+  "src/lib/theme-colors.ts": {
+   "hexLiteral": [
+    "#050608",
+    "#0B1019",
+    "#121722",
+    "#1C2638",
+    "#FFFFFF",
+    "#FFFFFF",
+    "#8F9BB0",
+    "#626B7D",
+    "#40506B",
+    "#4583FF",
+    "#A3BFF9",
+    "#2E5CE9",
+    "#D3A84C",
+    "#DDB864",
+    "#B98C36",
+    "#5FC584",
+    "#86D9A0",
+    "#2F9E66",
+    "#E0606E",
+    "#E77D89",
+    "#C24957",
+    "#8090E8",
+    "#98A5EF",
+    "#B984CC",
+    "#9D6AB0",
+    "#4A9EC9"
+   ]
+  }
+ }
+}

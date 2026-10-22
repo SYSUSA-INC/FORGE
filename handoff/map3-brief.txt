@@ -1,0 +1,464 @@
+
+######## new-solicitation
+SUMMARY: I read the New Solicitation flow end to end and changed nothing. Today it files exactly one file. UploadSolicitationForm.tsx keeps only files[0] (lines 35-49). Its queue has concurrency 1 and claims each file through createSolicitationFromUploadAction ({uploadId}), then navigates to /solicitations/{id} with router.push.
+
+The action (solicitations/actions.ts:33-123) does these steps in order:
+1. requireAuth and requireCurrentOrg.
+2. claimUpload as resourceType "solicitation". The claim fixes the record id up front.
+3. Inserts the solicitation with id = claim.resourceId, ON CONFLICT DO NOTHING.
+4. Starts a durable "solicitation_parse" job with runDurable. It does this only if the row is new or the record never had a job (hasAnyJob).
+5. finishClaim, then recordAudit "solicitation.upload" (or "solicitation.amendment.upload"), then revalidatePath("/solicitations").
+
+The parse job (jobs.ts:451) reads the file with a read budget and verification (loadUploadBytes / getVerifiedObject). It then calls parseSolicitationFromBytes, which does text extraction, falls back to vision OCR for images and sparse PDFs, and runs AI extraction. That fills title, agency, office, type, number, NAICS, set-aside, due date, Section L/M summaries, the requirement sweep, lmStructure, keyDates and extractionCoverage, then merges in companion-document clauses.
+
+After the upload, the detail page shows the parse status and a job note but does not poll; the user has to refresh. "Retry parse" appears once the row has said "parsing" for 5 minutes.
+
+Several multi-file patterns already exist:
+- **Amendments** (AmendmentsPanel): per-file claim into child solicitations, concurrency 2, number read from the file name.
+- **Companion documents** (SolicitationDocumentsPanel): per-file claim into solicitation_document, concurrency 2, type read from the file name.
+- **GSA paste**: queue with no claim, then one batch action. It checks all ids with peekStoredUploads, creates the opportunity, files each attachment as its own solicitation, and runs the parses one after another with runDurableBatch. Max 20 files.
+- **Knowledge import**: per-file claim; the AI kind classification runs after filing, inside the extract job, and is only a suggestion.
+
+An opportunity is linked only through "Convert to opportunity". That creates a new opportunity and copies the base's metadata. Amendments take their parent's opportunityId when filed. There is no way to link a solicitation to an existing opportunity.
+
+The upload ledger allows one claim per upload, for one resource type and one record. So the "confirm labels, then file" order in BL-STAB-3 fits the ledger. Re-labelling a file after it is filed would need a new ledger operation or a re-upload.
+
+The BL-STAB-2 design doc (docs/design/BL-STAB-2_DIRECT_UPLOADS.md:616-620) already sketches BL-STAB-3:
+1. a queue with no claim callback;
+2. classifyUploadsAction(uploadIds), which reads the stored objects with peekStoredUploads and getVerifiedObject / getRange inside the 24-hour window;
+3. the user confirms;
+4. each file is claimed through its own typed action.
+
+The target taxonomy (base, amendment, Q&A, PWS/SOW/other attachment, pricing sheet, form) does not match today's storage:
+- Amendments can be stored two ways: as a child solicitation or as a companion document of type "amendment".
+- No uploaded-file path exists for Q&A. solicitation_qa rows come only from SAM.gov polling or pasted text.
+- The companion-document enum (solicitation_document_type) has no pricing, form or Q&A values.
+CONSTRAINTS:
+- Tenant isolation:
+- every new server action opens with requireAuth() + requireCurrentOrg() and takes organizationId only from requireCurrentOrg();
+- never accept organizationId as a parameter;
+- every query on solicitation, solicitation_document, solicitation_qa, file_upload and background_job carries eq(organizationId).
+A parent solicitation or target opportunity id coming from the client must be checked against the org BEFORE claimUpload, so that a refusal leaves the upload in `stored` (the pattern at actions.ts:48-56 and document-actions.ts:134-144).
+- Ledger claim rules:
+- claim one upload per record, through claimUpload with the right resourceType (solicitation or solicitation_document);
+- insert the record with id = claim.resourceId ON CONFLICT DO NOTHING;
+- queue the parse BEFORE finishClaim;
+- call releaseClaim(claimedAt) on an insert failure, and failClaim only when the file itself is unusable.
+Once a file is claimed it cannot be re-filed under another type or record. Labels must therefore be final before claiming, or moving a file between record kinds needs new ledger work.
+- Only the uploading user can claim (file_upload.user_id). Classifying or filing must happen within 24 h of `stored`; after that the sweep fails the upload as `unclaimed`. peekStoredUploads silently drops ids past 50, so a batch needs an explicit cap of 50 or less (GSA uses 20).
+- The base solicitation row must exist before companion documents can be filed (solicitation_document.solicitation_id is NOT NULL). Amendments as child solicitations need parentSolicitationId set at insert. So within one batch, the base has to be filed first.
+- Parse jobs:
+- one open job per (org, kind, resource) is enforced by an index;
+- use enqueueJob + runDurableBatch for a batch rather than runDurable per file, so large parses don't run side by side in one instance;
+- in memory-storage mode only, pass the bytes from inlineBytesForMemoryMode.
+Pricing sheets, forms and Q&A files need a decision on whether they are parsed at all. A new handler means a new background_job_kind value, which requires a migration.
+- No file bytes, base64 or whole text may pass through a server action (enforced by tests/ai/no-files-through-server-actions.test.ts and AGENTS.md convention 11). A content-based classifier has to read from storage on the server. getVerifiedObject reads the whole object, so a classification read budget, or ranged reads, are needed to stay inside maxDuration 300 s and function memory.
+- Audits:
+- recordAudit after each record insert (solicitation.upload, solicitation.amendment.upload, solicitation.document.upload, and solicitation.qa.add if Q&A is ingested);
+- consider a batch-level audit carrying the labels, confidence and whether the user overrode them;
+- if classification reads file content beyond the request, check whether recordRead applies (ENGINEERING_STANDARDS §2).
+If the batch creates or links an opportunity: audit it, and call revalidatePath("/") (BL-7, Command Center counts) as the GSA action does.
+- A new AI feature key needs an AI_FEATURES entry, an AI_FEATURE_MODEL_CLASS entry (a Record type that forces a routing decision), a PROMPT_VERSIONS entry and an update to tests/ai/prompt-versions.lock.json. Classification must also handle:
+- stub mode (stubbed:true): fall back to the file-name heuristics;
+- QuotaExceededError when the trial has ended or the token cap is reached: fall back too.
+Vision OCR exists only with Anthropic.
+- Schema changes need src/db/schema.ts and a drizzle/0134_*.sql together. Candidates:
+- enum values on solicitation_document_type (qa, pricing, form);
+- columns for classification label, confidence and evidence.
+COMPANION_DOCUMENT_TYPES in document-type-name.ts mirrors the enum for the client and must change with it, as must DOC_TYPE_LABELS and DOC_TYPE_OPTIONS (Record<CompanionDocumentType,...>) in SolicitationDocumentsPanel.tsx.
+- Server-action files must not export non-async values, so batch limits go in a sibling *-constants.ts (the gsa-constants.ts pattern). Colours must use tokens or THEME, not hex values. Keep each PR under 1,500 lines of diff (plan phases) and update docs/BACKLOG.md for BL-STAB-3 in the same PR.
+OWNER Qs:
+? Amendments: should a file classified as an amendment always be filed as a child solicitation (parentSolicitationId: full parse with metadata and dates, diff view, inherits the opportunity), or as a companion document of type "amendment" (requirements merged into the base, no dates)? Both exist today. Should the companion-document "amendment" type then be retired?
+? Q&A files: should a Q&A file be kept as a record (a new companion type "qa" whose parse runs parseQaPairs and stores solicitation_qa rows with source "attachment"), ingested as answers without keeping the file (like the SAM.gov poll), or both? Q&A pairs are matched against the base's requirements, so should Q&A ingestion wait until the base's parse finishes?
+? Pricing sheets and forms (SF-1449, SF-33, SF-30, reps and certs): should they be stored only (no requirement extraction, so a spreadsheet doesn't add noise clauses to the merged list), parsed like other attachments, or given their own paths? Note that SF-1449 is often the base solicitation itself, and SF-30 is the amendment form.
+? Should the labels be new enum values (pricing, form, qa) on solicitation_document_type, or mapped onto existing ones (j_attachment, other)? Should the label, confidence and evidence be kept on the record (new columns) or only in the audit log?
+? What if a batch has no base solicitation (for example only Amendment 0002 and a Q&A for an RFP already in FORGE), or two candidate bases (RFP Volume I and Volume II)? Should the screen let the user pick an existing solicitation as the parent, and treat extra volumes as companion documents of type "rfp"?
+? Should New Solicitation let the user link the batch to an existing opportunity, or create one, at filing time? Today only Convert creates a new opportunity, and no action links to an existing one, even though the opportunity page's empty state promises it.
+? What evidence and confidence are expected? Is a file-name match (current heuristics) plus a short quote from the first page enough, or must every file go through AI content classification (cost, quota, slow for large PDFs, unavailable in stub mode)? Which confidence threshold should pre-select a label versus require the user to choose?
+? What is the maximum number of files per batch (GSA uses 20; the ledger peek handles at most 50), and should .zip packages from SAM.gov be supported now or stay a follow-up?
+? After filing, where should the user land: the base solicitation's page (which would need live parse-status refresh for every file) or a batch summary listing each file, its record and parse state? Should the detail page start polling parse status?
+? If the user leaves the confirm screen, the uploads stay `stored` and count toward storage for 24 h with no way back to them. Is a 'resume unfiled uploads' tray wanted, or is losing them acceptable?
+RISKS:
+! Possible requirement-merge race, found by reading the code and not reproduced: mergeSolicitationRequirements (solicitation-requirements.ts:103-170) does an unlocked read-modify-write of solicitations.extracted_requirements. The base parse (solicitation-parse.ts:270, then 285) and companion-document parses (solicitation-document-parse.ts:165) both call it. If a batch starts them at the same moment (runDurable per file), a document's merge can overwrite the parent's freshly written clauses with a stale copy, losing the base's own requirements or a document's. Mitigation: run the batch's jobs one after another, base first (runDurableBatch), or merge under a row lock.
+! Running runDurable once per file (today's per-file claim pattern) starts that many parses at the same time in one instance: parse budgets up to 150 MiB of PDF each, AI sweeps in parallel. The GSA path avoids this with runDurableBatch (120 s budget). Anything left over waits for the cron, which runs only 3 jobs every 5 minutes, so a 15-file batch can take about 25 minutes to finish parsing.
+! Classifying before filing means reading `stored` uploads by uploadId and userId. No helper does this today: peekStoredUploads omits storageKey, and getVerifiedObject reads whole objects. Content classification of large PDFs or Office files inside one 300 s action, for many files, can time out or exhaust memory. Its results also live only in React state unless stored, so a page refresh loses the labels while the uploads stay stored.
+! The ledger is one claim per upload. A misclassified file filed as a solicitation cannot be moved to a companion document or a Q&A record without deleting it (the file is released) and uploading again. So the confirm step is load-bearing, and a later 're-label' feature needs new ledger and record-move work.
+! peekStoredUploads silently ignores ids past 50 (uploads.ts:602). A batch action that does not cap its input would drop files with no error.
+! Taxonomy mismatch: amendments have two storage forms today (child solicitation versus companion document), Q&A has no file path, and pricing and form labels have no enum values. Picking wrongly duplicates or loses data: amendment dates are not captured on the companion path, and running requirement extraction on a pricing sheet adds noise clauses to the merged list.
+! Stub AI mode and AI quota: classification and parse return empty or stubbed results without ANTHROPIC_API_KEY, and refuseIfOverCap throws QuotaExceededError when the trial has ended or the token cap is hit. Classification must degrade to the name heuristics with low confidence rather than fail the batch. Each classify call also spends the tenant's AI quota before anything is filed.
+! Pre-existing gaps the batch will expose: convertToOpportunityAction has no recordAudit and no revalidatePath("/"); there is no action to link to an existing opportunity; the detail page has no parse-status polling (users with many files must refresh); companion merges bump solicitations.updated_at, which can hide the 'Retry parse' stuck heuristic; and the /solicitations list shows amendments as top-level rows.
+! Leaving the page after uploading but before confirming: useUploadQueue's beforeunload guard stops once items are `done`. The unfiled uploads then hold storage-quota reservations and count toward MAX_STORED_PER_USER = 200 for up to 24 h before the sweep fails them.
+! Ordering failures in a batch filing: if the base insert fails, the companion documents and amendments cannot be filed (FK). The action must say exactly which files were filed and which were not (GSA's attachmentsSkipped pattern), and a retry must stay idempotent per upload (alreadyClaimed means done).
+
+######## amendments-documents
+SUMMARY: I read the code only. I changed nothing and ran no tests (the one exception was a node -e probe of the two file-name regexes, which wrote no files).
+
+FORGE files the classes in three different ways today.
+
+1. **Base solicitation.** A `solicitation` row with no parent.
+2. **Amendment.** Also a full `solicitation` row: a child with `parent_solicitation_id` and a free-text `amendment_number`. There is no date column and no uniqueness rule. Its file is parsed as if it were a whole solicitation. Its clauses are never merged into the parent; they reach readers only once the rows are linked to an opportunity. A diff against the parent is computed each time the page loads.
+3. **Companion document.** A `solicitation_document` row whose `document_type` is one of: rfp, pws, sow, cdrl, j_attachment, amendment, other. The type is only a label: no parse or merge code reads it. Every companion goes through the same full extraction, and its requirements are added to the parent's list.
+
+That makes "amendment" exist twice: as a child solicitation (diffed, not merged) and as a companion type (merged, not diffed).
+
+For the BL-STAB-3 classes:
+- **Q&A** has no file path at all. Q&A comes only from the SAM.gov poll or pasted text, and the file itself is never kept.
+- **Pricing sheet** and **form** have no type, no parser and no enum value. A J-3 pricing sheet lands as j_attachment; most forms land as other or rfp.
+- **Schema work for new classes:** each needs an `ALTER TYPE solicitation_document_type ADD VALUE IF NOT EXISTS` migration, plus the `pgEnum` list in `schema.ts`, plus the copied list in `document-type-name.ts` and the panel's label maps.
+- **Upload-ledger work:** a new resource type in the ledger needs no migration, but it does need code in several places.
+
+The upload ledger already supports the flow the design doc prescribes for BL-STAB-3: upload with no claim, peek, classify within 24 hours, then claim each file through its own action. The GSA paste import is a working example.
+
+Two hard limits shape the design:
+- A file can only be claimed once, as one record type. Changing a label after filing means rewriting the ledger row; otherwise the cleanup sweep can delete the file.
+- The requirement merge reads and rewrites the parent's list with no lock (the database rules forbid transactions). With a base and several companions uploaded at once, their parses overlap and the base's own requirements can be silently lost.
+CONSTRAINTS:
+- Every new server action must open with requireAuth() and requireCurrentOrg(), and check any parent solicitation's org before claiming. That way a refused file is left stored and can be retried. The actions take upload ids only, never file bytes or text (convention 11; enforced by no-files-through-server-actions.test.ts).
+- Classification must read stored, unclaimed uploads within the 24 h claim window. peekStoredUploads handles 50 ids per call, and a user may hold at most 200 stored uploads. If the confirm step comes later than 24 h, the sweep fails the uploads ('unclaimed').
+- Claims are one-way and typed. An upload claimed as 'solicitation' can never be claimed as 'solicitation_document'. Re-labelling after filing must either move the file_upload row's resource_type and resource_id in step with the record, or delete and re-upload. Otherwise releaseOrphanedClaims plus the sweep (which checks only the ledger row's own type and id) deletes a file the new record holds.
+- Companion documents and amendments need the base solicitation's id at claim time (foreign key). In a batch, the base must be filed first. If the base fails, the dependent files stay stored but cannot be filed.
+- Keep the existing filing order: insert with the claim's id (onConflictDoNothing) → queue the parse (runDurable, or enqueueJob then runDurableBatch) → finishClaim with claimedAt → recordAudit → revalidatePath. A crash between steps is repaired by the sweep only because the parse is queued before finishClaim.
+- Audit each filing with the existing actions ('solicitation.upload', 'solicitation.amendment.upload', 'solicitation.document.upload'); a batch-level audit like GSA's is optional on top. Labels confirmed or overridden by the user, with the classifier's suggestion and confidence, belong in audit metadata or a stored column.
+- A new document class means: an ALTER TYPE solicitation_document_type ADD VALUE IF NOT EXISTS migration (idempotent for the fresh-DB gate), the same value added to the pgEnum in schema.ts:2426-2429, to COMPANION_DOCUMENT_TYPES and its rules in document-type-name.ts, and to DOC_TYPE_LABELS and DOC_TYPE_OPTIONS in the panel. Classification columns on solicitation or solicitation_document need schema plus migration together. A new UploadResourceType or SolicitationQaSource needs no migration (text columns), but must be added to recordHoldsUpload, releaseOrphanedClaims, anyRecordNamesKey and PARSE_KIND. A new background_job_kind needs an enum migration plus a HANDLERS entry.
+- Stub AI mode (no ANTHROPIC_API_KEY): the AI parse returns empty fields, and a classifier on the knowledge-classify pattern returns stubbed:true. The file-name heuristics (documentTypeFromName, amendmentNumberFromName, QA_FILE) must still give every file a label, with honest low confidence.
+- Each classify call is metered against the tenant's AI quota and can throw QuotaExceededError. A failure must fall back to the heuristic label and must not block filing.
+- No db.transaction (Neon pgbouncer rule). Coordination between parses has to use conditional UPDATEs or run the jobs one after another.
+- Reading files to classify them happens inside a server action limited to 300 s. getVerifiedObject downloads the whole object. Scanned PDFs and images have no text without vision OCR (images are limited to 5 MB). Legacy .doc/.xls/.ppt and .zip are refused at upload.
+- The diff, merge, Q&A matching and compliance flagging all run on the team's verdicts (requirement_correction, keyed by doc_key = '' or companion id). Moving a file between solicitation and solicitation_document orphans its verdicts.
+- The UI must use Tailwind tokens or THEME from src/lib/theme-colors.ts, with no hex colours. Note that [id]/page.tsx:555-556 and solicitations/page.tsx:18-23 already break this.
+OWNER Qs:
+? Which way should an amendment be filed: a child solicitation (diffed, but its clauses not merged until an opportunity exists) or the companion type 'amendment' (merged, never diffed)? Should BL-STAB-3 retire one of the two, and should the companion 'amendment' type stop being offered?
+? If a batch has no clear base solicitation (only a PWS, pricing sheet and forms), should FORGE refuse, make the largest or most likely file the base, or create an empty base record?
+? If a batch has two candidates for base (for example RFP Volume I and Volume II, or an SF1449 cover plus the RFP body), is the second one a companion of type 'rfp' ('additional volume')?
+? Where does a Q&A file go before BL-STAB-5 ships? Should it be kept as a new companion type 'qa' (its file kept, its 'requirements' excluded from the merge, Q&A pairs read into solicitation_qa), read into solicitation_qa only with the file not kept, or should BL-STAB-3 wait for BL-STAB-5?
+? Should pricing sheets and forms become new document_type values ('pricing', 'form'), which needs an enum migration? Should they skip the requirement sweep, which today runs on them and adds CLIN and form-block text to the requirement list?
+? Does 'form' mean the SF1449/SF33 cover (often the base solicitation itself), the SF30 (the amendment's cover), or offeror forms to fill in (reps and certs, past-performance questionnaires)? Each would be filed differently.
+? A revised attachment that comes with an amendment (for example 'Attachment J-3 Rev 1'): file it as a companion of the base, a companion of the amendment, or a replacement that removes the old one's clauses?
+? Can a batch be added to an existing solicitation, routing amendments, attachments and Q&A to it, or does New Solicitation always create a new base? Should it also offer to attach the batch to an existing opportunity?
+? What confidence level puts a label in front of the user for review? Should FORGE ever file without confirmation when every label is high-confidence?
+? Is a mislabelled file changed after filing by re-labelling it in place (needs a ledger-aware move action), or by deleting and re-uploading it?
+? How should amendments in a batch be numbered and ordered when file names state no number, given there is no amendment-date column? Should BL-STAB-3 add amendment_date and do BL-STAB-4b ordering in the same PR?
+? Are .zip packages (SAM.gov 'download all') and legacy .doc/.xls in scope? Both are refused at upload today, and contracting officers often release Q&A in those formats.
+? May the classifier spend AI quota on every file (one fast call each), or should it be heuristic-only when quota is low or AI is in stub mode?
+RISKS:
+! Race in the requirement merge: mergeSolicitationRequirements reads and rewrites the parent's list without a lock, and the base's own clauses live in that same column. If a companion's merge reads the parent before the base parse writes (solicitation-parse.ts:254-281) and writes after it, the base's clauses are lost. The base's own merge then finds no untagged clauses, so the base's requirements stay gone until a Re-parse. Uploading a base and its companions at once makes these parses overlap almost every time.
+! Unchecked parent: createSolicitationFromUploadAction accepts any in-org solicitation as parent, including an amendment. A classifier that routes 'amendment' to the wrong parent creates nested trees that the list, diff and convert-to-opportunity code handle only one level deep (convert links direct children only).
+! False positives in the number reader: amendmentNumberFromName reads 'CDRL A001' as amendment 001 and 'PWS Mod 2' as amendment 2. documentTypeFromName calls 'Questions and Answers Amendment 0002' an amendment and 'SF1449 Solicitation' an rfp. Using these as evidence without content checks will mislabel common SAM.gov names.
+! Amendment diff noise: an SF30-style amendment is parsed as a whole solicitation, and its full list is compared against the base list, which already includes the companion clauses. Most base requirements show as 'removed' and the front-matter fields look changed. The amendment's new due date never updates the parent or opportunity.
+! Unmerged amendments: their clauses reach drafting and compliance only once the rows share an opportunity. A batch that files amendments under an unconverted base shows nothing from them on the base page, nor in its AI review, which uses the base's rawText and merged list only.
+! Q&A pollution: with no Q&A path, a Q&A file filed as a companion of type 'other' adds every 'shall' sentence in the answers to the requirement list and the compliance seed. It also never reaches solicitation_qa or the 'amended by Q&A' flags.
+! Wasted AI calls: a companion's front matter and key dates are computed and discarded. Pricing sheets and forms would run the full requirement sweep and L/M pass. A batch of 10 to 20 files can use a large share of the monthly AI quota, and an intake that also classifies reads every file twice (once to classify, once to parse).
+! Classification cost: reading content for classification downloads whole objects (up to the per-format read budget, for example PDF 150 MB) inside a 300 s server action. Scanned PDFs and images give no text without vision, so the classifier must either pay for OCR or fall back to the file name with low confidence.
+! File loss on re-label: changing a filed document's class across tables without updating file_upload.resource_type and resource_id leads releaseOrphanedClaims and the sweep to delete the file the new record holds.
+! Silent coercion: an unknown documentType is coerced to 'other' with no error (document-actions.ts:146). If a new class is added to the client before the enum and migration ship, files are filed as 'other' without any notice.
+! Duplicate amendment numbers: there is no unique (parent, number) and ordering is by createdAt. A batch uploaded two at a time lands out of order, and repeating an earlier upload creates duplicate 'Amendment 0001' rows.
+! The 24 h window: if a user leaves the confirm screen past 24 h, every staged upload is failed by the sweep. A large batch also nears the 10-pending and 200-stored caps, and the peek limit of 50 ids per call.
+! Existing audit gaps (merge action, convert to opportunity, reparse) will be copied if BL-STAB-3 reuses these paths without adding recordAudit.
+
+######## qa-pricing-forms
+SUMMARY: How FORGE handles Q&A, pricing sheets and forms today, read for BL-STAB-3. Nothing was changed.
+
+Q&A arrives in only two ways. (1) Polling the SAM.gov notice: pollSolicitationQa runs daily from the cron and on "Check SAM.gov now". (2) Text pasted into the panel: addManualQa. Neither stores the file itself. Both feed one rule-based reader, parseQaPairs. It only recognises labelled prose ("Q1:"/"A1:", "Question:"/"Answer:", "Government Response:", or a numbered question followed by an answer marker). In practice most contracting-officer Q&A is a spreadsheet with one row per question, a Word table, or a scanned PDF. All of these read to 0 pairs today. Answers go into solicitation_qa, which has no link to any file and no delete path. Answers are matched to requirements and compliance rows are flagged only once, when they are stored. That needs the parent's requirements to already exist and the solicitation to have an opportunity. A brand-new solicitation whose base document is still parsing has neither, and nothing re-matches later. Uploaded files are never checked for Q&A: an amendment that carries Q&A yields requirements, not answers.
+
+Pricing sheets and forms: nothing reads or stores CLINs, price schedules or forms (SF-1449, SF-33, SF-18, DD-254). The only nearby things are a free-text clinSummary from eBuy paste, the 'pricing' section kind and role, and SF-30 and DD-1423, which are mapped by file name to amendment and cdrl. Spreadsheets are flattened to tab-separated text by exceljs. PDFs are read from the text layer only; no reader for fillable-form fields is installed.
+
+Filing today: solicitation_document.document_type is a Postgres enum (rfp, pws, sow, cdrl, j_attachment, amendment, other) with no qa, pricing or form value. Every companion document, whatever its type, runs the full AI pipeline: front matter, the full-text requirement sweep, and Sections L/M. Its requirements are then merged into the parent. So a pricing workbook or Q&A filed as j_attachment or other pollutes the requirement list and spends AI quota.
+
+Lowest-risk filing route: file Q&A, pricing and forms as solicitation_document rows with new enum values. The upload ledger (recordHoldsUpload, releaseOrphanedClaims, PARSE_KIND), the storage meter, solicitation delete and the sweep-recovery parse already handle that table. Branch on document type inside the existing solicitation_document_parse job: Q&A means read the text, parseQaPairs, store linked to the document; pricing and forms mean keep the text only and skip the requirement sweep and merge. Add solicitation_qa.document_id, cascade-deleted with the document, so a Q&A file's answers leave with it.
+
+BL-STAB-5 should then swap in a better reader (row by row, layout, AI pass) and add suggestions. It should not add a separate resource type, which the BL-STAB-2 design doc suggested. Before BL-STAB-5 lands, a file labelled Q&A should be kept, read with today's parser, and show an honest "0 answers read in this layout" state. It must never fall back to the requirement sweep, and Re-parse should re-read it after BL-STAB-5 ships.
+CONSTRAINTS:
+- Tenant isolation: every new lib function touching solicitation_qa or solicitation_document must reference organizationId (scripts/check-isolation.mjs surface C). Server actions start with requireAuth() + requireCurrentOrg() and never take organizationId as a parameter. Jobs carry and apply job.organizationId.
+- No file content through server actions (AGENTS.md convention 11): a Q&A, pricing or form file is filed by uploadId. claimUpload → insert the record with id = claim.resourceId (ON CONFLICT DO NOTHING) → runDurable(parse) before finishClaim(claimedAt) → recordAudit. Q&A text is read inside the job from storage (loadUploadBytes / getVerifiedObject), not sent from the browser.
+- Upload ledger rules:
+- one upload maps to exactly one record, so a file cannot be both an amendment and a Q&A document
+- claim within 24 h, or the sweep deletes the file
+- at most 200 stored uploads per user
+- check the parent before the claim
+- pass claimedAt to finishClaim, releaseClaim and failClaim
+- releaseClaim on insert failure; failClaim only when the file itself is unusable
+- Prefer filing Q&A, pricing and forms as solicitation_document rows with new enum values. A new resource type or table must be added to recordHoldsUpload, releaseOrphanedClaims, PARSE_KIND/queueMissingParse, getStorageBytesUsed and deleteSolicitationAction, or files leak or escape the storage meter.
+- Migrations: ALTER TYPE solicitation_document_type ADD VALUE IF NOT EXISTS for each new value, with no statement in the same migration using the new value (migrations run inside BEGIN). Add solicitation_qa.document_id (FK to solicitation_document) with an index. schema.ts and the drizzle/NNNN file ship together. Keep COMPANION_DOCUMENT_TYPES and the panel label maps in step.
+- Parse must branch on document_type inside the existing solicitation_document_parse handler. qa, pricing and form documents must not run aiExtractSolicitation or contribute extractedRequirements or lmStructure; otherwise they pollute the merged requirement list, L/M and compliance seed, and spend AI quota. Branching there also keeps the sweep's queueMissingParse working with no new job kind.
+- Audit: every Q&A ingested from a file needs recordAudit (for example 'solicitation.qa.add' with source 'upload' and documentId, or a new action). The actor comes from job.requestedByUserId and may be null on the sweep-recovered path. 'solicitation.document.upload' already records documentType.
+- Stub AI mode: parseQaPairs is AI-free and works without a provider. The classifier must fall back to deterministic evidence (file name, format, title strings such as 'STANDARD FORM 1449', Q/A markers, CLIN/'unit price' headers) when the AI call returns stubbed.
+- Q&A matching needs the parent's requirements and opportunityId. The base parse is async, so Q&A from a new batch must be read after the base and companion parses settle, or a re-match step must exist, or affected_refs and compliance flags stay empty.
+- Kept files count toward storageGb (checked at intent). Read budgets: xlsx 40 MiB, docx 100 MiB, pdf 150 MiB, text 25 MiB.
+- UI: Tailwind tokens and THEME only, no hex or rgba (docs/DESIGN_SYSTEM.md). QaPanel's source label must handle a new 'upload' source.
+- Process: diff under 1,500 LOC per PR (BL-STAB-3 will need phases); BL-STAB-3 and BL-STAB-5 stay separate tickets; update docs/BACKLOG.md and the manuals that say Q&A files are not stored.
+OWNER Qs:
+? Before BL-STAB-5: should a file labelled Q&A be kept and read with today's reader, showing an honest '0 answers read in this layout; paste them or re-parse later' when it finds none? And should BL-STAB-3 own the Q&A file record (solicitation_document type 'qa' plus solicitation_qa.document_id) that BL-STAB-5 then reads better, instead of BL-STAB-5 adding its own resource type as the BL-STAB-2 design doc suggests?
+? An amendment that is also Q&A (an SF-30 with the Q&A attached, a very common release): file it as an amendment (child solicitation, diffed) AND read its Q&A pairs into the base solicitation's Q&A? Or does each file get exactly one label?
+? Posted date for uploaded Q&A: the upload time, a date read from the document, or a date the user confirms on the review screen? It drives the newest-first order on the Q&A panel.
+? When a batch holds a base solicitation plus amendments plus Q&A, do the answers always attach to the base (root) solicitation?
+? Deleting or re-labelling a Q&A file: should its answers and compliance flags go with it? And should users be able to delete a single wrong answer? No path for that exists today.
+? Pricing sheets: store and show text only, with no requirement sweep? Or also pull pricing instructions ('Offerors shall complete all yellow cells') into requirements? Is CLIN or price-schedule extraction wanted now, or as a separate ticket?
+? Should .xlsm (macro-enabled price templates), legacy .xls/.doc and .ods be accepted for store-only filing? Upload refuses them today.
+? Should pricing documents be visible only to the 'pricing' role and admins? No per-document access control exists today.
+? Forms taxonomy:
+- SF-30 → amendment, DD-1423 → CDRL; agreed?
+- Standalone SF-1449, SF-33, SF-18 → 'form'?
+- DD-254: a form, or an attachment whose security requirements should be extracted?
+- Should a standalone SF-1449 or SF-33 fill in the solicitation number, due date, NAICS and set-aside when the base document lacks them?
+? Most commercial RFQs begin with an SF-1449 page. Should the classifier treat a long document with a form cover as the base solicitation, not a form? What page-count or section rule decides?
+? A batch with no base solicitation (only Q&A, forms or pricing): refuse it, or let the user pick an existing solicitation to file into?
+? Should filing Q&A from a file notify the solicitation's assigned team, as the daily SAM.gov check does?
+? Large Q&A releases: raise the silent 300-pair cap and the 6,000-character answer cap, or at least tell the user when they are hit?
+? Should the new classifier later run on SAM.gov notice attachments, which the Q&A poll downloads and drops today (audit finding 14)? Or is that out of scope?
+RISKS:
+! Pollution and cost: without new type values and a type-aware parse, Q&A, pricing and forms land as 'j_attachment', 'rfp' or 'other'. They then get the full requirement sweep and L/M extraction (several AI calls on up to 500k characters each) and their sentences merge into the parent requirement list, compliance seed and outline.
+! Timing gap: a Q&A file filed in the same batch as its base is matched against an empty requirement list (the base parse is still running) and against a solicitation with no opportunityId. affected_refs stays empty and no compliance row is flagged. No re-match exists, not on convert-to-opportunity and not on proposal creation.
+! User trust before BL-STAB-5: the common contracting-officer formats (Excel row per question, Word tables, CSV, scanned PDFs) read to 0 pairs today. A correctly labelled Q&A file will show 'no answers' until BL-STAB-5 unless the UI explains why.
+! SAM.gov poll interplay: a pair stored first from SAM.gov makes the uploaded copy a duplicate, so it is not linked to the document; deleting the uploaded file then removes nothing. If uploaded-file pairs are cascade-deleted, the SAM.gov copy never comes back, because that link is already in qa_seen_links. And qa_seen_links already holds Excel and table Q&A that read 0 pairs, so BL-STAB-5 will not re-read those unless the list is reset.
+! No way to remove a bogus answer: a file wrongly labelled Q&A can create answers and compliance flags that cannot be removed short of deleting the solicitation, unless document_id plus cascade (or a delete action) ships with BL-STAB-3.
+! Label heuristics conflict: documentTypeFromName calls 'Solicitation Q&A.pdf' an 'rfp'. looksLikeQaDocument calls 'RFI Questions for Industry.docx' (a sources-sought base), 'Industry Day Slides.pptx' and 'RFI Response Template.docx' Q&A. A commercial RFQ's first page is an SF-1449. File-name evidence alone will mislabel.
+! Classifying by content needs whole-file reads: zip directories and PDF cross-reference tables sit at the end of the file, so a ranged read is not enough. Doing that for many files in one server action risks memory and timeouts, and files over the read budget cannot be read at all. If the review screen is left open past 24 h, the sweep deletes the staged uploads.
+! Forms: values typed into fillable PDFs are likely missing from the text layer, and dynamic XFA forms may yield placeholder text. Scanned forms go to the requirement-oriented vision prompt. SF-1449 and SF-33 metadata would not reach the solicitation row.
+! Pricing workbooks: hidden sheets, formulas without cached results and merged headers give noisy or blank text. A small CSV under 200 characters fails as 'no extractable text'. Macro-enabled .xlsm and legacy .xls templates are refused at upload.
+! Silent truncation: Q&A sets over 300 pairs, answers over 6,000 characters and questions over 2,000 characters are cut without telling the user.
+! Enum migrations cannot be rolled back (Postgres cannot drop an enum value), and the new values cannot be backfilled in the same migration. Choose the type names carefully before shipping.
+! Scope creep: Q&A filing, pricing and forms filing plus a classifier and a review screen will pass 1,500 LOC. BL-STAB-3 needs phasing, and the Q&A reader must stay minimal so BL-STAB-5 is not pre-empted.
+
+######## classification-signals
+SUMMARY: I read the code only and changed nothing. FORGE has the parts for a cheap classifier, but none of them do the BL-STAB-3 job yet, and the evidence UI has no source today.
+
+What exists:
+- **File-name rules (pure, browser-safe):** `amendmentNumberFromName` (src/lib/amendment-name.ts:15) and `documentTypeFromName` (src/lib/document-type-name.ts:31). They return only a label or number. They do not return the text that matched, so there is nothing to show as evidence. They misfire on common names: "Attachment J-3 Pricing.xlsx" becomes j_attachment, "Solicitation Q&A.pdf" becomes rfp, and `amendmentNumberFromName("CDRL A001.pdf")` returns "001".
+- **Text rules (pure):** `parseQaPairs` and `looksLikeQaDocument` (solicitation-qa-logic.ts:39, :102); `segmentSolicitation` (solicitation-segments.ts:204), which finds UCF Sections B–M and Attachment J headings with character offsets; `locateSection` (solicitation-sections.ts:59); `locateQuote` and `pageAt` (requirement-provenance.ts:83, :114), which check a quote word for word and turn an offset into a PDF page.
+- **Nothing yet** detects SF-30, SF-1449 or SF-33 forms, amendments from their text, pricing sheets, or solicitation numbers. The only related helper is `normalizeSolicitationNumber`, a comparer at recompete-match.ts:228.
+- **One AI classifier:** `classifyArtifactKind` (knowledge-classify.ts:42). Its kinds are knowledge-base kinds, not BL-STAB-3 labels. It reads only the first 8,000 characters (ai-prompts.ts:1676). Its confidence is self-reported, and its prompt says the reasoning is "not shown to end users". The pattern is still the one to copy: `completeStructuredForTenant` with a zod schema, `maxTokens` 200, temperature 0.1, stub mode returning `stubbed: true`, and a 0.6 threshold.
+- **Gateway behaviour:** the gateway (ai.ts:1197) handles model routing, the trial and token-cap checks, the untrusted-content rule, telemetry and charging tokens after the call. Without ANTHROPIC_API_KEY it falls back to a stub that returns no structured data. Even in stub mode, an ended trial makes it throw `QuotaExceededError`.
+- **Quotas and gates:** no tier feature flag covers intake. Parsing and knowledge classification charge only `aiTokensPerMonth`, never `aiRequestsPerMonth`.
+
+Can classification run before the file is filed? Yes, but it needs a new helper in uploads.ts:
+- `peekStoredUploads` (uploads.ts:596) returns no storage key.
+- `getVerifiedObject` (:824) reads any key in the organization. It checks size and etag, but not the upload's status or owner, and it has no size limit (it downloads the whole object).
+- `loadOwn` is private.
+- So the new helper must load the user's own `stored` row, apply a byte limit, then read the file. Classifying does not claim the upload or extend its 24-hour window.
+
+Partial reads:
+- Text files: a ranged read of the first bytes works.
+- PDFs: need the whole file, because pdf.js needs the full buffer. pdf-parse-fork's `max` option (pdf-parse.js:80) does cut rendering to the first N pages, but `extractPdfText` never passes it, and it throws away the PDF's title metadata.
+- DOCX and XLSX: possible by ranged reads, but the zip-directory code (upload-verify.ts:226) keeps only entry names. It would need entry offsets plus `zlib.inflateRaw`.
+- Scanned PDFs: there is no page-splitting library, so classifying by vision means sending the whole PDF (Anthropic only; the code refuses over 24 MB).
+
+Estimated cost and time per file. These are estimates: prices come from the claude-api skill's model table (cached 2026-10-06), and the per-page and image token figures are approximate and need checking.
+- **Text-layer file:** about 3–3.5k input tokens (a system prompt of about 1k plus 8,000 characters of text) and 150–300 output tokens.
+  - On the routed "fast" model (claude-haiku-4-5, $1/$5 per million tokens): about $0.003–0.005 per file.
+  - On a tenant override to Sonnet 4.6 ($3/$15): about $0.011–0.015.
+  - A 20-file batch: about $0.10 on Haiku or $0.30 on Sonnet.
+  - Prompt caching does not help on Haiku 4.5, whose minimum cacheable prompt is 4,096 tokens.
+  - For comparison, one full parse costs tens of cents to dollars, so classification is about 1–5% of a parse.
+- **Scanned PDF by vision:** roughly 1.5–3k tokens per page for the whole document. A 30-page scan is about $0.05–0.09 on Haiku. Images are roughly width×height/750 tokens, about $0.002 each.
+- **Time per file:**
+  - File-name rules: about 0 ms in the browser.
+  - On the server:
+    - Storage HEAD and GET: about 0.2–2 s for files up to about 20 MB. Storage timeouts allow 30 s plus 2 s per MiB, up to 240 s.
+    - Text extraction: under 1 s for DOCX or text. 1–10 s or more for a 100-page PDF unless `max` is used. Slow for large workbooks.
+    - The Haiku call: about 1–3 s.
+    - About four database round trips.
+  - So about 2–6 s per normal file. If each file gets its own server action, run in parallel (the 300 s `maxDuration` applies per action), a batch takes about as long as its slowest file. A file near the 150–500 MB limits can approach the 300 s cap unless classification has its own smaller byte limit, falling back to file-name rules.
+
+Recommended layering:
+1. File-name rules, extended to return the matched text, for free and instantly.
+2. Deterministic text signals, which give verifiable evidence with page numbers: UCF sections L/M/B, Q&A pairs, SF-30/1449 header lines, sheet names, a solicitation number shared across files.
+3. A Haiku call only when the rules are weak or disagree, returning verbatim quotes checked with `locateQuote`.
+
+When AI is unavailable (stub mode, trial ended, token cap reached), classification falls back to the rules and never blocks filing. The user confirms every label.
+CONSTRAINTS:
+- Auth gate first: the classify action must call requireAuth() + requireCurrentOrg() before any read, refuse while impersonating (as requestUploadAction does), take only uploadIds (never organizationId), and scope every ledger query by organizationId AND the uploading userId (claim and peek rules are per user).
+- Never move file bytes or a file's text through a server action (convention 11 and the no-files test). Read the stored upload from storage server-side by uploadId.
+- Apply a byte limit before any download: getVerifiedObject has none and does a full GET. Use a classification limit smaller than parseBudgetBytes, or name-only rules above it. A partial read with getRange must head() and compare size/etag with the ledger row itself.
+- Classification must not claim the upload or change its status. The 24 h claim window (CLAIM_WINDOW_MS) and the sweeper still apply; after a day an unfiled upload becomes 'unclaimed' and is deleted.
+- Every AI call goes through completeStructuredForTenant with a declared AiFeature. A new feature key needs AI_FEATURES, AI_FEATURE_MODEL_CLASS, PROMPT_VERSIONS, prompt fixtures and the prompt-versions lock (gates: prompt-versions test). Document text must be fenced(); the gateway appends the untrusted-content rule.
+- Degrade, never block: in stub mode, on a non-Anthropic provider (vision), at the token cap, or after a trial ends (QuotaExceededError is thrown even in stub mode), fall back to name and structure rules, mark the label as not AI-checked, and let the user confirm and file.
+- Evidence shown to users must be verifiable: check AI quotes with locateQuote and pageAt, and drop or downgrade quotes that do not match. Today's classifier 'reasoning' is meant only for audit/debug.
+- Audits: filing audits (solicitation.upload, solicitation.amendment.upload, solicitation.document.upload) should record the suggested label, confidence and chosen label. If the suggestion is stored on a tenant row, recordAudit it (e.g. 'file_upload.classify'). Reading one's own upload is not a §2 'sensitive read'.
+- Each label must map to an existing filing and parse path (solicitation_parse, solicitation_document_parse, knowledge_artifact_extract). Q&A, pricing sheet and form have no solicitation_document_type value or upload resource type; adding them needs ALTER TYPE ... ADD VALUE and a schema.ts edit in the same PR, passing the Fresh-DB migration gate. A new resource type also needs recordHoldsUpload, releaseOrphanedClaims and PARSE_KIND cases.
+- Server actions on /solicitations/new and /solicitations/[id] have maxDuration 300 s, and storage timeouts reach 240 s. Classify per file (one action per upload or a background job), never all files in one action.
+- Add a per-user rate limit for classification (enforceRateLimit), since each call spends tokens. Decide explicitly whether it also charges aiRequestsPerMonth (with refundQuota on failure).
+- Diff budget is 1,500 LOC per PR: phase the work (pure rules and evidence module plus tests, then the stored-upload read helper and classify action/prompt, then UI and filing).
+OWNER Qs:
+? Exact label set and where each lands: base solicitation becomes a solicitation row; is an amendment a child solicitation (parentSolicitationId, the BL-STAB-4 path) or a solicitation_document of type 'amendment'? Is a Q&A file turned into solicitation_qa pairs now (overlaps BL-STAB-5) or kept as a document? Are pricing sheets and forms new document types (an enum migration) or 'other'? Should they be parsed for requirements at all or only stored?
+? One file can be two things: an SF-30 amendment that carries the Q&A answers, an SF-1449 cover that is the base solicitation, an RFP with the PWS as Section C. One label per file, or a primary label plus secondary tags?
+? Does 'form' mean the government's cover forms (SF-30/1449/33, which really are the amendment or base) or forms the offeror fills in and returns (reps & certs, DD-254, past-performance questionnaires, wage determinations)?
+? Should every file get an AI call (about $0.003–0.005 each on Haiku), or only files the name and structure rules are unsure about? Should classification charge aiRequestsPerMonth (per file, per batch) or tokens only, as parsing does?
+? When AI is unavailable (stub, trial ended, token cap reached), is it acceptable to file using rule-based labels after user confirmation, or should the multi-file flow be blocked?
+? Above what confidence is a label pre-selected rather than left for the user to pick (0.6 is the knowledge-base precedent)? Show a percent, or high/medium/low?
+? What counts as evidence: the file-name token that matched, a quoted line with its page, structural signals (Sections L and M found, 12 Q&A pairs, sheet 'CLIN Pricing'), or cross-file signals (same solicitation number as the base)? Must every label show at least one verifiable quote?
+? Batch limits: the most files per New Solicitation (GSA precedent is 20), and the largest file classified by content rather than by name only (e.g. read the content only up to X MB)?
+? Scanned PDFs and images: pay for vision classification (the whole PDF is sent, ~1.5–3k tokens per page), or classify by name only and let the parse sort it out?
+? Must a batch contain exactly one base solicitation? What happens with zero bases (only amendments for an existing solicitation), or two files both labelled base?
+? Should the AI suggestion persist (survive a refresh, reviewable later, an audit of AI suggestion against human choice)? That needs a DB column or table and a migration; holding it only in the browser does not.
+? Are contract modifications ('P00003', SF-30 used as a mod to an awarded contract) amendments for this flow, or rejected/other?
+? Should classification also pull amendment numbers and order (SF-30 block 2) so BL-STAB-4b can diff each amendment against the one before it?
+RISKS:
+! Double read: classification downloads and extracts the file, then the parse job downloads and extracts it again. For 100+ MB PDFs this doubles function time and memory; pdf-parse renders every page unless `max` is added to extractPdfText.
+! PDFs cannot be read partially (pdf.js needs the whole buffer; the xref table is at the end). Only text files work with a plain range read. DOCX/XLSX partial reads need new zip-entry and inflate code. Large files may need name-only labels.
+! Fillable SF-30/SF-1449 PDFs keep field values in form annotations, which pdf.js 1.10 getTextContent likely does not return (verify with real samples). The amendment and solicitation-number blocks may be missing from the extracted text, and scanned forms have no text at all.
+! Self-reported confidence is uncalibrated and there is no classification eval set (the gold-set and extraction-eval tools measure extraction). A 0.6 threshold has no evidence behind it for these labels.
+! Prompt injection: a document's own text can claim to be a different kind of document. fenced() plus the untrusted-content rule help; user confirmation and deterministic evidence are the real guard.
+! The current name rules misfire on common federal file names (examples in facts). Rule order hides pricing and PWS under j_attachment, and the CDRL 'A001' pattern becomes an amendment number. Reusing them unchanged as AI-free evidence will mislabel files.
+! Quota or trial refusals in the middle of a batch: the token-cap pre-check starts refusing once usage reaches the cap, so some files get AI labels and others don't. The UI must show mixed states clearly.
+! Dev and preview default to stub AI, so the AI path is only exercised in tests (__setCompleteImplForTest) or with a key. Previews on memory storage can return 'gone' when the classify action runs on another instance.
+! If classification results live only in the browser, a refresh or navigation loses them; the uploads then sit until the 24 h sweeper deletes them, and server-side audits cannot record what the AI suggested.
+! UTF-16 text/CSV uploads pass upload verification but decode as garbage in extractTextFromPlainText, so they are misclassified (and misparsed).
+! A tenant model override (e.g. moving the classifier to 'strong') changes cost about 3–15x per file without code changes. Newer models reject forced tool choice and temperature; the gateway adapts, but answer quality varies by model.
+! Adding labels to solicitation_document_type, a new background_job_kind or a file_upload column means migrations (next is 0134) that must pass the fresh-DB and schema-migration coupling gates, which adds to the 1,500-LOC per-PR budget.
+
+######## ledger-batch
+SUMMARY: I read the upload ledger and queue code for BL-STAB-3 and changed nothing. The ledger can already hold N checked files while the user reviews them. One `document` upload can be filed later as a solicitation (a base or an amendment) or as a companion document, and `peekStoredUploads` checks a batch without claiming anything. Five things are missing or get in the way of classifying files before they are filed:
+
+1. **The review clock is 24 hours per file and nothing can extend it.** Each upload can be claimed only while it is `stored` and `purge_after` (verify time + 24 h) has not passed.
+2. **Only the uploader can act on a file.** Complete, claim, cancel and peek all check the uploading user's id.
+3. **There is no way to read a stored file without claiming it.** The private `loadOwn` is the only lookup that returns an unclaimed file's storage key. `getVerifiedObject` checks only the organization and the etag (not status, user or size), and it downloads the whole object.
+4. **`useUploadQueue` files each item as soon as it uploads, or never.** It has no "file later" step, no way to change an item's labels after adding it, and no leave-page warning once uploads finish. All of its state is lost on reload.
+5. **Filing depends on order.** Amendments need `parentSolicitationId` and documents need `solicitationId`, so the base must be filed first.
+
+GSA paste is the model for a batch action: peek every file first, file each one on its own, collect what was skipped, queue one parse per record with `enqueueJob`, then run them in order with `runDurableBatch`. Two parts of it should not be copied. It creates its opportunity in a way a retry repeats, and it treats `alreadyClaimed` as "skipped". In BL-STAB-3 the base record's id comes from its upload's claim, so the whole batch can be made safe to retry.
+
+Hazards I found:
+- **Changing a file's label to a different record type after a failed filing.** The claim keeps the record id from the first attempt (`coalesce`), which can leave two records sharing one stored file. Deleting one of them would later delete the bytes the other still uses.
+- **A new record type (for example for Q&A) that is not added to `recordHoldsUpload`.** That function returns false for unknown types, so the file would be released and deleted right after it is filed.
+- **Base and document parses running at the same time.** Possibly lost data, not confirmed: the requirement merge is a read-then-write with no lock, so the base's own requirements could be overwritten.
+- **More than 50 upload ids passed to `peekStoredUploads`.** It silently drops the extras; they are reported neither as ready nor as refused.
+CONSTRAINTS:
+- Review deadline: each file can be claimed only while `status = 'stored'` and `purge_after` (verify time + 24 h) is in the future. The earliest file in the batch expires first. Making review last longer needs a new ledger function that moves `purge_after` forward only for stored rows; that also keeps the files counted against the storage quota.
+- Only the uploader can act: complete, claim, cancel and peek all filter on the uploading user's id. The same user must confirm the labels and file the batch unless new ledger code allows a hand-off.
+- Reading a file for classification needs a new function in src/lib/uploads.ts (nothing exported does it today). It must check org + user + `stored` + purpose `document` + open window, use the ledger's own storage key (`assertKeyInOrg`), refuse anything over a byte budget before downloading, and verify the etag (through `getVerifiedObject`, or a HEAD before and after a ranged read). It must not change status, resourceId/resourceType or purge_after: setting resourceId early would break `cancelUpload`'s `isNull(resourceId)` check and the claim's `coalesce`.
+- Classification must stay out of `useUploadQueue`'s `claim` slot, which would set `stored: false` and lose the cancel-on-remove behaviour. Run it as a separate per-item call, for example from `onItemDone`, or add an explicit 'inspect' step and a meta-update API to the hook.
+- Classify one file per request, not all files in one request: the page limit is 300 s, and a large PDF needs a full download to read its text.
+- Any classification result written to a tenant table needs `organization_id`, an organization filter on every query, a matching drizzle migration, and `recordAudit` after the write. A new action name such as `file_upload.classify` follows the `<resource>.<verb>` convention.
+- Filing order: the base (or an existing parent the user picks) comes first, then amendments in number order (createdAt sets the list order), then documents with `sortOrder`. Don't claim any dependent file until the base's id is known. On a retry, an `alreadyClaimed` result for the base means 'use that id and carry on', not 'skipped' as GSA treats it.
+- Partial failure: return results per uploadId, as `attachmentsSkipped` does. On an insert error, check whether the insert actually landed before calling `releaseClaim`, as GSA's `fileAttachment` does at lines 325-341. Queue the parse before `finishClaim` so the sweep can finish a filing that dies part-way.
+- A relabel between attempts must not cross record types (solicitation ↔ solicitation_document) once an earlier claim fixed a resourceId, or it must check both tables first. Otherwise the earlier record id is reused under the other type.
+- Parses: one open job per record (`enqueueJob`). Run them through `runDurableBatch` (one at a time, 120 s budget) in dependency order, base before documents (because of the possible merge race), not N `runDurable` calls at once. Queued jobs the batch doesn't reach go to the cron at 3 per 5-minute tick.
+- Batch size: at most 50 files (`peekStoredUploads` silently drops the rest) and at most 10 pending uploads per user at once. Put the cap in a `*-constants.ts` file, because 'use server' files may export only async functions.
+- Actions must call `requireAuth()` + `requireCurrentOrg()` first, never take `organizationId` as a parameter, and check every label or document type the client sends against a server-side list.
+- Stub AI mode, an AI failure, or the monthly token cap must fall back to the file-name heuristics and never block filing.
+- A new record type that holds a file (for example for Q&A) has to be added in all of these places, or its files get deleted or go uncounted: `UploadResourceType` and `document.claimableAs` (upload-policy.ts:19-24, 54), the `recordHoldsUpload` switch, `releaseOrphanedClaims`, `anyRecordNamesKey`, `PARSE_KIND` in jobs.ts, `getStorageBytesUsed`, and the file release in its delete action.
+- Per-record audits should match existing names: `solicitation.upload`, `solicitation.amendment.upload`, `solicitation.document.upload`. Revalidate /solicitations and the base's page.
+OWNER Qs:
+? Must a batch contain exactly one base solicitation? What should happen with none (add to an existing solicitation the user picks?) or with two or more (separate solicitations, or Volume I/II of one)?
+? Do PWS/SOW, pricing sheets and forms attach to the base solicitation, or to the amendment that brought them?
+? What should a Q&A file become: a companion document (type 'other', or a new 'qa' type) whose text is also loaded into solicitation_qa, or Q&A pairs only? Do pricing sheets and forms get new document types (needs an enum migration), or map to j_attachment / other?
+? Must the labels survive a reload or a closed tab, so a review can be finished later or on another device? That needs a server-side batch record; today the queue lives only in the browser.
+? Can someone other than the uploader (for example the capture manager) confirm the labels and file the batch? The ledger currently allows only the uploader.
+? Is a 24-hour review window acceptable, or should review keep the files longer (they keep counting against the storage quota while held)?
+? How deep should classification read: file name and the first pages only, or the full text? What should happen to files over the read budget (PDF 150 MB, Word 100 MB) or scanned or image-only files? Is the AI token cost per file acceptable?
+? Do high-confidence labels go straight through, or must the user confirm every file? What confidence threshold?
+? What is the maximum number of files per batch (GSA allows 20; the ledger's batch check stops at 50)?
+? How should amendments be ordered when numbers are missing or unclear (by number, by the document's own date, or by asking the user)?
+? If some files fail to file, should the rest still be filed and the failures reported (GSA's behaviour), or should nothing be filed?
+? Should a batch also create or link an opportunity, as GSA paste does, or stay intake only?
+? Should the audit record when the user changes the AI's suggested label (suggestion, confidence and final choice)?
+RISKS:
+! `peekStoredUploads` silently drops every id past the 50th (uploads.ts:602): they appear in neither `ready` nor `bad`, so a large batch could quietly leave files unfiled.
+! Changing a file's label to a different record type after a failed attempt reuses the earlier record id (claim `coalesce`, uploads.ts:468). If the earlier insert had landed, one storage key ends up held by two records. Deleting one releases the key, and the sweep, which checks only the current type's table, deletes bytes the other record still uses. The sweep's stored-row check can also fail a row whose earlier record holds the file under the other type.
+! `createSolicitationFromUploadAction` calls `releaseClaim` on an insert error without checking whether the insert landed (actions.ts:86-89). Reusing it for a batch can leave a solicitation record next to a file that looks unfiled.
+! A new record type left out of `recordHoldsUpload` has its file marked released by `finishClaim` and deleted by the next sweep.
+! Requirement merges are read-then-write with no lock (solicitation-requirements.ts:103-171). Base and document parses running together could drop the base's own requirements. Running the batch in order reduces this, but the cron can still pick up a queued document job while the batch is parsing the base. (Possible, not confirmed.)
+! Reusing the per-file actions as they are starts N parses at once in one instance through `runDurable`, a memory risk with 150 MB PDFs. Serialising them instead pushes the long tail to the cron at 3 jobs per 5 minutes, so a 20-file batch could take about 30 minutes to finish parsing.
+! Classifying on content downloads each file once more before its parse. `getVerifiedObject` has no size budget, so a classify call on a 500 MB upload could run out of memory or time unless a budget is enforced first.
+! Abandoned reviews: there is no leave-page warning once uploads finish, and queue state is lost on reload. The stored files stay for 24 h, count toward the 200-file per-user cap (`too_many_stored`) and the storage reservation, and the daily volume cap counts them even after they are cancelled.
+! A quota or rate refusal at intent can stop a batch partway (file 7 of 12), leaving a partial set to review.
+! A classifier that reads with `getRange` and no etag check could label bytes that are swapped before filing (the PUT link stays valid for up to an hour). The parse would then fail with 'changed', and the label would describe a different file.
+! Copying GSA's retry handling (`alreadyClaimed` counted as skipped, `ALREADY_FILED`) would make a retried batch report filed files as failures and lose the base id that amendments and documents need.
+! The parse overwrites title, type and solicitationNumber on the solicitation row, so a label or metadata written only into those columns at filing is lost.
+! No record type holds a Q&A file, and the document type enum has no qa, pricing or form values. Without a schema decision, labels like 'pricing sheet' or 'form' all end up as 'other' and the label is lost after filing.
+
+######## CRITIC
+SUMMARY: I am the completeness critic. I read the code to check the five maps and to cover the areas none of them looked at. I changed nothing and ran no tests; the only things I ran were a regex check and a check of the Next.js version.
+
+The five maps are broadly accurate. I confirmed their main claims against the code: the ledger claim rules, the 50-id silent cut in peekStoredUploads, getVerifiedObject reading the whole object, recordHoldsUpload returning false for an unknown resource type, the cross-type relabel `coalesce` hazard, the unlocked requirement merge, convertToOpportunityAction having no audit and no revalidatePath("/"), the list page's hex colours and the missing parent filter, and the absence of any polling. Three claims are wrong and must be corrected.
+
+**Corrections**
+
+1. **Server actions do not run in parallel from one browser tab.** The classification map says one classify action per file, run in parallel, makes a batch take about as long as its slowest file. That is wrong on this stack. Next 14.2.15's client action queue runs server actions one at a time per tab. Per-file classify actions therefore add up rather than overlap. A slow classify also holds up the upload queue's own requestUploadAction and completeUploadAction calls, so other files sit at "Checking".
+2. **Memory storage is not a preview risk.** The classification map says previews on memory storage can return "gone". They can't: memoryStorageRefused refuses every upload on any Vercel deployment that uses memory storage.
+3. **Only the admin manual says Q&A files are not kept.** The statement "Attachment bytes are not stored" is in ADMIN_MANUAL.md:756 only. It is not at USER_MANUAL.md:627, as one map says.
+
+**What none of the maps covered**
+
+- **SAM.gov Q&A checks never reach uploaded solicitations.** No code path ever sets `solicitation.notice_id`: neither insert site sets it, and neither does the parse. So the daily check, which needs a notice ID, never runs for any uploaded solicitation, and "Check SAM.gov now" is disabled on them. For an uploaded solicitation, Q&A today comes only from pasted text.
+- **Filing attachments as separate base solicitations (the GSA pattern) leaks into other features.** Each such file shows up in:
+  - the Command Center recompete strip (the 40 newest top-level solicitations);
+  - the search palette;
+  - the opportunity's Documents & AI panel, which loads each linked solicitation's full raw text;
+  - the customer-voice phrases, which come from the newest solicitation's raw text;
+  - the outline built from Section L, which reads the 10 most recent.
+
+  Filing order therefore matters.
+- **Reminders don't reach anyone for amendments.** Key-date reminders and Q&A notifications go to the team assigned to each solicitation row. An amendment filed as a child solicitation has no team, so reminders about its new dates reach nobody.
+- **Parses left over from a batch wait in one queue shared by every company.** The jobs cron runs 3 due jobs per 5-minute tick, oldest first across all tenants. Section auto-draft and knowledge extraction use the same queue. Previews have no cron at all. There is a precedent for moving work forward without the cron: the auto-draft dialog checks progress every 5 seconds and each check runs the next queued job.
+- **getVerifiedObject throws on storage errors.** The chat-attachment path shows the pattern to copy: check the size against the read budget before reading, and catch a storage error rather than failing the file.
+- **The colour test has a blind spot, and the UI can't be unit-tested.** The theme-token test's regex misses 8-digit hex values; the two in the solicitation page get through today. The list page isn't covered by that test at all. Tests run in a Node environment with no component testing, so UI logic needs to sit in pure modules to be tested.
+- **Audit log filter.** The audit log viewer's "Solicitations" filter matches resource types starting with "solicitation". An audit recorded with resource type `file_upload` will not appear under it.
+- **No duplicate detection.** Nothing checks for the same file uploaded twice, though `file_upload.etag` exists and could be used.
+- **Tests that pin today's behaviour.** One expects "Attachment J-3 Pricing.xlsx" to be typed j_attachment. Another expects an upload to keep its record id when a claim is released.
+- **Two process facts.** The diff-size cap counts docs and tests. The manuals are shown inside the app at /help/user and /help/admin.
+- **Mobile.** There is no drag-and-drop on touch screens, the file input has no `multiple` attribute, and the review rows need to stack on narrow screens.
+- **Backlog order.** The owner said BL-STAB-8 would come right after BL-STAB-2c. The BL-STAB rules also say "fix the root cause, no bandages".
+CONSTRAINTS:
+- Server actions from one tab run one at a time (Next 14.2.15's action queue). The design must not count on per-file classify or filing actions running in parallel.
+- Keep each action short: no full download of large files inside a user-facing action.
+- Or move content classification to a background job keyed by upload id, with a progress action the client polls (the AutoDraft pattern, which also runs queued work forward).
+- Expect the upload queue's intents and completions to wait behind any long action.
+- Wrap every storage read for classification in try/catch:
+- a throw from head() or get() means 'storage unreachable': fall back to a name-only label and leave the upload stored;
+- check parseBudgetBytes, or a smaller classify budget, BEFORE reading (the section-chat-attachments.ts:221-238 pattern);
+- never failClaim or cancel because of a classify read.
+- Plan the filing so that only the files meant to be bases become solicitation rows. Each extra solicitation row on an opportunity is picked up by:
+- the Command Center recompete strip;
+- the search palette and the /solicitations list;
+- the opportunity Documents & AI panel, which loads each row's full raw text;
+- customer voice (newest rawText);
+- the outline built from Section L (10 newest);
+- loadOpportunityRequirements.
+If amendments are filed as child rows, file them after the base and expect them to become the 'newest' solicitation.
+- New UI:
+- 'use client' files export only PascalCase components (RSC boundary gate);
+- shared label lists, caps and rules go in plain .ts modules (batch caps in a *-constants.ts beside the action file);
+- pure logic stays testable (vitest is node-only, with no component tests);
+- every new href and revalidatePath must resolve (Internal link check).
+- Colours: use semantic token families only (DESIGN_SYSTEM §4 rule 4, where brass = attention/needs a choice). Add new or retouched intake files to the FILES list in tests/design/theme-tokens.test.ts. Remember that test does not catch 8-digit hex, so review by eye.
+- Mobile:
+- the file input needs `multiple`, because touch has no drag-and-drop;
+- per-file review rows must stack below `sm`;
+- don't rely on beforeunload to protect unfiled uploads on phones; mobile Safari does not reliably fire it.
+- Audits: give the batch-level audit a resourceType starting with 'solicitation' so it appears under the audit log's 'Solicitations' filter. Keep the per-record actions (solicitation.upload, solicitation.amendment.upload, solicitation.document.upload). A new resourceType 'file_upload' audit is visible only under 'All resources'.
+- Schema:
+- new enum values via ALTER TYPE ... ADD VALUE IF NOT EXISTS, and not used in the same migration (each migration runs in a transaction; auto-applied at boot when non-destructive);
+- any new tenant table must pass check-tenant-firewall (NOT NULL org, cascade FK, leading org index) and check-schema-drift (indexes declared in schema.ts);
+- add a test tying COMPANION_DOCUMENT_TYPES to the pg enum if new types are added.
+- Tests that will need deliberate updates: upload-policy.test.ts:186-201 (if pricing or Q&A detection changes documentTypeFromName); uploads-documents.test.ts:103 (if unknown types become errors). uploads.test.ts:114 (record id kept across a released claim) must still pass after any relabel fix.
+- Docs ship with the code and render in-app:
+- USER_MANUAL 625-627 and 659-671;
+- ADMIN_MANUAL 724, 756 (only if Q&A files become stored), 929 and 948;
+- the New Solicitation page copy;
+- docs/BACKLOG.md.
+The diff-size guard counts docs and tests toward the 1,500 LOC per PR.
+- A new background_job_kind also needs a KIND_LABEL entry on src/app/(app)/admin/jobs/page.tsx (not compiler-enforced) and a HANDLERS entry (compiler-enforced).
+- BL-STAB rules: fix at the root cause, with no workaround that hides a failure. A name-only 'classifier' presented as classification, or labels that silently fall back to 'other', would break the owner's stated rule unless the fallback is visible to the user.
+OWNER Qs:
+? SAM.gov link. No code ever gives an uploaded solicitation a SAM.gov notice ID, so the daily Q&A check and 'Check SAM.gov now' never work for uploads. Should BL-STAB-3 let the user attach the batch to an opportunity imported from SAM.gov, so the solicitation takes its notice ID? Or ask for the notice ID or SAM.gov link on the confirm screen?
+? Backlog order. You put BL-STAB-8 (security gates) right after BL-STAB-2c, yet it is still queued. Should BL-STAB-3 go next, or BL-STAB-8 first? Should BL-STAB-4b (diff each amendment against the previous one) ship with BL-STAB-3, since the batch will decide amendment order?
+? Duplicates. If the same file appears twice in a batch, or was already filed in FORGE (same content hash or, after parse, the same solicitation number), should FORGE warn, skip it, or file it anyway?
+? Team and reminders. Amendments filed as child solicitations have no team, so reminders about their new due dates reach nobody. Should a filed batch assign the uploader to the base's team, and should amendments use the base's team for reminders and Q&A notifications?
+? After filing, should the user stay on a batch screen that moves the parses forward and shows each file's state, as the Auto-draft dialog does? Or go to the base solicitation page and rely on the jobs cron? The cron runs 3 jobs per 5 minutes, shared by all companies, so a 20-file batch can take about 30 minutes.
+? Phones. Is filing from a phone a goal (photos of pages, files from the Files app)? Each image would become its own record; should several images combine into one document, which is not possible today?
+? Should the classifier's suggestion and the user's final choice be kept as labelled data to improve the classifier later? A prior audit (08, line 98) flagged that classification never learns from corrections.
+? Should the classification step work while a platform admin is viewing as another company (impersonating)? Today every server action is blocked then, so admins can't demo the intake.
+RISKS:
+! Next 14.2.15 runs a tab's server actions one at a time. A design that classifies with one action per file, or one big action, makes the user wait for the sum of all files, not the slowest one. While a long classify runs, the remaining uploads' intent and completion calls wait behind it, so progress bars sit at 'Checking'. One big action can also reach the 300 s page limit.
+! getVerifiedObject throws on storage errors. If the classify path doesn't catch them, a brief R2 outage fails the whole batch or a file, instead of falling back to name-only labels.
+! Filing extra files as base solicitations, as GSA paste does, affects the opportunity in several ways. It floods the Command Center recompete strip, search and the /solicitations list. It makes the opportunity's Documents & AI panel load hundreds of KB of raw text per row. It changes which solicitation customer voice and the Section L outline read: the newest row wins, which could be an SF-30 or a pricing sheet.
+! Uploaded solicitations never get SAM.gov Q&A checks because notice_id is never set. Users following USER_MANUAL:627 may expect daily Q&A that never arrives. A batch without a Q&A path leaves paste as the only route.
+! Child amendments' key dates trigger reminders for an empty team, so revised due dates go unnoticed while the base keeps reminding about the old date.
+! Parses left over from a batch go to a global queue that runs 3 jobs per 5-minute tick and is shared with other tenants' parses and auto-drafts. Large batches delay everyone. On previews (no cron) a batch looks stuck unless an admin presses 'Run due jobs now', which can mislead testing.
+! The theme test doesn't catch 8-digit hex literals and doesn't cover solicitations/page.tsx or new/*. Colour drift in new intake UI can pass CI.
+! No duplicate detection. A user who drops the same package twice, or re-uploads an RFP already in FORGE, gets duplicate solicitations, duplicate parses and duplicate AI spend.
+! The client UI can't be unit-tested (node-only vitest, no component tests). Label editing, ordering and 'confirm' logic left inside .tsx files will ship untested.
+! Mobile: no drag-and-drop on touch, no `multiple` on the input, and an unreliable beforeunload on mobile Safari. Phone users can lose unfiled uploads, which stay reserved for 24 h, and wide review rows will be cramped.
+! Audit visibility: a batch audit typed resourceType 'file_upload' won't appear under the audit log's 'Solicitations' filter, so admins can miss intake decisions.
+! A new job kind without a KIND_LABEL entry shows its raw enum name on Admin → Jobs. Adding a value to the pg enum without updating COMPANION_DOCUMENT_TYPES fails no gate.
