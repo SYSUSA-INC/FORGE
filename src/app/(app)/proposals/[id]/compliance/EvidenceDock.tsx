@@ -10,18 +10,11 @@ import {
   type AvailableEvidence,
   type EvidenceRow,
 } from "./actions";
-import { withAlpha, THEME } from "@/lib/theme-colors";
 
 const KIND_LABELS: Record<ComplianceEvidenceKind, string> = {
   past_performance: "Past performance",
   knowledge_entry: "Knowledge",
   section_paragraph: "Section paragraph",
-};
-
-const KIND_COLORS: Record<ComplianceEvidenceKind, string> = {
-  past_performance: THEME.green,
-  knowledge_entry: THEME.indigo,
-  section_paragraph: THEME.brass,
 };
 
 type Tab = ComplianceEvidenceKind;
@@ -112,20 +105,12 @@ export function EvidenceDock({
       {evidence.length > 0 ? (
         <ul className="mt-1.5 flex flex-col gap-1.5">
           {evidence.map((e) => {
-            const color = KIND_COLORS[e.kind];
             return (
               <li
                 key={e.id}
                 className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
               >
-                <span
-                  className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
-                  style={{
-                    color,
-                    background: withAlpha(color, 0.1),
-                    border: `1px solid ${withAlpha(color, 0.25)}`,
-                  }}
-                >
+                <span className="aur-tag mt-0.5 shrink-0 !px-1.5 !py-0.5 text-muted">
                   {KIND_LABELS[e.kind]}
                 </span>
                 <div className="flex-1 min-w-0">

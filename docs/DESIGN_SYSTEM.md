@@ -139,7 +139,9 @@ Utility classes in `globals.css`:
 4. **Status means the same thing everywhere.** Green = done / won,
    red = blocked / lost / mandatory, brass = attention / partial /
    desired, cobalt = in progress / assigned, indigo = under analysis or
-   review, plum = pink team, `muted` = not started / informational.
+   review, `muted` = not started / informational. Colour teams, stages and
+   categories are not statuses: they use `aur-tag` (`ColorTeamTag`), an ink
+   label with the team hue only on the leading diamond (owner, 2026-10-22).
 5. **Hairlines before shadows.** A card is a hairline on paper; reach
    for `aur-card-elevated` only for something that floats over the page.
 6. **Type roles.** Headings are `font-normal` (400) with

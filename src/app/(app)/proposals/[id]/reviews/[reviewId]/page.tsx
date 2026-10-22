@@ -35,6 +35,7 @@ import { ReviewSummaryPanel } from "./ReviewSummaryPanel";
 import { ReminderPanel } from "./ReminderPanel";
 import { listOrgReviewers } from "../actions";
 import { withAlpha } from "@/lib/theme-colors";
+import { ColorTeamTag } from "@/components/ui/ColorTeamTag";
 
 export const dynamic = "force-dynamic";
 
@@ -173,16 +174,7 @@ export default async function ReviewDetailPage({
           >
             ← All reviews
           </Link>
-          <span
-            className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
-            style={{
-              color: colorHex,
-              backgroundColor: withAlpha(colorHex, 0.1),
-              border: `1px solid ${withAlpha(colorHex, 0.25)}`,
-            }}
-          >
-            {REVIEW_COLOR_LABELS[r.color]}
-          </span>
+          <ColorTeamTag color={colorHex}>{REVIEW_COLOR_LABELS[r.color]}</ColorTeamTag>
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
             style={{

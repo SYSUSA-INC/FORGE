@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { STAGE_COLORS, STAGE_LABELS } from "@/lib/proposal-types";
 import { ProposalTabs } from "./ProposalTabs";
 import { DeleteProposalButton } from "./DeleteProposalButton";
-import { withAlpha } from "@/lib/theme-colors";
+import { ColorTeamTag } from "@/components/ui/ColorTeamTag";
 
 export const dynamic = "force-dynamic";
 
@@ -91,23 +91,10 @@ export default async function ProposalDetailLayout({
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-4 py-3">
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: stageColor }}
-        />
         <div className="font-mono text-[11px] uppercase tracking-label text-muted">
           Current stage
         </div>
-        <div
-          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-label"
-          style={{
-            color: stageColor,
-            backgroundColor: withAlpha(stageColor, 0.1),
-            border: `1px solid ${withAlpha(stageColor, 0.25)}`,
-          }}
-        >
-          {stageLabel}
-        </div>
+        <ColorTeamTag color={stageColor}>{stageLabel}</ColorTeamTag>
       </div>
 
       <ProposalTabs id={p.id} />
