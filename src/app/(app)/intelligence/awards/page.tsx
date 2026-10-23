@@ -24,7 +24,7 @@ export default async function AwardsIntelPage({
         title="Awards & recompetes"
         subtitle="Search federal contract awards by NAICS, agency, or keyword. Surface incumbents whose contracts are ending soon to prioritize recompete pursuit."
         actions={
-          <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+          <Link href="/intelligence" className="aur-link">
             ← Intelligence
           </Link>
         }

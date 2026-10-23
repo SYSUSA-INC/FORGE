@@ -78,7 +78,7 @@ export default async function AiEnginePage() {
         title="AI Engine"
         subtitle="What the AI does for your organization this month, what it may spend, and which model class each feature runs in."
         actions={
-          <Link href="/settings" className="aur-btn aur-btn-ghost">
+          <Link href="/settings" className="aur-link">
             ← Settings
           </Link>
         }

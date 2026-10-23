@@ -47,7 +47,7 @@ export default async function LossIntelligencePage() {
         title="Cross-loss patterns"
         subtitle="What your debriefs and outcomes say together that none of them says alone."
         actions={
-          <Link href="/intelligence" className="aur-btn aur-btn-ghost text-[11px]">
+          <Link href="/intelligence" className="aur-link">
             ← FORGE Brain
           </Link>
         }

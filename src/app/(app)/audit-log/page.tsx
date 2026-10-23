@@ -60,7 +60,7 @@ export default async function AuditLogPage({
         title="Audit log"
         subtitle="Tenant-scoped record of every mutating action — who did what, to which resource, and when. Filterable by actor, action, resource, time window. Exportable as CSV for compliance reviews."
         actions={
-          <Link href="/settings" className="aur-btn aur-btn-ghost">
+          <Link href="/settings" className="aur-link">
             Back to settings
           </Link>
         }

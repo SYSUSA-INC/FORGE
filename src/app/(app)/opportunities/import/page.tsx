@@ -65,7 +65,7 @@ export default async function ImportPage() {
             >
               Paste GSA email
             </Link>
-            <Link href="/opportunities" className="aur-btn aur-btn-ghost">
+            <Link href="/opportunities" className="aur-link">
               Back to opportunities
             </Link>
           </>

@@ -31,7 +31,7 @@ export default async function FirmsIntelPage({
           title="8(a) firms"
           subtitle="Search active and recently graduated 8(a) participants."
           actions={
-            <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+            <Link href="/intelligence" className="aur-link">
               ← Intelligence
             </Link>
           }
@@ -80,7 +80,7 @@ export default async function FirmsIntelPage({
         title="8(a) firms"
         subtitle="Search active and recently graduated 8(a) participants. Newly graduated firms are high-value capture targets — they're now competing in open competition for the first time."
         actions={
-          <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+          <Link href="/intelligence" className="aur-link">
             ← Intelligence
           </Link>
         }

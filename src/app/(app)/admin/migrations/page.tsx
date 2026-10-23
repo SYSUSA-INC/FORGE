@@ -45,7 +45,7 @@ export default async function MigrationsPage() {
         title="Database migrations"
         subtitle="Apply pending schema migrations against this tenant's database. Idempotent — re-runs are a no-op."
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost">
+          <Link href="/admin" className="aur-link">
             ← Platform admin
           </Link>
         }

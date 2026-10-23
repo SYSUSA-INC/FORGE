@@ -3004,6 +3004,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **C8 (this PR):** nine more boxed list rows move to hairlines (agency contacts, trial requests, add-on catalog, scout, the review checklist, consolidated report and summary panels, customer history, Q&A). Still open in C: the boxed rows that are not simple lists (form panels, label rows, cards in a grid), secondary actions as links, one button size, one table style.
 
+**C9 (this PR):** back and breadcrumb actions ("Back", "← …", 50 links, including the ghost-button ones) become text links with a new `.aur-link` class. Still open in C: other secondary actions ("Cancel", "Open", "Activity →"), one small button size, one table style, and the boxed rows that are not simple lists.
+
 **Next (serial):** rest of C.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")

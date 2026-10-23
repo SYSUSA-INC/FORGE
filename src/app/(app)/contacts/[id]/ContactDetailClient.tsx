@@ -71,7 +71,7 @@ export function ContactDetailClient({ contact, touches, owners, opportunities }:
         subtitle={[contact.title, contact.agency, contact.office].filter(Boolean).join(" · ")}
         actions={
           <>
-            <Link href="/contacts" className="aur-btn aur-btn-ghost">
+            <Link href="/contacts" className="aur-link">
               ← All contacts
             </Link>
             <button type="button" onClick={remove} disabled={pending} className="aur-btn aur-btn-ghost text-rose-300">

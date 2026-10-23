@@ -54,7 +54,7 @@ export default async function TierEditPage({
         actions={
           <Link
             href="/admin/tiers"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-link"
           >
             ← All tiers
           </Link>

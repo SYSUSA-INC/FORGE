@@ -231,7 +231,7 @@ export default async function AdminUsagePage() {
         title="AI usage & costs"
         subtitle={`Per-tenant token + request consumption for ${monthLabel}. Resets first of next month.`}
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
+          <Link href="/admin" className="aur-link">
             ← SuperAdmin portal
           </Link>
         }

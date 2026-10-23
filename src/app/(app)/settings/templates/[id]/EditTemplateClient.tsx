@@ -652,7 +652,7 @@ export function EditTemplateClient({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
             href="/settings/templates"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-link"
           >
             Back
           </Link>

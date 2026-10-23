@@ -82,7 +82,7 @@ export default async function VerifyRequirementsPage({ params }: { params: { id:
         title={s.title || "Solicitation"}
         subtitle={`${list.length} requirements · ${counts.unreviewed} to review (${counts.notFound} not found in source) · ${counts.confirmed} confirmed · ${counts.edited} edited · ${counts.rejected} rejected · ${counts.added} added`}
         actions={
-          <Link href={`/solicitations/${s.id}`} className="aur-btn aur-btn-ghost">
+          <Link href={`/solicitations/${s.id}`} className="aur-link">
             ← Back to solicitation
           </Link>
         }

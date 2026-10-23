@@ -61,7 +61,7 @@ export default async function PlatformAuditLogPage({
         title="Platform audit log"
         subtitle="Cross-tenant view of every recorded action. Reads from the same audit_log table that powers each tenant's /audit-log, but without the per-org scope filter. Use the tenant filter to focus, or the activity-by-tenant panel below to spot anomalies."
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost">
+          <Link href="/admin" className="aur-link">
             Back to admin
           </Link>
         }

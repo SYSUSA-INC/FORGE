@@ -32,7 +32,7 @@ export default async function Sba8aAdminPage() {
         title="Socioeconomic cert registry"
         subtitle="Pull active and graduated firms holding SBA socioeconomic certifications (8(a), HUBZone, WOSB, EDWOSB, SDVOSB, VOB, Native American). Used by /intelligence/firms and to chip awards on /intelligence/awards."
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost">
+          <Link href="/admin" className="aur-link">
             ← Platform admin
           </Link>
         }

@@ -24,7 +24,7 @@ export default function ForgotPasswordPage({
           {sent ? (
             <Link
               href="/sign-in"
-              className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+              className="aur-link"
             >
               Back to sign in
             </Link>

@@ -106,7 +106,7 @@ export default async function ProductionErrorsPage({
         title="Production errors"
         subtitle="In-app error log — uncaught exceptions deduped by fingerprint. Acknowledge to silence; resolve when the underlying bug is fixed. Same mental model as an audit log of errors."
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
+          <Link href="/admin" className="aur-link">
             ← SuperAdmin portal
           </Link>
         }

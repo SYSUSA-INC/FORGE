@@ -93,7 +93,7 @@ export default async function NewProposalPage({
         title="New proposal"
         subtitle="Step 2 of 2 — set up the proposal. Default sections will be created automatically."
         actions={
-          <Link href="/proposals/new" className="aur-btn aur-btn-ghost">
+          <Link href="/proposals/new" className="aur-link">
             ← Back to launcher
           </Link>
         }
@@ -107,7 +107,7 @@ export default async function NewProposalPage({
             </p>
             <Link
               href="/proposals/new"
-              className="aur-btn aur-btn-primary self-start"
+              className="aur-link"
             >
               Back to launcher
             </Link>

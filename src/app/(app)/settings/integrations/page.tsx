@@ -43,7 +43,7 @@ export default async function IntegrationsPage() {
         title="Integrations"
         subtitle="Your company's SAM.gov API key is set here. The other services run on credentials managed by the FORGE team."
         actions={
-          <Link href="/settings" className="aur-btn aur-btn-ghost">
+          <Link href="/settings" className="aur-link">
             ← Settings
           </Link>
         }

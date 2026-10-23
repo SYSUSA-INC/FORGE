@@ -277,7 +277,7 @@ export default async function SolicitationDetail({
         }
         actions={
           <>
-            <Link href="/solicitations" className="aur-btn aur-btn-ghost">
+            <Link href="/solicitations" className="aur-link">
               Back
             </Link>
             <SolicitationActions

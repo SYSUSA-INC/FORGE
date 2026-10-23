@@ -18,7 +18,7 @@ export default async function NewPromoCodePage() {
         actions={
           <Link
             href="/admin/promo-codes"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-link"
           >
             ← All codes
           </Link>

@@ -61,7 +61,7 @@ export default async function VerifyEmailPage({
               </p>
               <Link
                 href="/sign-up"
-                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+                className="aur-link"
               >
                 Back to sign up
               </Link>

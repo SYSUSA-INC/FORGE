@@ -37,7 +37,7 @@ export default async function ArtifactDetailPage({
         actions={
           <Link
             href="/knowledge-base/import"
-            className="aur-btn aur-btn-ghost"
+            className="aur-link"
           >
             ← Corpus
           </Link>
