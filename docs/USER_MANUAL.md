@@ -84,6 +84,8 @@ On **https://www.sysgov.com/sign-in** enter your email + password and click **Si
 
 If your organization uses SSO, use **Continue with Google** or **Continue with Microsoft** instead.
 
+**Too many attempts.** To stop password guessing, FORGE allows 10 sign-in attempts per email address in any 15 minutes. After that, sign-in is refused (it shows the usual "incorrect email or password" message, even with the right password) until the 15 minutes pass. Wait, then try again, or use **Forgot password?** if you are unsure of your password.
+
 ### 1.4 Forgot your password
 
 Click **Forgot password?** below the sign-in form. Enter your email — you'll get a reset link (valid for 1 hour). This works for every account, including one you created with **Continue with Google / Microsoft** (it simply sets a password on it) and one where you were invited but never finished creating a password. If no email arrives, contact your administrator: they can issue the reset link from the admin portal and send it to you directly.

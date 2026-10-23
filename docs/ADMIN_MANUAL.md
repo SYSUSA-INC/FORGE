@@ -636,6 +636,7 @@ Common causes:
 - They're disabled at the user level — check the "Disabled" pill in the Platform users tab
 - Their org is disabled — check the Organizations tab for a "Disabled" pill next to their org
 - Their membership was set to `disabled` — open the org's `/users` page as an org admin and re-enable them
+- They were rate limited — password sign-in allows 10 attempts per email and 60 per IP address in any 15 minutes, and a refused attempt looks the same as a wrong password (the log line `[auth] sign-in rate limited` names `email` or `ip`). Wait out the window. If a shared office or VPN address is being refused for everyone, the per-IP limit is the cause. There is no unlock button; a database error in the limiter also refuses sign-in (it fails closed) until the database is back
 
 ### 7.4 Data isolation
 
