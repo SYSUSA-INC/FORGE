@@ -3032,6 +3032,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **C10 (this PR):** one table style, `.aur-table` (open hairline rows, mono column heads): the notification rules and audit log tables drop their boxed wrapper and faint rules, the help manuals drop the full cell grid, and the reports tables adopt the class. Still open in C: the other ~20 hand-styled tables, other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
 
+**Manuals (this PR):** `docs/USER_MANUAL.md` (§2.0 Look and feel, What's new, sign-in notes, templates, compliance category) and `docs/ADMIN_MANUAL.md` (§1, §4, §7.1.1) now describe everything shipped in this item, and AGENTS.md convention 12 requires the manuals to change in the same PR as any user-visible change.
+
 **Next (serial):** rest of C.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")

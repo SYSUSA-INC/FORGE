@@ -35,6 +35,11 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **A new look** — FORGE now follows the EnableNow design system: white paper in light mode, a dark mode, Host Grotesk text and Geist Mono labels, one blue accent and a small blue diamond that marks where you are (§2.0).
+- **Tabs, tags and tables** — tabs are plain text with the diamond on the current one; colour-team, stage, category and relationship tags are neutral labels; header figures sit on a hairline; lists and tables are open rows rather than boxes (§2.0).
+- **Back links** — "Back" and "← …" actions are now text links beside the page's buttons (§2.0).
+- **Emails** — verification, reset, invite, review and notification emails use the same light look (§1.2).
+- **Sign-in limits** — 10 attempts per email in 15 minutes (§1.3).
 - **Request a trial** — anyone with a company email can ask for a 14-day trial workspace; editing never stops when a trial ends, only AI pauses (§1.0).
 - **API access** — admins create read-only API tokens to connect FORGE to a CRM or BI tool (§4.15).
 - **Your company's SAM.gov API key** — admins set the company's own key, tested with SAM.gov before it is saved (§4.16).
@@ -70,6 +75,8 @@ Click **Create account**. You'll see a "Check your inbox" screen.
 
 ### 1.2 Verify your email
 
+Emails from FORGE (verification, password reset, invitations, review assignments and notifications) share one light layout: a white card on a pale background, the blue FORGE mark, ink text and a blue button.
+
 Look for an email from `Forge <noreply@sysgov.com>` titled **"Verify your email for Forge"**. Click **Verify email** (or paste the link into a browser). The link expires in 24 hours.
 
 ![Verification email](docs/images/verify-email.png)
@@ -83,6 +90,8 @@ On **https://www.sysgov.com/sign-in** enter your email + password and click **Si
 ![Sign-in card](docs/images/sign-in.png)
 
 If your organization uses SSO, use **Continue with Google** or **Continue with Microsoft** instead.
+
+After you sign in, FORGE returns you to the page you were trying to open, but only when it is a page inside FORGE; a link that points anywhere else (including one written with a backslash, such as `/\example.com`) takes you to the Command Center instead.
 
 ### 1.4 Forgot your password
 
@@ -105,11 +114,23 @@ By default you can only join the organization that owns your email domain. If yo
 
 ## 2. The app layout
 
+### 2.0 Look and feel
+
+FORGE follows the EnableNow design system. A few conventions hold on every page, in light and dark mode (the moon button in the top bar switches):
+
+- **One accent.** Blue marks actions, links and where you are. A small **blue diamond** marks the current sidebar item, the current tab and the page's label above its title.
+- **Status colours mean one thing.** Green is done or won; red is blocked, lost or mandatory; amber/brass is attention or partial; blue is in progress; indigo is analysis or review; grey is not started. They are used for status only.
+- **Tags are neutral.** Colour-team and stage tags (Pink, Red, Gold, White Gloves, S1–S7) are an ink label with a small diamond in the team's colour. Compliance categories (Section L, M, C, FAR), evidence kinds, knowledge kinds, company relationships and key-date types are plain grey labels. On a solicitation's key dates, the colour shows how close a date is: grey for past, amber within 7 days, ink otherwise.
+- **Tabs** are plain text; the diamond shows on the current tab and on the one under your cursor. The sidebar's group headers are small mono labels with a **+** or **−**.
+- **Figures and lists.** The tiles under a page title are ink figures on a thin line (only error counts use red). Lists and tables are open rows with a hairline between them, and hover shades a row.
+- **Back and secondary links.** "Back", "← Platform admin" and similar are text links next to the page's buttons.
+- **Text.** Running sentences are set in the body font; mono is for labels, numbers and identifiers.
+
 After signing in you'll see the main **app shell**:
 
 ![App shell](docs/images/app-shell.png)
 
-- **Left sidebar** — collapsible navigation with a wide mode (full labels + group headers) and an icon-rail mode (icons only, hover to see labels). Click the chevron at the top to toggle. Groups: Command Center, Operations, Opportunities, Customer Relations, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Sub-items render with tree-connector lines so the hierarchy stays visually obvious. See §2.2 for the full nav structure.
+- **Left sidebar** — collapsible navigation with a wide mode (full labels + mono group headers with **+/−**, the current page marked with a blue diamond) and an icon-rail mode (icons only, hover to see labels). Click the chevron at the top to toggle. Groups: Command Center, Operations, Opportunities, Customer Relations, Platform Intelligence, Help, and Platform Administration (superadmin only). Operations + sub-pages are gated to org admins. Sub-items render with tree-connector lines so the hierarchy stays visually obvious. See §2.2 for the full nav structure.
 - **Top bar** — the mobile hamburger, the **⌘K search box** (find a page or a record, or ask the Brain — see §2.1.1), live session clock, Settings shortcut, and your avatar
 - **Content area** — changes with the page you're on
 - **User identity card** — pinned at the bottom of the sidebar. Shows your name, email, and active org. Click your avatar in the top bar (or the identity card directly) to open the user menu.
@@ -284,6 +305,8 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 **Settings → Billing** shows your plan, when it renews, and the other plans you can move to. Below the plans, **Add-ons** lists what you can add on top of any plan à la carte: a **token top-up** raises this month's AI token cap by its amount (buy several to stack them; a plan with an unlimited cap needs none), **extra seats** and **extra storage** raise your seat and storage limits the same way, and a **feature unlock** turns one feature on — for example Winner analysis on a plan that does not include it. The public pricing page lists the same add-ons under the plans. The line above the list shows your AI token cap this month and how much of it comes from add-ons. An org admin adds one with **Add …**. If you already pay for a plan by card, the add-on goes straight onto your plan's invoice: it counts immediately, your next invoice charges it for the rest of the current period, and from then on it renews with the plan. (A yearly plan with a monthly add-on is the exception: that add-on keeps its own monthly subscription.) Without a card plan, **Add …** goes through the same card checkout as a plan, and the add-on shows as **Active** within a few seconds of returning. Under each add-on you have bought, admins can change how many top-ups you hold (**Update**, prorated) or remove it: one on your plan's invoice is removed at once and the unused time is credited on your next invoice; one with its own subscription is cancelled and stays on until the end of the period you paid for. An add-on marked **Contact sales** is arranged with us and granted to your organization by hand. Everyone can see the list; only admins can buy.
 
 **Trials.** A workspace on a trial shows the days left in a line under the top bar and under **Current plan**. When the trial ends without a plan, nothing you have done is lost and **editing carries on as usual** — you can still write, create proposals, invite colleagues, upload and export. Only the AI features pause (drafting, chat, analyses and AI checks) until an admin chooses a plan here.
+
+**Default template.** On **Settings → Templates** the organization's default template carries a blue **Default** label and a blue-tinted card, in the app's accent colour (it no longer uses the template's own brand colour).
 
 **Templates on your plan.** Building your own proposal templates (Settings → Templates: new templates, editing, uploading a Word file) is part of some plans. On a plan without it, the templates you already have keep working: they still appear when you start a proposal, and an admin can still choose the default or archive one. Only creating and editing are paused; the page links to Billing.
 
@@ -611,7 +634,7 @@ Section L/M traceability matrix. Every shall-statement from the RFP gets a row:
 
 ![Compliance matrix](docs/images/proposal-compliance.png)
 
-- **Category** — Section L, M, C, FAR clause, or Other
+- **Category** — Section L, M, C, FAR clause, or Other (shown as a neutral grey label)
 - **Number** — the RFP reference (e.g., "L.3.2")
 - **Requirement text** — the shall statement
 - **Volume** — proposal volume this lives in

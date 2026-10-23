@@ -28,6 +28,8 @@ Admins in FORGE are the people who decide who has access, what their access lets
 
 ## 1. Roles overview
 
+Admin pages use the same look as the rest of FORGE (User Manual §2.0): text tabs with a blue diamond, ink figures on a hairline, open hairline tables (the Audit Log and Notification rules tables, for example), neutral grey tags, and "Back" / "← SuperAdmin portal" as text links beside a page's buttons. Status colours keep one meaning each: green done, red blocked or failed, amber attention, blue in progress.
+
 FORGE has two kinds of privileged users:
 
 ### Organization admin
@@ -298,6 +300,8 @@ For a future "full snapshot with bodies" pattern (e.g., for legal-hold scenarios
 ---
 
 ## 4. Audit & accountability
+
+The Audit Log shows events as an open table: mono column heads, one hairline between rows, and a Detail control on the right of each row.
 
 This is the section to read before your first quarterly review. It tells you exactly where each kind of change lives so you can answer the "who, when, why" questions confidently.
 
@@ -624,6 +628,10 @@ Migration 0107 adds `api_token` — sync it on `/admin/migrations` after deployi
 2. Check the user's spam folder
 3. Check the domain is verified at https://resend.com/domains (sysgov.com should show green SPF/DKIM/DMARC)
 4. Check Vercel env vars: `RESEND_API_KEY` and `EMAIL_FROM` are set on Production, Preview, and Development
+
+### 7.1.1 What the emails look like
+
+Every email FORGE sends (verification, reset, invite, review, comment mention, notification rules, digests, billing reminders) shares one light layout: white card on a pale background, a blue FORGE mark, ink text and a blue button with square corners. Colours come from one table in `src/lib/theme-colors.ts` (`EMAIL_HEX`) because mail clients cannot read the app's theme. A mail client with its own dark mode may invert the card.
 
 ### 7.2 A user's password doesn't work
 
