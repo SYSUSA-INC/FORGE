@@ -86,9 +86,9 @@ export function ReviewSummaryPanel({ reviewId, summary, summaryAt }: { reviewId:
           {summary.themes.length ? (
             <div>
               <div className="font-mono text-[10px] uppercase tracking-label text-subtle">Themes</div>
-              <ul className="mt-1 flex flex-col gap-1.5">
+              <ul className="mt-1 flex flex-col divide-y divide-layer/10">
                 {summary.themes.map((t, i) => (
-                  <li key={i} className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+                  <li key={i} className="px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]">
                     <div className="font-body text-[12px] font-semibold text-text">{t.title}</div>
                     <div className="font-body text-[12px] leading-relaxed text-muted">{t.detail}</div>
                     {t.sections.length ? <div className="mt-1 font-mono text-[10px] text-subtle">{t.sections.join(" · ")}</div> : null}

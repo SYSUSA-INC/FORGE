@@ -37,11 +37,11 @@ export function AgencyContactsView({ agency, contacts, className }: { agency: st
           Nobody from this agency is in the contacts yet. A warm name here is worth more than a page of boilerplate: <Link href={addHref} className="text-indigo-300 hover:underline">add the people you know</Link>.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col divide-y divide-layer/10">
           {contacts.slice(0, SHOW).map((c) => {
             const next = nextTouchStatus(c.nextTouchAt);
             return (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5">
+              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]">
                 <div className="min-w-0">
                   <Link href={`/contacts/${c.id}`} className="font-body text-[12px] font-semibold text-text hover:underline">
                     {c.name}

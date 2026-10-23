@@ -3002,6 +3002,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **D (this PR):** the transactional emails (shared shell, invite, reset, verify, review, notification and digest builders, billing dunning) move from the old navy palette to EnableNow's light look: white card on slate-25, ink and slate text, brand-blue button with 3px corners, no gradient stripe. Colours come from one `EMAIL_HEX` table in `theme-colors.ts` (email clients cannot read CSS variables). Still open: the rest of C (boxed rows, secondary actions as links, one button size, one table style).
 
+**C8 (this PR):** nine more boxed list rows move to hairlines (agency contacts, trial requests, add-on catalog, scout, the review checklist, consolidated report and summary panels, customer history, Q&A). Still open in C: the boxed rows that are not simple lists (form panels, label rows, cards in a grid), secondary actions as links, one button size, one table style.
+
 **Next (serial):** rest of C.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")

@@ -46,9 +46,9 @@ export function ConsolidatedReport({
       {groups.length === 0 ? (
         <p className="font-body text-[12px] text-muted">Nothing to consolidate yet. Comments from every reviewer fold in here by section as they arrive.</p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col divide-y divide-layer/10">
           {groups.map((g) => (
-            <li key={g.sectionId ?? "general"} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5">
+            <li key={g.sectionId ?? "general"} className="flex flex-wrap items-center justify-between gap-2 px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]">
               <span className="min-w-0 truncate font-mono text-[11px] text-text">
                 {g.sectionId && sectionNumbers[g.sectionId] !== undefined ? `§${sectionNumbers[g.sectionId]} · ` : ""}
                 {g.title}

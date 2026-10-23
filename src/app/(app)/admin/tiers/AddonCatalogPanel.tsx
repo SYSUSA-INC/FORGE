@@ -28,9 +28,9 @@ export function AddonCatalogPanel({ addons, activeGrants }: { addons: AddonCatal
       {addons.length === 0 ? (
         <div className="font-mono text-[11px] text-muted">No add-ons yet. Create a token top-up or a feature unlock below.</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y divide-layer/10">
           {addons.map((a) => (
-            <li key={a.id} className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
+            <li key={a.id} className="px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]">
               {editing === a.id ? (
                 <AddonForm initial={a} onDone={() => setEditing(null)} />
               ) : (
