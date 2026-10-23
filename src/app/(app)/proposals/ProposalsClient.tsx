@@ -218,7 +218,7 @@ export function ProposalsClient({
             No proposals match.
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col divide-y divide-layer/10">
             {filtered.map((p) => (
               <ProposalRowItem key={p.id} p={p} />
             ))}
@@ -261,7 +261,7 @@ function ProposalRowItem({ p }: { p: ProposalRow }) {
   return (
     <Link
       href={`/proposals/${p.id}`}
-      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 transition-colors hover:border-layer/20 md:grid-cols-[1fr_auto_auto_auto]"
+      className="grid grid-cols-1 items-center gap-3 px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06] md:grid-cols-[1fr_auto_auto_auto]"
     >
       <div className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">
