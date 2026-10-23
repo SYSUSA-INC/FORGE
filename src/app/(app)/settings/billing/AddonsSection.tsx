@@ -33,7 +33,7 @@ export async function AddonsSection({
   return (
     <Panel title="Add-ons" eyebrow="À la carte" className="mt-4">
       {tier ? (
-        <p className="mb-3 font-mono text-[11px] text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           AI token cap this month:{" "}
           {capNow === 0 ? (
             <span className="text-text">Unlimited on {tier.tierName}</span>

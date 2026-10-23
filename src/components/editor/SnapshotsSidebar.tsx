@@ -176,7 +176,7 @@ export function SnapshotsSidebar({
       {loading ? (
         <p className="font-mono text-[11px] text-muted">Loading…</p>
       ) : snapshots.length === 0 ? (
-        <p className="font-mono text-[11px] text-muted">
+        <p className="font-body text-[13px] leading-[1.5] text-muted">
           No snapshots yet. Take one to checkpoint the current text.
         </p>
       ) : (

@@ -205,7 +205,7 @@ export function TierEditForm({
         <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Stripe binding
         </legend>
-        <p className="mb-3 font-mono text-[10px] text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           Paste the Stripe Price ids for this tier (from Stripe Dashboard →
           Products → your product → Prices). Leave blank to disable
           self-serve checkout for this tier (Enterprise / sales-assisted only).

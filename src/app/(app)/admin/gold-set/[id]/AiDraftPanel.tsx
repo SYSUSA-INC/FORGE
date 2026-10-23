@@ -63,13 +63,13 @@ export function AiDraftPanel({ docId, state, approved }: { docId: string; state:
         </div>
       }
     >
-      <p className="font-mono text-[11px] text-muted">
+      <p className="font-body text-[13px] leading-[1.5] text-muted">
         The AI reads the document in windows and proposes every requirement, page or format limit and Section M factor it finds,
         quoted from the text. Proposals wait for review below; anything matching an existing annotation, including a rejected one,
         is skipped. It drafts; the expert decides. Search the document for what it may have missed. Keep this page open while it
         works; if it closes, Continue picks up where it stopped. AI usage counts against your own organisation.
       </p>
-      <p className="mt-2 font-mono text-[11px] text-text">
+      <p className="mt-2 font-body text-[13px] leading-[1.5] text-text">
         {progress ??
           (started
             ? `${state.windowsDone} windows read · ${state.proposed ?? 0} proposed · ${state.duplicates ?? 0} duplicates skipped${state.windowsFailed ? ` · ${state.windowsFailed} windows failed` : ""}`

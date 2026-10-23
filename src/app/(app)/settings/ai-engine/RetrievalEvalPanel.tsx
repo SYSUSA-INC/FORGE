@@ -78,7 +78,7 @@ export function RetrievalEvalPanel({
         ) : null
       }
     >
-      <p className="mb-3 font-mono text-[11px] text-muted">
+      <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
         Each case is a section of a proposal you won that is already in the Brain. FORGE searches for
         it twice: with the query the drafter uses for sources (no draft yet), and with the section&apos;s
         mapped requirements. A search succeeds when a result carries that section&apos;s winning text.
@@ -88,7 +88,7 @@ export function RetrievalEvalPanel({
       </p>
       {note ? <p className="mb-3 font-mono text-[11px] text-text">{note}</p> : null}
       {runs.length === 0 ? (
-        <p className="font-mono text-[11px] text-muted">
+        <p className="font-body text-[13px] leading-[1.5] text-muted">
           No runs yet. Cases come from won proposals harvested into the Brain (Knowledge base → harvest, or the nightly indexer).
         </p>
       ) : (

@@ -145,7 +145,7 @@ export function ReviewClient({
         <div className="font-display text-base font-semibold text-text">
           Your recommendation
         </div>
-        <p className="mt-1 font-mono text-[11px] text-muted">
+        <p className="mt-1 font-body text-[13px] leading-[1.5] text-muted">
           Picking <strong className="text-emerald-300">Bid</strong> moves this
           opportunity from Identified to Qualification automatically.
         </p>

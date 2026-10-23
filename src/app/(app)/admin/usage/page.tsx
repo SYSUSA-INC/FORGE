@@ -363,7 +363,7 @@ export default async function AdminUsagePage() {
             </div>
           )}
 
-          <p className="mt-3 font-mono text-[10px] text-muted">
+          <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
             Cost estimate: ${costPerMTok}/M tokens (blended Anthropic Sonnet
             input + output). Override via AI_COST_PER_MTOK env var.
           </p>
@@ -522,7 +522,7 @@ export default async function AdminUsagePage() {
             </div>
           )}
 
-          <p className="mt-3 font-mono text-[10px] text-muted">
+          <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
             Source: ai_call_log, one row per gateway call. Refused = blocked
             at the token-cap pre-check. Parse fail = the model&apos;s answer did
             not match the feature&apos;s schema. Via tool = answered through a

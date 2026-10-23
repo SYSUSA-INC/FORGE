@@ -104,7 +104,7 @@ export function EbuyPasteClient() {
           </Link>
         }
       >
-        <p className="mb-3 font-mono text-[11px] text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           eBuy RFQs aren&rsquo;t indexed by SAM.gov. Open the RFQ in eBuy,
           select all, paste below — or paste the body of the eBuy notification
           email. The AI will extract the title, RFQ number, vehicle, due date,

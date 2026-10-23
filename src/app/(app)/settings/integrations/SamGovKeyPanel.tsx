@@ -76,7 +76,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
         FORGE uses this key for Import from SAM.gov, company search and sync, Getting started, the scout, the daily Q&amp;A check and Check SAM.gov now. Without it, FORGE&apos;s shared key is used when available. Get a free key on SAM.gov: sign in, open Account Details and request a Public API Key.
       </p>
 
-      <p className="mt-3 font-mono text-[11px] text-text">
+      <p className="mt-3 font-body text-[13px] leading-[1.5] text-text">
         {company && company.readable
           ? `${maskLast4(company.last4)} · added${company.setByName ? ` by ${company.setByName}` : ""} on ${day(company.setAt)}${company.verifiedAt ? ` · SAM.gov accepted it on ${day(company.verifiedAt)}` : ""}`
           : company
@@ -87,13 +87,13 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
       </p>
       {/* BL-STAB-7d — what SAM.gov last said, for the key in use (an unreadable key isn't used). */}
       {!company?.readable ? null : company.status === "rate_limited" ? (
-        <p className="mt-1 font-mono text-[11px] text-gold">SAM.gov&apos;s request limit for this key was reached on {day(company.statusAt)}; it resets daily.</p>
+        <p className="mt-1 font-body text-[13px] leading-[1.5] text-gold">SAM.gov&apos;s request limit for this key was reached on {day(company.statusAt)}; it resets daily.</p>
       ) : company.status === "invalid" ? (
-        <p className="mt-1 font-mono text-[11px] text-rose">
+        <p className="mt-1 font-body text-[13px] leading-[1.5] text-rose">
           SAM.gov rejected this key on {day(company.statusAt)}: it is invalid or expired. SAM.gov searches fail and the daily Q&amp;A check is paused until a new key is saved.
         </p>
       ) : company.status === "forbidden" ? (
-        <p className="mt-1 font-mono text-[11px] text-gold">
+        <p className="mt-1 font-body text-[13px] leading-[1.5] text-gold">
           SAM.gov refused a request for this key on {day(company.statusAt)}: it isn&apos;t allowed to use part of SAM.gov. Check its access on SAM.gov, or save a new key.
         </p>
       ) : null}
@@ -132,7 +132,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
       ) : (
         <p className="mt-3 font-mono text-[11px] text-gold">{view.dbReady ? KEYRING_UNAVAILABLE_MESSAGE : DATABASE_PENDING_MESSAGE}</p>
       )}
-      <p className="mt-2 font-mono text-[10px] text-subtle">
+      <p className="mt-2 font-body text-[13px] leading-[1.5] text-subtle">
         FORGE encrypts the key and only ever sends it to SAM.gov. It can&apos;t be shown again — not to you, your team or FORGE support.
       </p>
       {company ? (

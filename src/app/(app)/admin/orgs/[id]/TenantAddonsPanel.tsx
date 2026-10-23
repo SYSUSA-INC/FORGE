@@ -124,12 +124,12 @@ export function TenantAddonsPanel({
               {pending ? "Saving…" : "Grant"}
             </button>
           </div>
-          <p className="font-mono text-[10px] leading-relaxed text-muted">
+          <p className="font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
             Audited as <code>tenant.addon.grant</code> / <code>tenant.addon.revoke</code> in the tenant&apos;s audit log. Leave the date empty for an open-ended grant.
           </p>
         </form>
       ) : (
-        <p className="font-mono text-[10px] text-muted">No active add-ons in the catalogue. Create one under /admin/tiers first.</p>
+        <p className="font-body text-[13px] leading-[1.5] text-muted">No active add-ons in the catalogue. Create one under /admin/tiers first.</p>
       )}
 
       {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}

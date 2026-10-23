@@ -53,7 +53,7 @@ export function ItarRestrictedToggle({ organizationId, initialValue }: Props) {
           <span className="font-mono text-[10px] uppercase tracking-label text-muted">
             ITAR restriction
           </span>
-          <p className="font-mono text-[10px] text-subtle">
+          <p className="font-body text-[13px] leading-[1.5] text-subtle">
             When on, every new invite requires an admin-attested US-person check.
           </p>
         </div>

@@ -232,7 +232,7 @@ export default async function TenantActivityPage({
           eyebrow={`Latest ${recentActivity.length}`}
         >
           {recentActivity.length === 0 ? (
-            <p className="font-mono text-[11px] text-muted">
+            <p className="font-body text-[13px] leading-[1.5] text-muted">
               No audit-log entries for this tenant yet.
             </p>
           ) : (

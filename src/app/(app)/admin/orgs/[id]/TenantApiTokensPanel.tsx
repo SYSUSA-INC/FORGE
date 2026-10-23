@@ -41,7 +41,7 @@ export function TenantApiTokensPanel({ organizationId, tokens }: { organizationI
     });
   }
 
-  if (tokens.length === 0) return <p className="font-mono text-[11px] text-muted">This tenant has no API tokens.</p>;
+  if (tokens.length === 0) return <p className="font-body text-[13px] leading-[1.5] text-muted">This tenant has no API tokens.</p>;
 
   return (
     <div>
@@ -104,7 +104,7 @@ export function TenantApiTokensPanel({ organizationId, tokens }: { organizationI
               Revoke all active
             </button>
           </div>
-          <p className="mt-1 font-mono text-[10px] text-muted">Fill in the reason first; it applies to a single revoke too.</p>
+          <p className="mt-1 font-body text-[13px] leading-[1.5] text-muted">Fill in the reason first; it applies to a single revoke too.</p>
         </div>
       ) : null}
 

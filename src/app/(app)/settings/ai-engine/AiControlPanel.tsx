@@ -308,7 +308,7 @@ function RoutingPanel(p: AiControlPanelProps) {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 font-mono text-[10px] text-muted">
+        <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
           Calls, tokens and errors are this month&apos;s, from the AI call ledger (errors include calls refused at the
           cap). Embeddings are routed to the embedding provider, not a completion model.
         </p>

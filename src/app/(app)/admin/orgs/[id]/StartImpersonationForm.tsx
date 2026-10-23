@@ -73,7 +73,7 @@ export function StartImpersonationForm({
       <div className="font-mono text-[10px] uppercase tracking-label text-amber-300">
         Assume identity of {organizationName}
       </div>
-      <p className="font-mono text-[11px] text-muted">
+      <p className="font-body text-[13px] leading-[1.5] text-muted">
         You&rsquo;ll browse the app read-only as this tenant. Every mutation is
         blocked; ending the session is a single click in the banner. The
         session expires in 1 hour. Reason is permanent in this tenant&rsquo;s

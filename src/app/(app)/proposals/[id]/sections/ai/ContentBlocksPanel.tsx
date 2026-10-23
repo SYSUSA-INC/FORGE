@@ -104,7 +104,7 @@ export function ContentBlocksPanel({
               ))}
             </div>
           ) : null}
-          <p className="mt-1 font-mono text-[10px] text-muted">
+          <p className="mt-1 font-body text-[13px] leading-[1.5] text-muted">
             Blocks are the <span className="text-text">Boilerplate</span> entries under Knowledge, version-controlled with a changelog.
             Inserted text arrives as a tracked suggestion by FORGE AI.
           </p>

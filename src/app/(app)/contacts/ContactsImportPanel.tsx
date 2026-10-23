@@ -227,7 +227,7 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
       {preview ? (
         <>
           {preview.stoppedAt !== null ? (
-            <p className="font-mono text-[10px] text-amber-200">
+            <p className="font-body text-[13px] leading-[1.5] text-amber-200">
               This file holds more than {IMPORT_LIMITS.maxRows} contacts; one import takes {IMPORT_LIMITS.maxRows}. Reading stopped at {preview.format === "vcard" ? "card" : "line"} {preview.stoppedAt}: import from there on as a separate file{preview.format === "vcard" ? "" : " (with the header row)"}.
             </p>
           ) : null}

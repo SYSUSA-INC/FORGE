@@ -51,7 +51,7 @@ export function TenantDomainsEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="font-mono text-[10px] leading-relaxed text-subtle">
+      <p className="font-body text-[13px] leading-[1.5] leading-relaxed text-subtle">
         By default a person may only join the tenant that owns their email
         domain. Invitations from any other domain are held until a platform
         admin approves them. Public mailbox providers (gmail.com, outlook.com…)

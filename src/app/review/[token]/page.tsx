@@ -22,7 +22,7 @@ export default async function PublicReviewPage({
             <p className="mt-2 font-mono text-[12px] text-muted">
               {res.error}
             </p>
-            <p className="mt-4 font-mono text-[11px] text-muted">
+            <p className="mt-4 font-body text-[13px] leading-[1.5] text-muted">
               If this is unexpected, ask the sender to resend the request — or
               sign in to FORGE if you have an account.
             </p>

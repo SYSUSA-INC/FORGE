@@ -260,7 +260,7 @@ export function FirmsSearchClient({
           </Field>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-layer/10 px-5 py-3">
-          <p className="font-mono text-[11px] text-muted">
+          <p className="font-body text-[13px] leading-[1.5] text-muted">
             Newly graduated firms are <em>especially</em> valuable capture
             targets — they're now competing in full-and-open for the first
             time. Try Status = Graduated, within 24 months.

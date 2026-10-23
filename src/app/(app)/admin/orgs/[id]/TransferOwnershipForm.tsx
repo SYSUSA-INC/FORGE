@@ -121,7 +121,7 @@ export function TransferOwnershipForm({
         </div>
       ) : null}
 
-      <p className="font-mono text-[10px] leading-relaxed text-muted">
+      <p className="font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
         The new primary must already be an active admin of this org. To
         add someone, ask the tenant&apos;s existing admin to invite them
         with the Admin role first. Audited as{" "}

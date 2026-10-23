@@ -892,12 +892,12 @@ function DocxPanel({
             </li>
           ))}
         </ul>
-        <p className="mt-3 font-mono text-[10px] text-muted">
+        <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
           Loop pattern for proposal sections:{" "}
           <code>&#123;#sections&#125;&#123;title&#125; &#123;body&#125;&#123;/sections&#125;</code>
           {" "}— each section in the proposal will repeat this block.
         </p>
-        <p className="mt-2 font-mono text-[10px] text-muted">
+        <p className="mt-2 font-body text-[13px] leading-[1.5] text-muted">
           For rich Word formatting (headings, bold, lists from the editor),
           use{" "}
           <code>&#123;#sections&#125;&#123;title&#125; &#123;@bodyXml&#125;&#123;/sections&#125;</code>
