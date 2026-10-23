@@ -7,6 +7,8 @@
  * delivery as sent and never sent anything.
  */
 
+import { EMAIL_HEX } from "@/lib/theme-colors";
+
 export type BuiltEmail = { subject: string; html: string; text: string };
 
 const SUBJECT_MAX = 120;
@@ -29,13 +31,13 @@ export function joinAppUrl(appUrl: string, path: string | undefined): string {
 
 function footer(ruleName: string): { html: string; text: string } {
   return {
-    html: `<p style="margin:24px 0 0 0;font-size:12px;color:#6B7A93;line-height:1.5;">Sent by the notification rule &ldquo;${escapeHtml(ruleName)}&rdquo;. Manage rules under Operations Management &rarr; Notification rules.</p>`,
+    html: `<p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};line-height:1.5;">Sent by the notification rule &ldquo;${escapeHtml(ruleName)}&rdquo;. Manage rules under Operations Management &rarr; Notification rules.</p>`,
     text: `Sent by the notification rule "${ruleName}". Manage rules under Operations Management → Notification rules.`,
   };
 }
 
 function openLink(url: string): string {
-  return `<p style="margin:20px 0 0 0;"><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#4C8DFF;color:#0b1220;font-weight:600;text-decoration:none;font-size:14px;">Open in FORGE</a></p>`;
+  return `<p style="margin:20px 0 0 0;"><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 16px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.onAccent};font-weight:600;text-decoration:none;font-size:14px;">Open in FORGE</a></p>`;
 }
 
 /** One immediate-frequency notification. */
@@ -51,8 +53,8 @@ export function buildRuleNotificationEmail(input: {
   const body = (input.body ?? "").trim();
   const f = footer(input.ruleName);
   const html = [
-    `<h1 style="margin:0 0 12px 0;font-size:18px;color:#EEF2F8;">${escapeHtml(input.subject.trim())}</h1>`,
-    body ? `<p style="margin:0;font-size:14px;line-height:1.55;color:#A3B1C6;">${escapeHtml(body)}</p>` : "",
+    `<h1 style="margin:0 0 12px 0;font-size:18px;color:${EMAIL_HEX.ink};">${escapeHtml(input.subject.trim())}</h1>`,
+    body ? `<p style="margin:0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">${escapeHtml(body)}</p>` : "",
     openLink(url),
     f.html,
   ]
@@ -78,8 +80,8 @@ export function buildDigestEmail(input: {
   const url = joinAppUrl(input.appUrl, "/notifications");
   const f = footer(input.ruleName);
   const html = [
-    `<h1 style="margin:0 0 12px 0;font-size:18px;color:#EEF2F8;">${escapeHtml(headline)}</h1>`,
-    `<p style="margin:0;font-size:14px;line-height:1.55;color:#A3B1C6;">Your ${input.cadence} digest has ${n} ${noun} waiting in your FORGE inbox.</p>`,
+    `<h1 style="margin:0 0 12px 0;font-size:18px;color:${EMAIL_HEX.ink};">${escapeHtml(headline)}</h1>`,
+    `<p style="margin:0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">Your ${input.cadence} digest has ${n} ${noun} waiting in your FORGE inbox.</p>`,
     openLink(url),
     f.html,
   ].join("\n");

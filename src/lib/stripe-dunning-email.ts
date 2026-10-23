@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { memberships, organizations, users } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { log } from "@/lib/log";
+import { EMAIL_HEX } from "@/lib/theme-colors";
 
 /**
  * BL-17 Slice 4 — single notification email on invoice.payment_failed.
@@ -160,7 +161,7 @@ function buildHtml(args: {
   const cta = args.hostedInvoiceUrl
     ? `<p style="margin: 20px 0;">
          <a href="${args.hostedInvoiceUrl}"
-            style="display:inline-block;background:#4C8DFF;color:#0b1220;padding:10px 18px;border-radius:8px;font-weight:600;text-decoration:none;">
+            style="display:inline-block;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.onAccent};padding:10px 18px;border-radius:3px;font-weight:600;text-decoration:none;">
            Update payment method →
          </a>
        </p>`
@@ -179,7 +180,7 @@ function buildHtml(args: {
       service interruption, click below:
     </p>
     ${cta}
-    <p style="margin:24px 0 0 0;color:#94a3b8;font-size:12px;">
+    <p style="margin:24px 0 0 0;color:${EMAIL_HEX.muted};font-size:12px;">
       This is attempt ${args.attemptCount} of Stripe's retry sequence.
       After all retries are exhausted, your subscription will be
       automatically cancelled and FORGE access will revert to your

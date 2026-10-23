@@ -73,6 +73,24 @@ export const PRINT_HEX = {
   accent: "#B98C36",
 } as const;
 
+/**
+ * Email colours (EnableNow, light). Email clients cannot read CSS
+ * variables or follow a theme, so mail uses these literals: white card on
+ * the slate-25 wash, ink and slate text, the brand blue for the button.
+ */
+export const EMAIL_HEX = {
+  page: "#F6F7FA",
+  card: "#FFFFFF",
+  ink: "#181B23",
+  muted: "#626B7D",
+  line: "#E4E8F1",
+  accent: "#2953D7",
+  onAccent: "#FFFFFF",
+  tint: "#EEF3FF",
+  brass: "#785A1C",
+  green: "#096F64",
+} as const;
+
 /** Literal hex (dark-theme values) for emails, PDFs and stored data. */
 export const THEME_HEX: Record<ThemeColor, string> = {
   canvas: "#050608",

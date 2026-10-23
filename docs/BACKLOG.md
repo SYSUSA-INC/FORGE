@@ -3000,7 +3000,9 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **C7 (this PR):** visual check of C1 to C6 in both themes (home, proposals, reviews, compliance, company, admin). One fix: the first tab's label sat 26px inside the page edge; it now lines up.
 
-**Next (serial):** rest of C, D HTML emails.
+**D (this PR):** the transactional emails (shared shell, invite, reset, verify, review, notification and digest builders, billing dunning) move from the old navy palette to EnableNow's light look: white card on slate-25, ink and slate text, brand-blue button with 3px corners, no gradient stripe. Colours come from one `EMAIL_HEX` table in `theme-colors.ts` (email clients cannot read CSS variables). Still open: the rest of C (boxed rows, secondary actions as links, one button size, one table style).
+
+**Next (serial):** rest of C.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)
