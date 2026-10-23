@@ -407,21 +407,15 @@ export function NavContent({
                 key={g.id}
                 href={g.href}
                 onClick={onNavigate}
-                className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                aria-current={active ? "page" : undefined}
+                className={`relative flex items-center rounded-md py-2 pl-6 pr-2 text-[14px] font-medium transition-colors ${
                   active
                     ? "bg-cobalt-400/10 text-text"
                     : "text-muted hover:bg-bone hover:text-text"
                 }`}
               >
-                {active && <span className="aur-diamond absolute -left-1 top-1/2 -translate-y-1/2" />}
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
-                    active ? "bg-cobalt-400/15 text-cobalt" : "bg-layer/5 text-muted"
-                  }`}
-                >
-                  {g.icon}
-                </span>
-                <span className="font-medium">{g.label}</span>
+                {active && <span aria-hidden className="aur-diamond absolute left-2 top-1/2 -translate-y-1/2" />}
+                {g.label}
               </Link>
             );
           }
@@ -435,24 +429,14 @@ export function NavContent({
                 type="button"
                 onClick={() => toggleGroup(g.id)}
                 aria-expanded={showChildren}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                  groupActive
-                    ? "text-text"
-                    : "text-muted hover:bg-bone hover:text-text"
+                className={`flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors ${
+                  groupActive ? "text-text" : "text-muted hover:text-text"
                 }`}
               >
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-md text-xs ${
-                    groupActive ? "bg-cobalt-400/15 text-cobalt" : "bg-layer/5 text-muted"
-                  }`}
-                >
-                  {g.icon}
+                <span className="flex-1 font-mono text-[10px] uppercase tracking-label">
+                  {g.label}
                 </span>
-                <span className="flex-1 font-medium">{g.label}</span>
-                <span
-                  aria-hidden
-                  className="grid h-5 w-5 place-items-center rounded-md border border-layer/10 bg-layer/[0.03] font-mono text-[12px] text-muted"
-                >
+                <span aria-hidden className="font-light">
                   {showChildren ? "−" : "+"}
                 </span>
               </button>
@@ -473,13 +457,14 @@ export function NavContent({
                         <Link
                           href={c.href}
                           onClick={onNavigate}
-                          className={`relative block rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+                          aria-current={active ? "page" : undefined}
+                          className={`relative block rounded-md py-1.5 pl-6 pr-2 text-[14px] transition-colors ${
                             active
                               ? "bg-cobalt-400/10 text-text"
                               : "text-muted hover:bg-bone hover:text-text"
                           }`}
                         >
-                          {active && <span className="aur-diamond mr-2 align-middle" />}
+                          {active && <span aria-hidden className="aur-diamond absolute left-2 top-1/2 -translate-y-1/2" />}
                           {c.label}
                         </Link>
                       </li>
