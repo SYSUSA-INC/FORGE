@@ -1197,6 +1197,26 @@ mind. Bandage will come off but a true fix will stay."
       session ends, and they enrol again at the next sign-in.
     - **Sessions:** signed out after 8 hours without use and after 24
       hours at most (today they last 30 days and renew on every use).
+  - **Owner decisions, round 2 (2026-10-23), for 8a:**
+    - **Passkeys:** an optional second factor beside the authenticator
+      app, and required for platform superadmins.
+    - **Preview deployments:** the same MFA rules as production, with a
+      preview-only test bypass code so testers can get past the second
+      step.
+    - **Emergency off-switch:** an environment variable
+      (`MFA_ENFORCEMENT=off`) skips the second step. Each sign-in under
+      it writes an audit row, and a banner shows while it is on.
+    - **OAuth:** no linking by email alone (a Google/Microsoft sign-in
+      links only to an account it is already attached to, or through an
+      invite); Entra is restricted to an allow-list of tenants; sign-up
+      is `invite_only` in production (`SIGNUP_MODE`).
+    - **Between password and second step:** the pending session lasts 10
+      minutes; 5 wrong codes lock the sign-in for 15 minutes.
+    - **Emails:** only the superadmin reset emails the person (with the
+      written reason). No emails for adding or removing a factor, for
+      recovery codes, or for new devices in 8a.
+    - **Factors:** up to 3 per user (authenticator apps and passkeys
+      together) and 10 single-use recovery codes, regenerated on demand.
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
