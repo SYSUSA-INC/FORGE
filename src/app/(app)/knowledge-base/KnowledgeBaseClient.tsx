@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { withAlpha, THEME } from "@/lib/theme-colors";
 
 type OutcomeLabel = "none" | "won" | "lost" | "no_bid" | "withdrawn";
 
@@ -18,13 +17,6 @@ type Entry = {
   outcomeLabel: OutcomeLabel;
   archivedAt: string | null;
   updatedAt: string;
-};
-
-const KIND_COLOR: Record<string, string> = {
-  capability: THEME.cobalt,
-  past_performance: THEME.plum,
-  personnel: THEME.indigo,
-  boilerplate: THEME.muted,
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -170,21 +162,13 @@ export function KnowledgeBaseClient({
         ) : (
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {entries.map((e) => {
-              const color = KIND_COLOR[e.kind] ?? THEME.muted;
               return (
                 <li key={e.id} className="aur-card flex flex-col gap-2 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1">
-                      <span
-                        className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
-                        style={{
-                          color,
-                          backgroundColor: withAlpha(color, 0.1),
-                          border: `1px solid ${withAlpha(color, 0.31)}`,
-                        }}
-                      >
-                        {KIND_LABEL[e.kind] ?? e.kind}
-                      </span>
+                      <span className="aur-tag text-muted">
+{KIND_LABEL[e.kind] ?? e.kind}
+</span>
                       {e.outcomeLabel !== "none" ? (
                         <span
                           className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${OUTCOME_TONES[e.outcomeLabel]}`}

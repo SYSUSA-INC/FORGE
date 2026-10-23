@@ -14,57 +14,6 @@ const KEY_DATE_TYPE_LABELS: Record<SolicitationKeyDate["type"], string> = {
   other: "Milestone",
 };
 
-const KEY_DATE_TYPE_COLOR: Record<
-  SolicitationKeyDate["type"],
-  { color: string; bg: string; border: string }
-> = {
-  proposal_due: {
-    color: THEME.red,
-    bg: withAlpha(THEME.red, 0.10),
-    border: withAlpha(THEME.red, 0.30),
-  },
-  final_rfp: {
-    color: THEME.brassDeep,
-    bg: withAlpha(THEME.brassDeep, 0.10),
-    border: withAlpha(THEME.brassDeep, 0.30),
-  },
-  qa_cutoff: {
-    color: THEME.brass,
-    bg: withAlpha(THEME.brass, 0.10),
-    border: withAlpha(THEME.brass, 0.30),
-  },
-  oral_presentation: {
-    color: THEME.indigo,
-    bg: withAlpha(THEME.indigo, 0.10),
-    border: withAlpha(THEME.indigo, 0.30),
-  },
-  site_visit: {
-    color: THEME.cobalt,
-    bg: withAlpha(THEME.cobalt, 0.10),
-    border: withAlpha(THEME.cobalt, 0.30),
-  },
-  expected_award: {
-    color: THEME.green,
-    bg: withAlpha(THEME.green, 0.10),
-    border: withAlpha(THEME.green, 0.30),
-  },
-  debrief_window: {
-    color: THEME.muted,
-    bg: withAlpha(THEME.muted, 0.10),
-    border: withAlpha(THEME.muted, 0.30),
-  },
-  protest_window: {
-    color: THEME.muted,
-    bg: withAlpha(THEME.muted, 0.10),
-    border: withAlpha(THEME.muted, 0.30),
-  },
-  other: {
-    color: THEME.muted,
-    bg: withAlpha(THEME.muted, 0.10),
-    border: withAlpha(THEME.muted, 0.30),
-  },
-};
-
 function daysUntil(isoDate: string): number {
   const todayMs = Date.UTC(
     new Date().getUTCFullYear(),
@@ -75,14 +24,11 @@ function daysUntil(isoDate: string): number {
   return Math.round((targetMs - todayMs) / 86_400_000);
 }
 
+/** Colour by proximity, not by type: past is muted, within a week is attention, the rest is ink. */
 function urgencyStyle(days: number): { color: string; label: string } {
-  if (days < 0) return { color: THEME.subtle, label: `${Math.abs(days)}d ago` };
-  if (days === 0) return { color: THEME.red, label: "Today" };
-  if (days === 1) return { color: THEME.red, label: "Tomorrow" };
-  if (days <= 3) return { color: THEME.red, label: `In ${days} days` };
-  if (days <= 7) return { color: THEME.brass, label: `In ${days} days` };
-  if (days <= 14) return { color: THEME.brass, label: `In ${days} days` };
-  return { color: THEME.muted, label: `In ${days} days` };
+  if (days < 0) return { color: THEME.muted, label: `${Math.abs(days)}d ago` };
+  const label = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `In ${days} days`;
+  return { color: days <= 7 ? THEME.brass : THEME.text, label };
 }
 
 function formatDate(isoDate: string): string {
@@ -141,7 +87,7 @@ export function KeyDateTimeline({
             ((new Date((kd.isoDate as string) + "T00:00:00Z").getTime() - minMs) /
               span) *
             100;
-          const style = KEY_DATE_TYPE_COLOR[kd.type];
+          const dot = urgencyStyle(daysUntil(kd.isoDate as string)).color;
           return (
             <div
               key={`${kd.isoDate}-${kd.label}`}
@@ -149,8 +95,8 @@ export function KeyDateTimeline({
               className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full"
               style={{
                 left: `${pct.toFixed(1)}%`,
-                backgroundColor: style.color,
-                boxShadow: `0 0 0 2px ${style.bg}`,
+                backgroundColor: dot,
+                boxShadow: `0 0 0 2px ${withAlpha(dot, 0.1)}`,
               }}
             />
           );
@@ -162,7 +108,6 @@ export function KeyDateTimeline({
         {sorted.map((kd) => {
           const days = daysUntil(kd.isoDate as string);
           const urgency = urgencyStyle(days);
-          const typeStyle = KEY_DATE_TYPE_COLOR[kd.type];
           const typeLabel = KEY_DATE_TYPE_LABELS[kd.type];
           const isPast = days < 0;
           return (
@@ -172,14 +117,7 @@ export function KeyDateTimeline({
               style={{ opacity: isPast ? 0.5 : 1 }}
             >
               {/* Type badge */}
-              <span
-                className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"
-                style={{
-                  color: typeStyle.color,
-                  background: typeStyle.bg,
-                  border: `1px solid ${typeStyle.border}`,
-                }}
-              >
+              <span className="aur-tag shrink-0 !px-1.5 !py-0.5 text-muted">
                 {typeLabel}
               </span>
 

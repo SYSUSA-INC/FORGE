@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import {
   RELATIONSHIPS,
-  RELATIONSHIP_COLORS,
   RELATIONSHIP_LABELS,
 } from "@/lib/company-types";
 import { CompaniesClient } from "./CompaniesClient";
@@ -73,7 +72,6 @@ export default async function CompaniesPage() {
     <CompaniesClient
       relationships={RELATIONSHIPS}
       relationshipLabels={RELATIONSHIP_LABELS}
-      relationshipColors={RELATIONSHIP_COLORS}
       counts={counts}
       companies={rows.map((c) => ({
         id: c.id,

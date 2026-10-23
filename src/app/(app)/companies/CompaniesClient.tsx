@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { CompanyRelationship } from "@/db/schema";
-import { withAlpha } from "@/lib/theme-colors";
 
 type CompanyRow = {
   id: string;
@@ -34,13 +33,11 @@ export function CompaniesClient({
   companies,
   relationships,
   relationshipLabels,
-  relationshipColors,
   counts,
 }: {
   companies: CompanyRow[];
   relationships: RelationshipDef[];
   relationshipLabels: Record<CompanyRelationship, string>;
-  relationshipColors: Record<CompanyRelationship, string>;
   counts: Record<string, number>;
 }) {
   const [filter, setFilter] = useState("");
@@ -157,7 +154,6 @@ export function CompaniesClient({
               <CompanyRowItem
                 key={c.id}
                 c={c}
-                relColor={relationshipColors[c.relationship]}
                 relLabel={relationshipLabels[c.relationship]}
               />
             ))}
@@ -170,11 +166,9 @@ export function CompaniesClient({
 
 function CompanyRowItem({
   c,
-  relColor,
   relLabel,
 }: {
   c: CompanyRow;
-  relColor: string;
   relLabel: string;
 }) {
   const loc = [c.city, c.state].filter(Boolean).join(", ");
@@ -208,16 +202,9 @@ function CompanyRowItem({
           </div>
         ) : null}
       </div>
-      <span
-        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
-        style={{
-          color: relColor,
-          backgroundColor: withAlpha(relColor, 0.1),
-          border: `1px solid ${withAlpha(relColor, 0.25)}`,
-        }}
-      >
-        {relLabel}
-      </span>
+      <span className="aur-tag text-muted">
+{relLabel}
+</span>
       <div className="font-mono text-[11px] text-muted">
         <div>Location</div>
         <div className={loc ? "text-text" : "text-muted"}>{loc || "—"}</div>
