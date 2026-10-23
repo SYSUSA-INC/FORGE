@@ -2998,6 +2998,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **C6 (this PR):** helper, notice and empty-state paragraphs (69 `<p>` with six or more words of text) move from mono 10/11px to body 13px. Labels, numbers and identifiers stay mono. Still in C: remaining boxed rows, secondary actions as links, one small button size, one table style.
 
+**C7 (this PR):** visual check of C1 to C6 in both themes (home, proposals, reviews, compliance, company, admin). One fix: the first tab's label sat 26px inside the page edge; it now lines up.
+
 **Next (serial):** rest of C, D HTML emails.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
