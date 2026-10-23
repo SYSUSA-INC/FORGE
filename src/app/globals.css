@@ -401,6 +401,10 @@
   .aur-tab {
     @apply inline-flex items-center gap-2 px-3 py-2 font-display text-[15px] font-medium text-muted transition-colors hover:text-text;
   }
+  /* The first tab's label lines up with the page edge: padding (0.75rem) plus the diamond slot (0.375rem + 0.5rem gap). */
+  .aur-tab:first-child {
+    margin-left: -1.625rem;
+  }
   .aur-tab[aria-current="page"],
   .aur-tab[aria-pressed="true"] {
     @apply text-text;
