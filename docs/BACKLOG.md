@@ -84,7 +84,7 @@ Effort key:
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | 🔄 PR #387 |
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
-| 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C2 neutral tags in review (this PR) |
+| 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C3 tabs and tiles in review (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2989,6 +2989,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 **C1 (shipped, #403; compliance category chips were missed there and fixed in C2):** owner answers 2026-10-22 — colour-team and stage tags become an ink `aur-tag` with a team diamond (`ColorTeamTag`); the default-template marker uses the accent; compliance category and evidence-kind chips are neutral ink. 
 
 **C2 (this PR):** compliance category and knowledge-kind and company-relationship chips are neutral `aur-tag`s; key dates colour by proximity (past muted, within 7 days brass, else ink) with a neutral type tag; the workflow strip is ink labels with a diamond on the current stage. Still in C: sidebar, tabs, hairline stat tiles and list rows, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
+
+**C3 (this PR):** tabs become sans text with the diamond on the current and hovered tab (`.aur-tab`, six sites); page-header meta tiles and `StatTile` become ink figures on a hairline (only error counts keep a hue). Still in C: sidebar group labels, list rows on hairlines, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
 
 **Next (serial):** rest of C, D HTML emails.
 

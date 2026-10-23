@@ -75,20 +75,8 @@ function MetaTile({
     | "magenta";
   href?: string;
 }) {
-  const tone =
-    accent === "hazard" || accent === "gold"
-      ? "text-gold"
-      : accent === "blood" || accent === "rose"
-        ? "text-rose"
-        : accent === "signal" || accent === "emerald"
-          ? "text-emerald"
-          : accent === "cobalt"
-            ? "text-cobalt"
-            : accent === "violet"
-              ? "text-violet"
-              : accent === "plum" || accent === "magenta"
-                ? "text-magenta"
-                : "text-text";
+  // Figures are ink; only an error count keeps a hue.
+  const tone = accent === "blood" || accent === "rose" ? "text-rose" : "text-text";
 
   const body = (
     <>
@@ -105,7 +93,7 @@ function MetaTile({
     return (
       <Link
         href={href}
-        className={`aur-card group block px-4 py-3 transition-colors hover:border-cobalt-400/40 hover:bg-layer/[0.04]`}
+        className="group block border-t border-layer/10 pt-3 transition-colors hover:border-cobalt"
         title={`View ${label.toLowerCase()}`}
       >
         {body}
@@ -116,5 +104,5 @@ function MetaTile({
     );
   }
 
-  return <div className={`aur-card px-4 py-3`}>{body}</div>;
+  return <div className="border-t border-layer/10 pt-3">{body}</div>;
 }
