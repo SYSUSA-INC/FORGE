@@ -396,6 +396,24 @@
     @apply inline-flex items-center gap-1.5 rounded border border-layer/15 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-text;
   }
 
+  /* A tab: sans text, the diamond marks the current one and appears on
+     hover (EnableNow). No underline, no box. */
+  .aur-tab {
+    @apply inline-flex items-center gap-2 px-3 py-2 font-display text-[15px] font-medium text-muted transition-colors hover:text-text;
+  }
+  .aur-tab[aria-current="page"],
+  .aur-tab[aria-pressed="true"] {
+    @apply text-text;
+  }
+  .aur-tab .aur-diamond {
+    @apply scale-0 transition-transform;
+  }
+  .aur-tab:hover .aur-diamond,
+  .aur-tab[aria-current="page"] .aur-diamond,
+  .aur-tab[aria-pressed="true"] .aur-diamond {
+    @apply scale-100;
+  }
+
   .aur-ring { position: relative; }
   .aur-ring::before {
     content: "";

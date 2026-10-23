@@ -15,23 +15,11 @@ export function StatTile({
   accent?: "paper" | "hazard" | "blood" | "signal" | "ink" | "cobalt" | "plum" | "violet" | "emerald" | "gold" | "rose" | "magenta";
   icon?: ReactNode;
 }) {
-  const accentColor =
-    accent === "hazard" || accent === "gold"
-      ? "text-gold"
-      : accent === "blood" || accent === "rose"
-        ? "text-rose"
-        : accent === "signal" || accent === "emerald"
-          ? "text-emerald"
-          : accent === "cobalt"
-            ? "text-cobalt"
-            : accent === "violet"
-              ? "text-violet"
-              : accent === "plum" || accent === "magenta"
-                ? "text-magenta"
-                : "text-text";
+  // Figures are ink; only an error count keeps a hue.
+  const accentColor = accent === "blood" || accent === "rose" ? "text-rose" : "text-text";
 
   return (
-    <div className="aur-card p-4">
+    <div className="border-t border-layer/10 pt-3">
       <div className="flex items-start justify-between">
         <span className="font-mono text-[10px] uppercase tracking-label text-muted">
           {label}

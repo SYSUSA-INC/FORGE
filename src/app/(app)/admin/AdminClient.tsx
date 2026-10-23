@@ -237,13 +237,10 @@ export function AdminClient({
             key={t.key}
             type="button"
             onClick={() => openTab(t.key)}
-            className={`relative -mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
-              tab === t.key
-                ? "border-teal-400 text-text"
-                : "border-transparent text-muted hover:text-text"
-            }`}
+            className="aur-tab"
+            aria-pressed={tab === t.key}
           >
-            {t.label}
+            <span aria-hidden className="aur-diamond" />{t.label}
           </button>
         ))}
       </nav>

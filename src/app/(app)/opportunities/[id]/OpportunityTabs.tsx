@@ -26,13 +26,10 @@ export function OpportunityTabs({ id }: { id: string }) {
           <Link
             key={t.key}
             href={href}
-            className={`relative -mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
-              active
-                ? "border-teal-400 text-text"
-                : "border-transparent text-muted hover:text-text"
-            }`}
+            className="aur-tab"
+            aria-current={active ? "page" : undefined}
           >
-            {t.label}
+            <span aria-hidden className="aur-diamond" />{t.label}
           </Link>
         );
       })}

@@ -244,18 +244,12 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`relative -mb-px px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
-        active
-          ? "border-b-2 border-teal text-text"
-          : "border-b-2 border-transparent text-muted hover:text-text"
-      }`}
+      className="aur-tab"
+      aria-pressed={active}
     >
+      <span aria-hidden className="aur-diamond" />
       {label}
-      <span
-        className={`ml-2 rounded px-1.5 py-0.5 text-[10px] ${
-          active ? "bg-teal/15 text-teal" : "bg-layer/5 text-muted"
-        }`}
-      >
+      <span className="font-mono text-[11px] text-subtle">
         {count}
       </span>
     </button>

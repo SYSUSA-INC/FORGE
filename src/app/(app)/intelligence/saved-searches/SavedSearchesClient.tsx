@@ -60,12 +60,10 @@ export function SavedSearchesClient({ rows }: { rows: SavedSearchRow[] }) {
             type="button"
             key={f}
             onClick={() => setFilter(f)}
-            className={`-mb-px border-b-2 px-4 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${
-              filter === f
-                ? "border-teal-400 text-text"
-                : "border-transparent text-muted hover:text-text"
-            }`}
+            className="aur-tab"
+            aria-pressed={filter === f}
           >
+            <span aria-hidden className="aur-diamond" />
             {f === "all" ? "All" : f === "mine" ? "Mine" : "Shared"} ·{" "}
             {f === "all"
               ? items.length
