@@ -1217,6 +1217,10 @@ mind. Bandage will come off but a true fix will stay."
       recovery codes, or for new devices in 8a.
     - **Factors:** up to 3 per user (authenticator apps and passkeys
       together) and 10 single-use recovery codes, regenerated on demand.
+  - **8a-0 foundations (in progress):** the fixes below ship as small
+    PRs ahead of the MFA work. Done: `safeRedirectTarget` rejects
+    backslashes (`/\evil.com`) and is now plain UTF-8 with a test
+    (this PR).
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
