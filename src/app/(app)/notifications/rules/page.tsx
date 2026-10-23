@@ -109,26 +109,26 @@ export default async function NotificationRulesPage() {
         </Panel>
       ) : (
         <Panel title="Rules" eyebrow={`${activeCount} active of ${total}`}>
-          <div className="overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.02]">
-            <table className="w-full min-w-[800px] text-left">
-              <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-label text-subtle">
+          <div className="overflow-x-auto">
+            <table className="aur-table min-w-[800px]">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 font-normal">Name</th>
-                  <th className="px-3 py-2 font-normal">Trigger</th>
-                  <th className="px-3 py-2 font-normal">Recipients</th>
-                  <th className="px-3 py-2 font-normal">Channels</th>
-                  <th className="px-3 py-2 font-normal">Frequency</th>
-                  <th className="px-3 py-2 font-normal">SLA</th>
-                  <th className="px-3 py-2 font-normal">State</th>
+                  <th>Name</th>
+                  <th>Trigger</th>
+                  <th>Recipients</th>
+                  <th>Channels</th>
+                  <th>Frequency</th>
+                  <th>SLA</th>
+                  <th>State</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr
                     key={r.id}
-                    className="border-b border-layer/5 last:border-0"
+                    
                   >
-                    <td className="px-3 py-2 font-display text-[12px] text-text">
+                    <td className="font-display text-[12px] text-text">
                       <Link
                         href={`/notifications/rules/${r.id}`}
                         className="hover:underline"
@@ -141,26 +141,26 @@ export default async function NotificationRulesPage() {
                         </div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="font-mono text-[11px] text-muted">
                       {TRIGGER_EVENT_KIND_LABELS[r.triggerEventKind]}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="font-mono text-[11px] text-muted">
                       {RECIPIENT_STRATEGY_LABELS[r.recipientStrategy]}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="font-mono text-[11px] text-muted">
                       {r.channels
                         .map((c) => CHANNEL_LABELS[c])
                         .join(", ")}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="font-mono text-[11px] text-muted">
                       {FREQUENCY_LABELS[r.frequency]}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="font-mono text-[11px] text-muted">
                       {r.slaSeconds
                         ? `${Math.round(r.slaSeconds / 3600)}h`
                         : "—"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td>
                       <span
                         className={`rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
                           r.active

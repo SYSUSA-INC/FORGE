@@ -96,21 +96,21 @@ export function MarkdownRenderer({ source }: { source: string }) {
         hr: () => <hr className="my-10 border-layer/10" />,
         table: ({ children }) => (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse border border-layer/10 font-body text-sm">
+            <table className="aur-table">
               {children}
             </table>
           </div>
         ),
         thead: ({ children }) => (
-          <thead className="bg-layer/[0.04]">{children}</thead>
+          <thead>{children}</thead>
         ),
         th: ({ children }) => (
-          <th className="border border-layer/10 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-muted">
+          <th>
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td className="border border-layer/10 px-3 py-2 text-muted">
+          <td className="text-muted">
             {children}
           </td>
         ),

@@ -79,26 +79,26 @@ export function ReportsClient({ report }: { report: Report }) {
         <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           Reached = got at least this far. A lost bid counts as having reached Submitted; a no-bid as having left at Qualification.
         </p>
-        <table className="w-full text-left font-body text-[13px]">
+        <table className="aur-table">
           <thead>
-            <tr className="font-mono text-[10px] uppercase tracking-wider text-muted">
-              <th className="py-2 pr-3">Stage</th>
-              <th className="py-2 pr-3 text-right">Now</th>
-              <th className="py-2 pr-3 text-right">Reached</th>
+            <tr>
+              <th>Stage</th>
+              <th className="text-right">Now</th>
+              <th className="text-right">Reached</th>
               <th className="w-1/3 py-2 pr-3" />
-              <th className="py-2 text-right">Conversion</th>
+              <th className="text-right">Conversion</th>
             </tr>
           </thead>
           <tbody>
             {report.funnel.map((f) => (
-              <tr key={f.stage} className="border-t border-layer/10">
-                <td className="py-2 pr-3 text-text">{f.label}</td>
-                <td className="py-2 pr-3 text-right font-mono text-[12px] text-muted">{f.current}</td>
-                <td className="py-2 pr-3 text-right font-mono text-[12px] text-text">{f.reached}</td>
-                <td className="py-2 pr-3">
+              <tr key={f.stage}>
+                <td className="text-text">{f.label}</td>
+                <td className="text-right font-mono text-[12px] text-muted">{f.current}</td>
+                <td className="text-right font-mono text-[12px] text-text">{f.reached}</td>
+                <td>
                   <Bar value={f.reached} max={maxReached} title={`${f.label}: ${f.reached} reached`} />
                 </td>
-                <td className="py-2 text-right font-mono text-[12px] text-text">{formatRate(f.conversion)}</td>
+                <td className="text-right font-mono text-[12px] text-text">{formatRate(f.conversion)}</td>
               </tr>
             ))}
           </tbody>
@@ -127,29 +127,29 @@ export function ReportsClient({ report }: { report: Report }) {
           </span>
           <span>Won month = award date, else when it was marked won.</span>
         </div>
-        <table className="w-full text-left font-body text-[13px]">
+        <table className="aur-table">
           <thead>
-            <tr className="font-mono text-[10px] uppercase tracking-wider text-muted">
-              <th className="py-2 pr-3">Month</th>
+            <tr>
+              <th>Month</th>
               <th className="w-1/3 py-2 pr-3" />
-              <th className="py-2 pr-3 text-right">Created</th>
-              <th className="py-2 pr-3 text-right">Won</th>
-              <th className="py-2 text-right">Won value</th>
+              <th className="text-right">Created</th>
+              <th className="text-right">Won</th>
+              <th className="text-right">Won value</th>
             </tr>
           </thead>
           <tbody>
             {report.months.map((m) => (
               <tr key={m.month} className="border-t border-layer/10">
-                <td className="py-2 pr-3 font-mono text-[12px] text-text">{m.month}</td>
-                <td className="py-2 pr-3">
+                <td className="font-mono text-[12px] text-text">{m.month}</td>
+                <td>
                   <div className="flex flex-col gap-0.5">
                     <Bar value={m.created} max={maxMonth} title={`${m.month}: ${m.created} created`} tone="base" />
                     <Bar value={m.won} max={maxMonth} title={`${m.month}: ${m.won} won (${formatDollars(m.wonValue)})`} />
                   </div>
                 </td>
-                <td className="py-2 pr-3 text-right font-mono text-[12px] text-muted">{m.created}</td>
-                <td className="py-2 pr-3 text-right font-mono text-[12px] text-text">{m.won}</td>
-                <td className="py-2 text-right font-mono text-[12px] text-text">{formatDollars(m.wonValue)}</td>
+                <td className="text-right font-mono text-[12px] text-muted">{m.created}</td>
+                <td className="text-right font-mono text-[12px] text-text">{m.won}</td>
+                <td className="text-right font-mono text-[12px] text-text">{formatDollars(m.wonValue)}</td>
               </tr>
             ))}
           </tbody>
@@ -178,30 +178,30 @@ function WinRateTable({
         <p className="font-body text-[13px] text-muted">No won, lost or no-bid opportunities in this period yet.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left font-body text-[13px]">
+          <table className="aur-table">
             <thead>
-              <tr className="font-mono text-[10px] uppercase tracking-wider text-muted">
-                <th className="py-2 pr-3">{label}</th>
-                <th className="py-2 pr-3 text-right">Won</th>
-                <th className="py-2 pr-3 text-right">Lost</th>
-                <th className="py-2 pr-3 text-right">No bid</th>
+              <tr>
+                <th>{label}</th>
+                <th className="text-right">Won</th>
+                <th className="text-right">Lost</th>
+                <th className="text-right">No bid</th>
                 <th className="w-1/4 py-2 pr-3" />
-                <th className="py-2 pr-3 text-right">Win rate</th>
-                <th className="py-2 text-right">Won value</th>
+                <th className="text-right">Win rate</th>
+                <th className="text-right">Won value</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.key} className="border-t border-layer/10">
-                  <td className="py-2 pr-3 text-text">{r.key}</td>
-                  <td className="py-2 pr-3 text-right font-mono text-[12px] text-text">{r.won}</td>
-                  <td className="py-2 pr-3 text-right font-mono text-[12px] text-muted">{r.lost}</td>
-                  <td className="py-2 pr-3 text-right font-mono text-[12px] text-muted">{r.noBid}</td>
-                  <td className="py-2 pr-3">
+                  <td className="text-text">{r.key}</td>
+                  <td className="text-right font-mono text-[12px] text-text">{r.won}</td>
+                  <td className="text-right font-mono text-[12px] text-muted">{r.lost}</td>
+                  <td className="text-right font-mono text-[12px] text-muted">{r.noBid}</td>
+                  <td>
                     {r.winRate === null ? null : <Bar value={r.winRate} max={1} title={`${r.key}: ${r.won} of ${r.decided} decided won`} />}
                   </td>
-                  <td className="py-2 pr-3 text-right font-mono text-[12px] text-text">{formatRate(r.winRate)}</td>
-                  <td className="py-2 text-right font-mono text-[12px] text-text">{formatDollars(r.wonValue)}</td>
+                  <td className="text-right font-mono text-[12px] text-text">{formatRate(r.winRate)}</td>
+                  <td className="text-right font-mono text-[12px] text-text">{formatDollars(r.wonValue)}</td>
                 </tr>
               ))}
             </tbody>

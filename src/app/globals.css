@@ -305,6 +305,20 @@
   }
 
   /* A secondary action as a text link (EnableNow): ink, blue on hover. */
+  /* One table style: open hairline rows, mono column heads (EnableNow). */
+  .aur-table {
+    @apply w-full text-left font-body text-[13px];
+  }
+  .aur-table th {
+    @apply py-2 pr-3 font-mono text-[10px] font-normal uppercase tracking-label text-muted;
+  }
+  .aur-table tbody tr {
+    @apply border-t border-layer/10;
+  }
+  .aur-table td {
+    @apply py-2 pr-3;
+  }
+
   .aur-link {
     @apply inline-flex items-center gap-2 py-1.5 font-display text-[15px] font-medium text-text transition-colors hover:text-cobalt;
   }
