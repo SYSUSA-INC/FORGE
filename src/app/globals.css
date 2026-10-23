@@ -304,6 +304,11 @@
     border-color: rgb(var(--c-action-hover));
   }
 
+  /* A secondary action as a text link (EnableNow): ink, blue on hover. */
+  .aur-link {
+    @apply inline-flex items-center gap-2 py-1.5 font-display text-[15px] font-medium text-text transition-colors hover:text-cobalt;
+  }
+
   .aur-btn-ghost {
     @apply inline-flex items-center justify-center gap-2 px-3.5 py-1.5 font-display text-sm font-medium text-muted hover:text-cobalt transition-colors;
   }

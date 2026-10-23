@@ -44,7 +44,7 @@ export default async function CorpusImportPage() {
         title="Drop anything here"
         subtitle="The Brain reads what's in this corpus to build its intelligence. Drop old proposals, RFPs, contracts, debriefs, capability briefs, resumes, brochures — anything that captures historical context."
         actions={
-          <Link href="/knowledge-base" className="aur-btn aur-btn-ghost">
+          <Link href="/knowledge-base" className="aur-link">
             ← Knowledge base
           </Link>
         }

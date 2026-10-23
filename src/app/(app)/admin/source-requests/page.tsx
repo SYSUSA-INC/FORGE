@@ -25,7 +25,7 @@ export default async function PlatformSourceRequestsPage() {
         title="Source requests"
         subtitle="Customer-suggested opportunity sources. Triage, set status, and leave notes — these are the inputs to platform-roadmap decisions."
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost">
+          <Link href="/admin" className="aur-link">
             ← Platform admin
           </Link>
         }

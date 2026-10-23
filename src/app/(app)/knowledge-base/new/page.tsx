@@ -16,7 +16,7 @@ export default async function NewKnowledgeEntryPage() {
         title="New entry"
         subtitle="Capture a capability, a past-performance reference, a key person, or a chunk of boilerplate. Tag it so it shows up when you filter."
         actions={
-          <Link href="/knowledge-base" className="aur-btn aur-btn-ghost">
+          <Link href="/knowledge-base" className="aur-link">
             Back
           </Link>
         }

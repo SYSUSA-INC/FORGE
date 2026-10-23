@@ -21,7 +21,7 @@ export default async function SavedSearchesPage() {
           title="Saved searches"
           subtitle="Re-run favorite searches against awards and firms."
           actions={
-            <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+            <Link href="/intelligence" className="aur-link">
               ← Intelligence
             </Link>
           }
@@ -48,7 +48,7 @@ export default async function SavedSearchesPage() {
         title="Saved searches"
         subtitle="Run a search again with one click. Shared ones are visible to everyone in your org."
         actions={
-          <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+          <Link href="/intelligence" className="aur-link">
             ← Intelligence
           </Link>
         }

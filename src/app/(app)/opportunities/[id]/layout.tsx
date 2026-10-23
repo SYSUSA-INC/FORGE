@@ -52,7 +52,7 @@ export default async function OpportunityDetailLayout({
         subtitle={[opp.agency, opp.office].filter(Boolean).join(" · ") || undefined}
         actions={
           <>
-            <Link href="/opportunities" className="aur-btn aur-btn-ghost">
+            <Link href="/opportunities" className="aur-link">
               Back
             </Link>
             <SendForReviewButton opportunityId={opp.id} />

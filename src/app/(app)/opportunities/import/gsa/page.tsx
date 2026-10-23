@@ -21,7 +21,7 @@ export default async function GsaImportPage() {
         title="Paste GSA email"
         subtitle="Forwarded a GSA opportunity notification? Paste the email body and FORGE extracts the structured fields. Drop the RFP/RFQ attachments alongside and they'll be linked to the new opportunity automatically."
         actions={
-          <Link href="/opportunities/import" className="aur-btn aur-btn-ghost">
+          <Link href="/opportunities/import" className="aur-link">
             ← Back to import
           </Link>
         }

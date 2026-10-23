@@ -38,7 +38,7 @@ export default async function CompanySearchPage() {
         title="Search SAM.gov entities"
         subtitle="Find registered companies by name, UEI, CAGE, or NAICS. Prefilled with your org's NAICS codes; swap in any value to broaden or narrow."
         actions={
-          <Link href="/companies" className="aur-btn aur-btn-ghost">
+          <Link href="/companies" className="aur-link">
             Back to companies
           </Link>
         }

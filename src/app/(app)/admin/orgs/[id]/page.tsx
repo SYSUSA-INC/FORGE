@@ -248,7 +248,7 @@ export default async function TenantDetailPage({
               organizationName={org.name}
               disabled={!!org.disabledAt}
             />
-            <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
+            <Link href="/admin" className="aur-link">
               ← All organizations
             </Link>
           </>

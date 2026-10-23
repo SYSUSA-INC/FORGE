@@ -183,7 +183,7 @@ export default async function TenantActivityPage({
           <>
             <Link
               href={`/admin/orgs/${org.id}`}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-link"
             >
               ← Tenant detail
             </Link>

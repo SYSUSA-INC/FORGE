@@ -62,7 +62,7 @@ export default async function ProposalDetailLayout({
             >
               View opportunity
             </Link>
-            <Link href="/proposals" className="aur-btn aur-btn-ghost">
+            <Link href="/proposals" className="aur-link">
               Back
             </Link>
             <DeleteProposalButton id={p.id} title={p.title} />

@@ -75,7 +75,7 @@ export default async function AmendmentDiffPage({
         actions={
           <Link
             href={`/solicitations/${params.id}`}
-            className="aur-btn aur-btn-ghost"
+            className="aur-link"
           >
             ← Back to solicitation
           </Link>

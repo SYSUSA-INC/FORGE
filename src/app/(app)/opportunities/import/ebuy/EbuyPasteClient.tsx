@@ -98,7 +98,7 @@ export function EbuyPasteClient() {
         actions={
           <Link
             href="/opportunities/import"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-link"
           >
             Back to SAM.gov import
           </Link>

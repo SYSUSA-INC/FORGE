@@ -34,7 +34,7 @@ export default async function KnowledgeEntryPage({
             : undefined
         }
         actions={
-          <Link href="/knowledge-base" className="aur-btn aur-btn-ghost">
+          <Link href="/knowledge-base" className="aur-link">
             Back
           </Link>
         }

@@ -26,7 +26,7 @@ export default async function NewNotificationRulePage() {
         actions={
           <Link
             href="/notifications/rules"
-            className="aur-btn aur-btn-ghost"
+            className="aur-link"
           >
             Back to rules
           </Link>

@@ -65,7 +65,7 @@ export default async function TiersPage() {
         title="Subscription tiers"
         subtitle="Tier defaults (price, features, quotas) and per-tier tenant counts. Editing + per-tenant assignment lands in BL-16 Phase C-2/C-3."
         actions={
-          <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
+          <Link href="/admin" className="aur-link">
             ← SuperAdmin portal
           </Link>
         }

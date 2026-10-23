@@ -16,7 +16,7 @@ export default async function UsaspendingImportPage() {
         title="USAspending.gov"
         subtitle="Pull federal contracts you've won (or partnered on) directly from USAspending.gov and import them as past-performance entries. The Brain uses these as grounding when drafting past-performance volumes."
         actions={
-          <Link href="/knowledge-base" className="aur-btn aur-btn-ghost">
+          <Link href="/knowledge-base" className="aur-link">
             ← Knowledge base
           </Link>
         }

@@ -44,7 +44,7 @@ export default async function CompanyDetailPage({
         subtitle={[c.city, c.state].filter(Boolean).join(", ") || undefined}
         actions={
           <>
-            <Link href="/companies" className="aur-btn aur-btn-ghost">
+            <Link href="/companies" className="aur-link">
               Back
             </Link>
             <CompanyDetailActions id={c.id} hasUei={!!c.uei} name={c.name} />

@@ -96,7 +96,7 @@ export default async function BackgroundJobsPage({
         actions={
           <>
             <RunJobsNowButton />
-            <Link href="/admin" className="aur-btn aur-btn-ghost text-[11px]">
+            <Link href="/admin" className="aur-link">
               ← SuperAdmin portal
             </Link>
           </>

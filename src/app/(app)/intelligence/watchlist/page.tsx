@@ -21,7 +21,7 @@ export default async function WatchlistPage() {
           title="Watchlist"
           subtitle="Pinned awards and firms your team is tracking."
           actions={
-            <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+            <Link href="/intelligence" className="aur-link">
               ← Intelligence
             </Link>
           }
@@ -49,7 +49,7 @@ export default async function WatchlistPage() {
         title="Watchlist"
         subtitle="Pinned awards and firms your team is tracking. Add notes; saved here, visible to your whole org."
         actions={
-          <Link href="/intelligence" className="aur-btn aur-btn-ghost">
+          <Link href="/intelligence" className="aur-link">
             ← Intelligence
           </Link>
         }
