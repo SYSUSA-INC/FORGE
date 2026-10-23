@@ -86,7 +86,7 @@ export function EnterpriseInvoiceForm({
 
   if (buyableTiers.length === 0) {
     return (
-      <p className="mt-3 font-mono text-[10px] text-muted">
+      <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
         No tiers have Stripe Prices configured. Add Price ids in
         /admin/tiers first.
       </p>
@@ -107,7 +107,7 @@ export function EnterpriseInvoiceForm({
       <div className="font-mono text-[10px] uppercase tracking-label text-muted">
         Issue enterprise wire-invoice
       </div>
-      <p className="font-mono text-[10px] leading-relaxed text-muted">
+      <p className="font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
         Sales-led path for{" "}
         <span className="text-text">{organizationName}</span>: creates a
         Stripe subscription with{" "}

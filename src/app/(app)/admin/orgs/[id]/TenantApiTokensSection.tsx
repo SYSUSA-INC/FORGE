@@ -15,7 +15,7 @@ export async function TenantApiTokensSection({ organizationId }: { organizationI
   return (
     <Panel title="API tokens" eyebrow={`${active} active · ${refusal ? "not in plan" : "in plan"}`}>
       {refusal && active > 0 ? (
-        <p className="mb-3 font-mono text-[11px] text-gold">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-gold">
           API access isn&apos;t in this tenant&apos;s plan, so these tokens are refused until it is.
         </p>
       ) : null}

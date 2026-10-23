@@ -23,7 +23,7 @@ export function TagManager({ tags }: { tags: Row[] }) {
 
   if (tags.length === 0) {
     return (
-      <p className="font-mono text-[11px] text-muted">
+      <p className="font-body text-[13px] leading-[1.5] text-muted">
         No tags yet. Add tags during upload or by drag-dropping artifacts onto
         a tag bucket in &ldquo;By kind &amp; tag&rdquo; mode.
       </p>

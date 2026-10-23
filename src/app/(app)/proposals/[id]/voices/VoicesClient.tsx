@@ -120,7 +120,7 @@ export function VoicesClient({ authors }: { authors: ProposalAuthorVoice[] }) {
                         ))}
                       </tbody>
                     </table>
-                    <p className="mt-3 font-mono text-[10px] text-muted">
+                    <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
                       To read as one voice, agree these points in the house style (Settings → House style, or the volume&apos;s own rules) — the drafter and chat then follow it for every author.
                     </p>
                   </>

@@ -99,7 +99,7 @@ export function GoldenEvalPanel({
         ) : null
       }
     >
-      <p className="mb-3 font-mono text-[11px] text-muted">
+      <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
         Each run re-drafts sections of proposals you won, with the saved text withheld, and scores
         the draft against what won: shared vocabulary (45%), length fit (20%), specificity (20%)
         and placeholder-free prose (15%). Compare runs across prompt versions and models: pick a model to
@@ -161,7 +161,7 @@ const VERDICT: Record<JudgeCalibration["overall"]["verdict"], string> = {
 function CalibrationLine({ calibration }: { calibration: JudgeCalibration }) {
   const a = calibration.overall;
   return (
-    <p className="mb-3 font-mono text-[11px] text-muted">
+    <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
       Rubric judge vs. your experts: {a.n} rated draft{a.n === 1 ? "" : "s"}
       {a.withinOne !== null ? ` · within one point ${pct(a.withinOne)}` : ""}
       {a.spearman !== null ? ` · rank agreement ${a.spearman.toFixed(2)}` : ""}

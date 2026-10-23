@@ -82,7 +82,7 @@ export function TierAssignmentForm({
     <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
       <label className="aur-label">{firstAssignment ? "Assign tier" : "Change tier"}</label>
       {firstAssignment ? (
-        <p className="font-mono text-[10px] leading-relaxed text-muted">
+        <p className="font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
           This tenant has no subscription row, so every gated feature is
           denied until a tier is assigned.
         </p>
@@ -124,7 +124,7 @@ export function TierAssignmentForm({
         </div>
       ) : null}
 
-      <p className="font-mono text-[10px] leading-relaxed text-muted">
+      <p className="font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
         Audited as <code>tenant.tier_change</code> in the target tenant&apos;s
         audit log. Tenant admins see the change in their own /audit-log.
         Retired tiers (active=false) are filtered out of the dropdown.

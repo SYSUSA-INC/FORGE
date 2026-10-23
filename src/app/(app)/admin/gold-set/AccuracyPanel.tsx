@@ -80,7 +80,7 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
         </span>
       }
     >
-      <p className="mb-3 font-mono text-[11px] text-muted">
+      <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
         Reads every approved document exactly as intake reads a solicitation (the requirement sweep, then the AI review) and
         scores it against the expert&rsquo;s annotations: requirement recall (target 98%) and precision, page and format limits
         captured (target 100%), Section M factors found and kept in order (from the dedicated Section L and M passes when the

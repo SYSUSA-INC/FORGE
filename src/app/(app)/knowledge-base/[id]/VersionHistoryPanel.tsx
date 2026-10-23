@@ -20,7 +20,7 @@ export function VersionHistoryPanel({ id, versions }: { id: string; versions: En
 
   if (versions.length === 0) {
     return (
-      <p className="font-mono text-[11px] text-muted">
+      <p className="font-body text-[13px] leading-[1.5] text-muted">
         No versions yet. The next save that changes the title, body or tags starts the history, keeping the current text as v1.
       </p>
     );

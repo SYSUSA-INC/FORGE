@@ -161,7 +161,7 @@ export function ResearchRail({
             </div>
           ) : null}
           {!data && !pending ? (
-            <p className="font-mono text-[11px] text-muted">
+            <p className="font-body text-[13px] leading-[1.5] text-muted">
               Keep writing. A couple of seconds after you pause, the rail shows Brain
               passages for the paragraph you are in, requirements this section has
               not covered yet, win themes it has not reinforced, and any contradiction

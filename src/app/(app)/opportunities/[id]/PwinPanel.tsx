@@ -126,7 +126,7 @@ export async function PwinPanel({
         </p>
       )}
 
-      <p className="mt-3 font-mono text-[10px] leading-relaxed text-muted">
+      <p className="mt-3 font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
         Contributions are log-odds; the bar shows relative weight. The
         model excludes this opportunity&apos;s own outcome from its history,
         and every recorded outcome freezes a snapshot so the model is

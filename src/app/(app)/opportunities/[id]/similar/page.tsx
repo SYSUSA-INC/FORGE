@@ -136,7 +136,7 @@ export default async function OpportunitySimilarAwardsPage({
     return (
       <Panel title="Couldn't load similar awards" eyebrow="Upstream error" accent="hazard">
         <p className="font-mono text-[12px] text-rose-200">{search.error}</p>
-        <p className="mt-2 font-mono text-[11px] text-muted">
+        <p className="mt-2 font-body text-[13px] leading-[1.5] text-muted">
           Try{" "}
           <Link
             href={`/intelligence/awards?savedSearch=`}

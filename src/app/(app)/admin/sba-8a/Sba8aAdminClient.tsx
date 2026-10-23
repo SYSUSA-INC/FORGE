@@ -266,7 +266,7 @@ export function Sba8aAdminClient({
         eyebrow="Monthly cron · cleanup"
         accent={cronSecretPresent ? "emerald" : "hazard"}
       >
-        <p className="mb-3 font-mono text-[11px] text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           A Vercel Cron job refreshes verified cert types from SAM.gov on
           the <strong>first of each month at 3 AM UTC</strong>. It pulls
           the most recent ~300 firms per verified cert type (catches new
@@ -323,7 +323,7 @@ export function Sba8aAdminClient({
           </button>
         </div>
 
-        <p className="mt-2 font-mono text-[11px] text-subtle">
+        <p className="mt-2 font-body text-[13px] leading-[1.5] text-subtle">
           Current retention: <strong className="text-text">{retentionMonths} months</strong>.
           Graduated firms with cert exit date older than this get pruned
           on every cron run.
@@ -373,7 +373,7 @@ export function Sba8aAdminClient({
         title="Pull from SAM.gov"
         eyebrow="Live fetch · sbaBusinessTypeCode=A6"
       >
-        <p className="mb-3 font-mono text-[11px] text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           Pulls one batch of pages and upserts by UEI. Click again to continue
           from the next page. Each page is 10 firms (free-tier cap). The SAM.gov API
           tier limits ~1000 calls/day.
@@ -464,7 +464,7 @@ export function Sba8aAdminClient({
       </Panel>
 
       <Panel title="Paste CSV" eyebrow="Manual import">
-        <p className="mb-2 font-mono text-[11px] text-muted">
+        <p className="mb-2 font-body text-[13px] leading-[1.5] text-muted">
           Headers (case-insensitive): <code>uei</code>, <code>firm_name</code>{" "}
           (or "legal business name"), <code>cert_entry_date</code>,{" "}
           <code>cert_exit_date</code> (or "graduation date"),{" "}

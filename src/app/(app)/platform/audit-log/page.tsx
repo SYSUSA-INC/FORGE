@@ -79,7 +79,7 @@ export default async function PlatformAuditLogPage({
           className="xl:col-span-1"
         >
           {tenants.length === 0 ? (
-            <p className="font-mono text-[11px] text-muted">
+            <p className="font-body text-[13px] leading-[1.5] text-muted">
               No audit rows recorded yet — the table is empty.
             </p>
           ) : (

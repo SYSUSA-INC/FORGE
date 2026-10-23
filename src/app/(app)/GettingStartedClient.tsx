@@ -168,7 +168,7 @@ export function GettingStartedClient({ state }: { state: OnboardingState }) {
                   </button>
                 </div>
                 {!state.samConfigured ? (
-                  <p className="font-mono text-[11px] text-amber-200">
+                  <p className="font-body text-[13px] leading-[1.5] text-amber-200">
                     SAM.gov lookups need a SAM.gov API key. Add your company&apos;s key under{" "}
                     <Link href="/settings/integrations" className="underline">
                       Settings → Integrations
@@ -304,9 +304,9 @@ export function GettingStartedClient({ state }: { state: OnboardingState }) {
                   {busy === "propose" ? "Thinking…" : "Propose a starting setup"}
                 </button>
                 {!hasNaics ? (
-                  <p className="font-mono text-[11px] text-subtle">Needs at least one NAICS code — finish step 1 first.</p>
+                  <p className="font-body text-[13px] leading-[1.5] text-subtle">Needs at least one NAICS code — finish step 1 first.</p>
                 ) : state.aiStub ? (
-                  <p className="font-mono text-[11px] text-amber-200">AI is in stub mode: the proposal will be built from the registration only.</p>
+                  <p className="font-body text-[13px] leading-[1.5] text-amber-200">AI is in stub mode: the proposal will be built from the registration only.</p>
                 ) : null}
               </div>
             )}

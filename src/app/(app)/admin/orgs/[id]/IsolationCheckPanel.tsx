@@ -69,7 +69,7 @@ export function IsolationCheckPanel({ organizationId }: Props) {
           <h3 className="font-stencil text-[12px] uppercase tracking-label text-text">
             Runtime isolation check
           </h3>
-          <p className="font-mono text-[10px] text-muted">
+          <p className="font-body text-[13px] leading-[1.5] text-muted">
             Probes 3 representative tables against a phantom attacker
             tenant. Failed checks are real cross-tenant leaks.
           </p>
@@ -91,7 +91,7 @@ export function IsolationCheckPanel({ organizationId }: Props) {
       {loading ? (
         <p className="font-mono text-[11px] text-muted">Loading…</p>
       ) : results.length === 0 ? (
-        <p className="font-mono text-[11px] text-muted">
+        <p className="font-body text-[13px] leading-[1.5] text-muted">
           No checks have been run for this tenant yet.
         </p>
       ) : (

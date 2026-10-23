@@ -47,7 +47,7 @@ export default async function SamNoticesPage() {
       </Panel>
       <Panel title={`Recent runs (${o.runs.length})`}>
         {o.runs.length === 0 ? (
-          <p className="font-mono text-[11px] text-muted">No run yet. Use Run load now, or wait for 04:20 UTC.</p>
+          <p className="font-body text-[13px] leading-[1.5] text-muted">No run yet. Use Run load now, or wait for 04:20 UTC.</p>
         ) : (
           <ul className="flex flex-col gap-1">
             {o.runs.map((r) => (

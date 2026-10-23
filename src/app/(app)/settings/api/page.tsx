@@ -73,7 +73,7 @@ export default async function ApiAccessPage() {
             ))}
           </tbody>
         </table>
-        <p className="mt-3 font-mono text-[11px] text-muted">
+        <p className="mt-3 font-body text-[13px] leading-[1.5] text-muted">
           List parameters: limit (1–{API_PAGE_MAX}, default 50) · cursor · updated_since (ISO 8601) · stage. Rate limit:{" "}
           {API_RATE_LIMIT.limit} requests a minute per token. Every answered request is recorded in the audit log.
         </p>

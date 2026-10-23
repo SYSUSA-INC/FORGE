@@ -216,7 +216,7 @@ export function TenantUsersClient({
         eyebrow={`${members.length} total`}
       >
         {members.length === 0 ? (
-          <p className="font-mono text-[11px] text-muted">
+          <p className="font-body text-[13px] leading-[1.5] text-muted">
             No members. The tenant is empty — invite the primary admin via{" "}
             <a href="/admin" className="text-violet underline-offset-2 hover:underline">
               the SuperAdmin portal
@@ -362,7 +362,7 @@ export function TenantUsersClient({
         eyebrow={`${pendingInvites.length} waiting`}
       >
         {pendingInvites.length === 0 ? (
-          <p className="font-mono text-[11px] text-muted">
+          <p className="font-body text-[13px] leading-[1.5] text-muted">
             No pending invites for this tenant.
           </p>
         ) : (
@@ -578,7 +578,7 @@ function TenantInvitePanel({
   return (
     <Panel title={`Invite a user to ${organizationName}`} eyebrow="Platform admin · this tenant">
       {tenantDomains ? (
-        <p className="mb-3 font-mono text-[10px] leading-relaxed text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] leading-relaxed text-muted">
           Tenant domains:{" "}
           {tenantDomains.emailDomains.length > 0 ? tenantDomains.emailDomains.join(", ") : "none on file"}
           {tenantDomains.approvedExternalDomains.length > 0

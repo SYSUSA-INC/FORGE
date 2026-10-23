@@ -76,7 +76,7 @@ export function ReportsClient({ report }: { report: Report }) {
           ]),
         )}
       >
-        <p className="mb-3 font-mono text-[10px] text-muted">
+        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
           Reached = got at least this far. A lost bid counts as having reached Submitted; a no-bid as having left at Qualification.
         </p>
         <table className="w-full text-left font-body text-[13px]">
