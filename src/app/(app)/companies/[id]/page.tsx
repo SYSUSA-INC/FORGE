@@ -7,12 +7,10 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import {
-  RELATIONSHIP_COLORS,
   RELATIONSHIP_LABELS,
 } from "@/lib/company-types";
 import { CompanyForm } from "../CompanyForm";
 import { CompanyDetailActions } from "./CompanyDetailActions";
-import { withAlpha } from "@/lib/theme-colors";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +34,6 @@ export default async function CompanyDetailPage({
     .limit(1);
   if (!c) notFound();
 
-  const relColor = RELATIONSHIP_COLORS[c.relationship];
   const relLabel = RELATIONSHIP_LABELS[c.relationship];
 
   return (
@@ -69,20 +66,9 @@ export default async function CompanyDetailPage({
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-4 py-3">
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: relColor }}
-        />
-        <div
-          className="rounded-md px-2 py-1 font-mono text-[11px] uppercase tracking-label"
-          style={{
-            color: relColor,
-            backgroundColor: withAlpha(relColor, 0.1),
-            border: `1px solid ${withAlpha(relColor, 0.25)}`,
-          }}
-        >
-          {relLabel}
-        </div>
+        <span className="aur-tag text-muted">
+{relLabel}
+</span>
         {c.syncSource === "samgov" && c.lastSyncedAt ? (
           <span className="ml-auto font-mono text-[10px] text-muted">
             Last SAM.gov sync: {new Date(c.lastSyncedAt).toLocaleString()}

@@ -74,7 +74,6 @@ export function ComplianceClient({
   ownerStatusLabels,
   ownerStatusColors,
   categoryLabels,
-  categoryColors,
   statusLabels,
   statusColors,
   sections,
@@ -89,7 +88,6 @@ export function ComplianceClient({
   ownerStatusLabels: Record<ComplianceOwnerStatus, string>;
   ownerStatusColors: Record<ComplianceOwnerStatus, string>;
   categoryLabels: Record<ComplianceCategory, string>;
-  categoryColors: Record<ComplianceCategory, string>;
   statusLabels: Record<ComplianceStatus, string>;
   statusColors: Record<ComplianceStatus, string>;
   sections: SectionLite[];
@@ -241,7 +239,6 @@ export function ComplianceClient({
                   ownerStatusLabels={ownerStatusLabels}
                   ownerStatusColors={ownerStatusColors}
                   categoryLabels={categoryLabels}
-                  categoryColors={categoryColors}
                   statusLabels={statusLabels}
                   statusColors={statusColors}
                   sections={sections}
@@ -660,7 +657,6 @@ function ItemRowCard({
   ownerStatusLabels,
   ownerStatusColors,
   categoryLabels,
-  categoryColors,
   statusLabels,
   statusColors,
   sections,
@@ -674,7 +670,6 @@ function ItemRowCard({
   ownerStatusLabels: Record<ComplianceOwnerStatus, string>;
   ownerStatusColors: Record<ComplianceOwnerStatus, string>;
   categoryLabels: Record<ComplianceCategory, string>;
-  categoryColors: Record<ComplianceCategory, string>;
   statusLabels: Record<ComplianceStatus, string>;
   statusColors: Record<ComplianceStatus, string>;
   sections: SectionLite[];
@@ -755,22 +750,14 @@ function ItemRowCard({
   }
 
   if (!editing) {
-    const catColor = categoryColors[item.category];
     const stColor = statusColors[item.status];
     return (
       <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[auto_1fr_auto]">
           <div className="flex flex-col gap-1 md:w-32">
-            <span
-              className="rounded-md px-2 py-0.5 text-center font-mono text-[10px] uppercase tracking-label"
-              style={{
-                color: catColor,
-                backgroundColor: withAlpha(catColor, 0.1),
-                border: `1px solid ${withAlpha(catColor, 0.25)}`,
-              }}
-            >
-              {categoryLabels[item.category]}
-            </span>
+            <span className="aur-tag justify-center text-muted">
+{categoryLabels[item.category]}
+</span>
             {item.number ? (
               <span className="text-center font-mono text-[12px] font-semibold text-text">
                 {item.number}

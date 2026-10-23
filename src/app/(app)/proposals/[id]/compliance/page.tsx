@@ -13,7 +13,6 @@ import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import {
   CATEGORIES,
-  CATEGORY_COLORS,
   CATEGORY_LABELS,
   OWNER_STATUS_COLORS,
   OWNER_STATUS_LABELS,
@@ -183,7 +182,6 @@ export default async function ProposalCompliancePage({
         ownerStatusLabels={OWNER_STATUS_LABELS}
         ownerStatusColors={OWNER_STATUS_COLORS}
         categoryLabels={CATEGORY_LABELS}
-        categoryColors={CATEGORY_COLORS}
         statusLabels={STATUS_LABELS}
         statusColors={STATUS_COLORS}
         sections={sections.map((s) => ({

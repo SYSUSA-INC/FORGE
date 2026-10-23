@@ -4,9 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import type { ProposalStage } from "@/db/schema";
-import { STAGES, STAGE_COLORS, advanceStage } from "@/lib/proposal-types";
+import { STAGES, advanceStage } from "@/lib/proposal-types";
 import { advanceProposalStageAction } from "../actions";
-import { withAlpha } from "@/lib/theme-colors";
 
 export function StageAdvancePanel({
   proposalId,
@@ -60,28 +59,16 @@ export function StageAdvancePanel({
             return (
               <span key={s.key} className="flex items-center gap-1">
                 <span
-                  className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-1.5 py-1 font-mono text-[10px] uppercase tracking-widest transition-colors ${
                     isCurrent
                       ? "text-text"
                       : reached
                         ? "text-muted"
                         : "text-subtle"
                   }`}
-                  style={
-                    isCurrent
-                      ? {
-                          color: STAGE_COLORS[s.key],
-                          backgroundColor: withAlpha(STAGE_COLORS[s.key], 0.1),
-                          border: `1px solid ${withAlpha(STAGE_COLORS[s.key], 0.38)}`,
-                        }
-                      : {
-                          backgroundColor: reached
-                            ? withAlpha(STAGE_COLORS[s.key], 0.07)
-                            : "transparent",
-                          border: `1px solid ${reached ? withAlpha(STAGE_COLORS[s.key], 0.19) : "rgba(255,255,255,0.1)"}`,
-                        }
-                  }
+                  aria-current={isCurrent ? "step" : undefined}
                 >
+                  {isCurrent ? <span aria-hidden className="aur-diamond" /> : null}
                   {s.shortLabel}
                 </span>
                 {i < arr.length - 1 ? (
