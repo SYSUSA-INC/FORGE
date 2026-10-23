@@ -165,10 +165,6 @@ export function ComplianceClient({
                   : "border-layer/10 bg-layer/[0.02] text-muted hover:border-layer/20"
               }`}
             >
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: c.color }}
-              />
               {c.label} · {n}
             </button>
           );

@@ -390,6 +390,12 @@
     @apply inline-block h-1.5 w-1.5 flex-none rotate-45 bg-accent;
   }
 
+  /* A tag: ink label, hairline, no tint. Identity (team, stage, category)
+     rides on the leading diamond or the words, never on a status hue. */
+  .aur-tag {
+    @apply inline-flex items-center gap-1.5 rounded border border-layer/15 px-2 py-1 font-mono text-[10px] uppercase tracking-label text-text;
+  }
+
   .aur-ring { position: relative; }
   .aur-ring::before {
     content: "";

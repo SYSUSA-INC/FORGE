@@ -55,15 +55,7 @@ export function TemplatesList({ templates }: { templates: TemplateRow[] }) {
             {active.map((t) => (
               <li
                 key={t.id}
-                className="aur-card flex flex-col gap-3 p-4"
-                style={{
-                  borderColor: t.isDefault
-                    ? `${t.brandPrimary}80`
-                    : undefined,
-                  background: t.isDefault
-                    ? `${t.brandPrimary}0D`
-                    : undefined,
-                }}
+                className={`aur-card flex flex-col gap-3 p-4 ${t.isDefault ? "border-accent/50 bg-accent/5" : ""}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">

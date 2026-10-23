@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { ProposalStage } from "@/db/schema";
 import { STAGES } from "@/lib/proposal-types";
-import { withAlpha } from "@/lib/theme-colors";
+import { ColorTeamTag } from "@/components/ui/ColorTeamTag";
 
 type ProposalRow = {
   id: string;
@@ -278,16 +278,7 @@ function ProposalRowItem({ p }: { p: ProposalRow }) {
           {p.oppSolicitation ? ` · ${p.oppSolicitation}` : ""}
         </div>
       </div>
-      <span
-        className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
-        style={{
-          color: p.stageColor,
-          backgroundColor: withAlpha(p.stageColor, 0.1),
-          border: `1px solid ${withAlpha(p.stageColor, 0.25)}`,
-        }}
-      >
-        {p.stageLabel}
-      </span>
+      <ColorTeamTag color={p.stageColor}>{p.stageLabel}</ColorTeamTag>
       <div className="font-mono text-[11px] text-muted">
         <div>Due</div>
         <div className={due ? "text-text" : "text-muted"}>{due ?? "—"}</div>

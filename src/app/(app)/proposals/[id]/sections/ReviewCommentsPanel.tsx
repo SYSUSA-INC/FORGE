@@ -9,6 +9,8 @@ import {
   type SectionReviewComment,
 } from "@/lib/review-comments";
 import { resolveSectionReviewCommentAction } from "./review-comment-actions";
+import { REVIEW_COLOR_HEX } from "@/lib/review-types";
+import { ColorTeamTag } from "@/components/ui/ColorTeamTag";
 
 /**
  * BL-AIP-6b — the section's open colour-team review comments, human
@@ -62,7 +64,7 @@ export function ReviewCommentsPanel({
           return (
             <li key={c.id} className="rounded border border-layer/10 bg-layer/[0.02] p-2">
               <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-muted">
-                <span className="rounded border border-layer/10 bg-layer/5 px-1.5 py-0.5">{REVIEW_COLOR_LABELS[c.color]}</span>
+                <ColorTeamTag color={REVIEW_COLOR_HEX[c.color]}>{REVIEW_COLOR_LABELS[c.color]}</ColorTeamTag>
                 {/* BL-FB-X-COLOR-TEAM Slice 3 — carried forward unresolved from an earlier round */}
                 {c.carriedFrom ? (
                   <Link
