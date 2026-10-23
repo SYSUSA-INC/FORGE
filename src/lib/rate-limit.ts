@@ -53,6 +53,12 @@ export type RateLimitOptions = {
    * 3600 (per hour), 86400 (per day).
    */
   windowSeconds: number;
+  /**
+   * When the counter store errors, refuse instead of allowing. Use it
+   * for brute-force defences (sign-in, one-time codes), where a broken
+   * limiter must not become an open door. Default false: fail open.
+   */
+  failClosed?: boolean;
 };
 
 export type RateLimitOk = {
@@ -79,7 +85,8 @@ export type RateLimitResult = RateLimitOk | RateLimitDenied;
  * Postgres error), we LOG the error and ALLOW the request. Fail-open
  * is intentional — rate limiting is a defense, and a broken rate
  * limiter shouldn't take down the entire endpoint. Real abuse will
- * recur and get caught on a working call.
+ * recur and get caught on a working call. Brute-force defences pass
+ * `failClosed: true` and are refused instead.
  */
 export async function enforceRateLimit(
   opts: RateLimitOptions,
@@ -118,6 +125,10 @@ export async function enforceRateLimit(
       resetIn,
     };
   } catch (err) {
+    if (opts.failClosed) {
+      log.error("[rate-limit]", "DB error, failing closed", { error: err });
+      return { ok: false, retryAfter: resetIn };
+    }
     // Fail-open. Log and allow.
     log.error("[rate-limit]", "DB error, failing open", { error: err });
     return { ok: true, remaining: opts.limit, resetIn };
