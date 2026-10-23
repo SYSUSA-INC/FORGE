@@ -56,12 +56,12 @@ export function ChecklistPanel({
       title="Reviewer checklist"
       eyebrow={canTick && myProgress ? `You: ${myProgress.done}/${myProgress.total} · all: ${progress.done}/${progress.of}` : `${progress.done}/${progress.of} ticks across reviewers`}
     >
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col divide-y divide-layer/10">
         {items.map((item) => {
           const state = mine.get(item.key);
           const others = reviewers.filter((r) => r.userId !== currentUserId && states.some((s) => s.userId === r.userId && s.itemKey === item.key && s.checked)).length;
           return (
-            <li key={item.key} className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <li key={item.key} className="px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]">
               <label className={`flex items-start gap-2 ${canTick ? "cursor-pointer" : ""}`}>
                 <input
                   type="checkbox"

@@ -153,9 +153,9 @@ export async function CustomerHistoryPanel({
                 No parsed Section M summaries from prior solicitations at this agency.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="divide-y divide-layer/10">
                 {h.evaluatorPriorities.map((e) => (
-                  <li key={e.solicitationId} className="rounded-md border border-layer/10 bg-layer/[0.02] px-2.5 py-1.5">
+                  <li key={e.solicitationId} className="px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06] px-2.5 py-1.5">
                     <Link
                       href={`/solicitations/${e.solicitationId}`}
                       className="font-display text-[12px] text-text hover:underline"

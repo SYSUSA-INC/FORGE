@@ -68,11 +68,11 @@ export function ScoutClient({
       {decided.length > 0 ? (
         <section className="mb-6">
           <Panel title="Recently decided" eyebrow={trackLine(track)}>
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col divide-y divide-layer/10">
               {decided.map((c) => (
                 <li
                   key={c.id}
-                  className="flex flex-wrap items-center gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                  className="flex flex-wrap items-center gap-2 px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]"
                 >
                   <GradeMark grade={c.grade} />
                   <span

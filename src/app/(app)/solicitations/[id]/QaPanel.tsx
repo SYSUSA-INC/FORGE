@@ -148,9 +148,9 @@ export function QaPanel({
             : "No answers yet. Add a SAM.gov notice ID to poll the notice, or paste the Q&A."}
         </p>
       ) : (
-        <ul className="flex max-h-[480px] flex-col gap-2 overflow-y-auto">
+        <ul className="flex max-h-[480px] flex-col divide-y divide-layer/10 overflow-y-auto">
           {initial.map((q) => (
-            <li key={q.id} className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <li key={q.id} className="px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06]">
               {q.question ? (
                 <p className="font-body text-[12px] leading-relaxed text-muted">
                   <span className="mr-1.5 font-mono text-[10px] uppercase tracking-widest text-subtle">Q{q.ordinal}</span>
