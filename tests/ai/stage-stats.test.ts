@@ -8,8 +8,8 @@ const row = (stage: string, responseDueDate: Date | null) =>
 
 describe("buildStageStats past-due bookkeeping", () => {
   it("counts an elapsed date as past due while the pursuit is still open", () => {
-    const stats = buildStageStats([row("writing", past), row("capture", soon)]);
-    expect(stats.writing?.pastDueCount).toBe(1);
+    const stats = buildStageStats([row("pre_proposal", past), row("capture", soon)]);
+    expect(stats.pre_proposal?.pastDueCount).toBe(1);
     expect(stats.capture?.pastDueCount).toBe(0);
     expect(stats.capture?.soonestDue).toEqual(soon);
   });

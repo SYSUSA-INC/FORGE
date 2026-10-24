@@ -75,19 +75,19 @@ export function winRateBy(rows: ReportOpp[], dim: WinRateDimension, limit = 25):
 }
 
 /** The pipeline in order. "won" closes it; lost and no-bid leave it. */
-export const FUNNEL_STAGES = ["identified", "sources_sought", "qualification", "capture", "pre_proposal", "writing", "submitted", "won"] as const;
+export const FUNNEL_STAGES = ["identified", "sources_sought", "qualification", "capture", "pre_proposal", "submitted", "won"] as const;
 
 export const STAGE_LABELS: Record<string, string> = {
   identified: "Identified",
-  sources_sought: "Sources sought",
-  qualification: "Qualification",
-  capture: "Capture",
-  pre_proposal: "Pre-proposal",
-  writing: "Writing",
+  sources_sought: "Evaluated",
+  qualification: "Qualified",
+  capture: "Captured",
+  pre_proposal: "Developed",
+  writing: "Developed",
   submitted: "Submitted",
-  won: "Won",
-  lost: "Lost",
-  no_bid: "No bid",
+  won: "Closed-Won",
+  lost: "Archived · Lost",
+  no_bid: "Archived · No bid",
 };
 
 /**
@@ -99,6 +99,7 @@ export const STAGE_LABELS: Record<string, string> = {
 export function stageReached(stage: string): number {
   if (stage === "lost") return FUNNEL_STAGES.indexOf("submitted");
   if (stage === "no_bid") return FUNNEL_STAGES.indexOf("qualification");
+  if (stage === "writing") return FUNNEL_STAGES.indexOf("pre_proposal");
   return FUNNEL_STAGES.indexOf(stage as (typeof FUNNEL_STAGES)[number]);
 }
 

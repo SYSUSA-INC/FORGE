@@ -127,7 +127,6 @@ function nextStage(current: OpportunityStage): OpportunityStage {
     "qualification",
     "capture",
     "pre_proposal",
-    "writing",
     "submitted",
     "won",
   ];

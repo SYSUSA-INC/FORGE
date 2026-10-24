@@ -13,7 +13,7 @@ const row = (id: string, stage: OpportunityStage, age: number, pWin = 50, valueL
 
 const ROWS = [
   row("a", "identified", 5, 20, "$1M", "$3M"), // weighted 400K
-  row("b", "writing", 10, 50, "", "$2M"), // 1M
+  row("b", "pre_proposal", 10, 50, "", "$2M"), // 1M
   row("c", "won", 20, 100, "$500K", "$500K"), // 500K
   row("d", "lost", 40, 30),
   row("e", "no_bid", 60, 10, "$9M", ""), // 900K
