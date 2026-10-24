@@ -3036,6 +3036,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **Manuals (this PR):** `docs/USER_MANUAL.md` (§2.0 Look and feel, What's new, sign-in notes, templates, compliance category) and `docs/ADMIN_MANUAL.md` (§1, §4, §7.1.1) now describe everything shipped in this item, and AGENTS.md convention 12 requires the manuals to change in the same PR as any user-visible change.
 
+**UX pass, Command Center (this PR):** Won, Lost, No bid and Submitted tiles no longer show a red "past due" (those stages are past the response date by definition; `buildStageStats` skips them, with a test); header figures are no longer zero-padded ("6", not "06") on every page; the Proposal stages, Recent proposals and Quick links panels use hairline rows.
+
 **Next (serial):** rest of C.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")

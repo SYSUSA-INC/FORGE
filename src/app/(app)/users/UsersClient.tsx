@@ -167,7 +167,7 @@ function RolesOverviewPanel({ summary }: { summary: MembersSummary }) {
               {r.label}
             </div>
             <div className="mt-1 font-display text-[20px] font-semibold text-text">
-              {String(summary.byRole[r.value] ?? 0).padStart(2, "0")}
+              {String(summary.byRole[r.value] ?? 0)}
             </div>
             <div className="mt-1 line-clamp-2 font-body text-[11px] leading-snug text-muted">
               {r.description}

@@ -66,8 +66,8 @@ export default async function PlatformAuditLogPage({
           </Link>
         }
         meta={[
-          { label: "Tenants seen", value: String(tenants.length).padStart(2, "0") },
-          { label: "Matches", value: String(result.total).padStart(2, "0") },
+          { label: "Tenants seen", value: String(tenants.length) },
+          { label: "Matches", value: String(result.total) },
           { label: "Page", value: `${result.page}` },
           { label: "Page size", value: String(result.pageSize) },
         ]}

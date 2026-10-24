@@ -69,20 +69,20 @@ export default async function SolicitationsListPage() {
           </>
         }
         meta={[
-          { label: "Total", value: String(total).padStart(2, "0") },
+          { label: "Total", value: String(total) },
           {
             label: "Parsed",
-            value: String(parsed).padStart(2, "0"),
+            value: String(parsed),
             accent: parsed > 0 ? "emerald" : undefined,
           },
           {
             label: "Linked to opp",
-            value: String(linked).padStart(2, "0"),
+            value: String(linked),
             accent: linked > 0 ? "cobalt" : undefined,
           },
           {
             label: "Parse errors",
-            value: String(failed).padStart(2, "0"),
+            value: String(failed),
             accent: failed > 0 ? "rose" : undefined,
           },
         ]}

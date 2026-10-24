@@ -73,10 +73,10 @@ export default async function NotificationRulesPage() {
           </Link>
         }
         meta={[
-          { label: "Total rules", value: String(total).padStart(2, "0") },
+          { label: "Total rules", value: String(total) },
           {
             label: "Active",
-            value: String(activeCount).padStart(2, "0"),
+            value: String(activeCount),
             accent: activeCount > 0 ? "emerald" : undefined,
           },
         ]}

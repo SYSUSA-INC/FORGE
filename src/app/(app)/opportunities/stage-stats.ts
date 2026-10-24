@@ -1,5 +1,6 @@
 import type { OpportunityStage } from "@/db/schema";
 import { parseDollars } from "@/lib/money";
+import { STAGES } from "@/lib/opportunity-types";
 
 /**
  * Per-stage aggregates surfaced on the dashboard widget grid.
@@ -8,7 +9,9 @@ import { parseDollars } from "@/lib/money";
  *   soonestDue     — earliest non-past-due response_due_date in this stage
  *                    (null if none have a due date or all are past)
  *   pastDueCount   — opportunities whose response date already elapsed
- *                    (signals stale data that needs cleanup)
+ *                    (signals stale data that needs cleanup). Only for
+ *                    stages still working to that date: submitted, won,
+ *                    lost and no-bid pursuits are past it by definition.
  *   totalValueLow  — sum of parsed `valueLow` strings across the stage
  *   totalValueHigh — sum of parsed `valueHigh` strings across the stage
  *
@@ -30,6 +33,11 @@ type RowLike = {
   valueHigh: string;
 };
 
+/** Stages where the response date is meant to have passed. */
+const PAST_THE_DATE = new Set(
+  STAGES.filter((s) => s.phase === "closed" || s.key === "submitted").map((s) => s.key),
+);
+
 export function buildStageStats(rows: RowLike[]): Record<string, StageStat> {
   const out: Record<string, StageStat> = {};
   const now = Date.now();
@@ -50,7 +58,7 @@ export function buildStageStats(rows: RowLike[]): Record<string, StageStat> {
     stat.totalValueLow += parseDollars(r.valueLow);
     stat.totalValueHigh += parseDollars(r.valueHigh);
 
-    if (r.responseDueDate) {
+    if (r.responseDueDate && !PAST_THE_DATE.has(r.stage)) {
       if (r.responseDueDate.getTime() < now) {
         stat.pastDueCount += 1;
       } else {

@@ -90,19 +90,19 @@ export default async function KnowledgeBasePage({
         meta={[
           {
             label: "Total",
-            value: String(all.length).padStart(2, "0"),
+            value: String(all.length),
           },
           {
             label: "Capabilities",
-            value: String(counts.capability).padStart(2, "0"),
+            value: String(counts.capability),
           },
           {
             label: "Past performance",
-            value: String(counts.past_performance).padStart(2, "0"),
+            value: String(counts.past_performance),
           },
           {
             label: "Personnel",
-            value: String(counts.personnel).padStart(2, "0"),
+            value: String(counts.personnel),
           },
         ]}
       />
