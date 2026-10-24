@@ -1,6 +1,6 @@
 import type { OpportunityStage } from "@/db/schema";
 import { weightedValueOf } from "@/lib/pipeline-drill";
-import { STAGES } from "@/lib/opportunity-types";
+import { STAGES, canonicalStage } from "@/lib/opportunity-types";
 import { FUNNEL_STAGES, stageReached } from "@/lib/reports-logic";
 
 /**
@@ -68,12 +68,12 @@ export function buildFunnelData(rows: RowLike[]): FunnelData {
   for (const s of [...active, ...closed]) byKey[s.key] = s;
 
   for (const r of rows) {
-    const stat = byKey[r.stage];
+    const stat = byKey[canonicalStage(r.stage)];
     if (!stat) continue;
     stat.count += 1;
     // BL-PIPE-DRILL — the same rule the "Pipeline value" drill-down lists by.
     stat.weightedValue += weightedValueOf(r);
-    const at = stageReached(r.stage);
+    const at = stageReached(canonicalStage(r.stage));
     for (let i = 0; i <= at; i++) {
       const step = byKey[FUNNEL_STAGES[i]!];
       if (step) step.reached += 1;

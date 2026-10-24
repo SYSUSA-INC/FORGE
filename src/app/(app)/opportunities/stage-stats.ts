@@ -1,6 +1,6 @@
 import type { OpportunityStage } from "@/db/schema";
 import { parseDollars } from "@/lib/money";
-import { STAGES } from "@/lib/opportunity-types";
+import { STAGES, canonicalStage } from "@/lib/opportunity-types";
 
 /**
  * Per-stage aggregates surfaced on the dashboard widget grid.
@@ -43,7 +43,8 @@ export function buildStageStats(rows: RowLike[]): Record<string, StageStat> {
   const now = Date.now();
 
   for (const r of rows) {
-    let stat = out[r.stage];
+    const stage = canonicalStage(r.stage);
+    let stat = out[stage];
     if (!stat) {
       stat = {
         count: 0,
@@ -52,13 +53,13 @@ export function buildStageStats(rows: RowLike[]): Record<string, StageStat> {
         totalValueLow: 0,
         totalValueHigh: 0,
       };
-      out[r.stage] = stat;
+      out[stage] = stat;
     }
     stat.count += 1;
     stat.totalValueLow += parseDollars(r.valueLow);
     stat.totalValueHigh += parseDollars(r.valueHigh);
 
-    if (r.responseDueDate && !PAST_THE_DATE.has(r.stage)) {
+    if (r.responseDueDate && !PAST_THE_DATE.has(stage)) {
       if (r.responseDueDate.getTime() < now) {
         stat.pastDueCount += 1;
       } else {
@@ -93,8 +94,8 @@ export function formatDueProximity(soonest: Date | null): string | null {
 }
 
 /**
- * Spell-out helper: "S1" → "Stage 1", "S7" → "Stage 7", and pass-
- * through for closed-state codes (W → "Won", L → "Lost", NB → "No Bid").
+ * Spell-out helper: "S1" → "Stage 1", "S6" → "Stage 6", and pass-
+ * through for closed-state codes (W → "Closed-Won", L and NB → "Archived").
  *
  * Lives in this file (not StageWidget.tsx) so server components can
  * import it. Putting it next to a "use client" boundary turns the
@@ -104,8 +105,8 @@ export function formatDueProximity(soonest: Date | null): string | null {
  */
 export function spellOutStageCode(shortLabel: string): string {
   if (/^S\d+$/.test(shortLabel)) return `Stage ${shortLabel.slice(1)}`;
-  if (shortLabel === "W") return "Won";
-  if (shortLabel === "L") return "Lost";
-  if (shortLabel === "NB") return "No Bid";
+  if (shortLabel === "W") return "Closed-Won";
+  if (shortLabel === "L") return "Archived · Lost";
+  if (shortLabel === "NB") return "Archived · No bid";
   return shortLabel;
 }

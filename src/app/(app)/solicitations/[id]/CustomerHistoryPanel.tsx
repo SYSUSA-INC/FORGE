@@ -2,19 +2,11 @@ import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { getCustomerIntelligence } from "@/lib/customer-intelligence";
 import { formatMoney } from "@/lib/customer-patterns";
+import { STAGE_LABELS } from "@/lib/opportunity-types";
 
-const STAGE_LABEL: Record<string, string> = {
-  identified: "Identified",
-  sources_sought: "Sources sought",
-  qualification: "Qualification",
-  capture: "Capture",
-  pre_proposal: "Pre-proposal",
-  writing: "Writing",
-  submitted: "Submitted",
-  won: "Won",
-  lost: "Lost",
-  no_bid: "No bid",
-};
+// Rows carry the stage as a plain string; unknown values fall back to the key.
+const STAGE_LABEL: Record<string, string> = STAGE_LABELS;
+
 
 /**
  * BL-FB-SOL-CUSTOMER-PATTERN — what the org already knows about this

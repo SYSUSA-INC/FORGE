@@ -17,63 +17,56 @@ export const STAGES: {
   },
   {
     key: "sources_sought",
-    label: "Sources Sought / RFI",
+    label: "Evaluated",
     shortLabel: "S2",
     phase: "capture",
     color: THEME.cobaltLight,
   },
   {
     key: "qualification",
-    label: "Qualification",
+    label: "Qualified",
     shortLabel: "S3",
     phase: "capture",
     color: THEME.cobalt,
   },
   {
     key: "capture",
-    label: "Capture",
+    label: "Captured",
     shortLabel: "S4",
     phase: "capture",
     color: THEME.green,
   },
   {
     key: "pre_proposal",
-    label: "Pre-Proposal",
+    label: "Developed",
     shortLabel: "S5",
     phase: "proposal",
     color: THEME.indigo,
   },
   {
-    key: "writing",
-    label: "Writing",
-    shortLabel: "S6",
-    phase: "proposal",
-    color: THEME.plum,
-  },
-  {
     key: "submitted",
     label: "Submitted",
-    shortLabel: "S7",
+    shortLabel: "S6",
     phase: "proposal",
     color: THEME.plumDeep,
   },
   {
     key: "won",
-    label: "Won",
+    label: "Closed-Won",
     shortLabel: "W",
     phase: "closed",
     color: THEME.green,
   },
   {
     key: "lost",
-    label: "Lost",
+    label: "Archived · Lost",
     shortLabel: "L",
     phase: "closed",
     color: THEME.red,
   },
   {
     key: "no_bid",
-    label: "No Bid",
+    label: "Archived · No bid",
     shortLabel: "NB",
     phase: "closed",
     color: THEME.subtle,
@@ -84,9 +77,10 @@ export const STAGE_LABELS: Record<OpportunityStage, string> = Object.fromEntries
   STAGES.map((s) => [s.key, s.label]),
 ) as Record<OpportunityStage, string>;
 
-export const STAGE_COLORS: Record<OpportunityStage, string> = Object.fromEntries(
-  STAGES.map((s) => [s.key, s.color]),
-) as Record<OpportunityStage, string>;
+export const STAGE_COLORS = {
+  ...Object.fromEntries(STAGES.map((s) => [s.key, s.color])),
+  writing: STAGES.find((s) => s.key === "pre_proposal")!.color,
+} as Record<OpportunityStage, string>;
 
 export const CONTRACT_TYPES = [
   "",

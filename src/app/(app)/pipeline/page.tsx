@@ -107,8 +107,8 @@ export default async function PipelinePage({
         title="Opportunity pipeline"
         subtitle={
           sinceCutoff
-            ? `Funnel view across the seven active stages — opportunities created in the last ${windowKey} days.`
-            : "Funnel view across the seven active stages — every opportunity in your tenant."
+            ? `Funnel view across the six active stages — opportunities created in the last ${windowKey} days.`
+            : "Funnel view across the six active stages — every opportunity in your tenant."
         }
         actions={headerActions}
         meta={[

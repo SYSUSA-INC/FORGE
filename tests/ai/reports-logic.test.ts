@@ -38,7 +38,7 @@ const rows: ReportOpp[] = [
   opp({ agency: "GSA", stage: "no_bid" }),
   opp({ agency: "Navy", stage: "won", valueLow: "500k", updatedAt: new Date("2026-08-02T00:00:00Z") }),
   opp({ agency: "", stage: "lost", setAside: "SDVOSB" }),
-  opp({ agency: "Navy", stage: "writing", valueHigh: "1.5M" }),
+  opp({ agency: "Navy", stage: "pre_proposal", valueHigh: "1.5M" }),
   opp({ agency: "Army", stage: "capture", createdAt: new Date("2024-01-05T00:00:00Z") }),
 ];
 
@@ -56,14 +56,15 @@ describe("winRateBy", () => {
 
 describe("stageFunnel", () => {
   it("reads lost as reaching submitted and no-bid as leaving at qualification", () => {
-    expect(stageReached("lost")).toBe(6);
+    expect(stageReached("lost")).toBe(5);
     expect(stageReached("no_bid")).toBe(2);
-    expect(stageReached("won")).toBe(7);
+    expect(stageReached("writing")).toBe(4);
+    expect(stageReached("won")).toBe(6);
     const f = stageFunnel(rows);
-    expect(f.map((x) => x.reached)).toEqual([7, 7, 7, 6, 5, 5, 4, 2]);
+    expect(f.map((x) => x.reached)).toEqual([7, 7, 7, 6, 5, 4, 2]);
     expect(f[0]!.conversion).toBeNull();
     expect(f[3]).toMatchObject({ stage: "capture", current: 1, reached: 6, conversion: 6 / 7 });
-    expect(f[7]).toMatchObject({ stage: "won", current: 2, conversion: 0.5 });
+    expect(f[6]).toMatchObject({ stage: "won", current: 2, conversion: 0.5 });
   });
 });
 

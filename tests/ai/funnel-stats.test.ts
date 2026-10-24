@@ -6,7 +6,7 @@ const row = (stage: string) =>
 
 describe("buildFunnelData reached counts (BL-PIPE-FUNNEL)", () => {
   const data = buildFunnelData(
-    ["identified", "identified", "qualification", "writing", "submitted", "won", "lost", "no_bid"].map(row),
+    ["identified", "identified", "qualification", "pre_proposal", "submitted", "won", "lost", "no_bid"].map(row),
   );
   const reached = Object.fromEntries([...data.active, ...data.closed].map((s) => [s.key, s.reached]));
   const conversion = Object.fromEntries([...data.active, ...data.closed].map((s) => [s.key, s.conversion]));
@@ -18,7 +18,6 @@ describe("buildFunnelData reached counts (BL-PIPE-FUNNEL)", () => {
       qualification: 6,
       capture: 4,
       pre_proposal: 4,
-      writing: 4,
       submitted: 3,
       won: 1,
     });

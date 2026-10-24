@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Stage names** — the opportunity stages now read Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived; Pre-proposal and Writing became one Developed stage (§5.0).
 - **The pipeline funnel** — the pipeline page draws a real funnel, one segment per stage from Identified to Won; click any segment for the opportunities behind it (§5).
 - **A new look** — FORGE now follows the EnableNow design system: white paper in light mode, a dark mode, Host Grotesk text and Geist Mono labels, one blue accent and a small blue diamond that marks where you are (§2.0).
 - **Tabs, tags and tables** — tabs are plain text with the diamond on the current one; colour-team, stage, category and relationship tags are neutral labels; header figures sit on a hairline; lists and tables are open rows rather than boxes (§2.0).
@@ -123,7 +124,7 @@ FORGE follows the EnableNow design system. A few conventions hold on every page,
 
 - **One accent.** Blue marks actions, links and where you are. A small **blue diamond** marks the current sidebar item, the current tab and the page's label above its title.
 - **Status colours mean one thing.** Green is done or won; red is blocked, lost or mandatory; amber/brass is attention or partial; blue is in progress; indigo is analysis or review; grey is not started. They are used for status only.
-- **Tags are neutral.** Colour-team and stage tags (Pink, Red, Gold, White Gloves, S1–S7) are an ink label with a small diamond in the team's colour. Compliance categories (Section L, M, C, FAR), evidence kinds, knowledge kinds, company relationships and key-date types are plain grey labels. On a solicitation's key dates, the colour shows how close a date is: grey for past, amber within 7 days, ink otherwise.
+- **Tags are neutral.** Colour-team and stage tags (Pink, Red, Gold, White Gloves, S1–S6) are an ink label with a small diamond in the team's colour. Compliance categories (Section L, M, C, FAR), evidence kinds, knowledge kinds, company relationships and key-date types are plain grey labels. On a solicitation's key dates, the colour shows how close a date is: grey for past, amber within 7 days, ink otherwise.
 - **Tabs** are plain text; the diamond shows on the current tab and on the one under your cursor. The sidebar's group headers are small mono labels with a **+** or **−**.
 - **Figures and lists.** The tiles under a page title are ink figures on a thin line (only error counts use red). Lists and tables are open rows with a hairline between them, and hover shades a row.
 - **Back and secondary links.** "Back", "← Platform admin" and similar are text links next to the page's buttons.
@@ -354,6 +355,23 @@ Changes only persist when you click **Save changes** at the top-right. **Reset**
 
 ## 5. Opportunities
 
+### 5.0 The stages
+
+An opportunity moves through six active stages and ends in one of three closed states. Since BL-PIPE-STAGES (2026-10-24) they carry the names of the reference funnel:
+
+| Code | Stage | What it means |
+|---|---|---|
+| S1 | **Identified** | On the watchlist; not yet looked at |
+| S2 | **Evaluated** | Market research done (sources sought, RFI, industry day) |
+| S3 | **Qualified** | Passed the bid / no-bid gate |
+| S4 | **Captured** | Positioning, teaming and the capture plan |
+| S5 | **Developed** | The proposal is being planned and written (the former Pre-proposal and Writing stages, now one) |
+| S6 | **Submitted** | Proposal in, waiting on the award |
+| W | **Closed-Won** | Awarded to you |
+| L / NB | **Archived** | Lost, or declared a no-bid. FORGE keeps which of the two it was: the win rate counts won against lost, and no-bids are left out |
+
+Saved links, API responses and exports use the stored keys (`identified`, `sources_sought`, `qualification`, `capture`, `pre_proposal`, `submitted`, `won`, `lost`, `no_bid`), which did not change.
+
 **Opportunities** are pursuits you're tracking — from identification through submission. Each opportunity has a single named **owner**: the person accountable for advancing it through the stage gates. Capture and Admin roles can change the owner; everyone else can view it. Every meaningful change to an opportunity gets a row on its **Activity** timeline (§5.4) so the audit trail tells you not only the current state but how it got there.
 
 Go to **Opportunities** in the sidebar.
@@ -362,10 +380,10 @@ Go to **Opportunities** in the sidebar.
 
 ![Opportunities list](docs/images/opportunities-list.png)
 
-The page leads with a **10-widget grid** of stage tiles — one per active stage (S1 through S7, spelled out as "Stage 1"… "Stage 7") plus the three closed states (Won / Lost / No Bid). Each tile shows:
+The page leads with a **10-widget grid** of stage tiles — one per active stage (S1 through S6, spelled out as "Stage 1"… "Stage 6") plus the three closed states (Closed-Won / Archived · Lost / Archived · No bid). Each tile shows:
 
 - The count of opportunities in that stage
-- The descriptive label ("Sources Sought / RFI", "Qualification", etc.)
+- The descriptive label ("Evaluated", "Qualified", etc.)
 - A **value range** — sum of `valueLow` to sum of `valueHigh` across the stage, formatted compactly (`$250k – $5M`). Tiles where every entry has no value range hide the line.
 - A due-date hint — "due in 3 days" / "due today" for the soonest upcoming response date, or a red **N past due** badge if responses are stale
 - An "Everything" tile at the start that clears the filter
@@ -462,7 +480,7 @@ A live **Rollup score** with a verdict label — **Strong pursue** (≥70), **Wa
 
 Right-side **Gate decision** panel lets you:
 - **Advance stage** to any non-closed stage
-- **Declare no-bid** (stage → No Bid)
+- **Declare no-bid** (stage → Archived · No bid)
 - **Record as lost** (stage → Lost)
 
 Each gate decision **requires a reasoning note**. The note becomes a permanent entry on the Activity timeline, attributed to you. This is the trail you'll lean on at quarterly pipeline reviews when somebody asks "why did we walk away from this one?" — open the opportunity, scroll Activity, read the note. No tribal knowledge.

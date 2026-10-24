@@ -87,6 +87,7 @@ Effort key:
 | 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C6 body paragraphs in review (this PR) |
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 📝 recorded; phases to be sized |
+| 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3015,6 +3016,27 @@ Closed-Won · Archived; FORGE's are Identified · Sources sought ·
 Qualification · Capture · Pre-proposal · Writing · Submitted · Won (with
 Lost and No bid). Renaming is a schema and label change for a later PR.
 
+### BL-PIPE-STAGES — Stage names from the reference funnel
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in review (this PR)
+
+Owner decisions (2026-10-24): rename the stages to the reference funnel's
+names; merge Pre-proposal and Writing into one **Developed** stage
+(existing Writing opportunities move to Developed); keep Lost and No bid
+apart under one **Archived** label, so the win rate (won ÷ won + lost)
+and loss intelligence keep working.
+
+**Delivered:** labels only change, the stored keys do not, so the API
+(`/api/v1/opportunities` still returns `identified`, `sources_sought`,
+…), stage history, imports and saved searches keep working. Mapping:
+identified → Identified, sources_sought → Evaluated, qualification →
+Qualified, capture → Captured, pre_proposal → Developed, submitted →
+Submitted, won → Closed-Won, lost → Archived · Lost, no_bid → Archived ·
+No bid; short codes S1–S6, W, L, NB. Migration 0134 moves `writing` rows
+to `pre_proposal`; the enum value stays (Postgres cannot drop one) and
+`canonicalStage()` folds any straggler. Reports' funnel, the pipeline
+funnel, the gate decision's next-stage order and the customer-history
+labels all read from the one list.
+
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
 **Priority:** P1  ·  **Effort:** XL  ·  **Status:** 📝 recorded (2026-10-24); each phase to be sized and ordered with the owner
 
@@ -3053,11 +3075,15 @@ proposal's chances. Over time FORGE owns the proposal lifecycle.
   action at each stage and drafts more of the proposal unprompted, with
   a person approving. Depends on 1 to 4.
 
-**Owner questions before sizing:** which sources matter first (state
-portals vary by state; commercial sources are mostly paid); what a
-capability matrix should contain and look like to them; whether the
-pipeline stages should be renamed to the reference funnel's; and how
-much FORGE may do without a person approving at each step.
+**Owner answers (2026-10-24):**
+- **Sources:** all 51 state portals, on the backlog for now; each needs
+  its own adapter and terms-of-use check (phase 2).
+- **Capability matrix:** a questionnaire built from the RFP/RFI's
+  requirements and capabilities; the customer answers it, and the
+  answers feed the PWin and say whether a partner is needed (phase 3).
+- **Stages:** renamed to the reference funnel's (BL-PIPE-STAGES).
+- **Autonomy:** FORGE does as much as it can, and everything needs a
+  person's approval (phase 5).
 
 ### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 in review (this PR)
