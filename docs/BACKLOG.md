@@ -2997,13 +2997,12 @@ Owner (2026-10-24): "I want to see a funnel on the pipeline dashboard,
 and I should be able to click any part of the funnel and get the
 details", to compare each stage with the next and see the win ratio.
 
-**Delivered:** `PipelineFunnel` draws one tapering segment per stage,
-Identified at the top and Won at the tip, each labelled beside it. A
-segment's top edge is as wide as the number of opportunities that reached
-that stage and its bottom edge as wide as the number that reached the
-next, so the taper is the conversion; the figure beside each segment
-says the share of the previous stage that got here and how many sit
-there now (or their weighted value in value mode). `buildFunnelData`
+**Delivered:** `PipelineFunnel` draws one band per stage, Identified at
+the top and Won at the tip, each labelled beside it. The bands, each in its stage's colour, narrow in
+even steps with a light rim for depth (the shape is the funnel, not a
+chart; a data-driven taper bulged); the figure beside each band says how
+many reached it, the share of the previous stage that did, and how many
+sit there now (or their weighted value in value mode). `buildFunnelData`
 now carries `reached` and `conversion` per stage, using the same rule as
 Reports (`stageReached`: a lost bid reached Submitted; a no-bid left at
 Qualification), so the two never disagree. Every segment and the won /

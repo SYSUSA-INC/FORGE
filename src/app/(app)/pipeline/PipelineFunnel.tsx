@@ -5,23 +5,24 @@ import {
   type FunnelData,
   type FunnelStageStat,
 } from "./funnel-stats";
-import { THEME, withAlpha } from "@/lib/theme-colors";
 
 /**
- * The pipeline as a funnel (BL-PIPE-FUNNEL): one tapering segment per
- * stage, Identified at the top down to Won at the tip, with the stage's
- * label beside it. A segment's top edge is as wide as the number of
- * opportunities that reached that stage and its bottom edge as wide as
- * the number that reached the next, so the taper is the conversion. A
- * lost bid counts as having reached Submitted; a no-bid as having left
- * at Qualification (the same rule as Reports). Clicking a segment opens
- * the dashboard filtered to that stage, in the page's time window.
+ * The pipeline as a funnel (BL-PIPE-FUNNEL): one band per stage,
+ * Identified at the top down to Won at the tip, with the stage's label
+ * beside it. The bands narrow in even steps (the shape is the funnel,
+ * not a chart); the numbers live in the labels: how many reached the
+ * stage, the share of the previous stage that did, and how many sit
+ * there now. A lost bid counts as having reached Submitted; a no-bid as
+ * having left at Qualification (the same rule as Reports). Clicking a
+ * band opens the dashboard filtered to that stage, in the page's window.
  *
  * Server component: the count/value toggle lives in PipelineFilters and
  * only changes the figure shown beside each segment.
  */
-const SEG_H = 34;
-const MIN_PCT = 10;
+const SEG_H = 40;
+/** Top and tip widths of the funnel, as a share of the drawing. */
+const TOP_PCT = 100;
+const TIP_PCT = 22;
 
 export function PipelineFunnel({
   data,
@@ -37,27 +38,25 @@ export function PipelineFunnel({
   const lost = data.closed.find((s) => s.key === "lost");
   const noBid = data.closed.find((s) => s.key === "no_bid");
   const steps: FunnelStageStat[] = won ? [...data.active, won] : data.active;
-  const peak = Math.max(1, ...steps.map((s) => s.reached));
-  const pct = (n: number) => Math.max(MIN_PCT, (n / peak) * 100);
+  const stepW = (TOP_PCT - TIP_PCT) / Math.max(1, steps.length);
+  const widthAt = (i: number) => TOP_PCT - i * stepW;
 
   return (
     <div className="flex flex-col">
       {steps.map((s, i) => {
         const prev = steps[i - 1];
         const next = steps[i + 1];
-        const top = pct(s.reached);
-        const bottom = Math.min(top, next ? pct(next.reached) : top * 0.5);
+        const top = widthAt(i);
+        // The last band comes to a point.
+        const bottom = next ? widthAt(i + 1) : 0;
         const points = [
           `${50 - top / 2},0`,
           `${50 + top / 2},0`,
           `${50 + bottom / 2},${SEG_H}`,
           `${50 - bottom / 2},${SEG_H}`,
         ].join(" ");
-        // One hue, deepening down the funnel; Won is the success green.
-        const fill =
-          s.key === "won"
-            ? THEME.green
-            : withAlpha(THEME.cobalt, 0.3 + (i / Math.max(1, steps.length - 1)) * 0.6);
+        // Each band in its stage's own colour, the same one as its label's diamond.
+        const fill = s.color;
         const figure =
           mode === "value"
             ? formatDollars(s.weightedValue)
@@ -66,19 +65,27 @@ export function PipelineFunnel({
           <Link
             key={s.key}
             href={drillHref(window, null, s.key, mode)}
-            className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-1 py-[2px] transition-colors hover:bg-cobalt-400/[0.06] md:grid-cols-[320px_1fr]"
+            className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-1 py-[1px] transition-colors hover:bg-cobalt-400/[0.06] md:grid-cols-[320px_1fr]"
             title={`${s.label}: ${s.reached} reached this stage. Open them.`}
           >
             <svg
               viewBox={`0 0 100 ${SEG_H}`}
               preserveAspectRatio="none"
-              className="h-9 w-full"
+              className="h-10 w-full"
               aria-hidden
             >
               <polygon
                 points={points}
-                fill={fill}
+                style={{ fill }}
                 className="transition-opacity group-hover:opacity-80"
+              />
+              {/* A light rim along the top edge gives the band some depth. */}
+              <ellipse
+                cx="50"
+                cy="0"
+                rx={top / 2}
+                ry="3"
+                fill="rgb(255 255 255 / 0.28)"
               />
             </svg>
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
