@@ -1220,7 +1220,9 @@ mind. Bandage will come off but a true fix will stay."
   - **8a-0 foundations (in progress):** the fixes below ship as small
     PRs ahead of the MFA work. Done: `safeRedirectTarget` rejects
     backslashes (`/\evil.com`) and is now plain UTF-8 with a test
-    (this PR).
+    (#415). Password sign-in is rate-limited per email (10 per 15
+    minutes) and per IP (60 per 15 minutes), and `enforceRateLimit` has a
+    `failClosed` option the sign-in limits use (this PR).
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
@@ -3031,6 +3033,8 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 **C9 (this PR):** back and breadcrumb actions ("Back", "← …", 50 links, including the ghost-button ones) become text links with a new `.aur-link` class. Still open in C: other secondary actions ("Cancel", "Open", "Activity →"), one small button size, one table style, and the boxed rows that are not simple lists.
 
 **C10 (this PR):** one table style, `.aur-table` (open hairline rows, mono column heads): the notification rules and audit log tables drop their boxed wrapper and faint rules, the help manuals drop the full cell grid, and the reports tables adopt the class. Still open in C: the other ~20 hand-styled tables, other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
+
+**Manuals (this PR):** `docs/USER_MANUAL.md` (§2.0 Look and feel, What's new, sign-in notes, templates, compliance category) and `docs/ADMIN_MANUAL.md` (§1, §4, §7.1.1) now describe everything shipped in this item, and AGENTS.md convention 12 requires the manuals to change in the same PR as any user-visible change.
 
 **Next (serial):** rest of C.
 

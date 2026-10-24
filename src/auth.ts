@@ -14,6 +14,7 @@ import { attachPendingInvitesByEmail } from "@/lib/invite-accept";
 import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
+import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 
 async function enrichFromDb(userId: string): Promise<{
@@ -109,6 +110,28 @@ async function provisionOrgForUser(
   }
 }
 
+const SIGN_IN_WINDOW_SECONDS = 15 * 60;
+const SIGN_IN_PER_EMAIL = 10;
+const SIGN_IN_PER_IP = 60;
+
+async function signInAllowed(email: string, request: Request): Promise<boolean> {
+  const byEmail = await enforceRateLimit({
+    key: `signin:email:${email}`,
+    limit: SIGN_IN_PER_EMAIL,
+    windowSeconds: SIGN_IN_WINDOW_SECONDS,
+    failClosed: true,
+  });
+  const byIp = await enforceRateLimit({
+    key: `signin:ip:${ipFromRequest(request)}`,
+    limit: SIGN_IN_PER_IP,
+    windowSeconds: SIGN_IN_WINDOW_SECONDS,
+    failClosed: true,
+  });
+  if (byEmail.ok && byIp.ok) return true;
+  log.warn("[auth]", "sign-in rate limited", { reason: byEmail.ok ? "ip" : "email" });
+  return false;
+}
+
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db),
   ...authConfig,
@@ -120,11 +143,16 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
         const email = String(credentials.email).toLowerCase().trim();
         const password = String(credentials.password);
         if (!email || !password) return null;
+
+        // BL-STAB-8a-0 — brute-force limits that fail closed: a broken
+        // counter store must not turn into unlimited password guesses.
+        // The same refusal as a wrong password, so it reveals nothing.
+        if (!(await signInAllowed(email, request))) return null;
 
         const [user] = await db
           .select()

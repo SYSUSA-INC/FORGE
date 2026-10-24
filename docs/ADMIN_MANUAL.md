@@ -28,6 +28,8 @@ Admins in FORGE are the people who decide who has access, what their access lets
 
 ## 1. Roles overview
 
+Admin pages use the same look as the rest of FORGE (User Manual §2.0): text tabs with a blue diamond, ink figures on a hairline, open hairline tables (the Audit Log and Notification rules tables, for example), neutral grey tags, and "Back" / "← SuperAdmin portal" as text links beside a page's buttons. Status colours keep one meaning each: green done, red blocked or failed, amber attention, blue in progress.
+
 FORGE has two kinds of privileged users:
 
 ### Organization admin
@@ -298,6 +300,8 @@ For a future "full snapshot with bodies" pattern (e.g., for legal-hold scenarios
 ---
 
 ## 4. Audit & accountability
+
+The Audit Log shows events as an open table: mono column heads, one hairline between rows, and a Detail control on the right of each row.
 
 This is the section to read before your first quarterly review. It tells you exactly where each kind of change lives so you can answer the "who, when, why" questions confidently.
 
@@ -625,6 +629,10 @@ Migration 0107 adds `api_token` — sync it on `/admin/migrations` after deployi
 3. Check the domain is verified at https://resend.com/domains (sysgov.com should show green SPF/DKIM/DMARC)
 4. Check Vercel env vars: `RESEND_API_KEY` and `EMAIL_FROM` are set on Production, Preview, and Development
 
+### 7.1.1 What the emails look like
+
+Every email FORGE sends (verification, reset, invite, review, comment mention, notification rules, digests, billing reminders) shares one light layout: white card on a pale background, a blue FORGE mark, ink text and a blue button with square corners. Colours come from one table in `src/lib/theme-colors.ts` (`EMAIL_HEX`) because mail clients cannot read the app's theme. A mail client with its own dark mode may invert the card.
+
 ### 7.2 A user's password doesn't work
 
 From the SuperAdmin portal → Platform users → their row → **Reset password**. They'll get a fresh reset link.
@@ -636,6 +644,7 @@ Common causes:
 - They're disabled at the user level — check the "Disabled" pill in the Platform users tab
 - Their org is disabled — check the Organizations tab for a "Disabled" pill next to their org
 - Their membership was set to `disabled` — open the org's `/users` page as an org admin and re-enable them
+- They were rate limited — password sign-in allows 10 attempts per email and 60 per IP address in any 15 minutes, and a refused attempt looks the same as a wrong password (the log line `[auth] sign-in rate limited` names `email` or `ip`). Wait out the window. If a shared office or VPN address is being refused for everyone, the per-IP limit is the cause. There is no unlock button; a database error in the limiter also refuses sign-in (it fails closed) until the database is back
 
 ### 7.4 Data isolation
 

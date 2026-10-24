@@ -93,6 +93,13 @@ When writing code yourself (Claude, Cursor, etc.):
     `getVerifiedObject`, then `finishClaim` / `releaseClaim` /
     `failClaim` with the claim's `claimedAt` (`src/lib/uploads.ts`).
 
+12. **Update the manuals in the same PR.** Any change a user or an
+    admin can see or feel (screens, labels, colours, emails, limits,
+    sign-in or security behaviour) updates `docs/USER_MANUAL.md`
+    and/or `docs/ADMIN_MANUAL.md`, and its "What's new" list when it
+    is a feature. Say in the PR which sections changed, or why none
+    did.
+
 ## Where to look
 
 - `docs/ENGINEERING_STANDARDS.md` — canonical standards (this is the
