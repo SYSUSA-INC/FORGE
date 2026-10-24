@@ -73,9 +73,22 @@ export const STAGES: {
   },
 ];
 
-export const STAGE_LABELS: Record<OpportunityStage, string> = Object.fromEntries(
-  STAGES.map((s) => [s.key, s.label]),
-) as Record<OpportunityStage, string>;
+/**
+ * BL-PIPE-STAGES (owner, 2026-10-24) — the stages read as the reference
+ * funnel: Identified · Evaluated · Qualified · Captured · Developed ·
+ * Submitted · Closed-Won · Archived. The stored keys are unchanged, so
+ * the API, stage history and imports keep working. "writing" merged
+ * into "pre_proposal" (Developed): migration 0134 moved the rows, the
+ * enum value stays, and `canonicalStage` folds any straggler.
+ */
+export function canonicalStage(stage: OpportunityStage): OpportunityStage {
+  return stage === "writing" ? "pre_proposal" : stage;
+}
+
+export const STAGE_LABELS = {
+  ...Object.fromEntries(STAGES.map((s) => [s.key, s.label])),
+  writing: "Developed",
+} as Record<OpportunityStage, string>;
 
 export const STAGE_COLORS = {
   ...Object.fromEntries(STAGES.map((s) => [s.key, s.color])),

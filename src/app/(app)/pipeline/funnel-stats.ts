@@ -27,7 +27,7 @@ export type FunnelStageStat = {
 };
 
 export type FunnelData = {
-  /** The 7 active stages (S1-S7) in order — what the funnel renders. */
+  /** The six active stages (S1–S6) in order — what the funnel renders. */
   active: FunnelStageStat[];
   /** Closed states (W / L / NB) for the outcome split below. */
   closed: FunnelStageStat[];
