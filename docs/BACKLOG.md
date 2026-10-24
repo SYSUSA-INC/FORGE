@@ -85,6 +85,8 @@ Effort key:
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | 🔄 PR #387 |
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
 | 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C6 body paragraphs in review (this PR) |
+| 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
+| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 📝 recorded; phases to be sized |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2987,6 +2989,76 @@ site (its CSS variables and design-system page), not approximated.
 
 ---
 
+
+### BL-PIPE-FUNNEL — The pipeline as a funnel
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in review (this PR)
+
+Owner (2026-10-24): "I want to see a funnel on the pipeline dashboard,
+and I should be able to click any part of the funnel and get the
+details", to compare each stage with the next and see the win ratio.
+
+**Delivered:** `PipelineFunnel` draws one tapering segment per stage,
+Identified at the top and Won at the tip, each labelled beside it. A
+segment's top edge is as wide as the number of opportunities that reached
+that stage and its bottom edge as wide as the number that reached the
+next, so the taper is the conversion; the figure beside each segment
+says the share of the previous stage that got here and how many sit
+there now (or their weighted value in value mode). `buildFunnelData`
+now carries `reached` and `conversion` per stage, using the same rule as
+Reports (`stageReached`: a lost bid reached Submitted; a no-bid left at
+Qualification), so the two never disagree. Every segment and the won /
+lost / no-bid figures open the dashboard filtered to that stage in the
+page's window. A **Lessons from lost bids** link opens loss intelligence.
+
+**Open with the owner:** the stage names. The reference funnel reads
+Identified · Evaluated · Qualified · Captured · Developed · Submitted ·
+Closed-Won · Archived; FORGE's are Identified · Sources sought ·
+Qualification · Capture · Pre-proposal · Writing · Submitted · Won (with
+Lost and No bid). Renaming is a schema and label change for a later PR.
+
+### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
+**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 📝 recorded (2026-10-24); each phase to be sized and ordered with the owner
+
+Owner vision (2026-10-24): FORGE learns each subscribed customer's
+business model, capabilities, NAICS codes and what they actually do under
+them; builds its own keyword list from that and scouts opportunity sites
+across federal, state, local and commercial; evaluates each find against
+the customer and returns a prioritised list with the reasoning; generates
+a capability matrix on request; and keeps learning as each opportunity
+progresses and closes, so the lessons from every outcome raise the next
+proposal's chances. Over time FORGE owns the proposal lifecycle.
+
+**What exists today, and the gap, per phase:**
+- **1. The customer model.** Exists: the organisation profile (NAICS,
+  set-asides, vehicles, past performance, keywords), the knowledge base
+  and corpus, the Brain. Gap: FORGE does not yet write its own account of
+  "what this company actually does", nor keep it current from new
+  proposals, wins and losses without someone editing it.
+- **2. Keywords and scouting.** Exists: the nightly SAM.gov scout on the
+  org's keywords and NAICS, eBuy and GSA pastes, source requests. Gap:
+  keywords FORGE derives itself from the customer model; sources beyond
+  SAM.gov (state and local portals, commercial), each of which needs its
+  own adapter and terms of use; one scout queue across sources.
+- **3. Evaluation and the prioritised list.** Exists: PWin with
+  calibration, opportunity triage, the Scout page's finds. Gap: one
+  ranked list with the reasons written out per find, grounded in the
+  customer model; a capability matrix (our capabilities against the
+  opportunity's requirements) generated on request. The compliance
+  matrix is the requirement-side half of this.
+- **4. Learning from outcomes.** Exists: loss intelligence, outcome
+  insights, the round debrief, the golden eval, PWin movers. Gap: lessons
+  captured per opportunity as a structured record that the drafter and
+  the evaluator read back, and a visible loop from "we lost because" to
+  "the next proposal did this differently".
+- **5. Owning the lifecycle.** The end state: FORGE proposes the next
+  action at each stage and drafts more of the proposal unprompted, with
+  a person approving. Depends on 1 to 4.
+
+**Owner questions before sizing:** which sources matter first (state
+portals vary by state; commercial sources are mostly paid); what a
+capability matrix should contain and look like to them; whether the
+pipeline stages should be renamed to the reference funnel's; and how
+much FORGE may do without a person approving at each step.
 
 ### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 in review (this PR)

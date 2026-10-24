@@ -149,8 +149,8 @@ export default async function PipelinePage({
         title="Stage funnel"
         eyebrow={
           mode === "value"
-            ? "Width = PWin% × midpoint of value range"
-            : "Width = number of opportunities in stage"
+            ? "Width = how many reached each stage · figures = PWin% × midpoint of value"
+            : "Width = how many reached each stage"
         }
       >
         <PipelineFunnel data={data} mode={mode} window={windowKey} />

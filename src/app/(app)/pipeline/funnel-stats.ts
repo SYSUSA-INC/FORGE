@@ -1,6 +1,7 @@
 import type { OpportunityStage } from "@/db/schema";
 import { weightedValueOf } from "@/lib/pipeline-drill";
 import { STAGES } from "@/lib/opportunity-types";
+import { FUNNEL_STAGES, stageReached } from "@/lib/reports-logic";
 
 /**
  * Per-stage aggregates for the pipeline funnel — count, weighted
@@ -15,6 +16,14 @@ export type FunnelStageStat = {
   color: string;
   count: number;
   weightedValue: number; // PWin% × midpoint(valueLow, valueHigh) summed
+  /**
+   * BL-PIPE-FUNNEL — how many got at least this far (a lost bid reached
+   * Submitted, a no-bid left at Qualification: reports-logic.stageReached).
+   * For lost and no-bid it is the count itself.
+   */
+  reached: number;
+  /** Share of the previous funnel stage that reached this one; null for the first and for lost / no-bid. */
+  conversion: number | null;
 };
 
 export type FunnelData = {
@@ -48,6 +57,8 @@ export function buildFunnelData(rows: RowLike[]): FunnelData {
       color: s.color,
       count: 0,
       weightedValue: 0,
+      reached: 0,
+      conversion: null,
     };
     if (s.phase === "closed") closed.push(stat);
     else active.push(stat);
@@ -62,7 +73,19 @@ export function buildFunnelData(rows: RowLike[]): FunnelData {
     stat.count += 1;
     // BL-PIPE-DRILL — the same rule the "Pipeline value" drill-down lists by.
     stat.weightedValue += weightedValueOf(r);
+    const at = stageReached(r.stage);
+    for (let i = 0; i <= at; i++) {
+      const step = byKey[FUNNEL_STAGES[i]!];
+      if (step) step.reached += 1;
+    }
   }
+  FUNNEL_STAGES.forEach((key, i) => {
+    const step = byKey[key];
+    const prev = i > 0 ? byKey[FUNNEL_STAGES[i - 1]!] : undefined;
+    if (!step) return;
+    step.conversion = prev && prev.reached > 0 ? step.reached / prev.reached : null;
+  });
+  for (const s of closed) if (s.key !== "won") s.reached = s.count;
 
   const totalCount = active.reduce((s, x) => s + x.count, 0)
     + closed.reduce((s, x) => s + x.count, 0);
