@@ -188,6 +188,8 @@ Each group is collapsible — click the group header (or its chevron) to fold it
 
 The default landing page after sign-in is the **Command Center** (`/`). It's the at-a-glance home — a 10-tile stage grid for opportunities (count + value range + due hint per stage), a "Next deadline" panel highlighting the soonest non-past-due opportunity, and a "Proposal stages" breakdown. Clicking any tile **navigates** to the Opportunities Dashboard pre-filtered to that stage.
 
+A tile's red **past due** count means an open pursuit whose response date has passed and needs cleaning up. Submitted, Won, Lost and No bid tiles never show it: those pursuits are past the date by definition. The figures under the page title and on the tiles are plain counts ("6", not "06"). The Proposal stages, Recent proposals and Quick links panels are open rows with a hairline between them.
+
 Two panels appear only when there is something to say. **Needs attention** lists open work that looks like a recompete of a pursuit you already decided. **PWin movers** (BL-AIP-7b) lists the live pursuits whose calibrated PWin moved most over the last seven days — from → to, the stage, the model's confidence, and the one or two factor changes behind the move (an evaluation that was scored, an incumbent that appeared, a proposal whose readiness changed). Every night FORGE freezes the model's estimate for each live opportunity when it changed, so a move is always explained by something that happened in your pipeline. The same panel, longer, is on **FORGE Brain** (`/intelligence`).
 
 The **Opportunities Dashboard** (`/opportunities`) is the same tile grid plus an editable filter + search + the per-opportunity list. Clicking a tile here **filters in place** rather than navigating.

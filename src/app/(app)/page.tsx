@@ -60,15 +60,15 @@ export default async function DashboardPage() {
         meta={[
           {
             label: "Active opportunities",
-            value: String(totalActiveOpps).padStart(2, "0"),
+            value: String(totalActiveOpps),
           },
           {
             label: "Active proposals",
-            value: String(activeProposals).padStart(2, "0"),
+            value: String(activeProposals),
           },
           {
             label: "In review",
-            value: String(snap.proposalsInReview).padStart(2, "0"),
+            value: String(snap.proposalsInReview),
             accent: snap.proposalsInReview > 0 ? "violet" : undefined,
           },
           {
@@ -168,11 +168,11 @@ export default async function DashboardPage() {
               No active proposals.
             </p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col divide-y divide-layer/10">
               {Object.entries(propByStage).map(([stage, count]) => (
                 <li
                   key={stage}
-                  className="flex items-center justify-between rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5"
+                  className="flex items-center justify-between px-1 py-2"
                 >
                   <span className="font-mono text-[11px] uppercase tracking-widest text-muted">
                     {stage}
@@ -212,12 +212,12 @@ export default async function DashboardPage() {
               .
             </p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col divide-y divide-layer/10">
               {recentProposals.map((p) => (
                 <li key={p.id}>
                   <Link
                     href={`/proposals/${p.id}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
+                    className="flex items-center justify-between gap-3 px-1 py-2.5 transition-colors hover:bg-cobalt-400/[0.06]"
                   >
                     <span className="min-w-0 truncate font-display text-[14px] text-text">
                       {p.title}
@@ -240,10 +240,10 @@ export default async function DashboardPage() {
         </Panel>
 
         <Panel title="Quick links">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col divide-y divide-layer/10">
             <Link
               href="/opportunities"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
+              className="flex items-center justify-between px-1 py-2.5 transition-colors hover:bg-cobalt-400/[0.06]"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -253,11 +253,11 @@ export default async function DashboardPage() {
                   Open Opportunities Dashboard
                 </div>
               </div>
-              <span className="text-teal">→</span>
+              <span className="text-accent">→</span>
             </Link>
             <Link
               href="/opportunities/import"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
+              className="flex items-center justify-between px-1 py-2.5 transition-colors hover:bg-cobalt-400/[0.06]"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -267,11 +267,11 @@ export default async function DashboardPage() {
                   Import opportunities
                 </div>
               </div>
-              <span className="text-teal">→</span>
+              <span className="text-accent">→</span>
             </Link>
             <Link
               href="/intelligence"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
+              className="flex items-center justify-between px-1 py-2.5 transition-colors hover:bg-cobalt-400/[0.06]"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -281,11 +281,11 @@ export default async function DashboardPage() {
                   AI brief + insights
                 </div>
               </div>
-              <span className="text-teal">→</span>
+              <span className="text-accent">→</span>
             </Link>
             <Link
               href="/notifications"
-              className="aur-card flex items-center justify-between px-3 py-2.5 transition-colors hover:border-layer/20"
+              className="flex items-center justify-between px-1 py-2.5 transition-colors hover:bg-cobalt-400/[0.06]"
             >
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
@@ -295,7 +295,7 @@ export default async function DashboardPage() {
                   Notifications
                 </div>
               </div>
-              <span className="text-teal">→</span>
+              <span className="text-accent">→</span>
             </Link>
           </div>
         </Panel>

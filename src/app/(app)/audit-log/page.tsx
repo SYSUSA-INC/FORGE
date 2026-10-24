@@ -67,7 +67,7 @@ export default async function AuditLogPage({
         meta={[
           {
             label: "Matches",
-            value: String(result.total).padStart(2, "0"),
+            value: String(result.total),
           },
           {
             label: "Page",

@@ -67,7 +67,7 @@ export default async function OnboardingPage() {
           { label: "Signed in as", value: user.email ?? user.id },
           {
             label: "Workspaces",
-            value: String(rows.length).padStart(2, "0"),
+            value: String(rows.length),
             accent: rows.length === 0 ? "rose" : "gold",
           },
           {

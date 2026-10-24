@@ -115,12 +115,12 @@ export default async function PipelinePage({
           // BL-PIPE-DRILL — each number opens the opportunities behind it.
           {
             label: "In window",
-            value: String(data.totalCount).padStart(2, "0"),
+            value: String(data.totalCount),
             href: drillHref(windowKey, null, undefined, mode),
           },
           {
             label: "Active",
-            value: String(activeCount).padStart(2, "0"),
+            value: String(activeCount),
             accent: activeCount > 0 ? "cobalt" : undefined,
             href: drillHref(windowKey, "active", undefined, mode),
           },

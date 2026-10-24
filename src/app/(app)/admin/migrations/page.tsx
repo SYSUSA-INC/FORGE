@@ -57,11 +57,11 @@ export default async function MigrationsPage() {
           },
           {
             label: "Applied",
-            value: String(status.appliedFiles.length).padStart(2, "0"),
+            value: String(status.appliedFiles.length),
           },
           {
             label: "Pending",
-            value: String(status.pendingFiles.length).padStart(2, "0"),
+            value: String(status.pendingFiles.length),
             accent: status.pendingFiles.length > 0 ? "rose" : undefined,
           },
         ]}

@@ -69,10 +69,10 @@ export default async function ScoutPage() {
           </Link>
         }
         meta={[
-          { label: "New finds", value: String(fresh.length).padStart(2, "0") },
+          { label: "New finds", value: String(fresh.length) },
           {
             label: "Recommended pursue",
-            value: String(pursue).padStart(2, "0"),
+            value: String(pursue),
             accent: pursue > 0 ? "emerald" : undefined,
           },
           {

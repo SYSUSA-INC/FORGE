@@ -32,22 +32,22 @@ export default async function PlatformSourceRequestsPage() {
         meta={[
           {
             label: "Pending",
-            value: String(counts.pending).padStart(2, "0"),
+            value: String(counts.pending),
             accent: counts.pending > 0 ? "gold" : undefined,
           },
           {
             label: "Under review",
-            value: String(counts.under_review).padStart(2, "0"),
+            value: String(counts.under_review),
             accent: counts.under_review > 0 ? "cobalt" : undefined,
           },
           {
             label: "Shipped",
-            value: String(counts.shipped).padStart(2, "0"),
+            value: String(counts.shipped),
             accent: counts.shipped > 0 ? "emerald" : undefined,
           },
           {
             label: "Rejected",
-            value: String(counts.rejected).padStart(2, "0"),
+            value: String(counts.rejected),
           },
         ]}
       />
