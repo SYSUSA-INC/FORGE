@@ -88,7 +88,7 @@ Effort key:
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 📝 recorded; phases to be sized |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
-| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | 📝 design in review (this PR) |
+| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ design approved 2026-10-25 (this PR); phase A next |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3039,7 +3039,7 @@ funnel, the gate decision's next-stage order and the customer-history
 labels all read from the one list.
 
 ### BL-CAP-MATRIX — Capability matrix as a questionnaire
-**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** 📝 design in review (this PR); no code yet
+**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** ✅ design approved (owner, 2026-10-25); phase A next
 
 Owner (2026-10-24): "a questionnaire that should be based on the
 requirements and capabilities in the RFP/RFI and the customer should be
@@ -3107,14 +3107,11 @@ re-parse offers a rebuild without losing answers to unchanged questions.
   each one before it counts. Nothing suggested affects coverage or PWin
   until confirmed.
 
-**Decisions for the owner before phase A:**
-1. The answer scale above, or fewer options (for example Have / Partial /
-   Gap / N/A).
-2. The teaming threshold: 70% coverage of `shall` requirements.
-3. The PWin weight: up to ±1.0 log-odds (about ±20 points of PWin at the
-   middle of the range) for full versus no coverage.
-4. Who may answer: any member on the opportunity, or the opportunity's
-   owner and admins only.
+**Owner decisions (2026-10-25), all as proposed:** the six-option answer
+scale; teaming flagged under 70% coverage of `shall` requirements; the
+PWin factor up to ±1.0 log-odds; any member on the opportunity may
+answer (the same rule as the bid / no-bid scores). Phase A starts once
+this design PR merges.
 
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
 **Priority:** P1  ·  **Effort:** XL  ·  **Status:** 📝 recorded (2026-10-24); each phase to be sized and ordered with the owner
