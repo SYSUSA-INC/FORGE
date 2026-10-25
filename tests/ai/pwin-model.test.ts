@@ -32,6 +32,7 @@ const neutral: PwinFeatures = {
   agencyHistory: null,
   naicsHistory: null,
   readiness: null,
+  capability: null,
 };
 
 const allCerts: SocioEconomic = {
@@ -82,6 +83,27 @@ describe("PWin — set-aside eligibility", () => {
     // Any small-business status satisfies a total small business set-aside.
     expect(setAsideEligibility("Total Small Business", { ...noCerts, hubzone: true })).toBe(true);
     expect(setAsideEligibility("Small Business", noCerts)).toBe(false);
+  });
+});
+
+describe("PWin — capability questionnaire (BL-CAP-MATRIX)", () => {
+  const prior = computePrior(0, 0);
+  const cap = (coverage: number, shallGapsOpen = 0) => ({
+    ...neutral,
+    capability: { coverage, shallGapsOpen, partnerCovered: 0, answered: 8, total: 10 },
+  });
+  it("adds nothing at half coverage and up to ±1.0 at the ends", () => {
+    expect(scoreFeatures(cap(0.5), prior).factors.find((f) => f.key === "capability")).toBeUndefined();
+    expect(scoreFeatures(cap(1), prior).factors.find((f) => f.key === "capability")?.logOdds).toBeCloseTo(1.0);
+    expect(scoreFeatures(cap(0), prior).factors.find((f) => f.key === "capability")?.logOdds).toBeCloseTo(-1.0);
+  });
+  it("takes a further 0.3 off while a shall-level gap has no partner", () => {
+    const s = scoreFeatures(cap(0.8, 2), prior);
+    expect(s.factors.find((f) => f.key === "capability_gap")?.logOdds).toBeCloseTo(-0.3);
+    expect(scoreFeatures(cap(0.8, 0), prior).factors.find((f) => f.key === "capability_gap")).toBeUndefined();
+  });
+  it("ignores an untrusted questionnaire", () => {
+    expect(scoreFeatures({ ...neutral, capability: null }, prior).factors).toEqual([]);
   });
 });
 

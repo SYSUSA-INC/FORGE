@@ -4,6 +4,13 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import {
+  CAPABILITY_PWIN_MIN_ANSWERED,
+  CAPABILITY_PWIN_MIN_ANSWERED_SHARE,
+  CAPABILITY_TEAMING_THRESHOLD,
+  capabilityPwinFeature,
+  computeCapabilityCoverage,
+} from "@/lib/capability-coverage";
+import {
   CAPABILITY_ANSWER_LABELS,
   CAPABILITY_ANSWER_VALUES,
   answeredCount,
@@ -50,6 +57,8 @@ export function CapabilityMatrixPanel({
 
   const total = matrix?.questions.length ?? 0;
   const answered = matrix ? answeredCount(matrix.questions, matrix.answers) : 0;
+  const coverage = matrix ? computeCapabilityCoverage(matrix.questions, matrix.answers) : null;
+  const pwinActive = coverage ? capabilityPwinFeature(coverage) !== null : false;
   const stale = !!matrix && matrix.parseVersion !== currentParseVersion;
 
   const groups = useMemo(() => {
@@ -104,7 +113,7 @@ export function CapabilityMatrixPanel({
       <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
         FORGE drafts the questions from the solicitation&apos;s requirements and Section M, plus the standing
         questions every bid gets. Review them, drop or reword any, and answer each one honestly: the answers
-        are what the coverage score, the partner decision and PWin will read (phase B).
+        are what the coverage score, the partner decision and PWin read.
       </p>
       {stale ? (
         <p className="mb-3 font-body text-[13px] text-brass">
@@ -114,6 +123,62 @@ export function CapabilityMatrixPanel({
       ) : null}
       {error ? <p className="mb-3 font-body text-[13px] text-rose">{error}</p> : null}
       {notice ? <p className="mb-3 font-body text-[13px] text-green">{notice}</p> : null}
+
+      {matrix && coverage ? (
+        <div className="mb-4 grid grid-cols-2 gap-3 border-t border-layer/10 pt-3 md:grid-cols-4">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-label text-muted">Coverage</div>
+            <div className="font-display text-2xl tabular-nums text-text">
+              {coverage.coverage === null ? "—" : `${Math.round(coverage.coverage * 100)}%`}
+            </div>
+            <div className="font-mono text-[10px] text-subtle">
+              {coverage.shallCoverage === null ? "no shall answers yet" : `${Math.round(coverage.shallCoverage * 100)}% of shall`}
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-label text-muted">Partner</div>
+            <div className={`font-display text-2xl ${coverage.partnerNeeded ? "text-brass" : "text-text"}`}>
+              {coverage.coverage === null ? "—" : coverage.partnerNeeded ? "Needed" : "Not needed"}
+            </div>
+            <div className="font-mono text-[10px] text-subtle">
+              {coverage.partnerNeeded
+                ? `${coverage.shallGapsOpen} shall gap${coverage.shallGapsOpen === 1 ? "" : "s"} open · ${coverage.partnerCovered} covered`
+                : `flagged under ${Math.round(CAPABILITY_TEAMING_THRESHOLD * 100)}% of shall`}
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-label text-muted">Gaps</div>
+            <div className="font-display text-2xl tabular-nums text-text">{coverage.gaps.length}</div>
+            <div className="font-mono text-[10px] text-subtle">answered as a gap</div>
+          </div>
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-label text-muted">PWin</div>
+            <div className={`font-display text-2xl ${pwinActive ? "text-text" : "text-muted"}`}>
+              {pwinActive ? "Counting" : "Not yet"}
+            </div>
+            <div className="font-mono text-[10px] text-subtle">
+              {pwinActive
+                ? "capability coverage is a PWin factor"
+                : `answer ${CAPABILITY_PWIN_MIN_ANSWERED}+ and ${Math.round(CAPABILITY_PWIN_MIN_ANSWERED_SHARE * 100)}% of the questions`}
+            </div>
+          </div>
+          {coverage.gaps.length > 0 ? (
+            <ul className="col-span-2 flex flex-col divide-y divide-layer/10 md:col-span-4">
+              {coverage.gaps.map((g) => (
+                <li key={g.questionId} className="flex flex-wrap items-center gap-2 py-1.5 font-body text-[13px] text-text">
+                  <span className="min-w-0 flex-1">{g.text}</span>
+                  {g.refs.map((r) => (
+                    <span key={r} className="aur-tag text-muted">{r}</span>
+                  ))}
+                  <span className={`font-mono text-[10px] uppercase tracking-label ${g.partnerNamed ? "text-green" : "text-brass"}`}>
+                    {g.value === "gap_none" ? "no plan" : g.partnerNamed ? "partner named" : "partner needed"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {!matrix ? (
         <p className="font-body text-[13px] text-muted">

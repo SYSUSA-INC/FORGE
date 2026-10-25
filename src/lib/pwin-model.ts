@@ -20,6 +20,8 @@
  * No DB, no server-only: the server lib assembles features and calls in.
  */
 
+import type { CapabilityPwinFeature } from "@/lib/capability-coverage";
+
 export const PWIN_MODEL_VERSION = "v1";
 
 /** Industry-typical PWin for a competitive federal bid, used until an org has history. */
@@ -59,6 +61,11 @@ export type PwinReadiness = {
 
 export type PwinFeatures = {
   evaluation: PwinEvaluation | null;
+  /**
+   * BL-CAP-MATRIX — the answered capability questionnaire, or null while
+   * it is unbuilt or too empty to trust (capabilityPwinFeature).
+   */
+  capability: CapabilityPwinFeature | null;
   weAreIncumbent: boolean;
   competitorIncumbent: boolean;
   incumbentNamed: boolean;
@@ -237,6 +244,26 @@ export function scoreFeatures(
         "Compliance coverage",
         (f.readiness.complianceRatio - 0.5) * 0.8,
         `${Math.round(f.readiness.complianceRatio * 100)}% of ${f.readiness.complianceTotal} items complete`,
+      );
+    }
+  }
+
+  // BL-CAP-MATRIX — the answered capability questionnaire: linear from
+  // -1.0 at no coverage to +1.0 at full, and a further -0.3 while a
+  // shall-level gap has no partner named (owner, 2026-10-25).
+  if (f.capability) {
+    add(
+      "capability",
+      "Capability coverage",
+      (f.capability.coverage - 0.5) * 2.0,
+      `${Math.round(f.capability.coverage * 100)}% covered across ${f.capability.answered} of ${f.capability.total} answered questions`,
+    );
+    if (f.capability.shallGapsOpen > 0) {
+      add(
+        "capability_gap",
+        "Capability gap without a partner",
+        -0.3,
+        `${f.capability.shallGapsOpen} shall-level gap${f.capability.shallGapsOpen === 1 ? "" : "s"} with no partner named`,
       );
     }
   }
