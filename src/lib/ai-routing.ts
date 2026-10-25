@@ -71,6 +71,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   solicitation_review: "standard",
   capability_matrix: "standard",
   capability_questions: "standard",
+  capability_suggestions: "standard",
   question_generator: "standard",
   compliance_preflight: "standard",
   compliance_automap: "standard",

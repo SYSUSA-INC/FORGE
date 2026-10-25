@@ -1,4 +1,4 @@
-import type { CapabilityAnswer, CapabilityQuestion } from "@/lib/capability-matrix-types";
+import type { CapabilityAnswer, CapabilityQuestion, CapabilitySuggestion } from "@/lib/capability-matrix-types";
 import {
   bigint,
   boolean,
@@ -512,6 +512,8 @@ export const opportunityCapabilityMatrices = pgTable(
     parseVersion: text("parse_version").notNull().default(""),
     questions: jsonb("questions").$type<CapabilityQuestion[]>().notNull().default([]),
     answers: jsonb("answers").$type<Record<string, CapabilityAnswer>>().notNull().default({}),
+    // Phase C — FORGE's suggested answers, keyed by question id; never read by coverage or PWin.
+    suggestions: jsonb("suggestions").$type<Record<string, CapabilitySuggestion>>().notNull().default({}),
     builtByUserId: text("built_by_user_id").references(() => users.id, { onDelete: "set null" }),
     builtAt: timestamp("built_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

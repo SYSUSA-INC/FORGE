@@ -17,11 +17,15 @@ import {
   type CapabilityAnswer,
   type CapabilityAnswerValue,
   type CapabilityQuestion,
+  type CapabilitySuggestion,
 } from "@/lib/capability-matrix-types";
+import { pendingSuggestions } from "@/lib/capability-suggestions";
 import {
   answerCapabilityQuestionAction,
   buildCapabilityQuestionsAction,
+  dismissCapabilitySuggestionAction,
   removeCapabilityQuestionAction,
+  suggestCapabilityAnswersAction,
   updateCapabilityQuestionAction,
 } from "../capability-matrix-actions";
 
@@ -33,6 +37,8 @@ import {
 export type CapabilityMatrixView = {
   questions: CapabilityQuestion[];
   answers: Record<string, CapabilityAnswer>;
+  /** Phase C — FORGE's suggestions for unanswered questions; a person confirms each. */
+  suggestions: Record<string, CapabilitySuggestion>;
   parseVersion: string;
   builtAt: string | null;
 };
@@ -60,6 +66,7 @@ export function CapabilityMatrixPanel({
   const coverage = matrix ? computeCapabilityCoverage(matrix.questions, matrix.answers) : null;
   const pwinActive = coverage ? capabilityPwinFeature(coverage) !== null : false;
   const stale = !!matrix && matrix.parseVersion !== currentParseVersion;
+  const suggested = matrix ? pendingSuggestions(matrix.questions, matrix.answers, matrix.suggestions) : 0;
 
   const groups = useMemo(() => {
     const out: { area: string; questions: CapabilityQuestion[] }[] = [];
@@ -90,30 +97,67 @@ export function CapabilityMatrixPanel({
     });
   }
 
+  function suggest() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await suggestCapabilityAnswersAction({ opportunityId });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      const parts = [
+        res.fromMatrix > 0 ? `${res.fromMatrix} from the solicitation's matrix` : "",
+        res.fromPrior > 0 ? `${res.fromPrior} from earlier questionnaires` : "",
+        res.fromAi > 0 ? `${res.fromAi} from past performance and the knowledge base` : "",
+      ].filter(Boolean);
+      setNotice(
+        res.suggested === 0
+          ? `Nothing to suggest${res.aiSkipped ? ` (${res.aiSkipped})` : ""}; answer the questions yourself.`
+          : `${res.suggested} answer${res.suggested === 1 ? "" : "s"} suggested (${parts.join("; ")}). Confirm or change each one; none counts until you do.`,
+      );
+      router.refresh();
+    });
+  }
+
   return (
     <Panel
       title="Capability matrix"
-      eyebrow={matrix ? `${answered} of ${total} answered` : "Questionnaire"}
+      eyebrow={matrix ? `${answered} of ${total} answered${suggested > 0 ? ` · ${suggested} suggested` : ""}` : "Questionnaire"}
       actions={
-        <button
-          type="button"
-          className="aur-btn aur-btn-primary"
-          disabled={pending || !hasRequirements}
-          onClick={build}
-          title={
-            hasRequirements
-              ? "FORGE drafts the questions from the parsed solicitation's requirements."
-              : "Parse a solicitation on this opportunity first."
-          }
-        >
-          {pending ? "Drafting…" : matrix ? "Rebuild questions" : "Build questionnaire"}
-        </button>
+        <div className="flex items-center gap-2">
+          {matrix && answered < total ? (
+            <button
+              type="button"
+              className="aur-btn"
+              disabled={pending}
+              onClick={suggest}
+              title="FORGE pre-fills the unanswered questions from the solicitation's scored matrix, earlier questionnaires, past performance and the knowledge base. You confirm each one."
+            >
+              {pending ? "Working…" : "Suggest answers"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="aur-btn aur-btn-primary"
+            disabled={pending || !hasRequirements}
+            onClick={build}
+            title={
+              hasRequirements
+                ? "FORGE drafts the questions from the parsed solicitation's requirements."
+                : "Parse a solicitation on this opportunity first."
+            }
+          >
+            {pending ? "Drafting…" : matrix ? "Rebuild questions" : "Build questionnaire"}
+          </button>
+        </div>
       }
     >
       <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
         FORGE drafts the questions from the solicitation&apos;s requirements and Section M, plus the standing
         questions every bid gets. Review them, drop or reword any, and answer each one honestly: the answers
-        are what the coverage score, the partner decision and PWin read.
+        are what the coverage score, the partner decision and PWin read. <strong className="font-medium text-text">Suggest answers</strong> pre-fills
+        what FORGE can show evidence for; a suggestion counts only once you confirm it.
       </p>
       {stale ? (
         <p className="mb-3 font-body text-[13px] text-brass">
@@ -198,6 +242,7 @@ export function CapabilityMatrixPanel({
                     opportunityId={opportunityId}
                     question={q}
                     answer={matrix.answers[q.id] ?? null}
+                    suggestion={matrix.answers[q.id] ? null : (matrix.suggestions[q.id] ?? null)}
                     partners={partners}
                     onError={setError}
                   />
@@ -215,12 +260,14 @@ function QuestionRow({
   opportunityId,
   question,
   answer,
+  suggestion,
   partners,
   onError,
 }: {
   opportunityId: string;
   question: CapabilityQuestion;
   answer: CapabilityAnswer | null;
+  suggestion: CapabilitySuggestion | null;
   partners: { id: string; name: string; relationship: string }[];
   onError: (e: string | null) => void;
 }) {
@@ -244,6 +291,34 @@ function QuestionRow({
         evidence: next.evidence ?? evidence,
         partnerCompanyId: (next.partner ?? partner) || null,
       });
+      if (!res.ok) onError(res.error);
+      else router.refresh();
+    });
+  }
+
+  function confirmSuggestion() {
+    if (!suggestion) return;
+    onError(null);
+    setValue(suggestion.value);
+    setEvidence(suggestion.evidence);
+    startTransition(async () => {
+      const res = await answerCapabilityQuestionAction({
+        opportunityId,
+        questionId: question.id,
+        value: suggestion.value,
+        evidence: suggestion.evidence,
+        partnerCompanyId: null,
+        fromSuggestion: true,
+      });
+      if (!res.ok) onError(res.error);
+      else router.refresh();
+    });
+  }
+
+  function dismissSuggestion() {
+    onError(null);
+    startTransition(async () => {
+      const res = await dismissCapabilitySuggestionAction({ opportunityId, questionId: question.id });
       if (!res.ok) onError(res.error);
       else router.refresh();
     });
@@ -309,6 +384,38 @@ function QuestionRow({
             Remove
           </button>
         </div>
+        {suggestion ? (
+          <div className="mt-2 border-l-2 border-cobalt/40 pl-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-label text-cobalt">Suggested</span>
+              <span className="font-body text-[13px] text-text">{CAPABILITY_ANSWER_LABELS[suggestion.value]}</span>
+              <button type="button" className="aur-btn aur-btn-ghost" onClick={confirmSuggestion} disabled={pending}>
+                Confirm
+              </button>
+              <button
+                type="button"
+                className="font-mono text-[10px] uppercase tracking-label text-subtle hover:text-rose"
+                onClick={dismissSuggestion}
+                disabled={pending}
+              >
+                Dismiss
+              </button>
+            </div>
+            <p className="mt-1 font-body text-[12px] leading-[1.5] text-muted">{suggestion.reason}</p>
+            {suggestion.evidence ? (
+              <p className="mt-0.5 font-body text-[12px] leading-[1.5] text-text">{suggestion.evidence}</p>
+            ) : null}
+            {suggestion.sources.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {suggestion.sources.map((src) => (
+                  <span key={`${src.kind}:${src.ref}`} className="aur-tag text-muted" title={src.kind.replace("_", " ")}>
+                    {src.kind === "matrix" ? `${src.ref}: ${src.label}` : src.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <input
           className="aur-input mt-2 w-full"
           placeholder="Evidence: a past performance, a knowledge entry, or a note"
