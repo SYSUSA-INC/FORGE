@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { and, eq, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import type { OpportunityStage } from "@/db/schema";
+import { db } from "@/db";
+import { opportunityCapabilityMatrices, type OpportunityStage } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { computeCapabilityCoverage } from "@/lib/capability-coverage";
 import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
 import { applyDrill, drillSummary, isDrill, parsePipelineDrill, pipelineHref, weightedValueOf } from "@/lib/pipeline-drill";
@@ -33,6 +36,35 @@ export default async function OpportunitiesPage({
   const drilled = isDrill(drill);
   const rows = drilled ? applyDrill(snapshot.oppRows, drill, new Date()) : snapshot.oppRows;
 
+  // BL-CAP-MATRIX — the Qualified list carries each opportunity's capability
+  // coverage (the questionnaire's confirmed answers), so the funnel's
+  // Qualified band opens a list that says who is ready to bid and who needs
+  // a partner. Loaded only for this stage: one org-scoped query over the
+  // listed ids.
+  const capability = new Map<string, { coverage: number | null; partnerNeeded: boolean; answered: number; total: number }>();
+  if (requestedStage === "qualification" && rows.length > 0) {
+    const matrices = await db
+      .select({
+        opportunityId: opportunityCapabilityMatrices.opportunityId,
+        questions: opportunityCapabilityMatrices.questions,
+        answers: opportunityCapabilityMatrices.answers,
+      })
+      .from(opportunityCapabilityMatrices)
+      .where(
+        and(
+          eq(opportunityCapabilityMatrices.organizationId, organizationId),
+          inArray(
+            opportunityCapabilityMatrices.opportunityId,
+            rows.map((r) => r.id),
+          ),
+        ),
+      );
+    for (const m of matrices) {
+      const c = computeCapabilityCoverage(m.questions, m.answers);
+      capability.set(m.opportunityId, { coverage: c.coverage, partnerNeeded: c.partnerNeeded, answered: c.answered, total: c.total });
+    }
+  }
+
   const list = rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -55,6 +87,7 @@ export default async function OpportunitiesPage({
         : null,
     updatedAt: r.updatedAt.toISOString(),
     weightedValue: drill.view === "valued" ? weightedValueOf(r) : null,
+    capability: requestedStage === "qualification" ? (capability.get(r.id) ?? null) : undefined,
   }));
 
   if (list.length === 0 && !drilled) {
