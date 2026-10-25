@@ -88,7 +88,7 @@ Effort key:
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 📝 recorded; phases to be sized |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
-| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ design approved 2026-10-25 (this PR); phase A next |
+| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | 🔄 phase A in review (this PR); design approved 2026-10-25 |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3039,7 +3039,9 @@ funnel, the gate decision's next-stage order and the customer-history
 labels all read from the one list.
 
 ### BL-CAP-MATRIX — Capability matrix as a questionnaire
-**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** ✅ design approved (owner, 2026-10-25); phase A next
+**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** 🔄 phase A in review (this PR); design approved (owner, 2026-10-25)
+
+**Phase A delivered:** table `opportunity_capability_matrix` (migration 0135; org-scoped, one row per opportunity, questions and answers as JSON with the parse version), the question builder (`capability_questions` AI feature, standing questions in `src/lib/capability-matrix-types.ts`, prompt in `capability-matrix-prompt.ts`), the panel on the Evaluation tab (build, rebuild with answers carried over, reword, remove, answer with evidence and a partner), audit rows `opportunity.capability_questions.{build,answer,edit,remove}`, tests for the question set, the carry-over and the parse version. Relation to BL-STAB-9b: the solicitation page's AI-scored matrix (one cell per requirement, `capability_matrix` feature) stays as is; phase C reads its cells as suggested answers.
 
 Owner (2026-10-24): "a questionnaire that should be based on the
 requirements and capabilities in the RFP/RFI and the customer should be

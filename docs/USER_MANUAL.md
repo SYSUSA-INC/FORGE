@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Capability questionnaire** — on an opportunity's Evaluation tab, FORGE drafts the capability questions from the parsed solicitation and you answer them (§5.4 Evaluation).
 - **Stage names** — the opportunity stages now read Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived; Pre-proposal and Writing became one Developed stage (§5.0).
 - **The pipeline funnel** — the pipeline page draws a real funnel, one segment per stage from Identified to Won; click any segment for the opportunities behind it (§5).
 - **A new look** — FORGE now follows the EnableNow design system: white paper in light mode, a dark mode, Host Grotesk text and Geist Mono labels, one blue accent and a small blue diamond that marks where you are (§2.0).
@@ -475,6 +476,8 @@ A qualification scorecard with 5 weighted dimensions (0–100 sliders):
 - Financial attractiveness
 
 ![Evaluation scorecard](docs/images/opportunity-evaluation.png)
+
+**Capability matrix (BL-CAP-MATRIX, phase A).** Below the scorecard and the gate, the **Capability matrix** panel is a questionnaire about what the solicitation asks for. Click **Build questionnaire** once a solicitation on the opportunity has been parsed: FORGE reads its shall / should / may requirements and the Section L and M summaries and drafts 10 to 20 questions ("Can we migrate all ITSM workflows within 12 months?"), each tagged with the requirement references it covers, after nine standing questions every bid gets (incumbency, clearances, key personnel, past performance, certifications, facilities, financial capacity, geography, eligibility). Click a question to reword it; **Remove** drops one. Answer each with **Have it, proven** (add the past performance or knowledge entry as evidence), **Have it, unproven**, **Partial**, **Gap: partner needed** (name a teaming partner or subcontractor from Companies), **Gap: no plan** or **Not applicable**. Each answer saves at once and is recorded in the Audit Log. If the solicitation is re-parsed later, the panel says so; **Rebuild questions** drafts them again and keeps your answers to questions that did not change. The coverage score, the partner-needed flag and the PWin link come in phase B; the AI-scored capability matrix on the solicitation page (§5.4, BL-STAB-9b) is separate and will feed suggested answers in phase C.
 
 A live **Rollup score** with a verdict label — **Strong pursue** (≥70), **Watch** (50–69), or **Consider no-bid** (<50). Add a rationale and click **Save evaluation**. The save is stamped with your user id and a timestamp, so anyone reviewing the deal later can see who scored it that way and when.
 

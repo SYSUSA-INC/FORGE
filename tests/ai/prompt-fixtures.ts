@@ -81,6 +81,8 @@ import {
 } from "@/lib/ai-prompts-bl23";
 import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
+import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
+import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
 import { buildScanUserPrompt, SCAN_SYSTEM } from "@/lib/proposal-scan-input";
 import { fromPlainText } from "@/lib/tiptap-doc";
 
@@ -329,6 +331,25 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
   knowledge_extract: () => [
     buildKnowledgeExtractPrompt({ artifactKind: "won_proposal", artifactTitle: "DOE proposal", artifactTags: ["cloud"], rawText: "Three reversible waves held downtime to zero." }),
   ],
+  capability_questions: () => [
+    buildCapabilityQuestionsPrompt({
+      opportunity: {
+        title: "Enterprise ITSM Modernization",
+        agency: "Department of Veterans Affairs",
+        naicsCode: "541512",
+        setAside: "SDVOSB",
+        placeOfPerformance: "Washington, DC",
+        incumbent: "Acme Federal",
+        description: "Modernise the ITSM platform and migrate 40 workflows.",
+      },
+      requirements: [
+        { kind: "shall", text: "The contractor shall migrate all ITSM workflows within 12 months.", ref: "C.3.1" },
+        { kind: "should", text: "The contractor should provide a 24x7 service desk.", ref: "C.4.2" },
+      ],
+      sectionLSummary: "Volume I technical, 30 pages.",
+      sectionMSummary: "Technical approach, past performance, price.",
+    }),
+  ],
   loss_intelligence: () => [
     buildLossNarrativePrompt({
       organizationName: "Acme Federal",
@@ -465,6 +486,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   image_ocr: [],
   knowledge_classify: [artifactKindClassifySchema],
   knowledge_extract: [knowledgeExtractionSchema],
+  capability_questions: [draftedQuestionSchema],
   loss_intelligence: [lossNarrativeSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],
