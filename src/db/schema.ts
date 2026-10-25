@@ -1,3 +1,4 @@
+import type { CapabilityAnswer, CapabilityQuestion } from "@/lib/capability-matrix-types";
 import {
   bigint,
   boolean,
@@ -491,6 +492,37 @@ export const opportunityEvaluations = pgTable("opportunity_evaluation", {
   rationale: text("rationale").notNull().default(""),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// BL-CAP-MATRIX — the capability matrix as a questionnaire: FORGE drafts
+// the questions from the opportunity's parsed solicitation(s); a person
+// reviews and answers them. One row per opportunity. `questions` and
+// `answers` are JSON (see src/lib/capability-matrix-types.ts); `parseVersion`
+// names the requirement set the questions came from, so a re-parse offers a
+// rebuild without losing answers to unchanged questions.
+export const opportunityCapabilityMatrices = pgTable(
+  "opportunity_capability_matrix",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    parseVersion: text("parse_version").notNull().default(""),
+    questions: jsonb("questions").$type<CapabilityQuestion[]>().notNull().default([]),
+    answers: jsonb("answers").$type<Record<string, CapabilityAnswer>>().notNull().default({}),
+    builtByUserId: text("built_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    builtAt: timestamp("built_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    organizationIdIdx: index("opportunity_capability_matrix_org_idx").on(t.organizationId),
+    opportunityUidx: uniqueIndex("opportunity_capability_matrix_opp_uidx").on(t.opportunityId),
+  }),
+);
+export type OpportunityCapabilityMatrix = typeof opportunityCapabilityMatrices.$inferSelect;
 
 export type OpportunityActivity = typeof opportunityActivities.$inferSelect;
 export type NewOpportunityActivity = typeof opportunityActivities.$inferInsert;

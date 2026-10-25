@@ -23,6 +23,7 @@ export const AI_FEATURES = {
   solicitation_extract: "Solicitation extraction",
   solicitation_review: "Solicitation AI review",
   capability_matrix: "Capability matrix",
+  capability_questions: "Capability questionnaire",
   question_generator: "Question generator",
   ebuy_extract: "eBuy extraction",
   gsa_extract: "GSA extraction",
