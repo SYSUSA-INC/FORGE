@@ -88,6 +88,7 @@ Effort key:
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 📝 recorded; phases to be sized |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
+| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | 📝 design in review (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3037,6 +3038,84 @@ to `pre_proposal`; the enum value stays (Postgres cannot drop one) and
 funnel, the gate decision's next-stage order and the customer-history
 labels all read from the one list.
 
+### BL-CAP-MATRIX — Capability matrix as a questionnaire
+**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** 📝 design in review (this PR); no code yet
+
+Owner (2026-10-24): "a questionnaire that should be based on the
+requirements and capabilities in the RFP/RFI and the customer should be
+able to answer these questions to determine the PWIN and if there is a
+need for a partner." Phase 3 of BL-VISION-AUTOPILOT. Rule from the same
+day: FORGE does as much as it can, and a person approves everything.
+
+**What it is.** On an opportunity with a parsed solicitation, a
+**Capability matrix** panel (on the Evaluation tab, beside the bid /
+no-bid gate). **Build the questionnaire** asks FORGE to read the
+solicitation's extracted requirements (`shall` / `should` / `may`, each
+with its reference), Section M's evaluation factors, and the notice's
+set-aside, NAICS, clearance and certification facts, and to draft 10 to
+20 questions, each naming the requirement references it covers. A fixed
+set of standing questions is always included: incumbency, clearances,
+key personnel, relevant past performance in the last 3 to 5 years,
+certifications (CMMC, ISO, FedRAMP where named), facility, financial
+capacity for the contract's size, geographic presence, and set-aside
+eligibility. The person reviews the questions, can edit or drop any, and
+answers each one.
+
+**The answer.** One of: **Have it, proven** (with a past-performance or
+knowledge-base citation), **Have it, unproven**, **Partial**, **Gap:
+partner needed** (with an optional partner from Companies, relationship
+teaming partner or subcontractor), **Gap: no plan**, **Not applicable**;
+plus a free-text evidence line. Questions and answers are stored per
+opportunity and versioned by the solicitation parse they came from, so a
+re-parse offers a rebuild without losing answers to unchanged questions.
+
+**What comes out.**
+- **Coverage:** the weighted share of `shall` requirements covered
+  (proven 1.0, unproven 0.75, partial 0.5, partner named 0.6, gap 0),
+  with `should` at half weight and `may` at a quarter. Shown as a figure
+  with the uncovered references listed.
+- **Partner needed:** set when any `shall` requirement is answered "Gap:
+  partner needed", or coverage is under the threshold (proposed 70%).
+  The panel lists the gaps and the candidate partners named, and links
+  to Companies to add one.
+- **PWin:** a new feature `capability: { coverage, shallGaps,
+  partnerCovered }` on `PwinFeatures` and one new factor, "Capability
+  coverage", in log-odds (proposed: linear, from -1.0 at 0% to +1.0 at
+  100%, 0 at 50%, and -0.3 extra while a `shall` gap has no partner).
+  An unanswered questionnaire adds nothing, so PWin does not move until
+  a person has answered. The five human evaluation scores are not
+  overwritten; the panel only suggests revisiting Resource availability
+  when coverage and that score disagree by more than 30 points.
+- **Compliance matrix:** questions carry the same requirement references
+  as the compliance matrix items, so a later slice can show "partner"
+  on a compliance row.
+
+**Phases (one PR each, under 1,500 lines, manuals updated in each):**
+- **A — questions and answers:** table `opportunity_capability_matrix`
+  (org-scoped; questions and answers as JSON with the parse version),
+  the AI question builder with the standing questions, the panel to
+  review, edit and answer, audit rows for build and answer, and the
+  Evaluation tab link.
+- **B — coverage, partner flag and PWin:** the coverage calculation, the
+  partner-needed rule and gap list, the PWin feature and factor with a
+  calibration note, the pipeline funnel's qualified-stage tie-in
+  (coverage shown on the Qualified tile's drill list), tests for the
+  arithmetic.
+- **C — suggested answers:** FORGE pre-fills answers from past
+  performance, the knowledge base and prior questionnaires, marked
+  "suggested" with the evidence it used; the person confirms or changes
+  each one before it counts. Nothing suggested affects coverage or PWin
+  until confirmed.
+
+**Decisions for the owner before phase A:**
+1. The answer scale above, or fewer options (for example Have / Partial /
+   Gap / N/A).
+2. The teaming threshold: 70% coverage of `shall` requirements.
+3. The PWin weight: up to ±1.0 log-odds (about ±20 points of PWin at the
+   middle of the range) for full versus no coverage.
+4. Who may answer: any member on the opportunity, or the opportunity's
+   owner and admins only.
+
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
 **Priority:** P1  ·  **Effort:** XL  ·  **Status:** 📝 recorded (2026-10-24); each phase to be sized and ordered with the owner
 
@@ -3080,7 +3159,8 @@ proposal's chances. Over time FORGE owns the proposal lifecycle.
   its own adapter and terms-of-use check (phase 2).
 - **Capability matrix:** a questionnaire built from the RFP/RFI's
   requirements and capabilities; the customer answers it, and the
-  answers feed the PWin and say whether a partner is needed (phase 3).
+  answers feed the PWin and say whether a partner is needed (phase 3;
+  design in BL-CAP-MATRIX).
 - **Stages:** renamed to the reference funnel's (BL-PIPE-STAGES).
 - **Autonomy:** FORGE does as much as it can, and everything needs a
   person's approval (phase 5).
