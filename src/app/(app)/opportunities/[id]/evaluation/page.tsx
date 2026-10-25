@@ -86,6 +86,7 @@ export default async function OpportunityEvaluationPage({
               ? {
                   questions: matrix.questions,
                   answers: matrix.answers,
+                  suggestions: matrix.suggestions,
                   parseVersion: matrix.parseVersion,
                   builtAt: matrix.builtAt ? matrix.builtAt.toISOString() : null,
                 }

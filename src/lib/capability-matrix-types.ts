@@ -50,6 +50,27 @@ export type CapabilityAnswer = {
   updatedByUserId: string;
 };
 
+/** Where a suggested answer came from (phase C). */
+export type CapabilitySuggestionSource =
+  | { kind: "matrix"; ref: string; label: string }
+  | { kind: "knowledge"; ref: string; label: string }
+  | { kind: "past_performance"; ref: string; label: string }
+  | { kind: "prior"; ref: string; label: string };
+
+/**
+ * An answer FORGE proposes. It never counts: coverage and PWin read
+ * `answers` only. A person confirms it (it becomes an answer) or
+ * changes it (their own answer replaces it) or dismisses it.
+ */
+export type CapabilitySuggestion = {
+  value: CapabilityAnswerValue;
+  evidence: string;
+  /** One sentence on why, for the person deciding. */
+  reason: string;
+  sources: CapabilitySuggestionSource[];
+  suggestedAt: string;
+};
+
 export const CAPABILITY_EVIDENCE_MAX = 1_000;
 export const CAPABILITY_QUESTION_TEXT_MAX = 400;
 export const CAPABILITY_DRAFTED_MAX = 20;

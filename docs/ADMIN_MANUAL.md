@@ -471,7 +471,7 @@ Feature flags gate specific actions in the app. When the flag is `false` for a t
 
 | Flag | Gated action | Where it's enforced |
 |---|---|---|
-| `aiAutoDraft` | AI section draft / improve / tighten | `generateSectionDraftAction` |
+| `aiAutoDraft` | AI section draft / improve / tighten; the capability questionnaire's drafted questions and suggested answers (User Manual §5.4; features `capability_questions`, `capability_suggestions`, each 10 runs per org per hour) | `generateSectionDraftAction`, `buildCapabilityQuestionsAction`, `suggestCapabilityAnswersAction` |
 | `winnerAnalysis` | Proposal-vs-winner analysis | `runWinnerAnalysisAction` |
 | `complianceMatrix` | AI compliance preflight | `runCompliancePreflightAction` |
 | `bulkExport` | Audit-log CSV download | `exportAuditLogCsvAction` |

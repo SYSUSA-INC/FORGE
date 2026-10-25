@@ -83,6 +83,8 @@ import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
 import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
 import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
+import { buildCapabilitySuggestionsPrompt } from "@/lib/capability-suggestions-prompt";
+import { aiSuggestionSchema } from "@/lib/capability-suggestions";
 import { buildScanUserPrompt, SCAN_SYSTEM } from "@/lib/proposal-scan-input";
 import { fromPlainText } from "@/lib/tiptap-doc";
 
@@ -350,6 +352,26 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       sectionMSummary: "Technical approach, past performance, price.",
     }),
   ],
+  capability_suggestions: () => [
+    buildCapabilitySuggestionsPrompt({
+      opportunity: {
+        title: "Enterprise ITSM Modernization",
+        agency: "Department of Veterans Affairs",
+        naicsCode: "541512",
+        setAside: "SDVOSB",
+        placeOfPerformance: "Washington, DC",
+        incumbent: "Acme Federal",
+      },
+      questions: [
+        { id: "s2", text: "Do we hold the facility and personnel clearances the work needs?", refs: [], kind: "standing", area: "Security" },
+        { id: "q1", text: "Can we migrate 40 ITSM workflows within 12 months?", refs: ["C.3.1"], kind: "shall", area: "Technical" },
+      ],
+      pastPerformance: [
+        { id: "p1", customer: "DHS", contract: "ITSM consolidation", value: "$4.2M", periodStart: "2023-01", periodEnd: "2025-06", description: "Migrated 32 workflows to ServiceNow." },
+      ],
+      knowledgeEntries: [{ id: "k1", kind: "capability", title: "Cloud migration", body: "32 applications migrated for DHS.", tags: ["cloud"] }],
+    }),
+  ],
   loss_intelligence: () => [
     buildLossNarrativePrompt({
       organizationName: "Acme Federal",
@@ -487,6 +509,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   knowledge_classify: [artifactKindClassifySchema],
   knowledge_extract: [knowledgeExtractionSchema],
   capability_questions: [draftedQuestionSchema],
+  capability_suggestions: [aiSuggestionSchema],
   loss_intelligence: [lossNarrativeSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],
