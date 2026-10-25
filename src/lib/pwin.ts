@@ -15,6 +15,7 @@ import "server-only";
 
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
+import { capabilityPwinFeature, computeCapabilityCoverage } from "@/lib/capability-coverage";
 import {
   complianceItems,
   opportunities,
@@ -25,6 +26,7 @@ import {
   proposals,
   proposalScanResults,
   pwinSnapshots,
+  opportunityCapabilityMatrices,
 } from "@/db/schema";
 import {
   brierScore,
@@ -188,6 +190,7 @@ async function historicalStaticLogits(
       agencyHistory: null,
       naicsHistory: null,
       readiness: null,
+      capability: null,
     };
     return { logit: scoreFeatures(features, prior).logit, won: h.won };
   });
@@ -301,6 +304,24 @@ export async function computePwin(
     };
   }
 
+  // BL-CAP-MATRIX — the answered capability questionnaire, if trusted.
+  const [matrix] = await db
+    .select({
+      questions: opportunityCapabilityMatrices.questions,
+      answers: opportunityCapabilityMatrices.answers,
+    })
+    .from(opportunityCapabilityMatrices)
+    .where(
+      and(
+        eq(opportunityCapabilityMatrices.opportunityId, opportunityId),
+        eq(opportunityCapabilityMatrices.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  const capability = matrix
+    ? capabilityPwinFeature(computeCapabilityCoverage(matrix.questions, matrix.answers))
+    : null;
+
   // History excludes this opportunity so an already-decided bid does
   // not see its own outcome.
   const history = (await loadHistory(organizationId)).filter(
@@ -326,6 +347,7 @@ export async function computePwin(
       : null,
     naicsHistory: opp.naicsCode ? tally(history, (h) => h.naicsCode === opp.naicsCode) : null,
     readiness,
+    capability,
   };
 
   let fit: CalibrationFit | null = null;
