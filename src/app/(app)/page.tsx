@@ -6,6 +6,7 @@ import { getOrganizationSnapshot } from "@/lib/org-snapshot";
 import { STAGES, STAGE_LABELS as OPP_STAGE_LABELS } from "@/lib/opportunity-types";
 import { STAGE_LABELS as PROP_STAGE_LABELS } from "@/lib/proposal-types";
 import { CommandCenterStageGrid } from "./CommandCenterStageGrid";
+import { CompanyModelNudgePanel } from "./CompanyModelNudgePanel";
 import { GettingStartedPanel } from "./GettingStartedPanel";
 import { PwinMoversPanel } from "./PwinMoversPanel";
 import { RecompeteAttentionPanel } from "./RecompeteAttentionPanel";
@@ -84,6 +85,10 @@ export default async function DashboardPage() {
           org admins, until UEI, NAICS, scout keywords and a capability
           statement are all in place. */}
       <GettingStartedPanel organizationId={organizationId} isOrgAdmin={isOrgAdmin} />
+
+      {/* BL-COMPANY-MODEL 1b — for org admins: what changed since the
+          company model was approved, or that none is approved yet. */}
+      <CompanyModelNudgePanel isOrgAdmin={isOrgAdmin} />
 
       {/* Stage widget grid — same data + visuals as /opportunities so
           the two pages can never disagree. Click a tile to drill into

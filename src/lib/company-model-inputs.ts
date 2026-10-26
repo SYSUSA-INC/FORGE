@@ -117,6 +117,7 @@ export async function loadCompanyModelInputs(organizationId: string): Promise<Co
       questionnaireOpportunityIds,
       outcomes: { won: pursuits.filter((b) => b.outcome === "won").length, lost: pursuits.filter((b) => b.outcome === "lost").length },
       registrationOnly,
+      naicsCodes: [...naicsCodes],
     },
     allowedEvidence,
     naicsCodes,

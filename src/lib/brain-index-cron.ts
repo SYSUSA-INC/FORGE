@@ -42,6 +42,7 @@ import {
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
+import { refreshCompanyModelStaleness } from "@/lib/company-model-stale";
 import { log } from "@/lib/log";
 import type { ProposalOutcomeType } from "@/db/schema";
 
@@ -60,6 +61,9 @@ export type BrainIndexSummary = {
   extractionSkippedStub: boolean;
   liveEmbeddings: boolean;
   errors: number;
+  /** BL-COMPANY-MODEL 1b — approved company models checked for staleness, and how many are stale. */
+  companyModelsChecked: number;
+  companyModelsStale: number;
 };
 
 export type BrainIndexOptions = {
@@ -93,7 +97,22 @@ export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<Brain
     extractionSkippedStub: false,
     liveEmbeddings: live,
     errors: 0,
+    companyModelsChecked: 0,
+    companyModelsStale: 0,
   };
+
+  // BL-COMPANY-MODEL 1b — what changed since each approved company model
+  // was approved; the reasons show on the Command Center and Settings.
+  // First, so the stub-mode return below cannot skip it.
+  try {
+    const r = await refreshCompanyModelStaleness();
+    summary.companyModelsChecked = r.checked;
+    summary.companyModelsStale = r.stale;
+    summary.errors += r.errors;
+  } catch (err) {
+    summary.errors += 1;
+    log.error("[brain-index]", "company model staleness failed", { error: err });
+  }
 
   // 0. Un-harvested submitted / won proposals (BL-AIP-4b).
   try {

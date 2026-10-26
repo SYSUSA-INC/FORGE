@@ -10,6 +10,7 @@ import {
   linesToList,
   type CompanyModelBody,
 } from "@/lib/company-model";
+import { changedSections } from "@/lib/company-model-staleness";
 import { approveCompanyModelAction, buildCompanyModelAction, discardCompanyModelDraftAction, saveCompanyModelDraftAction } from "./actions";
 
 export type CompanyModelView = {
@@ -137,7 +138,7 @@ export function CompanyModelPanel({
         {notice ? <p className="mb-3 font-body text-[13px] text-green">{notice}</p> : null}
 
         {draft ? (
-          <DraftEditor draft={draft} onChange={setDraft} evidenceLabels={evidenceLabels} disabled={pending || !canEdit} />
+          <DraftEditor draft={draft} approved={approved} onChange={setDraft} evidenceLabels={evidenceLabels} disabled={pending || !canEdit} />
         ) : approved ? (
           <ModelView body={approved} evidenceLabels={evidenceLabels} />
         ) : (
@@ -205,20 +206,29 @@ function ModelView({ body, evidenceLabels }: { body: CompanyModelBody; evidenceL
 
 function DraftEditor({
   draft,
+  approved,
   onChange,
   evidenceLabels,
   disabled,
 }: {
   draft: CompanyModelBody;
+  approved: CompanyModelBody | null;
   onChange: (b: CompanyModelBody) => void;
   evidenceLabels: Record<string, string>;
   disabled: boolean;
 }) {
   const L = COMPANY_MODEL_LIMITS;
   const set = <K extends keyof CompanyModelBody>(key: K, value: CompanyModelBody[K]) => onChange({ ...draft, [key]: value });
+  // Phase 1b — a rebuild reads as a diff: each section that differs from
+  // the approved model is marked, and the approved one sits below.
+  const changed = approved ? changedSections(approved, draft) : new Set<keyof CompanyModelBody>();
+  const mark = (key: keyof CompanyModelBody) => (changed.has(key) ? <span className="ml-2 text-brass">changed</span> : null);
   const lines = (title: string, key: "differentiators" | "gaps" | "keywords", max: number, hint: string) => (
     <div>
-      <div className={LABEL}>{title}</div>
+      <div className={LABEL}>
+        {title}
+        {mark(key)}
+      </div>
       <textarea
         className="aur-input mt-1 w-full"
         rows={4}
@@ -233,12 +243,18 @@ function DraftEditor({
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div className="md:col-span-2">
-        <div className={LABEL}>Summary</div>
+        <div className={LABEL}>
+          Summary
+          {mark("summary")}
+        </div>
         <textarea className="aur-input mt-1 w-full" rows={5} maxLength={L.summary} disabled={disabled} value={draft.summary} onChange={(e) => set("summary", e.target.value)} />
       </div>
       <div className="md:col-span-2">
         <div className="flex items-center justify-between">
-          <div className={LABEL}>Capabilities</div>
+          <div className={LABEL}>
+            Capabilities
+            {mark("capabilities")}
+          </div>
           <button
             type="button"
             className="aur-link font-mono text-[10px] uppercase tracking-label"
@@ -285,6 +301,7 @@ function DraftEditor({
       </div>
       <PairEditor
         title="NAICS work"
+        changed={changed.has("naicsWork")}
         rows={draft.naicsWork.map((n) => [n.code, n.whatWeDo])}
         placeholders={["Code", "What we actually do under it"]}
         max={L.naicsWork}
@@ -293,6 +310,7 @@ function DraftEditor({
       />
       <PairEditor
         title="Customers"
+        changed={changed.has("customers")}
         rows={draft.customers.map((c) => [c.agency, c.work, c.outcomes])}
         placeholders={["Agency", "Work", "Outcomes"]}
         max={L.customers}
@@ -303,6 +321,7 @@ function DraftEditor({
       {lines("Gaps", "gaps", L.gaps, "One per line: what lost bids and gap answers keep pointing at")}
       <PairEditor
         title="Partners"
+        changed={changed.has("partners")}
         rows={draft.partners.map((p) => [p.name, p.covers])}
         placeholders={["Company", "What it covers"]}
         max={L.partners}
@@ -317,6 +336,7 @@ function DraftEditor({
 /** Rows of two or three short fields: NAICS work, customers, partners. */
 function PairEditor({
   title,
+  changed,
   rows,
   placeholders,
   max,
@@ -324,6 +344,7 @@ function PairEditor({
   onChange,
 }: {
   title: string;
+  changed: boolean;
   rows: string[][];
   placeholders: string[];
   max: number;
@@ -334,7 +355,10 @@ function PairEditor({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <div className={LABEL}>{title}</div>
+        <div className={LABEL}>
+          {title}
+          {changed ? <span className="ml-2 text-brass">changed</span> : null}
+        </div>
         <button type="button" className="aur-link font-mono text-[10px] uppercase tracking-label" disabled={disabled || rows.length >= max} onClick={() => onChange([...rows, Array(cols).fill("")])}>
           Add
         </button>
