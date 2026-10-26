@@ -64,6 +64,8 @@ export type CompanyModelSources = {
   outcomes: { won: number; lost: number };
   /** True when only the registration was available (a new tenant). */
   registrationOnly: boolean;
+  /** The NAICS codes at build time, so a later change reads as a staleness reason (absent on older builds). */
+  naicsCodes?: string[];
 };
 
 export function emptyCompanyModel(): CompanyModelBody {
