@@ -85,6 +85,8 @@ import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
 import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
 import { buildCapabilitySuggestionsPrompt } from "@/lib/capability-suggestions-prompt";
 import { aiSuggestionSchema } from "@/lib/capability-suggestions";
+import { companyModelBodySchema } from "@/lib/company-model";
+import { buildCompanyModelPrompt } from "@/lib/company-model-prompt";
 import { buildScanUserPrompt, SCAN_SYSTEM } from "@/lib/proposal-scan-input";
 import { fromPlainText } from "@/lib/tiptap-doc";
 
@@ -372,6 +374,29 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       knowledgeEntries: [{ id: "k1", kind: "capability", title: "Cloud migration", body: "32 applications migrated for DHS.", tags: ["cloud"] }],
     }),
   ],
+  company_model: () => [
+    buildCompanyModelPrompt({
+      organization: {
+        name: "EnableNow Federal",
+        website: "https://enablenow.example",
+        state: "VA",
+        primaryNaics: "541512",
+        naicsList: ["541512", "541519"],
+        pscCodes: ["D399"],
+        setAsides: ["SDVOSB"],
+        vehicles: ["GSA MAS (Schedules)"],
+        companySecurityLevel: "Secret",
+        employeeSecurityLevel: "Secret",
+        dcaaCompliant: true,
+        keywords: ["ITSM", "ServiceNow"],
+      },
+      pastPerformance: [{ id: "p1", customer: "DHS", contract: "ITSM consolidation", value: "$4.2M", periodStart: "2023-01", periodEnd: "2025-06", description: "Migrated 32 workflows to ServiceNow." }],
+      knowledgeEntries: [{ id: "k1", kind: "capability", title: "Cloud migration", body: "32 applications migrated for DHS.", tags: ["cloud"] }],
+      pursuits: [{ proposalId: "pr1", title: "VA ITSM pilot", outcome: "won", agency: "VA", naicsCode: "541512", reasons: [], awardedTo: "", decidedAt: "2026-03-01" }],
+      questionnaireAnswers: [{ opportunityId: "o1", opportunityTitle: "Enterprise ITSM Modernization", questionId: "s2", question: "Do we hold the clearances the work needs?", value: "have_proven", evidence: "Secret FCL" }],
+      approved: null,
+    }),
+  ],
   loss_intelligence: () => [
     buildLossNarrativePrompt({
       organizationName: "Acme Federal",
@@ -510,6 +535,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   knowledge_extract: [knowledgeExtractionSchema],
   capability_questions: [draftedQuestionSchema],
   capability_suggestions: [aiSuggestionSchema],
+  company_model: [companyModelBodySchema],
   loss_intelligence: [lossNarrativeSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],

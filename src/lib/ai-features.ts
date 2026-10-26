@@ -25,6 +25,7 @@ export const AI_FEATURES = {
   capability_matrix: "Capability matrix",
   capability_questions: "Capability questionnaire",
   capability_suggestions: "Capability suggested answers",
+  company_model: "Company model",
   question_generator: "Question generator",
   ebuy_extract: "eBuy extraction",
   gsa_extract: "GSA extraction",

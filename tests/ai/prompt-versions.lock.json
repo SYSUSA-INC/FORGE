@@ -17,6 +17,10 @@
       "version": "2026-10-25.1",
       "sha256": "3be634c98f0fb9db80b3e50c9676dccd3aa6facd30ef6072ee636f08b11f0512"
     },
+    "company_model": {
+      "version": "2026-10-26.1",
+      "sha256": "10f2fd58e191e7e1a951b793a0294e60f819703c2c0da3ee17ca64c8dcdfd13e"
+    },
     "compliance_automap": {
       "version": "2026-10-05.1",
       "sha256": "f121b895e70a028d25a8facec8687121cce290d1947f1bbafc4bba462ce6d612"

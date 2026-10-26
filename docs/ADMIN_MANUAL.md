@@ -155,6 +155,10 @@ A few responsibilities that rest on the admin specifically:
 - **Re-sync from SAM.gov after every NAICS change or registration renewal.** The sync overwrites the relevant fields with the SAM.gov source of truth.
 - **Document your contracting-vehicle list.** If you add a new vehicle (e.g., a new IDIQ award), reflect it in Settings the same day. Capture and Proposal users rely on this list to flag teaming opportunities.
 
+### 2.7 Approve the company model
+
+**Settings → Company model** (User Manual §4.17) is the record FORGE keeps of what the company does, and the admin is the one who approves it. **Build the model** is the `company_model` AI feature (standard class, routable from Settings → AI Engine; gated by `aiAutoDraft` and the monthly request quota, refunded when the answer is unusable; five builds per org per hour). Review the draft as you would a capability statement going to a customer: every "proven" capability must carry evidence you recognise, the NAICS lines must describe real work, and the gaps should be ones you would say out loud. Approving writes `organization_model_version` N and clears the draft; readers (the scout, the questionnaire's suggested answers, the drafter; phase 1c) use only an approved version, so an unapproved draft changes nothing. The Audit Log records `organization.model.build`, `.edit`, `.approve` (with the version) and `.discard`. Migration 0137 adds `organization_model` and `organization_model_version`; sync it on `/admin/migrations` after deploying if the boot-time auto-apply did not run.
+
 ---
 
 ## 3. Super administrator (platform)
@@ -471,7 +475,7 @@ Feature flags gate specific actions in the app. When the flag is `false` for a t
 
 | Flag | Gated action | Where it's enforced |
 |---|---|---|
-| `aiAutoDraft` | AI section draft / improve / tighten; the capability questionnaire's drafted questions and suggested answers (User Manual §5.4; features `capability_questions`, `capability_suggestions`, each 10 runs per org per hour) | `generateSectionDraftAction`, `buildCapabilityQuestionsAction`, `suggestCapabilityAnswersAction` |
+| `aiAutoDraft` | AI section draft / improve / tighten; the capability questionnaire's drafted questions and suggested answers (User Manual §5.4; features `capability_questions`, `capability_suggestions`, each 10 runs per org per hour); the company model build (§2.7; feature `company_model`, 5 per org per hour) | `generateSectionDraftAction`, `buildCapabilityQuestionsAction`, `suggestCapabilityAnswersAction`, `buildCompanyModelAction` |
 | `winnerAnalysis` | Proposal-vs-winner analysis | `runWinnerAnalysisAction` |
 | `complianceMatrix` | AI compliance preflight | `runCompliancePreflightAction` |
 | `bulkExport` | Audit-log CSV download | `exportAuditLogCsvAction` |
