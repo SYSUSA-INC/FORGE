@@ -27,6 +27,12 @@ type Opp = {
   updatedAt: string;
   /** BL-PIPE-DRILL — PWin × midpoint, shown when opened from "Pipeline value". */
   weightedValue?: number | null;
+  /**
+   * BL-CAP-MATRIX — the capability questionnaire's coverage, on the
+   * Qualified list only: undefined elsewhere, null when the opportunity
+   * has no questionnaire.
+   */
+  capability?: { coverage: number | null; partnerNeeded: boolean; answered: number; total: number } | null;
 };
 
 type StageConfig = {
@@ -235,7 +241,11 @@ function OppRow({ o }: { o: Opp }) {
     : null;
 
   return (
-    <div className="grid grid-cols-1 items-center gap-3 px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06] md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+    <div
+      className={`grid grid-cols-1 items-center gap-3 px-1 py-3 transition-colors hover:bg-cobalt-400/[0.06] ${
+        o.capability === undefined ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]"
+      }`}
+    >
       <Link href={`/opportunities/${o.id}`} className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">
           {o.title}
@@ -261,6 +271,7 @@ function OppRow({ o }: { o: Opp }) {
           {o.weightedValue != null ? formatDollars(o.weightedValue) : valueRange}
         </div>
       </div>
+      {o.capability !== undefined ? <CoverageCell c={o.capability} /> : null}
       <div className="font-mono text-[11px] text-muted">
         <div className="text-muted">Due</div>
         <div className={due ? "text-text" : "text-muted"}>{due ?? "—"}</div>
@@ -272,6 +283,26 @@ function OppRow({ o }: { o: Opp }) {
         </div>
       </div>
       <SendForReviewButton opportunityId={o.id} size="sm" />
+    </div>
+  );
+}
+
+/** The Qualified list's coverage figure: the questionnaire's confirmed answers, or a dash without one. */
+function CoverageCell({ c }: { c: NonNullable<Opp["capability"]> | null }) {
+  if (!c || c.coverage === null) {
+    return (
+      <div className="font-mono text-[11px] text-muted" title={c ? "Questionnaire built, nothing answered yet" : "No capability questionnaire yet"}>
+        <div className="text-muted">Coverage</div>
+        <div className="text-muted">—</div>
+      </div>
+    );
+  }
+  return (
+    <div className="font-mono text-[11px] text-muted" title={`${c.answered} of ${c.total} questions answered`}>
+      <div className="text-muted">Coverage</div>
+      <div className={c.partnerNeeded ? "text-brass" : "text-text"}>
+        {Math.round(c.coverage * 100)}%{c.partnerNeeded ? " · partner" : ""}
+      </div>
     </div>
   );
 }
