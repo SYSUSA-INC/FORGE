@@ -1,4 +1,5 @@
 import type { CapabilityAnswer, CapabilityQuestion, CapabilitySuggestion } from "@/lib/capability-matrix-types";
+import type { CompanyModelBody, CompanyModelSources } from "@/lib/company-model";
 import {
   bigint,
   boolean,
@@ -525,6 +526,62 @@ export const opportunityCapabilityMatrices = pgTable(
   }),
 );
 export type OpportunityCapabilityMatrix = typeof opportunityCapabilityMatrices.$inferSelect;
+
+/**
+ * BL-COMPANY-MODEL — FORGE's own account of what the company does
+ * (drizzle/0137). One row per organization: the draft FORGE wrote (or a
+ * person edited) and the approved body readers use. Every approval also
+ * appends an `organization_model_version` row. A draft never counts.
+ */
+export const organizationModels = pgTable(
+  "organization_model",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    draft: jsonb("draft").$type<CompanyModelBody | null>(),
+    draftSources: jsonb("draft_sources").$type<CompanyModelSources | null>(),
+    draftGeneratedAt: timestamp("draft_generated_at"),
+    draftModel: text("draft_model").notNull().default(""),
+    draftPromptVersion: text("draft_prompt_version").notNull().default(""),
+    draftEditedByUserId: text("draft_edited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    approved: jsonb("approved").$type<CompanyModelBody | null>(),
+    approvedSources: jsonb("approved_sources").$type<CompanyModelSources | null>(),
+    approvedVersion: integer("approved_version").notNull().default(0),
+    approvedByUserId: text("approved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+    // Phase 1b fills this: what changed since the approval.
+    staleReasons: jsonb("stale_reasons").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("organization_model_org_idx").on(t.organizationId),
+    orgUq: uniqueIndex("organization_model_org_uidx").on(t.organizationId),
+  }),
+);
+
+export type OrganizationModel = typeof organizationModels.$inferSelect;
+
+export const organizationModelVersions = pgTable(
+  "organization_model_version",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    body: jsonb("body").$type<CompanyModelBody>().notNull(),
+    sources: jsonb("sources").$type<CompanyModelSources | null>(),
+    approvedByUserId: text("approved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("organization_model_version_org_idx").on(t.organizationId),
+    orgVersionUq: uniqueIndex("organization_model_version_org_version_uidx").on(t.organizationId, t.version),
+  }),
+);
 
 export type OpportunityActivity = typeof opportunityActivities.$inferSelect;
 export type NewOpportunityActivity = typeof opportunityActivities.$inferInsert;
