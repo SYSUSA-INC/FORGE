@@ -86,9 +86,10 @@ Effort key:
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
 | 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C6 body paragraphs in review (this PR) |
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
-| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 📝 recorded; phases to be sized |
+| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phase 1 (BL-COMPANY-MODEL) design in review (this PR); phase 3 shipped as BL-CAP-MATRIX |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ shipped: A #422, B #423, C #424, Qualified list coverage (this PR); design approved 2026-10-25 |
+| 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | 📝 design for approval (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3121,8 +3122,101 @@ PWin factor up to ±1.0 log-odds; any member on the opportunity may
 answer (the same rule as the bid / no-bid scores). Phase A starts once
 this design PR merges.
 
+### BL-COMPANY-MODEL — FORGE's account of the company, approved by a person
+**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** 📝 design for approval (this PR)
+
+Phase 1 of BL-VISION-AUTOPILOT: "FORGE learns each subscribed customer's
+business model, capabilities, NAICS codes and what they actually do under
+them." Rule from the same day: FORGE does as much as it can, and a person
+approves everything.
+
+**Why.** Every AI feature today reads a different slice of the company:
+onboarding reads the registration, the scout's triage reads the
+capability-statement entry and a few other capability entries, the
+section drafter reads the profile and the Brain, the questionnaire's
+suggestions read past performance and the Brain. None of them learns
+from outcomes. The company model is one record all of them read, built
+by FORGE from everything it has, and corrected and approved by a person.
+
+**The record.** Table `organization_model` (org-scoped, one current row;
+every saved state also in `organization_model_version`, as the knowledge
+entries keep theirs):
+- `summary` — what the company does, one or two paragraphs in plain words;
+- `capabilities[]` — `{ name, description, strength: proven | unproven |
+  partial, evidence[] }`, evidence being references to knowledge entries,
+  past-performance rows, won proposals and confirmed questionnaire
+  answers;
+- `naicsWork[]` — `{ code, whatWeDo }`: what the company actually does
+  under each code it lists, not the code's dictionary meaning;
+- `customers[]` — `{ agency, work, outcomes }` from past performance and
+  decided pursuits;
+- `differentiators[]`, `gaps[]` (what the questionnaires keep answering
+  as a gap and what lost bids keep citing) and `partners[]` (the companies
+  that have covered gaps);
+- `keywords[]` — search terms derived from the above (the seed for phase
+  2's own keyword list; until then they are proposed into Settings →
+  scout keywords for a person to accept);
+- `sources` — what the build read (entry ids, proposal ids, questionnaire
+  ids, outcome counts), with `generatedAt`, `model` and the prompt
+  version;
+- `status` draft | approved, `approvedByUserId`, `approvedAt`, and
+  `staleReasons[]`: what changed since the approval.
+
+**How it is built.** Settings → **Company model** (a new tab) → **Build
+the model**: one structured AI call (`company_model`, standard class,
+gated by `aiAutoDraft` and the request quota, 5 per org per hour) over
+the organisation profile (NAICS, PSC, set-asides, vehicles, clearances,
+past performance, keywords), the capability statement and up to 40
+Brain-ranked capability, past-performance and personnel entries, the last
+20 decided pursuits with the loss reasons Loss intelligence holds, and
+every confirmed capability questionnaire answer across opportunities.
+Rules in the prompt: every capability cites its evidence; nothing is
+invented; a gap comes from evidence, never from silence. The page shows
+the draft beside the approved version, every field editable inline;
+**Approve** makes it the current model and writes the version. Until a
+draft is approved, readers use the previous approved version, or with
+none, what they read today. A new tenant's first build runs from the
+registration alone (replacing the one-off onboarding draft) and says so.
+
+**Staying current.** A nightly step in the existing brain-index cron
+marks the approved model stale, with the reason, when a proposal outcome
+is recorded, a questionnaire gains five or more confirmed answers, a
+capability entry is added or edited, or the profile's NAICS or past
+performance change. The Command Center shows "Company model: 3 changes
+since approval — Review"; **Rebuild** drafts the revision as a diff
+against the approved version, and a person approves it. Nothing approves
+itself.
+
+**Readers.** The scout's triage reads the approved model's summary and
+capabilities in place of the capability entries; the questionnaire's
+suggested answers get the model's capabilities as evidence sources,
+cited as `model:<capability>`; the section drafter's company context
+reads the summary and differentiators; the pursuit brief names the gaps
+and partners. Each reader keeps its present fallback when no approved
+model exists.
+
+**Phases (one PR each, under 1,500 lines, manuals updated in each):**
+- **1a — the record and the page:** tables and migration, the build
+  action and prompt, the Settings tab with inline edits and Approve,
+  audit rows `organization.model.{build, edit, approve}`, tests for the
+  prompt input, the evidence filtering and the version write.
+- **1b — staying current:** the staleness step in the cron with its
+  reasons, the Command Center nudge, Rebuild as a diff against the
+  approved version, tests for the triggers.
+- **1c — readers:** the scout, the questionnaire suggestions, the
+  drafter and the pursuit brief switch to the approved model, each with
+  its fallback and a test that the fallback still holds.
+
+**Decisions for the owner:**
+1. Who may approve: org admins only (proposed), or any Capture role too.
+2. The staleness triggers as listed, or a shorter list.
+3. Which reader switches first: the scout (proposed), since it runs
+   nightly and its triage quality is the most visible.
+4. Derived keywords: proposed into Settings for a person to accept
+   (proposed), or merged into the scout profile on approval.
+
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
-**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 📝 recorded (2026-10-24); each phase to be sized and ordered with the owner
+**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phase 1 designed as BL-COMPANY-MODEL (this PR, for approval); phase 3's questionnaire shipped as BL-CAP-MATRIX (#422–#425)
 
 Owner vision (2026-10-24): FORGE learns each subscribed customer's
 business model, capabilities, NAICS codes and what they actually do under
