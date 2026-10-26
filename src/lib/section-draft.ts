@@ -42,6 +42,7 @@ import {
 import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
 import { voiceGuidanceForSection } from "@/lib/voice";
 import { goldenOf, screenPatternIntel } from "@/lib/golden-holdout";
+import { getApprovedCompanyModel } from "@/lib/company-model-read";
 import { log } from "@/lib/log";
 
 export const DRAFT_MODES: readonly SectionDraftMode[] = [
@@ -139,6 +140,11 @@ export async function prepareSectionDraft(input: {
     .limit(1);
 
   // Limit past-performance to 3 entries, trim each.
+  // BL-COMPANY-MODEL 1c — the approved company model, when one exists.
+  const companyModel = await getApprovedCompanyModel(organizationId).catch((err) => {
+    log.warn("[prepareSectionDraft]", "company model read failed", { error: err });
+    return null;
+  });
   const pastPerformance = (orgRow?.pastPerformance ?? [])
     .slice(0, 3)
     .map((p) => ({
@@ -260,6 +266,14 @@ export async function prepareSectionDraft(input: {
 
   const snapshot: SectionDraftSnapshot = {
     organizationName: orgRow?.name ?? "your organization",
+    companyModel: companyModel
+      ? {
+          version: companyModel.version,
+          summary: companyModel.body.summary,
+          differentiators: companyModel.body.differentiators,
+          capabilities: companyModel.body.capabilities.map((c) => `${c.name} (${c.strength})`),
+        }
+      : undefined,
     proposal: {
       title: row.proposal.title,
       agency: row.agency ?? "",

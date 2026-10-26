@@ -70,6 +70,7 @@ import {
 } from "@/lib/brief-logic";
 import { getCustomerIntelligence } from "@/lib/customer-intelligence";
 import { getLossIntelligence } from "@/lib/loss-intelligence";
+import { getApprovedCompanyModel } from "@/lib/company-model-read";
 import { log } from "@/lib/log";
 import { STAGE_LABELS as OPP_STAGE_LABELS } from "@/lib/opportunity-types";
 import { STAGE_LABELS as PROP_STAGE_LABELS } from "@/lib/proposal-types";
@@ -151,7 +152,7 @@ async function buildPursuitSnapshot(
   }
 
   // Grounding — each signal is best-effort; a failure leaves it out.
-  const [pwin, recompete, customer, loss, brain] = await Promise.all([
+  const [pwin, recompete, customer, loss, brain, companyModel] = await Promise.all([
     computePwin(organizationId, opportunityId).catch((err) => {
       log.warn("[briefs]", "pwin failed", { error: err });
       return null;
@@ -181,10 +182,24 @@ async function buildPursuitSnapshot(
       log.warn("[briefs]", "brain search failed", { error: err });
       return null;
     }),
+    // BL-COMPANY-MODEL 1c — the approved company model, when one exists.
+    getApprovedCompanyModel(organizationId).catch((err) => {
+      log.warn("[briefs]", "company model read failed", { error: err });
+      return null;
+    }),
   ]);
 
   const snapshot: OpportunitySnapshot = {
     organizationName: orgRow?.name ?? "your organization",
+    companyModel: companyModel
+      ? {
+          version: companyModel.version,
+          summary: companyModel.body.summary,
+          capabilities: companyModel.body.capabilities.map((c) => `${c.name} (${c.strength})`),
+          gaps: companyModel.body.gaps,
+          partners: companyModel.body.partners.map((p) => `${p.name}: ${p.covers}`),
+        }
+      : null,
     asOf: now.toISOString().slice(0, 10),
     opportunity: {
       title: oppRow.title,

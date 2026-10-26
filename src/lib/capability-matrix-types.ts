@@ -55,7 +55,8 @@ export type CapabilitySuggestionSource =
   | { kind: "matrix"; ref: string; label: string }
   | { kind: "knowledge"; ref: string; label: string }
   | { kind: "past_performance"; ref: string; label: string }
-  | { kind: "prior"; ref: string; label: string };
+  | { kind: "prior"; ref: string; label: string }
+  | { kind: "model"; ref: string; label: string };
 
 /**
  * An answer FORGE proposes. It never counts: coverage and PWin read

@@ -60,6 +60,8 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { clampConfidence, cleanList } from "@/lib/brief-logic";
 import { getCustomerIntelligence } from "@/lib/customer-intelligence";
+import { companyModelAsCapabilities } from "@/lib/company-model";
+import { getApprovedCompanyModel } from "@/lib/company-model-read";
 import { log } from "@/lib/log";
 import type { RecompeteFlag } from "@/lib/recompete-match";
 import { flagSamResults } from "@/lib/recompete-radar";
@@ -661,7 +663,8 @@ export async function runScoutForOrganization(input: {
     const history = await learningHistory(organizationId);
     const track = await getScoutTrack({ organizationId });
     const capabilities = await capabilitiesOf(organizationId);
-    if (capabilities.length === 0) notes.push("No capability statement in the Knowledge base: the AI can't judge scope, so it recommends Watch at most.");
+    if (capabilities.length === 0) notes.push("No approved company model and no capability statement in the Knowledge base: the AI can't judge scope, so it recommends Watch at most.");
+    else if (capabilities[0]?.title.startsWith("Company model v")) notes.push(`Triage grounded in the approved ${capabilities[0].title.toLowerCase()}.`);
     const snapshotOf = (row: ScoutCandidate) => {
       const s = byNotice.get(row.noticeId);
       return buildSnapshot(org.name, org.primaryNaics, org.naicsList, org.socio, profile, capabilities, row, s?.flag ?? null, s?.customer ?? null, history, track, now);
@@ -864,6 +867,13 @@ export const scoutTriageBatchHandler: BatchHandler<z.infer<typeof scoutTriageSch
  * excerpts, archived entries left out.
  */
 async function capabilitiesOf(organizationId: string): Promise<{ title: string; text: string }[]> {
+  // BL-COMPANY-MODEL 1c — the approved company model, when there is one,
+  // is what the organization says it does; the entries are the fallback.
+  const model = await getApprovedCompanyModel(organizationId).catch((err) => {
+    log.warn("[scout]", "company model read failed; using capability entries", { error: err });
+    return null;
+  });
+  if (model) return companyModelAsCapabilities(model.body, model.version);
   const rows = await db
     .select({ title: knowledgeEntries.title, body: knowledgeEntries.body })
     .from(knowledgeEntries)

@@ -120,6 +120,15 @@ describe("acceptAiSuggestions", () => {
     expect(out.q3?.value).toBe("gap_none");
     expect(out.q9).toBeUndefined();
   });
+  it("accepts the approved company model's capabilities as sources (phase 1c)", () => {
+    const out = acceptAiSuggestions({
+      parsed: { suggestions: [{ questionId: "q1", value: "have_proven", evidence: "Model: ITSM migration", reason: "Listed as proven.", sources: ["model:itsm-migration"] }] },
+      questions: [q("q1", "shall")],
+      allowed: new Map([["model:itsm-migration", { kind: "model" as const, label: "Company model: ITSM migration" }]]),
+      now: NOW,
+    });
+    expect(out.q1).toMatchObject({ value: "have_proven", sources: [{ kind: "model", ref: "model:itsm-migration", label: "Company model: ITSM migration" }] });
+  });
 });
 
 describe("mergeSuggestions and pendingSuggestions", () => {
