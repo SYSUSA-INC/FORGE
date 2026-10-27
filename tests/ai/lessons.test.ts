@@ -71,3 +71,11 @@ describe("buildLessonsExtractPrompt", () => {
     expect(p.system).toContain("at most 8 lessons");
   });
 });
+
+describe("parseLessonCitations (phase 4b)", () => {
+  it("finds cited lesson numbers within range, once each, in order", async () => {
+    const { parseLessonCitations } = await import("@/lib/lessons");
+    expect(parseLessonCitations("We cut over in waves [Lesson 2]. Price at cost [lesson 1][Lesson 2]. Bogus [Lesson 9] and [Lesson 0].", 3)).toEqual([1, 2]);
+    expect(parseLessonCitations("No markers here.", 3)).toEqual([]);
+  });
+});

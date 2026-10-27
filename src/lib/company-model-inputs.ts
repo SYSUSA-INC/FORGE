@@ -1,8 +1,8 @@
 import "server-only";
 
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { knowledgeEntries, opportunities, opportunityCapabilityMatrices, organizations } from "@/db/schema";
+import { knowledgeEntries, opportunities, opportunityCapabilityMatrices, opportunityLessons, organizations } from "@/db/schema";
 import { CAPABILITY_ANSWER_LABELS } from "@/lib/capability-matrix-types";
 import type { CompanyModelSources, EvidenceLabel } from "@/lib/company-model";
 import type { CompanyModelPromptInput } from "@/lib/company-model-prompt";
@@ -18,6 +18,7 @@ import { rowToOrgProfile, type SocioEconomic } from "@/lib/org-types";
 export const COMPANY_MODEL_KNOWLEDGE_LIMIT = 40;
 export const COMPANY_MODEL_PURSUIT_LIMIT = 20;
 export const COMPANY_MODEL_ANSWER_LIMIT = 200;
+export const COMPANY_MODEL_LESSON_LIMIT = 30;
 
 const SET_ASIDE_LABELS: Record<keyof SocioEconomic, string> = {
   sba8a: "8(a)",
@@ -80,7 +81,17 @@ export async function loadCompanyModelInputs(organizationId: string): Promise<Co
     if (used) questionnaireOpportunityIds.push(m.opportunityId);
   }
 
+  // BL-LESSONS-LOOP 4b — confirmed avoid and watch lessons are gap evidence.
+  const lessonRows = await db
+    .select({ id: opportunityLessons.id, kind: opportunityLessons.kind, text: opportunityLessons.text, from: opportunities.title })
+    .from(opportunityLessons)
+    .innerJoin(opportunities, eq(opportunities.id, opportunityLessons.opportunityId))
+    .where(and(eq(opportunityLessons.organizationId, organizationId), eq(opportunityLessons.status, "confirmed"), inArray(opportunityLessons.kind, ["avoid", "watch"])))
+    .orderBy(desc(opportunityLessons.confirmedAt))
+    .limit(COMPANY_MODEL_LESSON_LIMIT);
+
   const allowedEvidence = new Map<string, EvidenceLabel>();
+  for (const l of lessonRows) allowedEvidence.set(`lesson:${l.id}`, { kind: "lesson", label: `Lesson: ${l.text.slice(0, 60)}` });
   for (const p of profile.pastPerformance) allowedEvidence.set(`pp:${p.id}`, { kind: "past_performance", label: `${p.customer} — ${p.contract}`.trim() });
   for (const e of entries) allowedEvidence.set(`knowledge:${e.id}`, { kind: "knowledge", label: e.title });
   for (const b of pursuits) allowedEvidence.set(`proposal:${b.proposalId}`, { kind: "proposal", label: `${b.title} (${b.outcome})` });
@@ -109,6 +120,7 @@ export async function loadCompanyModelInputs(organizationId: string): Promise<Co
       knowledgeEntries: entries,
       pursuits: pursuits.map((b) => ({ proposalId: b.proposalId, title: b.title, outcome: b.outcome, agency: b.agency, naicsCode: b.naicsCode, reasons: b.reasons, awardedTo: b.awardedTo, decidedAt: b.decidedAt })),
       questionnaireAnswers,
+      lessons: lessonRows,
     },
     sources: {
       knowledgeEntryIds: entries.map((e) => e.id),

@@ -73,7 +73,7 @@ export function emptyCompanyModel(): CompanyModelBody {
 }
 
 /** A label for an evidence reference, from what the build showed. */
-export type EvidenceLabel = { kind: "knowledge" | "past_performance" | "proposal" | "questionnaire"; label: string };
+export type EvidenceLabel = { kind: "knowledge" | "past_performance" | "proposal" | "questionnaire" | "lesson"; label: string };
 
 /**
  * Keep the AI's draft honest: evidence must be a reference the prompt

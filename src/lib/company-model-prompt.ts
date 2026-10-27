@@ -27,6 +27,8 @@ export type CompanyModelPromptInput = {
   knowledgeEntries: { id: string; kind: string; title: string; body: string; tags: string[] }[];
   pursuits: { proposalId: string; title: string; outcome: "won" | "lost"; agency: string; naicsCode: string; reasons: string[]; awardedTo: string; decidedAt: string | null }[];
   questionnaireAnswers: { opportunityId: string; opportunityTitle: string; questionId: string; question: string; value: string; evidence: string }[];
+  /** BL-LESSONS-LOOP 4b — confirmed lessons of kind avoid or watch, as gap evidence ("lesson:<id>"). */
+  lessons?: { id: string; kind: string; text: string; from: string }[];
   /** The approved body, when rebuilding: the model revises rather than starts over. */
   approved: string | null;
 };
@@ -41,7 +43,7 @@ Rules:
 - "capabilities": up to ${L.capabilities}, each one concrete thing the company does, with "strength" proven (evidence given), unproven (claimed, no evidence) or partial, and "evidence" listing the ids of the material that shows it, exactly as given (pp:<id>, knowledge:<id>, proposal:<id>, questionnaire:<opportunityId>:<questionId>). "proven" needs at least one evidence id.
 - "naicsWork": for each NAICS code the company lists, what it actually does under that code in its own work, not the code's dictionary meaning; skip a code the material says nothing about.
 - "customers": agencies the material shows the company has served or bid to, with the work and how it went.
-- "differentiators": what the material shows the company does better or differently; "gaps": what lost bids, debriefs and gap answers in the questionnaires keep pointing at; "partners": companies the material shows covering a gap.
+- "differentiators": what the material shows the company does better or differently; "gaps": what lost bids, debriefs, gap answers in the questionnaires and the confirmed lessons keep pointing at (cite a lesson as lesson:<id>); "partners": companies the material shows covering a gap.
 - "keywords": up to ${L.keywords} short search terms (1 to 3 words) that find this company's kind of work on a procurement site: the services behind the codes, not the codes, and not generic words.
 - Fewer, grounded statements beat a full-looking record. Leave a list empty when the material gives nothing for it.${input.approved ? "\n- An approved model exists; revise it from the material rather than starting over, keeping what still holds." : ""}`;
 
@@ -76,6 +78,9 @@ ${bids || "(none)"}
 
 Confirmed capability questionnaire answers (${input.questionnaireAnswers.length}):
 ${qa || "(none)"}
+
+Confirmed lessons from decided bids (${input.lessons?.length ?? 0}):
+${(input.lessons ?? []).map((l) => `- id=lesson:${l.id} | ${l.kind} | ${l.text} — from ${l.from}`).join("\n") || "(none)"}
 ${input.approved ? `\nApproved model to revise:\n${input.approved}\n` : ""}
 Write the company model with the tool.`;
 

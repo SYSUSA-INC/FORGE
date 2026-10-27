@@ -22,9 +22,9 @@ import type { AiFeature } from "@/lib/ai-features";
 export type PromptedFeature = Exclude<AiFeature, "embedding" | "embedding_query">;
 
 export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
-  opportunity_brief: "2026-10-26.1",
+  opportunity_brief: "2026-10-27.1",
   pipeline_brief: "2026-09-28.1",
-  section_draft: "2026-10-26.1",
+  section_draft: "2026-10-27.1",
   section_chat: "2026-10-07.1",
   proposal_scan: "2026-10-05.1",
   proposal_scan_background: "2026-10-05.1",
@@ -37,7 +37,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   capability_matrix: "2026-10-08.1",
   capability_questions: "2026-10-25.1",
   capability_suggestions: "2026-10-26.1",
-  company_model: "2026-10-26.1",
+  company_model: "2026-10-27.1",
   lessons_extract: "2026-10-27.1",
   question_generator: "2026-10-08.1",
   ebuy_extract: "2026-10-05.1",

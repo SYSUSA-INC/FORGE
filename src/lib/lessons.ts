@@ -159,3 +159,13 @@ export function lessonsMatching<T extends { appliesTo: LessonAppliesTo }>(lesson
 export function termsFrom(text: string, max: number = LESSON_LIMITS.applies): string[] {
   return Array.from(new Set(text.split(",").map((s) => s.trim()).filter(Boolean))).slice(0, max);
 }
+
+/** The lesson numbers a draft cites as "[Lesson n]" (or "[Lesson 2][Lesson 5]"), de-duplicated, within 1..max. */
+export function parseLessonCitations(text: string, max: number): number[] {
+  const out = new Set<number>();
+  for (const m of text.matchAll(/\[\s*Lesson\s+(\d{1,2})\s*\]/gi)) {
+    const n = Number(m[1]);
+    if (n >= 1 && n <= max) out.add(n);
+  }
+  return Array.from(out).sort((a, b) => a - b);
+}

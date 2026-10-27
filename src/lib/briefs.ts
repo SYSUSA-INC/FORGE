@@ -25,6 +25,7 @@
  * Every read and write carries organizationId. Server-only; callers
  * own auth.
  */
+import { lessonsForContext } from "@/lib/lessons-read";
 import "server-only";
 
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -152,7 +153,7 @@ async function buildPursuitSnapshot(
   }
 
   // Grounding — each signal is best-effort; a failure leaves it out.
-  const [pwin, recompete, customer, loss, brain, companyModel] = await Promise.all([
+  const [pwin, recompete, customer, loss, brain, companyModel, lessons] = await Promise.all([
     computePwin(organizationId, opportunityId).catch((err) => {
       log.warn("[briefs]", "pwin failed", { error: err });
       return null;
@@ -187,10 +188,16 @@ async function buildPursuitSnapshot(
       log.warn("[briefs]", "company model read failed", { error: err });
       return null;
     }),
+    // BL-LESSONS-LOOP 4b — confirmed lessons that bear on this pursuit.
+    lessonsForContext(organizationId, { agency: oppRow.agency, naicsCode: oppRow.naicsCode }).catch((err) => {
+      log.warn("[briefs]", "lessons read failed", { error: err });
+      return [];
+    }),
   ]);
 
   const snapshot: OpportunitySnapshot = {
     organizationName: orgRow?.name ?? "your organization",
+    ...(lessons.length ? { lessons: lessons.map((l) => ({ kind: l.kind, text: l.text, from: l.fromTitle })) } : {}),
     companyModel: companyModel
       ? {
           version: companyModel.version,
