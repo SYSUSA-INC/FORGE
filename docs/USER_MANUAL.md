@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each, and Platform Intelligence → Lessons lists them all (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
 - **Capability questionnaire** — on an opportunity's Evaluation tab, FORGE drafts the capability questions from the parsed solicitation and you answer them; the answers give a coverage score, say whether a partner is needed, and feed PWin. **Suggest answers** pre-fills them from the solicitation's scored matrix, earlier questionnaires, past performance and the Knowledge base, and nothing counts until you confirm it (§5.4 Evaluation).
 - **Stage names** — the opportunity stages now read Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived; Pre-proposal and Writing became one Developed stage (§5.0).
@@ -759,6 +760,14 @@ Your team's verdicts are kept if the solicitation is re-parsed, and an amendment
 Each compliance item has its own **owner** field — the person responsible for making sure the proposal addresses that requirement. Status changes are stamped with the editor's user id and updated_at, so you can see at a glance which rows have moved and who moved them. Use this view in pre-submission checks: filter by status = Not addressed, look at owner, walk down the list. Nothing falls through the cracks.
 
 ---
+
+#### Outcome and lessons
+
+Record how the bid ended (won, lost, no-bid, withdrawn) with the reasons, the award value, the competitor it went to, and the debrief (requested, scheduled, held, declined) with the strengths, weaknesses and improvements the agency gave. Below it, **Lessons from this bid** (BL-LESSONS-LOOP) is what the bid taught the company: one sentence each, marked **Do**, **Avoid** or **Watch**, with what it applies to (an agency, a NAICS code, a section kind, a capability). When you record a won or lost outcome, and again when a debrief is marked held, FORGE drafts up to eight lessons from the outcome, the debrief, the winner analysis, the open reviewer comments and the loss patterns across your decided bids; **Draft lessons** does the same on demand. They arrive as **proposed**: a Capture or Admin user clicks **Confirm**, or **Edit** to reword it and set what it applies to before confirming, or **Retire**. Anyone can **Add lesson** by hand; a Capture or Admin user's lesson is confirmed at once, anyone else's waits. Only confirmed lessons will be read by the drafter, the Evaluation tab and the pursuit brief (phase 4b, coming); proposed and retired ones are read by nothing, and retired ones stay greyed. Every draft, confirmation, edit and retirement is in the Audit Log.
+
+### 6.4 Lessons (Platform Intelligence → Lessons)
+
+**Platform Intelligence → Lessons** lists every lesson the organization has recorded, proposed first, each with its kind, source, what it applies to and the bid it came from. Confirm, edit or retire from here as on the Outcome tab. Phase 4c adds where each lesson was applied and how that bid ended.
 
 ## 7. Companies
 

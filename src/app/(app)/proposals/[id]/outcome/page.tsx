@@ -10,6 +10,9 @@ import {
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { OutcomeClient } from "./OutcomeClient";
+import { listLessons } from "@/lib/lessons-draft";
+import { safeQuery } from "@/lib/schema-resilience";
+import { LessonsList, type LessonView } from "./LessonsList";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,7 @@ export default async function ProposalOutcomePage({
 }: {
   params: { id: string };
 }) {
-  await requireAuth();
+  const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   const [p] = await db
@@ -27,6 +30,7 @@ export default async function ProposalOutcomePage({
       stage: proposals.stage,
       title: proposals.title,
       submittedAt: proposals.submittedAt,
+      opportunityId: proposals.opportunityId,
     })
     .from(proposals)
     .where(
@@ -70,7 +74,20 @@ export default async function ProposalOutcomePage({
     )
     .limit(1);
 
+  // BL-LESSONS-LOOP — the lessons this bid taught, below the outcome.
+  const CONFIRM_ROLES = ["admin", "capture"];
+  const canConfirm = user.isSuperadmin || (!!user.role && CONFIRM_ROLES.includes(user.role));
+  const lessonRows = p.opportunityId
+    ? await safeQuery(() => listLessons({ organizationId, opportunityId: p.opportunityId! }), [], { tag: "outcome.lessons" })
+    : [];
+  const lessons: LessonView[] = lessonRows.map((r) => ({
+    ...r,
+    confirmedAt: r.confirmedAt ? r.confirmedAt.toISOString() : null,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
   return (
+    <>
     <OutcomeClient
       proposalId={params.id}
       currentStage={p.stage}
@@ -122,5 +139,9 @@ export default async function ProposalOutcomePage({
           : null
       }
     />
+    <div className="mt-4">
+      <LessonsList lessons={lessons} canConfirm={canConfirm} proposalId={params.id} title="Lessons from this bid" />
+    </div>
+    </>
   );
 }

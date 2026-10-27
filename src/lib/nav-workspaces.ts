@@ -123,6 +123,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
       { href: "/companies/new", label: "Add company" },
       { href: "/intelligence", label: "FORGE Brain" },
       { href: "/intelligence/losses", label: "Loss intelligence" },
+      { href: "/intelligence/lessons", label: "Lessons" },
       { href: "/intelligence/awards", label: "Awards & recompetes" },
       { href: "/intelligence/firms", label: "8(a) firms" },
       { href: "/intelligence/watchlist", label: "Watchlist" },

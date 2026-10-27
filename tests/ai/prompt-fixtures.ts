@@ -87,6 +87,8 @@ import { buildCapabilitySuggestionsPrompt } from "@/lib/capability-suggestions-p
 import { aiSuggestionSchema } from "@/lib/capability-suggestions";
 import { companyModelBodySchema } from "@/lib/company-model";
 import { buildCompanyModelPrompt } from "@/lib/company-model-prompt";
+import { draftedLessonsSchema } from "@/lib/lessons";
+import { buildLessonsExtractPrompt } from "@/lib/lessons-prompt";
 import { buildScanUserPrompt, SCAN_SYSTEM } from "@/lib/proposal-scan-input";
 import { fromPlainText } from "@/lib/tiptap-doc";
 
@@ -397,6 +399,18 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       approved: null,
     }),
   ],
+  lessons_extract: () => [
+    buildLessonsExtractPrompt({
+      proposal: { title: "VA ITSM pilot", agency: "VA", naicsCode: "541512", outcome: "lost", reasons: ["price"], summary: "Lost on price.", lessonsLearned: "Transition priced too high.", awardedTo: "Rival" },
+      outcomeId: "o1",
+      debrief: { id: "d1", status: "held", strengths: "Technical approach", weaknesses: "Price 8% above", improvements: "Price transition at cost", notes: "" },
+      winnerGaps: [{ id: "w1", text: "Winner showed a 90-day cutover plan." }],
+      reviewComments: [{ id: "c1", section: "Pricing", text: "Transition labour looks heavy." }],
+      lossPatterns: [{ id: "p1", title: "Price on VA bids", detail: "Lost 3 of 4 VA bids on price." }],
+      sectionKinds: ["technical", "pricing"],
+      existing: [],
+    }),
+  ],
   loss_intelligence: () => [
     buildLossNarrativePrompt({
       organizationName: "Acme Federal",
@@ -536,6 +550,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   capability_questions: [draftedQuestionSchema],
   capability_suggestions: [aiSuggestionSchema],
   company_model: [companyModelBodySchema],
+  lessons_extract: [draftedLessonsSchema],
   loss_intelligence: [lossNarrativeSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],
