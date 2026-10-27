@@ -86,11 +86,12 @@ Effort key:
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
 | 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C6 body paragraphs in review (this PR) |
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
-| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL), 3 (BL-CAP-MATRIX) and 4 (BL-LESSONS-LOOP) shipped; 2 and 5 to be sized |
+| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL), 3 (BL-CAP-MATRIX) and 4 (BL-LESSONS-LOOP) shipped; phase 5 designed as BL-NEXT-ACTION (this PR); 2 to be sized |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ shipped: A #422, B #423, C #424, Qualified list coverage (this PR); design approved 2026-10-25 |
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
+| 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | 📝 design for approval (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3307,8 +3308,157 @@ roles confirm a lesson; FORGE drafts them on outcome recorded and on
 debrief closed; the drafter reads them first; retired lessons are kept
 and shown greyed. Phase 4a starts once this design PR merges.
 
+### BL-NEXT-ACTION — FORGE proposes the next action, and prepares it, for a person to approve
+**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** 📝 design for approval (this PR)
+
+Phase 5 of BL-VISION-AUTOPILOT, the end state: "FORGE proposes the next
+action at each stage and drafts more of the proposal unprompted, with a
+person approving." Rule from the owner (2026-10-24): FORGE does as much
+as it can, and everything needs a person's approval. Depends on phases
+1, 3 and 4, all shipped.
+
+**What exists, and the gap.** Each stage already has its tools: the
+pursuit brief (with a free-text "next actions" list the brief writes
+once and nobody tracks), the evaluation scorecard and the gate, the
+capability questionnaire with its coverage and partner call, the
+outline from Section L, the drafter, compliance auto-map, the colour
+teams with the AI pre-review, the health scan, the outcome, the
+debrief and the lessons. The Command Center shows counts, the next
+deadline, and three nudges (setup, company model, lessons). Nothing
+says, for each pursuit, *the next thing to do is this, because of
+that*; nothing does the preparable part of it ahead of the person; and
+nothing records whether what FORGE suggested was done.
+
+**The record.** Table `opportunity_next_action` (org-scoped, cascade
+on the opportunity): the opportunity, and the proposal when the action
+is proposal-side; `kind`, one of a fixed vocabulary (below); `title`
+(one line: "Answer the 7 open questionnaire questions"); `reason` (one
+or two sentences naming the signal: "Due in 12 days; coverage is
+counting at 58% and the shall question on FedRAMP has no partner");
+`href` (where the action is done); `priority` now | this_week | later;
+`dueBy` (derived from the response date and the stage); `stage` when
+proposed; `rule` (the rule id, for the audit trail and the tests);
+`evidence` (the ids the rule read: the questionnaire, the brief, the
+review); `status` proposed | prepared | done | dismissed | superseded,
+with who and when; `prepared` (what FORGE did ahead: the ids of the
+drafted sections, the built outline, the questionnaire; phase 5c);
+`snoozedUntil` on a dismissal. One open row per opportunity and kind.
+
+**How actions are proposed: rules first, not a model.** A pure rule
+set (`src/lib/next-action-rules.ts`, tested) reads one pursuit state
+(`next-action-state.ts`, loaded in one pass per opportunity: stage,
+response and award dates, the solicitation's parse status, whether an
+evaluation is saved, the questionnaire's questions, answers, coverage,
+partner call and waiting suggestions, the last brief's call, PWin,
+competitors recorded, the proposal and its stage, section statuses and
+page caps, the share of compliance items mapped, open and closed
+reviews, open review comments, the last health scan's findings,
+submitted at, the outcome, the debrief, proposed lessons) and returns
+up to three actions, ranked by priority then due date. Deterministic,
+explainable, free: no AI call decides what to do next; the AI is used
+only to *do* the preparable work (5c). The rules by stage:
+
+| Stage | Proposes, when |
+|---|---|
+| S1 Identified | **Parse the solicitation** when one is attached and unparsed · **Score the evaluation** when none is saved · **Write the brief** when none exists · **Take the gate decision** when due within 14 days and no decision |
+| S2 Evaluated | **Build the questionnaire** when the solicitation is parsed and none exists · **Answer the questionnaire** (N open; M suggestions waiting) · **Take the gate decision** when the rollup is saved and coverage is counting |
+| S3 Qualified | **Find a partner** when the questionnaire says one is needed (links Companies) · **Record the incumbent** when no competitor is marked incumbent · **Create the proposal** when due within 45 days and none exists |
+| S4 Captured | **Create the proposal** when none exists · **Build the outline** when the proposal has no sections and the solicitation is parsed |
+| S5 Developed | **Draft the N sections not started** · **Map compliance** when under 80% of items are mapped · **Start the pink team** when every section is at least draft complete and no review has run · **Resolve the M open comments** · **Tighten K sections over their cap** · **Run the health scan** when the last one is older than the last section save · **Submit** when due within 3 days and the gold team passed |
+| S6 Submitted | **Record the outcome** when the award date has passed, or 60 days after submission · **Hold the debrief** when lost and none is held |
+| Closed | **Confirm the N proposed lessons** · **Hold the debrief** when lost and none |
+| Any active | **At risk** when due within 7 days and the proposal is before red team, or due within 14 days with no proposal: priority now, with the reason |
+
+Every rule has an id, the evidence it cites, and a **done** test: the
+state that means the action happened (an evaluation saved, a
+questionnaire built, a review started). Recompute runs nightly in the
+Brain index cron (as the company-model staleness does) and when an
+opportunity or proposal page opens; a rule that still holds keeps its
+row, one whose done test passes marks the row **done** (with the time,
+by the state, not by a click), one that stops holding for another
+reason marks it **superseded**. A dismissal snoozes the rule for 14
+days ("Not now") or until the stage changes.
+
+**Where it shows.**
+- **The opportunity's overview** and **the proposal's overview**: a
+  **Next action** panel at the top of the right column: the first
+  action with its reason and a button to where it is done, the second
+  and third beneath, each with **Done** (when the state cannot tell,
+  such as "find a partner") and **Not now**. Everyone sees it; the
+  pursuit's owner, Capture and Admin may dismiss.
+- **The Command Center**: a **Next actions** panel across the
+  organisation, the signed-in user's own pursuits first, then the
+  rest, at most eight, grouped by pursuit with the stage and days to
+  due; **At risk** rows carry the red tag. Renders nothing when
+  nothing is proposed.
+- **The pipeline brief** reads the open actions as input (prompt
+  version bumped), so "Priorities this week" names them rather than
+  guessing.
+- **The weekly digest** email adds the reader's open actions of
+  priority now and this week.
+- **Reports** adds **Next actions taken**: done ÷ (done + dismissed)
+  over the range, and, with 5c, the share of prepared drafts accepted.
+
+**Preparing ahead (5c), with approval.** When an action is one FORGE
+can do itself, the nightly job does it and the row becomes
+**prepared**, so the person reviews instead of starting from nothing:
+- **Build the outline** (the Section L bootstrap) for a proposal with
+  no sections;
+- **Build the questionnaire** and run **Suggest answers** when the
+  solicitation is parsed;
+- **Map compliance** (auto-map) when under 80% is mapped;
+- **Draft the sections not started**, in priority order, each landing
+  as a **tracked insertion authored FORGE AI** (the BL-AIP-6
+  mechanism), so the section stays Not started until someone accepts
+  the change, and reads as a suggestion in the editor;
+- **Run the health scan** when it is stale.
+Every prepared item is something a person then accepts, confirms, maps
+or rejects; nothing prepared changes a decision, a stage, a status or
+a submission. Gated per tenant by `aiAutoDraft` and the request quota;
+capped at **six section drafts per organisation per night** and one
+outline, questionnaire, auto-map and scan per proposal per night;
+holdout drafts excluded. An admin switch, **Settings → AI Engine →
+Prepare ahead**, turns it off (default on where `aiAutoDraft` is on);
+the panel says "FORGE drafted 3 sections overnight; review them".
+Lessons (phase 4) apply to these drafts as to any other, so the loop
+keeps closing.
+
+**Audit.** `opportunity.next_action.{propose, prepare, done, dismiss}`
+on the opportunity, with the rule id and the evidence; a prepared draft
+also leaves the section's own audit row as today.
+
+**Phases (one PR each, under 1,500 lines, manuals updated in each):**
+- **5a — the rules and the record:** the table and migration, the
+  state loader, the rule set with a test per rule (holds, done,
+  superseded), the nightly recompute, the panels on the opportunity
+  and proposal overviews with Done and Not now, the audit rows.
+- **5b — the organisation view:** the Command Center panel, the
+  pipeline brief's input, the digest lines, the Reports figure.
+- **5c — preparing ahead:** the nightly prepare step for the five
+  actions above, the tracked-insertion landing for drafts, the cap,
+  the admin switch, the prepared state in the panels, the accepted
+  share in Reports.
+
+**Decisions for the owner:**
+1. Rules, not a model, decide the next action; the AI only prepares
+   the work. (Proposed: yes. An AI "what next" call per pursuit per
+   night would cost more and explain less.)
+2. Which actions FORGE may prepare overnight: outline, questionnaire
+   with suggested answers, compliance auto-map, section drafts as
+   tracked insertions, health scan. (Proposed: all five.)
+3. The nightly cap: six section drafts per organisation, one of each
+   other kind per proposal. (Proposed: yes; the cap is a constant an
+   admin cannot raise, the switch turns it off.)
+4. Default of **Prepare ahead**: on wherever `aiAutoDraft` is on.
+   (Proposed: on. Off would make phase 5 opt-in.)
+5. Who may dismiss: the pursuit's owner, Capture and Admin. (Proposed:
+   yes; everyone sees.)
+6. Notification: digest lines only, no in-app notification per action.
+   (Proposed: digest only; "At risk" already reaches people through
+   the deadline rules.)
+
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
-**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phases 1 (BL-COMPANY-MODEL, #426–#429), 3 (BL-CAP-MATRIX, #422–#425) and 4 (BL-LESSONS-LOOP, #430–#433) shipped; phases 2 (keywords and more sources) and 5 (FORGE proposes the next action) to be sized with the owner
+**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phases 1 (BL-COMPANY-MODEL, #426–#429), 3 (BL-CAP-MATRIX, #422–#425) and 4 (BL-LESSONS-LOOP, #430–#433) shipped; phase 5 designed as BL-NEXT-ACTION (this PR, for approval); phase 2 (keywords and more sources) to be sized with the owner
 
 Owner vision (2026-10-24): FORGE learns each subscribed customer's
 business model, capabilities, NAICS codes and what they actually do under
