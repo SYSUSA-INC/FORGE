@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptCompanyModel,
+  companyModelAsCapabilities,
   companyModelChanges,
   emptyCompanyModel,
+  keywordsNotSearched,
   linesToList,
+  modelCapabilityRef,
   sanitizeCompanyModelBody,
   type CompanyModelBody,
 } from "@/lib/company-model";
@@ -81,5 +84,24 @@ describe("buildCompanyModelPrompt", () => {
     const revised = buildCompanyModelPrompt({ ...JSON.parse(JSON.stringify({ organization: { name: "Acme", website: "", state: "", primaryNaics: "", naicsList: [], pscCodes: [], setAsides: [], vehicles: [], companySecurityLevel: "", employeeSecurityLevel: "", dcaaCompliant: false, keywords: [] }, pastPerformance: [], knowledgeEntries: [], pursuits: [], questionnaireAnswers: [] })), approved: "{\"summary\":\"old\"}" });
     expect(revised.system).toContain("approved model exists");
     expect(revised.messages[0]!.content).toContain("Approved model to revise");
+  });
+});
+
+describe("readers (phase 1c)", () => {
+  it("turns the approved model into the scout's capability lines, summary first", () => {
+    const lines = companyModelAsCapabilities(
+      body({ summary: "We do ITSM.", capabilities: [{ name: "ITSM migration", description: "ServiceNow", strength: "proven", evidence: [] }] }),
+      3,
+    );
+    expect(lines).toEqual([
+      { title: "Company model v3", text: "We do ITSM." },
+      { title: "ITSM migration", text: "ServiceNow (proven)" },
+    ]);
+    expect(companyModelAsCapabilities(body(), 1)).toEqual([]);
+  });
+  it("names the keywords the scout does not search yet, ignoring case, and makes stable refs", () => {
+    expect(keywordsNotSearched(body({ keywords: ["ITSM", "Service desk", "cloud"] }), ["itsm", "Cloud "])).toEqual(["Service desk"]);
+    expect(modelCapabilityRef("ITSM / ServiceNow migration!")).toBe("itsm-servicenow-migration");
+    expect(modelCapabilityRef("")).toBe("capability");
   });
 });

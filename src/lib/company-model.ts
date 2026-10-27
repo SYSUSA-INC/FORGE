@@ -148,3 +148,27 @@ export function linesToList(text: string, max: number): string[] {
     .filter(Boolean)
     .slice(0, max);
 }
+
+/** A stable id for a capability, for "model:<ref>" evidence references. */
+export function modelCapabilityRef(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "capability";
+}
+
+/**
+ * The approved model as the scout's triage reads capabilities: the
+ * summary first, then one line per capability with its strength.
+ */
+export function companyModelAsCapabilities(body: CompanyModelBody, version: number, max = 12): { title: string; text: string }[] {
+  const out: { title: string; text: string }[] = [];
+  if (body.summary) out.push({ title: `Company model v${version}`, text: body.summary.replace(/\s+/g, " ").slice(0, 700) });
+  for (const c of body.capabilities.slice(0, max)) {
+    out.push({ title: c.name.slice(0, 120), text: `${c.description} (${c.strength})`.replace(/\s+/g, " ").slice(0, 700) });
+  }
+  return out;
+}
+
+/** The model's keywords the scout profile does not search yet. */
+export function keywordsNotSearched(model: CompanyModelBody, searchKeywords: string[]): string[] {
+  const have = new Set(searchKeywords.map((k) => k.trim().toLowerCase()).filter(Boolean));
+  return model.keywords.filter((k) => k && !have.has(k.trim().toLowerCase()));
+}

@@ -703,6 +703,8 @@ export type SectionDraftSnapshot = {
     contract: string;
     description: string;
   }[];
+  /** BL-COMPANY-MODEL 1c — the approved company model, when one exists. */
+  companyModel?: { version: number; summary: string; differentiators: string[]; capabilities: string[] };
   /** Phase 14d — optional. Drafter falls back to non-pattern-guided when omitted. */
   patternIntel?: SectionDraftPatternIntel;
   /**
@@ -767,6 +769,7 @@ Style rules:
 - Match section conventions: Executive Summary → 1–2 punchy paragraphs; Technical → numbered approach steps + how-it-mitigates-risk; Management → roles + governance + risk register; Past Performance → CPARS-style references; Pricing → assumptions + cost model; Compliance → traceability statements.
 - Cite the customer (agency, office, mission) and the solicitation number when context is provided.
 - Reuse facts from the snapshot exactly as given. Do NOT invent contract numbers, dates, dollar values, customer names, or staff bios.
+- When the snapshot includes \`companyModel\`, it is the organization's approved account of itself: write from its summary, name its capabilities as the company's own, and lean on its differentiators where the section allows; never claim a capability it does not list.
 - If the snapshot is sparse, write what you can with general best practices and explicitly mark TBD placeholders in [BRACKETS] for the human author to fill.
 
 Phase 14d — pattern guidance:
@@ -1110,6 +1113,8 @@ export type OpportunitySnapshot = {
   } | null;
   lossPatterns?: { title: string; severity: string; detail: string }[];
   brainHits?: { title: string; excerpt: string; outcomeLabel: string | null }[];
+  /** BL-COMPANY-MODEL 1c — the approved company model, when one exists. */
+  companyModel?: { version: number; summary: string; capabilities: string[]; gaps: string[]; partners: string[] } | null;
 };
 
 const OPPORTUNITY_BRIEF_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform. You write concise, candid pursuit briefs for capture and proposal leaders thinking about a single opportunity.
@@ -1126,6 +1131,7 @@ Style rules:
 
 BL-AIP-7a — grounding:
 - \`modelPwin\` is the platform's calibrated estimate with the factors that moved it and how well the model has predicted this organization's past outcomes (Brier: lower is better). Prefer it to the hand-set \`opportunity.pwin\` when they differ, and say why.
+- \`companyModel\` is the organization's approved account of what it does, with the gaps it knows about and the partners that have covered them: judge fit against it, and when a gap bears on this pursuit, name it and the partner.
 - \`recompete\` lists past bids that look like this one, with how they ended and what the team wrote down afterwards. \`customer\` is this organization's record at the agency and who beat it there. \`lossPatterns\` are shapes this organization has lost on before. \`brainHits\` are passages from the organization's own corpus that match this pursuit. Use them; never invent what they do not say.
 - Answer through the record_pursuit_brief tool: \`brief\` (the prose, 5–8 sentences), \`recommendation\` — exactly one of pursue, watch or no_bid — \`confidence\` (0 to 1, how sure you are of that call), \`keySignals\` (up to five one-line facts from the snapshot that drove the call) and \`nextActions\` (up to four concrete steps). Never repeat the prose in the lists.`;
 

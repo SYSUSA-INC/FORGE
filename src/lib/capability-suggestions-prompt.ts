@@ -40,6 +40,8 @@ export function buildCapabilitySuggestionsPrompt(input: {
   questions: CapabilityQuestion[];
   pastPerformance: SuggestionPastPerformance[];
   knowledgeEntries: SuggestionKnowledgeEntry[];
+  /** BL-COMPANY-MODEL 1c — the approved company model's capabilities, cited as "model:<ref>". */
+  companyCapabilities?: { ref: string; name: string; description: string; strength: string }[];
 }): { system: string; messages: { role: "user"; content: string }[] } {
   const scale = CAPABILITY_ANSWER_VALUES.map((v) => `- ${v}: ${CAPABILITY_ANSWER_LABELS[v]}`).join("\n");
   const system = `You are a capture analyst for a US government contractor. A bid team has capability questions about a solicitation; you suggest an answer to each one FROM THE EVIDENCE GIVEN, so the team can confirm or correct it.
@@ -49,7 +51,8 @@ ${scale}
 
 Rules:
 - Use only the past performance and knowledge entries given. Never assume a capability the evidence does not show.
-- "have_proven" needs a source: cite it in "sources" as "pp:<id>" or "knowledge:<id>", exactly as given. Without a source, the most you may suggest is "have_unproven" or "partial".
+- "have_proven" needs a source: cite it in "sources" as "pp:<id>", "knowledge:<id>" or "model:<ref>", exactly as given. Without a source, the most you may suggest is "have_unproven" or "partial".
+- The company model is the approved account of what the company does; a capability it marks proven supports "have_proven", one marked unproven or partial supports at most that answer.
 - Suggest "gap_none" when the evidence shows the company has not done this kind of work. Suggest "na" only when the question plainly does not apply to a company like this one.
 - Skip a question when the evidence says nothing about it. Fewer, grounded suggestions beat guesses.
 - "evidence" is one line naming the contract or entry and the fact in it. "reason" is one sentence on why that answer.`;
@@ -72,9 +75,16 @@ Rules:
     .map((q) => `- id=${q.id} | ${q.kind} | ${q.area} | ${q.text}${q.refs.length ? ` [${q.refs.join(", ")}]` : ""}`)
     .join("\n");
 
+  const model = (input.companyCapabilities ?? [])
+    .map((c) => `- id=model:${c.ref} | ${c.strength} | ${c.name}: ${c.description.replace(/\n/g, " ").slice(0, BODY_MAX)}`)
+    .join("\n");
+
   const user = `Opportunity: ${input.opportunity.title}
 Agency: ${input.opportunity.agency || "unknown"} · NAICS: ${input.opportunity.naicsCode || "unknown"} · Set-aside: ${input.opportunity.setAside || "none stated"}
 Place of performance: ${input.opportunity.placeOfPerformance || "unknown"} · Incumbent: ${input.opportunity.incumbent || "unknown"}
+
+Company model capabilities (${input.companyCapabilities?.length ?? 0}):
+${model || "(no approved company model)"}
 
 Past performance (${input.pastPerformance.length}):
 ${pp || "(none on file)"}

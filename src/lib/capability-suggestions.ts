@@ -166,7 +166,7 @@ export const aiSuggestionSchema = z.object({
         value: z.enum(CAPABILITY_ANSWER_VALUES),
         evidence: z.string().max(600),
         reason: z.string().max(CAPABILITY_SUGGESTION_REASON_MAX),
-        /** "knowledge:<id>" or "pp:<id>", from the evidence given. */
+        /** "knowledge:<id>", "pp:<id>" or "model:<ref>", from the evidence given. */
         sources: z.array(z.string().max(80)).max(6),
       }),
     )
@@ -174,7 +174,7 @@ export const aiSuggestionSchema = z.object({
 });
 export type AiSuggestions = z.infer<typeof aiSuggestionSchema>;
 
-export type AllowedSource = { kind: "knowledge" | "past_performance"; label: string };
+export type AllowedSource = { kind: "knowledge" | "past_performance" | "model"; label: string };
 
 /**
  * Keep only suggestions for questions that exist, with sources from the

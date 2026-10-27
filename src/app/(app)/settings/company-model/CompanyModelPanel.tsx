@@ -7,11 +7,12 @@ import {
   CAPABILITY_STRENGTHS,
   COMPANY_MODEL_LIMITS,
   companyModelChanges,
+  keywordsNotSearched,
   linesToList,
   type CompanyModelBody,
 } from "@/lib/company-model";
 import { changedSections } from "@/lib/company-model-staleness";
-import { approveCompanyModelAction, buildCompanyModelAction, discardCompanyModelDraftAction, saveCompanyModelDraftAction } from "./actions";
+import { adoptCompanyModelKeywordsAction, approveCompanyModelAction, buildCompanyModelAction, discardCompanyModelDraftAction, saveCompanyModelDraftAction } from "./actions";
 
 export type CompanyModelView = {
   draft: CompanyModelBody | null;
@@ -33,11 +34,14 @@ export function CompanyModelPanel({
   canEdit,
   evidenceLabels,
   basis,
+  searchKeywords,
 }: {
   model: CompanyModelView | null;
   canEdit: boolean;
   evidenceLabels: Record<string, string>;
   basis: Basis;
+  /** Settings → scout keywords, to show which of the model's keywords are not searched yet. */
+  searchKeywords: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -46,6 +50,7 @@ export function CompanyModelPanel({
   const [draft, setDraft] = useState<CompanyModelBody | null>(model?.draft ?? null);
   const approved = model?.approved ?? null;
   const changes = draft ? companyModelChanges(approved, draft) : 0;
+  const missingKeywords = approved ? keywordsNotSearched(approved, searchKeywords) : [];
 
   function run(label: string, fn: () => Promise<{ ok: true } | { ok: false; error: string }>) {
     setError(null);
@@ -107,7 +112,7 @@ export function CompanyModelPanel({
                     className="aur-btn aur-btn-primary"
                     disabled={pending}
                     onClick={() =>
-                      run("Approved. The scout, the questionnaire and the drafter read this version from here on.", async () => {
+                      run("Approved. The scout, the questionnaire's suggested answers, the drafter and the pursuit brief read this version from here on.", async () => {
                         const res = await approveCompanyModelAction({ body: draft });
                         if (res.ok) setDraft(null);
                         return res;
@@ -147,6 +152,24 @@ export function CompanyModelPanel({
           </p>
         )}
       </Panel>
+
+      {approved && missingKeywords.length > 0 ? (
+        <Panel
+          title="Keywords the scout does not search yet"
+          eyebrow={`${missingKeywords.length} from the approved model`}
+          actions={
+            canEdit ? (
+              <button type="button" className="aur-btn" disabled={pending} onClick={() => run("Keywords added to Settings → Search keywords; the next scout run uses them.", adoptCompanyModelKeywordsAction)}>
+                Add to scout keywords
+              </button>
+            ) : null
+          }
+        >
+          <p className="font-body text-[13px] leading-[1.5] text-muted">
+            The model proposes these; nothing searches them until an admin adds them: {missingKeywords.join(" · ")}.
+          </p>
+        </Panel>
+      ) : null}
 
       {draft && approved ? (
         <Panel title="Approved model" eyebrow={`Version ${model?.approvedVersion} · what readers use until the draft is approved`}>
@@ -328,7 +351,7 @@ function DraftEditor({
         disabled={disabled}
         onChange={(rows) => set("partners", rows.map(([name, covers]) => ({ name, covers })))}
       />
-      {lines("Keywords", "keywords", L.keywords, "One per line; proposed into Settings → scout keywords once approved (phase 1c)")}
+      {lines("Keywords", "keywords", L.keywords, "One per line; once approved, an admin can add them to Settings → scout keywords")}
     </div>
   );
 }

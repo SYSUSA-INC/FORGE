@@ -3,12 +3,12 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { organizationModels, organizationModelVersions } from "@/db/schema";
+import { organizationModels, organizationModelVersions, organizations } from "@/db/schema";
 import { completeStructuredForTenant } from "@/lib/ai";
 import { PROMPT_VERSIONS } from "@/lib/ai-prompt-versions";
 import { recordAudit } from "@/lib/audit-log";
 import { requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
-import { acceptCompanyModel, companyModelBodySchema, sanitizeCompanyModelBody } from "@/lib/company-model";
+import { acceptCompanyModel, companyModelBodySchema, keywordsNotSearched, sanitizeCompanyModelBody } from "@/lib/company-model";
 import { loadCompanyModelInputs } from "@/lib/company-model-inputs";
 import { buildCompanyModelPrompt } from "@/lib/company-model-prompt";
 import { log } from "@/lib/log";
@@ -189,4 +189,33 @@ export async function discardCompanyModelDraftAction(): Promise<Result> {
   });
   revalidatePath(PAGE);
   return { ok: true };
+}
+
+/**
+ * Phase 1c (design decision 4) — the approved model's keywords are
+ * proposed, not merged: an admin adds the ones the scout does not search
+ * yet to Settings → scout keywords here.
+ */
+export async function adoptCompanyModelKeywordsAction(): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
+  const { organizationId } = await requireCurrentOrg();
+  const user = await requireOrgAdmin(organizationId);
+  const row = await loadRow(organizationId);
+  if (!row?.approved) return { ok: false, error: "Approve the company model first." };
+  const [org] = await db.select({ searchKeywords: organizations.searchKeywords }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!org) return { ok: false, error: "Organization not found." };
+  const missing = keywordsNotSearched(row.approved, org.searchKeywords);
+  if (missing.length === 0) return { ok: true, added: 0 };
+  const searchKeywords = [...org.searchKeywords, ...missing].slice(0, 50);
+  await db.update(organizations).set({ searchKeywords, updatedAt: new Date() }).where(eq(organizations.id, organizationId));
+  await recordAudit({
+    organizationId,
+    actor: { userId: user.id, email: user.email },
+    action: "organization.model.keywords",
+    resourceType: "organization",
+    resourceId: organizationId,
+    metadata: { added: missing },
+  });
+  revalidatePath(PAGE);
+  revalidatePath("/settings");
+  return { ok: true, added: missing.length };
 }

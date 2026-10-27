@@ -39,6 +39,8 @@ import {
   type MatrixRequirement,
 } from "@/lib/capability-suggestions";
 import { buildCapabilitySuggestionsPrompt } from "@/lib/capability-suggestions-prompt";
+import { modelCapabilityRef } from "@/lib/company-model";
+import { getApprovedCompanyModel } from "@/lib/company-model-read";
 import { log } from "@/lib/log";
 import { selectKnowledgeForMatrix } from "@/lib/matrix-knowledge";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -443,8 +445,11 @@ export async function suggestCapabilityAnswersAction(input: {
       query: [`Opportunity: ${opp.title}`, ...left.map((q) => q.text)].join("\n"),
       limit: CAPABILITY_SUGGESTION_KNOWLEDGE_LIMIT,
     });
-    if (pastPerformance.length === 0 && knowledge.entries.length === 0) {
-      aiSkipped = "no past performance or knowledge entries on file";
+    // BL-COMPANY-MODEL 1c — the approved model's capabilities are evidence too.
+    const model = await getApprovedCompanyModel(organizationId);
+    const companyCapabilities = (model?.body.capabilities ?? []).map((c) => ({ ref: modelCapabilityRef(c.name), name: c.name, description: c.description, strength: c.strength }));
+    if (pastPerformance.length === 0 && knowledge.entries.length === 0 && companyCapabilities.length === 0) {
+      aiSkipped = "no past performance, knowledge entries or approved company model on file";
     } else {
       try {
         await ensureFeature(organizationId, "aiAutoDraft");
@@ -458,6 +463,7 @@ export async function suggestCapabilityAnswersAction(input: {
         questions: left,
         pastPerformance,
         knowledgeEntries: knowledge.entries,
+        companyCapabilities,
       });
       const res = await completeStructuredForTenant({
         organizationId,
@@ -482,6 +488,7 @@ export async function suggestCapabilityAnswersAction(input: {
         const allowed = new Map<string, AllowedSource>();
         for (const p of pastPerformance) allowed.set(`pp:${p.id}`, { kind: "past_performance", label: `${p.customer} — ${p.contract}`.trim() });
         for (const e of knowledge.entries) allowed.set(`knowledge:${e.id}`, { kind: "knowledge", label: e.title });
+        for (const c of companyCapabilities) allowed.set(`model:${c.ref}`, { kind: "model", label: `Company model: ${c.name}` });
         fromAi = acceptAiSuggestions({ parsed: res.data, questions: left, allowed, now });
       }
     }

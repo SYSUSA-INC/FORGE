@@ -14,8 +14,8 @@
       "sha256": "8124552b9ffa2076015dc1dd8160a28bf0addf3712e497371fc5b0646f3ce699"
     },
     "capability_suggestions": {
-      "version": "2026-10-25.1",
-      "sha256": "3be634c98f0fb9db80b3e50c9676dccd3aa6facd30ef6072ee636f08b11f0512"
+      "version": "2026-10-26.1",
+      "sha256": "fdc421b71e111500fbdc746995b3aad262be7351d2c0ba2de9433a1303c11b0c"
     },
     "company_model": {
       "version": "2026-10-26.1",
@@ -70,8 +70,8 @@
       "sha256": "b8edcc1436a442458e63fbdf2ad09b4154f4e970761a5566acbe4b180b661b22"
     },
     "opportunity_brief": {
-      "version": "2026-09-28.1",
-      "sha256": "2b1bad7e1dcdae4bbc63b4f6b0d17379e68df89cff0076c61f16aafd2247bab7"
+      "version": "2026-10-26.1",
+      "sha256": "a9f94a42bd3100336d8485d4b9a7f47d7a926542c59270367dd5a7ca3011d98c"
     },
     "opportunity_triage": {
       "version": "2026-10-13.1",
@@ -114,8 +114,8 @@
       "sha256": "d696b52435b39ab30ba340e2ea8c06e80dd6fe5c1e0ef6712c61279e554b4389"
     },
     "section_draft": {
-      "version": "2026-10-07.1",
-      "sha256": "05fc2e5c80120f79565c5a581c7e1fd3921a69013bc23b584fbb7ee32c039526"
+      "version": "2026-10-26.1",
+      "sha256": "68f624cfc866e613d712b0376ed4e2e6a9327f262458a887f7a5503625940e22"
     },
     "solicitation_extract": {
       "version": "2026-10-08.2",

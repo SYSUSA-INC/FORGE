@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { organizationModels } from "@/db/schema";
+import { organizationModels, organizations } from "@/db/schema";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { loadCompanyModelInputs } from "@/lib/company-model-inputs";
@@ -21,13 +21,18 @@ export default async function CompanyModelPage() {
   const { user, organizationId } = await requireCurrentOrg();
   const canEdit = user.isSuperadmin || (!!user.role && ORG_ADMIN_ROLES.includes(user.role));
 
-  const [row, inputs] = await Promise.all([
+  const [row, inputs, org] = await Promise.all([
     safeQuery(
       async () => (await db.select().from(organizationModels).where(eq(organizationModels.organizationId, organizationId)).limit(1))[0] ?? null,
       null,
       { tag: "company-model.row" },
     ),
     safeQuery(() => loadCompanyModelInputs(organizationId), null, { tag: "company-model.inputs" }),
+    safeQuery(
+      async () => (await db.select({ searchKeywords: organizations.searchKeywords }).from(organizations).where(eq(organizations.id, organizationId)).limit(1))[0] ?? null,
+      null,
+      { tag: "company-model.keywords" },
+    ),
   ]);
 
   const view: CompanyModelView | null = row
@@ -55,7 +60,7 @@ export default async function CompanyModelPage() {
         title="Company model"
         subtitle="FORGE's own account of what the company does, built from the profile, the Knowledge base, decided bids and confirmed questionnaires. An admin approves every version; the scout, the questionnaire and the drafter read the approved one."
       />
-      <CompanyModelPanel model={view} canEdit={canEdit} evidenceLabels={evidenceLabels} basis={basis} />
+      <CompanyModelPanel model={view} canEdit={canEdit} evidenceLabels={evidenceLabels} basis={basis} searchKeywords={org?.searchKeywords ?? []} />
     </>
   );
 }
