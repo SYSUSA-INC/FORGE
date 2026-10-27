@@ -86,10 +86,11 @@ Effort key:
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
 | 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C6 body paragraphs in review (this PR) |
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
-| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phase 1 shipped as BL-COMPANY-MODEL; phase 3 shipped as BL-CAP-MATRIX; phases 2, 4, 5 to be sized |
+| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL) and 3 (BL-CAP-MATRIX) shipped; phase 4 designed as BL-LESSONS-LOOP (this PR); 2 and 5 to be sized |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
 | 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ shipped: A #422, B #423, C #424, Qualified list coverage (this PR); design approved 2026-10-25 |
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
+| 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | 📝 design for approval (this PR) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3221,8 +3222,92 @@ model exists.
 4. Derived keywords: proposed into Settings for a person to accept
    (proposed), or merged into the scout profile on approval.
 
+### BL-LESSONS-LOOP — Lessons from every outcome, read back by the next bid
+**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** 📝 design for approval (this PR)
+
+Phase 4 of BL-VISION-AUTOPILOT: "keeps learning as each opportunity
+progresses and closes, so the lessons from every outcome raise the next
+proposal's chances." Rule: FORGE does as much as it can, and a person
+approves everything.
+
+**What exists, and the gap.** An outcome carries free-text lessons and
+reason codes; a debrief carries strengths, weaknesses and improvements;
+Loss intelligence detects patterns across decided bids; the drafter
+already reads debrief weaknesses and winner-analysis gaps as writing
+signals; the recompete radar and the pursuit brief show a similar past
+bid's lessons line. None of it is a record a person confirmed, none is
+matched to the next bid on purpose, and nothing shows whether a lesson
+was ever applied or whether applying it worked.
+
+**The record.** Table `opportunity_lesson` (org-scoped): the opportunity
+and proposal it came from; `source` (outcome, debrief, winner analysis,
+review, questionnaire, manual); `kind` do | avoid | watch; `text` (one
+sentence, imperative: "Price the transition at cost; we lost VA ITSM on
+price by 8%"); `appliesTo` (agency, NAICS codes, section kinds, capability
+names, any of which may be empty); `evidence[]` (the outcome, debrief,
+analysis or comment ids it came from); `status` proposed | confirmed |
+retired, with who confirmed and when; `appliedCount`. Table
+`opportunity_lesson_application`: the lesson, the proposal and section
+it was applied in, by whom, and the outcome of that proposal once
+decided.
+
+**How lessons are drafted.** When an outcome is recorded or a debrief is
+closed, one AI call (`lessons_extract`, standard class, gated by
+`aiAutoDraft` and the request quota) reads the outcome's reasons and
+free text, the debrief, the winner analysis, the open reviewer comments
+on the losing sections and the loss patterns that match, and drafts up
+to eight lessons, each with its evidence ids and what it applies to. They
+sit as **proposed** on the proposal's Outcome tab and on Loss
+intelligence → **Lessons**; a person edits and **Confirms**, or retires.
+Anyone may also write a lesson by hand. Nothing proposed is read by
+anything.
+
+**Who reads confirmed lessons.**
+- **The drafter:** the lessons whose `appliesTo` matches the section
+  kind, the agency or a NAICS code go into `patternIntel.lessons` with a
+  rule to apply each one and cite it as `[Lesson n]`; a citation in the
+  saved body records an application.
+- **The Evaluation tab:** "Lessons that apply" beside the scorecard, the
+  confirmed lessons matching the agency, NAICS or a recompete, each with
+  the bid it came from.
+- **The pursuit brief:** the same list in the snapshot, with a rule to
+  name a lesson when it bears on the call.
+- **The company model's gaps** (BL-COMPANY-MODEL): the build reads
+  confirmed lessons of kind avoid as gap evidence.
+
+**The visible loop.** Loss intelligence → **Lessons** lists every lesson
+with the bid it came from, the proposals it was applied in, and how those
+ended: a lesson applied in a later bid that was won reads **closed the
+loop**; one applied and lost again reads **did not help**, with the bid;
+one never applied reads **not yet applied**. The Command Center nudges
+when proposed lessons wait for confirmation.
+
+**Phases (one PR each, under 1,500 lines, manuals updated in each):**
+- **4a — the record:** the two tables and migration, the extraction
+  feature and prompt, the proposed → confirmed flow on the Outcome tab
+  and the Lessons page, manual lessons, audit rows
+  `opportunity.lesson.{draft, confirm, edit, retire}`, tests for the
+  acceptance pass and the matching rule.
+- **4b — readers:** the drafter's `patternIntel.lessons` with citations
+  recorded as applications, the Evaluation tab's "Lessons that apply",
+  the brief's list, the company model's gap evidence; prompt versions
+  bumped; tests for the matching and the citation parse.
+- **4c — the loop:** application outcomes filled in when a proposal is
+  decided, the loop states on the Lessons page, the Command Center
+  nudge, a count on Reports.
+
+**Decisions for the owner:**
+1. Who confirms a lesson: Capture and Admin roles (proposed), or any
+   member on the opportunity.
+2. When FORGE drafts them: on outcome recorded and on debrief closed
+   (proposed), or on outcome only.
+3. Which reader first: the drafter (proposed), since a cited lesson in a
+   draft is the loop made visible.
+4. Retired lessons: kept and shown greyed on the Lessons page (proposed),
+   or hidden.
+
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
-**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phase 1 shipped as BL-COMPANY-MODEL (#426–#429); phase 3's questionnaire shipped as BL-CAP-MATRIX (#422–#425); phases 2, 4 and 5 to be sized with the owner
+**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phase 1 shipped as BL-COMPANY-MODEL (#426–#429); phase 3's questionnaire shipped as BL-CAP-MATRIX (#422–#425); phase 4 designed as BL-LESSONS-LOOP (this PR, for approval); phases 2 and 5 to be sized with the owner
 
 Owner vision (2026-10-24): FORGE learns each subscribed customer's
 business model, capabilities, NAICS codes and what they actually do under
