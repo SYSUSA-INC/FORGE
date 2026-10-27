@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   opportunities,
+  opportunityLessonApplications,
   opportunityLessons,
   proposalDebriefs,
   proposalOutcomes,
@@ -207,5 +208,20 @@ export async function listLessons(input: { organizationId: string; opportunityId
     ? await db.select({ id: proposals.id, title: proposals.title }).from(proposals).where(and(eq(proposals.organizationId, input.organizationId), inArray(proposals.id, proposalIds)))
     : [];
   const titleOf = new Map(titles.map((t) => [t.id, t.title]));
-  return rows.map((r) => ({ ...r, proposalTitle: r.proposalId ? (titleOf.get(r.proposalId) ?? null) : null }));
+  // Phase 4c — where each lesson was applied and how that bid ended.
+  const lessonIds = rows.map((r) => r.id);
+  const apps = lessonIds.length
+    ? await db
+        .select({ lessonId: opportunityLessonApplications.lessonId, proposalId: opportunityLessonApplications.proposalId, outcomeType: opportunityLessonApplications.outcomeType, appliedAt: opportunityLessonApplications.appliedAt, proposalTitle: proposals.title })
+        .from(opportunityLessonApplications)
+        .innerJoin(proposals, eq(proposals.id, opportunityLessonApplications.proposalId))
+        .where(and(eq(opportunityLessonApplications.organizationId, input.organizationId), inArray(opportunityLessonApplications.lessonId, lessonIds)))
+    : [];
+  const appsOf = new Map<string, { proposalId: string; proposalTitle: string; outcomeType: string | null; appliedAt: Date }[]>();
+  for (const a of apps) {
+    const list = appsOf.get(a.lessonId) ?? [];
+    if (!list.some((x) => x.proposalId === a.proposalId)) list.push({ proposalId: a.proposalId, proposalTitle: a.proposalTitle, outcomeType: a.outcomeType, appliedAt: a.appliedAt });
+    appsOf.set(a.lessonId, list);
+  }
+  return rows.map((r) => ({ ...r, proposalTitle: r.proposalId ? (titleOf.get(r.proposalId) ?? null) : null, applications: appsOf.get(r.id) ?? [] }));
 }

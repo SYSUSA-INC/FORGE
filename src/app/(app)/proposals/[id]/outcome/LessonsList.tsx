@@ -8,6 +8,9 @@ import {
   LESSON_KIND_LABELS,
   LESSON_KINDS,
   LESSON_SOURCE_LABELS,
+  LOOP_STATE_LABELS,
+  lessonLoopSummary,
+  loopStateOf,
   termsFrom,
   type LessonAppliesTo,
   type LessonKind,
@@ -36,6 +39,8 @@ export type LessonView = {
   createdAt: string;
   opportunityTitle: string;
   proposalTitle: string | null;
+  /** Phase 4c — where it was applied and how that bid ended. */
+  applications: { proposalId: string; proposalTitle: string; outcomeType: string | null; appliedAt: string }[];
 };
 
 const ORDER: LessonStatus[] = ["proposed", "confirmed", "retired"];
@@ -64,6 +69,7 @@ export function LessonsList({
   const [newKind, setNewKind] = useState<LessonKind>("do");
   const counts = { proposed: 0, confirmed: 0, retired: 0 } as Record<LessonStatus, number>;
   for (const l of lessons) counts[(l.status as LessonStatus) ?? "proposed"] += 1;
+  const loop = lessonLoopSummary(lessons);
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: string) {
     setError(null);
@@ -95,7 +101,7 @@ export function LessonsList({
   return (
     <Panel
       title={title}
-      eyebrow={`${counts.proposed} proposed · ${counts.confirmed} confirmed${counts.retired ? ` · ${counts.retired} retired` : ""}`}
+      eyebrow={`${counts.proposed} proposed · ${counts.confirmed} confirmed${counts.retired ? ` · ${counts.retired} retired` : ""}${loop.applied ? ` · ${loop.applied} applied · ${loop.closed} closed the loop` : ""}`}
       actions={
         proposalId && canConfirm ? (
           <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={draft} title="FORGE reads the outcome, the debrief, the winner analysis, open review comments and the loss patterns.">
@@ -237,6 +243,7 @@ function LessonRow({
             </Link>
           ) : null}
         </div>
+        {lesson.status === "confirmed" ? <LoopLine applications={lesson.applications} /> : null}
       </div>
       {canConfirm && !retired ? (
         <div className="flex items-start gap-2">
@@ -276,5 +283,22 @@ function LessonRow({
         </div>
       ) : null}
     </li>
+  );
+}
+
+/** Phase 4c — the loop, per confirmed lesson: where it was applied and how those bids ended. */
+function LoopLine({ applications }: { applications: LessonView["applications"] }) {
+  const state = loopStateOf(applications);
+  const tone = state === "closed" ? "text-green" : state === "did_not_help" ? "text-rose" : state === "applied_undecided" ? "text-brass" : "text-subtle";
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 font-body text-[12px]">
+      <span className={`${LABEL} ${tone}`}>{LOOP_STATE_LABELS[state]}</span>
+      {applications.map((a) => (
+        <Link key={a.proposalId} href={`/proposals/${a.proposalId}/outcome`} className="aur-link">
+          {a.proposalTitle}
+          {a.outcomeType ? ` (${a.outcomeType})` : " (undecided)"}
+        </Link>
+      ))}
+    </div>
   );
 }

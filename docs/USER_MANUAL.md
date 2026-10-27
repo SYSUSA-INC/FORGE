@@ -35,7 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
-- **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each, and the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones (§6.3 Outcome and lessons, §6.4).
+- **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each; the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones, and the Lessons page shows which closed the loop (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
 - **Capability questionnaire** — on an opportunity's Evaluation tab, FORGE drafts the capability questions from the parsed solicitation and you answer them; the answers give a coverage score, say whether a partner is needed, and feed PWin. **Suggest answers** pre-fills them from the solicitation's scored matrix, earlier questionnaires, past performance and the Knowledge base, and nothing counts until you confirm it (§5.4 Evaluation).
 - **Stage names** — the opportunity stages now read Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived; Pre-proposal and Writing became one Developed stage (§5.0).
@@ -767,7 +767,7 @@ Record how the bid ended (won, lost, no-bid, withdrawn) with the reasons, the aw
 
 ### 6.4 Lessons (Platform Intelligence → Lessons)
 
-**Platform Intelligence → Lessons** lists every lesson the organization has recorded, proposed first, each with its kind, source, what it applies to and the bid it came from. Confirm, edit or retire from here as on the Outcome tab. Phase 4c adds where each lesson was applied and how that bid ended.
+**Platform Intelligence → Lessons** lists every lesson the organization has recorded, proposed first, each with its kind, source, what it applies to and the bid it came from. Confirm, edit or retire from here as on the Outcome tab. Under each confirmed lesson is the loop (phase 4c): the bids it was applied in (a draft that cited it) and how each ended, read as **Closed the loop** (applied in a later bid that was won), **Did not help** (applied and lost again, never won), **Applied, bid undecided** or **Not yet applied**; the panel's eyebrow counts the applied and closed ones. When a proposal's outcome is recorded, every lesson applied in it learns the result. On the Command Center, Capture and Admin users see **Lessons waiting** while FORGE's proposed lessons wait for confirmation, with Confirm →; Reports shows **Lessons closed the loop** beside the win rate.
 
 ## 7. Companies
 
