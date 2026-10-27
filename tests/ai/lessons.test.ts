@@ -79,3 +79,22 @@ describe("parseLessonCitations (phase 4b)", () => {
     expect(parseLessonCitations("No markers here.", 3)).toEqual([]);
   });
 });
+
+describe("loopStateOf and lessonLoopSummary (phase 4c)", () => {
+  it("reads the loop from the applications' outcomes and sums confirmed lessons", async () => {
+    const { loopStateOf, lessonLoopSummary } = await import("@/lib/lessons");
+    expect(loopStateOf([])).toBe("not_applied");
+    expect(loopStateOf([{ outcomeType: null }])).toBe("applied_undecided");
+    expect(loopStateOf([{ outcomeType: "lost" }, { outcomeType: null }])).toBe("did_not_help");
+    expect(loopStateOf([{ outcomeType: "lost" }, { outcomeType: "won" }])).toBe("closed");
+    expect(
+      lessonLoopSummary([
+        { status: "proposed", applications: [] },
+        { status: "confirmed", applications: [] },
+        { status: "confirmed", applications: [{ outcomeType: "won" }] },
+        { status: "confirmed", applications: [{ outcomeType: null }] },
+        { status: "retired", applications: [{ outcomeType: "won" }] },
+      ]),
+    ).toEqual({ proposed: 1, confirmed: 3, applied: 2, closed: 1 });
+  });
+});

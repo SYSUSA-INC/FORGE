@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { opportunities, opportunityLessonApplications, opportunityLessons, proposals } from "@/db/schema";
-import { lessonsMatching, parseLessonCitations, type LessonAppliesTo, type LessonMatchContext } from "@/lib/lessons";
+import { lessonLoopSummary, lessonsMatching, parseLessonCitations, type LessonAppliesTo, type LessonMatchContext } from "@/lib/lessons";
 import { log } from "@/lib/log";
 
 /**
@@ -96,4 +96,37 @@ export async function recordLessonApplications(input: {
     log.warn("[recordLessonApplications]", "failed", { error: err });
   }
   return recorded;
+}
+
+/**
+ * Phase 4c — when a proposal is decided, every application recorded on
+ * it learns the outcome, so the Lessons page can say whether applying
+ * the lesson closed the loop. Best-effort; org-scoped.
+ */
+export async function recordLessonOutcomes(input: { organizationId: string; proposalId: string; outcomeType: "won" | "lost" | null }): Promise<void> {
+  try {
+    await db
+      .update(opportunityLessonApplications)
+      .set({ outcomeType: input.outcomeType })
+      .where(and(eq(opportunityLessonApplications.organizationId, input.organizationId), eq(opportunityLessonApplications.proposalId, input.proposalId)));
+  } catch (err) {
+    log.warn("[recordLessonOutcomes]", "failed", { error: err });
+  }
+}
+
+/** The loop in numbers, for the Command Center and Reports. */
+export async function lessonLoopStats(organizationId: string): Promise<{ proposed: number; confirmed: number; applied: number; closed: number }> {
+  const rows = await db
+    .select({ id: opportunityLessons.id, status: opportunityLessons.status })
+    .from(opportunityLessons)
+    .where(eq(opportunityLessons.organizationId, organizationId));
+  const apps = rows.length
+    ? await db
+        .select({ lessonId: opportunityLessonApplications.lessonId, outcomeType: opportunityLessonApplications.outcomeType })
+        .from(opportunityLessonApplications)
+        .where(eq(opportunityLessonApplications.organizationId, organizationId))
+    : [];
+  const byLesson = new Map<string, { outcomeType: string | null }[]>();
+  for (const a of apps) byLesson.set(a.lessonId, [...(byLesson.get(a.lessonId) ?? []), { outcomeType: a.outcomeType }]);
+  return lessonLoopSummary(rows.map((r) => ({ status: r.status, applications: byLesson.get(r.id) ?? [] })));
 }

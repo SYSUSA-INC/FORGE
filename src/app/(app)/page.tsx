@@ -8,6 +8,7 @@ import { STAGE_LABELS as PROP_STAGE_LABELS } from "@/lib/proposal-types";
 import { CommandCenterStageGrid } from "./CommandCenterStageGrid";
 import { CompanyModelNudgePanel } from "./CompanyModelNudgePanel";
 import { GettingStartedPanel } from "./GettingStartedPanel";
+import { LessonsNudgePanel } from "./LessonsNudgePanel";
 import { PwinMoversPanel } from "./PwinMoversPanel";
 import { RecompeteAttentionPanel } from "./RecompeteAttentionPanel";
 
@@ -89,6 +90,9 @@ export default async function DashboardPage() {
       {/* BL-COMPANY-MODEL 1b — for org admins: what changed since the
           company model was approved, or that none is approved yet. */}
       <CompanyModelNudgePanel isOrgAdmin={isOrgAdmin} />
+
+      {/* BL-LESSONS-LOOP 4c — proposed lessons waiting on a Capture or Admin user. */}
+      <LessonsNudgePanel canConfirm={isOrgAdmin || user.role === "capture"} />
 
       {/* Stage widget grid — same data + visuals as /opportunities so
           the two pages can never disagree. Click a tile to drill into

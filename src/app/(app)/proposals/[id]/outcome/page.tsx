@@ -84,6 +84,7 @@ export default async function ProposalOutcomePage({
     ...r,
     confirmedAt: r.confirmedAt ? r.confirmedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
+    applications: r.applications.map((a) => ({ ...a, appliedAt: a.appliedAt.toISOString() })),
   }));
 
   return (

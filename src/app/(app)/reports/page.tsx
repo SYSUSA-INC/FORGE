@@ -3,7 +3,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { formatDollars } from "@/lib/money";
+import { lessonLoopStats } from "@/lib/lessons-read";
 import { loadReportOpportunities, reportsRefusal } from "@/lib/reports";
+import { safeQuery } from "@/lib/schema-resilience";
 import { buildReport, formatRate, parseReportRange, REPORT_RANGE_LABELS } from "@/lib/reports-logic";
 import { ReportsClient } from "./ReportsClient";
 
@@ -37,6 +39,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: { ra
   const range = parseReportRange(searchParams.range);
   const report = buildReport(await loadReportOpportunities(organizationId), range);
   const s = report.summary;
+  // BL-LESSONS-LOOP 4c — the loop in numbers, beside the win rate.
+  const loop = await safeQuery(() => lessonLoopStats(organizationId), { proposed: 0, confirmed: 0, applied: 0, closed: 0 }, { tag: "reports.lessons" });
 
   return (
     <>
@@ -49,6 +53,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { ra
           { label: "Win rate", value: formatRate(s.winRate), accent: "emerald" },
           { label: "Won value", value: formatDollars(s.wonValue) },
           { label: "Open pipeline", value: formatDollars(s.openValue) },
+          { label: "Lessons closed the loop", value: `${loop.closed} of ${loop.confirmed}`, accent: loop.closed > 0 ? "emerald" : undefined },
         ]}
       />
       <ReportsClient report={report} />

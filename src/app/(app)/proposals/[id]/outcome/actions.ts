@@ -208,6 +208,13 @@ export async function saveOutcomeAction(
         log.warn("[saveOutcomeAction]", "pwin outcome snapshot failed", { error: err });
       }
     }
+    // BL-LESSONS-LOOP 4c — the lessons applied in this bid learn how it ended.
+    try {
+      const { recordLessonOutcomes } = await import("@/lib/lessons-read");
+      await recordLessonOutcomes({ organizationId, proposalId, outcomeType: outcomeType === "won" || outcomeType === "lost" ? outcomeType : null });
+    } catch (err) {
+      log.warn("[saveOutcomeAction]", "lesson outcome update failed", { error: err });
+    }
     // BL-LESSONS-LOOP (owner's decision 2) — a newly recorded won or lost
     // outcome has FORGE draft the lessons; proposed only, best-effort.
     if (!existing && (outcomeType === "won" || outcomeType === "lost")) {

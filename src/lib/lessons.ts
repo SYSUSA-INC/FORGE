@@ -169,3 +169,46 @@ export function parseLessonCitations(text: string, max: number): number[] {
   }
   return Array.from(out).sort((a, b) => a - b);
 }
+
+/** Phase 4c — what happened after a confirmed lesson was applied. */
+export type LoopState = "closed" | "did_not_help" | "applied_undecided" | "not_applied";
+export const LOOP_STATE_LABELS: Record<LoopState, string> = {
+  closed: "Closed the loop",
+  did_not_help: "Did not help",
+  applied_undecided: "Applied, bid undecided",
+  not_applied: "Not yet applied",
+};
+
+/**
+ * A lesson applied in a later bid that was won closed the loop; applied
+ * and lost again, with no win, did not help; applied in bids not yet
+ * decided is pending; never applied is not yet applied.
+ */
+export function loopStateOf(applications: { outcomeType: string | null }[]): LoopState {
+  if (applications.length === 0) return "not_applied";
+  if (applications.some((a) => a.outcomeType === "won")) return "closed";
+  if (applications.some((a) => a.outcomeType === "lost")) return "did_not_help";
+  return "applied_undecided";
+}
+
+/** The counts the Lessons page's eyebrow, the Command Center and Reports show. */
+export function lessonLoopSummary(lessons: { status: string; applications: { outcomeType: string | null }[] }[]): {
+  proposed: number;
+  confirmed: number;
+  applied: number;
+  closed: number;
+} {
+  let proposed = 0;
+  let confirmed = 0;
+  let applied = 0;
+  let closed = 0;
+  for (const l of lessons) {
+    if (l.status === "proposed") proposed += 1;
+    if (l.status !== "confirmed") continue;
+    confirmed += 1;
+    const state = loopStateOf(l.applications);
+    if (state !== "not_applied") applied += 1;
+    if (state === "closed") closed += 1;
+  }
+  return { proposed, confirmed, applied, closed };
+}
