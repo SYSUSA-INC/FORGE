@@ -208,6 +208,17 @@ export async function saveOutcomeAction(
         log.warn("[saveOutcomeAction]", "pwin outcome snapshot failed", { error: err });
       }
     }
+    // BL-LESSONS-LOOP (owner's decision 2) — a newly recorded won or lost
+    // outcome has FORGE draft the lessons; proposed only, best-effort.
+    if (!existing && (outcomeType === "won" || outcomeType === "lost")) {
+      try {
+        const { draftLessonsForProposal } = await import("@/lib/lessons-draft");
+        const r = await draftLessonsForProposal({ organizationId, proposalId, actor: { userId: user.id, email: user.email } });
+        if (!r.ok) log.info("[saveOutcomeAction]", "lessons not drafted", { reason: r.error });
+      } catch (err) {
+        log.warn("[saveOutcomeAction]", "lesson drafting failed", { error: err });
+      }
+    }
     await recordAudit({
       organizationId,
       actor: { userId: user.id, email: user.email },
@@ -282,7 +293,7 @@ export async function saveDebriefAction(
 
   try {
     const [existing] = await db
-      .select({ id: proposalDebriefs.id })
+      .select({ id: proposalDebriefs.id, status: proposalDebriefs.status })
       .from(proposalDebriefs)
       .where(eq(proposalDebriefs.proposalId, proposalId))
       .limit(1);
@@ -298,6 +309,17 @@ export async function saveDebriefAction(
       await db.insert(proposalDebriefs).values(payload);
     }
 
+    // BL-LESSONS-LOOP (owner's decision 2) — a debrief that has just been
+    // held has FORGE draft the lessons; proposed only, best-effort.
+    if (statusRaw === "held" && existing?.status !== "held") {
+      try {
+        const { draftLessonsForProposal } = await import("@/lib/lessons-draft");
+        const r = await draftLessonsForProposal({ organizationId, proposalId, actor: { userId: user.id, email: user.email } });
+        if (!r.ok) log.info("[saveDebriefAction]", "lessons not drafted", { reason: r.error });
+      } catch (err) {
+        log.warn("[saveDebriefAction]", "lesson drafting failed", { error: err });
+      }
+    }
     await recordAudit({
       organizationId,
       actor: { userId: user.id, email: user.email },

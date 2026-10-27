@@ -38,6 +38,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   capability_questions: "2026-10-25.1",
   capability_suggestions: "2026-10-26.1",
   company_model: "2026-10-26.1",
+  lessons_extract: "2026-10-27.1",
   question_generator: "2026-10-08.1",
   ebuy_extract: "2026-10-05.1",
   gsa_extract: "2026-10-05.1",

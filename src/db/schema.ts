@@ -1,5 +1,6 @@
 import type { CapabilityAnswer, CapabilityQuestion, CapabilitySuggestion } from "@/lib/capability-matrix-types";
 import type { CompanyModelBody, CompanyModelSources } from "@/lib/company-model";
+import type { LessonAppliesTo } from "@/lib/lessons";
 import {
   bigint,
   boolean,
@@ -580,6 +581,73 @@ export const organizationModelVersions = pgTable(
   (t) => ({
     orgIdx: index("organization_model_version_org_idx").on(t.organizationId),
     orgVersionUq: uniqueIndex("organization_model_version_org_version_uidx").on(t.organizationId, t.version),
+  }),
+);
+
+/**
+ * BL-LESSONS-LOOP — a lesson from a decided bid (drizzle/0138). FORGE
+ * drafts them as `proposed`; a Capture or Admin user confirms, edits or
+ * retires each. Only `confirmed` lessons are read by anything (phase 4b).
+ */
+export const opportunityLessons = pgTable(
+  "opportunity_lesson",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+    /** outcome | debrief | winner_analysis | review | questionnaire | manual */
+    source: text("source").notNull().default("manual"),
+    /** do | avoid | watch */
+    kind: text("kind").notNull().default("do"),
+    text: text("text").notNull().default(""),
+    appliesTo: jsonb("applies_to").$type<LessonAppliesTo>().notNull().default({ agencies: [], naicsCodes: [], sectionKinds: [], capabilities: [] }),
+    evidence: jsonb("evidence").$type<string[]>().notNull().default([]),
+    /** proposed | confirmed | retired */
+    status: text("status").notNull().default("proposed"),
+    confirmedByUserId: text("confirmed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at"),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    appliedCount: integer("applied_count").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_lesson_org_idx").on(t.organizationId),
+    orgOppIdx: index("opportunity_lesson_org_opp_idx").on(t.organizationId, t.opportunityId),
+    orgStatusIdx: index("opportunity_lesson_org_status_idx").on(t.organizationId, t.status),
+  }),
+);
+
+export type OpportunityLesson = typeof opportunityLessons.$inferSelect;
+
+/** Where a confirmed lesson was applied, and how that bid ended (phases 4b and 4c). */
+export const opportunityLessonApplications = pgTable(
+  "opportunity_lesson_application",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => opportunityLessons.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id").references(() => proposalSections.id, { onDelete: "set null" }),
+    appliedByUserId: text("applied_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    appliedAt: timestamp("applied_at").notNull().defaultNow(),
+    /** won | lost | null until the proposal is decided. */
+    outcomeType: text("outcome_type"),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_lesson_application_org_idx").on(t.organizationId),
+    lessonIdx: index("opportunity_lesson_application_lesson_idx").on(t.lessonId),
   }),
 );
 
