@@ -1,3 +1,4 @@
+import { recordLessonApplications } from "@/lib/lessons-read";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { completeForTenant } from "@/lib/ai";
@@ -165,6 +166,10 @@ export async function POST(req: NextRequest) {
           draftText: text,
           stubbed: ai.stubbed,
         });
+        // BL-LESSONS-LOOP 4b — a draft that cites "[Lesson n]" records an application.
+        if (!ai.stubbed && prepared.lessons.length > 0) {
+          await recordLessonApplications({ organizationId, proposalId: prepared.proposalId, sectionId: body.sectionId, userId: user.id, draftText: text, offered: prepared.lessons });
+        }
 
         send({
           type: "done",

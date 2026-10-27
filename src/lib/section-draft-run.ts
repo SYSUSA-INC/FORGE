@@ -6,6 +6,7 @@
  * so the two paths cannot drift. Callers authenticate; this takes the
  * organization and user as given.
  */
+import { recordLessonApplications } from "@/lib/lessons-read";
 import "server-only";
 
 import { completeForTenant } from "@/lib/ai";
@@ -159,6 +160,10 @@ export async function runSectionDraft(input: {
       abPairId: input.abPairId,
       abVariant: input.abVariant,
     });
+    // BL-LESSONS-LOOP 4b — a draft that cites "[Lesson n]" records an application.
+    if (!ai.stubbed && prepared.lessons.length > 0) {
+      await recordLessonApplications({ organizationId, proposalId: prepared.proposalId, sectionId: input.sectionId, userId: input.userId, draftText: text, offered: prepared.lessons });
+    }
 
     return {
       ok: true,

@@ -705,6 +705,8 @@ export type SectionDraftSnapshot = {
   }[];
   /** BL-COMPANY-MODEL 1c — the approved company model, when one exists. */
   companyModel?: { version: number; summary: string; differentiators: string[]; capabilities: string[] };
+  /** BL-LESSONS-LOOP 4b — confirmed lessons that bear on this section, numbered for "[Lesson n]" citations. */
+  lessons?: { n: number; kind: string; text: string; from: string }[];
   /** Phase 14d — optional. Drafter falls back to non-pattern-guided when omitted. */
   patternIntel?: SectionDraftPatternIntel;
   /**
@@ -770,6 +772,7 @@ Style rules:
 - Cite the customer (agency, office, mission) and the solicitation number when context is provided.
 - Reuse facts from the snapshot exactly as given. Do NOT invent contract numbers, dates, dollar values, customer names, or staff bios.
 - When the snapshot includes \`companyModel\`, it is the organization's approved account of itself: write from its summary, name its capabilities as the company's own, and lean on its differentiators where the section allows; never claim a capability it does not list.
+- When a LESSONS block is given, each is something this company learned from a decided bid and confirmed. Apply every lesson that bears on this section in the text itself, and mark the sentence that applies it with its number, e.g. "[Lesson 2]"; do not quote the lesson or mention that it is a lesson. Leave the marker out of a sentence that does not apply one.
 - If the snapshot is sparse, write what you can with general best practices and explicitly mark TBD placeholders in [BRACKETS] for the human author to fill.
 
 Phase 14d — pattern guidance:
@@ -928,6 +931,12 @@ export function buildSectionDraftPrompt(
   // register and rhythm to hold while writing, never facts.
   const authorVoiceBlock = snapshot.authorVoice?.guidance ? snapshot.authorVoice.guidance : "";
 
+  // BL-LESSONS-LOOP 4b — confirmed lessons that bear on this section.
+  const lessonsBlock =
+    snapshot.lessons && snapshot.lessons.length > 0
+      ? [`LESSONS this company confirmed from decided bids (apply the ones that bear on this section; mark the sentence with the number):`, ...snapshot.lessons.map((l) => `[Lesson ${l.n}] (${l.kind}) ${l.text} — from ${l.from}`)].join("\n")
+      : "";
+
   // Pass the snapshot as JSON but omit the solicitation + winThemes +
   // sources + customerVoice + authorVoice fields (formatted above) so
   // we don't double-print large text.
@@ -937,6 +946,7 @@ export function buildSectionDraftPrompt(
     sources: _omitSources,
     customerVoice: _omitVoice,
     authorVoice: _omitAuthorVoice,
+    lessons: _omitLessons,
     ...snapshotForJson
   } = snapshot;
   void _omitSol;
@@ -944,6 +954,7 @@ export function buildSectionDraftPrompt(
   void _omitSources;
   void _omitVoice;
   void _omitAuthorVoice;
+  void _omitLessons;
 
   // BL-AIP-2 — `draft_alt` is a first draft too; it used to fall through
   // to the "tightened body" instruction, contaminating variant B of
@@ -965,6 +976,8 @@ export function buildSectionDraftPrompt(
     voiceBlock ? `` : "",
     authorVoiceBlock,
     authorVoiceBlock ? `` : "",
+    lessonsBlock,
+    lessonsBlock ? `` : "",
     mappedBlock,
     mappedBlock ? `` : "",
     citationBlock,
@@ -1115,6 +1128,8 @@ export type OpportunitySnapshot = {
   brainHits?: { title: string; excerpt: string; outcomeLabel: string | null }[];
   /** BL-COMPANY-MODEL 1c — the approved company model, when one exists. */
   companyModel?: { version: number; summary: string; capabilities: string[]; gaps: string[]; partners: string[] } | null;
+  /** BL-LESSONS-LOOP 4b — confirmed lessons that bear on this pursuit, with the bid each came from. */
+  lessons?: { kind: string; text: string; from: string }[];
 };
 
 const OPPORTUNITY_BRIEF_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform. You write concise, candid pursuit briefs for capture and proposal leaders thinking about a single opportunity.
@@ -1132,6 +1147,7 @@ Style rules:
 BL-AIP-7a — grounding:
 - \`modelPwin\` is the platform's calibrated estimate with the factors that moved it and how well the model has predicted this organization's past outcomes (Brier: lower is better). Prefer it to the hand-set \`opportunity.pwin\` when they differ, and say why.
 - \`companyModel\` is the organization's approved account of what it does, with the gaps it knows about and the partners that have covered them: judge fit against it, and when a gap bears on this pursuit, name it and the partner.
+- \`lessons\` are what this organization confirmed it learned from decided bids that look like this one: when one bears on the call, name it in the brief and in \`keySignals\`, and let an "avoid" lesson weigh on the recommendation.
 - \`recompete\` lists past bids that look like this one, with how they ended and what the team wrote down afterwards. \`customer\` is this organization's record at the agency and who beat it there. \`lossPatterns\` are shapes this organization has lost on before. \`brainHits\` are passages from the organization's own corpus that match this pursuit. Use them; never invent what they do not say.
 - Answer through the record_pursuit_brief tool: \`brief\` (the prose, 5–8 sentences), \`recommendation\` — exactly one of pursue, watch or no_bid — \`confidence\` (0 to 1, how sure you are of that call), \`keySignals\` (up to five one-line facts from the snapshot that drove the call) and \`nextActions\` (up to four concrete steps). Never repeat the prose in the lists.`;
 

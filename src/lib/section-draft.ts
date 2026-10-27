@@ -43,6 +43,7 @@ import { gatherPatternIntelForSection } from "@/lib/section-pattern-intel";
 import { voiceGuidanceForSection } from "@/lib/voice";
 import { goldenOf, screenPatternIntel } from "@/lib/golden-holdout";
 import { getApprovedCompanyModel } from "@/lib/company-model-read";
+import { lessonsForContext } from "@/lib/lessons-read";
 import { log } from "@/lib/log";
 
 export const DRAFT_MODES: readonly SectionDraftMode[] = [
@@ -80,6 +81,8 @@ export type PreparedSectionDraft =
       holdoutDropped: number;
       /** BL-AIX Phase 1d — what the drafter was handed as fact; its figures need no citation. */
       knownText: string;
+      /** BL-LESSONS-LOOP 4b — the lessons offered, in "[Lesson n]" order, so a citing draft records an application. */
+      lessons: { id: string }[];
     }
   | { ok: false; error: string };
 
@@ -145,6 +148,14 @@ export async function prepareSectionDraft(input: {
     log.warn("[prepareSectionDraft]", "company model read failed", { error: err });
     return null;
   });
+  // BL-LESSONS-LOOP 4b — confirmed lessons that bear on this section, by
+  // section kind, agency and NAICS; a holdout (golden eval) sees none.
+  const lessons = input.holdout
+    ? []
+    : await lessonsForContext(organizationId, { sectionKind: row.section.kind, agency: row.agency ?? "", naicsCode: row.naicsCode ?? "" }).catch((err) => {
+        log.warn("[prepareSectionDraft]", "lessons read failed", { error: err });
+        return [];
+      });
   const pastPerformance = (orgRow?.pastPerformance ?? [])
     .slice(0, 3)
     .map((p) => ({
@@ -298,6 +309,7 @@ export async function prepareSectionDraft(input: {
     },
     pastPerformance,
     patternIntel,
+    ...(lessons.length ? { lessons: lessons.map((l, i) => ({ n: i + 1, kind: l.kind, text: l.text, from: l.fromTitle })) } : {}),
     solicitation: solicitationContext,
     // BL-FB-GEN-THEMES — pass per-proposal win themes through so the
     // drafter weaves them into every section. Cap at 3 (the same cap
@@ -355,6 +367,7 @@ export async function prepareSectionDraft(input: {
   return {
     ok: true,
     prompt: buildSectionDraftPrompt(input.mode, snapshot),
+    lessons: lessons.map((l) => ({ id: l.id })),
     proposalId: row.proposal.id,
     sectionKind: row.section.kind,
     maxTokens: draftMaxTokens(input.mode),

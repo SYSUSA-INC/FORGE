@@ -12,6 +12,7 @@ import { Panel } from "@/components/ui/Panel";
 import { EvaluationForm } from "./EvaluationForm";
 import { GateDecisionPanel } from "./GateDecisionPanel";
 import { CapabilityMatrixPanel } from "./CapabilityMatrixPanel";
+import { LessonsThatApplyPanel } from "./LessonsThatApplyPanel";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { parseVersionOf } from "@/lib/capability-matrix-types";
 
@@ -26,7 +27,7 @@ export default async function OpportunityEvaluationPage({
   const { organizationId } = await requireCurrentOrg();
 
   const [opp] = await db
-    .select({ id: opportunities.id, stage: opportunities.stage })
+    .select({ id: opportunities.id, stage: opportunities.stage, agency: opportunities.agency, naicsCode: opportunities.naicsCode })
     .from(opportunities)
     .where(
       and(
@@ -75,8 +76,10 @@ export default async function OpportunityEvaluationPage({
           <EvaluationForm opportunityId={params.id} initial={existing ?? null} />
         </Panel>
       </div>
-      <div>
+      <div className="flex flex-col gap-4">
         <GateDecisionPanel opportunityId={params.id} currentStage={opp.stage} />
+        {/* BL-LESSONS-LOOP 4b — confirmed lessons from bids like this one. */}
+        <LessonsThatApplyPanel agency={opp.agency} naicsCode={opp.naicsCode} />
       </div>
       <div className="xl:col-span-3">
         <CapabilityMatrixPanel
