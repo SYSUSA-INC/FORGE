@@ -43,6 +43,7 @@ import {
   refundQuota,
 } from "@/lib/subscription-gates";
 import { refreshCompanyModelStaleness } from "@/lib/company-model-stale";
+import { refreshNextActions } from "@/lib/next-action-sync";
 import { log } from "@/lib/log";
 import type { ProposalOutcomeType } from "@/db/schema";
 
@@ -64,6 +65,9 @@ export type BrainIndexSummary = {
   /** BL-COMPANY-MODEL 1b — approved company models checked for staleness, and how many are stale. */
   companyModelsChecked: number;
   companyModelsStale: number;
+  /** BL-NEXT-ACTION 5a — pursuits the rules ran over, and open actions after the run. */
+  nextActionsChecked: number;
+  nextActionsOpen: number;
 };
 
 export type BrainIndexOptions = {
@@ -99,6 +103,8 @@ export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<Brain
     errors: 0,
     companyModelsChecked: 0,
     companyModelsStale: 0,
+    nextActionsChecked: 0,
+    nextActionsOpen: 0,
   };
 
   // BL-COMPANY-MODEL 1b — what changed since each approved company model
@@ -112,6 +118,19 @@ export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<Brain
   } catch (err) {
     summary.errors += 1;
     log.error("[brain-index]", "company model staleness failed", { error: err });
+  }
+
+  // BL-NEXT-ACTION 5a — the rules over every active or recently closed
+  // pursuit, so the Next action panels and the audit trail stay current
+  // without a page open. Also before the stub-mode return: no AI call.
+  try {
+    const r = await refreshNextActions();
+    summary.nextActionsChecked = r.checked;
+    summary.nextActionsOpen = r.proposed;
+    summary.errors += r.errors;
+  } catch (err) {
+    summary.errors += 1;
+    log.error("[brain-index]", "next actions refresh failed", { error: err });
   }
 
   // 0. Un-harvested submitted / won proposals (BL-AIP-4b).

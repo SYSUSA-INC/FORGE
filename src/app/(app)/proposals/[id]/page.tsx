@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { opportunityHasSectionL } from "@/lib/proposal-bootstrap";
 import { SECTION_STATUS_COLORS, SECTION_STATUS_LABELS } from "@/lib/proposal-types";
 import { safeQuery } from "@/lib/schema-resilience";
+import { NextActionPanel } from "@/components/intelligence/NextActionPanel";
 import { BootstrapPanel } from "./BootstrapPanel";
 import { BrainMinePanel } from "./BrainMinePanel";
 import { getBrainMineStatusAction } from "./brain-actions";
@@ -124,6 +125,8 @@ export default async function ProposalOverviewPage({
       </div>
 
       <div className="flex flex-col gap-4">
+        {/* BL-NEXT-ACTION 5a — the pursuit's next action, proposal side included. */}
+        <NextActionPanel opportunityId={p.opportunityId} />
         <StageAdvancePanel proposalId={p.id} currentStage={p.stage} />
 
         <ExportPanel
