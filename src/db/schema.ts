@@ -651,6 +651,54 @@ export const opportunityLessonApplications = pgTable(
   }),
 );
 
+/**
+ * BL-NEXT-ACTION phase 5a — the next action FORGE proposes for a pursuit,
+ * one open row per opportunity and kind, written by the rules in
+ * `src/lib/next-actions.ts` and closed by them or by a person.
+ */
+export const opportunityNextActions = pgTable(
+  "opportunity_next_action",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+    /** One of NEXT_ACTION_KINDS. */
+    kind: text("kind").notNull(),
+    /** The rule that proposed it (the kind, today). */
+    rule: text("rule").notNull().default(""),
+    title: text("title").notNull().default(""),
+    reason: text("reason").notNull().default(""),
+    href: text("href").notNull().default(""),
+    /** now | this_week | later */
+    priority: text("priority").notNull().default("this_week"),
+    dueBy: timestamp("due_by", { mode: "date" }),
+    /** The opportunity stage when proposed; a dismissal lifts when it changes. */
+    stage: text("stage").notNull().default(""),
+    evidence: jsonb("evidence").$type<string[]>().notNull().default([]),
+    /** proposed | prepared | done | dismissed | superseded */
+    status: text("status").notNull().default("proposed"),
+    /** What FORGE did ahead (phase 5c). */
+    prepared: jsonb("prepared").$type<Record<string, unknown> | null>(),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at"),
+    snoozedUntil: timestamp("snoozed_until"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_next_action_org_idx").on(t.organizationId),
+    orgOppIdx: index("opportunity_next_action_org_opp_idx").on(t.organizationId, t.opportunityId),
+    orgStatusIdx: index("opportunity_next_action_org_status_idx").on(t.organizationId, t.status),
+  }),
+);
+
+export type OpportunityNextAction = typeof opportunityNextActions.$inferSelect;
+
 export type OpportunityActivity = typeof opportunityActivities.$inferSelect;
 export type NewOpportunityActivity = typeof opportunityActivities.$inferInsert;
 export type OpportunityActivityKind =

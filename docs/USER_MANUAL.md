@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Next action** — every opportunity and proposal overview opens with what FORGE proposes you do next on that pursuit and why, from rules over its state: the evaluation, the questionnaire, the gate, the proposal, its drafts, compliance, reviews and scan, the outcome and the lessons; an At risk action comes first when the deadline is close; Done and Not now for the owner, Capture and Admin (§5.4 Overview, §6.3 Overview).
 - **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each; the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones, and the Lessons page shows which closed the loop (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
 - **Capability questionnaire** — on an opportunity's Evaluation tab, FORGE drafts the capability questions from the parsed solicitation and you answer them; the answers give a coverage score, say whether a partner is needed, and feed PWin. **Suggest answers** pre-fills them from the solicitation's scored matrix, earlier questionnaires, past performance and the Knowledge base, and nothing counts until you confirm it (§5.4 Evaluation).
@@ -474,6 +475,8 @@ Every opportunity has four tabs.
 
 Same form as New opportunity, but with every field editable. Save persists.
 
+**Next action (BL-NEXT-ACTION).** The first panel on the right is what FORGE proposes you do next on this pursuit, with the reason and a **Go** button to where it is done: at Identified, parse the attached solicitation, score the evaluation, write the brief, and take the gate when the due date is within two weeks; at Evaluated, build the capability questionnaire once the solicitation is parsed, answer its open questions (with how many suggested answers wait), then take the gate once the evaluation is saved and the questionnaire counts; at Qualified, find a partner when the questionnaire says one is needed, record the incumbent, and create the proposal when the due date is within 45 days; at Captured, create the proposal and build its outline; at Developed, the proposal's work (§6.3); at Submitted, record the outcome once the award date has passed or 60 days after submission, and hold the debrief when lost; once closed, confirm the lessons FORGE proposed. An **At risk** action (due within 7 days before red team, or within 14 with no proposal) always comes first. Two more actions follow the first. Rules over the pursuit's state decide them, not an AI call, so each reason names what was read; the rules run when you open the page and overnight. An action closes itself when the state shows it was done (an evaluation saved, a questionnaire built); the pursuit's owner, Capture and Admin users can also click **Done**, or **Not now** to quiet it for 14 days or until the stage changes. The Audit Log records each proposal and decision.
+
 **AI pursuit brief (BL-AIP-7a).** The panel on the right gives a **Pursue / Watch / Consider no-bid** call with a confidence, a 5–8 sentence brief, the signals that drove the call and next actions. It is grounded in what FORGE already knows: the calibrated PWin and its factors (and how well that model has predicted your past outcomes), past bids that look like this one with what the team wrote down afterwards, your record at this agency and who beat you there, the patterns you have lost on, and matching passages from your own corpus. Briefs are kept — the last one shows when you open the page — and a new one is only written when something that matters has changed (or you click **Regenerate**). Answer **Was this useful?** to record feedback. When the pursuit closes (gate decision or proposal outcome), every brief that made a call on it is graded against the result; the panel's eyebrow shows the running track ("3 right, 1 wrong · 75%"). A "Watch" call is a hedge and is never counted right or wrong.
 
 #### Evaluation
@@ -580,7 +583,9 @@ Pick an **Opportunity** (dropdown of your org's opportunities), optionally overr
 
 #### Overview
 
-Edit title, roles, notes. Right-side **Workflow** panel shows:
+Edit title, roles, notes. Above the Workflow panel, **Next action** (BL-NEXT-ACTION; §5.4 Overview) shows what FORGE proposes next for the pursuit this proposal belongs to; at Developed that is the proposal's own work: draft the sections not started, map the compliance matrix while under 80% of requirements are mapped to a section, start the pink team once every section has a draft, resolve open review comments, tighten sections over their page cap (at 350 words a page), run the health scan when sections changed since the last one, and submit when the gold team passed and the due date is within three days.
+
+Right-side **Workflow** panel shows:
 - Color-team progression bar with your current stage highlighted
 - **Advance to next stage** button
 - Close-out buttons (Submitted, Awarded, Lost, No Bid, Archived)

@@ -12,6 +12,7 @@ import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
 import { CustomerContactsPanel } from "./CustomerContactsPanel";
 import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
 import { PwinPanel } from "./PwinPanel";
+import { NextActionPanel } from "@/components/intelligence/NextActionPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +92,8 @@ export default async function OpportunityOverviewPage({
         />
       </Panel>
       <div className="flex flex-col gap-4">
+        {/* BL-NEXT-ACTION 5a — what to do next on this pursuit, and why. */}
+        <NextActionPanel opportunityId={opp.id} />
         {/* BL-FB-WIN-RECOMPETE — have we bid this before? Renders nothing when not. */}
         <RecompeteRadarPanel
           organizationId={organizationId}
