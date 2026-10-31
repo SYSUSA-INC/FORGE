@@ -9,6 +9,7 @@ import {
   users,
 } from "@/db/schema";
 import { log } from "@/lib/log";
+import { nextActionsForDigest } from "@/lib/next-action-read";
 
 /**
  * BL-13 Phase D — batched-frequency materialization.
@@ -49,6 +50,7 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
   let rulesScanned = 0;
   let digestEmailsSent = 0;
   let digestEmailErrors = 0;
+  const actionsSent = new Set<string>();
 
   for (const frequency of BATCHED_FREQUENCIES) {
     if (frequency === "batched_weekly" && !isWeeklyDay) continue;
@@ -198,11 +200,19 @@ export async function materializeNotificationBatches(): Promise<BatchesResult> {
               const to = emailById.get(g.recipientUserId);
               try {
                 if (!to) throw new Error("recipient has no email address");
+                // BL-NEXT-ACTION 5b — the weekly digest carries the reader's
+                // open actions on their own pursuits, once per reader per run.
+                let nextActions: { title: string; pursuit: string; href: string }[] | undefined;
+                if (frequency === "batched_weekly" && !actionsSent.has(`${organizationId}:${g.recipientUserId}`)) {
+                  nextActions = await nextActionsForDigest(organizationId, g.recipientUserId).catch(() => []);
+                  actionsSent.add(`${organizationId}:${g.recipientUserId}`);
+                }
                 await sendDigestEmail({
                   to,
                   ruleName: rule.name,
                   count: g.deliveryIds.length,
                   cadence: frequency === "batched_daily" ? "daily" : "weekly",
+                  nextActions,
                 });
                 digestEmailsSent += 1;
               } catch (err) {

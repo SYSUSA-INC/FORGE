@@ -23,7 +23,7 @@ export type PromptedFeature = Exclude<AiFeature, "embedding" | "embedding_query"
 
 export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   opportunity_brief: "2026-10-27.1",
-  pipeline_brief: "2026-09-28.1",
+  pipeline_brief: "2026-10-31.1",
   section_draft: "2026-10-27.1",
   section_chat: "2026-10-07.1",
   proposal_scan: "2026-10-05.1",

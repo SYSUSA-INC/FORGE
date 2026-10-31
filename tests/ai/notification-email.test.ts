@@ -101,6 +101,25 @@ describe("buildDigestEmail", () => {
     expect(many.text).toContain("12 updates waiting");
   });
 
+  it("lists the reader's next actions when given, each linking into FORGE (BL-NEXT-ACTION 5b)", () => {
+    const d = buildDigestEmail({
+      ruleName: "Weekly wrap",
+      count: 2,
+      cadence: "weekly",
+      appUrl: "https://forge.example.com",
+      nextActions: [
+        { title: "Draft the 2 sections not started", pursuit: "Help desk <VA>", href: "/proposals/p1/sections" },
+        { title: "Take the bid / no-bid decision", pursuit: "Cloud migration", href: "/opportunities/o1/evaluation" },
+      ],
+    });
+    expect(d.html).toContain("Next actions on your pursuits");
+    expect(d.html).toContain('href="https://forge.example.com/proposals/p1/sections"');
+    expect(d.html).toContain("Help desk &lt;VA&gt;");
+    expect(d.text).toContain("- Take the bid / no-bid decision — Cloud migration: https://forge.example.com/opportunities/o1/evaluation");
+    const none = buildDigestEmail({ ruleName: "Weekly wrap", count: 2, cadence: "weekly", appUrl: "https://forge.example.com", nextActions: [] });
+    expect(none.html).not.toContain("Next actions");
+  });
+
   it("always links to the inbox and never goes negative", () => {
     const d = buildDigestEmail({
       ruleName: "r",
