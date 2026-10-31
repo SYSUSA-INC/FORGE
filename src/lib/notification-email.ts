@@ -72,6 +72,8 @@ export function buildDigestEmail(input: {
   count: number;
   cadence: "daily" | "weekly";
   appUrl: string;
+  /** BL-NEXT-ACTION 5b — the reader's open next actions on their own pursuits. */
+  nextActions?: { title: string; pursuit: string; href: string }[];
 }): BuiltEmail {
   const n = Math.max(0, Math.floor(input.count));
   const noun = n === 1 ? "update" : "updates";
@@ -79,12 +81,26 @@ export function buildDigestEmail(input: {
   const subject = `[FORGE] ${headline}`.slice(0, SUBJECT_MAX);
   const url = joinAppUrl(input.appUrl, "/notifications");
   const f = footer(input.ruleName);
+  const actions = (input.nextActions ?? []).slice(0, 5);
+  const actionsHtml =
+    actions.length > 0
+      ? [
+          `<h2 style="margin:16px 0 6px 0;font-size:14px;color:${EMAIL_HEX.ink};">Next actions on your pursuits</h2>`,
+          `<ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.55;color:${EMAIL_HEX.ink};">`,
+          ...actions.map((a) => `<li><a href="${escapeHtml(joinAppUrl(input.appUrl, a.href))}" style="color:${EMAIL_HEX.ink};">${escapeHtml(a.title)}</a> <span style="color:${EMAIL_HEX.muted};">— ${escapeHtml(a.pursuit)}</span></li>`),
+          `</ul>`,
+        ].join("\n")
+      : "";
+  const actionsText = actions.length > 0 ? ["Next actions on your pursuits:", ...actions.map((a) => `- ${a.title} — ${a.pursuit}: ${joinAppUrl(input.appUrl, a.href)}`)].join("\n") : "";
   const html = [
     `<h1 style="margin:0 0 12px 0;font-size:18px;color:${EMAIL_HEX.ink};">${escapeHtml(headline)}</h1>`,
     `<p style="margin:0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">Your ${input.cadence} digest has ${n} ${noun} waiting in your FORGE inbox.</p>`,
+    actionsHtml,
     openLink(url),
     f.html,
-  ].join("\n");
-  const text = [headline, `Your ${input.cadence} digest has ${n} ${noun} waiting in your FORGE inbox.`, `Open in FORGE: ${url}`, f.text].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const text = [headline, `Your ${input.cadence} digest has ${n} ${noun} waiting in your FORGE inbox.`, actionsText, `Open in FORGE: ${url}`, f.text].filter(Boolean).join("\n\n");
   return { subject, html, text };
 }

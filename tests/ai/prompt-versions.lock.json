@@ -82,8 +82,8 @@
       "sha256": "2593b487494e9e386e178b4bdba0b18e3c536609552db5032273220f4bc3903d"
     },
     "pipeline_brief": {
-      "version": "2026-09-28.1",
-      "sha256": "939e5db05a37f3c64ad1025bc1d39838df4f1b754ed18837d755863726080f4c"
+      "version": "2026-10-31.1",
+      "sha256": "5f4300ed081fb5fb961d5598b08bd4b0a4e022d6793dafd7879ee916a5467797"
     },
     "proposal_bootstrap": {
       "version": "2026-10-07.1",

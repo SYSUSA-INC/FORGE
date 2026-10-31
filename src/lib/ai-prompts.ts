@@ -1038,6 +1038,8 @@ export type PipelineSnapshot = {
     patterns: { title: string; severity: string; detail: string }[];
     topCompetitors: { name: string; count: number }[];
   } | null;
+  /** BL-NEXT-ACTION 5b — the open actions the rules propose, the reader's queue. */
+  nextActions?: { pursuit: string; stage: string; title: string; priority: string; dueDate: string | null }[];
 };
 
 const PIPELINE_BRIEF_SYSTEM = `You are an analyst inside FORGE — a federal proposal operations platform. You write concise, candid daily briefs for capture and proposal leaders.
@@ -1051,6 +1053,7 @@ Style rules:
 - Do NOT use governance/risk/compliance jargon. Speak in capture language: pursuit, capture, color team, Section M, gate.
 - If the snapshot is empty (no opportunities), explain there's nothing to brief on yet and suggest seeding pursuits via /opportunities/import.
 - When \`lossIntel\` is present, its patterns are what this organization actually lost on; when a live pursuit shows the same shape, say so. \`modelTrack\` is how well the PWin model has predicted this organization's outcomes (Brier: lower is better); trust the PWin figures accordingly.
+- When \`nextActions\` is present, these are the actions FORGE's rules already propose on live pursuits (priority now, this_week or later); build \`priorities\` from them, naming the pursuit and the action, and add a pursuit only when the snapshot shows a reason the rules do not cover. Never invent an action that is not in the list or the snapshot.
 - Answer through the record_pipeline_brief tool: \`brief\` (the prose), \`priorities\` (up to five pursuits or actions to chase this week, each one line naming the pursuit) and \`risks\` (up to five, each one line naming the pursuit). Never repeat the prose in the lists.`;
 
 export type OpportunitySnapshot = {

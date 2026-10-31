@@ -9,6 +9,7 @@ import { CommandCenterStageGrid } from "./CommandCenterStageGrid";
 import { CompanyModelNudgePanel } from "./CompanyModelNudgePanel";
 import { GettingStartedPanel } from "./GettingStartedPanel";
 import { LessonsNudgePanel } from "./LessonsNudgePanel";
+import { NextActionsPanel } from "./NextActionsPanel";
 import { PwinMoversPanel } from "./PwinMoversPanel";
 import { RecompeteAttentionPanel } from "./RecompeteAttentionPanel";
 
@@ -93,6 +94,9 @@ export default async function DashboardPage() {
 
       {/* BL-LESSONS-LOOP 4c — proposed lessons waiting on a Capture or Admin user. */}
       <LessonsNudgePanel canConfirm={isOrgAdmin || user.role === "capture"} />
+
+      {/* BL-NEXT-ACTION 5b — the open next actions across the organisation, own pursuits first. */}
+      <NextActionsPanel />
 
       {/* Stage widget grid — same data + visuals as /opportunities so
           the two pages can never disagree. Click a tile to drill into

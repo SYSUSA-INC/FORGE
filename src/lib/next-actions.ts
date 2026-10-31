@@ -443,3 +443,18 @@ export function reconcileNextActions(stored: StoredNextAction[], state: PursuitS
 export function mayDecideNextAction(user: { id: string; role: string | null; isSuperadmin: boolean }, ownerUserId: string | null): boolean {
   return user.isSuperadmin || user.role === "admin" || user.role === "capture" || (!!ownerUserId && ownerUserId === user.id);
 }
+
+/**
+ * Phase 5b — the organisation's open actions in one order: the reader's
+ * own pursuits first, then priority, due date and rule order.
+ */
+export function rankOrgActions<T extends { priority: NextActionPriority; dueBy: Date | null; rule: string; ownerUserId: string | null }>(rows: T[], userId: string): T[] {
+  const ranked = rankActions(rows);
+  return [...ranked.filter((r) => r.ownerUserId === userId), ...ranked.filter((r) => r.ownerUserId !== userId)];
+}
+
+/** Reports: done ÷ (done + dismissed); null until a person has decided one. */
+export function nextActionsTakenRate(stats: { done: number; dismissed: number }): number | null {
+  const n = stats.done + stats.dismissed;
+  return n === 0 ? null : stats.done / n;
+}
