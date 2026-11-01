@@ -81,6 +81,8 @@ export type StoredNextAction = {
   status: NextActionStatus;
   stage: string;
   snoozedUntil: Date | null;
+  /** When FORGE prepared it (phase 5c); null otherwise. */
+  preparedAt?: Date | null;
   title: string;
   reason: string;
   href: string;
@@ -430,6 +432,9 @@ export function reconcileNextActions(stored: StoredNextAction[], state: PursuitS
       continue;
     }
     const rule = RULE_BY_KIND.get(row.kind);
+    // A prepared row stays on the panel for a while after its rule stops
+    // holding, so the person sees what FORGE did; then it closes as done.
+    if (row.status === "prepared" && row.preparedAt && now.getTime() - row.preparedAt.getTime() < PREPARED_VISIBLE_DAYS * DAY) continue;
     res.close.push({ id: row.id, status: rule && rule.done(state) ? "done" : "superseded" });
   }
   for (const p of proposed) {
@@ -457,4 +462,39 @@ export function rankOrgActions<T extends { priority: NextActionPriority; dueBy: 
 export function nextActionsTakenRate(stats: { done: number; dismissed: number }): number | null {
   const n = stats.done + stats.dismissed;
   return n === 0 ? null : stats.done / n;
+}
+
+/** Phase 5c — what the nightly step may prepare, and the cap on drafts. */
+export const PREPARABLE_KINDS = ["build_outline", "build_questionnaire", "map_compliance", "draft_sections", "run_health_scan"] as const;
+export const PREPARE_DRAFTS_PER_NIGHT = 6;
+/** A prepared row whose rule no longer holds stays visible this long, so the person sees what was done. */
+export const PREPARED_VISIBLE_DAYS = 7;
+
+export type PreparedRecord = {
+  kind: "outline" | "questionnaire" | "compliance" | "drafts" | "scan";
+  at: string;
+  sections?: number;
+  sectionIds?: string[];
+  questions?: number;
+  suggested?: number;
+  applied?: number;
+  truncated?: number;
+};
+
+/** The sentence the panels show for a prepared row. */
+export function preparedSummary(p: PreparedRecord | null | undefined): string | null {
+  if (!p) return null;
+  const n = (c: number | undefined, w: string) => `${c ?? 0} ${w}${(c ?? 0) === 1 ? "" : "s"}`;
+  switch (p.kind) {
+    case "outline":
+      return `FORGE built the outline overnight (${n(p.sections, "section")}); review it.`;
+    case "questionnaire":
+      return `FORGE built the questionnaire overnight (${n(p.questions, "question")}${p.suggested ? `, ${n(p.suggested, "suggested answer")}` : ""}); confirm the answers.`;
+    case "compliance":
+      return `FORGE mapped ${n(p.applied, "requirement")} overnight; check the matrix.`;
+    case "drafts":
+      return `FORGE drafted ${n(p.sections, "section")} overnight as tracked insertions; accept or reject them in the editor${p.truncated ? ` (${p.truncated} cut off at the output limit)` : ""}.`;
+    case "scan":
+      return "FORGE queued the health scan overnight; its findings are on the overview.";
+  }
 }

@@ -246,7 +246,7 @@ export async function applyComplianceMappings(input: {
 export async function autoMapAndApply(input: {
   organizationId: string;
   proposalId: string;
-  actor: { id: string; email?: string | null };
+  actor: { id: string | null; email?: string | null };
   minConfidence?: AutoMapConfidence;
 }): Promise<{ ok: true; applied: number; suggested: number; stubbed: boolean } | { ok: false; error: string }> {
   const min = input.minConfidence ?? "high";

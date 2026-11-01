@@ -51,6 +51,8 @@ export type AiControlState = {
   requestsUsed: number;
   provider: AIProviderName;
   routingOn: boolean;
+  /** BL-NEXT-ACTION 5c — the nightly prepare-ahead step; on unless an admin switched it off. */
+  prepareAhead: boolean;
 };
 
 export async function getAiControlState(input: { organizationId: string }): Promise<AiControlState> {
@@ -73,7 +75,36 @@ export async function getAiControlState(input: { organizationId: string }): Prom
     requestsUsed,
     provider: getAIProviderStatus().active.name,
     routingOn: routingEnabled(),
+    prepareAhead: tier?.overrides.prepareAhead !== false,
   };
+}
+
+/** BL-NEXT-ACTION 5c — whether the nightly step may prepare work for this organisation. */
+export async function prepareAheadEnabled(organizationId: string): Promise<boolean> {
+  const tier = await getCurrentTier(organizationId);
+  return !!tier && tier.overrides.prepareAhead !== false;
+}
+
+/** BL-NEXT-ACTION 5c — switch the nightly prepare-ahead step on or off. */
+export async function setPrepareAhead(input: { organizationId: string; enabled: boolean; actor: Actor }): Promise<AiControlResult> {
+  const { organizationId } = input;
+  const overrides = await readOverrides(organizationId);
+  if (!overrides) return { ok: false, error: "This organization has no subscription yet." };
+  const { prepareAhead: previous, ...rest } = overrides;
+  const next = input.enabled ? rest : { ...rest, prepareAhead: false };
+  await db
+    .update(tenantSubscriptions)
+    .set({ customOverrides: next, updatedAt: new Date() })
+    .where(eq(tenantSubscriptions.organizationId, organizationId));
+  await recordAudit({
+    organizationId,
+    actor: input.actor,
+    action: "ai_engine.prepare_ahead.update",
+    resourceType: "tenant_subscription",
+    resourceId: organizationId,
+    metadata: { from: previous !== false, to: input.enabled },
+  });
+  return { ok: true };
 }
 
 export type AiDailyUsage = { day: string; tokens: number; calls: number };
