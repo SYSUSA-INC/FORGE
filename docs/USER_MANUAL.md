@@ -77,7 +77,7 @@ Fill in:
 - **Password** — at least 10 characters, with an uppercase, a lowercase, and a digit
 - **Confirm password**
 
-Click **Create account**. You'll see a "Check your inbox" screen.
+Click **Create account**. You'll see a "Check your inbox" screen. If an account with that email was created earlier but never verified, nothing about it changes (not the password, not the name): the verification email is sent again, and the person who owns the inbox finishes with it, or with **Forgot password?**, which sets a new password and verifies the address in one step.
 
 ### 1.2 Verify your email
 
@@ -113,6 +113,8 @@ https://www.sysgov.com/sign-up?invite=...&id=...
 ```
 
 Clicking it lands you on a sign-up page pre-filled with your email (you can't change it). Enter your name + password and click **Accept and create account**. You'll be signed in immediately and placed in your teammate's organization with the role they assigned you.
+
+If that email already has a FORGE account, the form says so and changes nothing about it: the link proves the inbox, not the account, so it never sets a password or a name on an account that exists. Sign in with your existing password (or use **Forgot password?**, which also proves the inbox and verifies the address) and the invitation is accepted at that sign-in; the link stays valid meanwhile.
 
 If your organization uses SSO, you can instead go to the sign-in page and use **Continue with Google / Microsoft** with the invited email address: the invitation is matched to that address and accepted automatically. Your admin may also hand you the invite link directly (for example in chat) — it is the same link the email carries.
 

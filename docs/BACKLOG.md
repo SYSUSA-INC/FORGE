@@ -1238,10 +1238,15 @@ mind. Bandage will come off but a true fix will stay."
     so invite-only mode no longer creates and deletes; a disabled person
     is refused on a first link; Entra sign-ins must come from
     `AUTH_MICROSOFT_ENTRA_ID_TENANTS` or the issuer's tenant; the sign-in
-    page names each refusal (this PR). Still to do before 8a: invite
-    acceptance overwriting an existing account's password and self
-    sign-up overwriting an unverified one; ending open sessions on
-    disable or password reset (needs a session version, with 8a).
+    page names each refusal (#439). An invite link accepted on the
+    sign-up form no longer rewrites an existing account's password and
+    name: `acceptInvite` (moved to `src/lib/invite-accept.ts`) refuses
+    with 409 before the token is spent and the account's next sign-in
+    accepts the invite; a self-service sign-up for an unverified account
+    changes nothing and re-sends the verification email, so nobody can
+    seed the password the inbox's owner then verifies into (this PR).
+    Still to do, with 8a: ending open sessions on disable or password
+    reset (needs a session version).
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
