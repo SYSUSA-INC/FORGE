@@ -136,6 +136,35 @@ export async function enforceRateLimit(
 }
 
 /**
+ * BL-STAB-8a-2 — the current window's standing without counting this
+ * call, for limits that count failures only (a wrong code counts, a
+ * right one does not). Same fail-open / fail-closed rule as above.
+ */
+export async function peekRateLimit(opts: RateLimitOptions): Promise<RateLimitResult> {
+  const now = Date.now();
+  const windowMs = opts.windowSeconds * 1000;
+  const windowStart = new Date(Math.floor(now / windowMs) * windowMs);
+  const resetIn = Math.max(1, Math.ceil((windowStart.getTime() + windowMs - now) / 1000));
+  try {
+    const result = await db.execute<{ count: number }>(sql`
+      SELECT count FROM rate_limit_counter WHERE key = ${opts.key} AND window_start = ${windowStart}
+    `);
+    type Row = { count: number };
+    const rows = ((result as unknown as { rows?: Row[] }).rows ?? (result as unknown as Row[])) as Row[];
+    const count = Number(rows[0]?.count ?? 0);
+    if (count >= opts.limit) return { ok: false, retryAfter: resetIn };
+    return { ok: true, remaining: Math.max(0, opts.limit - count), resetIn };
+  } catch (err) {
+    if (opts.failClosed) {
+      log.error("[rate-limit]", "DB error, failing closed", { error: err });
+      return { ok: false, retryAfter: resetIn };
+    }
+    log.error("[rate-limit]", "DB error, failing open", { error: err });
+    return { ok: true, remaining: opts.limit, resetIn };
+  }
+}
+
+/**
  * Best-effort extraction of the caller's IP from a Next.js request.
  * Used as the keying dimension for unauthenticated endpoints.
  *

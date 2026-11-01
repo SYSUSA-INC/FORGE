@@ -12,7 +12,7 @@ vi.mock("@/db", () => ({
 }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceRateLimit, peekRateLimit } from "@/lib/rate-limit";
 
 const opts = { key: "signin:email:a@b.co", limit: 3, windowSeconds: 900 };
 
@@ -28,6 +28,16 @@ describe("enforceRateLimit when the counter store fails", () => {
     const r = await enforceRateLimit({ ...opts, failClosed: true });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.retryAfter).toBeGreaterThan(0);
+  });
+
+  it("peek reads the window without counting, and fails closed too (BL-STAB-8a-2)", async () => {
+    state.mode = { count: 5 };
+    expect((await peekRateLimit({ ...opts, limit: 5, failClosed: true })).ok).toBe(false);
+    state.mode = { count: 4 };
+    expect((await peekRateLimit({ ...opts, limit: 5, failClosed: true })).ok).toBe(true);
+    state.mode = "down";
+    expect((await peekRateLimit({ ...opts, failClosed: true })).ok).toBe(false);
+    expect((await peekRateLimit(opts)).ok).toBe(true);
   });
 
   it("still counts normally when the store works", async () => {

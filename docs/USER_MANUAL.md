@@ -35,7 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
-- **Two-step sign-in, step one** — Settings → Security: add an authenticator app and keep your recovery codes, ahead of the release that makes the second step mandatory (§1.6).
+- **Two-step sign-in** — every sign-in now asks for a code from your authenticator app (or a recovery code) after the password; the first sign-in sets it up; sessions end after 8 hours idle or 24 hours (§1.3, §1.6).
 - **Next action** — every opportunity and proposal overview opens with what FORGE proposes you do next on that pursuit and why, from rules over its state: the evaluation, the questionnaire, the gate, the proposal, its drafts, compliance, reviews and scan, the outcome and the lessons; an At risk action comes first when the deadline is close; Done and Not now for the owner, Capture and Admin (§5.4 Overview, §6.3 Overview). The Command Center lists the open ones across your pursuits, the pipeline brief builds its priorities from them, the weekly digest email carries yours, and Reports shows how many were taken (§2.2, §5.5, §5.6, §10.1). With **Prepare ahead** on, FORGE does the preparable ones overnight (outline, questionnaire with suggested answers, compliance map, section drafts as tracked insertions, health scan) and the panel says what it prepared for you to review (§4.12).
 - **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each; the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones, and the Lessons page shows which closed the loop (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
@@ -100,6 +100,8 @@ If your organization uses SSO, use **Continue with Google** or **Continue with M
 
 After you sign in, FORGE returns you to the page you were trying to open, but only when it is a page inside FORGE; a link that points anywhere else (including one written with a backslash, such as `/\example.com`) takes you to the Command Center instead.
 
+**The second step (BL-STAB-8).** After your password, or after Google / Microsoft, FORGE asks for the six-digit code from your authenticator app (or one of your recovery codes) before anything opens; see §1.6. You have ten minutes for it, five wrong codes lock it for 15 minutes, and the first sign-in after the release takes you to a set-up page instead if you have no authenticator yet.
+
 **Too many attempts.** To stop password guessing, FORGE allows 10 sign-in attempts per email address in any 15 minutes. After that, sign-in is refused (it shows the usual "incorrect email or password" message, even with the right password) until the 15 minutes pass. Wait, then try again, or use **Forgot password?** if you are unsure of your password.
 
 ### 1.4 Forgot your password
@@ -132,7 +134,11 @@ FORGE is moving to a second step at every sign-in: after your password (or Googl
 - **Remove an authenticator.** **Remove** beside it asks for a current code from one of your authenticators (or a recovery code). Removing the last one also voids your recovery codes; you set up again from the start.
 - **Codes and time.** A code is good for about a minute around the moment it is shown. If every code is refused, check that your phone sets its time automatically.
 
-The second step itself (the page that asks for the code at sign-in, the session limits and the emergency reset) arrives with the next release; until then an authenticator you add simply waits. Your administrator will tell you when sign-in starts asking for it.
+**At sign-in.** Every sign-in asks for the second step: after the password (or Google / Microsoft), the **Second step** page takes a code from your authenticator app or a recovery code, and only then does FORGE open. The step has ten minutes; after that, sign in again. Five wrong codes lock it for 15 minutes. A recovery code works once; when you are down to two, FORGE sends you to Settings → Security after the sign-in so you can replace them. With no authenticator yet (your first sign-in after the release, or after a reset), sign-in takes you to **Set up two-step sign-in** first; confirming the first code is the second step for that sign-in. There is no "remember this browser": the second step is asked every time.
+
+**Sessions.** You are signed out after 8 hours without using FORGE and 24 hours after signing in whatever happens; the editors save as you work, so nothing is lost. Disabling your account, resetting your password or a two-step reset by a platform administrator ends every open session at its next request.
+
+**Lost everything?** Without your phone and your recovery codes, a platform administrator resets your two-step sign-in (with a written reason, and you are emailed); you then set it up again at the next sign-in.
 
 ## 2. The app layout
 

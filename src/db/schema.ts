@@ -75,6 +75,9 @@ export const users = pgTable("user", {
   /** BL-STAB-8a — bumped to end every open session of this user (8a-2 reads it). */
   sessionVersion: integer("session_version").notNull().default(1),
   mfaResetAt: timestamp("mfa_reset_at"),
+  /** BL-STAB-8a-2 — the server-side mark that the pending session `pid` passed the second step. */
+  mfaPassPid: text("mfa_pass_pid"),
+  mfaPassAt: timestamp("mfa_pass_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

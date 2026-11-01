@@ -50,6 +50,8 @@ export async function POST(req: Request) {
     .set({
       passwordHash,
       emailVerified: sql`COALESCE(${users.emailVerified}, now())`,
+      // BL-STAB-8a-2 — a new password ends every open session.
+      sessionVersion: sql`${users.sessionVersion} + 1`,
       updatedAt: new Date(),
     })
     .where(eq(users.email, email))

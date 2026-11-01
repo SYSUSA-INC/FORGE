@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -129,6 +129,8 @@ export async function setUserDisabledAction(
     .update(users)
     .set({
       disabledAt: disabled ? new Date() : null,
+      // BL-STAB-8a-2 — disabling ends every open session at its next request.
+      ...(disabled ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
       updatedAt: new Date(),
     })
     .where(eq(users.id, userId));

@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import { db } from "@/db";
-import { userMfaFactors, userRecoveryCodes, users } from "@/db/schema";
+import { memberships, userMfaFactors, userRecoveryCodes, users } from "@/db/schema";
 import { log } from "@/lib/log";
 import { cleanFactorLabel, generateRecoveryCodes, MFA_LIMITS, newTotpSecret, normalizeRecoveryCode, totpUri, verifyTotp } from "@/lib/mfa";
 import { hashPassword, verifyPassword } from "@/lib/passwords";
@@ -144,6 +144,12 @@ export async function removeFactor(input: { userId: string; factorId: string }):
     await db.update(users).set({ mfaEnrolledAt: null, updatedAt: new Date() }).where(eq(users.id, input.userId));
   }
   return { ok: true, remaining };
+}
+
+/** The workspace an audit row about this person goes to when the session has none yet: their first membership. */
+export async function firstWorkspaceOf(userId: string): Promise<string | null> {
+  const [m] = await db.select({ organizationId: memberships.organizationId }).from(memberships).where(eq(memberships.userId, userId)).limit(1);
+  return m?.organizationId ?? null;
 }
 
 export type CodeCheck = { ok: true; method: "totp" | "recovery"; factorId: string | null; recoveryCodesLeft?: number } | { ok: false };

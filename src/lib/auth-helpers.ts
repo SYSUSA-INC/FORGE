@@ -19,7 +19,24 @@ export type SessionUser = {
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
+  // BL-STAB-8a-2 — until the second step passed, the person is not in.
+  if (session.user.mfa !== "ok") return null;
   return session.user as SessionUser;
+}
+
+/** BL-STAB-8a-2 — the session between the password and the second step (the gate pages and their actions). */
+export async function getPendingSession(): Promise<{ id: string; email: string | null; mfa: "pending" | "enrol"; pid: string } | null> {
+  const session = await auth();
+  if (!session?.user?.id || session.user.mfa === "ok" || !session.user.pid) return null;
+  return { id: session.user.id, email: session.user.email ?? null, mfa: session.user.mfa, pid: session.user.pid };
+}
+
+/** A signed-in person, or one at the second step: what the enrolment actions accept. */
+export async function requireAuthOrPending(): Promise<{ id: string; email: string | null; pending: { pid: string } | null }> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/sign-in");
+  const pending = session.user.mfa !== "ok" && session.user.pid ? { pid: session.user.pid } : null;
+  return { id: session.user.id, email: session.user.email ?? null, pending };
 }
 
 export async function requireAuth(): Promise<SessionUser> {
