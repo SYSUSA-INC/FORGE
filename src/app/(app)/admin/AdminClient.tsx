@@ -18,10 +18,12 @@ import {
   createOrganizationAction,
   deleteOrganizationAction,
   deleteUserAction,
+  endAllSessionsAction,
   forcePasswordResetAction,
   previewUnverifiedPurgeAction,
   purgeUnverifiedAccountsAction,
   resendOrgAdminInviteAction,
+  resetUserMfaAction,
   setOrgDisabledAction,
   setUserDisabledAction,
   setUserSuperadminAction,
@@ -56,6 +58,8 @@ type UserRow = {
   isSuperadmin: boolean;
   disabled: boolean;
   verified: boolean;
+  /** BL-STAB-8a — has at least one second factor. */
+  mfaEnrolled: boolean;
   createdAt: string;
   memberships: {
     organizationId: string;
@@ -939,6 +943,8 @@ function UsersTab({
 
   return (
     <>
+    {/* BL-STAB-8a-4 — the platform epoch: every session ends at once */}
+    <EndAllSessionsPanel />
     {/* BL-AUTH-ABUSE Slice 1 — bulk clean-up of unverified sign-ups */}
     <UnverifiedPurgePanel />
     <Panel
@@ -1071,6 +1077,62 @@ function UnverifiedPurgePanel() {
   );
 }
 
+/** BL-STAB-8a-4 — raise the platform epoch: everyone, you included, signs in again within a minute. */
+function EndAllSessionsPanel() {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  function run() {
+    setErr(null);
+    startTransition(async () => {
+      const res = await endAllSessionsAction(reason);
+      if (!res.ok) return setErr(res.error);
+      setNote(`Done: epoch ${res.epoch}. Every session ends at its next request, yours within a minute.`);
+      setOpen(false);
+      setReason("");
+    });
+  }
+
+  return (
+    <Panel
+      title="Sessions"
+      eyebrow="Platform-wide"
+      actions={
+        !open ? (
+          <button type="button" className="aur-btn aur-btn-danger text-[11px]" onClick={() => { setOpen(true); setNote(null); setErr(null); }}>
+            End every session…
+          </button>
+        ) : null
+      }
+    >
+      <p className="font-body text-[13px] leading-[1.5] text-muted">
+        Ends every open session on the platform at once, yours included: everyone signs in again (with their second step) within a minute. Nobody&apos;s factors or passwords change. This is the release step of two-step sign-in, and the lever for a suspected token leak.
+      </p>
+      {open ? (
+        <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2">
+          <label className="block">
+            <span className="aur-label">Reason (written to the audit log)</span>
+            <input className="aur-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Two-step sign-in release, 2026-11-02" maxLength={500} disabled={pending} />
+          </label>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={pending || reason.trim().length < 10} onClick={run}>
+              {pending ? "Ending…" : "End every session now"}
+            </button>
+            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {err ? <div className="mt-2 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{err}</div> : null}
+      {note ? <div className="mt-2 rounded-md border border-emerald/40 bg-emerald/10 px-3 py-2 font-mono text-[11px] text-emerald">{note}</div> : null}
+    </Panel>
+  );
+}
+
 function UserRowItem({
   u,
   currentUserId,
@@ -1085,6 +1147,8 @@ function UserRowItem({
   const [reset, setReset] = useState<Extract<ResetLinkResult, { ok: true }> | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteSole, setDeleteSole] = useState(true);
+  const [confirmMfa, setConfirmMfa] = useState(false);
+  const [mfaReason, setMfaReason] = useState("");
 
   const isSelf = u.id === currentUserId;
   const soleWorkspaces = u.memberships.filter((m) => m.sole);
@@ -1142,9 +1206,26 @@ function UserRowItem({
     else setReset(res);
   }
 
+  // BL-STAB-8a-4 — the two-step reset, with its reason.
+  async function resetMfa() {
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    const res = await resetUserMfaAction(u.id, mfaReason);
+    setBusy(false);
+    if (!res.ok) {
+      setErr(res.error);
+      return;
+    }
+    setConfirmMfa(false);
+    setMfaReason("");
+    setNote(res.warning ?? `Two-step sign-in reset (${res.factors} factor${res.factors === 1 ? "" : "s"} removed), every session ended, ${u.email} emailed with the reason.`);
+    router.refresh();
+  }
+
   return (
     <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
-      <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+      <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-text">
             {u.name ?? u.email}
@@ -1168,6 +1249,11 @@ function UserRowItem({
                 Unverified
               </span>
             ) : null}
+            {u.mfaEnrolled ? (
+              <span className="ml-2 rounded bg-cobalt/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-cobalt">
+                2-step
+              </span>
+            ) : null}
           </div>
           <div className="mt-0.5 truncate font-mono text-[11px] text-muted">
             {u.email} ·{" "}
@@ -1185,6 +1271,19 @@ function UserRowItem({
           onClick={forceReset}
         >
           Reset password
+        </button>
+        <button
+          type="button"
+          className="aur-btn aur-btn-ghost text-[11px]"
+          disabled={busy || isSelf || !u.mfaEnrolled}
+          title={isSelf ? "Reset your own from Settings → Security." : !u.mfaEnrolled ? "No second factor to reset." : "Remove their factors and recovery codes; they enrol again at the next sign-in"}
+          onClick={() => {
+            setErr(null);
+            setNote(null);
+            setConfirmMfa((v) => !v);
+          }}
+        >
+          Reset MFA…
         </button>
         <button
           type="button"
@@ -1216,6 +1315,26 @@ function UserRowItem({
           Delete…
         </button>
       </div>
+      {/* BL-STAB-8a-4 — the two-step reset asks for its reason */}
+      {confirmMfa ? (
+        <div className="mt-2 rounded-md border border-brass/40 bg-brass/10 px-3 py-2 font-mono text-[11px] text-text">
+          <div>
+            Reset two-step sign-in for <span className="font-semibold">{u.email}</span>? Their authenticator apps, passkeys and recovery codes are removed and every open session ends. Their password stays. They set it up again at the next sign-in. The reason is emailed to them and recorded in the audit log.
+          </div>
+          <label className="mt-2 block">
+            <span className="aur-label">Reason</span>
+            <input className="aur-input" value={mfaReason} onChange={(e) => setMfaReason(e.target.value)} placeholder="e.g. Lost phone, identity confirmed by phone call with their manager" maxLength={500} disabled={busy} />
+          </label>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={busy || mfaReason.trim().length < 10} onClick={resetMfa}>
+              {busy ? "Resetting…" : "Reset two-step sign-in"}
+            </button>
+            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={busy} onClick={() => setConfirmMfa(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
       {/* BL-AUTH-ABUSE Slice 1 — delete with the consequences spelled out */}
       {confirmDelete ? (
         <div className="mt-2 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-text">

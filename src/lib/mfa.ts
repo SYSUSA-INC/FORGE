@@ -83,3 +83,12 @@ export function cleanFactorLabel(raw: unknown, fallback: string): string {
   const s = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
   return (s || fallback).slice(0, MFA_LIMITS.labelMax);
 }
+
+/** BL-STAB-8a-4 — the reason a superadmin writes for a reset: 10 to 500 characters, whitespace collapsed. */
+export const MFA_RESET_REASON = { min: 10, max: 500 } as const;
+export function cleanResetReason(input: unknown): { ok: true; reason: string } | { ok: false; error: string } {
+  const reason = String(input ?? "").replace(/\s+/g, " ").trim();
+  if (reason.length < MFA_RESET_REASON.min) return { ok: false, error: `Write a reason of at least ${MFA_RESET_REASON.min} characters: it goes to the person and into the audit log.` };
+  if (reason.length > MFA_RESET_REASON.max) return { ok: false, error: `Keep the reason under ${MFA_RESET_REASON.max} characters.` };
+  return { ok: true, reason };
+}

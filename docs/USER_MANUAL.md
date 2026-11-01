@@ -100,7 +100,7 @@ If your organization uses SSO, use **Continue with Google** or **Continue with M
 
 After you sign in, FORGE returns you to the page you were trying to open, but only when it is a page inside FORGE; a link that points anywhere else (including one written with a backslash, such as `/\example.com`) takes you to the Command Center instead.
 
-**The second step (BL-STAB-8).** After your password, or after Google / Microsoft, FORGE asks for the six-digit code from your authenticator app (or one of your recovery codes) before anything opens; see §1.6. You have ten minutes for it, five wrong codes lock it for 15 minutes, and the first sign-in after the release takes you to a set-up page instead if you have no authenticator yet.
+**The second step (BL-STAB-8).** After your password, or after Google / Microsoft, FORGE asks for the six-digit code from your authenticator app (or one of your recovery codes) before anything opens; see §1.6. You have ten minutes for it, five wrong codes lock it for 15 minutes, and the first sign-in after the release (or after an administrator's reset) takes you to a set-up page instead if you have no passkey or authenticator yet.
 
 **Too many attempts.** To stop password guessing, FORGE allows 10 sign-in attempts per email address in any 15 minutes. After that, sign-in is refused (it shows the usual "incorrect email or password" message, even with the right password) until the 15 minutes pass. Wait, then try again, or use **Forgot password?** if you are unsure of your password.
 
@@ -138,7 +138,9 @@ FORGE asks for a second step at every sign-in: after your password (or Google / 
 
 **At sign-in.** Every sign-in asks for the second step: after the password (or Google / Microsoft), the **Second step** page offers **Use a passkey** when you have one, and takes a code from your authenticator app or a recovery code; only then does FORGE open. The step has ten minutes; after that, sign in again. Five wrong codes lock it for 15 minutes. A recovery code works once; when you are down to two, FORGE sends you to Settings → Security after the sign-in so you can replace them. With no authenticator yet (your first sign-in after the release, or after a reset), sign-in takes you to **Set up two-step sign-in** first; adding the passkey, or confirming the app's first code, is the second step for that sign-in. There is no "remember this browser": the second step is asked every time.
 
-**Sessions.** You are signed out after 8 hours without using FORGE and 24 hours after signing in whatever happens; the editors save as you work, so nothing is lost. Disabling your account, resetting your password or a two-step reset by a platform administrator ends every open session at its next request.
+**Sessions.** You are signed out after 8 hours without using FORGE and 24 hours after signing in whatever happens; the editors save as you work, so nothing is lost. Disabling your account, resetting your password or a two-step reset by a platform administrator ends every open session at its next request, and a platform administrator can end everyone's sessions at once (you simply sign in again).
+
+**Lost your phone, passkey and recovery codes?** Ask a platform administrator for a two-step reset. They confirm who you are, then remove your authenticators and recovery codes and email you their reason; your password is unchanged, and your next sign-in takes you through **Set up two-step sign-in** again with new recovery codes. If you get that email without having asked, contact your administrator before signing in.
 
 **Lost everything?** Without your phone and your recovery codes, a platform administrator resets your two-step sign-in (with a written reason, and you are emailed); you then set it up again at the next sign-in.
 
