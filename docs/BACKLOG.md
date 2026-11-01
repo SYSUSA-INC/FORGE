@@ -3513,7 +3513,7 @@ proposal's chances. Over time FORGE owns the proposal lifecycle.
   person's approval (phase 5).
 
 ### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 A, B, C1–C10, D, the manuals and the Command Center pass shipped (#400–#415); the rest of C open
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 A, B, C1–C10, D, the manuals and the Command Center pass shipped (#400–#417); the rest of C open
 
 Follow-up to BL-UI-ENABLENOW after a both-theme sweep of every page.
 
