@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 next, after BL-UI-ENABLENOW (owner, 2026-10-08: right after BL-STAB-2c; 2026-10-21: next, now that BL-STAB-2 has shipped; the re-theme was asked for first) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 foundations shipped (#415, #416, #439, #440); 8a design for approval (this PR); then 8a-1 to 8a-4, 8b, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1257,6 +1257,68 @@ mind. Bandage will come off but a true fix will stay."
     account's password and self sign-up can overwrite an unverified one;
     password sign-in has no rate limit and the limiter fails open;
     `safeRedirectTarget` lets `/\evil.com` through.
+  - **8a design (this PR, for approval).** Four PRs, each under 1,500
+    lines, manuals in each. Packages: `otplib` (TOTP), `qrcode` (the
+    enrolment QR as SVG), `@simplewebauthn/server` and
+    `@simplewebauthn/browser` (passkeys, 8a-3).
+    - **The record.** `user_mfa_factor` (id, user_id, kind `totp` |
+      `passkey`, label, the TOTP secret encrypted with the secret box
+      under a new purpose `mfa_totp` with the user id as context, the
+      passkey's credential id, public key, counter and transports,
+      created_at, last_used_at); `user_recovery_code` (user_id,
+      code_hash, used_at; ten per batch, hashed like passwords); on
+      `user`: `mfa_enrolled_at`, `session_version` (default 1) and
+      `mfa_reset_at`. A platform setting `auth.session_epoch` ends every
+      session at once. No secret or code is ever stored in clear.
+    - **8a-1 — factors and enrolment.** Settings → **Security** (every
+      user): add an authenticator (QR and the text key, verified with a
+      first code before it counts), name it, remove it (a current code
+      required); recovery codes shown once at the first enrolment and on
+      **Regenerate** (a current code required), downloadable as text; up
+      to three factors. Audit `user.mfa.{enrol, remove,
+      recovery_regenerate}`. Pure and tested: the TOTP window (one step
+      either side, a code never accepted twice), code normalisation, the
+      recovery-code format and hashing.
+    - **8a-2 — the gate.** The JWT carries `mfa` (`pending` | `ok`),
+      `amr` (how the second step passed), `sv` (the user's session
+      version), `epoch`, `iat` and `lastActive`. After the password or
+      OAuth step the token is pending; the middleware's `authorized`
+      sends a pending session to `/sign-in/verify` (or to
+      `/sign-in/enrol` when the user has no factor yet) for every path
+      but those two, sign-out and `/api/auth`, so nothing in the app
+      opens before `mfa: ok`. The pending token dies after 10 minutes;
+      five wrong codes lock the sign-in for 15 minutes (the fail-closed
+      rate limit, keyed by user); a recovery code counts as the second
+      step and is burned. Sessions end after 8 hours without use and 24
+      hours at most (`lastActive` refreshed on use; both checked in the
+      JWT callback). Disabling a user, resetting their password or the
+      superadmin MFA reset bumps `session_version`, so every open session
+      of theirs ends at its next request; raising `auth.session_epoch`
+      ends everyone's (the release step). `MFA_ENFORCEMENT=off` skips the
+      second step, writes `auth.mfa.bypassed` per sign-in and shows a
+      banner to everyone; `MFA_PREVIEW_BYPASS_CODE` is accepted as a code
+      only when `VERCEL_ENV=preview`. Google / Microsoft sign-ins take
+      the same second step.
+    - **8a-3 — passkeys.** Register and sign in with WebAuthn (platform
+      and roaming authenticators), as a second factor beside the
+      authenticator app; a platform superadmin must hold one and enrols
+      it at the first sign-in after release before anything opens;
+      counted in the three-factor cap.
+    - **8a-4 — the reset, the rollout and the manuals.** SuperAdmin →
+      Platform users → **Reset MFA** with a written reason: every factor
+      and recovery code removed, `session_version` bumped, the person
+      emailed with the reason, audit `user.mfa.reset`; the release
+      runbook (raise the epoch, everyone signs in again and enrols);
+      User Manual §1.3 and a new §1.6 Two-step sign-in; Admin Manual §2
+      and §7.3.
+    - **Open points for the owner:** (1) the name the authenticator app
+      shows (proposed: "FORGE (sysgov.com)" with the user's email);
+      (2) no "remember this browser" option, since every sign-in needs
+      the second step (proposed: none, as decided on 2026-10-21);
+      (3) the 24-hour limit ends a session mid-edit (proposed: a notice
+      15 minutes before; the editors already autosave); (4) SMS as a
+      factor waits for the provider (as decided), so 8a ships with the
+      authenticator app and passkeys.
 - **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
   BL-STAB-2.
   - **Ask:** Upload several files at once; FORGE decides what each is
