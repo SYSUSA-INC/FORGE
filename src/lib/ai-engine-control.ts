@@ -145,7 +145,9 @@ async function readOverrides(organizationId: string) {
     .from(tenantSubscriptions)
     .where(eq(tenantSubscriptions.organizationId, organizationId))
     .limit(1);
-  return row ? (row.overrides ?? {}) : null;
+  // BL-NEXT-ACTION 5c — `prepareAhead` lives in the same jsonb; typed here
+  // rather than on the column so the type-only change needs no migration.
+  return row ? ((row.overrides ?? {}) as typeof row.overrides & { prepareAhead?: boolean }) : null;
 }
 
 /**

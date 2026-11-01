@@ -4056,8 +4056,6 @@ export const tenantSubscriptions = pgTable(
         quotas?: Partial<TierQuotas>;
         aiModels?: Record<string, string>;
         aiBudget?: { tokensPerMonth?: number; requestsPerMonth?: number };
-        /** BL-NEXT-ACTION 5c — false switches the nightly prepare-ahead step off. */
-        prepareAhead?: boolean;
       }>()
       .notNull()
       .default({}),
