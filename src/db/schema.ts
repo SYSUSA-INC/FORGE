@@ -70,9 +70,65 @@ export const users = pgTable("user", {
   passwordHash: text("password_hash"),
   isSuperadmin: boolean("is_superadmin").notNull().default(false),
   disabledAt: timestamp("disabled_at"),
+  /** BL-STAB-8a — set at the first confirmed factor; cleared when the last is removed or reset. */
+  mfaEnrolledAt: timestamp("mfa_enrolled_at"),
+  /** BL-STAB-8a — bumped to end every open session of this user (8a-2 reads it). */
+  sessionVersion: integer("session_version").notNull().default(1),
+  mfaResetAt: timestamp("mfa_reset_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+/**
+ * BL-STAB-8a-1 — a user's second factors: an authenticator app (the TOTP
+ * secret encrypted with the secret box, purpose `mfa_totp`, the user id as
+ * context) or, from 8a-3, a passkey. Unconfirmed rows are enrolments in
+ * progress and count for nothing.
+ */
+export const userMfaFactors = pgTable(
+  "user_mfa_factor",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** totp | passkey */
+    kind: text("kind").notNull().default("totp"),
+    label: text("label").notNull().default(""),
+    secretCiphertext: text("secret_ciphertext"),
+    secretKeyId: text("secret_key_id").notNull().default(""),
+    /** The last accepted TOTP time step, so a code is never accepted twice. */
+    lastUsedStep: integer("last_used_step"),
+    /** Passkeys (8a-3). */
+    credentialId: text("credential_id"),
+    publicKey: text("public_key"),
+    counter: integer("counter").notNull().default(0),
+    transports: jsonb("transports").$type<string[]>().notNull().default([]),
+    confirmedAt: timestamp("confirmed_at"),
+    lastUsedAt: timestamp("last_used_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("user_mfa_factor_user_idx").on(t.userId),
+  }),
+);
+
+/** BL-STAB-8a-1 — single-use recovery codes, stored as hashes, ten per batch. */
+export const userRecoveryCodes = pgTable(
+  "user_recovery_code",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("user_recovery_code_user_idx").on(t.userId),
+  }),
+);
 
 export const accounts = pgTable(
   "account",

@@ -18,7 +18,8 @@ import { resolveEnvLabel } from "@/lib/env-label";
  *   fresh 12-byte IV each time and a 16-byte tag checked before use.
  * - Errors carry only a reason, never key material. Nothing is logged.
  */
-export type SecretPurpose = "samgov_api_key";
+/** `mfa_totp` (BL-STAB-8a-1) uses the user id as the context, not an organization. */
+export type SecretPurpose = "samgov_api_key" | "mfa_totp";
 export type SecretBoxReason = "unavailable" | "unknown_key" | "malformed" | "auth_failed";
 
 export class SecretBoxError extends Error {
