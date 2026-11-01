@@ -9,7 +9,9 @@ import { unstable_update } from "@/auth";
 import { getSessionUser, requireAuth, requireAuthOrPending } from "@/lib/auth-helpers";
 import { log } from "@/lib/log";
 import { beginTotpEnrolment, confirmTotpEnrolment, regenerateRecoveryCodes, removeFactor, verifyUserCode } from "@/lib/mfa-store";
+import { beginPasskeyRegistration, finishPasskeyRegistration, superadminNeedsPasskey } from "@/lib/passkeys";
 import { enforceRateLimit, peekRateLimit } from "@/lib/rate-limit";
+import type { RegistrationResponseJSON } from "@simplewebauthn/types";
 
 /**
  * BL-STAB-8a-1 — a person's own second factors. Every action acts on
@@ -49,7 +51,7 @@ export async function beginEnrolmentAction(input: { label?: string }): Promise<{
   return beginTotpEnrolment({ userId: user.id, email: user.email ?? "", label: input.label });
 }
 
-export async function confirmEnrolmentAction(input: { factorId: string; code: string }): Promise<{ ok: true; recoveryCodes: string[] | null } | { ok: false; error: string }> {
+export async function confirmEnrolmentAction(input: { factorId: string; code: string }): Promise<{ ok: true; recoveryCodes: string[] | null; passkeyStillNeeded?: boolean } | { ok: false; error: string }> {
   const user = await requireAuthOrPending();
   if (!(await codeAllowed(user.id))) return { ok: false, error: "Too many wrong codes. Wait 15 minutes and try again." };
   const res = await confirmTotpEnrolment({ userId: user.id, factorId: input.factorId, code: input.code });
@@ -57,14 +59,37 @@ export async function confirmEnrolmentAction(input: { factorId: string; code: st
     await countWrongCode(user.id);
     return res;
   }
-  if (user.pending) {
+  // BL-STAB-8a-3 — a platform superadmin's sign-in needs a passkey: an
+  // app alone does not pass the step for them.
+  const passkeyStillNeeded = user.pending ? await superadminNeedsPasskey(user.id) : false;
+  if (user.pending && !passkeyStillNeeded) {
     // The first code proved the device: that is the second step, passed.
     await db.update(users).set({ mfaPassPid: user.pending.pid, mfaPassAt: new Date() }).where(eq(users.id, user.id));
     await unstable_update({});
   }
   await audit("user.mfa.enrol", { factorId: input.factorId, kind: "totp", recoveryCodesMinted: !!res.recoveryCodes, atSignIn: !!user.pending });
   revalidatePath(PATH);
-  return res;
+  return { ...res, passkeyStillNeeded };
+}
+
+/** BL-STAB-8a-3 — a passkey: the browser's ceremony between these two. */
+export async function beginPasskeyRegistrationAction(): Promise<{ ok: true; options: unknown } | { ok: false; error: string }> {
+  const user = await requireAuthOrPending();
+  return beginPasskeyRegistration({ userId: user.id, email: user.email ?? "" });
+}
+
+export async function finishPasskeyRegistrationAction(input: { response: RegistrationResponseJSON; label?: string }): Promise<{ ok: true; recoveryCodes: string[] | null } | { ok: false; error: string }> {
+  const user = await requireAuthOrPending();
+  const res = await finishPasskeyRegistration({ userId: user.id, response: input.response, label: input.label });
+  if (!res.ok) return res;
+  if (user.pending) {
+    // Registering the key proved possession: the second step, passed.
+    await db.update(users).set({ mfaPassPid: user.pending.pid, mfaPassAt: new Date() }).where(eq(users.id, user.id));
+    await unstable_update({});
+  }
+  await audit("user.mfa.enrol", { factorId: res.factorId, kind: "passkey", recoveryCodesMinted: !!res.recoveryCodes, atSignIn: !!user.pending });
+  revalidatePath(PATH);
+  return { ok: true, recoveryCodes: res.recoveryCodes };
 }
 
 export async function removeFactorAction(input: { factorId: string; code: string }): Promise<Result> {

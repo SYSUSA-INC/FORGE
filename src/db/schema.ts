@@ -78,6 +78,9 @@ export const users = pgTable("user", {
   /** BL-STAB-8a-2 — the server-side mark that the pending session `pid` passed the second step. */
   mfaPassPid: text("mfa_pass_pid"),
   mfaPassAt: timestamp("mfa_pass_at"),
+  /** BL-STAB-8a-3 — the one open passkey challenge, good for five minutes. */
+  webauthnChallenge: text("webauthn_challenge"),
+  webauthnChallengeAt: timestamp("webauthn_challenge_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

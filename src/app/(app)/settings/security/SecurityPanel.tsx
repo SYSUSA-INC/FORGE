@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { browserSupportsWebAuthn, startRegistration, WebAuthnError } from "@simplewebauthn/browser";
+import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/types";
 import { Panel } from "@/components/ui/Panel";
 import { MFA_LIMITS } from "@/lib/mfa-constants";
-import { beginEnrolmentAction, confirmEnrolmentAction, regenerateRecoveryCodesAction, removeFactorAction } from "./actions";
+import { beginEnrolmentAction, beginPasskeyRegistrationAction, confirmEnrolmentAction, finishPasskeyRegistrationAction, regenerateRecoveryCodesAction, removeFactorAction } from "./actions";
 
 export type FactorRow = { id: string; kind: string; label: string; createdAt: string; lastUsedAt: string | null };
 
@@ -13,11 +15,16 @@ type Enrolment = { factorId: string; secret: string; uri: string; qrSvg: string 
 /**
  * BL-STAB-8a-1 — add an authenticator (QR or key, then a first code),
  * remove one (a current code), and the recovery codes shown once.
+ * BL-STAB-8a-3 — or a passkey: the browser's ceremony between two
+ * actions. With `requirePasskey` (a platform superadmin at the gate)
+ * the passkey is the only way on.
  */
-export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string }) {
+export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref, requirePasskey }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string; requirePasskey?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [webauthn, setWebauthn] = useState(false);
+  useEffect(() => setWebauthn(browserSupportsWebAuthn()), []);
   const [enrolment, setEnrolment] = useState<Enrolment | null>(null);
   const [label, setLabel] = useState("");
   const [code, setCode] = useState("");
@@ -44,15 +51,46 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
       setEnrolment(null);
       setLabel("");
       setCode("");
-      if (res.recoveryCodes) setCodes(res.recoveryCodes);
-      // At sign-in (8a-2) the session is now in: a refresh would send the
-      // enrol page on to the app before the codes were seen, so the person
-      // continues from the codes panel; with no codes to show, straight away.
-      if (continueHref) {
-        if (!res.recoveryCodes) window.location.href = continueHref;
-      } else {
-        router.refresh();
+      afterEnrol(res.recoveryCodes, !!res.passkeyStillNeeded);
+    });
+  }
+
+  /** What follows a new factor: the codes once, then on (or a refresh). */
+  function afterEnrol(recoveryCodes: string[] | null, passkeyStillNeeded: boolean) {
+    if (recoveryCodes) setCodes(recoveryCodes);
+    if (passkeyStillNeeded) {
+      // A superadmin at the gate added an app: the passkey is still owed.
+      setError("Added. As a platform administrator you also need a passkey before you are in: add one below.");
+      router.refresh();
+      return;
+    }
+    // At sign-in (8a-2) the session is now in: a refresh would send the
+    // enrol page on to the app before the codes were seen, so the person
+    // continues from the codes panel; with no codes to show, straight away.
+    if (continueHref) {
+      if (!recoveryCodes) window.location.href = continueHref;
+    } else {
+      router.refresh();
+    }
+  }
+
+  function addPasskey() {
+    setError(null);
+    startTransition(async () => {
+      const begun = await beginPasskeyRegistrationAction();
+      if (!begun.ok) return setError(begun.error);
+      let response;
+      try {
+        response = await startRegistration(begun.options as PublicKeyCredentialCreationOptionsJSON);
+      } catch (err) {
+        if (err instanceof WebAuthnError && err.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED") return setError("That passkey is already on your account.");
+        if (err instanceof Error && err.name === "NotAllowedError") return setError("The passkey prompt was closed. Try again when you are ready.");
+        return setError("Your browser could not create a passkey here. Try another browser or device, or add an authenticator app instead.");
       }
+      const res = await finishPasskeyRegistrationAction({ response, label });
+      if (!res.ok) return setError(res.error);
+      setLabel("");
+      afterEnrol(res.recoveryCodes, false);
     });
   }
 
@@ -74,6 +112,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
     });
   }
 
+  const hasPasskey = factors.some((f) => f.kind === "passkey");
   const codesText = codes ? codes.join("\n") : "";
   const codesHref = codes ? `data:text/plain;charset=utf-8,${encodeURIComponent(`FORGE recovery codes for ${email}\nEach code works once.\n\n${codesText}\n`)}` : "";
 
@@ -81,22 +120,36 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
       <div className="flex flex-col gap-4">
         <Panel
-          title="Authenticator apps"
+          title="Authenticators"
           eyebrow={`${factors.length} of ${MFA_LIMITS.factors}`}
           actions={
             !enrolment && available && factors.length < MFA_LIMITS.factors ? (
-              <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={begin}>
-                Add an authenticator
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {webauthn ? (
+                  <button type="button" className={`aur-btn ${requirePasskey || !hasPasskey ? "aur-btn-primary" : ""}`} disabled={pending} onClick={addPasskey}>
+                    Add a passkey
+                  </button>
+                ) : null}
+                {!requirePasskey ? (
+                  <button type="button" className={`aur-btn ${webauthn && !hasPasskey ? "" : "aur-btn-primary"}`} disabled={pending} onClick={begin}>
+                    Add an authenticator app
+                  </button>
+                ) : null}
+              </div>
             ) : null
           }
         >
           {!available ? (
             <p className="font-body text-[13px] leading-[1.5] text-muted">Two-step sign-in is not available on this deployment yet. An administrator sets FORGE_SECRET_KEYS first.</p>
           ) : null}
-          {factors.length === 0 && !enrolment ? (
+          {requirePasskey ? (
+            <p className="mb-2 font-body text-[13px] leading-[1.5] text-text">
+              Platform administrators sign in with a passkey. {webauthn ? "Add one now: your browser or device (Touch ID, Windows Hello, a security key, or a password manager) does the rest." : "This browser cannot create passkeys; use a current browser on a device with Touch ID, Windows Hello or a security key."}
+            </p>
+          ) : null}
+          {factors.length === 0 && !enrolment && !requirePasskey ? (
             <p className="font-body text-[13px] leading-[1.5] text-muted">
-              No authenticator yet. Add one from any authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy and the like): scan the code, then type the six digits it shows. Once FORGE requires two-step sign-in, this is what the second step asks for.
+              Nothing yet. {webauthn ? "A passkey is the quickest: your device (Touch ID, Windows Hello, a security key, or a password manager) keeps it and confirms with a touch. Or add" : "Add"} an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy and the like): scan the code, then type the six digits it shows. This is what the second step asks for.
             </p>
           ) : null}
           {factors.length > 0 ? (
@@ -119,7 +172,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
           {!enrolment && available && factors.length < MFA_LIMITS.factors ? (
             <label className="mt-3 block">
               <span className="aur-label">Name for the next one (optional)</span>
-              <input className="aur-input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Phone, 1Password" maxLength={MFA_LIMITS.labelMax} />
+              <input className="aur-input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Phone, 1Password, YubiKey" maxLength={MFA_LIMITS.labelMax} />
             </label>
           ) : null}
           {enrolment ? (
