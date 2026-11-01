@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 foundations shipped (#415, #416, #439, #440); 8a design for approval (this PR); then 8a-1 to 8a-4, 8b, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 factors and enrolment (this PR); then 8a-2 to 8a-4, 8b, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1257,7 +1257,19 @@ mind. Bandage will come off but a true fix will stay."
     account's password and self sign-up can overwrite an unverified one;
     password sign-in has no rate limit and the limiter fails open;
     `safeRedirectTarget` lets `/\evil.com` through.
-  - **8a design (this PR, for approval).** Four PRs, each under 1,500
+  - **8a-1 delivered (this PR):** migration 0140 (`user_mfa_factor`,
+    `user_recovery_code`, the three `user` columns); `src/lib/mfa.ts`
+    (pure: code normalisation, recovery-code generation and shape, the
+    otpauth URI, `verifyTotp` with a one-step window and replay
+    protection, tested); `mfa-store.ts` (status, begin and confirm an
+    authenticator with the secret encrypted under purpose `mfa_totp`,
+    the QR as SVG, recovery codes minted at the first confirmation and
+    on demand, remove, `verifyUserCode` for the gate and the sensitive
+    changes); Settings → **Security** (nav in both lists) with the
+    three actions, each code attempt behind the fail-closed limiter
+    (5 per 15 minutes per user), audit `user.mfa.{enrol, remove,
+    recovery_regenerate}`; packages `otplib` 13.6 and `qrcode` 1.5.
+  - **8a design (approved as proposed, #441).** Four PRs, each under 1,500
     lines, manuals in each. Packages: `otplib` (TOTP), `qrcode` (the
     enrolment QR as SVG), `@simplewebauthn/server` and
     `@simplewebauthn/browser` (passkeys, 8a-3).

@@ -169,6 +169,10 @@ The **Next action** panel (User Manual §5.4 Overview and §6.3 Overview; BL-NEX
 
 ---
 
+### 2.10 Two-step sign-in (BL-STAB-8a)
+
+**Settings → Security** (User Manual §1.6; every member) holds a person's authenticator apps and recovery codes. 8a-1 ships the enrolment: `user_mfa_factor` (the TOTP secret encrypted with the secret box under purpose `mfa_totp` with the user id as context, the last accepted time step for replay protection, and the passkey columns 8a-3 will use) and `user_recovery_code` (bcrypt hashes, ten per batch, burned on use); `mfa_enrolled_at`, `session_version` and `mfa_reset_at` on `user` (migration 0140; sync it on `/admin/migrations` after deploying if the boot-time auto-apply did not run). The page needs `FORGE_SECRET_KEYS` (the same keyring as the SAM.gov keys, §3.2): without it the page says two-step sign-in is not available yet and nothing can be enrolled. A code is accepted one 30-second step either side of now and never at or before the last step accepted for that factor; five wrong codes on the Security page lock its actions for 15 minutes (the fail-closed limiter). The Audit Log records `user.mfa.enrol`, `.remove` (with how many factors remain) and `.recovery_regenerate` in the person's current workspace, or a log line when they have none. Nothing asks for the second step at sign-in yet: that is 8a-2 (the gate, the session limits, the off-switch), then 8a-3 (passkeys) and 8a-4 (the superadmin reset and the rollout).
+
 ## 3. Super administrator (platform)
 
 ### 3.1 Becoming a superadmin

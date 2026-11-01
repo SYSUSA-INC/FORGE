@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Two-step sign-in, step one** — Settings → Security: add an authenticator app and keep your recovery codes, ahead of the release that makes the second step mandatory (§1.6).
 - **Next action** — every opportunity and proposal overview opens with what FORGE proposes you do next on that pursuit and why, from rules over its state: the evaluation, the questionnaire, the gate, the proposal, its drafts, compliance, reviews and scan, the outcome and the lessons; an At risk action comes first when the deadline is close; Done and Not now for the owner, Capture and Admin (§5.4 Overview, §6.3 Overview). The Command Center lists the open ones across your pursuits, the pipeline brief builds its priorities from them, the weekly digest email carries yours, and Reports shows how many were taken (§2.2, §5.5, §5.6, §10.1). With **Prepare ahead** on, FORGE does the preparable ones overnight (outline, questionnaire with suggested answers, compliance map, section drafts as tracked insertions, health scan) and the panel says what it prepared for you to review (§4.12).
 - **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each; the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones, and the Lessons page shows which closed the loop (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
@@ -121,6 +122,17 @@ If your organization uses SSO, you can instead go to the sign-in page and use **
 By default you can only join the organization that owns your email domain. If you were invited to an organization from a different domain, the invitation is held until a platform administrator approves it: you will not receive the email until then, and a link that lands on **Invitation awaiting approval** means exactly that. Once approved, the invitation arrives as described above.
 
 ---
+
+### 1.6 Two-step sign-in (BL-STAB-8)
+
+FORGE is moving to a second step at every sign-in: after your password (or Google / Microsoft), a six-digit code from an authenticator app on your phone. **Settings → Security** is where you set it up.
+
+- **Add an authenticator.** Click **Add an authenticator**, open any authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy and the like), scan the QR code or type the key shown beside it, then enter the six digits the app shows and click **Confirm**. The app counts only once a code has confirmed it. You can name each one ("Phone", "1Password") and hold up to three.
+- **Recovery codes.** Your first authenticator comes with ten single-use recovery codes, shown once: save or **Download** them. A recovery code works in place of an authenticator code if you lose your phone, and each works once. **Replace** mints ten new ones (and voids the old) when you run low or think they were seen; it asks for a current code first.
+- **Remove an authenticator.** **Remove** beside it asks for a current code from one of your authenticators (or a recovery code). Removing the last one also voids your recovery codes; you set up again from the start.
+- **Codes and time.** A code is good for about a minute around the moment it is shown. If every code is refused, check that your phone sets its time automatically.
+
+The second step itself (the page that asks for the code at sign-in, the session limits and the emergency reset) arrives with the next release; until then an authenticator you add simply waits. Your administrator will tell you when sign-in starts asking for it.
 
 ## 2. The app layout
 
