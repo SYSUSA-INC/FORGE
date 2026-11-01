@@ -76,18 +76,18 @@ Effort key:
 | 3au-2 | **BL-STAB-1 review fixes** — the requirement sweep reads each entry on its own (kinds in any wording, a bad entry dropped, not the window), a window too short to split is read twice, batch repairs logged, union-safe decoding, stale docs | P0 | S | ✅ shipped (PR #360) |
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | ✅ shipped (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392; 2f-1 (files removed on delete, Word templates) shipped in PR #393 and #394; 2f-2 (chat attachments) shipped in PR #395; 2f-3 (contacts import in parts, paste guards; the last phase) shipped in PR #396) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
-| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | 🔄 7a shipped (PR #370); 7b (the company's own key on Settings → Integrations) shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388) |
+| 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | ✅ shipped: 7a #370, 7b #371, 7c #372, 7d #373, 7e #388 |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
-| 3aw-2 | **BL-STAB-11** — The platform admin home, a tenant's admin page and a tenant's activity page failed with a server error ("malformed array literal") once a cross-domain invite was waiting or anyone had acted in the tenant: a list was handed to Postgres where an array was expected; `inArray` now, and a test stops the shape coming back | P0 | S | 🔄 in review (this PR) |
+| 3aw-2 | **BL-STAB-11** — The platform admin home, a tenant's admin page and a tenant's activity page failed with a server error ("malformed array literal") once a cross-domain invite was waiting or anyone had acted in the tenant: a list was handed to Postgres where an array was expected; `inArray` now, and a test stops the shape coming back | P0 | S | ✅ shipped (#399) |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-8; owner decisions 2026-10-21 recorded) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
-| 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | 🔄 PR #387 |
+| 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | ✅ shipped (#387) |
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
-| 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A shipped (#400, #401); C6 body paragraphs in review (this PR) |
-| 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
+| 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A (#400, #401), B (#402), C1–C10, D (emails), the manuals and the Command Center pass shipped; still open in C: boxed form panels and cards, other secondary actions, one small button size, the remaining hand-styled tables |
+| 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | ✅ shipped (#418, #419) |
 | 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL), 3 (BL-CAP-MATRIX) and 4 (BL-LESSONS-LOOP) shipped; phase 5 (BL-NEXT-ACTION) shipped; 2 to be sized |
-| 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | 🔄 in review (this PR) |
+| 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | ✅ shipped (#420) |
 | 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ shipped: A #422, B #423, C #424, Qualified list coverage (this PR); design approved 2026-10-25 |
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
@@ -2996,7 +2996,7 @@ site (its CSS variables and design-system page), not approximated.
 
 
 ### BL-PIPE-FUNNEL — The pipeline as a funnel
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in review (this PR)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (#418, #419)
 
 Owner (2026-10-24): "I want to see a funnel on the pipeline dashboard,
 and I should be able to click any part of the funnel and get the
@@ -3021,7 +3021,7 @@ Qualification · Capture · Pre-proposal · Writing · Submitted · Won (with
 Lost and No bid). Renaming is a schema and label change for a later PR.
 
 ### BL-PIPE-STAGES — Stage names from the reference funnel
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in review (this PR)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (#420)
 
 Owner decisions (2026-10-24): rename the stages to the reference funnel's
 names; merge Pre-proposal and Writing into one **Developed** stage
@@ -3513,7 +3513,7 @@ proposal's chances. Over time FORGE owns the proposal lifecycle.
   person's approval (phase 5).
 
 ### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 in review (this PR)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 A, B, C1–C10, D, the manuals and the Command Center pass shipped (#400–#415); the rest of C open
 
 Follow-up to BL-UI-ENABLENOW after a both-theme sweep of every page.
 
