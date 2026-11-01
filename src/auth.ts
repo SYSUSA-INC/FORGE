@@ -15,6 +15,9 @@ import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 import { decideOAuthSignIn, ENTRA_PROVIDER, entraAllowedTenants, oauthErrorParam } from "@/lib/oauth-policy";
+import { getPlatformSetting } from "@/lib/platform-settings";
+import { evaluateSession, mfaEnforcementNow, needsRecheck, SESSION_POLICY, touchSession } from "@/lib/session-policy";
+import { recordAudit } from "@/lib/audit-log";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 
@@ -133,7 +136,14 @@ async function signInAllowed(email: string, request: Request): Promise<boolean> 
   return false;
 }
 
-export const { auth, handlers, signIn, signOut } = NextAuth({
+/** BL-STAB-8a-2 — the platform-wide epoch: raising it ends every session (the release step). */
+export async function currentSessionEpoch(): Promise<number> {
+  const raw = await getPlatformSetting("auth.session_epoch", "0");
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
   adapter: DrizzleAdapter(db),
   ...authConfig,
   providers: [
@@ -324,15 +334,85 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (row?.disabledAt) return false;
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
+      const now = Date.now();
       if (user?.id) {
+        // BL-STAB-8a-2 — sign-in: the claims the policy reads. The second
+        // step is owed unless enforcement is off; a person with no factor
+        // enrols first. The pending id keys the server-side pass marker.
         token.id = user.id;
+        const [row] = await db
+          .select({ mfaEnrolledAt: users.mfaEnrolledAt, sessionVersion: users.sessionVersion })
+          .from(users)
+          .where(eq(users.id, user.id))
+          .limit(1);
+        const enforcement = mfaEnforcementNow();
+        token.iatMs = now;
+        token.lastActive = now;
+        token.chk = now;
+        token.sv = row?.sessionVersion ?? 1;
+        token.epoch = await currentSessionEpoch();
+        token.pid = crypto.randomUUID();
+        if (enforcement.on) {
+          token.mfa = row?.mfaEnrolledAt ? "pending" : "enrol";
+          token.pendingAt = now;
+          token.amr = undefined;
+        } else {
+          token.mfa = "ok";
+          token.amr = "bypass";
+          token.pendingAt = undefined;
+          log.warn("[auth]", "second step skipped: MFA enforcement is off", { userId: user.id, reason: enforcement.reason });
+        }
       }
-      if (token.id) {
-        const enriched = await enrichFromDb(token.id as string);
-        token.isSuperadmin = enriched.isSuperadmin;
-        token.organizationId = enriched.organizationId;
-        token.role = enriched.role;
+      if (!token.id) return token;
+
+      if (evaluateSession(token, now) !== "ok") return null;
+      token = touchSession(token, now);
+
+      // The second step passed: the verify or enrol action wrote the pass
+      // marker for this pending id, then asked for a session update. The
+      // client can trigger an update too, but cannot write the marker.
+      if (trigger === "update" && token.mfa !== "ok" && token.pid) {
+        const [u] = await db
+          .select({ pid: users.mfaPassPid, at: users.mfaPassAt })
+          .from(users)
+          .where(eq(users.id, token.id as string))
+          .limit(1);
+        if (u?.pid === token.pid && u.at && now - u.at.getTime() <= SESSION_POLICY.pendingMs) {
+          token.mfa = "ok";
+          token.amr = token.amr ?? "code";
+          token.pendingAt = undefined;
+          await db.update(users).set({ mfaPassPid: null, mfaPassAt: null }).where(eq(users.id, token.id as string));
+        }
+      }
+
+      // Once a minute: the person still exists and is not disabled, their
+      // session version is the one this token was issued under, and the
+      // platform epoch has not moved. Any change ends the session.
+      if (needsRecheck(token, now)) {
+        const [u] = await db
+          .select({ sessionVersion: users.sessionVersion, disabledAt: users.disabledAt })
+          .from(users)
+          .where(eq(users.id, token.id as string))
+          .limit(1);
+        const epoch = await currentSessionEpoch();
+        if (!u || u.disabledAt || u.sessionVersion !== token.sv || epoch !== token.epoch) return null;
+        token.chk = now;
+      }
+
+      const enriched = await enrichFromDb(token.id as string);
+      token.isSuperadmin = enriched.isSuperadmin;
+      token.organizationId = enriched.organizationId;
+      token.role = enriched.role;
+      if (user?.id && token.amr === "bypass" && enriched.organizationId) {
+        await recordAudit({
+          organizationId: enriched.organizationId,
+          actor: { userId: user.id, email: user.email },
+          action: "auth.mfa.bypassed",
+          resourceType: "user",
+          resourceId: user.id,
+          metadata: { reason: (() => { const e = mfaEnforcementNow(); return e.on ? null : e.reason; })() },
+        });
       }
       return token;
     },
@@ -342,6 +422,8 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         session.user.isSuperadmin = token.isSuperadmin ?? false;
         session.user.organizationId = token.organizationId ?? null;
         session.user.role = token.role ?? null;
+        session.user.mfa = token.mfa ?? "pending";
+        session.user.pid = token.mfa === "ok" ? null : (token.pid ?? null);
       }
       return session;
     },

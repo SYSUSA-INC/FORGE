@@ -14,7 +14,7 @@ type Enrolment = { factorId: string; secret: string; uri: string; qrSvg: string 
  * BL-STAB-8a-1 — add an authenticator (QR or key, then a first code),
  * remove one (a current code), and the recovery codes shown once.
  */
-export function SecurityPanel({ email, factors, recoveryCodesLeft, available }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean }) {
+export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,14 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available }: 
       setLabel("");
       setCode("");
       if (res.recoveryCodes) setCodes(res.recoveryCodes);
-      router.refresh();
+      // At sign-in (8a-2) the session is now in: a refresh would send the
+      // enrol page on to the app before the codes were seen, so the person
+      // continues from the codes panel; with no codes to show, straight away.
+      if (continueHref) {
+        if (!res.recoveryCodes) window.location.href = continueHref;
+      } else {
+        router.refresh();
+      }
     });
   }
 
@@ -173,8 +180,8 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available }: 
                 <a className="aur-btn" href={codesHref} download="forge-recovery-codes.txt">
                   Download
                 </a>
-                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => setCodes(null)}>
-                  I saved them
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => { setCodes(null); if (continueHref) window.location.href = continueHref; }}>
+                  {continueHref ? "I saved them, continue" : "I saved them"}
                 </button>
               </div>
             </div>

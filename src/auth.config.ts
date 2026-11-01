@@ -1,15 +1,29 @@
 import type { NextAuthConfig } from "next-auth";
+import { evaluateSession, gateRedirect, SESSION_POLICY, touchSession } from "@/lib/session-policy";
 
 export const authConfig = {
   pages: {
     signIn: "/sign-in",
   },
-  session: { strategy: "jwt" },
+  // BL-STAB-8a-2 — 24 hours at most; the idle limit and the absolute limit
+  // are enforced on the claims (session-policy.ts), the cookie just follows.
+  session: { strategy: "jwt", maxAge: SESSION_POLICY.absoluteMs / 1000 },
   trustHost: true,
   providers: [],
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
+
+      // BL-STAB-8a-2 — a session that has not passed the second step goes
+      // to the verify (or enrol) page and nowhere else.
+      if (auth?.user) {
+        const to = gateRedirect(pathname, auth.user.mfa);
+        if (to) {
+          const url = new URL(to, request.nextUrl);
+          if (!pathname.startsWith("/sign-in")) url.searchParams.set("callbackUrl", pathname + request.nextUrl.search);
+          return Response.redirect(url);
+        }
+      }
 
       if (pathname === "/sign-in" || pathname.startsWith("/sign-in/")) return true;
       if (pathname === "/sign-up" || pathname.startsWith("/sign-up/")) return true;
@@ -58,11 +72,20 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
       }
+      // BL-STAB-8a-2 — the edge sees every request: a session past its idle
+      // or absolute limit, a pending step past ten minutes, or a token from
+      // before this policy (no claims) ends here. Otherwise note the activity.
+      if (token.id) {
+        if (evaluateSession(token, Date.now()) !== "ok") return null;
+        return touchSession(token, Date.now());
+      }
       return token;
     },
     async session({ session, token }) {
       if (token?.id && session.user) {
         session.user.id = token.id as string;
+        session.user.mfa = token.mfa ?? "pending";
+        session.user.pid = token.mfa === "ok" ? null : (token.pid ?? null);
       }
       return session;
     },
