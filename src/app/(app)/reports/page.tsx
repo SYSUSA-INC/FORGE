@@ -4,9 +4,11 @@ import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { formatDollars } from "@/lib/money";
 import { lessonLoopStats } from "@/lib/lessons-read";
+import { nextActionStats } from "@/lib/next-action-read";
+import { nextActionsTakenRate } from "@/lib/next-actions";
 import { loadReportOpportunities, reportsRefusal } from "@/lib/reports";
 import { safeQuery } from "@/lib/schema-resilience";
-import { buildReport, formatRate, parseReportRange, REPORT_RANGE_LABELS } from "@/lib/reports-logic";
+import { buildReport, formatRate, parseReportRange, rangeStart, REPORT_RANGE_LABELS } from "@/lib/reports-logic";
 import { ReportsClient } from "./ReportsClient";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +43,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: { ra
   const s = report.summary;
   // BL-LESSONS-LOOP 4c — the loop in numbers, beside the win rate.
   const loop = await safeQuery(() => lessonLoopStats(organizationId), { proposed: 0, confirmed: 0, applied: 0, closed: 0 }, { tag: "reports.lessons" });
+  // BL-NEXT-ACTION 5b — the share of FORGE's proposed actions a person marked done, over the range.
+  const actions = await safeQuery(() => nextActionStats(organizationId, rangeStart(range)), { done: 0, dismissed: 0, open: 0 }, { tag: "reports.nextActions" });
+  const taken = nextActionsTakenRate(actions);
 
   return (
     <>
@@ -54,6 +59,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { ra
           { label: "Won value", value: formatDollars(s.wonValue) },
           { label: "Open pipeline", value: formatDollars(s.openValue) },
           { label: "Lessons closed the loop", value: `${loop.closed} of ${loop.confirmed}`, accent: loop.closed > 0 ? "emerald" : undefined },
+          { label: "Next actions taken", value: taken === null ? "—" : `${actions.done} of ${actions.done + actions.dismissed}`, accent: taken !== null && taken >= 0.5 ? "emerald" : undefined },
         ]}
       />
       <ReportsClient report={report} />

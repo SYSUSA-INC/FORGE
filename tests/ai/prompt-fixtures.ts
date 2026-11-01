@@ -235,6 +235,7 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       proposals: { total: 2, byStage: { drafting: 1, review: 1 }, inActiveReview: 1 },
       modelTrack: { n: 20, brier: 0.18 },
       lossIntel: { decided: 10, winRate: 0.4, patterns: [{ title: "Price above awardee", severity: "high", detail: "Lost 3 of 4 on price." }], topCompetitors: [{ name: "Legacy Corp", count: 3 }] },
+      nextActions: [{ pursuit: "Help desk", stage: "pre_proposal", title: "Draft the 2 sections not started", priority: "now", dueDate: "2026-10-12" }],
     }),
   ],
   section_draft: () => [

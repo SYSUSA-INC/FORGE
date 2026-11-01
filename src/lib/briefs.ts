@@ -26,6 +26,7 @@
  * own auth.
  */
 import { lessonsForContext } from "@/lib/lessons-read";
+import { nextActionsForBrief } from "@/lib/next-action-read";
 import "server-only";
 
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -458,11 +459,16 @@ async function buildPipelineSnapshot(
     .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
     .where(and(eq(proposals.organizationId, organizationId), eq(proposalReviews.status, "in_progress")));
 
-  const [track, loss] = await Promise.all([
+  const [track, loss, nextActions] = await Promise.all([
     getPwinTrack(organizationId).catch(() => ({ n: 0, brier: null })),
     getLossIntelligence(organizationId).catch((err) => {
       log.warn("[briefs]", "loss intel failed", { error: err });
       return null;
+    }),
+    // BL-NEXT-ACTION 5b — the rules' open actions are the brief's input.
+    nextActionsForBrief(organizationId).catch((err) => {
+      log.warn("[briefs]", "next actions failed", { error: err });
+      return [];
     }),
   ]);
 
@@ -511,6 +517,7 @@ async function buildPipelineSnapshot(
           topCompetitors: loss.competitors.slice(0, 5).map((c) => ({ name: c.name, count: c.lostTo })),
         }
       : null,
+    nextActions,
   };
   const key = snapshotKeyOf({
     o: oppByStage,
@@ -518,6 +525,7 @@ async function buildPipelineSnapshot(
     t: opps.length,
     pt: props.length,
     r: inActiveReviewRows.length,
+    na: nextActions.map((a) => `${a.pursuit}|${a.title}|${a.priority}`),
     day: now.toISOString().slice(0, 10),
     prompt: PIPELINE_BRIEF_PROMPT_VERSION,
   });

@@ -514,6 +514,7 @@ export async function sendDigestEmail(opts: {
   ruleName: string;
   count: number;
   cadence: "daily" | "weekly";
+  nextActions?: { title: string; pursuit: string; href: string }[];
 }): Promise<void> {
   const built = buildDigestEmail({ ...opts, appUrl: baseUrl() });
   await sendEmail({

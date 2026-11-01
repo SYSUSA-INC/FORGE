@@ -35,7 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
-- **Next action** — every opportunity and proposal overview opens with what FORGE proposes you do next on that pursuit and why, from rules over its state: the evaluation, the questionnaire, the gate, the proposal, its drafts, compliance, reviews and scan, the outcome and the lessons; an At risk action comes first when the deadline is close; Done and Not now for the owner, Capture and Admin (§5.4 Overview, §6.3 Overview).
+- **Next action** — every opportunity and proposal overview opens with what FORGE proposes you do next on that pursuit and why, from rules over its state: the evaluation, the questionnaire, the gate, the proposal, its drafts, compliance, reviews and scan, the outcome and the lessons; an At risk action comes first when the deadline is close; Done and Not now for the owner, Capture and Admin (§5.4 Overview, §6.3 Overview). The Command Center lists the open ones across your pursuits, the pipeline brief builds its priorities from them, the weekly digest email carries yours, and Reports shows how many were taken (§2.2, §5.5, §5.6, §10.1).
 - **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each; the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones, and the Lessons page shows which closed the loop (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
 - **Capability questionnaire** — on an opportunity's Evaluation tab, FORGE drafts the capability questions from the parsed solicitation and you answer them; the answers give a coverage score, say whether a partner is needed, and feed PWin. **Suggest answers** pre-fills them from the solicitation's scored matrix, earlier questionnaires, past performance and the Knowledge base, and nothing counts until you confirm it (§5.4 Evaluation).
@@ -195,6 +195,8 @@ Each group is collapsible — click the group header (or its chevron) to fold it
 The default landing page after sign-in is the **Command Center** (`/`). It's the at-a-glance home — a 10-tile stage grid for opportunities (count + value range + due hint per stage), a "Next deadline" panel highlighting the soonest non-past-due opportunity, and a "Proposal stages" breakdown. Clicking any tile **navigates** to the Opportunities Dashboard pre-filtered to that stage.
 
 A tile's red **past due** count means an open pursuit whose response date has passed and needs cleaning up. Submitted, Won, Lost and No bid tiles never show it: those pursuits are past the date by definition. The figures under the page title and on the tiles are plain counts ("6", not "06"). The Proposal stages, Recent proposals and Quick links panels are open rows with a hairline between them.
+
+**Next actions (BL-NEXT-ACTION).** When FORGE's rules propose actions on live pursuits (§5.4 Overview), the Command Center lists up to eight of them, your own pursuits first, grouped by pursuit with its stage and days to the due date; an **At risk** action is marked in red and the panel's eyebrow counts them. Each line opens where the action is done. The panel is absent when nothing is proposed.
 
 Two panels appear only when there is something to say. **Needs attention** lists open work that looks like a recompete of a pursuit you already decided. **PWin movers** (BL-AIP-7b) lists the live pursuits whose calibrated PWin moved most over the last seven days — from → to, the stage, the model's confidence, and the one or two factor changes behind the move (an evaluation that was scored, an incumbent that appeared, a proposal whose readiness changed). Every night FORGE freezes the model's estimate for each live opportunity when it changed, so a move is always explained by something that happened in your pipeline. The same panel, longer, is on **FORGE Brain** (`/intelligence`).
 
@@ -521,13 +523,13 @@ Each entry shows the author's avatar, name, kind, body, and timestamp. You can d
 
 ### 5.5 Pipeline brief (FORGE Brain page)
 
-**Intelligence → Pipeline brief** writes a 4–7 sentence take on your whole portfolio — what to chase, what to abandon, what is at risk this week — with **Priorities this week** and **Risks** listed underneath. Since BL-AIP-7a it is grounded in the PWin model's track record and your loss intelligence (the patterns and competitors you keep losing to), it is stored (the last one shows on load; a new one is written when the pipeline changes or you click **Regenerate**), and you can mark it useful or not.
+**Intelligence → Pipeline brief** writes a 4–7 sentence take on your whole portfolio — what to chase, what to abandon, what is at risk this week — with **Priorities this week** and **Risks** listed underneath. Since BL-AIP-7a it is grounded in the PWin model's track record and your loss intelligence (the patterns and competitors you keep losing to), it is stored (the last one shows on load; a new one is written when the pipeline changes or you click **Regenerate**), and you can mark it useful or not. Since BL-NEXT-ACTION it also reads the open next actions FORGE's rules propose on your pursuits, so **Priorities this week** names those actions and their pursuits rather than guessing; a change in them is reason enough for a new brief.
 
 ### 5.6 Reports
 
 **Platform Intelligence → Reports** (`/reports`) shows how your pursuits turn out. It's part of some plans (or an add-on); without it the page says so and links to Billing.
 
-- **Range** — Last 12 months (default), Last 24 months or All time, counted by when each opportunity was created. The header shows the totals for the range: opportunities, win rate, value won and open pipeline value.
+- **Range** — Last 12 months (default), Last 24 months or All time, counted by when each opportunity was created. The header shows the totals for the range: opportunities, win rate, value won, open pipeline value, the lessons that closed the loop, and **Next actions taken**: of the actions FORGE proposed that a person decided in the range, how many were marked done rather than Not now (a dash until someone has decided one; actions that closed themselves from the state are not counted either way).
 - **Win rate by agency, by NAICS and by set-aside** — won, lost and no-bid counts, the win rate (won ÷ (won + lost); no-bids are shown beside it, not in the rate) and the value won. Blank values are grouped as "(not set)". Busiest first.
 - **Stage funnel** — for each stage, how many opportunities sit there now, how many got at least that far, and what share of the previous stage got there. A lost bid counts as having reached Submitted; a no-bid as having left at Qualification.
 - **Created and won by month** — the last 12 months: opportunities added and won each month and the value won (won month = award date, or when it was marked won).
@@ -1036,7 +1038,7 @@ Notifications are kept indefinitely; there's no auto-prune. If you want to clear
 
 ### 10.1 Frequency and digest
 
-Your tenant admin decides whether each kind of notification arrives **immediately**, in a **daily digest** (one row per recipient per day rolling up all matching events), or a **weekly digest** (one row per recipient per Sunday rolling up the week). Defaults are immediate for everything; admins can tune this under `/notifications/rules`. If you're getting too many or too few, that's where to ask them to adjust.
+Your tenant admin decides whether each kind of notification arrives **immediately**, in a **daily digest** (one row per recipient per day rolling up all matching events), or a **weekly digest** (one row per recipient per Sunday rolling up the week). A weekly digest email also lists up to five open **next actions** on the pursuits you own, of priority now or this week, each linking to where it is done (BL-NEXT-ACTION). Defaults are immediate for everything; admins can tune this under `/notifications/rules`. If you're getting too many or too few, that's where to ask them to adjust.
 
 ### 10.2 Test sends
 

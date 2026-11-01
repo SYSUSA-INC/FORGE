@@ -4,7 +4,9 @@ import {
   NEXT_ACTION_MAX,
   NEXT_ACTION_RULES,
   mayDecideNextAction,
+  nextActionsTakenRate,
   proposeNextActions,
+  rankOrgActions,
   reconcileNextActions,
   type PursuitState,
   type StoredNextAction,
@@ -180,6 +182,24 @@ describe("reconcileNextActions", () => {
     const rec = reconcileNextActions([stored({}), stored({ id: "row2" })], state(), NOW);
     expect(rec.insert.map((p) => p.kind)).toEqual(["write_brief"]);
     expect(rec.close).toEqual([{ id: "row2", status: "superseded" }]);
+  });
+});
+
+describe("rankOrgActions and the taken rate (5b)", () => {
+  it("puts the reader's own pursuits first, then priority, due date and rule order", () => {
+    const rows = [
+      { id: "a", priority: "now" as const, dueBy: days(3), rule: "at_risk", ownerUserId: "other" },
+      { id: "b", priority: "later" as const, dueBy: days(30), rule: "write_brief", ownerUserId: "me" },
+      { id: "c", priority: "this_week" as const, dueBy: days(10), rule: "draft_sections", ownerUserId: "me" },
+      { id: "d", priority: "this_week" as const, dueBy: days(10), rule: "map_compliance", ownerUserId: null },
+    ];
+    expect(rankOrgActions(rows, "me").map((r) => r.id)).toEqual(["c", "b", "a", "d"]);
+    expect(rankOrgActions(rows, "nobody").map((r) => r.id)).toEqual(["a", "c", "d", "b"]);
+  });
+
+  it("reports done over decided, and nothing until a person decided one", () => {
+    expect(nextActionsTakenRate({ done: 0, dismissed: 0 })).toBeNull();
+    expect(nextActionsTakenRate({ done: 3, dismissed: 1 })).toBe(0.75);
   });
 });
 
