@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { OAUTH_ERROR_MESSAGES } from "@/lib/oauth-policy";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { SsoButtons } from "@/components/auth/SsoButtons";
@@ -93,6 +94,8 @@ export default async function SignInPage({
 }
 
 function errorMessage(error: string): string {
+  // BL-STAB-8a-0 — the OAuth policy's refusals, by their query value.
+  if (OAUTH_ERROR_MESSAGES[error]) return OAUTH_ERROR_MESSAGES[error]!;
   switch (error) {
     case "CredentialsSignin":
       return "Invalid email or password.";

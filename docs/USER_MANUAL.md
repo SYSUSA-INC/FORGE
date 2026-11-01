@@ -95,7 +95,7 @@ On **https://www.sysgov.com/sign-in** enter your email + password and click **Si
 
 ![Sign-in card](docs/images/sign-in.png)
 
-If your organization uses SSO, use **Continue with Google** or **Continue with Microsoft** instead.
+If your organization uses SSO, use **Continue with Google** or **Continue with Microsoft** instead. A Google or Microsoft sign-in opens the FORGE account it is already connected to. It never attaches itself to an existing account just because the email address matches: if you created your account with a password, sign in with the password (the page says so), and the Google or Microsoft route becomes yours only through an invitation to that address. Someone with no FORGE account gets one this way only through an invitation, or where self-service sign-up is open. Microsoft sign-ins work only from the Microsoft organizations your administrator has allowed, and a provider that has not verified your address is refused.
 
 After you sign in, FORGE returns you to the page you were trying to open, but only when it is a page inside FORGE; a link that points anywhere else (including one written with a backslash, such as `/\example.com`) takes you to the Command Center instead.
 

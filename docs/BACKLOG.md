@@ -1229,7 +1229,19 @@ mind. Bandage will come off but a true fix will stay."
     backslashes (`/\evil.com`) and is now plain UTF-8 with a test
     (#415). Password sign-in is rate-limited per email (10 per 15
     minutes) and per IP (60 per 15 minutes), and `enforceRateLimit` has a
-    `failClosed` option the sign-in limits use (this PR).
+    `failClosed` option the sign-in limits use (#416). Google / Microsoft
+    sign-ins follow `decideOAuthSignIn` (`src/lib/oauth-policy.ts`, run in
+    `callbacks.signIn` before the adapter links or creates anything): an
+    attached provider account signs in; a same-address account is linked
+    only through a pending approved invite, never by the address alone; a
+    stranger gets an account only through an invite or `SIGNUP_MODE=open`,
+    so invite-only mode no longer creates and deletes; a disabled person
+    is refused on a first link; Entra sign-ins must come from
+    `AUTH_MICROSOFT_ENTRA_ID_TENANTS` or the issuer's tenant; the sign-in
+    page names each refusal (this PR). Still to do before 8a: invite
+    acceptance overwriting an existing account's password and self
+    sign-up overwriting an unverified one; ending open sessions on
+    disable or password reset (needs a session version, with 8a).
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
