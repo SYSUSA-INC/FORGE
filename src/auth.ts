@@ -3,9 +3,9 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { memberships, organizations, users, type Role } from "@/db/schema";
+import { accounts, allowlist, memberships, organizations, users, type Role } from "@/db/schema";
 import { authConfig } from "@/auth.config";
 import { verifyPassword } from "@/lib/passwords";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
@@ -14,6 +14,7 @@ import { attachPendingInvitesByEmail } from "@/lib/invite-accept";
 import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
+import { decideOAuthSignIn, ENTRA_PROVIDER, entraAllowedTenants, oauthErrorParam } from "@/lib/oauth-policy";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 
@@ -175,6 +176,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         };
       },
     }),
+    // BL-STAB-8a-0 — the adapter may link a provider account to an existing
+    // user by email only after `callbacks.signIn` has approved it, and that
+    // policy (src/lib/oauth-policy.ts) approves a link by email only through
+    // a pending invite. So the flag stays on for the link itself, and the
+    // callback is what makes it safe.
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
@@ -263,8 +269,52 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   },
   callbacks: {
     ...authConfig.callbacks,
-    async signIn({ user }) {
-      // Block sign-in for disabled users, including OAuth flows.
+    async signIn({ user, account, profile }) {
+      // BL-STAB-8a-0 — Google / Microsoft: the policy in oauth-policy.ts.
+      // It runs before the adapter links or creates anything, so a
+      // stranger in invite-only mode is never created (and never deleted),
+      // a disabled person is refused on a first link too, an address alone
+      // links nothing without an invite, and Microsoft sign-ins must come
+      // from an allow-listed tenant.
+      if (account && account.provider !== "credentials") {
+        const email = (user?.email ?? (profile as { email?: string } | undefined)?.email ?? "").trim().toLowerCase() || null;
+        const p = (profile ?? {}) as { email_verified?: boolean; tid?: string };
+        const [linked, byEmail, invite] = await Promise.all([
+          db
+            .select({ id: users.id, disabledAt: users.disabledAt })
+            .from(accounts)
+            .innerJoin(users, eq(users.id, accounts.userId))
+            .where(and(eq(accounts.provider, account.provider), eq(accounts.providerAccountId, account.providerAccountId)))
+            .limit(1),
+          email ? db.select({ id: users.id, disabledAt: users.disabledAt }).from(users).where(eq(users.email, email)).limit(1) : Promise.resolve([]),
+          email
+            ? db
+                .select({ id: allowlist.id })
+                .from(allowlist)
+                .where(and(eq(allowlist.email, email), eq(allowlist.revoked, false), isNull(allowlist.consumedAt), sql`(${allowlist.crossDomain} = false OR ${allowlist.platformApprovedAt} IS NOT NULL)`))
+                .limit(1)
+            : Promise.resolve([]),
+        ]);
+        const decision = decideOAuthSignIn({
+          provider: account.provider,
+          email,
+          // Entra's token is for a verified directory account; Google says so explicitly.
+          emailVerifiedByProvider: account.provider === ENTRA_PROVIDER ? true : p.email_verified === true,
+          linkedUser: linked[0] ?? null,
+          userByEmail: byEmail[0] ?? null,
+          pendingInvite: invite.length > 0,
+          signupOpen: selfServiceRegistrationAllowed(),
+          entraTenant: account.provider === ENTRA_PROVIDER ? (p.tid ?? null) : null,
+          allowedTenants: account.provider === ENTRA_PROVIDER ? entraAllowedTenants({ AUTH_MICROSOFT_ENTRA_ID_TENANTS: process.env.AUTH_MICROSOFT_ENTRA_ID_TENANTS, AUTH_MICROSOFT_ENTRA_ID_ISSUER: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER }) : [],
+        });
+        if (!decision.ok) {
+          log.warn("[auth]", "oauth sign-in refused", { provider: account.provider, code: decision.code, identity: email ?? account.providerAccountId });
+          return `/sign-in?error=${oauthErrorParam(decision.code)}`;
+        }
+        return true;
+      }
+      // Password sign-in: `authorize` already refused a disabled person; this
+      // keeps the check for any other provider that may be added.
       if (!user?.id) return true;
       const [row] = await db
         .select({ disabledAt: users.disabledAt })
