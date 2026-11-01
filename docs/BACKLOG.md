@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a-2 the gate (this PR); then 8a-3, 8a-4, 8b, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a-2 #443; 8a-3 passkeys (this PR); then 8a-4, 8b, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1333,11 +1333,21 @@ mind. Bandage will come off but a true fix will stay."
       banner to everyone; `MFA_PREVIEW_BYPASS_CODE` is accepted as a code
       only when `VERCEL_ENV=preview`. Google / Microsoft sign-ins take
       the same second step.
-    - **8a-3 — passkeys.** Register and sign in with WebAuthn (platform
-      and roaming authenticators), as a second factor beside the
-      authenticator app; a platform superadmin must hold one and enrols
-      it at the first sign-in after release before anything opens;
-      counted in the three-factor cap.
+    - **8a-3 — passkeys** (this PR). Register and sign in with WebAuthn
+      (platform and roaming authenticators) as a second factor beside
+      the authenticator app, within the three-factor cap:
+      `@simplewebauthn/server` and `/browser` v9 (the versions
+      next-auth's peer range accepts), the credential on the
+      `user_mfa_factor` row, one five-minute challenge per user on
+      `user.webauthn_challenge` (migration 0142), the relying party from
+      the app's own host (`WEBAUTHN_ORIGIN` / `WEBAUTHN_RP_ID` to
+      override). Settings → Security and the enrol page offer **Add a
+      passkey** when the browser can; the Second step offers **Use a
+      passkey** when one exists (`amr: passkey`, the shared lock). A
+      platform superadmin must hold one: with none, sign-in stops at the
+      enrol page with the app option hidden, and the server refuses to
+      pass the step on an app alone. Verified end to end with a virtual
+      authenticator (Playwright CDP).
     - **8a-4 — the reset, the rollout and the manuals.** SuperAdmin →
       Platform users → **Reset MFA** with a written reason: every factor
       and recovery code removed, `session_version` bumped, the person

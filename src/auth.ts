@@ -15,6 +15,7 @@ import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 import { decideOAuthSignIn, ENTRA_PROVIDER, entraAllowedTenants, oauthErrorParam } from "@/lib/oauth-policy";
+import { superadminNeedsPasskey } from "@/lib/passkeys";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { evaluateSession, mfaEnforcementNow, needsRecheck, SESSION_POLICY, touchSession } from "@/lib/session-policy";
 import { recordAudit } from "@/lib/audit-log";
@@ -342,7 +343,7 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
         // enrols first. The pending id keys the server-side pass marker.
         token.id = user.id;
         const [row] = await db
-          .select({ mfaEnrolledAt: users.mfaEnrolledAt, sessionVersion: users.sessionVersion })
+          .select({ mfaEnrolledAt: users.mfaEnrolledAt, sessionVersion: users.sessionVersion, isSuperadmin: users.isSuperadmin })
           .from(users)
           .where(eq(users.id, user.id))
           .limit(1);
@@ -354,7 +355,10 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
         token.epoch = await currentSessionEpoch();
         token.pid = crypto.randomUUID();
         if (enforcement.on) {
-          token.mfa = row?.mfaEnrolledAt ? "pending" : "enrol";
+          // BL-STAB-8a-3 — a platform superadmin must hold a passkey: with
+          // none, the first sign-in enrols one before anything opens.
+          const needsPasskey = !!row?.isSuperadmin && (await superadminNeedsPasskey(user.id));
+          token.mfa = row?.mfaEnrolledAt && !needsPasskey ? "pending" : "enrol";
           token.pendingAt = now;
           token.amr = undefined;
         } else {

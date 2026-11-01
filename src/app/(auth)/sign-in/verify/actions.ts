@@ -8,6 +8,8 @@ import { recordAudit } from "@/lib/audit-log";
 import { getPendingSession } from "@/lib/auth-helpers";
 import { log } from "@/lib/log";
 import { firstWorkspaceOf, verifyUserCode } from "@/lib/mfa-store";
+import { beginPasskeyAuthentication, finishPasskeyAuthentication } from "@/lib/passkeys";
+import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 import { enforceRateLimit, peekRateLimit } from "@/lib/rate-limit";
 import { previewBypassCode, SESSION_POLICY } from "@/lib/session-policy";
 
@@ -46,20 +48,45 @@ export async function verifyMfaCodeAction(input: { code: string }): Promise<{ ok
     recoveryCodesLeft = check.recoveryCodesLeft ?? null;
   }
 
-  await db.update(users).set({ mfaPassPid: pending.pid, mfaPassAt: new Date() }).where(eq(users.id, pending.id));
-  await unstable_update({});
+  await passSecondStep(pending.id, pending.pid, amr, recoveryCodesLeft);
+  return { ok: true, recoveryCodesLeft };
+}
 
-  const [me] = await db.select({ email: users.email }).from(users).where(eq(users.id, pending.id)).limit(1);
-  log.info("[auth]", "second step passed", { userId: pending.id, amr });
+/** The pass marker for this pending id, the token refresh, the audit row. */
+async function passSecondStep(userId: string, pid: string, amr: string, recoveryCodesLeft: number | null): Promise<void> {
+  await db.update(users).set({ mfaPassPid: pid, mfaPassAt: new Date() }).where(eq(users.id, userId));
+  await unstable_update({});
+  const [me] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+  log.info("[auth]", "second step passed", { userId, amr });
   // The workspace is not on the pending session; the audit row goes to
   // the person's first active membership when they have one.
   try {
-    const organizationId = await firstWorkspaceOf(pending.id);
+    const organizationId = await firstWorkspaceOf(userId);
     if (organizationId) {
-      await recordAudit({ organizationId, actor: { userId: pending.id, email: me?.email }, action: "auth.mfa.verified", resourceType: "user", resourceId: pending.id, metadata: { amr, recoveryCodesLeft } });
+      await recordAudit({ organizationId, actor: { userId, email: me?.email }, action: "auth.mfa.verified", resourceType: "user", resourceId: userId, metadata: { amr, recoveryCodesLeft } });
     }
   } catch (err) {
     log.warn("[auth]", "mfa audit failed", { error: err });
   }
-  return { ok: true, recoveryCodesLeft };
+}
+
+/** BL-STAB-8a-3 — the passkey route through the second step. */
+export async function beginPasskeySignInAction(): Promise<{ ok: true; options: unknown } | { ok: false; error: string }> {
+  const pending = await getPendingSession();
+  if (!pending || pending.mfa !== "pending") return { ok: false, error: "Sign in again." };
+  return beginPasskeyAuthentication({ userId: pending.id });
+}
+
+export async function finishPasskeySignInAction(input: { response: AuthenticationResponseJSON }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pending = await getPendingSession();
+  if (!pending || pending.mfa !== "pending") return { ok: false, error: "Sign in again." };
+  const limitOpts = { key: `mfa-code:${pending.id}`, limit: SESSION_POLICY.lockAttempts, windowSeconds: SESSION_POLICY.lockWindowSeconds, failClosed: true };
+  if (!(await peekRateLimit(limitOpts)).ok) return { ok: false, error: "Too many failed attempts. Wait 15 minutes, then sign in again." };
+  const res = await finishPasskeyAuthentication({ userId: pending.id, response: input.response });
+  if (!res.ok) {
+    await enforceRateLimit(limitOpts);
+    return res;
+  }
+  await passSecondStep(pending.id, pending.pid, "passkey", null);
+  return { ok: true };
 }

@@ -112,9 +112,14 @@ export async function confirmTotpEnrolment(input: { userId: string; factorId: st
     .set({ confirmedAt: now, lastUsedAt: now, lastUsedStep: v.timeStep })
     .where(and(eq(userMfaFactors.userId, input.userId), eq(userMfaFactors.id, row.id)));
   await db.update(users).set({ mfaEnrolledAt: sql`COALESCE(${users.mfaEnrolledAt}, now())`, updatedAt: now }).where(eq(users.id, input.userId));
-  const [existing] = await db.select({ n: sql<number>`count(*)::int` }).from(userRecoveryCodes).where(eq(userRecoveryCodes.userId, input.userId));
-  const recoveryCodes = (existing?.n ?? 0) === 0 ? await mintRecoveryCodes(input.userId) : null;
+  const recoveryCodes = await ensureRecoveryCodes(input.userId);
   return { ok: true, recoveryCodes };
+}
+
+/** The first factor of any kind mints the recovery codes, returned once; later factors return null. */
+export async function ensureRecoveryCodes(userId: string): Promise<string[] | null> {
+  const [existing] = await db.select({ n: sql<number>`count(*)::int` }).from(userRecoveryCodes).where(eq(userRecoveryCodes.userId, userId));
+  return (existing?.n ?? 0) === 0 ? await mintRecoveryCodes(userId) : null;
 }
 
 async function mintRecoveryCodes(userId: string): Promise<string[]> {

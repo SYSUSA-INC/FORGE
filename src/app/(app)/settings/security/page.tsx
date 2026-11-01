@@ -19,7 +19,7 @@ export default async function SecuritySettingsPage({ searchParams }: { searchPar
       <PageHeader
         eyebrow="Settings"
         title="Security"
-        subtitle="Two-step sign-in: an authenticator app on your phone, and recovery codes for when you lose it."
+        subtitle="Two-step sign-in: a passkey or an authenticator app, and recovery codes for when you lose them."
         meta={[
           { label: "Authenticators", value: String(status.factors.length) },
           { label: "Recovery codes left", value: String(status.recoveryCodesLeft) },

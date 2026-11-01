@@ -2,14 +2,16 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { SecurityPanel } from "@/app/(app)/settings/security/SecurityPanel";
 import { getMfaStatus } from "@/lib/mfa-store";
+import { superadminNeedsPasskey } from "@/lib/passkeys";
 import { safeRedirectTarget } from "@/lib/safe-redirect";
 import { GATE_PATHS } from "@/lib/session-policy";
 
 /**
  * BL-STAB-8a-2 — the first sign-in after release, or after a reset: no
  * factor yet, so the person sets one up before anything opens. The same
- * panel as Settings → Security; confirming the first code counts as the
- * second step for this sign-in.
+ * panel as Settings → Security; confirming the first code (or
+ * registering the passkey, 8a-3) counts as the second step for this
+ * sign-in.
  */
 export default async function EnrolPage({ searchParams }: { searchParams: { callbackUrl?: string } }) {
   const target = safeRedirectTarget(searchParams.callbackUrl);
@@ -18,12 +20,14 @@ export default async function EnrolPage({ searchParams }: { searchParams: { call
   if (session.user.mfa === "ok") redirect(target);
   if (session.user.mfa === "pending") redirect(`${GATE_PATHS.verify}?callbackUrl=${encodeURIComponent(target)}`);
   const status = await getMfaStatus(session.user.id);
+  // BL-STAB-8a-3 — a platform superadmin is here until they hold a passkey.
+  const requirePasskey = await superadminNeedsPasskey(session.user.id);
 
   return (
     <div className="mx-auto w-full max-w-5xl px-2 py-8">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-text">Set up two-step sign-in</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        FORGE now asks for a second step at every sign-in. Add an authenticator app for <span className="text-text">{session.user.email}</span>, save the recovery codes it comes with, and you are in. This takes about a minute.
+        FORGE now asks for a second step at every sign-in. {requirePasskey ? "Add a passkey" : "Add a passkey or an authenticator app"} for <span className="text-text">{session.user.email}</span>, save the recovery codes it comes with, and you are in. This takes about a minute.
       </p>
       <div className="mt-6">
         <SecurityPanel
@@ -32,6 +36,7 @@ export default async function EnrolPage({ searchParams }: { searchParams: { call
           recoveryCodesLeft={status.recoveryCodesLeft}
           available={status.available}
           continueHref={target}
+          requirePasskey={requirePasskey}
         />
       </div>
       <form
