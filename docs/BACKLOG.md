@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a-2 #443; 8a-3 #444; 8a-4 the reset and the runbook (this PR); then 8b, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design (this PR); then 8b-1…3, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1369,6 +1369,91 @@ mind. Bandage will come off but a true fix will stay."
       15 minutes before; the editors already autosave); (4) SMS as a
       factor waits for the provider (as decided), so 8a ships with the
       authenticator app and passkeys.
+  - **8b design (proposed 2026-11-01; approved by merging this PR).**
+    What is true today, from the code. **Password sign-in** refuses an
+    account whose address is unverified (`authorize`). **Self-service
+    sign-up** emails a verification link (24 hours) and refuses
+    disposable inboxes; nothing checks that the domain receives mail.
+    **Google / Microsoft** sign-ins need the provider's own
+    `email_verified`, but the FORGE row of an account the provider
+    created keeps `emailVerified` empty (the adapter never sets it), so
+    the address is "verified" only by the provider's word and nothing
+    in FORGE ever asks. **An invitation** marks the address verified
+    the moment it is accepted, and so does **Forgot password** and the
+    superadmin's **Reset password**: right when the link travelled
+    through the inbox, wrong when an admin used **Copy link** (email
+    not configured, or a bounce) and handed it over some other way: the
+    account then carries an address nobody proved. **Trial approval**
+    is an invitation, so the same. **Changing an address** has no path
+    at all (no profile page edits it; a superadmin cannot either).
+    **Deliverability** is the disposable-domain list and, for trial
+    requests, the public-mailbox list; a typo'd or dead domain is
+    accepted and the verification email bounces silently.
+    - **The rule:** no session for an unverified address, whoever
+      created the account and however they sign in; a link that did
+      not travel through the inbox proves nothing; the address is
+      checked for deliverability before an email is ever sent to it;
+      a changed address is a new address.
+    - **8b-1 — the gate (one PR).** The jwt sign-in callback refuses a
+      user whose `emailVerified` is empty, for every provider; the
+      sign-in page says so (`unverified_email`) with a **Resend
+      verification** link, rate-limited per address (3 per hour, fail
+      closed) and answering the same whether the address exists. The
+      adapter's `createUser` event stamps `emailVerified` for a
+      provider-verified Google / Microsoft address (the policy already
+      refused it otherwise). The invitation and the password-reset
+      token learn whether they went by email (`allowlist.email_sent_at`,
+      a `sent_by_email` flag on the token row; one migration): a link
+      that was emailed verifies the address on use, as today; a link
+      that was copied does not, and acceptance (or the reset) sends the
+      verification email and the sign-in page explains the one more
+      step. The register route's invite path returns `verified` only
+      when it is true. The unverified-purge keeps its 7-day rule and
+      its "alone in every workspace" guard, so an invitee who never
+      verified is not deleted from under a workspace.
+    - **8b-2 — deliverability (one PR).** `src/lib/email-deliverability.ts`:
+      a domain receives mail when it has an MX record, or, with none,
+      an A/AAAA record (RFC 5321 §5.1); `dns.promises` with a 3-second
+      budget, the verdict cached in memory for an hour per domain; a
+      timeout or a server failure is **fail-open** (the person is not
+      locked out by a DNS wobble; logged), NXDOMAIN or no records is a
+      refusal. Applied at self-service sign-up and at the trial request
+      ("That domain does not receive email. Check the spelling."),
+      before the verification email is sent, after the existing
+      disposable / public-mailbox rules. At **invite creation** (tenant
+      admin and superadmin) a dead domain is a warning on the form with
+      the invite still allowed (the admin may know better), recorded on
+      the audit row. Unit-tested with a stubbed resolver; a tiny
+      runtime test against a known domain is skipped offline.
+    - **8b-3 — change of address (one PR).** Settings → Security gains
+      **Change email**: the new address (validated and deliverability-
+      checked), a current second-step code, then a verification link to
+      the new address (24 hours, one pending change per user on the
+      user row: `pending_email`, `pending_email_token_at`; one
+      migration); the old address is told, with who and when, and that
+      nothing changes until the new one is confirmed. On confirmation
+      the row's `email` moves, the old address is kept on the audit row
+      (`user.email.change` with both addresses), every other session of
+      the person ends (`session_version`), Google / Microsoft links stay
+      (they are keyed by provider id, not address), and pending
+      invitations to the old address are left for an admin to re-issue.
+      A superadmin gets no edit of a person's address: the person does
+      it, or the superadmin invites the new address.
+    - **Not in 8b:** SMS or phone (8c); Turnstile and the public-form
+      rate limits at the edge (8d); a bounce webhook from Resend
+      (worth a later ticket: mark the address undeliverable and show
+      the admin).
+    - **Open points for the owner:** (1) an invitee who got a copied
+      link must now verify before the first sign-in: proposed yes, the
+      one-time cost is a click, and the alternative is an account on an
+      unproven address; (2) a dead domain at invite creation: proposed
+      a warning, not a refusal; (3) the change-of-address flow asks for
+      the second step: proposed yes, since it moves the account's
+      recovery channel; (4) existing accounts with an empty
+      `emailVerified` (Google / Microsoft sign-ups from before 8b): the
+      release backfills the stamp for accounts that hold a provider
+      link, because the provider verified them; the rest are asked at
+      their next sign-in.
 - **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
   BL-STAB-2.
   - **Ask:** Upload several files at once; FORGE decides what each is
