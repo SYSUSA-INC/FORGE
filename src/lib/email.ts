@@ -442,6 +442,34 @@ export async function sendOpportunityReviewRequestEmail(opts: {
 }
 
 /** BL-AIP-3 — whether a provider key is present; callers record the truth when not. */
+/** BL-STAB-8a-4 — a platform administrator reset the person's two-step sign-in. */
+export async function sendMfaResetEmail(opts: { to: string; reason: string; byEmail: string | null }): Promise<void> {
+  const url = `${appBaseUrl()}/sign-in`;
+  const reason = escapeHtml(opts.reason);
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Your two-step sign-in was reset</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      A FORGE platform administrator${opts.byEmail ? ` (${escapeHtml(opts.byEmail)})` : ""} removed the authenticator apps, passkeys and recovery codes from your account and signed you out everywhere. Their reason:
+    </p>
+    <blockquote style="margin:0 0 20px 0;padding:10px 14px;border-left:3px solid ${EMAIL_HEX.accent};font-size:14px;line-height:1.55;color:${EMAIL_HEX.ink};">${reason}</blockquote>
+    <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      Your password is unchanged. The next time you sign in, FORGE asks you to set up two-step sign-in again (a passkey or an authenticator app) and gives you new recovery codes.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Sign in</a>
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};">
+      Did not expect this? Reply to this email or contact your administrator before signing in.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: "Your FORGE two-step sign-in was reset",
+    html: emailShell("Two-step sign-in reset", body),
+    text: `A FORGE platform administrator${opts.byEmail ? ` (${opts.byEmail})` : ""} reset your two-step sign-in and signed you out everywhere.\n\nReason: ${opts.reason}\n\nYour password is unchanged. Sign in at ${url} to set it up again.\n\nDid not expect this? Contact your administrator before signing in.`,
+  });
+}
+
 export function emailConfigured(): boolean {
   return !!apiKey;
 }

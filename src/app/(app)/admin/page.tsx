@@ -73,6 +73,7 @@ export default async function AdminPage({
       disabledAt: users.disabledAt,
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
+      mfaEnrolledAt: users.mfaEnrolledAt,
     })
     .from(users)
     .orderBy(desc(users.createdAt));
@@ -142,6 +143,7 @@ export default async function AdminPage({
     isSuperadmin: u.isSuperadmin,
     disabled: !!u.disabledAt,
     verified: !!u.emailVerified,
+    mfaEnrolled: !!u.mfaEnrolledAt,
     createdAt: u.createdAt.toISOString(),
     memberships: membershipsByUser.get(u.id) ?? [],
   }));

@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a-2 #443; 8a-3 passkeys (this PR); then 8a-4, 8b, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a-2 #443; 8a-3 #444; 8a-4 the reset and the runbook (this PR); then 8b, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1348,13 +1348,19 @@ mind. Bandage will come off but a true fix will stay."
       enrol page with the app option hidden, and the server refuses to
       pass the step on an app alone. Verified end to end with a virtual
       authenticator (Playwright CDP).
-    - **8a-4 — the reset, the rollout and the manuals.** SuperAdmin →
-      Platform users → **Reset MFA** with a written reason: every factor
-      and recovery code removed, `session_version` bumped, the person
-      emailed with the reason, audit `user.mfa.reset`; the release
-      runbook (raise the epoch, everyone signs in again and enrols);
-      User Manual §1.3 and a new §1.6 Two-step sign-in; Admin Manual §2
-      and §7.3.
+    - **8a-4 — the reset, the rollout and the manuals** (this PR).
+      SuperAdmin → Platform users → **Reset MFA…** with a written reason
+      (10–500 characters): every factor and recovery code removed, the
+      enrolment and any pending pass marker cleared, `session_version`
+      bumped so every session of theirs ends, the person emailed the
+      reason and who did it (`sendMfaResetEmail`), audit
+      `user.mfa.reset`; refused for your own account and off for one
+      with no factor (a **2-step** pill marks the enrolled). The
+      **Sessions** panel's **End every session…** raises
+      `auth.session_epoch` with a reason (audit `auth.sessions.end_all`).
+      The release runbook is Admin Manual §7.9; §2.10, §7.3 and §7.8
+      updated; User Manual §1.3 and §1.6 updated. 8a-3 passkeys shipped in
+      #444.
     - **Open points for the owner:** (1) the name the authenticator app
       shows (proposed: "FORGE (sysgov.com)" with the user's email);
       (2) no "remember this browser" option, since every sign-in needs

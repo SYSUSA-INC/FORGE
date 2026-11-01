@@ -17,7 +17,13 @@ import {
   type PurgeCandidate,
 } from "@/lib/account-hygiene";
 import { recordAudit } from "@/lib/audit-log";
+import { currentSessionEpoch } from "@/auth";
+import { emailConfigured, sendMfaResetEmail } from "@/lib/email";
 import { inviteAwaitsApproval } from "@/lib/email-domain";
+import { log } from "@/lib/log";
+import { cleanResetReason } from "@/lib/mfa";
+import { resetMfa } from "@/lib/mfa-store";
+import { setPlatformSetting } from "@/lib/platform-settings";
 import { deliverInvite, deliverPasswordReset } from "@/lib/invite-send";
 import type { InviteResult, ResetLinkResult } from "@/lib/invite-types";
 import { issueToken } from "@/lib/tokens";
@@ -190,6 +196,87 @@ export async function forcePasswordResetAction(
     emailSent: delivery.emailSent,
     warning: delivery.warning,
   };
+}
+
+/**
+ * BL-STAB-8a-4 — the superadmin two-step reset, with a written reason:
+ * every factor and recovery code removed, every open session ended,
+ * the person emailed with the reason, `user.mfa.reset` in the audit
+ * log. Their password is untouched; they enrol again at the next
+ * sign-in. Not for your own account (Settings → Security does that
+ * with a current code).
+ */
+export async function resetUserMfaAction(
+  userId: string,
+  reasonInput: string,
+): Promise<{ ok: true; factors: number; emailSent: boolean; warning?: string } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  if (userId === actor.id) return { ok: false, error: "Reset your own two-step sign-in from Settings → Security." };
+  const reason = cleanResetReason(reasonInput);
+  if (!reason.ok) return reason;
+
+  const [user] = await db
+    .select({ email: users.email, disabledAt: users.disabledAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) return { ok: false, error: "User not found." };
+
+  const removed = await resetMfa(userId);
+
+  let emailSent = false;
+  let warning: string | undefined;
+  try {
+    if (!emailConfigured()) throw new Error("email is not configured on this deployment");
+    await sendMfaResetEmail({ to: user.email, reason: reason.reason, byEmail: actor.email ?? null });
+    emailSent = true;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.warn("[resetUserMfaAction]", "reset email failed", { userId, error: message });
+    warning = `The reset is done but the email could not be sent (${message}). Tell the person yourself: their next sign-in sets two-step sign-in up again.`;
+  }
+
+  log.info("[auth]", "mfa reset by superadmin", { userId, actorId: actor.id, ...removed, emailSent });
+  const auditOrgId = await resolveAuditOrgForUser(actor.organizationId, userId);
+  if (auditOrgId) {
+    await recordAudit({
+      organizationId: auditOrgId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "user.mfa.reset",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { targetEmail: user.email, reason: reason.reason, factorsRemoved: removed.factors, recoveryCodesRemoved: removed.recoveryCodes, emailSent, superadmin: true },
+    });
+  }
+  revalidatePath("/admin");
+  return { ok: true, factors: removed.factors, emailSent, warning };
+}
+
+/**
+ * BL-STAB-8a-4 — end every session on the platform at once, yours
+ * included: the platform epoch moves, and each session sees it at its
+ * next request (within a minute). Nobody's factors change. The release
+ * step of the two-step rollout, and the lever for a suspected token
+ * leak.
+ */
+export async function endAllSessionsAction(reasonInput: string): Promise<{ ok: true; epoch: number } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  const reason = cleanResetReason(reasonInput);
+  if (!reason.ok) return reason;
+  const epoch = (await currentSessionEpoch()) + 1;
+  await setPlatformSetting("auth.session_epoch", String(epoch), actor.id);
+  log.warn("[auth]", "session epoch raised: every session ends", { epoch, actorId: actor.id, reason: reason.reason });
+  if (actor.organizationId) {
+    await recordAudit({
+      organizationId: actor.organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "auth.sessions.end_all",
+      resourceType: "platform",
+      resourceId: "auth.session_epoch",
+      metadata: { epoch, reason: reason.reason, superadmin: true },
+    });
+  }
+  return { ok: true, epoch };
 }
 
 export async function resendOrgAdminInviteAction(

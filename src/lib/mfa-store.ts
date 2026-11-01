@@ -206,3 +206,28 @@ export async function verifyUserCode(input: { userId: string; code: string; now?
   }
   return { ok: false };
 }
+
+/**
+ * BL-STAB-8a-4 — the superadmin reset: every factor and recovery code
+ * removed, enrolment cleared, every open session ended (the session
+ * version moves), the pending pass marker and challenge dropped. The
+ * person enrols again at their next sign-in. Returns what was removed.
+ */
+export async function resetMfa(userId: string): Promise<{ factors: number; recoveryCodes: number }> {
+  const removedFactors = await db.delete(userMfaFactors).where(eq(userMfaFactors.userId, userId)).returning({ id: userMfaFactors.id });
+  const removedCodes = await db.delete(userRecoveryCodes).where(eq(userRecoveryCodes.userId, userId)).returning({ id: userRecoveryCodes.id });
+  await db
+    .update(users)
+    .set({
+      mfaEnrolledAt: null,
+      mfaResetAt: new Date(),
+      mfaPassPid: null,
+      mfaPassAt: null,
+      webauthnChallenge: null,
+      webauthnChallengeAt: null,
+      sessionVersion: sql`${users.sessionVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+  return { factors: removedFactors.length, recoveryCodes: removedCodes.length };
+}
