@@ -2,9 +2,9 @@ import "server-only";
 
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { opportunities, opportunityNextActions } from "@/db/schema";
+import { opportunities, opportunityNextActions, proposalSections, proposals } from "@/db/schema";
 import { canonicalStage } from "@/lib/opportunity-types";
-import { rankOrgActions, type NextActionPriority } from "@/lib/next-actions";
+import { rankOrgActions, type NextActionPriority, type NextActionStatus, type PreparedRecord } from "@/lib/next-actions";
 import type { OpportunityStage } from "@/db/schema";
 
 /**
@@ -26,6 +26,7 @@ export type OrgNextAction = {
   opportunityTitle: string;
   stage: OpportunityStage;
   ownerUserId: string | null;
+  status: NextActionStatus;
 };
 
 async function openRows(organizationId: string): Promise<OrgNextAction[]> {
@@ -43,12 +44,13 @@ async function openRows(organizationId: string): Promise<OrgNextAction[]> {
       opportunityTitle: opportunities.title,
       stage: opportunities.stage,
       ownerUserId: opportunities.ownerUserId,
+      status: opportunityNextActions.status,
     })
     .from(opportunityNextActions)
     .innerJoin(opportunities, eq(opportunities.id, opportunityNextActions.opportunityId))
     .where(and(eq(opportunityNextActions.organizationId, organizationId), eq(opportunities.organizationId, organizationId), inArray(opportunityNextActions.status, ["proposed", "prepared"])))
     .limit(500);
-  return rows.map((r) => ({ ...r, priority: r.priority as NextActionPriority, stage: canonicalStage(r.stage) }));
+  return rows.map((r) => ({ ...r, priority: r.priority as NextActionPriority, status: r.status as NextActionStatus, stage: canonicalStage(r.stage) }));
 }
 
 /** The Command Center: the reader's pursuits first, at most `max`. */
@@ -68,8 +70,12 @@ export async function nextActionsForDigest(organizationId: string, userId: strin
   return rows.slice(0, max).map((r) => ({ title: r.title, pursuit: r.opportunityTitle, href: r.href, priority: r.priority }));
 }
 
-/** Reports: decided actions since `since` (all time when null), and what is open now. */
-export async function nextActionStats(organizationId: string, since: Date | null): Promise<{ done: number; dismissed: number; open: number }> {
+/**
+ * Reports: decided actions since `since` (all time when null), what is open
+ * now, and (phase 5c) how many sections FORGE drafted overnight and how
+ * many of those a person has since taken up (the section left Not started).
+ */
+export async function nextActionStats(organizationId: string, since: Date | null): Promise<{ done: number; dismissed: number; open: number; preparedDrafts: number; acceptedDrafts: number }> {
   const decidedWhere = since
     ? and(eq(opportunityNextActions.organizationId, organizationId), inArray(opportunityNextActions.status, ["done", "dismissed"]), gte(opportunityNextActions.decidedAt, since))
     : and(eq(opportunityNextActions.organizationId, organizationId), inArray(opportunityNextActions.status, ["done", "dismissed"]));
@@ -81,5 +87,21 @@ export async function nextActionStats(organizationId: string, since: Date | null
       .where(and(eq(opportunityNextActions.organizationId, organizationId), inArray(opportunityNextActions.status, ["proposed", "prepared"]))),
   ]);
   const by = Object.fromEntries(decided.map((d) => [d.status, d.n]));
-  return { done: by.done ?? 0, dismissed: by.dismissed ?? 0, open: open?.n ?? 0 };
+  const preparedRows = await db
+    .select({ prepared: opportunityNextActions.prepared, updatedAt: opportunityNextActions.updatedAt })
+    .from(opportunityNextActions)
+    .where(and(eq(opportunityNextActions.organizationId, organizationId), eq(opportunityNextActions.kind, "draft_sections")));
+  const sectionIds = preparedRows
+    .filter((r) => !since || r.updatedAt >= since)
+    .flatMap((r) => ((r.prepared as PreparedRecord | null)?.sectionIds ?? []));
+  let acceptedDrafts = 0;
+  if (sectionIds.length > 0) {
+    const taken = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(proposalSections)
+      .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+      .where(and(eq(proposals.organizationId, organizationId), inArray(proposalSections.id, sectionIds), sql`${proposalSections.status} <> 'not_started'`));
+    acceptedDrafts = taken[0]?.n ?? 0;
+  }
+  return { done: by.done ?? 0, dismissed: by.dismissed ?? 0, open: open?.n ?? 0, preparedDrafts: sectionIds.length, acceptedDrafts };
 }

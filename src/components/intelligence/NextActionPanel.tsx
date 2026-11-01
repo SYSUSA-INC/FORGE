@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { syncNextActions, type NextActionView } from "@/lib/next-action-sync";
-import { daysUntil, mayDecideNextAction, NEXT_ACTION_PRIORITY_LABELS } from "@/lib/next-actions";
+import { daysUntil, mayDecideNextAction, NEXT_ACTION_PRIORITY_LABELS, preparedSummary } from "@/lib/next-actions";
 import { safeQuery } from "@/lib/schema-resilience";
 import { NextActionButtons } from "./NextActionButtons";
 
@@ -22,12 +22,18 @@ export async function NextActionPanel({ opportunityId }: { opportunityId: string
   const now = new Date();
 
   return (
-    <Panel title="Next action" eyebrow={eyebrowFor(first!, now)} accent={first!.priority === "now" ? "gold" : undefined}>
+    <Panel title="Next action" eyebrow={eyebrowFor(first!, now)} accent={first!.status === "prepared" ? "cobalt" : first!.priority === "now" ? "gold" : undefined}>
       <div className="font-display text-[17px] font-semibold leading-snug text-text">{first!.title}</div>
       <p className="mt-1 font-body text-[13px] leading-[1.5] text-muted">{first!.reason}</p>
+      {first!.prepared ? (
+        <p className="mt-2 font-body text-[13px] leading-[1.5] text-text">
+          <span className="font-mono text-[10px] uppercase tracking-label text-accent">Prepared · </span>
+          {preparedSummary(first!.prepared)}
+        </p>
+      ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link href={first!.href} className="aur-btn aur-btn-primary">
-          Go
+          {first!.prepared ? "Review" : "Go"}
         </Link>
         {canDecide ? <NextActionButtons id={first!.id} /> : null}
       </div>
@@ -35,8 +41,8 @@ export async function NextActionPanel({ opportunityId }: { opportunityId: string
         <ul className="mt-4 flex flex-col divide-y divide-layer/10 border-t border-layer/10">
           {rest.map((a) => (
             <li key={a.id} className="flex flex-wrap items-baseline gap-2 py-2 font-body text-[13px]">
-              <span className="font-mono text-[10px] uppercase tracking-label text-muted">{NEXT_ACTION_PRIORITY_LABELS[a.priority]}</span>
-              <Link href={a.href} className="aur-link min-w-0 flex-1 text-text" title={a.reason}>
+              <span className={`font-mono text-[10px] uppercase tracking-label ${a.prepared ? "text-accent" : "text-muted"}`}>{a.prepared ? "Prepared" : NEXT_ACTION_PRIORITY_LABELS[a.priority]}</span>
+              <Link href={a.href} className="aur-link min-w-0 flex-1 text-text" title={a.prepared ? (preparedSummary(a.prepared) ?? a.reason) : a.reason}>
                 {a.title}
               </Link>
               {canDecide ? <NextActionButtons id={a.id} compact /> : null}
@@ -51,5 +57,5 @@ export async function NextActionPanel({ opportunityId }: { opportunityId: string
 function eyebrowFor(a: NextActionView, now: Date): string {
   const d = daysUntil(a.dueBy, now);
   const due = d === null ? null : d < 0 ? `${-d} day${d === -1 ? "" : "s"} past due` : d === 0 ? "due today" : `due in ${d} day${d === 1 ? "" : "s"}`;
-  return [NEXT_ACTION_PRIORITY_LABELS[a.priority], due].filter(Boolean).join(" · ");
+  return [a.prepared ? "Prepared overnight" : NEXT_ACTION_PRIORITY_LABELS[a.priority], due].filter(Boolean).join(" · ");
 }

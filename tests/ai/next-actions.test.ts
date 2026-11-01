@@ -5,6 +5,8 @@ import {
   NEXT_ACTION_RULES,
   mayDecideNextAction,
   nextActionsTakenRate,
+  PREPARABLE_KINDS,
+  preparedSummary,
   proposeNextActions,
   rankOrgActions,
   reconcileNextActions,
@@ -178,6 +180,19 @@ describe("reconcileNextActions", () => {
     expect(reconcileNextActions([other], state({ stage: "qualification", responseDueDate: days(90) }), NOW).insert.map((p) => p.kind)).toEqual(["record_incumbent"]);
   });
 
+  it("keeps a prepared row visible for a week after its rule stops holding, then closes it as done (5c)", () => {
+    const prepared = stored({ status: "prepared", preparedAt: days(-2) });
+    const fresh = reconcileNextActions([prepared], state({ evaluationSaved: true }), NOW);
+    expect(fresh.close).toEqual([]);
+    expect(fresh.insert.map((p) => p.kind)).toEqual(["write_brief"]);
+    const old = reconcileNextActions([stored({ status: "prepared", preparedAt: days(-8) })], state({ evaluationSaved: true }), NOW);
+    expect(old.close).toEqual([{ id: "row1", status: "done" }]);
+    // While its rule still holds, a prepared row is refreshed like any open row.
+    const holding = reconcileNextActions([stored({ status: "prepared", preparedAt: days(-2), priority: "later" })], state(), NOW);
+    expect(holding.update).toHaveLength(1);
+    expect(holding.close).toEqual([]);
+  });
+
   it("does not insert a second open row for the same kind", () => {
     const rec = reconcileNextActions([stored({}), stored({ id: "row2" })], state(), NOW);
     expect(rec.insert.map((p) => p.kind)).toEqual(["write_brief"]);
@@ -200,6 +215,18 @@ describe("rankOrgActions and the taken rate (5b)", () => {
   it("reports done over decided, and nothing until a person decided one", () => {
     expect(nextActionsTakenRate({ done: 0, dismissed: 0 })).toBeNull();
     expect(nextActionsTakenRate({ done: 3, dismissed: 1 })).toBe(0.75);
+  });
+});
+
+describe("preparedSummary (5c)", () => {
+  it("names what FORGE did overnight, in the person's terms", () => {
+    expect(PREPARABLE_KINDS).toEqual(["build_outline", "build_questionnaire", "map_compliance", "draft_sections", "run_health_scan"]);
+    expect(preparedSummary({ kind: "outline", at: "2026-11-01T02:00:00Z", sections: 7 })).toBe("FORGE built the outline overnight (7 sections); review it.");
+    expect(preparedSummary({ kind: "questionnaire", at: "x", questions: 12, suggested: 1 })).toBe("FORGE built the questionnaire overnight (12 questions, 1 suggested answer); confirm the answers.");
+    expect(preparedSummary({ kind: "compliance", at: "x", applied: 9 })).toBe("FORGE mapped 9 requirements overnight; check the matrix.");
+    expect(preparedSummary({ kind: "drafts", at: "x", sections: 3, sectionIds: ["a", "b", "c"], truncated: 1 })).toBe("FORGE drafted 3 sections overnight as tracked insertions; accept or reject them in the editor (1 cut off at the output limit).");
+    expect(preparedSummary({ kind: "scan", at: "x" })).toContain("queued the health scan");
+    expect(preparedSummary(null)).toBeNull();
   });
 });
 

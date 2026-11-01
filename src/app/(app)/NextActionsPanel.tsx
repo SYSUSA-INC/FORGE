@@ -59,7 +59,7 @@ export async function NextActionsPanel() {
                 <ul className="mt-1 flex flex-col gap-0.5">
                   {g.actions.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-baseline gap-2 font-body text-[13px]">
-                      <span className={`font-mono text-[10px] uppercase tracking-label ${a.kind === "at_risk" ? "text-rose" : "text-muted"}`}>{a.kind === "at_risk" ? "At risk" : NEXT_ACTION_PRIORITY_LABELS[a.priority]}</span>
+                      <span className={`font-mono text-[10px] uppercase tracking-label ${a.kind === "at_risk" ? "text-rose" : a.status === "prepared" ? "text-accent" : "text-muted"}`}>{a.kind === "at_risk" ? "At risk" : a.status === "prepared" ? "Prepared" : NEXT_ACTION_PRIORITY_LABELS[a.priority]}</span>
                       <Link href={a.href} className="aur-link min-w-0 flex-1 text-text" title={a.reason}>
                         {a.title}
                       </Link>

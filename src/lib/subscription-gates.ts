@@ -87,6 +87,8 @@ export type CurrentTier = {
      * "strong"). Read by the AI gateway; see src/lib/ai-routing.ts.
      */
     aiModels?: Record<string, string>;
+    /** BL-NEXT-ACTION 5c — false switches the nightly prepare-ahead step off; absent means on. */
+    prepareAhead?: boolean;
     /**
      * BL-AIP-7c — the tenant admin's own monthly ceiling, set on the AI
      * Engine control panel. Only ever lowers the effective quota.

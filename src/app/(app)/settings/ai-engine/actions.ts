@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
-import { setAiBudget, setAiFeatureRouting, type AiControlResult } from "@/lib/ai-engine-control";
+import { setAiBudget, setAiFeatureRouting, setPrepareAhead, type AiControlResult } from "@/lib/ai-engine-control";
 import type { AiModelClass } from "@/lib/ai-routing";
 import { runGoldenEval } from "@/lib/golden-eval";
 import { runRetrievalEval } from "@/lib/retrieval-eval";
@@ -60,6 +60,15 @@ export async function setAiBudgetAction(input: {
   });
   if (res.ok) revalidatePath("/settings/ai-engine");
   return res.ok ? { ok: true } : res;
+}
+
+/** BL-NEXT-ACTION 5c — the Prepare ahead switch. Org admins only. */
+export async function setPrepareAheadAction(input: { enabled: boolean }): Promise<AiControlResult> {
+  const { organizationId } = await requireCurrentOrg();
+  const actor = await requireOrgAdmin(organizationId);
+  const res = await setPrepareAhead({ organizationId, enabled: input.enabled === true, actor: { userId: actor.id, email: actor.email } });
+  if (res.ok) revalidatePath("/settings/ai-engine");
+  return res;
 }
 
 /**

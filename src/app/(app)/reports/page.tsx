@@ -44,7 +44,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { ra
   // BL-LESSONS-LOOP 4c — the loop in numbers, beside the win rate.
   const loop = await safeQuery(() => lessonLoopStats(organizationId), { proposed: 0, confirmed: 0, applied: 0, closed: 0 }, { tag: "reports.lessons" });
   // BL-NEXT-ACTION 5b — the share of FORGE's proposed actions a person marked done, over the range.
-  const actions = await safeQuery(() => nextActionStats(organizationId, rangeStart(range)), { done: 0, dismissed: 0, open: 0 }, { tag: "reports.nextActions" });
+  const actions = await safeQuery(() => nextActionStats(organizationId, rangeStart(range)), { done: 0, dismissed: 0, open: 0, preparedDrafts: 0, acceptedDrafts: 0 }, { tag: "reports.nextActions" });
   const taken = nextActionsTakenRate(actions);
 
   return (
@@ -60,6 +60,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { ra
           { label: "Open pipeline", value: formatDollars(s.openValue) },
           { label: "Lessons closed the loop", value: `${loop.closed} of ${loop.confirmed}`, accent: loop.closed > 0 ? "emerald" : undefined },
           { label: "Next actions taken", value: taken === null ? "—" : `${actions.done} of ${actions.done + actions.dismissed}`, accent: taken !== null && taken >= 0.5 ? "emerald" : undefined },
+          { label: "Prepared drafts taken up", value: actions.preparedDrafts === 0 ? "—" : `${actions.acceptedDrafts} of ${actions.preparedDrafts}`, accent: actions.acceptedDrafts > 0 ? "emerald" : undefined },
         ]}
       />
       <ReportsClient report={report} />

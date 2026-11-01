@@ -6,7 +6,7 @@ import { opportunityNextActions, type OpportunityNextAction } from "@/db/schema"
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 import { loadPursuitState, listPursuitsToRefresh } from "@/lib/next-action-state";
-import { NEXT_ACTION_MAX, NEXT_ACTION_SNOOZE_DAYS, rankActions, reconcileNextActions, type NextActionPriority, type NextActionStatus, type ProposedAction, type StoredNextAction } from "@/lib/next-actions";
+import { NEXT_ACTION_MAX, NEXT_ACTION_SNOOZE_DAYS, rankActions, reconcileNextActions, type NextActionPriority, type NextActionStatus, type PreparedRecord, type ProposedAction, type StoredNextAction } from "@/lib/next-actions";
 
 /**
  * BL-NEXT-ACTION phase 5a — keep the stored next actions of a pursuit in
@@ -22,14 +22,22 @@ export type NextActionView = {
   priority: NextActionPriority;
   dueBy: Date | null;
   status: NextActionStatus;
+  /** What FORGE did overnight (phase 5c); null unless prepared. */
+  prepared: PreparedRecord | null;
 };
 
+function preparedOf(r: OpportunityNextAction): PreparedRecord | null {
+  const p = r.prepared as PreparedRecord | null;
+  return p && typeof p.kind === "string" && typeof p.at === "string" ? p : null;
+}
+
 function toStored(r: OpportunityNextAction): StoredNextAction {
-  return { id: r.id, kind: r.kind, status: r.status as NextActionStatus, stage: r.stage, snoozedUntil: r.snoozedUntil, title: r.title, reason: r.reason, href: r.href, priority: r.priority as NextActionPriority, dueBy: r.dueBy };
+  const p = preparedOf(r);
+  return { id: r.id, kind: r.kind, status: r.status as NextActionStatus, stage: r.stage, snoozedUntil: r.snoozedUntil, preparedAt: p ? new Date(p.at) : null, title: r.title, reason: r.reason, href: r.href, priority: r.priority as NextActionPriority, dueBy: r.dueBy };
 }
 
 function toView(r: OpportunityNextAction): NextActionView {
-  return { id: r.id, kind: r.kind, title: r.title, reason: r.reason, href: r.href, priority: r.priority as NextActionPriority, dueBy: r.dueBy, status: r.status as NextActionStatus };
+  return { id: r.id, kind: r.kind, title: r.title, reason: r.reason, href: r.href, priority: r.priority as NextActionPriority, dueBy: r.dueBy, status: r.status as NextActionStatus, prepared: preparedOf(r) };
 }
 
 /**
@@ -99,7 +107,10 @@ export async function syncNextActions(organizationId: string, opportunityId: str
       .from(opportunityNextActions)
       .where(and(eq(opportunityNextActions.organizationId, organizationId), eq(opportunityNextActions.opportunityId, opportunityId), inArray(opportunityNextActions.status, ["proposed", "prepared"])))
   ).map((r) => ({ ...toView(r), rule: r.rule }));
-  return { actions: rankActions(open).slice(0, NEXT_ACTION_MAX), ownerUserId: loaded.ownerUserId };
+  // Prepared work comes first: it waits on the person, the rest waits on nobody.
+  const ranked = rankActions(open);
+  const ordered = [...ranked.filter((a) => a.status === "prepared"), ...ranked.filter((a) => a.status !== "prepared")];
+  return { actions: ordered.slice(0, NEXT_ACTION_MAX), ownerUserId: loaded.ownerUserId };
 }
 
 /** A person's decision on an open action. Permission is the caller's to check. */

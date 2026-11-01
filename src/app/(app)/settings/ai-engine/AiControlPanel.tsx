@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import type { BurnDown, FeatureRoutingRow } from "@/lib/ai-control";
 import { AI_MODEL_CLASS_LABELS, AI_MODEL_CLASSES, type AiModelClass } from "@/lib/ai-routing";
-import { setAiBudgetAction, setAiFeatureRoutingAction } from "./actions";
+import { setAiBudgetAction, setAiFeatureRoutingAction, setPrepareAheadAction } from "./actions";
 
 export type FeatureUsageRow = { feature: string; calls: number; tokens: number; errors: number; refused: number };
 export type DailyUsageRow = { day: string; tokens: number; calls: number };
@@ -25,6 +25,8 @@ export type AiControlPanelProps = {
   provider: string;
   routingOn: boolean;
   isAdmin: boolean;
+  /** BL-NEXT-ACTION 5c — the nightly prepare-ahead step. */
+  prepareAhead: boolean;
 };
 
 function n(v: number): string {
@@ -57,6 +59,7 @@ export function AiControlPanel(p: AiControlPanelProps) {
   return (
     <>
       <BudgetPanel {...p} />
+      <PrepareAheadPanel {...p} />
       <RoutingPanel {...p} />
     </>
   );
@@ -164,6 +167,36 @@ function BudgetPanel(p: AiControlPanelProps) {
       {!p.isAdmin ? (
         <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-subtle">An org admin sets the budget.</p>
       ) : null}
+    </Panel>
+  );
+}
+
+/** BL-NEXT-ACTION 5c — the switch for the nightly prepare-ahead step. */
+function PrepareAheadPanel(p: AiControlPanelProps) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [on, setOn] = useState(p.prepareAhead);
+  const [note, setNote] = useState<string | null>(null);
+  function toggle(enabled: boolean) {
+    setOn(enabled);
+    setNote(null);
+    startTransition(async () => {
+      const res = await setPrepareAheadAction({ enabled });
+      setNote(res.ok ? (enabled ? "On. FORGE prepares overnight; a person accepts each piece." : "Off. FORGE proposes next actions but prepares nothing.") : res.error);
+      if (res.ok) router.refresh();
+      else setOn(!enabled);
+    });
+  }
+  return (
+    <Panel title="Prepare ahead" eyebrow={on ? "On · overnight" : "Off"}>
+      <label className="flex items-start gap-3 font-body text-[13px] leading-[1.5] text-text">
+        <input type="checkbox" className="mt-1" checked={on} disabled={!p.isAdmin || pending} onChange={(e) => toggle(e.target.checked)} />
+        <span>
+          Let FORGE do the preparable next actions overnight: build a proposal&apos;s outline from Section L, build the capability questionnaire and suggest its answers, map the compliance matrix, draft the sections nobody has started as FORGE AI tracked insertions, and run the health scan. Everything prepared waits for a person to accept, confirm, map or reject it; nothing prepared changes a decision, a stage, a status or a submission. At most six section drafts per night, within the AI budget.
+        </span>
+      </label>
+      {note ? <p className="mt-2 font-mono text-[11px] text-text">{note}</p> : null}
+      {!p.isAdmin ? <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-subtle">An org admin sets this.</p> : null}
     </Panel>
   );
 }

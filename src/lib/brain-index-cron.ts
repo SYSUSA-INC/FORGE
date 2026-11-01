@@ -43,6 +43,7 @@ import {
   refundQuota,
 } from "@/lib/subscription-gates";
 import { refreshCompanyModelStaleness } from "@/lib/company-model-stale";
+import { prepareNextActions } from "@/lib/next-action-prepare";
 import { refreshNextActions } from "@/lib/next-action-sync";
 import { log } from "@/lib/log";
 import type { ProposalOutcomeType } from "@/db/schema";
@@ -68,6 +69,8 @@ export type BrainIndexSummary = {
   /** BL-NEXT-ACTION 5a — pursuits the rules ran over, and open actions after the run. */
   nextActionsChecked: number;
   nextActionsOpen: number;
+  /** BL-NEXT-ACTION 5c — preparable actions looked at, and done ahead. */
+  nextActionsPrepared: number;
 };
 
 export type BrainIndexOptions = {
@@ -105,6 +108,7 @@ export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<Brain
     companyModelsStale: 0,
     nextActionsChecked: 0,
     nextActionsOpen: 0,
+    nextActionsPrepared: 0,
   };
 
   // BL-COMPANY-MODEL 1b — what changed since each approved company model
@@ -131,6 +135,18 @@ export async function runBrainIndex(opts: BrainIndexOptions = {}): Promise<Brain
   } catch (err) {
     summary.errors += 1;
     log.error("[brain-index]", "next actions refresh failed", { error: err });
+  }
+
+  // BL-NEXT-ACTION 5c — do the preparable ones ahead (outline, questionnaire,
+  // compliance map, section drafts as tracked insertions, health scan) under
+  // the Prepare ahead switch and the nightly caps. Skips itself in stub mode.
+  try {
+    const r = await prepareNextActions();
+    summary.nextActionsPrepared = r.prepared;
+    summary.errors += r.errors;
+  } catch (err) {
+    summary.errors += 1;
+    log.error("[brain-index]", "next actions prepare failed", { error: err });
   }
 
   // 0. Un-harvested submitted / won proposals (BL-AIP-4b).

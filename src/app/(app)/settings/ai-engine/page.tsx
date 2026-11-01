@@ -30,6 +30,7 @@ const EMPTY_STATE: AiControlState = {
   effectiveTokenCap: 0,
   effectiveRequestCap: 0,
   budget: {},
+  prepareAhead: true,
   aiModels: {},
   tokensUsed: 0,
   requestsUsed: 0,
@@ -101,6 +102,7 @@ export default async function AiEnginePage() {
         platformTokenCap={state.platformTokenCap}
         platformRequestCap={state.platformRequestCap}
         budget={state.budget}
+        prepareAhead={state.prepareAhead}
         daily={usage.daily}
         usageByFeature={usage.byFeature.map((f) => ({
           feature: f.feature,
