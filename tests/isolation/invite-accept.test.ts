@@ -13,7 +13,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, users } from "@/db/schema";
-import { attachPendingInvitesByEmail } from "@/lib/invite-accept";
+import { acceptInvite, attachPendingInvitesByEmail } from "@/lib/invite-accept";
+import { consumeToken, issueToken } from "@/lib/tokens";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 describe("BL-AUTH-INVITE — attachPendingInvitesByEmail", () => {
@@ -150,5 +151,66 @@ describe("BL-AUTH-INVITE — attachPendingInvitesByEmail", () => {
       alreadyMember: 0,
       organizationIds: [],
     });
+  });
+});
+
+describe("BL-STAB-8a-0 — acceptInvite never rewrites an existing account", () => {
+  let fx: TwoTenantFixture;
+  const createdUserIds: string[] = [];
+  beforeEach(async () => {
+    fx = await createTwoTenants("invite-accept-8a0");
+  });
+  afterEach(async () => {
+    for (const id of createdUserIds) await db.delete(users).where(eq(users.id, id));
+    createdUserIds.length = 0;
+    await fx.cleanup();
+  });
+
+  async function invite(email: string) {
+    const [inv] = await db
+      .insert(allowlist)
+      .values({ email, organizationId: fx.orgA.organizationId, role: "author", invitedByUserId: fx.orgA.userId })
+      .returning({ id: allowlist.id });
+    const raw = await issueToken("invite", inv!.id);
+    return { id: inv!.id, raw };
+  }
+
+  it("refuses the sign-up form for an address that already has an account, spends nothing, and the next sign-in attaches the invite", async () => {
+    const email = `taken-${Date.now().toString(36)}@bl-auth.test`;
+    const id = `invite-8a0-${Date.now().toString(36)}`;
+    await db.insert(users).values({ id, email, name: "Original", passwordHash: "hash-original", emailVerified: new Date() });
+    createdUserIds.push(id);
+    const inv = await invite(email);
+
+    const res = await acceptInvite({ inviteId: inv.id, rawToken: inv.raw, name: "Impostor", passwordHash: "hash-impostor" });
+    expect(res).toMatchObject({ ok: false, status: 409, code: "existing_account" });
+
+    const [u] = await db.select({ name: users.name, passwordHash: users.passwordHash }).from(users).where(eq(users.id, id));
+    expect(u).toEqual({ name: "Original", passwordHash: "hash-original" });
+    const [row] = await db.select({ consumedAt: allowlist.consumedAt }).from(allowlist).where(eq(allowlist.id, inv.id));
+    expect(row?.consumedAt).toBeNull();
+    // The token was not spent.
+    expect(await consumeToken("invite", inv.id, inv.raw)).toBe(true);
+
+    // The account's own sign-in accepts the invite.
+    const attached = await attachPendingInvitesByEmail({ userId: id, email });
+    expect(attached.attached).toBe(1);
+    const rows = await db.select({ role: memberships.role }).from(memberships).where(and(eq(memberships.userId, id), eq(memberships.organizationId, fx.orgA.organizationId)));
+    expect(rows).toEqual([{ role: "author" }]);
+  });
+
+  it("creates a new address's account, membership and verified email, and spends the token", async () => {
+    const email = `fresh-${Date.now().toString(36)}@bl-auth.test`;
+    const inv = await invite(email);
+    const res = await acceptInvite({ inviteId: inv.id, rawToken: inv.raw, name: "Fresh", passwordHash: "hash-fresh" });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    createdUserIds.push(res.userId);
+    const [u] = await db.select({ emailVerified: users.emailVerified, passwordHash: users.passwordHash }).from(users).where(eq(users.id, res.userId));
+    expect(u?.emailVerified).not.toBeNull();
+    expect(u?.passwordHash).toBe("hash-fresh");
+    const [row] = await db.select({ consumedAt: allowlist.consumedAt }).from(allowlist).where(eq(allowlist.id, inv.id));
+    expect(row?.consumedAt).not.toBeNull();
+    expect(await consumeToken("invite", inv.id, inv.raw)).toBe(false);
   });
 });

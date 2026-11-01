@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { allowlist, memberships, organizations, users } from "@/db/schema";
+import { memberships, organizations, users } from "@/db/schema";
 import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
 import { sendVerificationEmail } from "@/lib/email";
-import { domainOf, inviteAwaitsApproval, isPublicEmailDomain } from "@/lib/email-domain";
+import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
+import { acceptInvite } from "@/lib/invite-accept";
 import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
-import { consumeToken, issueToken } from "@/lib/tokens";
+import { issueToken } from "@/lib/tokens";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 import { ensureTenantSubscription } from "@/lib/tenant-subscription";
@@ -75,131 +76,6 @@ async function provisionUserAndOrg(opts: {
     await db.delete(users).where(eq(users.id, user.id)).catch(() => undefined);
     throw err;
   }
-}
-
-async function acceptInvite(opts: {
-  inviteId: string;
-  rawToken: string;
-  name: string;
-  passwordHash: string;
-}): Promise<
-  | { ok: true; userId: string; organizationId: string }
-  | { ok: false; error: string; status?: number }
-> {
-  const [inv] = await db
-    .select()
-    .from(allowlist)
-    .where(
-      and(eq(allowlist.id, opts.inviteId), eq(allowlist.revoked, false)),
-    )
-    .limit(1);
-
-  if (!inv) return { ok: false, error: "Invitation not found or revoked.", status: 404 };
-  if (inv.consumedAt) {
-    return { ok: false, error: "Invitation already used.", status: 409 };
-  }
-  // BL-AUTH-DOMAIN — a cross-domain invite is unusable until a platform
-  // admin approves it, whatever link the caller holds (a token from
-  // before the tenant's domains changed must not get anyone in).
-  // Checked before the token is spent so nothing is burned.
-  if (inviteAwaitsApproval(inv)) {
-    return {
-      ok: false,
-      error:
-        "This invitation is waiting for platform-admin approval because your email domain is not part of that organization. You will get an email once it is approved.",
-      status: 403,
-    };
-  }
-
-  const ok = await consumeToken("invite", inv.id, opts.rawToken);
-  if (!ok) {
-    return { ok: false, error: "Invitation link is invalid or expired.", status: 400 };
-  }
-
-  const email = inv.email.toLowerCase();
-
-  const [existing] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  let userId: string;
-  if (existing) {
-    await db
-      .update(users)
-      .set({
-        passwordHash: opts.passwordHash,
-        name: opts.name || null,
-        emailVerified: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, existing.id));
-    userId = existing.id;
-  } else {
-    const [created] = await db
-      .insert(users)
-      .values({
-        email,
-        name: opts.name || null,
-        passwordHash: opts.passwordHash,
-        emailVerified: new Date(),
-      })
-      .returning({ id: users.id });
-    if (!created) {
-      return { ok: false, error: "Could not create user.", status: 500 };
-    }
-    userId = created.id;
-  }
-
-  const [existingMembership] = await db
-    .select({ userId: memberships.userId })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, userId),
-        eq(memberships.organizationId, inv.organizationId),
-      ),
-    )
-    .limit(1);
-
-  // Membership insert MUST succeed before we mark the invite consumed.
-  // Otherwise a transient DB error would burn the invite token without
-  // creating the membership — the user couldn't retry (token gone) and
-  // couldn't sign in (no membership). On failure we surface the error
-  // and leave the allowlist row consumable.
-  if (!existingMembership) {
-    try {
-      await db.insert(memberships).values({
-        userId,
-        organizationId: inv.organizationId,
-        role: inv.role,
-        status: "active",
-        title: inv.title,
-        // BL-ITAR-TAG — carry the admin's attestation forward onto the
-        // membership row so per-member compliance queries don't need
-        // to join through the (eventually expired) allowlist row.
-        usPersonAttested: inv.usPersonAttested,
-        usPersonAttestedAt: inv.usPersonAttestedAt,
-      });
-    } catch (err) {
-      log.error("[acceptInvite]", "membership insert failed", { error: err });
-      return {
-        ok: false,
-        error:
-          "Could not finish creating your account — please try again or contact support.",
-        status: 500,
-      };
-    }
-  }
-
-  // Only now is it safe to mark the invite consumed.
-  await db
-    .update(allowlist)
-    .set({ consumedAt: new Date() })
-    .where(eq(allowlist.id, inv.id));
-
-  return { ok: true, userId, organizationId: inv.organizationId };
 }
 
 export async function POST(req: Request) {
@@ -369,10 +245,12 @@ export async function POST(req: Request) {
     }
 
     if (existing && !existing.emailVerified) {
-      await db
-        .update(users)
-        .set({ passwordHash, name: name || null, updatedAt: new Date() })
-        .where(eq(users.id, existing.id));
+      // BL-STAB-8a-0 — an unverified account is never replaced: whoever
+      // set its password keeps it, and only the inbox's owner can finish
+      // (the verification link, or Forgot password, which also verifies).
+      // Setting a new password here would let a second person seed the
+      // password the inbox's owner then verifies into.
+      log.info("[register]", "self-service sign-up for an unverified account: verification re-sent, nothing changed", { userId: existing.id });
     } else {
       try {
         await provisionUserAndOrg({ email, name, passwordHash });

@@ -25,7 +25,9 @@ import "server-only";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, memberships, users } from "@/db/schema";
+import { inviteAwaitsApproval } from "@/lib/email-domain";
 import { log } from "@/lib/log";
+import { consumeToken } from "@/lib/tokens";
 
 export type AttachResult = {
   /** Memberships created (one per accepted invite). */
@@ -125,4 +127,134 @@ export async function attachPendingInvitesByEmail(input: {
   }
 
   return result;
+}
+
+/**
+ * BL-STAB-8a-0 — the emailed invite link, used on the sign-up form.
+ * Creates the account and the membership for a new address. An address
+ * that already has an account is refused before the token is spent:
+ * the link proves the inbox, not the account, so it never sets that
+ * account's password or name; the person signs in (or resets their
+ * password, which proves the inbox too) and `attachPendingInvitesByEmail`
+ * accepts the invite at that sign-in.
+ */
+export async function acceptInvite(opts: {
+  inviteId: string;
+  rawToken: string;
+  name: string;
+  passwordHash: string;
+}): Promise<
+  | { ok: true; userId: string; organizationId: string }
+  | { ok: false; error: string; status?: number; code?: "existing_account" }
+> {
+  const [inv] = await db
+    .select()
+    .from(allowlist)
+    .where(
+      and(eq(allowlist.id, opts.inviteId), eq(allowlist.revoked, false)),
+    )
+    .limit(1);
+
+  if (!inv) return { ok: false, error: "Invitation not found or revoked.", status: 404 };
+  if (inv.consumedAt) {
+    return { ok: false, error: "Invitation already used.", status: 409 };
+  }
+  // BL-AUTH-DOMAIN — a cross-domain invite is unusable until a platform
+  // admin approves it, whatever link the caller holds (a token from
+  // before the tenant's domains changed must not get anyone in).
+  // Checked before the token is spent so nothing is burned.
+  if (inviteAwaitsApproval(inv)) {
+    return {
+      ok: false,
+      error:
+        "This invitation is waiting for platform-admin approval because your email domain is not part of that organization. You will get an email once it is approved.",
+      status: 403,
+    };
+  }
+
+  const email = inv.email.toLowerCase();
+
+  // Checked before the token is spent, so the link stays usable for the
+  // sign-in path and nothing about the existing account changes.
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  if (existing) {
+    return {
+      ok: false,
+      code: "existing_account",
+      error: "This email already has a FORGE account. Sign in with it (use Forgot password if you need to), and the invitation is accepted automatically.",
+      status: 409,
+    };
+  }
+
+  const ok = await consumeToken("invite", inv.id, opts.rawToken);
+  if (!ok) {
+    return { ok: false, error: "Invitation link is invalid or expired.", status: 400 };
+  }
+
+  const [created] = await db
+    .insert(users)
+    .values({
+      email,
+      name: opts.name || null,
+      passwordHash: opts.passwordHash,
+      emailVerified: new Date(),
+    })
+    .returning({ id: users.id });
+  if (!created) {
+    return { ok: false, error: "Could not create user.", status: 500 };
+  }
+  const userId = created.id;
+
+  const [existingMembership] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(memberships.organizationId, inv.organizationId),
+      ),
+    )
+    .limit(1);
+
+  // Membership insert MUST succeed before we mark the invite consumed.
+  // Otherwise a transient DB error would burn the invite token without
+  // creating the membership — the user couldn't retry (token gone) and
+  // couldn't sign in (no membership). On failure we surface the error
+  // and leave the allowlist row consumable.
+  if (!existingMembership) {
+    try {
+      await db.insert(memberships).values({
+        userId,
+        organizationId: inv.organizationId,
+        role: inv.role,
+        status: "active",
+        title: inv.title,
+        // BL-ITAR-TAG — carry the admin's attestation forward onto the
+        // membership row so per-member compliance queries don't need
+        // to join through the (eventually expired) allowlist row.
+        usPersonAttested: inv.usPersonAttested,
+        usPersonAttestedAt: inv.usPersonAttestedAt,
+      });
+    } catch (err) {
+      log.error("[acceptInvite]", "membership insert failed", { error: err });
+      return {
+        ok: false,
+        error:
+          "Could not finish creating your account — please try again or contact support.",
+        status: 500,
+      };
+    }
+  }
+
+  // Only now is it safe to mark the invite consumed.
+  await db
+    .update(allowlist)
+    .set({ consumedAt: new Date() })
+    .where(eq(allowlist.id, inv.id));
+
+  return { ok: true, userId, organizationId: inv.organizationId };
 }
