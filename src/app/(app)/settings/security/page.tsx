@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireAuth } from "@/lib/auth-helpers";
+import { pendingEmailChange } from "@/lib/email-change-store";
 import { getMfaStatus } from "@/lib/mfa-store";
 import { safeQuery } from "@/lib/schema-resilience";
 import { SecurityPanel } from "./SecurityPanel";
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function SecuritySettingsPage({ searchParams }: { searchParams: { low?: string } }) {
   const user = await requireAuth();
   const status = await safeQuery(() => getMfaStatus(user.id), { factors: [], enrolledAt: null, recoveryCodesLeft: 0, available: false }, { tag: "settings.security" });
+  // BL-STAB-8b-3 — a change of address waiting for the new inbox.
+  const pending = await safeQuery(() => pendingEmailChange(user.id), null, { tag: "settings.security.pending-email" });
   return (
     <>
       <PageHeader
@@ -36,6 +39,7 @@ export default async function SecuritySettingsPage({ searchParams }: { searchPar
         factors={status.factors.map((f) => ({ id: f.id, kind: f.kind, label: f.label, createdAt: f.createdAt.toISOString().slice(0, 10), lastUsedAt: f.lastUsedAt ? f.lastUsedAt.toISOString().slice(0, 10) : null }))}
         recoveryCodesLeft={status.recoveryCodesLeft}
         available={status.available}
+        pendingEmail={pending?.email ?? null}
       />
     </>
   );

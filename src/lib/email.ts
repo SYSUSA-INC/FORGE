@@ -470,6 +470,56 @@ export async function sendMfaResetEmail(opts: { to: string; reason: string; byEm
   });
 }
 
+/** BL-STAB-8b-3 — the link to the new address: click it and the account moves to it. */
+export async function sendEmailChangeConfirmEmail(opts: { to: string; token: string; currentEmail: string }): Promise<void> {
+  const url = `${appBaseUrl()}/confirm-email?token=${encodeURIComponent(opts.token)}&email=${encodeURIComponent(opts.to)}`;
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Confirm your new email address</h1>
+    <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      The FORGE account for <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.currentEmail)}</strong> asked to move to this address. Click the button to confirm. Nothing changes until you do; the link expires in 24 hours.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${url}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Confirm new address</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:${EMAIL_HEX.muted};">
+      If the button doesn't work, paste this URL in your browser:<br/>
+      <span style="color:${EMAIL_HEX.muted};word-break:break-all;">${url}</span>
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};">
+      Didn't ask for this? Ignore this email and nothing changes.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: "Confirm your new FORGE email address",
+    html: emailShell("Confirm your new email address", body),
+    text: `The FORGE account for ${opts.currentEmail} asked to move to this address. Confirm by visiting: ${url}\n\nNothing changes until you do; the link expires in 24 hours. If you didn't ask for this, ignore this email.`,
+  });
+}
+
+/** BL-STAB-8b-3 — the old address is told: a change was requested, or it went through. */
+export async function sendEmailChangeNoticeEmail(opts: { to: string; newEmail: string; confirmed: boolean }): Promise<void> {
+  const url = `${appBaseUrl()}/settings/security`;
+  const headline = opts.confirmed ? "Your FORGE email address changed" : "A change of email address was requested";
+  const line = opts.confirmed
+    ? `Your FORGE account now signs in as <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.newEmail)}</strong>, and every open session was signed out. This address no longer opens the account.`
+    : `Someone signed in to your FORGE account and asked to move it to <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.newEmail)}</strong>. Nothing changes until that inbox confirms within 24 hours. If this was you, there is nothing to do.`;
+  const action = opts.confirmed
+    ? "If this was not you, contact your administrator at once: they can reset your two-step sign-in and your password."
+    : `If this was not you, cancel it under Settings → Security (${url}) and change your password.`;
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">${headline}</h1>
+    <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">${line}</p>
+    <p style="margin:0;font-size:12px;color:${EMAIL_HEX.muted};">${escapeHtml(action)}</p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: headline,
+    html: emailShell(headline, body),
+    text: `${headline}. ${line.replace(/<[^>]+>/g, "")}\n\n${action}`,
+  });
+}
+
 export function emailConfigured(): boolean {
   return !!apiKey;
 }

@@ -70,6 +70,9 @@ export const users = pgTable("user", {
   passwordHash: text("password_hash"),
   isSuperadmin: boolean("is_superadmin").notNull().default(false),
   disabledAt: timestamp("disabled_at"),
+  /** BL-STAB-8b-3 — a change of address waiting for the new inbox's click (24 hours). */
+  pendingEmail: text("pending_email"),
+  pendingEmailAt: timestamp("pending_email_at"),
   /** BL-STAB-8a — set at the first confirmed factor; cleared when the last is removed or reset. */
   mfaEnrolledAt: timestamp("mfa_enrolled_at"),
   /** BL-STAB-8a — bumped to end every open session of this user (8a-2 reads it). */

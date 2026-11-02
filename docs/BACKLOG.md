@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 deliverability (this PR); then 8b-3, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1454,7 +1454,19 @@ mind. Bandage will come off but a true fix will stay."
       the invite still allowed (the admin may know better), recorded on
       the audit row. Unit-tested with a stubbed resolver; a tiny
       runtime test against a known domain is skipped offline.
-    - **8b-3 — change of address (one PR).** Settings → Security gains
+    - **8b-3 — change of address** (this PR). Shipped as designed:
+      `src/lib/email-change.ts` (pure rules, tested), `email-change-store`
+      (the pending change on the user row, migration 0144; a 24-hour
+      `change-email` token keyed by the new address; `confirmEmailChange`
+      moves the address, stamps it verified, clears the pending change
+      and bumps `session_version`, refusing spent, stale, cancelled or
+      taken), `requestEmailChangeAction` (sign-up rules plus the
+      deliverability check, a current code via the shared limiter, the
+      two emails, audit `user.email.change_requested`),
+      `cancelEmailChangeAction`, the **Email address** panel on Settings →
+      Security, and `/confirm-email` (no session needed; audit
+      `user.email.change`, the old address told). User Manual §1.6,
+      Admin Manual §2.10. Original plan: Settings → Security gains
       **Change email**: the new address (validated and deliverability-
       checked), a current second-step code, then a verification link to
       the new address (24 hours, one pending change per user on the

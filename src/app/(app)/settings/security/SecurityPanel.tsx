@@ -6,7 +6,7 @@ import { browserSupportsWebAuthn, startRegistration, WebAuthnError } from "@simp
 import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/types";
 import { Panel } from "@/components/ui/Panel";
 import { MFA_LIMITS } from "@/lib/mfa-constants";
-import { beginEnrolmentAction, beginPasskeyRegistrationAction, confirmEnrolmentAction, finishPasskeyRegistrationAction, regenerateRecoveryCodesAction, removeFactorAction } from "./actions";
+import { beginEnrolmentAction, beginPasskeyRegistrationAction, cancelEmailChangeAction, confirmEnrolmentAction, finishPasskeyRegistrationAction, regenerateRecoveryCodesAction, removeFactorAction, requestEmailChangeAction } from "./actions";
 
 export type FactorRow = { id: string; kind: string; label: string; createdAt: string; lastUsedAt: string | null };
 
@@ -19,7 +19,7 @@ type Enrolment = { factorId: string; secret: string; uri: string; qrSvg: string 
  * actions. With `requirePasskey` (a platform superadmin at the gate)
  * the passkey is the only way on.
  */
-export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref, requirePasskey }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string; requirePasskey?: boolean }) {
+export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref, requirePasskey, pendingEmail = null }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string; requirePasskey?: boolean; /** BL-STAB-8b-3 — a change of address waiting for the new inbox. */ pendingEmail?: string | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +31,35 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
   const [codes, setCodes] = useState<string[] | null>(null);
   const [askCodeFor, setAskCodeFor] = useState<{ kind: "remove"; factorId: string } | { kind: "regenerate" } | null>(null);
   const [askCode, setAskCode] = useState("");
+  // BL-STAB-8b-3 — the change of address.
+  const [changing, setChanging] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailNote, setEmailNote] = useState<string | null>(null);
+
+  function requestEmailChange() {
+    setEmailError(null);
+    startTransition(async () => {
+      const res = await requestEmailChangeAction({ newEmail, code: emailCode });
+      if (!res.ok) return setEmailError(res.error);
+      setChanging(false);
+      setNewEmail("");
+      setEmailCode("");
+      setEmailNote(`We sent a confirmation link to ${res.pendingEmail}. Nothing changes until it is clicked.`);
+      router.refresh();
+    });
+  }
+
+  function cancelEmailChange() {
+    setEmailError(null);
+    startTransition(async () => {
+      const res = await cancelEmailChangeAction();
+      if (!res.ok) return setEmailError(res.error);
+      setEmailNote("The change was cancelled.");
+      router.refresh();
+    });
+  }
 
   function begin() {
     setError(null);
@@ -214,6 +243,53 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
         </Panel>
       </div>
       <div className="flex flex-col gap-4">
+        {!continueHref ? (
+          <Panel
+            title="Email address"
+            eyebrow={pendingEmail ? "Change pending" : "Sign-in address"}
+            actions={
+              !changing && !pendingEmail && factors.length > 0 ? (
+                <button type="button" className="aur-link font-mono text-[10px] uppercase tracking-widest" disabled={pending} onClick={() => { setChanging(true); setEmailError(null); setEmailNote(null); }}>
+                  Change
+                </button>
+              ) : null
+            }
+          >
+            <p className="font-body text-[13px] leading-[1.5] text-text">{email}</p>
+            {pendingEmail ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="font-body text-[12px] leading-[1.5] text-muted">
+                  Moving to <span className="text-text">{pendingEmail}</span> once that inbox clicks its link (24 hours). Until then you sign in with the address above.
+                </p>
+                <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={cancelEmailChange}>
+                  Cancel the change
+                </button>
+              </div>
+            ) : null}
+            {!pendingEmail && !changing && factors.length === 0 ? (
+              <p className="mt-1 font-body text-[12px] leading-[1.5] text-muted">Set up two-step sign-in to change your address: a current code is asked for.</p>
+            ) : null}
+            {changing ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="font-body text-[12px] leading-[1.5] text-muted">
+                  A link goes to the new address and a notice to this one; nothing changes until the new inbox confirms. Then every session signs out and you sign in with the new address. Your password, factors and Google / Microsoft links stay.
+                </p>
+                <input className="aur-input" type="email" autoComplete="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="new.address@company.com" disabled={pending} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <input className="aur-input w-44 font-mono" autoComplete="one-time-code" value={emailCode} onChange={(e) => setEmailCode(e.target.value)} placeholder="123 456 or a recovery code" disabled={pending} />
+                  <button type="button" className="aur-btn aur-btn-primary" disabled={pending || !newEmail.includes("@") || emailCode.trim().length < 6} onClick={requestEmailChange}>
+                    Send confirmation link
+                  </button>
+                  <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => { setChanging(false); setEmailError(null); }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {emailError ? <p className="mt-2 font-body text-[12px] text-rose">{emailError}</p> : null}
+            {emailNote ? <p className="mt-2 font-body text-[12px] text-green">{emailNote}</p> : null}
+          </Panel>
+        ) : null}
         <Panel
           title="Recovery codes"
           eyebrow={factors.length === 0 ? "After the first authenticator" : `${recoveryCodesLeft} of ${MFA_LIMITS.recoveryCodes} unused`}
