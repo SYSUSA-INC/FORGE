@@ -18,12 +18,15 @@ export function InviteLinkNotice({
   warning,
   sentTo,
   kind = "invite",
+  domainWarning,
 }: {
   url: string | null;
   emailSent: boolean;
   warning?: string;
   sentTo: string;
   kind?: "invite" | "reset";
+  /** BL-STAB-8b-2 — the address's domain receives no mail. */
+  domainWarning?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -84,6 +87,7 @@ export function InviteLinkNotice({
           personal to {sentTo}.
         </div>
       ) : null}
+      {domainWarning ? <div className="mt-1 text-[10px] text-gold">{domainWarning}</div> : null}
     </div>
   );
 }

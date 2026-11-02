@@ -433,7 +433,7 @@ function CrossDomainApprovalsPanel({ approvals }: { approvals: ApprovalRow[] }) 
           <InviteLinkNotice
             url={done.res.inviteUrl}
             emailSent={done.res.emailSent}
-            warning={done.res.warning}
+            warning={done.res.warning} domainWarning={done.res.domainWarning}
             sentTo={`${done.email} (${done.tenantName})`}
           />
         </div>
@@ -637,7 +637,7 @@ function InviteUserPanel({ orgs }: { orgs: OrgRow[] }) {
           <InviteLinkNotice
             url={result.res.inviteUrl}
             emailSent={result.res.emailSent}
-            warning={result.res.warning}
+            warning={result.res.warning} domainWarning={result.res.domainWarning}
             sentTo={`${result.email} (${result.tenantName})`}
           />
         ) : null}
@@ -734,7 +734,7 @@ function CreateOrgPanel({ className }: { className?: string }) {
           <InviteLinkNotice
             url={success.res.inviteUrl}
             emailSent={success.res.emailSent}
-            warning={success.res.warning}
+            warning={success.res.warning} domainWarning={success.res.domainWarning}
             sentTo={success.email}
           />
         ) : null}
@@ -899,7 +899,7 @@ function OrgRowItem({
               <InviteLinkNotice
                 url={inviteLink.res.inviteUrl}
                 emailSent={inviteLink.res.emailSent}
-                warning={inviteLink.res.warning}
+                warning={inviteLink.res.warning} domainWarning={inviteLink.res.domainWarning}
                 sentTo={inviteLink.email}
               />
             </div>

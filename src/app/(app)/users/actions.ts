@@ -16,6 +16,7 @@ import {
   requireOrgAdmin,
 } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { checkDomainDeliverability, INVITE_DOMAIN_WARNING } from "@/lib/email-deliverability";
 import { inviteUrl } from "@/lib/app-url";
 import {
   crossDomainReason,
@@ -140,6 +141,11 @@ export async function inviteUserAction(input: {
     return { ok: false, error: "That email already belongs to a member." };
   }
 
+  // BL-STAB-8b-2 — a domain with no mail records is a warning here, not a
+  // refusal: the admin may know better, and the link can be handed over.
+  const deliverability = await checkDomainDeliverability(domainOf(email));
+  const domainWarning = deliverability.verdict === "undeliverable" ? INVITE_DOMAIN_WARNING : undefined;
+
   // BL-AUTH-DOMAIN — by default a person may only join the tenant that
   // owns their email domain. A tenant admin cannot add anyone from
   // another domain on their own: the invite is created on hold, nothing
@@ -232,6 +238,7 @@ export async function inviteUserAction(input: {
       emailSent: false,
       pendingApproval: true,
       warning: notice.warning ? `${reason} ${notice.warning}` : reason,
+      domainWarning,
     };
   }
 
@@ -263,6 +270,7 @@ export async function inviteUserAction(input: {
       crossDomain,
       platformApproved: crossDomain ? !!platformApprovedAt : undefined,
       emailSent: delivery.emailSent,
+      domainDeliverable: deliverability.verdict,
     },
   });
 
@@ -291,6 +299,7 @@ export async function inviteUserAction(input: {
     inviteUrl: delivery.inviteUrl,
     emailSent: delivery.emailSent,
     warning: delivery.warning,
+    domainWarning,
   };
 }
 

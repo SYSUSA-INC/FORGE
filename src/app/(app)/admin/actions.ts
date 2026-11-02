@@ -66,6 +66,7 @@ export async function createOrganizationAction(input: {
     ok: true,
     inviteId: res.inviteId,
     inviteUrl: res.inviteUrl,
+    domainWarning: res.domainWarning,
     emailSent: res.emailSent,
     warning: res.warning,
   };

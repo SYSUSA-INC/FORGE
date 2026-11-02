@@ -64,7 +64,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
   const [error, setError] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
-  const [approved, setApproved] = useState<{ inviteUrl: string | null; emailSent: boolean; warning?: string; organizationId: string } | null>(null);
+  const [approved, setApproved] = useState<{ inviteUrl: string | null; emailSent: boolean; warning?: string; domainWarning?: string; organizationId: string } | null>(null);
 
   function approve() {
     if (!window.confirm(`Create a workspace for ${r.company}, invite ${r.email} as its admin and start a ${TRIAL_DAYS}-day trial?`)) return;
@@ -72,7 +72,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
     startTransition(async () => {
       const res = await approveTrialRequestAction(r.id);
       if (!res.ok) return setError(res.error);
-      setApproved({ inviteUrl: res.inviteUrl, emailSent: res.emailSent, warning: res.warning, organizationId: res.organizationId });
+      setApproved({ inviteUrl: res.inviteUrl, emailSent: res.emailSent, warning: res.warning, domainWarning: res.domainWarning, organizationId: res.organizationId });
     });
   }
 
@@ -125,7 +125,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
       ) : null}
       {approved ? (
         <div className="mt-2 flex flex-col gap-2">
-          <InviteLinkNotice url={approved.inviteUrl} emailSent={approved.emailSent} warning={approved.warning} sentTo={r.email} />
+          <InviteLinkNotice url={approved.inviteUrl} emailSent={approved.emailSent} warning={approved.warning} domainWarning={approved.domainWarning} sentTo={r.email} />
           <Link href={`/admin/orgs/${approved.organizationId}`} className="font-mono text-[11px] text-indigo-300 underline-offset-2 hover:underline">
             Open the new workspace →
           </Link>

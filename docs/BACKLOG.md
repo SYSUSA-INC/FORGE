@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 the gate (this PR); then 8b-2, 8b-3, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 deliverability (this PR); then 8b-3, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1428,7 +1428,19 @@ mind. Bandage will come off but a true fix will stay."
       when it is true. The unverified-purge keeps its 7-day rule and
       its "alone in every workspace" guard, so an invitee who never
       verified is not deleted from under a workspace.
-    - **8b-2 — deliverability (one PR).** `src/lib/email-deliverability.ts`:
+    - **8b-2 — deliverability** (this PR). Shipped as designed, with one
+      addition: a canary. A domain that comes back "no such domain / no
+      records" is refused only when the resolver can also find
+      `sysgov.com` (`EMAIL_DELIVERABILITY_CANARY` overrides); a resolver
+      that finds nothing, as in a sandbox without DNS, gives no verdict
+      and the address goes through, logged. Refusal at `/api/register`
+      (self-service) and `/api/trial-request`; a warning (`domainWarning`
+      on `InviteResult`, shown in amber under the link) on the tenant and
+      superadmin invite actions, on Onboard a new organization and on a
+      trial approval; the audit row carries `domainDeliverable`. Unit
+      tests with a stubbed resolver cover MX, null MX, A / AAAA fallback,
+      SERVFAIL and timeout as unknown, the canary, the cache and that
+      unknown is never cached. Original plan: `src/lib/email-deliverability.ts`:
       a domain receives mail when it has an MX record, or, with none,
       an A/AAAA record (RFC 5321 §5.1); `dns.promises` with a 3-second
       budget, the verdict cached in memory for an hour per domain; a
