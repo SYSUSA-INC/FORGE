@@ -86,6 +86,8 @@ Emails from FORGE (verification, password reset, invitations, review assignments
 
 Look for an email from `Forge <noreply@sysgov.com>` titled **"Verify your email for Forge"**. Click **Verify email** (or paste the link into a browser). The link expires in 24 hours.
 
+**Did not get it, or the link expired?** Sign in with your password: FORGE says the address is not verified yet and offers **Resend verification**; the same button is on the page an expired link opens. The reply is the same whether or not the address has an account waiting, and three requests an hour is the limit. Until the address is verified no sign-in opens FORGE, whether by password or by Google / Microsoft.
+
 ![Verification email](docs/images/verify-email.png)
 
 After verification you land on the sign-in page with an **Email verified** confirmation.
@@ -99,6 +101,8 @@ On **https://www.sysgov.com/sign-in** enter your email + password and click **Si
 If your organization uses SSO, use **Continue with Google** or **Continue with Microsoft** instead. A Google or Microsoft sign-in opens the FORGE account it is already connected to. It never attaches itself to an existing account just because the email address matches: if you created your account with a password, sign in with the password (the page says so), and the Google or Microsoft route becomes yours only through an invitation to that address. Someone with no FORGE account gets one this way only through an invitation, or where self-service sign-up is open. Microsoft sign-ins work only from the Microsoft organizations your administrator has allowed, and a provider that has not verified your address is refused.
 
 After you sign in, FORGE returns you to the page you were trying to open, but only when it is a page inside FORGE; a link that points anywhere else (including one written with a backslash, such as `/\example.com`) takes you to the Command Center instead.
+
+**Not verified yet.** With the right password on an address that never verified, the page says so and offers **Resend verification** (§1.2). A wrong password gets the usual "incorrect email or password", whatever the address's state.
 
 **The second step (BL-STAB-8).** After your password, or after Google / Microsoft, FORGE asks for the six-digit code from your authenticator app (or one of your recovery codes) before anything opens; see §1.6. You have ten minutes for it, five wrong codes lock it for 15 minutes, and the first sign-in after the release (or after an administrator's reset) takes you to a set-up page instead if you have no passkey or authenticator yet.
 
@@ -124,6 +128,8 @@ If your organization uses SSO, you can instead go to the sign-in page and use **
 By default you can only join the organization that owns your email domain. If you were invited to an organization from a different domain, the invitation is held until a platform administrator approves it: you will not receive the email until then, and a link that lands on **Invitation awaiting approval** means exactly that. Once approved, the invitation arrives as described above.
 
 ---
+
+**A link you were handed, not emailed.** When your admin copied the link and sent it some other way (chat, a text), the account is created but your address is not yet verified: FORGE emails you a verification link right after you set your password, and sign-in waits for it. A link that arrived in your inbox needs no further step.
 
 ### 1.6 Two-step sign-in (BL-STAB-8)
 

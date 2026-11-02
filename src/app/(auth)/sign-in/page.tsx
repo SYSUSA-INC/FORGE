@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { OAUTH_ERROR_MESSAGES } from "@/lib/oauth-policy";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { ResendVerification } from "@/components/auth/ResendVerification";
 import { SsoButtons } from "@/components/auth/SsoButtons";
 import { safeRedirectTarget } from "@/lib/safe-redirect";
 import { SignInForm } from "./SignInForm";
@@ -9,7 +10,7 @@ import { SignInForm } from "./SignInForm";
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: { error?: string; callbackUrl?: string; verified?: string };
+  searchParams: { error?: string; callbackUrl?: string; verified?: string; email?: string };
 }) {
   // Validate callbackUrl — only allow same-origin relative paths.
   // Anything off-origin / protocol-relative / pointing at an API
@@ -62,6 +63,7 @@ export default async function SignInPage({
               {errorMessage(error)}
             </div>
           ) : null}
+          {error === "unverified_email" ? <ResendVerification email={searchParams.email ?? ""} /> : null}
 
           <SignInForm callbackUrl={safeCallback} />
 
@@ -97,6 +99,9 @@ function errorMessage(error: string): string {
   // BL-STAB-8a-0 — the OAuth policy's refusals, by their query value.
   if (OAUTH_ERROR_MESSAGES[error]) return OAUTH_ERROR_MESSAGES[error]!;
   switch (error) {
+    case "unverified_email":
+      // BL-STAB-8b-1 — shown only after a right password on an unverified address.
+      return "Verify your email address first: use the link we sent you, or ask for a new one below.";
     case "CredentialsSignin":
       return "Invalid email or password.";
     case "AccessDenied":

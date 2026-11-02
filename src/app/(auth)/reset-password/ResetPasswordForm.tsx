@@ -32,13 +32,13 @@ export function ResetPasswordForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, email, password }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
+      const data = (await res.json()) as { ok: boolean; error?: string; verified?: boolean };
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Something went wrong. Try again.");
         setLoading(false);
         return;
       }
-      router.push("/reset-password?done=1");
+      router.push(data.verified === false ? "/reset-password?done=1&verify=1" : "/reset-password?done=1");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Try again.");
       setLoading(false);

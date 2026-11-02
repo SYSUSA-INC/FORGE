@@ -92,7 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design (this PR); then 8b-1…3, 8c, 8d |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 the gate (this PR); then 8b-2, 8b-3, 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
@@ -1394,7 +1394,24 @@ mind. Bandage will come off but a true fix will stay."
       not travel through the inbox proves nothing; the address is
       checked for deliverability before an email is ever sent to it;
       a changed address is a new address.
-    - **8b-1 — the gate (one PR).** The jwt sign-in callback refuses a
+    - **8b-1 — the gate** (this PR). Shipped as designed with one
+      simplification: the "went by email" flag lives on the token row
+      alone (`verificationToken.sent_by_email`, set by `markTokenSent`
+      when the invite, reset or verification email actually went; read
+      by `consumeTokenDetailed`), so no `allowlist` column was needed.
+      `acceptInvite` and `/api/reset-password` verify the address only
+      from an emailed link and otherwise send the verification email;
+      the credentials provider refuses an unverified address with the
+      one revealing code (`unverified_email`, only after a right
+      password) and the sign-in page offers **Resend verification**
+      (`/api/resend-verification`: 3 per address, 10 per IP, an hour,
+      fail closed, neutral reply); the jwt callback refuses any provider
+      a session for an unverified row; OAuth stamps the opened account;
+      migration 0143 backfills accounts holding a provider link. Verified
+      end to end: wrong password generic, right password → the message
+      and the resend, the limiter's fourth call 429, and sign-in after
+      verification reaching the second step. Original plan:
+      The jwt sign-in callback refuses a
       user whose `emailVerified` is empty, for every provider; the
       sign-in page says so (`unverified_email`) with a **Resend
       verification** link, rate-limited per address (3 per hour, fail

@@ -55,7 +55,9 @@ export function SignUpForm({ invite }: { invite?: InviteProps }) {
         setLoading(false);
         return;
       }
-      if (invite || data.verified) {
+      // BL-STAB-8b-1 — an invite link that was copied rather than emailed
+      // leaves the address unverified: the inbox gets the link next.
+      if (data.verified) {
         router.push("/sign-in?verified=1");
       } else {
         router.push("/sign-up?sent=1");

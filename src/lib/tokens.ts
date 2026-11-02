@@ -67,11 +67,33 @@ export async function peekToken(
   return Boolean(row && row.expires.getTime() >= Date.now());
 }
 
+/**
+ * BL-STAB-8b-1 — the live token for this purpose and subject went out by
+ * email. A link that travelled through the inbox proves the address when
+ * it is used; a copied one (email not configured, or handed over some
+ * other way) does not, and the account verifies separately.
+ */
+export async function markTokenSent(purpose: TokenPurpose, subject: string): Promise<void> {
+  await db
+    .update(verificationTokens)
+    .set({ sentByEmail: true })
+    .where(eq(verificationTokens.identifier, prefix(purpose, subject)));
+}
+
 export async function consumeToken(
   purpose: TokenPurpose,
   subject: string,
   rawToken: string,
 ): Promise<boolean> {
+  return (await consumeTokenDetailed(purpose, subject, rawToken)).ok;
+}
+
+/** `consumeToken`, and whether the spent link had gone out by email. */
+export async function consumeTokenDetailed(
+  purpose: TokenPurpose,
+  subject: string,
+  rawToken: string,
+): Promise<{ ok: boolean; sentByEmail: boolean }> {
   const identifier = prefix(purpose, subject);
   const hashed = hashToken(rawToken);
 
@@ -86,7 +108,7 @@ export async function consumeToken(
     )
     .limit(1);
 
-  if (!row) return false;
+  if (!row) return { ok: false, sentByEmail: false };
   if (row.expires.getTime() < Date.now()) {
     await db
       .delete(verificationTokens)
@@ -96,7 +118,7 @@ export async function consumeToken(
           eq(verificationTokens.token, hashed),
         ),
       );
-    return false;
+    return { ok: false, sentByEmail: false };
   }
 
   await db
@@ -108,7 +130,7 @@ export async function consumeToken(
       ),
     );
 
-  return true;
+  return { ok: true, sentByEmail: row.sentByEmail };
 }
 
 export async function purgeExpiredTokens(): Promise<void> {

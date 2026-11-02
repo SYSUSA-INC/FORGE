@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
@@ -144,6 +144,11 @@ export async function currentSessionEpoch(): Promise<number> {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** BL-STAB-8b-1 — the credentials sign-in's one revealing refusal: right password, address not yet verified. */
+class UnverifiedEmail extends CredentialsSignin {
+  code = "unverified_email";
+}
+
 export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
   adapter: DrizzleAdapter(db),
   ...authConfig,
@@ -173,11 +178,14 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
           .limit(1);
         if (!user) return null;
         if (!user.passwordHash) return null;
-        if (!user.emailVerified) return null;
         if (user.disabledAt) return null;
 
         const ok = await verifyPassword(password, user.passwordHash);
         if (!ok) return null;
+        // BL-STAB-8b-1 — the right password on an unverified address: say
+        // so (the password already proves who is asking) and offer the
+        // verification email again; a wrong password stays "invalid".
+        if (!user.emailVerified) throw new UnverifiedEmail();
 
         return {
           id: user.id,
@@ -207,6 +215,9 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
   events: {
     async createUser({ user }) {
       if (!user.id) return;
+      // BL-STAB-8b-1 — a Google / Microsoft sign-in reaches here only with a
+      // provider-verified address (callbacks.signIn): FORGE's stamp too.
+      await db.update(users).set({ emailVerified: sql`COALESCE(${users.emailVerified}, now())` }).where(eq(users.id, user.id));
 
       // BL-AUTH-INVITE — an invitee who signs in with Google / Microsoft
       // instead of the emailed link: the provider proved the address, the
@@ -322,6 +333,12 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
           log.warn("[auth]", "oauth sign-in refused", { provider: account.provider, code: decision.code, identity: email ?? account.providerAccountId });
           return `/sign-in?error=${oauthErrorParam(decision.code)}`;
         }
+        // BL-STAB-8b-1 — the policy let only a provider-verified address
+        // through: FORGE's own stamp follows for the account it opens.
+        const opened = linked[0] ?? byEmail[0];
+        if (opened) {
+          await db.update(users).set({ emailVerified: sql`COALESCE(${users.emailVerified}, now())` }).where(eq(users.id, opened.id));
+        }
         return true;
       }
       // Password sign-in: `authorize` already refused a disabled person; this
@@ -343,10 +360,16 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
         // enrols first. The pending id keys the server-side pass marker.
         token.id = user.id;
         const [row] = await db
-          .select({ mfaEnrolledAt: users.mfaEnrolledAt, sessionVersion: users.sessionVersion, isSuperadmin: users.isSuperadmin })
+          .select({ mfaEnrolledAt: users.mfaEnrolledAt, sessionVersion: users.sessionVersion, isSuperadmin: users.isSuperadmin, emailVerified: users.emailVerified })
           .from(users)
           .where(eq(users.id, user.id))
           .limit(1);
+        // BL-STAB-8b-1 — no session for an unverified address, whoever
+        // created the account and whatever provider signed it in.
+        if (!row?.emailVerified) {
+          log.warn("[auth]", "sign-in refused: email not verified", { userId: user.id });
+          return null;
+        }
         const enforcement = mfaEnforcementNow();
         token.iatMs = now;
         token.lastActive = now;

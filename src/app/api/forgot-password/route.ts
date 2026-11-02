@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { emailConfigured, sendPasswordResetEmail } from "@/lib/email";
-import { issueToken } from "@/lib/tokens";
+import { issueToken, markTokenSent } from "@/lib/tokens";
 import { log } from "@/lib/log";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 
@@ -64,6 +64,7 @@ export async function POST(req: Request) {
     } else {
       try {
         await sendPasswordResetEmail(email, token);
+        await markTokenSent("reset-password", email);
       } catch (err) {
         log.error("[forgot-password]", "sendPasswordResetEmail failed", { error: err });
       }
