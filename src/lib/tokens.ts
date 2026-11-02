@@ -3,12 +3,14 @@ import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { verificationTokens } from "@/db/schema";
 
-export type TokenPurpose = "verify-email" | "reset-password" | "invite";
+export type TokenPurpose = "verify-email" | "reset-password" | "invite" | "change-email";
 
 const LIFETIMES_MS: Record<TokenPurpose, number> = {
   "verify-email": 24 * 60 * 60 * 1000,
   "reset-password": 60 * 60 * 1000,
   invite: 7 * 24 * 60 * 60 * 1000,
+  // BL-STAB-8b-3 — the link to the new address.
+  "change-email": 24 * 60 * 60 * 1000,
 };
 
 function prefix(purpose: TokenPurpose, subject: string): string {

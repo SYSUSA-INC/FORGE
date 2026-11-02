@@ -10,6 +10,10 @@ import { getSessionUser, requireAuth, requireAuthOrPending } from "@/lib/auth-he
 import { log } from "@/lib/log";
 import { beginTotpEnrolment, confirmTotpEnrolment, regenerateRecoveryCodes, removeFactor, verifyUserCode } from "@/lib/mfa-store";
 import { beginPasskeyRegistration, finishPasskeyRegistration, superadminNeedsPasskey } from "@/lib/passkeys";
+import { checkNewEmail } from "@/lib/email-change";
+import { cancelEmailChange, requestEmailChange } from "@/lib/email-change-store";
+import { domainRefusesMail, UNDELIVERABLE_MESSAGE } from "@/lib/email-deliverability";
+import { emailConfigured, sendEmailChangeConfirmEmail, sendEmailChangeNoticeEmail } from "@/lib/email";
 import { enforceRateLimit, peekRateLimit } from "@/lib/rate-limit";
 import type { RegistrationResponseJSON } from "@simplewebauthn/types";
 
@@ -119,4 +123,49 @@ export async function regenerateRecoveryCodesAction(input: { code: string }): Pr
   await audit("user.mfa.recovery_regenerate", { verifiedWith: check.method });
   revalidatePath(PATH);
   return { ok: true, recoveryCodes };
+}
+
+/**
+ * BL-STAB-8b-3 — a change of address: the new address checked like a
+ * sign-up's, a current code (the account's recovery channel moves), then
+ * the link to the new inbox and a notice to the old one. Nothing moves
+ * until the new inbox clicks.
+ */
+export async function requestEmailChangeAction(input: { newEmail: string; code: string }): Promise<{ ok: true; pendingEmail: string } | { ok: false; error: string }> {
+  const user = await requireAuth();
+  const checked = checkNewEmail(user.email, input.newEmail);
+  if (!checked.ok) return checked;
+  if (!emailConfigured()) return { ok: false, error: "Email is not configured on this deployment, so a new address cannot be confirmed. Ask an administrator." };
+  if (!(await codeAllowed(user.id))) return { ok: false, error: "Too many wrong codes. Wait 15 minutes and try again." };
+  const check = await verifyUserCode({ userId: user.id, code: input.code });
+  if (!check.ok) {
+    await countWrongCode(user.id);
+    return { ok: false, error: "Enter a current code from one of your authenticators (or a recovery code) to change your address." };
+  }
+  if (await domainRefusesMail(checked.email)) return { ok: false, error: UNDELIVERABLE_MESSAGE };
+  const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, checked.email)).limit(1);
+  if (taken) {
+    log.info("[email-change]", "refused: address in use", { userId: user.id });
+    return { ok: false, error: "That address can't be used." };
+  }
+  const { token } = await requestEmailChange({ userId: user.id, newEmail: checked.email });
+  try {
+    await sendEmailChangeConfirmEmail({ to: checked.email, token, currentEmail: user.email ?? "" });
+    if (user.email) await sendEmailChangeNoticeEmail({ to: user.email, newEmail: checked.email, confirmed: false });
+  } catch (err) {
+    log.error("[email-change]", "emails failed", { userId: user.id, error: err instanceof Error ? err.message : err });
+    await cancelEmailChange(user.id);
+    return { ok: false, error: "The confirmation email could not be sent. Try again later." };
+  }
+  await audit("user.email.change_requested", { from: user.email, to: checked.email, verifiedWith: check.method });
+  revalidatePath(PATH);
+  return { ok: true, pendingEmail: checked.email };
+}
+
+export async function cancelEmailChangeAction(): Promise<Result> {
+  const user = await requireAuth();
+  await cancelEmailChange(user.id);
+  await audit("user.email.change_cancelled", {});
+  revalidatePath(PATH);
+  return { ok: true };
 }
