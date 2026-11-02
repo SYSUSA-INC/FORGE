@@ -2855,11 +2855,62 @@ one group open at a time, the active page's group always open, state
 remembered per browser (`forge.nav.collapsed.v3`). Members see 7 groups
 and 25 items (45 before); the open group is what shows.
 
+**Phase 1 design — Identify (proposed 2026-11-02; approved by merging
+this PR; built as 1a and 1b).** What is true today: Scout lists the
+nightly finds with **Import as opportunity** and **Dismiss** and a
+"Search SAM.gov yourself" button; Import from SAM.gov, Paste from eBuy
+and Paste GSA email are three pages that each create an opportunity
+(GSA attaches the pasted email's files); New opportunity is a 20-field
+form; New solicitation uploads a document, parses it (requirements,
+Sections L and M, dates) onto a `solicitation` record, and
+**Convert to opportunity** creates the opportunity and links the record
+(`solicitation.opportunity_id`); the opportunity page already lists its
+linked solicitations. The two creates and the four ways in are six
+places for one job.
+- **1a — Create, one page** (`/opportunities/new`, replacing New
+  opportunity and New solicitation). Two ways on one page: **From a
+  document** (drop the RFP / RFI / RFQ / Sources Sought through the
+  upload path; FORGE parses it with the solicitation parser as today
+  and pre-fills the form: title, agency, solicitation number, NAICS,
+  PSC, set-aside, response due, place of performance; the person
+  corrects and saves) and **By hand** (the form as today). Either way
+  the result is one opportunity at Identified with the document
+  attached as a linked solicitation from birth, so no solicitation
+  record exists without its opportunity and the Evaluate work
+  (requirements, L and M, compliance) is already on it. The parse runs
+  while the person types ("Reading the document…"); saving before it
+  finishes is fine, the link is set regardless. `/solicitations/new`
+  redirects to Create with the document way open; the Solicitations
+  list stays as the documents view until phase 2 makes it a tab of the
+  opportunity. Audit `opportunity.create` gains `from: document | hand`.
+- **1b — Scout, the one-stop page** (`/opportunities/scout`). Top: a
+  tile for what sits in Identify ("N identified, waiting for
+  evaluation", opening the stage list) beside the scout's own tiles.
+  Then the finds, each with **Add to pipeline** (today's Import as
+  opportunity, renamed; always lands at Identified, the scout's
+  recommendation kept on the find) and **Not for us** (dismiss). Below,
+  **Bring in an opportunity** with a source picker: **SAM.gov search**
+  (the existing import client), **GSA eBuy** (paste), **GSA email**
+  (paste, attachments linked), and the sources that do not exist yet,
+  **enterprise portals** and **GWACs** (GSA MAS, OASIS+, Alliant and the
+  like), each listed with **Request this source**, which files a source
+  request through the existing feature so demand is counted. The three
+  import URLs redirect to Scout with that source open, so bookmarks and
+  the manual's links keep working. The Identify strip becomes Scout ·
+  Create · Solicitations. The nightly run, the scoring and the grading
+  are unchanged.
+- **Not in phase 1:** the stored stage keys, the chevron on the
+  opportunity, anything in Evaluate.
+- **Open points for the owner:** (1) Create without a document still
+  makes an opportunity, proposed yes; (2) Add to pipeline never asks
+  for a stage, proposed yes, Identified every time; (3) a find the scout
+  called "skip" can still be added, proposed yes, with the call kept
+  for the scout's grading; (4) enterprise portals and GWACs ship as
+  **Request this source** entries until a first integration is chosen,
+  proposed yes.
+
 **Phases to come, one PR each, design reviewed first:**
-1. **Identify:** Create as one page merging New Opportunity and New
-   Solicitation; Scout as the one-stop import (SAM.gov, GSA eBuy, GSA
-   email, enterprise portals, GWACs) with **Add to pipeline** on each
-   find.
+1. **Identify:** designed above; built as 1a (Create) and 1b (Scout).
 2. **Evaluate:** the stage page replaces Solicitations; a solicitation
    becomes a document on the opportunity, not a record of its own;
    Analyze (PWin and its report) and the Capability matrix (Yes / Partial
