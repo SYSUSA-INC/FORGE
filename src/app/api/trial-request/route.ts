@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { HONEYPOT_FIELD, signupBotSignal } from "@/lib/account-hygiene-logic";
 import { log } from "@/lib/log";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
+import { domainRefusesMail, UNDELIVERABLE_MESSAGE } from "@/lib/email-deliverability";
 import { submitTrialRequest } from "@/lib/trial-requests";
 import { validateTrialRequest } from "@/lib/trial-request-logic";
 
@@ -40,6 +41,11 @@ export async function POST(req: Request) {
     const checked = validateTrialRequest(payload);
     if (!checked.ok) {
       return NextResponse.json({ ok: false, field: checked.field, error: checked.error }, { status: 400 });
+    }
+
+    // BL-STAB-8b-2 — the approval invite has to be able to arrive.
+    if (await domainRefusesMail(checked.value.email)) {
+      return NextResponse.json({ ok: false, field: "email", error: UNDELIVERABLE_MESSAGE }, { status: 400 });
     }
 
     const outcome = await submitTrialRequest({ value: checked.value, sourceIp: ip });

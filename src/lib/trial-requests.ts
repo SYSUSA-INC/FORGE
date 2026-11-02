@@ -132,7 +132,7 @@ export async function pendingTrialRequestCount(): Promise<number> {
 }
 
 export type ApproveResult =
-  | { ok: true; organizationId: string; inviteUrl: string | null; emailSent: boolean; warning?: string }
+  | { ok: true; organizationId: string; inviteUrl: string | null; emailSent: boolean; warning?: string; domainWarning?: string }
   | { ok: false; error: string };
 
 /**
@@ -182,7 +182,7 @@ export async function approveTrialRequest(input: { requestId: string; actor: Act
     resourceId: req.id,
     metadata: { company: req.company, email: req.email, trialStarted: trial.ok, superadmin: true },
   });
-  return { ok: true, organizationId: made.organizationId, inviteUrl: made.inviteUrl, emailSent: made.emailSent, warning: made.warning };
+  return { ok: true, organizationId: made.organizationId, inviteUrl: made.inviteUrl, emailSent: made.emailSent, warning: made.warning, domainWarning: made.domainWarning };
 }
 
 /** Decline with an optional internal reason. Nothing is sent to the requester. */

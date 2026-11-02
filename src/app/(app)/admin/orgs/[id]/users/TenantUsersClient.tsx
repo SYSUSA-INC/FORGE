@@ -459,7 +459,7 @@ export function TenantUsersClient({
                     <InviteLinkNotice
                       url={inviteLink.res.inviteUrl}
                       emailSent={inviteLink.res.emailSent}
-                      warning={inviteLink.res.warning}
+                      warning={inviteLink.res.warning} domainWarning={inviteLink.res.domainWarning}
                       sentTo={inviteLink.email}
                     />
                   </div>
@@ -654,7 +654,7 @@ function TenantInvitePanel({
             <InviteLinkNotice
               url={result.res.inviteUrl}
               emailSent={result.res.emailSent}
-              warning={result.res.warning}
+              warning={result.res.warning} domainWarning={result.res.domainWarning}
               sentTo={result.email}
             />
           </div>

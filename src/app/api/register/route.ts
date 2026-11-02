@@ -5,6 +5,7 @@ import { memberships, organizations, users } from "@/db/schema";
 import { hashPassword, validatePasswordStrength } from "@/lib/passwords";
 import { sendVerificationEmail } from "@/lib/email";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
+import { domainRefusesMail, UNDELIVERABLE_MESSAGE } from "@/lib/email-deliverability";
 import { acceptInvite } from "@/lib/invite-accept";
 import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { issueToken, markTokenSent } from "@/lib/tokens";
@@ -215,6 +216,13 @@ export async function POST(req: Request) {
         { ok: false, error: "Use your work email — disposable inboxes can't be used to sign up." },
         { status: 400 },
       );
+    }
+
+    // BL-STAB-8b-2 — the verification email has to be able to arrive: a
+    // domain with no mail records (a typo, a dead domain) is refused here,
+    // before anything is created. DNS trouble lets the address through.
+    if (await domainRefusesMail(email)) {
+      return NextResponse.json({ ok: false, error: UNDELIVERABLE_MESSAGE }, { status: 400 });
     }
 
     // BL-AUTH-DOMAIN — by default a person may only join the tenant that

@@ -394,7 +394,7 @@ function InvitePanel({
           <InviteLinkNotice
             url={result.res.inviteUrl}
             emailSent={result.res.emailSent}
-            warning={result.res.warning}
+            warning={result.res.warning} domainWarning={result.res.domainWarning}
             sentTo={result.email}
           />
         ) : null}
@@ -533,7 +533,7 @@ function PendingPanel({
                   <InviteLinkNotice
                     url={link.res.inviteUrl}
                     emailSent={link.res.emailSent}
-                    warning={link.res.warning}
+                    warning={link.res.warning} domainWarning={link.res.domainWarning}
                     sentTo={link.email}
                   />
                 </div>

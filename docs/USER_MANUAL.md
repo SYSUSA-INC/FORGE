@@ -66,6 +66,8 @@ A short tour of what arrived recently; each line points to the section that expl
 
 New to FORGE and not invited by a colleague? Open **https://www.sysgov.com/request-trial** (or **Request a trial** on the sign-up page) and enter your name, **company email**, company, and optionally your job title and what you'd like to try. Personal mailboxes (Gmail, Outlook, Yahoo …) and throwaway inboxes can't request a trial, and if your company is already on FORGE you'll be asked to get an invitation from its admin instead. We review every request; once approved you get an email inviting you to your own workspace with a **14-day trial**. When the trial ends your work stays and editing carries on; AI features pause until your admin chooses a plan.
 
+The same deliverability rule as sign-up applies: an address whose domain receives no email is refused with "That domain does not receive email", since the approval would be sent there.
+
 ### 1.1 Create your account
 
 Open **https://www.sysgov.com/sign-up**.
@@ -74,7 +76,7 @@ Open **https://www.sysgov.com/sign-up**.
 
 Fill in:
 - **Name** — how we'll display you in the app: the name colleagues know you by, 2–80 characters of letters, spaces, hyphens and apostrophes (any alphabet; no numbers, links or email addresses)
-- **Work email** — used for verification and sign-in; throwaway inboxes (Mailinator, YOPmail and the like) are not accepted
+- **Work email** — used for verification and sign-in; throwaway inboxes (Mailinator, YOPmail and the like) are not accepted, and the domain has to receive email: a misspelt or dead domain is refused with "That domain does not receive email" before anything is created, so the verification link can actually arrive
 - **Password** — at least 10 characters, with an uppercase, a lowercase, and a digit
 - **Confirm password**
 

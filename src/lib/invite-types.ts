@@ -27,6 +27,8 @@ export type InviteResult =
       warning?: string;
       /** BL-AUTH-DOMAIN — waiting for a platform admin; no link exists yet. */
       pendingApproval?: boolean;
+      /** BL-STAB-8b-2 — the invitee's domain receives no mail (the invite still went). */
+      domainWarning?: string;
     }
   | { ok: false; error: string };
 

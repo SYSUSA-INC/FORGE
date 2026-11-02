@@ -13,6 +13,7 @@ import {
 import { recordAudit } from "@/lib/audit-log";
 import { inviteUrl } from "@/lib/app-url";
 import { requireSuperadmin } from "@/lib/auth-helpers";
+import { checkDomainDeliverability, INVITE_DOMAIN_WARNING } from "@/lib/email-deliverability";
 import { domainOf, inviteAwaitsApproval, isCrossDomainInvite } from "@/lib/email-domain";
 import {
   approveCrossDomainInvite,
@@ -107,6 +108,10 @@ export async function superadminInviteUserAction(
     .limit(1);
   if (!org) return { ok: false, error: "Tenant not found." };
   if (org.disabledAt) return { ok: false, error: "That tenant is disabled. Enable it before inviting." };
+
+  // BL-STAB-8b-2 — a dead domain is a warning, not a refusal.
+  const deliverability = await checkDomainDeliverability(domainOf(email));
+  const domainWarning = deliverability.verdict === "undeliverable" ? INVITE_DOMAIN_WARNING : undefined;
 
   // BL-AUTH-DOMAIN — a platform admin IS the approver, so a cross-domain
   // invite issued here is stamped approved at creation (and audited as
@@ -232,6 +237,7 @@ export async function superadminInviteUserAction(
       platformApproved: crossDomain ? true : undefined,
       homeOrganizationId: homeOrganization?.id ?? null,
       emailSent: delivery.emailSent,
+      domainDeliverable: deliverability.verdict,
       viaSuperadmin: true,
     },
   });
@@ -258,6 +264,7 @@ export async function superadminInviteUserAction(
     inviteUrl: delivery.inviteUrl,
     emailSent: delivery.emailSent,
     warning: delivery.warning,
+    domainWarning,
   };
 }
 

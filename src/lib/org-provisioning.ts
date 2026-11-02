@@ -15,6 +15,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { allowlist, organizations, type Role } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
+import { checkDomainDeliverability, INVITE_DOMAIN_WARNING } from "@/lib/email-deliverability";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { deliverInvite } from "@/lib/invite-send";
 import { defaultOrgSlug } from "@/lib/org-defaults";
@@ -22,7 +23,7 @@ import { ensureTenantSubscription } from "@/lib/tenant-subscription";
 import { issueToken } from "@/lib/tokens";
 
 export type ProvisionResult =
-  | { ok: true; organizationId: string; inviteId: string; inviteUrl: string | null; emailSent: boolean; warning?: string }
+  | { ok: true; organizationId: string; inviteId: string; inviteUrl: string | null; emailSent: boolean; warning?: string; domainWarning?: string }
   | { ok: false; error: string };
 
 export async function provisionOrganizationWithAdminInvite(input: {
@@ -37,6 +38,9 @@ export async function provisionOrganizationWithAdminInvite(input: {
   const adminEmail = input.adminEmail.trim().toLowerCase();
   const adminDomain = domainOf(adminEmail);
   const ownsDomain = !!adminDomain && !isPublicEmailDomain(adminDomain);
+  // BL-STAB-8b-2 — a dead domain is a warning on the result, not a refusal.
+  const deliverability = await checkDomainDeliverability(adminDomain);
+  const domainWarning = deliverability.verdict === "undeliverable" ? INVITE_DOMAIN_WARNING : undefined;
 
   const [org] = await db
     .insert(organizations)
@@ -93,5 +97,5 @@ export async function provisionOrganizationWithAdminInvite(input: {
     },
   });
 
-  return { ok: true, organizationId, inviteId: invite.id, inviteUrl: delivery.inviteUrl, emailSent: delivery.emailSent, warning: delivery.warning };
+  return { ok: true, organizationId, inviteId: invite.id, inviteUrl: delivery.inviteUrl, emailSent: delivery.emailSent, warning: delivery.warning, domainWarning };
 }
