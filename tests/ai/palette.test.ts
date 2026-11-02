@@ -27,10 +27,12 @@ describe("paletteCommands", () => {
     const hrefs = (v: typeof member) => paletteCommands(v).map((c) => c.href);
     const m = hrefs(member);
     expect(m).toContain("/");
-    expect(m).toContain("/opportunities/scout");
+    // BL-NAV-LIFECYCLE — nested items (the stages, Scout and Create) are listed; the old pages are shortcuts.
+    expect(m).toContain("/pipeline/evaluate");
+    expect(m).toContain("/pipeline/identify?tab=scout");
+    expect(paletteCommands(member).find((c) => c.href === "/opportunities/import/ebuy")?.group).toBe("Shortcuts");
     // BL-NAV-LIFECYCLE — a page that became a tab stays a shortcut.
     expect(m).toContain("/knowledge-base/new");
-    expect(paletteCommands(member).find((c) => c.href === "/knowledge-base/new")?.group).toBe("Shortcuts");
     expect(m).toContain("/settings/ai-engine");
     expect(m).not.toContain("/users");
     expect(m).not.toContain("/audit-log");

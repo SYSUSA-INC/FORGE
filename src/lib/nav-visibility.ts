@@ -27,6 +27,8 @@ export type NavItemLike = {
   href: string;
   /** Visible only to org admins (or superadmins). */
   admin?: boolean;
+  /** BL-NAV-LIFECYCLE — nested items, filtered the same way. */
+  children?: NavItemLike[];
 };
 
 export type NavGroupLike = {
@@ -54,5 +56,17 @@ export function visibleNavChildren<I extends NavItemLike>(
   v: NavVisibility,
 ): I[] {
   if (!children) return [];
-  return children.filter((c) => !(c.admin && !v.isOrgAdmin && !v.isSuperadmin));
+  return children
+    .filter((c) => !(c.admin && !v.isOrgAdmin && !v.isSuperadmin))
+    .map((c) => (c.children ? { ...c, children: visibleNavChildren(c.children, v) } : c));
+}
+
+/** BL-NAV-LIFECYCLE — every item of a tree, depth first (the palette and the tests read this). */
+export function flattenNavItems<I extends NavItemLike>(children: readonly I[] | undefined): I[] {
+  const out: I[] = [];
+  for (const c of children ?? []) {
+    out.push(c);
+    if (c.children) out.push(...(flattenNavItems(c.children) as I[]));
+  }
+  return out;
 }

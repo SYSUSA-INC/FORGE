@@ -17,7 +17,7 @@
  * sidebar would hide), the ranking, and the "is this a question" rule.
  * Unit-tested.
  */
-import { visibleNavChildren, visibleNavGroups, type NavVisibility } from "@/lib/nav-visibility";
+import { flattenNavItems, visibleNavChildren, visibleNavGroups, type NavVisibility } from "@/lib/nav-visibility";
 import { availableWorkspaces, NAV_BY_WORKSPACE, WORK_SHORTCUTS } from "@/lib/nav-workspaces";
 import type { Workspace } from "@/lib/nav-workspaces";
 
@@ -70,7 +70,7 @@ export function paletteCommands(v: NavVisibility): PaletteCommand[] {
     for (const group of visibleNavGroups(NAV_BY_WORKSPACE[ws], v)) {
       const items = group.href
         ? [{ href: group.href, label: group.label }]
-        : visibleNavChildren(group.children, v);
+        : flattenNavItems(visibleNavChildren(group.children, v));
       for (const item of items) {
         if (seen.has(item.href)) continue;
         seen.add(item.href);

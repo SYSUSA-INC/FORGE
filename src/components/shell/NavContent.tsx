@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { visibleNavChildren, visibleNavGroups } from "@/lib/nav-visibility";
+import { flattenNavItems, visibleNavChildren, visibleNavGroups } from "@/lib/nav-visibility";
 import {
   availableWorkspaces,
   NAV_BY_WORKSPACE,
@@ -111,6 +111,76 @@ function activeChildHref(children: WorkspaceNavItem[], pathname: string | null, 
   return best;
 }
 
+/**
+ * BL-NAV-LIFECYCLE — a tree of items: the stages under Pipeline, Scout and
+ * Create under Identify. An item with children folds; it is open while
+ * it or a descendant is the page, or once clicked open. Each depth
+ * indents a step, with the same tree connector as the first level.
+ */
+function NavItems({
+  items,
+  activeHref,
+  pathname,
+  search,
+  onNavigate,
+  depth,
+}: {
+  items: WorkspaceNavItem[];
+  activeHref: string | null;
+  pathname: string | null;
+  search: string;
+  onNavigate?: () => void;
+  depth: number;
+}) {
+  const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  return (
+    <ul className={`${depth === 0 ? "ml-[1.4rem] mt-0.5" : "ml-3"} flex flex-col border-l border-layer/[0.08] pl-0`}>
+      {items.map((c) => {
+        const active = c.href === activeHref;
+        const kids = c.children ?? [];
+        const inside = kids.length > 0 && flattenNavItems(kids).some((k) => itemMatches(pathname, search, k.href));
+        const open = kids.length > 0 && (inside || active || opened.has(c.href));
+        return (
+          <li key={c.href} className="relative pl-3 before:absolute before:left-0 before:top-1/2 before:h-px before:w-2.5 before:bg-layer/[0.08]">
+            <div className="flex items-center">
+              <Link
+                href={c.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={`relative block flex-1 rounded-md py-1.5 pl-6 pr-2 text-[14px] transition-colors ${
+                  active ? "bg-cobalt-400/10 text-text" : "text-muted hover:bg-bone hover:text-text"
+                }`}
+              >
+                {active && <span aria-hidden className="aur-diamond absolute left-2 top-1/2 -translate-y-1/2" />}
+                {c.label}
+              </Link>
+              {kids.length > 0 ? (
+                <button
+                  type="button"
+                  aria-label={open ? `Fold ${c.label}` : `Unfold ${c.label}`}
+                  aria-expanded={open}
+                  onClick={() =>
+                    setOpened((prev) => {
+                      const next = new Set(prev);
+                      if (open) next.delete(c.href);
+                      else next.add(c.href);
+                      return next;
+                    })
+                  }
+                  className="px-2 py-1 font-light text-muted hover:text-text"
+                >
+                  {open ? "−" : "+"}
+                </button>
+              ) : null}
+            </div>
+            {open ? <NavItems items={kids} activeHref={activeHref} pathname={pathname} search={search} onNavigate={onNavigate} depth={depth + 1} /> : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function initialsFor(name: string | null, email: string): string {
   const seed = name?.trim() || email;
   return (
@@ -145,11 +215,15 @@ export function NavContent({
   hideRailToggle?: boolean;
 }) {
   const pathname = usePathname();
+  // BL-NAV-LIFECYCLE — the query string decides which tab link is active
+  // (Scout or Create under Identify, the SuperAdmin portal's tabs), read
+  // live so a tab change without a path change still moves the mark.
+  const params = useSearchParams();
+  const search = params && params.toString() ? `?${params.toString()}` : "";
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
   const [railCollapsed, setRailCollapsedState] = useState(false);
-  const [search, setSearch] = useState("");
 
   // Hydrate from localStorage after mount. SSR + first client render
   // produce identical markup (avoids hydration mismatch warnings).
@@ -160,13 +234,6 @@ export function NavContent({
     setRailCollapsedState(readRailCollapsed());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // The query string decides which /admin tab link is active; read it
-  // after mount so server and first client render agree.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setSearch(window.location.search);
-  }, [pathname]);
 
   // Notify the parent shell when the rail collapses so it can resize
   // its sticky aside (60px ↔ 256px). The parent listens via a custom
@@ -262,7 +329,7 @@ export function NavContent({
             const children = visibleChildren(g);
             const groupActive = g.href
               ? hrefMatches(pathname, g.href)
-              : children.some((c) => itemMatches(pathname, search, c.href));
+              : flattenNavItems(children).some((c) => itemMatches(pathname, search, c.href));
 
             // Standalone link (e.g. Command Center) — direct navigation.
             if (g.href && children.length === 0) {
@@ -407,7 +474,7 @@ export function NavContent({
           const children = visibleChildren(g);
           const groupActive = g.href
             ? hrefMatches(pathname, g.href)
-            : children.some((c) => itemMatches(pathname, search, c.href));
+            : flattenNavItems(children).some((c) => itemMatches(pathname, search, c.href));
           const isCollapsedGroup = collapsedGroups.has(g.id);
           // Force the group open if the active page lives inside it.
           const showChildren =
@@ -455,36 +522,14 @@ export function NavContent({
                 </span>
               </button>
               {showChildren && (
-                <ul
-                  // Tree-connector line: the ul has a left border that
-                  // forms the vertical trunk; each li uses a small ::before
-                  // to draw the horizontal branch hook.
-                  className="ml-[1.4rem] mt-0.5 flex flex-col border-l border-layer/[0.08] pl-0"
-                >
-                  {children.map((c) => {
-                    const active = c.href === activeChildHref(children, pathname, search);
-                    return (
-                      <li
-                        key={c.href}
-                        className="relative pl-3 before:absolute before:left-0 before:top-1/2 before:h-px before:w-2.5 before:bg-layer/[0.08]"
-                      >
-                        <Link
-                          href={c.href}
-                          onClick={onNavigate}
-                          aria-current={active ? "page" : undefined}
-                          className={`relative block rounded-md py-1.5 pl-6 pr-2 text-[14px] transition-colors ${
-                            active
-                              ? "bg-cobalt-400/10 text-text"
-                              : "text-muted hover:bg-bone hover:text-text"
-                          }`}
-                        >
-                          {active && <span aria-hidden className="aur-diamond absolute left-2 top-1/2 -translate-y-1/2" />}
-                          {c.label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <NavItems
+                  items={children}
+                  activeHref={activeChildHref(flattenNavItems(children), pathname, search)}
+                  pathname={pathname}
+                  search={search}
+                  onNavigate={onNavigate}
+                  depth={0}
+                />
               )}
             </div>
           );

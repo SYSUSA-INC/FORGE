@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { visibleNavChildren, visibleNavGroups } from "@/lib/nav-visibility";
+import { flattenNavItems, visibleNavChildren, visibleNavGroups } from "@/lib/nav-visibility";
 import {
   availableWorkspaces,
   defaultWorkspace,
@@ -102,58 +102,42 @@ describe("BL-NAV-RESTORE — the chosen workspace is remembered", () => {
   });
 });
 
-describe("BL-NAV-LIFECYCLE — the everyday tree is the lifecycle, and admin items are admin-only", () => {
-  it("shows a member the seven groups, the seven stages in order, and no administration", () => {
+describe("BL-NAV-LIFECYCLE — Opportunity Management is the document's tree; every other group as it was", () => {
+  it("nests the seven stages under Pipeline and Scout and Create under Identify", () => {
     const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, member);
-    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "partners", "brain", "business", "help"]);
+    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "help"]);
     const opps = groups.find((g) => g.id === "opps")!;
-    expect(visibleNavChildren(opps.children, member).map((c) => c.label)).toEqual([
-      "Dashboard",
-      "Pipeline",
-      "Identify",
-      "Evaluate",
-      "Capture",
-      "Plan",
-      "Develop",
-      "Deliver",
-      "Measure",
-    ]);
-    const hrefs = groups.flatMap((g) => visibleNavChildren(g.children, member).map((c) => c.href));
+    expect(opps.label).toBe("Opportunity Management");
+    const top = visibleNavChildren(opps.children, member);
+    expect(top.map((c) => c.label)).toEqual(["Dashboard", "Pipeline"]);
+    const pipeline = top[1]!;
+    expect(pipeline.href).toBe("/pipeline");
+    expect((pipeline.children ?? []).map((c) => c.label)).toEqual(["Identify", "Evaluate", "Capture", "Plan", "Develop", "Deliver", "Measure"]);
+    expect((pipeline.children ?? []).map((c) => c.href)).toEqual(["/pipeline/identify", "/pipeline/evaluate", "/pipeline/capture", "/pipeline/plan", "/pipeline/develop", "/pipeline/deliver", "/pipeline/measure"]);
+    const identify = pipeline.children![0]!;
+    expect((identify.children ?? []).map((c) => c.label)).toEqual(["Scout", "Create"]);
+  });
+
+  it("leaves the other groups exactly as they were, and keeps admin items admin-only", () => {
+    const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, member);
+    const hrefs = groups.flatMap((g) => flattenNavItems(visibleNavChildren(g.children, member)).map((c) => c.href));
     expect(hrefs).toEqual(
-      expect.arrayContaining(["/opportunities/scout", "/opportunities?stage=sources_sought", "/proposals", "/reports", "/contacts", "/knowledge-base", "/settings", "/notifications"]),
+      expect.arrayContaining(["/contacts?owed=1", "/contacts?import=1", "/companies/new", "/intelligence/lessons", "/reports", "/knowledge-base/new", "/settings/company-model", "/notifications", "/help/user"]),
     );
     for (const h of ["/users", "/settings/billing", "/settings/templates", "/settings/api", "/notifications/rules", "/audit-log", "/help/admin"]) {
       expect(hrefs).not.toContain(h);
     }
-    // The ways in and the creates are tabs and buttons now, not menu items.
-    for (const h of ["/opportunities/new", "/opportunities/import", "/solicitations/new", "/knowledge-base/new", "/companies/new"]) {
-      expect(hrefs).not.toContain(h);
-    }
+    // The old Opportunities creates and imports are shortcuts now.
+    for (const h of ["/opportunities/new", "/opportunities/import", "/solicitations/new", "/proposals/new"]) expect(hrefs).not.toContain(h);
+    const adminGroups = visibleNavGroups(NAV_BY_WORKSPACE.work, orgAdmin);
+    expect(adminGroups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "administration", "help"]);
+    const admin = adminGroups.find((g) => g.id === "administration")!;
+    expect(visibleNavChildren(admin.children, orgAdmin).map((c) => c.href)).toEqual(["/users", "/settings/billing", "/settings/templates", "/settings/api", "/notifications/rules", "/audit-log"]);
   });
 
-  it("shows an org admin the administration items inside Business Management, in the same tree", () => {
-    const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, orgAdmin);
-    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "partners", "brain", "business", "help"]);
-    const business = groups.find((g) => g.id === "business")!;
-    expect(visibleNavChildren(business.children, orgAdmin).map((c) => c.href)).toEqual([
-      "/settings",
-      "/settings/integrations",
-      "/settings/ai-engine",
-      "/settings/security",
-      "/notifications",
-      "/users",
-      "/settings/billing",
-      "/settings/templates",
-      "/notifications/rules",
-      "/settings/api",
-      "/audit-log",
-    ]);
-    expect(visibleNavChildren(business.children, member).map((c) => c.href)).not.toContain("/users");
-  });
-
-  it("keeps the folded-away pages reachable as shortcuts, none of them admin-only", () => {
+  it("keeps the folded-away Opportunities pages reachable as shortcuts, none of them admin-only", () => {
     const hrefs = WORK_SHORTCUTS.map((s) => s.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/opportunities/new", "/opportunities/import/ebuy", "/solicitations/new", "/knowledge-base/new", "/contacts?owed=1"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/opportunities/import/ebuy", "/solicitations/new", "/proposals/new"]));
     expect(WORK_SHORTCUTS.every((s) => !s.admin)).toBe(true);
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
@@ -162,7 +146,7 @@ describe("BL-NAV-LIFECYCLE — the everyday tree is the lifecycle, and admin ite
 describe("workspace navigation trees", () => {
   it("keeps platform pages out of the work and company trees, and tenant work out of platform", () => {
     const hrefs = (w: keyof typeof NAV_BY_WORKSPACE) =>
-      NAV_BY_WORKSPACE[w].flatMap((g) => [g.href, ...(g.children ?? []).map((c) => c.href)]).filter(
+      NAV_BY_WORKSPACE[w].flatMap((g) => [g.href, ...flattenNavItems(g.children).map((c) => c.href)]).filter(
         (h): h is string => !!h,
       );
     expect(hrefs("work").some((h) => h.startsWith("/admin") || h.startsWith("/platform"))).toBe(false);

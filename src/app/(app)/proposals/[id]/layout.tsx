@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { opportunities, proposals, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { LifecycleChevron } from "@/components/lifecycle/LifecycleChevron";
+import { lifecycleForProposal } from "@/lib/lifecycle";
 import { STAGE_COLORS, STAGE_LABELS } from "@/lib/proposal-types";
 import { ProposalTabs } from "./ProposalTabs";
 import { DeleteProposalButton } from "./DeleteProposalButton";
@@ -91,6 +93,9 @@ export default async function ProposalDetailLayout({
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-4 py-3">
+      {/* BL-NAV-LIFECYCLE — where this proposal is on the seven-stage lifecycle. */}
+      <LifecycleChevron current={lifecycleForProposal(p.stage)} />
+
         <div className="font-mono text-[11px] uppercase tracking-label text-muted">
           Current stage
         </div>

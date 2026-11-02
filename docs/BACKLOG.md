@@ -2831,35 +2831,40 @@ every opportunity shows where it is; a folding menu gives the page the
 room; the rest of the menu is consolidated. The admin workspaces stay as
 they are.
 
-**Phase 0 — the menu (this PR).** Seven groups: Command Center;
-Opportunity Management (Dashboard, Pipeline, the seven stages);
-Customers (Contacts, Companies); Partners (Company Search, 8(a) firms,
-Awards & recompetes, Watchlist, Saved searches); FORGE Brain (Brain,
-Knowledge base, Company model); Business Management (Company settings,
-Integrations, AI Engine, Security, Notifications, and admin-only Users &
-Roles, Billing, Templates, Notification rules, API access, Audit Log);
-Help. The stages are flat under Opportunity Management (the document
-nested Identify under Pipeline and Scout under Identify, four levels
-deep). Until the stage pages exist, each stage opens the page that holds
-its work today: Identify → Scout, with the ways in as tabs (Scout, Import
-from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, Create);
-Evaluate, Capture, Plan, Deliver → the opportunities at the Evaluated,
-Qualified, Captured and Submitted pipeline stages; Develop → the
-proposals in flight; Measure → Reports with Closed-Won, Lessons and Loss
-intelligence as tabs. The Knowledge base carries Import, USAspending and
-New entry as tabs. `src/lib/section-tabs.ts` (pure, tested) holds the
-tab sets and `SectionTabs` in the shell shows the strip above any page
-in a set, so no page changed and every URL kept working; the pages that
-left the menu are ⌘K shortcuts (`WORK_SHORTCUTS`). The sidebar folds:
-one group open at a time, the active page's group always open, state
-remembered per browser (`forge.nav.collapsed.v3`). Members see 7 groups
-and 25 items (45 before); the open group is what shows.
+**Phase 0 — the frame (#449, corrected in this PR).** #449 read the
+document wrong: it flattened the stages beside Pipeline, opened each
+stage on the Opportunities list with a filter, built no chevron, and
+redrew the groups the owner had said to leave alone. This PR replaces
+it with the document's structure. **Sidebar:** Opportunity Management
+replaces Opportunities with Dashboard and Pipeline; the seven stages
+sit under Pipeline and Scout and Create under Identify (the sidebar
+gained a third level: an item with children folds with a **+**, and
+opens on its own when the page is inside it); Customer Relations,
+Platform Intelligence, Operations Management, Administration and Help
+are exactly as before, until the owner places them. The menu folds:
+one group open at a time, the active page's group always open.
+**Stage pages** at `/pipeline/<stage>`, each with the **chevron** on
+top (Identify → … → Measure, the current stage lit, every chevron a
+link; Pipeline itself has no chevron, by the owner's choice) and the
+stage's purpose in the owner's words. Identify holds Scout and Create
+as tabs (the Scout page's body, and the New opportunity form; the old
+URLs redirect, the proposal launcher's hand-off survives); Evaluate
+lists Identified and Evaluated opportunities with a link to the
+solicitation documents; Capture lists Qualified; Plan lists Captured;
+Develop lists Developed with links to the proposals; Deliver lists
+Submitted; Measure lists Closed-Won, Lost and No bid with links to
+Reports, Lessons and Loss intelligence. `src/lib/lifecycle.ts` (pure,
+tested) holds the stages, their pages and which pipeline stages each
+lists; the chevron also sits on every opportunity and proposal, lit
+at the stage the pursuit is in. The old Opportunities items that left
+the menu are ⌘K shortcuts. The stage behaviours arrive phase by phase
+on these pages.
 
 **Phases to come, one PR each, design reviewed first:**
-1. **Identify:** Create as one page merging New Opportunity and New
-   Solicitation; Scout as the one-stop import (SAM.gov, GSA eBuy, GSA
-   email, enterprise portals, GWACs) with **Add to pipeline** on each
-   find.
+1. **Identify:** on the Identify page's two tabs: Scout as the one-stop
+   import (SAM.gov, GSA eBuy, GSA email, enterprise portals, GWACs) with
+   **Add to pipeline** on each find; Create as one page merging New
+   Opportunity and New Solicitation (design in #451, folded in here).
 2. **Evaluate:** the stage page replaces Solicitations; a solicitation
    becomes a document on the opportunity, not a record of its own;
    Analyze (PWin and its report) and the Capability matrix (Yes / Partial
