@@ -17,6 +17,7 @@ import {
   sendPasswordResetEmail,
 } from "@/lib/email";
 import { log } from "@/lib/log";
+import { markTokenSent } from "@/lib/tokens";
 
 export const EMAIL_NOT_CONFIGURED_WARNING =
   "Email delivery is not configured on this deployment (RESEND_API_KEY), so nothing was sent. Copy the link below and send it to the person yourself.";
@@ -48,6 +49,7 @@ export async function deliverInvite(input: {
       inviterName: input.inviterName,
       role: input.role,
     });
+    await markTokenSent("invite", input.inviteId);
     return { inviteUrl: url, emailSent: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -72,6 +74,7 @@ export async function deliverPasswordReset(input: {
   }
   try {
     await sendPasswordResetEmail(input.to, input.token);
+    await markTokenSent("reset-password", input.to);
     return { resetUrl: url, emailSent: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

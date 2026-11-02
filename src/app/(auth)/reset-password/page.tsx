@@ -4,11 +4,13 @@ import { ResetPasswordForm } from "./ResetPasswordForm";
 export default function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: { token?: string; email?: string; done?: string };
+  searchParams: { token?: string; email?: string; done?: string; verify?: string };
 }) {
   const token = searchParams.token ?? "";
   const email = searchParams.email ?? "";
   const done = searchParams.done === "1";
+  // BL-STAB-8b-1 — the reset link was copied, not emailed: the address is still to verify.
+  const verify = searchParams.verify === "1";
 
   return (
     <div className="grid min-h-[calc(100vh-3.5rem)] place-items-center px-4 py-12">
@@ -20,7 +22,9 @@ export default function ResetPasswordPage({
                 Password updated
               </h1>
               <p className="mt-2 text-sm text-muted">
-                Your password has been changed. Sign in with the new one.
+                {verify
+                  ? "Your password has been changed. One more step: we sent a verification link to your email address. Click it, then sign in with the new password."
+                  : "Your password has been changed. Sign in with the new one."}
               </p>
               <Link
                 href="/sign-in"

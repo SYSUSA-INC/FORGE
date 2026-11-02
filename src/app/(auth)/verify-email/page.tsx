@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { ResendVerification } from "@/components/auth/ResendVerification";
 import { consumeToken } from "@/lib/tokens";
 
 export const runtime = "nodejs";
@@ -56,9 +57,10 @@ export default async function VerifyEmailPage({
               </h1>
               <p className="mt-2 text-sm text-muted">
                 {state === "invalid"
-                  ? "This link is invalid or has expired. Request a new verification email by signing up again."
-                  : "Missing token or email. Use the link sent to your inbox."}
+                  ? "This link is invalid or has expired. Ask for a new verification email below."
+                  : "Missing token or email. Use the link sent to your inbox, or ask for a new one below."}
               </p>
+              <ResendVerification email={email} />
               <Link
                 href="/sign-up"
                 className="aur-link"

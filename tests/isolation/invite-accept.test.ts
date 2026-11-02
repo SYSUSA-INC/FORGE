@@ -12,9 +12,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { allowlist, memberships, users } from "@/db/schema";
+import { allowlist, memberships, users, verificationTokens } from "@/db/schema";
 import { acceptInvite, attachPendingInvitesByEmail } from "@/lib/invite-accept";
-import { consumeToken, issueToken } from "@/lib/tokens";
+import { consumeToken, issueToken, markTokenSent } from "@/lib/tokens";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 describe("BL-AUTH-INVITE — attachPendingInvitesByEmail", () => {
@@ -199,18 +199,39 @@ describe("BL-STAB-8a-0 — acceptInvite never rewrites an existing account", () 
     expect(rows).toEqual([{ role: "author" }]);
   });
 
-  it("creates a new address's account, membership and verified email, and spends the token", async () => {
+  it("creates a new address's account, membership and verified email from an emailed link, and spends the token", async () => {
     const email = `fresh-${Date.now().toString(36)}@bl-auth.test`;
     const inv = await invite(email);
+    // BL-STAB-8b-1 — the link went through the inbox.
+    await markTokenSent("invite", inv.id);
     const res = await acceptInvite({ inviteId: inv.id, rawToken: inv.raw, name: "Fresh", passwordHash: "hash-fresh" });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     createdUserIds.push(res.userId);
+    expect(res.verified).toBe(true);
     const [u] = await db.select({ emailVerified: users.emailVerified, passwordHash: users.passwordHash }).from(users).where(eq(users.id, res.userId));
     expect(u?.emailVerified).not.toBeNull();
     expect(u?.passwordHash).toBe("hash-fresh");
     const [row] = await db.select({ consumedAt: allowlist.consumedAt }).from(allowlist).where(eq(allowlist.id, inv.id));
     expect(row?.consumedAt).not.toBeNull();
     expect(await consumeToken("invite", inv.id, inv.raw)).toBe(false);
+  });
+
+  it("BL-STAB-8b-1 — a copied invite link creates the account unverified and queues the verification email", async () => {
+    const email = `copied-${Date.now().toString(36)}@bl-auth.test`;
+    const inv = await invite(email);
+    const res = await acceptInvite({ inviteId: inv.id, rawToken: inv.raw, name: "Copied", passwordHash: "hash-copied" });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    createdUserIds.push(res.userId);
+    expect(res.verified).toBe(false);
+    const [u] = await db.select({ emailVerified: users.emailVerified }).from(users).where(eq(users.id, res.userId));
+    expect(u?.emailVerified).toBeNull();
+    // The membership exists all the same; the verification link was issued (email itself is stubbed here).
+    const rows = await db.select({ role: memberships.role }).from(memberships).where(and(eq(memberships.userId, res.userId), eq(memberships.organizationId, fx.orgA.organizationId)));
+    expect(rows).toEqual([{ role: "author" }]);
+    const [tok] = await db.select({ identifier: verificationTokens.identifier }).from(verificationTokens).where(eq(verificationTokens.identifier, `verify-email:${email}`));
+    expect(tok?.identifier).toBe(`verify-email:${email}`);
+    await db.delete(verificationTokens).where(eq(verificationTokens.identifier, `verify-email:${email}`));
   });
 });

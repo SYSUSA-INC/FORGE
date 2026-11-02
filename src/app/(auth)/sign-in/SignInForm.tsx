@@ -20,6 +20,12 @@ export function SignInForm({ callbackUrl }: { callbackUrl?: string }) {
         password,
         redirect: false,
       });
+      if (res?.code === "unverified_email") {
+        // BL-STAB-8b-1 — right password, address not yet verified: the page
+        // explains and offers the verification email again.
+        window.location.href = `/sign-in?error=unverified_email&email=${encodeURIComponent(email.trim().toLowerCase())}`;
+        return;
+      }
       if (!res || res.error) {
         setError("Invalid email or password.");
         setLoading(false);

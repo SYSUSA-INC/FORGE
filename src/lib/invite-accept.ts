@@ -27,7 +27,8 @@ import { db } from "@/db";
 import { allowlist, memberships, users } from "@/db/schema";
 import { inviteAwaitsApproval } from "@/lib/email-domain";
 import { log } from "@/lib/log";
-import { consumeToken } from "@/lib/tokens";
+import { sendVerificationEmail } from "@/lib/email";
+import { consumeTokenDetailed, issueToken, markTokenSent } from "@/lib/tokens";
 
 export type AttachResult = {
   /** Memberships created (one per accepted invite). */
@@ -144,7 +145,7 @@ export async function acceptInvite(opts: {
   name: string;
   passwordHash: string;
 }): Promise<
-  | { ok: true; userId: string; organizationId: string }
+  | { ok: true; userId: string; organizationId: string; verified: boolean }
   | { ok: false; error: string; status?: number; code?: "existing_account" }
 > {
   const [inv] = await db
@@ -190,18 +191,21 @@ export async function acceptInvite(opts: {
     };
   }
 
-  const ok = await consumeToken("invite", inv.id, opts.rawToken);
-  if (!ok) {
+  const spent = await consumeTokenDetailed("invite", inv.id, opts.rawToken);
+  if (!spent.ok) {
     return { ok: false, error: "Invitation link is invalid or expired.", status: 400 };
   }
 
+  // BL-STAB-8b-1 — the link proves the inbox only when it went there: a
+  // copied link (email not configured, or handed over some other way)
+  // creates the account unverified, and the verification email follows.
   const [created] = await db
     .insert(users)
     .values({
       email,
       name: opts.name || null,
       passwordHash: opts.passwordHash,
-      emailVerified: new Date(),
+      emailVerified: spent.sentByEmail ? new Date() : null,
     })
     .returning({ id: users.id });
   if (!created) {
@@ -256,5 +260,14 @@ export async function acceptInvite(opts: {
     .set({ consumedAt: new Date() })
     .where(eq(allowlist.id, inv.id));
 
-  return { ok: true, userId, organizationId: inv.organizationId };
+  if (!spent.sentByEmail) {
+    try {
+      const token = await issueToken("verify-email", email);
+      await sendVerificationEmail(email, token);
+      await markTokenSent("verify-email", email);
+    } catch (err) {
+      log.error("[acceptInvite]", "verification email after a copied invite link failed", { error: err, userId });
+    }
+  }
+  return { ok: true, userId, organizationId: inv.organizationId, verified: spent.sentByEmail };
 }

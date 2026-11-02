@@ -174,6 +174,9 @@ export const verificationTokens = pgTable(
     identifier: text("identifier").notNull(),
     token: text("token").notNull(),
     expires: timestamp("expires", { mode: "date" }).notNull(),
+    // BL-STAB-8b-1 — set once the link went out by email: a link that
+    // travelled through the inbox proves the address, a copied one does not.
+    sentByEmail: boolean("sent_by_email").notNull().default(false),
   },
   (vt) => ({
     compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),

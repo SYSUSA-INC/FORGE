@@ -7,7 +7,7 @@ import { sendVerificationEmail } from "@/lib/email";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { acceptInvite } from "@/lib/invite-accept";
 import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
-import { issueToken } from "@/lib/tokens";
+import { issueToken, markTokenSent } from "@/lib/tokens";
 import { defaultOrgName, defaultOrgSlug } from "@/lib/org-defaults";
 import { enforceRateLimit, ipFromRequest } from "@/lib/rate-limit";
 import { ensureTenantSubscription } from "@/lib/tenant-subscription";
@@ -192,7 +192,8 @@ export async function POST(req: Request) {
           { status: res.status ?? 400 },
         );
       }
-      return NextResponse.json({ ok: true, verified: true });
+      // BL-STAB-8b-1 — true only when the invite link went through the inbox.
+      return NextResponse.json({ ok: true, verified: res.verified });
     }
 
     // Self-service signup path — auto-creates org, requires email verification.
@@ -271,6 +272,7 @@ export async function POST(req: Request) {
 
     try {
       await sendVerificationEmail(email, token);
+      await markTokenSent("verify-email", email);
     } catch (err) {
       log.error("[register]", "sendVerificationEmail failed", { error: err });
       return NextResponse.json(
