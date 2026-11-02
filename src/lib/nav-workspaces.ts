@@ -81,99 +81,115 @@ export const WORKSPACES: Record<Workspace, WorkspaceMeta> = {
 const WORK_NAV: WorkspaceNavGroup[] = [
   { id: "command", label: "Command Center", icon: "▦", href: "/", needsWorkspace: true },
   {
+    // BL-NAV-LIFECYCLE — the proposal lifecycle as the menu: Identify ·
+    // Evaluate · Capture · Plan · Develop · Deliver · Measure, each item
+    // the worklist for that stage. Until the stage pages exist, each
+    // opens the opportunities at the pipeline stage it corresponds to
+    // (Evaluated, Qualified, Captured, Submitted, Closed-Won), the
+    // proposals in flight for Develop, and the ways in for Identify.
     id: "opps",
-    label: "Opportunities",
+    label: "Opportunity Management",
     icon: "✸",
     needsWorkspace: true,
     children: [
       { href: "/opportunities", label: "Dashboard" },
       { href: "/pipeline", label: "Pipeline" },
-      { href: "/opportunities/scout", label: "Scout" },
-      { href: "/opportunities/new", label: "New Opportunity" },
-      { href: "/opportunities/import", label: "Import from SAM.gov" },
-      { href: "/opportunities/import/ebuy", label: "Paste from eBuy" },
-      { href: "/opportunities/import/gsa", label: "Paste GSA email" },
-      { href: "/solicitations", label: "Solicitations" },
-      { href: "/solicitations/new", label: "New Solicitation" },
-      { href: "/proposals", label: "In-flight Proposals" },
-      { href: "/proposals/new", label: "New Proposals" },
+      { href: "/opportunities/scout", label: "Identify" },
+      { href: "/opportunities?stage=sources_sought", label: "Evaluate" },
+      { href: "/opportunities?stage=qualification", label: "Capture" },
+      { href: "/opportunities?stage=capture", label: "Plan" },
+      { href: "/proposals", label: "Develop" },
+      { href: "/opportunities?stage=submitted", label: "Deliver" },
+      { href: "/reports", label: "Measure" },
     ],
   },
   {
-    // BL-FB-X-CRM Slice 3 — the customer side of capture in one place:
-    // who we know, who we owe a call, and how people get in.
+    // The customer side: who we know and the agencies and companies
+    // around a pursuit. Follow-ups, add and import are on the page.
     id: "customers",
-    label: "Customer Relations",
+    label: "Customers",
     icon: "◎",
     needsWorkspace: true,
     children: [
-      { href: "/contacts", label: "Customer contacts" },
-      { href: "/contacts?owed=1", label: "Follow-ups owed" },
-      { href: "/contacts?add=1", label: "New contact" },
-      { href: "/contacts?import=1", label: "Import contacts" },
+      { href: "/contacts", label: "Contacts" },
+      { href: "/companies", label: "Companies" },
     ],
   },
   {
-    id: "intel",
-    label: "Platform Intelligence",
+    // Finding and tracking firms to team with.
+    id: "partners",
+    label: "Partners",
+    icon: "◇",
+    needsWorkspace: true,
+    children: [
+      { href: "/companies/search", label: "Company Search" },
+      { href: "/intelligence/firms", label: "8(a) firms" },
+      { href: "/intelligence/awards", label: "Awards & recompetes" },
+      { href: "/intelligence/watchlist", label: "Watchlist" },
+      { href: "/intelligence/saved-searches", label: "Saved searches" },
+    ],
+  },
+  {
+    // What FORGE knows: ask it, feed it, approve its account of you.
+    id: "brain",
+    label: "FORGE Brain",
     icon: "◈",
     needsWorkspace: true,
     children: [
-      { href: "/companies", label: "Company Search" },
-      { href: "/companies/new", label: "Add company" },
-      { href: "/intelligence", label: "FORGE Brain" },
-      { href: "/intelligence/losses", label: "Loss intelligence" },
-      { href: "/intelligence/lessons", label: "Lessons" },
-      { href: "/intelligence/awards", label: "Awards & recompetes" },
-      { href: "/intelligence/firms", label: "8(a) firms" },
-      { href: "/intelligence/watchlist", label: "Watchlist" },
-      { href: "/intelligence/saved-searches", label: "Saved searches" },
-      { href: "/reports", label: "Reports" },
-      { href: "/knowledge-base", label: "Knowledge" },
-      { href: "/knowledge-base/import", label: "Knowledge import" },
-      { href: "/knowledge-base/usaspending", label: "USAspending import" },
-      { href: "/knowledge-base/new", label: "New knowledge entry" },
+      { href: "/intelligence", label: "Brain" },
+      { href: "/knowledge-base", label: "Knowledge base" },
+      { href: "/settings/company-model", label: "Company model" },
     ],
   },
   {
-    id: "ops",
-    label: "Operations Management",
+    // How the business runs: settings for everyone, administration for
+    // admins, in one group.
+    id: "business",
+    label: "Business Management",
     icon: "⚙",
     needsWorkspace: true,
     children: [
-      { href: "/settings", label: "Settings" },
+      { href: "/settings", label: "Company settings" },
       { href: "/settings/integrations", label: "Integrations" },
       { href: "/settings/ai-engine", label: "AI Engine" },
-      { href: "/settings/company-model", label: "Company model" },
       { href: "/settings/security", label: "Security" },
       { href: "/notifications", label: "Notifications" },
+      { href: "/users", label: "Users & Roles", admin: true },
+      { href: "/settings/billing", label: "Billing", admin: true },
+      { href: "/settings/templates", label: "Templates", admin: true },
+      { href: "/notifications/rules", label: "Notification rules", admin: true },
+      { href: "/settings/api", label: "API access", admin: true },
+      { href: "/audit-log", label: "Audit Log", admin: true },
     ],
   },
-  {
-    id: "administration",
-    label: "Administration",
-    icon: "◆",
-    admin: true,
-    needsWorkspace: true,
-    children: [
-      { href: "/users", label: "Users & Roles" },
-      { href: "/settings/billing", label: "Billing" },
-      { href: "/settings/templates", label: "Templates" },
-      { href: "/settings/api", label: "API access" },
-      { href: "/notifications/rules", label: "Notification rules" },
-      { href: "/audit-log", label: "Audit Log" },
-    ],
-  },
-  {
-    id: "help",
-    label: "Help",
-    icon: "?",
-    children: [
-      { href: "/help/user", label: "User guide" },
-      { href: "/help/admin", label: "Admin guide", admin: true },
-      { href: "/help/faq", label: "FAQ" },
-    ],
-  },
+  // The guides are tabs on the help page (the admin guide for admins).
+  { id: "help", label: "Help", icon: "?", href: "/help/user" },
+];
+
+/**
+ * BL-NAV-LIFECYCLE — pages the everyday tree no longer lists because
+ * they are tabs or buttons on a listed page. ⌘K still offers them (and
+ * nothing here is admin-only), so "new opp" or "ebuy" keeps working.
+ */
+export const WORK_SHORTCUTS: WorkspaceNavItem[] = [
+  { href: "/opportunities/new", label: "New Opportunity" },
+  { href: "/opportunities/import", label: "Import from SAM.gov" },
+  { href: "/opportunities/import/ebuy", label: "Paste from eBuy" },
+  { href: "/opportunities/import/gsa", label: "Paste GSA email" },
+  { href: "/solicitations", label: "Solicitations" },
+  { href: "/solicitations/new", label: "New Solicitation" },
+  { href: "/proposals/new", label: "New Proposal" },
+  { href: "/contacts?owed=1", label: "Follow-ups owed" },
+  { href: "/contacts?add=1", label: "New contact" },
+  { href: "/contacts?import=1", label: "Import contacts" },
+  { href: "/companies/new", label: "Add company" },
+  { href: "/intelligence/losses", label: "Loss intelligence" },
+  { href: "/intelligence/lessons", label: "Lessons" },
+  { href: "/opportunities?stage=won", label: "Closed-Won" },
+  { href: "/knowledge-base/import", label: "Knowledge import" },
+  { href: "/knowledge-base/usaspending", label: "USAspending import" },
+  { href: "/knowledge-base/new", label: "New knowledge entry" },
+  { href: "/help/faq", label: "FAQ" },
 ];
 
 /** The company admin console — only what an org admin administers. */

@@ -18,7 +18,7 @@
  * Unit-tested.
  */
 import { visibleNavChildren, visibleNavGroups, type NavVisibility } from "@/lib/nav-visibility";
-import { availableWorkspaces, NAV_BY_WORKSPACE } from "@/lib/nav-workspaces";
+import { availableWorkspaces, NAV_BY_WORKSPACE, WORK_SHORTCUTS } from "@/lib/nav-workspaces";
 import type { Workspace } from "@/lib/nav-workspaces";
 
 /** Window event the header box dispatches to open the palette. */
@@ -75,6 +75,15 @@ export function paletteCommands(v: NavVisibility): PaletteCommand[] {
         if (seen.has(item.href)) continue;
         seen.add(item.href);
         out.push({ id: item.href, label: item.label, group: group.label, workspace: ws, href: item.href });
+      }
+    }
+    // BL-NAV-LIFECYCLE — the tabs and buttons the everyday tree folded
+    // away stay one keystroke away (a workspace is needed, as for the tree).
+    if (ws === "work" && v.hasWorkspace) {
+      for (const item of WORK_SHORTCUTS) {
+        if (seen.has(item.href)) continue;
+        seen.add(item.href);
+        out.push({ id: item.href, label: item.label, group: "Shortcuts", workspace: ws, href: item.href });
       }
     }
   }
