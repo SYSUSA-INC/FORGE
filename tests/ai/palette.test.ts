@@ -28,7 +28,9 @@ describe("paletteCommands", () => {
     const m = hrefs(member);
     expect(m).toContain("/");
     expect(m).toContain("/opportunities/scout");
+    // BL-NAV-LIFECYCLE — a page that became a tab stays a shortcut.
     expect(m).toContain("/knowledge-base/new");
+    expect(paletteCommands(member).find((c) => c.href === "/knowledge-base/new")?.group).toBe("Shortcuts");
     expect(m).toContain("/settings/ai-engine");
     expect(m).not.toContain("/users");
     expect(m).not.toContain("/audit-log");

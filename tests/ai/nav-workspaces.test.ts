@@ -12,6 +12,7 @@ import {
   pathInWorkspace,
   resolveWorkspace,
   WORKSPACES,
+  WORK_SHORTCUTS,
   workspaceForPath,
 } from "@/lib/nav-workspaces";
 
@@ -101,45 +102,60 @@ describe("BL-NAV-RESTORE — the chosen workspace is remembered", () => {
   });
 });
 
-describe("BL-NAV-RESTORE — the everyday tree is complete, and admin items are admin-only", () => {
-  it("shows a member every workspace page and no administration", () => {
+describe("BL-NAV-LIFECYCLE — the everyday tree is the lifecycle, and admin items are admin-only", () => {
+  it("shows a member the seven groups, the seven stages in order, and no administration", () => {
     const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, member);
-    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "help"]);
+    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "partners", "brain", "business", "help"]);
+    const opps = groups.find((g) => g.id === "opps")!;
+    expect(visibleNavChildren(opps.children, member).map((c) => c.label)).toEqual([
+      "Dashboard",
+      "Pipeline",
+      "Identify",
+      "Evaluate",
+      "Capture",
+      "Plan",
+      "Develop",
+      "Deliver",
+      "Measure",
+    ]);
     const hrefs = groups.flatMap((g) => visibleNavChildren(g.children, member).map((c) => c.href));
     expect(hrefs).toEqual(
-      expect.arrayContaining([
-        "/opportunities/import",
-        "/opportunities/import/ebuy",
-        "/opportunities/import/gsa",
-        "/solicitations/new",
-        "/companies/new",
-        "/knowledge-base/import",
-        "/knowledge-base/usaspending",
-        "/knowledge-base/new",
-        "/notifications",
-        "/help/user",
-      ]),
+      expect.arrayContaining(["/opportunities/scout", "/opportunities?stage=sources_sought", "/proposals", "/reports", "/contacts", "/knowledge-base", "/settings", "/notifications"]),
     );
     for (const h of ["/users", "/settings/billing", "/settings/templates", "/settings/api", "/notifications/rules", "/audit-log", "/help/admin"]) {
       expect(hrefs).not.toContain(h);
     }
+    // The ways in and the creates are tabs and buttons now, not menu items.
+    for (const h of ["/opportunities/new", "/opportunities/import", "/solicitations/new", "/knowledge-base/new", "/companies/new"]) {
+      expect(hrefs).not.toContain(h);
+    }
   });
 
-  it("shows an org admin the Administration group and the Admin guide in the same tree", () => {
+  it("shows an org admin the administration items inside Business Management, in the same tree", () => {
     const groups = visibleNavGroups(NAV_BY_WORKSPACE.work, orgAdmin);
-    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "administration", "help"]);
-    const admin = groups.find((g) => g.id === "administration")!;
-    expect(visibleNavChildren(admin.children, orgAdmin).map((c) => c.href)).toEqual([
+    expect(groups.map((g) => g.id)).toEqual(["command", "opps", "customers", "partners", "brain", "business", "help"]);
+    const business = groups.find((g) => g.id === "business")!;
+    expect(visibleNavChildren(business.children, orgAdmin).map((c) => c.href)).toEqual([
+      "/settings",
+      "/settings/integrations",
+      "/settings/ai-engine",
+      "/settings/security",
+      "/notifications",
       "/users",
       "/settings/billing",
       "/settings/templates",
-      "/settings/api",
       "/notifications/rules",
+      "/settings/api",
       "/audit-log",
     ]);
-    const help = groups.find((g) => g.id === "help")!;
-    expect(visibleNavChildren(help.children, orgAdmin).map((c) => c.href)).toContain("/help/admin");
-    expect(visibleNavChildren(help.children, member).map((c) => c.href)).not.toContain("/help/admin");
+    expect(visibleNavChildren(business.children, member).map((c) => c.href)).not.toContain("/users");
+  });
+
+  it("keeps the folded-away pages reachable as shortcuts, none of them admin-only", () => {
+    const hrefs = WORK_SHORTCUTS.map((s) => s.href);
+    expect(hrefs).toEqual(expect.arrayContaining(["/opportunities/new", "/opportunities/import/ebuy", "/solicitations/new", "/knowledge-base/new", "/contacts?owed=1"]));
+    expect(WORK_SHORTCUTS.every((s) => !s.admin)).toBe(true);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 });
 

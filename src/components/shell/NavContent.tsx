@@ -25,19 +25,22 @@ type NavUser = {
 // per hat (workspace / company admin / platform admin). The active one
 // follows the URL; the switcher under the brand moves between them.
 
-const COLLAPSED_GROUPS_KEY = "forge.nav.collapsed.v2";
+// BL-NAV-LIFECYCLE — v3: the menu folds, so the default is "every group
+// folded but the active page's"; an older stored set is ignored.
+const COLLAPSED_GROUPS_KEY = "forge.nav.collapsed.v3";
 const NAV_RAIL_COLLAPSED_KEY = "forge.nav.rail.v1";
 
-function readCollapsedGroups(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+/** The stored fold state, or null when this browser has none yet. */
+function readCollapsedGroups(): Set<string> | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(COLLAPSED_GROUPS_KEY);
-    if (!raw) return new Set();
+    if (!raw) return null;
     const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return new Set();
+    if (!Array.isArray(arr)) return null;
     return new Set(arr.filter((g): g is string => typeof g === "string"));
   } catch {
-    return new Set();
+    return null;
   }
 }
 
@@ -79,6 +82,11 @@ function hrefMatches(pathname: string | null, href: string): boolean {
   const cleanHref = href.split("?")[0]!;
   if (cleanHref === "/") return pathname === "/";
   return pathname === cleanHref || pathname.startsWith(cleanHref + "/");
+}
+
+/** The ids of the groups that fold, in this workspace's tree. */
+function groupIdsOf(workspace: Workspace): string[] {
+  return NAV_BY_WORKSPACE[workspace].filter((g) => (g.children?.length ?? 0) > 0).map((g) => g.id);
 }
 
 /** Query-tab links (e.g. /admin?tab=users) only match on the client with that tab. */
@@ -146,8 +154,11 @@ export function NavContent({
   // Hydrate from localStorage after mount. SSR + first client render
   // produce identical markup (avoids hydration mismatch warnings).
   useEffect(() => {
-    setCollapsedGroups(readCollapsedGroups());
+    // No stored state: every group folded; the active page's group is
+    // forced open at render, so the person sees where they are.
+    setCollapsedGroups(readCollapsedGroups() ?? new Set(groupIdsOf(workspace)));
     setRailCollapsedState(readRailCollapsed());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The query string decides which /admin tab link is active; read it
@@ -169,11 +180,14 @@ export function NavContent({
     );
   }, [railCollapsed]);
 
-  function toggleGroup(g: string) {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(g)) next.delete(g);
-      else next.add(g);
+  // BL-NAV-LIFECYCLE — a folding menu: opening a group folds the others,
+  // so the open group has the room; the active page's group is always
+  // shown open (below). Clicking the open group folds it.
+  function toggleGroup(g: string, isOpen: boolean) {
+    setCollapsedGroups(() => {
+      // Fold the open group; or open this one and fold every other.
+      const next = new Set<string>(groupIdsOf(workspace));
+      if (!isOpen) next.delete(g);
       writeCollapsedGroups(next);
       return next;
     });
@@ -280,7 +294,7 @@ export function NavContent({
                   // Force the group open and expand the rail in one shot
                   // — otherwise the user has to click twice to get to
                   // their destination.
-                  if (collapsedGroups.has(g.id)) toggleGroup(g.id);
+                  toggleGroup(g.id, false);
                   toggleRail();
                 }}
                 title={g.label}
@@ -427,7 +441,7 @@ export function NavContent({
             <div key={g.id} className="flex flex-col">
               <button
                 type="button"
-                onClick={() => toggleGroup(g.id)}
+                onClick={() => toggleGroup(g.id, showChildren)}
                 aria-expanded={showChildren}
                 className={`flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors ${
                   groupActive ? "text-text" : "text-muted hover:text-text"

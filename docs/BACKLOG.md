@@ -2809,6 +2809,78 @@ out to deliver; new AI work starts a new ticket.
 
 ---
 
+### BL-NAV-LIFECYCLE — The everyday menu is the proposal lifecycle
+
+**Owner, 2026-11-01 (FORGE II document):** the everyday sidebar
+follows the proposal lifecycle, **Identify → Evaluate → Capture → Plan →
+Develop → Deliver → Measure**, each stage a page that lists the
+opportunities at that stage and carries that stage's work; a chevron on
+every opportunity shows where it is; a folding menu gives the page the
+room; the rest of the menu is consolidated. The admin workspaces stay as
+they are.
+
+**Phase 0 — the menu (this PR).** Seven groups: Command Center;
+Opportunity Management (Dashboard, Pipeline, the seven stages);
+Customers (Contacts, Companies); Partners (Company Search, 8(a) firms,
+Awards & recompetes, Watchlist, Saved searches); FORGE Brain (Brain,
+Knowledge base, Company model); Business Management (Company settings,
+Integrations, AI Engine, Security, Notifications, and admin-only Users &
+Roles, Billing, Templates, Notification rules, API access, Audit Log);
+Help. The stages are flat under Opportunity Management (the document
+nested Identify under Pipeline and Scout under Identify, four levels
+deep). Until the stage pages exist, each stage opens the page that holds
+its work today: Identify → Scout, with the ways in as tabs (Scout, Import
+from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, Create);
+Evaluate, Capture, Plan, Deliver → the opportunities at the Evaluated,
+Qualified, Captured and Submitted pipeline stages; Develop → the
+proposals in flight; Measure → Reports with Closed-Won, Lessons and Loss
+intelligence as tabs. The Knowledge base carries Import, USAspending and
+New entry as tabs. `src/lib/section-tabs.ts` (pure, tested) holds the
+tab sets and `SectionTabs` in the shell shows the strip above any page
+in a set, so no page changed and every URL kept working; the pages that
+left the menu are ⌘K shortcuts (`WORK_SHORTCUTS`). The sidebar folds:
+one group open at a time, the active page's group always open, state
+remembered per browser (`forge.nav.collapsed.v3`). Members see 7 groups
+and 25 items (45 before); the open group is what shows.
+
+**Phases to come, one PR each, design reviewed first:**
+1. **Identify:** Create as one page merging New Opportunity and New
+   Solicitation; Scout as the one-stop import (SAM.gov, GSA eBuy, GSA
+   email, enterprise portals, GWACs) with **Add to pipeline** on each
+   find.
+2. **Evaluate:** the stage page replaces Solicitations; a solicitation
+   becomes a document on the opportunity, not a record of its own;
+   Analyze (PWin and its report) and the Capability matrix (Yes / Partial
+   with a percentage / No over the existing six-answer scale) with their
+   reports on the opportunity page; the decision Go, No-Go with a
+   required reason, or Partner.
+3. **Capture:** the Go and Partner worklist; the partner registry
+   (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
+   on the 8(a) registry and USAspending; the partner finder with a
+   prioritised list and rationale; a tokenised link for a partner to
+   answer the capability matrix with no account.
+4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
+   Gloves teams notified automatically, task owners, milestones, the
+   compliance matrix and outline fixed here.
+5. **Develop:** Create a draft on the opportunity page (the bootstrap
+   exists), external reviewers with section-level access, scheduling
+   links for reviews.
+6. **Deliver:** submit from the portal by email, sent from a platform
+   address with a per-opportunity reply address; replies ingested by an
+   inbound provider's webhook (Postmark, SendGrid Inbound Parse or
+   Mailgun; Resend is outbound-only) and filed on the opportunity.
+7. **Measure:** the stage page consolidating outcome, lessons, loss
+   intelligence and reports.
+8. **The partner portal:** partner accounts scoped to their own answers,
+   agreement templates with redlines, e-signature through DocuSign or
+   Dropbox Sign rather than built in-house.
+9. **The chevron on every opportunity and proposal**, each stage a link
+   to where that stage's work happens; and the pipeline stage names
+   aligned to the seven words (Identified, Evaluated, Captured, Planned,
+   Developed, Delivered, Measured, plus Archived).
+
+---
+
 ### BL-NAV-RESTORE — Put the full menu back in the everyday sidebar; admin items for admins only
 **Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #290)
 
