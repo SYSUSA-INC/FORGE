@@ -132,6 +132,12 @@ export async function enqueueJob(
         payload: spec.payload ?? {},
         requestedByUserId: spec.requestedByUserId ?? null,
         maxAttempts: spec.maxAttempts ?? JOB_MAX_ATTEMPTS,
+        // The app's clock, not the column's `now()` default: every reader
+        // asks "due by `new Date()`?" at millisecond precision, and a
+        // microsecond database stamp from the same millisecond reads as
+        // not yet due, so a pump started right after the enqueue (the
+        // auto-draft kick) would skip its own fresh job until the cron.
+        nextAttemptAt: new Date(),
       })
       .onConflictDoNothing()
       .returning();
@@ -294,11 +300,17 @@ export async function executeJob(
  * The cron tick: recover stuck rows, then run due rows oldest-first
  * inside a time budget so one long parse cannot push the function past
  * its limit and become the next stuck row.
+ *
+ * `organizationIds` limits both steps to those organizations (an empty
+ * list touches nothing). The real cron leaves it out and sweeps every
+ * tenant; tests pass their own fixture organizations so a tick cannot
+ * take another test's queued job.
  */
 export async function runJobsCron(opts: {
   maxJobs?: number;
   budgetMs?: number;
   now?: Date;
+  organizationIds?: string[];
 } = {}): Promise<JobsCronSummary> {
   const maxJobs = opts.maxJobs ?? 3;
   const budgetMs = opts.budgetMs ?? 200_000;
@@ -313,6 +325,8 @@ export async function runJobsCron(opts: {
     failed: 0,
     deferred: 0,
   };
+  if (opts.organizationIds && opts.organizationIds.length === 0) return summary;
+  const inOrgs = opts.organizationIds ? inArray(backgroundJobs.organizationId, opts.organizationIds) : undefined;
 
   // 1. Stuck rows: still `running` past the window → presumed dead.
   const running = await db
@@ -325,7 +339,7 @@ export async function runJobsCron(opts: {
       error: backgroundJobs.error,
     })
     .from(backgroundJobs)
-    .where(eq(backgroundJobs.status, "running"))
+    .where(and(eq(backgroundJobs.status, "running"), inOrgs))
     .limit(100);
   for (const row of running) {
     if (!jobIsStuck(row.startedAt, now)) continue;
@@ -355,7 +369,7 @@ export async function runJobsCron(opts: {
   const due = await db
     .select({ id: backgroundJobs.id, organizationId: backgroundJobs.organizationId })
     .from(backgroundJobs)
-    .where(and(eq(backgroundJobs.status, "queued"), lte(backgroundJobs.nextAttemptAt, now)))
+    .where(and(eq(backgroundJobs.status, "queued"), lte(backgroundJobs.nextAttemptAt, now), inOrgs))
     .orderBy(asc(backgroundJobs.nextAttemptAt), asc(backgroundJobs.createdAt))
     .limit(maxJobs + 1);
   for (let i = 0; i < due.length; i++) {
