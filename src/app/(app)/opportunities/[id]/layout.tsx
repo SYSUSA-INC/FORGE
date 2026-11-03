@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { opportunities, users } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { LifecycleChevron } from "@/components/lifecycle/LifecycleChevron";
+import { lifecycleForOpportunity } from "@/lib/lifecycle";
 import { STAGE_COLORS, STAGE_LABELS } from "@/lib/opportunity-types";
 import { OpportunityTabs } from "./OpportunityTabs";
 import { DeleteOpportunityButton } from "./DeleteOpportunityButton";
@@ -80,6 +82,9 @@ export default async function OpportunityDetailLayout({
           },
         ]}
       />
+
+      {/* BL-NAV-LIFECYCLE — where this pursuit is on the seven-stage lifecycle. */}
+      <LifecycleChevron current={lifecycleForOpportunity(opp.stage)} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-4 py-3">
         <span

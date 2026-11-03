@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { HeaderSettingsLink, HeaderWorkspace } from "@/components/shell/HeaderWorkspace";
-import { SectionTabs } from "@/components/shell/SectionTabs";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
@@ -108,9 +107,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="relative min-h-[calc(100vh-3.5rem)] flex-1 overflow-x-hidden px-4 py-6 md:px-6 md:py-8 lg:px-10">
-          <Suspense fallback={null}>
-            <SectionTabs isOrgAdmin={isOrgAdmin} isSuperadmin={isSuperadmin} />
-          </Suspense>
           {children}
           <footer className="mt-16 border-t border-layer/10 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-label text-subtle">

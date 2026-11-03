@@ -385,7 +385,7 @@ When any of these matter for your operating cadence, raise it and we'll prioriti
 
 The unified audit stream addresses the previous "no org-wide feed" and "no IP / user-agent capture" gaps. Two surfaces:
 
-**Business Management → Audit Log** (`/audit-log`) — tenant-scoped. Every mutating server action and sensitive read in your org writes a row with actor, action verb, resource type + id, IP, user-agent, structured metadata, and timestamp. Filter by actor, resource type (Opportunities / Proposals / Solicitations / Knowledge / Users / Settings / Templates / Companies / Notifications / **Authorization (denied)**), date range, or free-text. CSV export available.
+**Operations Management → Audit Log** (`/audit-log`) — tenant-scoped. Every mutating server action and sensitive read in your org writes a row with actor, action verb, resource type + id, IP, user-agent, structured metadata, and timestamp. Filter by actor, resource type (Opportunities / Proposals / Solicitations / Knowledge / Users / Settings / Templates / Companies / Notifications / **Authorization (denied)**), date range, or free-text. CSV export available.
 
 **Platform Administration → Audit Log** (`/platform/audit-log`) — **super-admin only**. Cross-tenant view of the same rows; adds a tenant filter dropdown, a category filter (Mutations / Reads), and an "Events by tenant" panel that highlights top-20 tenants by volume — useful for spotting an unusually quiet (suspicious) or unusually loud (potential abuse) tenant. CSV export includes tenant + slug columns.
 
@@ -401,7 +401,7 @@ The unified audit stream addresses the previous "no org-wide feed" and "no IP / 
 
 ## 5. Notification rules
 
-Open **Business Management → Notification rules** (`/notifications/rules`). The page lists every active and inactive rule in your tenant. Admin-only — non-admins are redirected.
+Open **Operations Management → Notification rules** (`/notifications/rules`). The page lists every active and inactive rule in your tenant. Admin-only — non-admins are redirected.
 
 A **notification rule** answers four questions: *what triggers it*, *who hears about it*, *through which channels*, and *how often*. Optionally a fifth: *what's the SLA, and who gets escalated to if it's not acknowledged in time*?
 
