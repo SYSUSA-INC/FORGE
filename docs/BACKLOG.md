@@ -93,6 +93,7 @@ Effort key:
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
 | 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
+| 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2819,6 +2820,61 @@ defect in the assessment plus its neighbours:
 **Queued slices:** none — BL-AIP-6b was the last slice the assessment
 scheduled. §8 of the assessment report describes what the program set
 out to deliver; new AI work starts a new ticket.
+
+---
+
+### BL-SCOUT-QUALITY — Scout raises real finds, not every notice that names a keyword
+
+**Owner, 2026-11-03:** two cards for one Marine Corps RFI (Amendments 03
+and 04), both "Scored · not triaged", fit 65 for a single mention of
+ServiceNow: "Our Scout has to be smarter … this is going to make our
+platform a junkyard." **Causes found:** the scout knew a notice by its
+own id, so each amendment was a new find; the fit score started at 35
+and gave the same +10 to a keyword in the title and one passing mention;
+the score was frozen at the first run (a find due tomorrow kept its old
+number); the AI review covered only the ten best new finds of a run, so
+the rest were shown unjudged among the judged ones.
+
+**Shipped (this PR).** `src/lib/scout-logic.ts`: `keywordStrength` (in
+the title or three mentions strong; twice, once in a short notice, or in
+an earlier notice of the solicitation moderate; once in a long
+description, over 800 characters, or only in the agency's name weak),
+`scoutFit` rebalanced to start at zero (keyword +30 / +15 / +3, primary
+NAICS +25, another code +15, set-aside +10, recompete won +25, lost +5 or
++10, a win at the agency +10, watchlisted award +15; the penalties as
+before), `passingMentionOnly` (a keyword find with only a weak mention
+and no recompete or win at the agency is dropped), `solicitationKey`
+(letters and digits of the number, 8 or more), `recompeteFromSignals`.
+`src/lib/scout.ts`: waiting finds of one solicitation fold into the
+latest (`foldWaitingFinds`); a new notice of a solicitation already in
+the pipeline raises no find, a decided one stays decided, a waiting one
+is replaced in place (`bySolicitation`); every waiting find is
+re-scored each run and a now-passing mention removed
+(`rescoreWaitingFinds`); the AI review takes the ten best of the new and
+the waiting unreviewed finds. Scout tab: **New finds** shows Pursue then
+Watch; **Show skipped (N)** reveals the skips; **Not yet reviewed** holds
+unjudged finds with the reason (stub mode, plan or quota, queued batch,
+waiting their turn). Tests: `tests/ai/scout-logic.test.ts` rewritten for
+the formula and the new rules; `tests/isolation/scout-quality.test.ts`
+(fold, replace, pipeline skip, passing mentions dropped, re-score, another
+tenant untouched).
+
+**Owner decisions:** keep **Show skipped** (2026-11-03). The AI review
+stays behind the plan's general AI switch (`aiAutoDraft`, which also
+gates chat, the company model and loss intelligence); a separate switch
+would be a pricing change.
+
+**Next: BL-SCOUT-AMEND — the amendment watch** (owner, 2026-11-03). When
+the scout, or a daily check of every open opportunity with a SAM.gov
+notice, finds a new notice of a solicitation in the pipeline: download
+every published attachment (size cap and storage limit as today), file
+each as an amendment document under the opportunity's solicitation so
+it is read and compared, and notify the opportunity's owner and everyone
+assigned to its proposal or review teams, in the app and by email, with
+the amendment number, a moved due date and the documents. A new
+"Solicitation amended" notification rule ships on by default. Watched:
+every open opportunity (not won, lost or no-bid); once Evaluate has the
+Go / No-Go decision, a No-Go stops the watch.
 
 ---
 
