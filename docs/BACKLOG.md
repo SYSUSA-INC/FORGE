@@ -2702,6 +2702,22 @@ defect in the assessment plus its neighbours:
   gone → permanent failure recorded on the row; open-job reuse; stuck
   recovery + abandonment + same-tick run; harvest with nothing to
   harvest; tenant B cannot claim or see A's jobs.
+- **Follow-up (2026-11-03): a fresh job is due at once.** `enqueueJob`
+  stamped `next_attempt_at` with the column's `now()` default
+  (microseconds, database clock), while every reader asks "due by
+  `new Date()`?" at millisecond precision, so a reader in the same
+  millisecond as the insert saw the job as not yet due. The auto-draft
+  pump kicked right after the enqueue then ran nothing and the job
+  waited for the next cron tick; in CI this was the intermittent
+  `auto-draft.test.ts` "never writes stub-mode text" failure (`ran: 0`).
+  The insert now writes the app's clock, like every other write of the
+  column. `runJobsCron` also takes an optional `organizationIds` filter
+  (both the stuck sweep and the claim; an empty list touches nothing;
+  the real cron leaves it out), and `background-jobs.test.ts` scopes its
+  ticks to its own fixture organizations. Tested: a tick limited to one
+  organization leaves another's queued and stuck rows alone; 25
+  enqueue-then-read rounds all find the job due (this test fails
+  without the fix).
 - Not moved: the compliance auto-map, review pre-flight and scan
   triggers keep `runInBackground` — scans already have their own
   durable queue (`scan_dirty_since` + backoff + the scan cron), and the

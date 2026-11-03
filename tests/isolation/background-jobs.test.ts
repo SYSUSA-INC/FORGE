@@ -6,11 +6,17 @@
  * job for the same resource is reused rather than duplicated; the cron
  * re-queues a stuck `running` row (and fails one whose attempts are
  * spent) and then runs due rows; a harvest with nothing to harvest is a
- * permanent failure; tenant B can neither claim nor see A's jobs.
+ * permanent failure; tenant B can neither claim nor see A's jobs; a
+ * cron tick limited to some organizations leaves the others' rows
+ * alone; a freshly queued job is due at once.
+ *
+ * Every cron tick here passes this file's own organization ids: other
+ * test files queue jobs in the same database, and an unscoped tick
+ * would claim them.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { backgroundJobs, solicitations } from "@/db/schema";
 import {
@@ -128,7 +134,10 @@ describe("BL-AIP-4c — background jobs", () => {
       })
       .returning({ id: backgroundJobs.id });
 
-    const summary = await runJobsCron({ maxJobs: 10 });
+    const summary = await runJobsCron({
+      maxJobs: 10,
+      organizationIds: [fx.orgA.organizationId, fx.orgB.organizationId],
+    });
     expect(summary.recovered).toBeGreaterThanOrEqual(1);
     expect(summary.abandoned).toBeGreaterThanOrEqual(1);
 
@@ -141,6 +150,70 @@ describe("BL-AIP-4c — background jobs", () => {
     expect(recovered.attempts).toBe(2);
     expect(recovered.status).toBe("failed");
     expect(recovered.error).toBe(BYTES_GONE_ERROR);
+  });
+
+  it("limits a tick to the organizations it is given", async () => {
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60_000);
+    const { job: queuedB } = await enqueueJob({
+      organizationId: fx.orgB.organizationId,
+      kind: "proposal_harvest",
+      resourceId: fx.orgB.proposalId,
+    });
+    const [stuckB] = await db
+      .insert(backgroundJobs)
+      .values({
+        organizationId: fx.orgB.organizationId,
+        kind: "solicitation_parse",
+        resourceId: solicitationId,
+        status: "running",
+        attempts: 1,
+        startedAt: twentyMinutesAgo,
+      })
+      .returning({ id: backgroundJobs.id });
+    const { job: queuedA } = await enqueueJob({
+      organizationId: fx.orgA.organizationId,
+      kind: "solicitation_parse",
+      resourceId: solicitationId,
+    });
+
+    const summary = await runJobsCron({ maxJobs: 10, organizationIds: [fx.orgA.organizationId] });
+    expect(summary).toMatchObject({ recovered: 0, abandoned: 0, ran: 1, failed: 1 });
+
+    // A's due job ran (bytes gone → failed); B's rows were not touched.
+    expect((await jobRow(queuedA.id)).status).toBe("failed");
+    expect(await jobRow(queuedB.id)).toMatchObject({ status: "queued", attempts: 0 });
+    expect(await jobRow(stuckB!.id)).toMatchObject({ status: "running", attempts: 1 });
+
+    // An empty list touches nothing.
+    expect(await runJobsCron({ maxJobs: 10, organizationIds: [] })).toMatchObject({ ran: 0, recovered: 0, abandoned: 0 });
+    expect((await jobRow(queuedB.id)).status).toBe("queued");
+  });
+
+  it("makes a freshly queued job due at once", async () => {
+    // A reader asking "due by now?" straight after the enqueue must find
+    // the row. With a microsecond database default, a stamp from the same
+    // millisecond read as not yet due (the auto-draft pump then ran 0).
+    for (let i = 0; i < 25; i++) {
+      const { job } = await enqueueJob({
+        organizationId: fx.orgA.organizationId,
+        kind: "solicitation_parse",
+        resourceId: solicitationId,
+      });
+      const due = await db
+        .select({ id: backgroundJobs.id })
+        .from(backgroundJobs)
+        .where(
+          and(
+            eq(backgroundJobs.id, job.id),
+            eq(backgroundJobs.organizationId, fx.orgA.organizationId),
+            lte(backgroundJobs.nextAttemptAt, new Date()),
+          ),
+        );
+      expect(due).toHaveLength(1);
+      await db
+        .delete(backgroundJobs)
+        .where(and(eq(backgroundJobs.id, job.id), eq(backgroundJobs.organizationId, fx.orgA.organizationId)));
+    }
   });
 
   it("fails a harvest with nothing to harvest without retrying", async () => {
