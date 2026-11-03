@@ -13,7 +13,7 @@ import { createSolicitationFromUploadAction } from "../actions";
  * request-size cap), the server checks it, and it is filed as a new
  * solicitation whose parse then runs in the background.
  */
-export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
+export function UploadSolicitationForm({ maxBytes, then = "solicitation" }: { maxBytes: number; /** BL-NAV-LIFECYCLE 1a — "create": go on to Identify → Create with the document. */ then?: "solicitation" | "create" }) {
   const router = useRouter();
   const [dragOver, setDragOver] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -27,7 +27,9 @@ export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
       return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
     },
     onItemDone: (item) => {
-      if (item.phase === "done" && item.result) router.push(`/solicitations/${item.result}`);
+      if (item.phase === "done" && item.result) {
+        router.push(then === "create" ? `/pipeline/identify?tab=create&from=${item.result}` : `/solicitations/${item.result}`);
+      }
     },
   });
   const limit = formatLimit(maxBytes);

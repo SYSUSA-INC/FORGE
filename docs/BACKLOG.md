@@ -2862,7 +2862,7 @@ on these pages.
 
 **Phases to come, one PR each, design reviewed first:**
 1. **Identify:** on the Identify page's two tabs.
-   - **1b — Scout, the one-stop page (this PR).** The Scout tab keeps the
+   - **1b — Scout, the one-stop page (this PR, with 1a).** The Scout tab keeps the
      nightly finds on top, each with **Add to pipeline** and **Not for
      us** (the old Import and Dismiss, same decision and grading), then
      **Bring in an opportunity** with a source picker (`?source=`):
@@ -2878,9 +2878,24 @@ on these pages.
      matches when its own query is a subset of the page's, so Scout stays
      lit with a source chosen. Stages are unchanged: a find or an import
      lands where it did (Identified, or the notice type's stage).
-   - **1a — Create as one page** merging New Opportunity and New
-     Solicitation: a document drop that parses and pre-fills the form, or
-     the form by hand; the document attached from birth (next).
+   - **1a — Create as one page (this PR, with 1b).** New Opportunity and
+     New Solicitation on the Create tab. **Start from a document** uses
+     the existing upload and parse (`createSolicitationFromUploadAction`,
+     a durable parse job) and hands over to
+     `/pipeline/identify?tab=create&from=<id>`: while the document is read
+     the page waits (`ParseWaiter` refreshes every 4 seconds; **Don't
+     wait** opens the form at once), then shows the opportunity form
+     pre-filled from the parsed fields. Saving calls
+     `createOpportunityAction(input, { solicitationId })`, which checks
+     the document is this workspace's and not already linked, links it and
+     its amendments, notes the activity, and audits
+     `opportunity.create` with `from: document | hand`. **Or fill in by
+     hand** is the form as before. `/solicitations/new` redirects to
+     Create; the proposal launcher's `afterCreate` hand-off survives.
+     `CreateSection` calls the org gate itself. Tested in
+     `tests/isolation/create-from-document.test.ts` (linked from birth
+     with amendments, a second save refused, another workspace refused,
+     by hand audited as such) and end to end.
 2. **Evaluate:** the stage page replaces Solicitations; a solicitation
    becomes a document on the opportunity, not a record of its own;
    Analyze (PWin and its report) and the Capability matrix (Yes / Partial

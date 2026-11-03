@@ -5,14 +5,12 @@ import { db } from "@/db";
 import { opportunities, users } from "@/db/schema";
 import { LifecycleChevron } from "@/components/lifecycle/LifecycleChevron";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { identifySource } from "@/lib/identify-sources";
 import { lifecycleStage, type LifecycleKey } from "@/lib/lifecycle";
 import { safeQuery } from "@/lib/schema-resilience";
-import { listOpportunityOwners } from "@/app/(app)/opportunities/actions";
-import { OpportunityForm } from "@/app/(app)/opportunities/OpportunityForm";
 import { ScoutSection } from "@/app/(app)/opportunities/scout/ScoutSection";
+import { CreateSection } from "./CreateSection";
 import { StageList, type StageListRow } from "./StageList";
 
 /**
@@ -24,18 +22,17 @@ import { StageList, type StageListRow } from "./StageList";
  * (Analyze, the decision, the plan, the draft, the submission) arrive
  * phase by phase on these pages.
  */
-export type StageSearchParams = { tab?: string; afterCreate?: string; source?: string };
+export type StageSearchParams = { tab?: string; afterCreate?: string; source?: string; from?: string; wait?: string };
 
 export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: LifecycleKey; searchParams: StageSearchParams }) {
   const stage = lifecycleStage(stageKey);
   if (!stage) notFound();
-  const user = await requireAuth();
+  await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   if (stage.key === "identify") {
     const tab = searchParams.tab === "create" ? "create" : "scout";
     const afterCreate = searchParams.afterCreate === "proposal" ? "proposal" : undefined;
-    const owners = tab === "create" ? await listOpportunityOwners() : [];
     return (
       <>
         <PageHeader eyebrow="Pipeline" title="Identify" subtitle={stage.description} />
@@ -57,16 +54,11 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
           ))}
         </nav>
         {tab === "create" ? (
-          <Panel title="Create an opportunity" eyebrow="By hand">
-            <p className="mb-4 font-body text-[13px] leading-[1.5] text-muted">
-              Add a lead, RFI or pre-RFP notice you want to pursue. It lands in the pipeline at Identified. To start from a solicitation document, upload it under{" "}
-              <Link href="/solicitations/new" className="aur-link">
-                New solicitation
-              </Link>{" "}
-              and convert it; one page for both is coming.
-            </p>
-            <OpportunityForm mode="create" owners={owners} defaultOwnerUserId={user.id} afterCreate={afterCreate} />
-          </Panel>
+          <CreateSection
+            from={searchParams.from}
+            wait={searchParams.wait !== "0"}
+            afterCreate={afterCreate}
+          />
         ) : (
           <ScoutSection source={identifySource(searchParams.source)} />
         )}
