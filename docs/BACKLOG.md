@@ -2861,10 +2861,26 @@ the menu are ⌘K shortcuts. The stage behaviours arrive phase by phase
 on these pages.
 
 **Phases to come, one PR each, design reviewed first:**
-1. **Identify:** on the Identify page's two tabs: Scout as the one-stop
-   import (SAM.gov, GSA eBuy, GSA email, enterprise portals, GWACs) with
-   **Add to pipeline** on each find; Create as one page merging New
-   Opportunity and New Solicitation (design in #451, folded in here).
+1. **Identify:** on the Identify page's two tabs.
+   - **1b — Scout, the one-stop page (this PR).** The Scout tab keeps the
+     nightly finds on top, each with **Add to pipeline** and **Not for
+     us** (the old Import and Dismiss, same decision and grading), then
+     **Bring in an opportunity** with a source picker (`?source=`):
+     SAM.gov search, GSA eBuy and GSA email render inline (the three
+     import pages' bodies, now sections; their URLs redirect to the
+     picker); enterprise portals and GWACs, which have no importer, open
+     the existing source-request form so the demand is counted. SAM.gov
+     results gained **Add to pipeline** beside every notice next to the
+     bulk **Add N selected to pipeline**; eBuy and GSA email say **Add to
+     pipeline** too. `src/lib/identify-sources.ts` (pure, tested) holds
+     the sources. The Identify route carries the import pages'
+     five-minute budget for their server actions. A sidebar tab link now
+     matches when its own query is a subset of the page's, so Scout stays
+     lit with a source chosen. Stages are unchanged: a find or an import
+     lands where it did (Identified, or the notice type's stage).
+   - **1a — Create as one page** merging New Opportunity and New
+     Solicitation: a document drop that parses and pre-fills the form, or
+     the form by hand; the document attached from birth (next).
 2. **Evaluate:** the stage page replaces Solicitations; a solicitation
    becomes a document on the opportunity, not a record of its own;
    Analyze (PWin and its report) and the Capability matrix (Yes / Partial

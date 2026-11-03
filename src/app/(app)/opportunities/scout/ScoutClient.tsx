@@ -410,7 +410,7 @@ function CandidateCard({ candidate: c }: { candidate: ScoutCandidateView }) {
               disabled={pending}
               onClick={() => decide("imported")}
             >
-              {pending ? "…" : "Import as opportunity"}
+              {pending ? "…" : "Add to pipeline"}
             </button>
             <button
               type="button"
@@ -418,7 +418,7 @@ function CandidateCard({ candidate: c }: { candidate: ScoutCandidateView }) {
               disabled={pending}
               onClick={() => decide("dismissed")}
             >
-              Dismiss
+              Not for us
             </button>
           </>
         )}

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { SamKeyNotice } from "@/components/ui/SamKeyNotice";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getSamKeyStatus } from "@/lib/samgov-key";
@@ -17,6 +16,8 @@ import {
   type ScoutRunView,
 } from "@/lib/scout-logic";
 import { ScoutClient } from "./ScoutClient";
+import { BringInSection } from "./BringInSection";
+import type { IdentifySource } from "@/lib/identify-sources";
 
 function ago(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -30,8 +31,12 @@ function ago(iso: string): string {
  * BL-AIP-7b — the Scout page: what the nightly scout found, its take on
  * each find, and the import / dismiss decisions that grade it.
  */
-/** The Scout page's body, shown under Identify. */
-export async function ScoutSection() {
+/**
+ * BL-NAV-LIFECYCLE 1b — the Scout tab under Pipeline → Identify: what the
+ * nightly scout found, each with Add to pipeline and Not for us, then
+ * every other source on the same page.
+ */
+export async function ScoutSection({ source }: { source: IdentifySource | null }) {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const isAdmin = user.role === "admin" || !!user.isSuperadmin;
@@ -59,10 +64,8 @@ export async function ScoutSection() {
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
-          Every night the scout re-runs your NAICS codes and keywords against SAM.gov, checks your watchlist for expiring awards, scores each find against your own history and recommends pursue, watch or skip. Importing a find adds it to the pipeline; dismissing one grades the scout. Bring in more from{" "}
-          <Link href="/opportunities/import" className="aur-link">SAM.gov search</Link>,{" "}
-          <Link href="/opportunities/import/ebuy" className="aur-link">GSA eBuy</Link> or a{" "}
-          <Link href="/opportunities/import/gsa" className="aur-link">GSA email</Link>; one page for every source is coming.
+          Every night the scout re-runs your NAICS codes and keywords against SAM.gov, checks your watchlist for expiring awards, scores each find against your own history and recommends pursue, watch or skip. <strong>Add to pipeline</strong> puts a find in the pipeline; <strong>Not for us</strong> sets it aside; both teach the scout your taste. Every other source is under{" "}
+          <a href="#bring-in" className="font-medium text-cobalt hover:underline">Bring in an opportunity</a> below.
         </p>
         <dl className="flex flex-wrap gap-6 font-mono text-[11px] text-muted">
           <div><dt className="uppercase tracking-label">New finds</dt><dd className="font-display text-xl text-text">{fresh.length}</dd></div>
@@ -81,6 +84,9 @@ export async function ScoutSection() {
         lastRun={lastRun}
         isAdmin={isAdmin}
       />
+      <div id="bring-in" className="scroll-mt-6">
+        <BringInSection organizationId={organizationId} source={source} />
+      </div>
     </>
   );
 }

@@ -7,6 +7,7 @@ import { LifecycleChevron } from "@/components/lifecycle/LifecycleChevron";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { identifySource } from "@/lib/identify-sources";
 import { lifecycleStage, type LifecycleKey } from "@/lib/lifecycle";
 import { safeQuery } from "@/lib/schema-resilience";
 import { listOpportunityOwners } from "@/app/(app)/opportunities/actions";
@@ -23,7 +24,7 @@ import { StageList, type StageListRow } from "./StageList";
  * (Analyze, the decision, the plan, the draft, the submission) arrive
  * phase by phase on these pages.
  */
-export type StageSearchParams = { tab?: string; afterCreate?: string };
+export type StageSearchParams = { tab?: string; afterCreate?: string; source?: string };
 
 export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: LifecycleKey; searchParams: StageSearchParams }) {
   const stage = lifecycleStage(stageKey);
@@ -67,7 +68,7 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
             <OpportunityForm mode="create" owners={owners} defaultOwnerUserId={user.id} afterCreate={afterCreate} />
           </Panel>
         ) : (
-          <ScoutSection />
+          <ScoutSection source={identifySource(searchParams.source)} />
         )}
       </>
     );
