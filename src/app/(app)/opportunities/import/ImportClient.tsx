@@ -172,14 +172,23 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
   }
 
   function importSelected() {
+    // BL-AIP-1 — send the rows the user ticked, exactly as displayed.
+    // The server used to re-search SAM.gov for the ids and lose any
+    // result outside its default window.
+    // The server imports at most MAX_IMPORT_ROWS a time: send (and mark) just those.
+    const picked = [...(results ?? []), ...unchecked].filter((o) => selected.has(o.noticeId)).slice(0, MAX_IMPORT_ROWS);
+    addToPipeline(picked, selected.size);
+  }
+
+  /** BL-NAV-LIFECYCLE 1b — the button beside each notice: that one row, now. */
+  function addOne(o: ImportableOpportunity) {
+    addToPipeline([o], 1);
+  }
+
+  function addToPipeline(picked: ImportableOpportunity[], wanted: number) {
     setError(null);
     setNotice(null);
     startImporting(async () => {
-      // BL-AIP-1 — send the rows the user ticked, exactly as displayed.
-      // The server used to re-search SAM.gov for the ids and lose any
-      // result outside its default window.
-      // The server imports at most MAX_IMPORT_ROWS a time: send (and mark) just those.
-      const picked = [...(results ?? []), ...unchecked].filter((o) => selected.has(o.noticeId)).slice(0, MAX_IMPORT_ROWS);
       const sent = new Set(picked.map((o) => o.noticeId));
       const res = await importSamGovOpportunitiesAction(picked);
       if (!res.ok) {
@@ -187,9 +196,9 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
         return;
       }
       setNotice(
-        `Imported ${res.imported} ${res.imported === 1 ? "opportunity" : "opportunities"}${
-          res.skipped > 0 ? ` · skipped ${res.skipped} duplicates` : ""
-        }${selected.size > sent.size ? ` · import again for the other ${selected.size - sent.size} (${MAX_IMPORT_ROWS} at a time)` : ""}.`,
+        `Added ${res.imported} ${res.imported === 1 ? "opportunity" : "opportunities"} to the pipeline${
+          res.skipped > 0 ? ` · skipped ${res.skipped} already there` : ""
+        }${wanted > sent.size ? ` · add again for the other ${wanted - sent.size} (${MAX_IMPORT_ROWS} at a time)` : ""}.`,
       );
       // Marked here rather than searched again (a search costs SAM.gov requests).
       const imported = (o: ImportableOpportunity) => (sent.has(o.noticeId) ? { ...o, alreadyImported: true } : o);
@@ -371,8 +380,8 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
                 onClick={importSelected}
               >
                 {importing
-                  ? "Importing…"
-                  : `Import ${selected.size} selected`}
+                  ? "Adding…"
+                  : `Add ${selected.size} selected to pipeline`}
               </button>
             </div>
           }
@@ -391,6 +400,8 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
                   o={o}
                   checked={selected.has(o.noticeId)}
                   onToggle={() => toggleSelected(o.noticeId)}
+                  onAdd={() => addOne(o)}
+                  busy={importing}
                 />
               ))}
             </ul>
@@ -405,7 +416,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
                 </button>
               </div>
               <ul className="mt-3 flex flex-col gap-2">
-                {unchecked.map((o) => <OpportunityRow key={o.noticeId} o={o} checked={selected.has(o.noticeId)} onToggle={() => toggleSelected(o.noticeId)} />)}
+                {unchecked.map((o) => <OpportunityRow key={o.noticeId} o={o} checked={selected.has(o.noticeId)} onToggle={() => toggleSelected(o.noticeId)} onAdd={() => addOne(o)} busy={importing} />)}
               </ul>
             </details>
           ) : null}
@@ -419,10 +430,15 @@ function OpportunityRow({
   o,
   checked,
   onToggle,
+  onAdd,
+  busy,
 }: {
   o: ImportableOpportunity;
   checked: boolean;
   onToggle: () => void;
+  /** BL-NAV-LIFECYCLE 1b — add this one notice to the pipeline. */
+  onAdd: () => void;
+  busy: boolean;
 }) {
   const due = o.responseDeadLine
     ? new Date(o.responseDeadLine).toLocaleDateString()
@@ -459,7 +475,7 @@ function OpportunityRow({
             </span>
             {o.alreadyImported ? (
               <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
-                Already imported
+                In the pipeline
               </span>
             ) : null}
             {o.recompete ? (
@@ -561,6 +577,21 @@ function OpportunityRow({
             >
               View on SAM.gov ↗
             </a>
+          ) : null}
+          {!o.alreadyImported ? (
+            <button
+              type="button"
+              className="aur-btn aur-btn-primary mt-2 block text-[11px]"
+              disabled={busy}
+              onClick={(e) => {
+                // Inside the row's label: don't also tick the checkbox.
+                e.preventDefault();
+                e.stopPropagation();
+                onAdd();
+              }}
+            >
+              Add to pipeline
+            </button>
           ) : null}
         </div>
       </label>

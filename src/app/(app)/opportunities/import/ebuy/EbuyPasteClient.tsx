@@ -155,7 +155,7 @@ export function EbuyPasteClient() {
             disabled={!parsedOnce || creating || fields.title.trim() === ""}
             onClick={create}
           >
-            {creating ? "Creating…" : "Create opportunity"}
+            {creating ? "Adding…" : "Add to pipeline"}
           </button>
         }
       >

@@ -25,6 +25,7 @@ export function OpportunityForm({
   owners,
   defaultOwnerUserId,
   afterCreate,
+  solicitationId,
 }: {
   mode: "create" | "edit";
   id?: string;
@@ -34,6 +35,8 @@ export function OpportunityForm({
   /** When set to "proposal", redirect into the proposal launcher
    *  with this new opportunity preselected after a successful create. */
   afterCreate?: "proposal";
+  /** BL-NAV-LIFECYCLE 1a — the uploaded document this opportunity is created from. */
+  solicitationId?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -101,7 +104,7 @@ export function OpportunityForm({
     startTransition(async () => {
       const payload = collect();
       if (mode === "create") {
-        const res = await createOpportunityAction(payload);
+        const res = await createOpportunityAction(payload, solicitationId ? { solicitationId } : undefined);
         if (!res.ok) return setError(res.error);
         // The "create from scratch" flow on the proposal launcher
         // routes here with `?afterCreate=proposal` so we know to chain

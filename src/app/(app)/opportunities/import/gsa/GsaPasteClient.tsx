@@ -221,7 +221,7 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
             }
             onClick={create}
           >
-            {creating ? "Creating…" : queue.busy ? "Uploading attachments…" : "Create opportunity"}
+            {creating ? "Adding…" : queue.busy ? "Uploading attachments…" : "Add to pipeline"}
           </button>
         }
       >
