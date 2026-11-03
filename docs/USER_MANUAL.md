@@ -463,7 +463,7 @@ Every way an opportunity comes in is on one page: **Opportunity Management → P
 - **SAM.gov search** — the search described in this section, with **Add to pipeline** beside every notice and **Add N selected to pipeline** for several at once.
 - **GSA eBuy** — paste an eBuy RFQ; FORGE reads its fields and **Add to pipeline** creates the opportunity.
 - **GSA email** — paste a forwarded GSA notification and drop its attachments (§5.2.2).
-- **Enterprise portals** and **GWACs** — FORGE does not read these yet. The picker opens the source-request form: name the portal or contract vehicle and how notices reach you today; every request is counted and decides which integration comes first. Meanwhile, paste the notice under GSA email or add it by hand under Create (§5.3).
+- **Enterprise portals** — FORGE does not read these yet. The picker opens the source-request form: name the portal and how notices reach you today; every request is counted and decides which integration comes first. Meanwhile, paste the notice under GSA email or add it by hand under Create (§5.3). GWACs (contract vehicles such as GSA MAS, OASIS+, Alliant or SEWP) are planned and not on the page yet.
 
 Whatever you add lands in the pipeline and shows on the **Evaluate** stage page. The old addresses (`/opportunities/import`, `/opportunities/import/ebuy`, `/opportunities/import/gsa`) open the Scout tab with that source chosen.
 

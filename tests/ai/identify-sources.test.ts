@@ -4,7 +4,7 @@ import { IDENTIFY_SOURCES, identifySource, identifySourceHref } from "@/lib/iden
 /** BL-NAV-LIFECYCLE phase 1b — the one-stop Scout's sources. */
 describe("identify sources", () => {
   it("lists the importers first, then the sources without one", () => {
-    expect(IDENTIFY_SOURCES.map((s) => s.key)).toEqual(["sam", "ebuy", "gsa", "portals", "gwacs"]);
+    expect(IDENTIFY_SOURCES.map((s) => s.key)).toEqual(["sam", "ebuy", "gsa", "portals"]);
     expect(IDENTIFY_SOURCES.filter((s) => s.live).map((s) => s.key)).toEqual(["sam", "ebuy", "gsa"]);
   });
 

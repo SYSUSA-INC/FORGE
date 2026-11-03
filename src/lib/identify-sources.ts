@@ -1,11 +1,11 @@
 /**
  * BL-NAV-LIFECYCLE phase 1b (FORGE II, footnote 3) — the sources the
  * Scout tab brings opportunities in from, on one page. SAM.gov search,
- * GSA eBuy and GSA email are working importers; enterprise portals and
- * GWACs have no integration yet, so they file a source request, which
- * records the demand. Pure; unit-tested.
+ * GSA eBuy and GSA email are working importers; enterprise portals have
+ * no integration yet, so they file a source request, which records the
+ * demand. GWACs are a backlog item (BL-SCOUT-GWAC). Pure; unit-tested.
  */
-export type IdentifySourceKey = "sam" | "ebuy" | "gsa" | "portals" | "gwacs";
+export type IdentifySourceKey = "sam" | "ebuy" | "gsa" | "portals";
 
 export type IdentifySource = {
   key: IdentifySourceKey;
@@ -21,7 +21,6 @@ export const IDENTIFY_SOURCES: readonly IdentifySource[] = [
   { key: "ebuy", label: "GSA eBuy", hint: "eBuy has no public API: paste an RFQ and FORGE reads its fields.", live: true },
   { key: "gsa", label: "GSA email", hint: "Paste a forwarded GSA notification; drop its attachments alongside.", live: true },
   { key: "portals", label: "Enterprise portals", hint: "State, local and commercial portals your team watches.", live: false },
-  { key: "gwacs", label: "GWACs", hint: "Contract vehicles your company holds: GSA MAS, OASIS+, Alliant, SEWP and the like.", live: false },
 ] as const;
 
 /** The source a `?source=` value names, or null for none or an unknown one. */

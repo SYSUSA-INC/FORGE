@@ -63,7 +63,7 @@ export async function BringInSection({ organizationId, source }: { organizationI
         <div className="mt-4">
           <Panel title={`${source.label}: not connected yet`} eyebrow="Request this source">
             <p className="font-body text-[13px] leading-[1.5] text-muted">
-              FORGE does not read {source.key === "gwacs" ? "contract-vehicle portals" : "enterprise portals"} yet. Tell us which one and how notices reach you today; each request is counted and shapes which integration comes first. Until then, paste a notice under GSA email or add it by hand under Create.
+              FORGE does not read enterprise portals yet. Tell us which one and how notices reach you today; each request is counted and shapes which integration comes first. Until then, paste a notice under GSA email or add it by hand under Create.
             </p>
           </Panel>
           <div className="mt-4">

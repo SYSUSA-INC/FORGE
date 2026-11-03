@@ -92,6 +92,7 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
+| 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2818,6 +2819,23 @@ defect in the assessment plus its neighbours:
 **Queued slices:** none — BL-AIP-6b was the last slice the assessment
 scheduled. §8 of the assessment report describes what the program set
 out to deliver; new AI work starts a new ticket.
+
+---
+
+### BL-SCOUT-GWAC — GWACs as a Scout source
+
+**Owner, 2026-11-03:** GWACs go on the backlog; the Scout page does not
+list them until they are built. **Ask (FORGE II, footnote 3):** Scout
+brings in opportunities from "current and future GWACs business users
+may have", alongside SAM.gov, GSA eBuy, GSA email and enterprise
+portals. **To decide before building:** which vehicles first (GSA MAS
+through eBuy is partly covered by the eBuy paste; OASIS+, Alliant 2/3,
+SEWP, Polaris, CIO-SP each have their own ordering portal and access
+rules); whether a vehicle's task-order notices can be read through an
+API or only by forwarded email (in which case the GSA-email paste is
+the bridge); and how a company records which vehicles it holds, so the
+scout only looks where it may bid. Lands as a source in the Bring-in
+picker on the Scout tab (`src/lib/identify-sources.ts`).
 
 ---
 
