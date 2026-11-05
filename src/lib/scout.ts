@@ -33,7 +33,7 @@
  */
 import "server-only";
 
-import { and, count, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne, notInArray, sql, type SQL } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/db";
 import {
@@ -89,10 +89,13 @@ import {
   isScoutRecommendation,
   learningExamples,
   naicsCodeOf,
+  passingMentionOnly,
+  recompeteFromSignals,
   SCOUT_DESCRIPTION_CHARS,
   scoutCodes,
   scoutFit,
   scoutKeywordQuery,
+  solicitationKey,
   staleReason,
   summarizeScoutTrack,
   type ScoutCandidateView,
@@ -490,6 +493,16 @@ export async function runScoutForOrganization(input: {
     log.warn("[scout]", "clearing stale finds failed", { organizationId, error: err });
   }
 
+  // BL-SCOUT-QUALITY — one card per solicitation: waiting finds that are
+  // notices of the same solicitation (each amendment is its own notice)
+  // fold into the latest.
+  try {
+    const folded = await foldWaitingFinds(organizationId);
+    if (folded > 0) notes.push(`Folded ${folded} waiting find${folded === 1 ? "" : "s"} into the latest notice of the same solicitation.`);
+  } catch (err) {
+    log.warn("[scout]", "folding waiting finds failed", { organizationId, error: err });
+  }
+
   // 2. Watchlisted awards ending soon.
   const awardDrafts: CandidateDraft[] = [];
   try {
@@ -514,24 +527,73 @@ export async function runScoutForOrganization(input: {
   }
   summary.found = found.size + awardDrafts.length;
 
+  // Customer records, read once per agency per run.
+  const customers = new Map<string, CustomerCounts | null>();
+  async function customerFor(agency: string, naicsCode: string): Promise<CustomerCounts | null> {
+    const key = agency.trim().toLowerCase();
+    if (!key) return null;
+    if (customers.has(key)) return customers.get(key) ?? null;
+    if (customers.size >= MAX_CUSTOMER_LOOKUPS) return null;
+    let counts: CustomerCounts | null = null;
+    try {
+      const ci = await getCustomerIntelligence({ organizationId, agency, naicsCode });
+      if (ci) {
+        counts = {
+          pursuits: ci.history.pursuits,
+          won: ci.history.won,
+          lost: ci.history.lost,
+          winRate: ci.history.winRate,
+        };
+      }
+    } catch (err) {
+      log.warn("[scout]", "customer intel failed", { organizationId, error: err });
+    }
+    customers.set(key, counts);
+    return counts;
+  }
+
+  const ctxBase = {
+    primaryNaics: naicsCodeOf(org.primaryNaics),
+    naicsList: codes.all,
+    socio: org.socio,
+    keywords: profile.keywords,
+    now,
+  };
+
+  // BL-SCOUT-QUALITY — every waiting find is scored again each run, so the
+  // deadline, the keyword weighting and the customer record are current; a
+  // find that is now only a passing mention of a keyword leaves the list.
+  try {
+    const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor);
+    if (r.dropped > 0) notes.push(`Removed ${r.dropped} waiting find${r.dropped === 1 ? "" : "s"} that only mention${r.dropped === 1 ? "s" : ""} a keyword in passing.`);
+  } catch (err) {
+    log.warn("[scout]", "re-scoring waiting finds failed", { organizationId, error: err });
+  }
+
   // 3. Drop what the tenant already has or already saw.
   const allIds = [...found.keys(), ...awardDrafts.map((d) => d.noticeId)];
-  if (allIds.length === 0) {
-    await finishRun(organizationId, run?.id ?? null, summary, notes, now);
-    return summary;
-  }
-  const [seen, imported] = await Promise.all([
-    db
-      .select({ noticeId: scoutCandidates.noticeId })
-      .from(scoutCandidates)
-      .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(scoutCandidates.noticeId, allIds))),
-    db
-      .select({ noticeId: opportunities.noticeId })
-      .from(opportunities)
-      .where(and(eq(opportunities.organizationId, organizationId), inArray(opportunities.noticeId, allIds))),
-  ]);
+  const triageOnly = allIds.length === 0;
+  const [seen, imported] = triageOnly
+    ? [[], []]
+    : await Promise.all([
+        db
+          .select({ noticeId: scoutCandidates.noticeId })
+          .from(scoutCandidates)
+          .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(scoutCandidates.noticeId, allIds))),
+        db
+          .select({ noticeId: opportunities.noticeId })
+          .from(opportunities)
+          .where(and(eq(opportunities.organizationId, organizationId), inArray(opportunities.noticeId, allIds))),
+      ]);
   const known = new Set([...seen, ...imported].map((r) => r.noticeId));
-  const freshSam = [...found.values()].filter((f) => !known.has(f.sam.noticeId));
+  // BL-SCOUT-QUALITY — one card per solicitation, across runs: a new notice
+  // of a solicitation already in the pipeline raises no find (the amendment
+  // watch files it there); one already dismissed or added stays decided; one
+  // still waiting is replaced by its newer notice.
+  const sol = await bySolicitation(organizationId, [...found.values()].filter((f) => !known.has(f.sam.noticeId)));
+  if (sol.inPipeline > 0) notes.push(`${sol.inPipeline} notice${sol.inPipeline === 1 ? " is" : "s are"} a new notice of a solicitation already in your pipeline; no find raised.`);
+  const freshSam = sol.fresh;
+  const replaceFor = sol.replaceFor;
   const freshAwards = awardDrafts.filter((d) => !known.has(d.noticeId));
 
   // BL-STAB-10 — the searches read no descriptions; read the new finds'
@@ -561,44 +623,15 @@ export async function runScoutForOrganization(input: {
   } catch (err) {
     log.warn("[scout]", "recompete flagging failed", { organizationId, error: err });
   }
-  const customers = new Map<string, CustomerCounts | null>();
-  async function customerFor(agency: string, naicsCode: string): Promise<CustomerCounts | null> {
-    const key = agency.trim().toLowerCase();
-    if (!key) return null;
-    if (customers.has(key)) return customers.get(key) ?? null;
-    if (customers.size >= MAX_CUSTOMER_LOOKUPS) return null;
-    let counts: CustomerCounts | null = null;
-    try {
-      const ci = await getCustomerIntelligence({ organizationId, agency, naicsCode });
-      if (ci) {
-        counts = {
-          pursuits: ci.history.pursuits,
-          won: ci.history.won,
-          lost: ci.history.lost,
-          winRate: ci.history.winRate,
-        };
-      }
-    } catch (err) {
-      log.warn("[scout]", "customer intel failed", { organizationId, error: err });
-    }
-    customers.set(key, counts);
-    return counts;
-  }
-
   // 5. Score and store.
-  const ctxBase = {
-    primaryNaics: naicsCodeOf(org.primaryNaics),
-    naicsList: codes.all,
-    socio: org.socio,
-    keywords: profile.keywords,
-    now,
-  };
   type Staged = { draft: CandidateDraft; fit: { score: number; signals: string[] }; flag: RecompeteFlag | null; customer: CustomerCounts | null };
   const staged: Staged[] = [];
+  let passing = 0;
   for (const f of freshSam) {
     const draft = fromSam(f.sam, f.source, f.keyword);
     const flag = flags[f.sam.noticeId] ?? null;
     const customer = await customerFor(draft.agency ?? "", draft.naicsCode ?? "");
+    const recompete = flag ? { outcome: flag.outcome, confidence: flag.confidence, hasLessons: !!flag.lessons } : null;
     const fit = scoutFit(
       {
         source: draft.source,
@@ -609,13 +642,13 @@ export async function runScoutForOrganization(input: {
         setAside: draft.setAside ?? "",
         responseDueAt: draft.responseDueAt ?? null,
       },
-      {
-        ...ctxBase,
-        keyword: f.keyword,
-        recompete: flag ? { outcome: flag.outcome, confidence: flag.confidence, hasLessons: !!flag.lessons } : null,
-        customer,
-      },
+      { ...ctxBase, keyword: f.keyword, recompete, customer },
     );
+    // BL-SCOUT-QUALITY — a keyword mentioned once in passing, with nothing else tying the notice to you, is not a find.
+    if (passingMentionOnly(fit, { recompete, customer }, draft.source)) {
+      passing += 1;
+      continue;
+    }
     staged.push({ draft, fit, flag, customer });
   }
   for (const draft of freshAwards) {
@@ -634,23 +667,33 @@ export async function runScoutForOrganization(input: {
     );
     staged.push({ draft, fit, flag: null, customer });
   }
-  if (staged.length === 0) {
-    await finishRun(organizationId, run?.id ?? null, summary, notes, now);
-    return summary;
+  if (passing > 0) notes.push(`Left out ${passing} notice${passing === 1 ? "" : "s"} that only mention${passing === 1 ? "s" : ""} a keyword in passing.`);
+
+  // A newer notice of a solicitation still waiting replaces that find in place.
+  const replacements = staged.filter((x) => replaceFor.has(x.draft.noticeId));
+  for (const x of replacements) {
+    await db
+      .update(scoutCandidates)
+      .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, updatedAt: now })
+      .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, replaceFor.get(x.draft.noticeId)!), eq(scoutCandidates.status, "new")));
   }
-  const inserted = await db
-    .insert(scoutCandidates)
-    .values(
-      staged.map((s) => ({
-        ...s.draft,
-        organizationId,
-        runId: run?.id ?? null,
-        fitScore: s.fit.score,
-        signals: s.fit.signals,
-      })),
-    )
-    .onConflictDoNothing()
-    .returning();
+  const toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
+  const inserted =
+    toInsert.length === 0
+      ? []
+      : await db
+          .insert(scoutCandidates)
+          .values(
+            toInsert.map((x) => ({
+              ...x.draft,
+              organizationId,
+              runId: run?.id ?? null,
+              fitScore: x.fit.score,
+              signals: x.fit.signals,
+            })),
+          )
+          .onConflictDoNothing()
+          .returning();
   summary.created = inserted.length;
 
   // 6. Triage the best-fitting new finds.
@@ -659,7 +702,24 @@ export async function runScoutForOrganization(input: {
     notes.push("AI provider is in stub mode; candidates were scored but not triaged.");
   } else {
     const byNotice = new Map(staged.map((s) => [s.draft.noticeId, s]));
-    const queue = [...inserted].sort((a, b) => b.fitScore - a.fitScore).slice(0, maxTriage);
+    // BL-SCOUT-QUALITY — the review takes the best of the new finds and of
+    // the waiting finds it has not reviewed yet, so no find stays unjudged
+    // just because it arrived on a busy run.
+    const backlog = await db
+      .select()
+      .from(scoutCandidates)
+      .where(
+        and(
+          eq(scoutCandidates.organizationId, organizationId),
+          eq(scoutCandidates.status, "new"),
+          isNull(scoutCandidates.recommendation),
+          isNull(scoutCandidates.triageBatchId),
+          inserted.length ? notInArray(scoutCandidates.id, inserted.map((r) => r.id)) : sql`true`,
+        ),
+      )
+      .orderBy(desc(scoutCandidates.fitScore))
+      .limit(maxTriage);
+    const queue = [...inserted, ...backlog].sort((a, b) => b.fitScore - a.fitScore).slice(0, maxTriage);
     const history = await learningHistory(organizationId);
     const track = await getScoutTrack({ organizationId });
     const capabilities = await capabilitiesOf(organizationId);
@@ -965,6 +1025,134 @@ async function learningHistory(organizationId: string): Promise<{ imported: stri
  * (staleReason). A find with no description of its own is judged on FORGE's
  * copy of SAM.gov; one that can't be judged yet is kept.
  */
+/** The solicitation key of a column, computed in SQL the way solicitationKey does it. */
+function keyOf(col: typeof scoutCandidates.solicitationNumber | typeof opportunities.solicitationNumber): SQL<string> {
+  return sql<string>`upper(regexp_replace(${col}, '[^A-Za-z0-9]', '', 'g'))`;
+}
+
+/**
+ * BL-SCOUT-QUALITY — this run's new notices, one per solicitation (the
+ * latest), set against what the tenant already has: a solicitation in the
+ * pipeline raises no find, a decided one stays decided, a waiting one is
+ * replaced by its newer notice. Notices without a usable number pass as is.
+ */
+async function bySolicitation<F extends { sam: SamOpportunity }>(
+  organizationId: string,
+  notices: F[],
+): Promise<{ fresh: F[]; replaceFor: Map<string, string>; inPipeline: number }> {
+  const latest = new Map<string, F>();
+  const fresh: F[] = [];
+  for (const f of notices) {
+    const k = solicitationKey(f.sam.solicitationNumber);
+    if (!k) {
+      fresh.push(f);
+      continue;
+    }
+    const prev = latest.get(k);
+    if (!prev || (Date.parse(f.sam.postedDate) || 0) > (Date.parse(prev.sam.postedDate) || 0)) latest.set(k, f);
+  }
+  const keys = [...latest.keys()];
+  const replaceFor = new Map<string, string>();
+  if (keys.length === 0) return { fresh, replaceFor, inPipeline: 0 };
+  const [cands, opps] = await Promise.all([
+    db
+      .select({ id: scoutCandidates.id, status: scoutCandidates.status, key: keyOf(scoutCandidates.solicitationNumber) })
+      .from(scoutCandidates)
+      .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(keyOf(scoutCandidates.solicitationNumber), keys))),
+    db
+      .select({ key: keyOf(opportunities.solicitationNumber) })
+      .from(opportunities)
+      .where(and(eq(opportunities.organizationId, organizationId), inArray(keyOf(opportunities.solicitationNumber), keys))),
+  ]);
+  const pipeline = new Set(opps.map((o) => o.key));
+  let inPipeline = 0;
+  for (const [k, f] of latest) {
+    if (pipeline.has(k)) {
+      inPipeline += 1;
+      continue;
+    }
+    const rows = cands.filter((c) => c.key === k);
+    if (rows.some((c) => c.status !== "new")) continue;
+    const waiting = rows.find((c) => c.status === "new");
+    if (waiting) replaceFor.set(f.sam.noticeId, waiting.id);
+    fresh.push(f);
+  }
+  return { fresh, replaceFor, inPipeline };
+}
+
+/** BL-SCOUT-QUALITY — waiting finds of one solicitation fold into the latest notice; returns how many left. */
+async function foldWaitingFinds(organizationId: string): Promise<number> {
+  const rows = await db
+    .select({ id: scoutCandidates.id, number: scoutCandidates.solicitationNumber, postedAt: scoutCandidates.postedAt, createdAt: scoutCandidates.createdAt })
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), ne(scoutCandidates.solicitationNumber, "")));
+  const groups = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const k = solicitationKey(r.number);
+    if (k) groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  const drop: string[] = [];
+  const when = (r: (typeof rows)[number]) => (r.postedAt ?? r.createdAt).getTime();
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    const keep = members.reduce((a, b) => (when(b) > when(a) ? b : a));
+    for (const m of members) if (m.id !== keep.id) drop.push(m.id);
+  }
+  if (drop.length === 0) return 0;
+  await db.delete(scoutCandidates).where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), inArray(scoutCandidates.id, drop)));
+  return drop.length;
+}
+
+/**
+ * BL-SCOUT-QUALITY — score every waiting find again with today's rules and
+ * dates; a find that is now only a passing mention of a keyword is removed.
+ */
+async function rescoreWaitingFinds(
+  organizationId: string,
+  ctxBase: Omit<Parameters<typeof scoutFit>[1], "keyword" | "recompete" | "customer">,
+  customerFor: (agency: string, naicsCode: string) => Promise<CustomerCounts | null>,
+): Promise<{ rescored: number; dropped: number }> {
+  const rows = await db
+    .select()
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new")))
+    .orderBy(desc(scoutCandidates.fitScore))
+    .limit(300);
+  const drop: string[] = [];
+  let rescored = 0;
+  for (const row of rows) {
+    const recompete = recompeteFromSignals(row.signals ?? []);
+    const customer = await customerFor(row.agency, row.naicsCode);
+    const fit = scoutFit(
+      {
+        source: row.source,
+        title: row.title,
+        description: row.description,
+        agency: row.agency,
+        naicsCode: row.naicsCode,
+        setAside: row.setAside,
+        responseDueAt: row.responseDueAt,
+      },
+      { ...ctxBase, keyword: row.matchedKeyword || null, recompete, customer },
+    );
+    if (passingMentionOnly(fit, { recompete, customer }, row.source)) {
+      drop.push(row.id);
+      continue;
+    }
+    if (fit.score !== row.fitScore || JSON.stringify(fit.signals) !== JSON.stringify(row.signals ?? [])) {
+      await db
+        .update(scoutCandidates)
+        .set({ fitScore: fit.score, signals: fit.signals, updatedAt: new Date() })
+        .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, row.id), eq(scoutCandidates.status, "new")));
+      rescored += 1;
+    }
+  }
+  if (drop.length > 0) {
+    await db.delete(scoutCandidates).where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), inArray(scoutCandidates.id, drop)));
+  }
+  return { rescored, dropped: drop.length };
+}
+
 async function clearStaleFinds(organizationId: string, rules: { codes: string[]; query: KeywordQuery | null; now: Date }, keep: Set<string>): Promise<number> {
   const waiting = await db
     .select({

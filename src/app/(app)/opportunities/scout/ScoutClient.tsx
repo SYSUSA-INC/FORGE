@@ -40,30 +40,7 @@ export function ScoutClient({
     <>
       <SettingsPanel profile={profile} lastRun={lastRun} track={track} isAdmin={isAdmin} />
 
-      <section className="mb-6">
-        <Panel
-          title="New finds"
-          eyebrow={
-            candidates.length === 0
-              ? "Nothing waiting"
-              : `${candidates.length} waiting · best fit first`
-          }
-        >
-          {candidates.length === 0 ? (
-            <p className="font-body text-[13px] leading-relaxed text-muted">
-              No new finds. The scout runs every night; an admin can run it now from the
-              settings above. Finds you import become opportunities; the ones you dismiss are
-              remembered so they are not shown again.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {candidates.map((c) => (
-                <CandidateCard key={c.id} candidate={c} />
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </section>
+      <FindsSections candidates={candidates} lastRun={lastRun} />
 
       {decided.length > 0 ? (
         <section className="mb-6">
@@ -106,6 +83,84 @@ export function ScoutClient({
       ) : null}
     </>
   );
+}
+
+/**
+ * BL-SCOUT-QUALITY — what the AI recommends (Pursue and Watch, best first),
+ * its skips behind a toggle, and the finds it has not reviewed yet, kept
+ * apart with the reason, so nothing unjudged sits among real finds.
+ */
+function FindsSections({ candidates, lastRun }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null }) {
+  const [showSkipped, setShowSkipped] = useState(false);
+  const order = (a: ScoutCandidateView, b: ScoutCandidateView) =>
+    (a.recommendation === "pursue" ? 0 : 1) - (b.recommendation === "pursue" ? 0 : 1) || b.fitScore - a.fitScore;
+  const recommended = candidates.filter((c) => c.recommendation === "pursue" || c.recommendation === "watch").sort(order);
+  const skipped = candidates.filter((c) => c.recommendation === "skip").sort((a, b) => b.fitScore - a.fitScore);
+  const unreviewed = candidates.filter((c) => !c.recommendation).sort((a, b) => b.fitScore - a.fitScore);
+  const why = unreviewedReason(unreviewed, lastRun);
+
+  return (
+    <>
+      <section className="mb-6">
+        <Panel
+          title="New finds"
+          eyebrow={recommended.length === 0 ? "Nothing recommended" : `${recommended.length} recommended · pursue first, then watch`}
+          actions={
+            skipped.length > 0 ? (
+              <button type="button" className="aur-link font-mono text-[10px] uppercase tracking-widest" onClick={() => setShowSkipped((v) => !v)}>
+                {showSkipped ? "Hide skipped" : `Show skipped (${skipped.length})`}
+              </button>
+            ) : null
+          }
+        >
+          {recommended.length === 0 ? (
+            <p className="font-body text-[13px] leading-relaxed text-muted">
+              Nothing the AI recommends right now. The scout runs every night; an admin can run it now from the settings above. Finds you add go to the pipeline; the ones you set aside are remembered so they are not shown again.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {recommended.map((c) => (
+                <CandidateCard key={c.id} candidate={c} />
+              ))}
+            </ul>
+          )}
+          {showSkipped && skipped.length > 0 ? (
+            <div className="mt-4 border-t border-layer/10 pt-3">
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-muted">Skipped by the AI · shown so you can overrule it</div>
+              <ul className="flex flex-col gap-2 opacity-80">
+                {skipped.map((c) => (
+                  <CandidateCard key={c.id} candidate={c} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </Panel>
+      </section>
+
+      {unreviewed.length > 0 ? (
+        <section className="mb-6">
+          <Panel title="Not yet reviewed" eyebrow={`${unreviewed.length} waiting for the AI's review`}>
+            <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">{why}</p>
+            <ul className="flex flex-col gap-2">
+              {unreviewed.map((c) => (
+                <CandidateCard key={c.id} candidate={c} />
+              ))}
+            </ul>
+          </Panel>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+/** Why finds are waiting for the AI's review, from the finds and the last run's notes. */
+function unreviewedReason(unreviewed: ScoutCandidateView[], lastRun: ScoutRunView | null): string {
+  if (unreviewed.length === 0) return "";
+  if (unreviewed.some((c) => c.stubbed) || lastRun?.stubbed) return "AI is in stub mode on this deployment, so the scout scored these but could not review them.";
+  const stopped = (lastRun?.note ?? "").split(/\n|(?<=\.)\s+/).find((n) => n.startsWith("Triage stopped"));
+  if (stopped) return `${stopped} The scout reviews them on its next run once that is resolved.`;
+  if (unreviewed.every((c) => c.triageQueued)) return "Queued for tonight's review, which runs as a batch at half price.";
+  return "The scout reviews the ten best finds each run; these wait their turn and are reviewed on the next runs, best first.";
 }
 
 function trackLine(t: ScoutTrack): string {
