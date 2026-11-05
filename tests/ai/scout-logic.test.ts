@@ -17,6 +17,8 @@ import {
   scoutKeywordQuery,
   solicitationKey,
   staleReason,
+  scoutSearchFunnel,
+  scoutTriageAllowance,
   summarizeScoutTrack,
   type FitContext,
   type FitInput,
@@ -297,5 +299,30 @@ describe("BL-STAB-10d — what the scout searches and what still fits", () => {
     const r = scoutFit({ ...base, agency: "Department of Veterans Affairs", title: "Help desk", description: "Tier 1 support." }, { ...ctx, keywords: ["Veterans Affairs"], keyword: "Veterans Affairs" });
     expect(r.signals).toContain("Your keyword Veterans Affairs is only in the agency's name");
     expect(r.keyword).toMatchObject({ strength: "weak", where: "agency" });
+  });
+});
+
+describe("BL-SCOUT-REACH — the AI review's share and the search funnel", () => {
+  it("keeps a fifth of the month's AI requests for the rest of FORGE", () => {
+    expect(scoutTriageAllowance(0, 0, 25)).toBe(25); // unlimited plan
+    expect(scoutTriageAllowance(500, 0, 25)).toBe(25);
+    expect(scoutTriageAllowance(500, 390, 25)).toBe(10); // 500 − 390 − 100 kept back
+    expect(scoutTriageAllowance(100, 75, 25)).toBe(5);
+    expect(scoutTriageAllowance(100, 95, 25)).toBe(0);
+  });
+
+  const counts = { samTotal: 412, received: 412, truncated: false, otherTypes: 120, folded: 40, matched: 250, notMentioned: 0, noDescription: 0, unchecked: 0 };
+  it("says what SAM.gov sent and how many are open", () => {
+    expect(scoutSearchFunnel(counts, false, 1000)).toBe("SAM.gov sent 412 notices: 250 open solicitations once amendments are folded and awards and closed notices left out.");
+  });
+  it("with keywords as the filter, says how many mention one", () => {
+    expect(scoutSearchFunnel({ ...counts, matched: 3, notMentioned: 240, noDescription: 5, unchecked: 2 }, true, 1000)).toBe(
+      "SAM.gov sent 412 notices: 250 open solicitations once amendments are folded and awards and closed notices left out, 3 mention a keyword and 245 don't, 2 not checked yet.",
+    );
+  });
+  it("says when SAM.gov held more than it sends", () => {
+    expect(scoutSearchFunnel({ ...counts, samTotal: 1450, received: 1000, truncated: true }, false, 1000)).toContain(
+      'SAM.gov holds 1,450 notices for this search but sends at most 1,000 per code: shorten "Posted in the last" so every one is read.',
+    );
   });
 });

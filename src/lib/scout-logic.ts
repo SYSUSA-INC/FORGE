@@ -5,7 +5,7 @@
  * the next prompt is shown, and the expiring-award window. Unit-tested.
  */
 import { setAsideEligibility, type SocioEconomic } from "@/lib/pwin-model";
-import { hasKeyword, matchNotice, matchStored, mentionsExcluded, parseKeyword, plainText, type DescriptionState, type KeywordQuery } from "@/lib/samgov-match";
+import { hasKeyword, matchNotice, matchStored, mentionsExcluded, parseKeyword, plainText, type DescriptionState, type KeywordQuery, type KeywordSearchCounts } from "@/lib/samgov-match";
 
 export type ScoutRecommendation = "pursue" | "watch" | "skip";
 export type ScoutDecision = "imported" | "dismissed";
@@ -490,4 +490,39 @@ export function staleReason(
   if (kept && (q.terms.includes(kept) || q.anyOf.some((g) => g.includes(kept)))) return mentionsExcluded(row, q, desc) ? "no_keyword" : null;
   const m = desc ? matchStored(row, q, desc) : matchNotice(row, q, null);
   return m.status === "not_mentioned" || m.status === "no_description" ? "no_keyword" : null;
+}
+
+// ── BL-SCOUT-REACH ────────────────────────────────────────────────────
+
+/** The share of a plan's monthly AI requests the scout leaves for the rest of FORGE. */
+export const SCOUT_AI_RESERVE = 0.2;
+
+/**
+ * How many finds the AI may review this run: what was asked, within the
+ * month's allowance less the reserve. `limit` 0 is an unlimited plan.
+ */
+export function scoutTriageAllowance(limit: number, used: number, wanted: number): number {
+  if (limit <= 0) return Math.max(0, wanted);
+  return Math.max(0, Math.min(wanted, limit - used - Math.ceil(limit * SCOUT_AI_RESERVE)));
+}
+
+/**
+ * The search, in one sentence, so the run note shows where notices went:
+ * what SAM.gov sent, how many are open solicitations, and with keywords
+ * as a filter how many mention one. Says when SAM.gov held more than it
+ * sends.
+ */
+export function scoutSearchFunnel(c: KeywordSearchCounts, keyworded: boolean, perCode: number): string {
+  const n = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString("en-US")} ${x === 1 ? one : many}`;
+  const open = keyworded ? c.matched + c.notMentioned + c.noDescription + c.unchecked : c.matched;
+  const parts = [`SAM.gov sent ${n(c.received, "notice")}: ${n(open, "open solicitation")} once amendments are folded and awards and closed notices left out`];
+  if (keyworded) {
+    const not = c.notMentioned + c.noDescription;
+    parts.push(`, ${c.matched.toLocaleString("en-US")} mention${c.matched === 1 ? "s" : ""} a keyword and ${not.toLocaleString("en-US")} ${not === 1 ? "doesn't" : "don't"}${c.unchecked > 0 ? `, ${c.unchecked.toLocaleString("en-US")} not checked yet` : ""}`);
+  }
+  let line = `${parts.join("")}.`;
+  if (c.truncated) {
+    line += ` SAM.gov holds ${n(c.samTotal, "notice")} for this search but sends at most ${perCode.toLocaleString("en-US")} per code: shorten "Posted in the last" so every one is read.`;
+  }
+  return line;
 }

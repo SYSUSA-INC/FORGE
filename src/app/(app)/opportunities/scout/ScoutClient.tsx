@@ -28,9 +28,12 @@ export function ScoutClient({
   track,
   lastRun,
   isAdmin,
+  unreviewedTotal,
 }: {
   profile: ScoutProfileView;
   candidates: ScoutCandidateView[];
+  /** BL-SCOUT-REACH — every unreviewed find, when the page loads only the best of them. */
+  unreviewedTotal?: number;
   decided: ScoutCandidateView[];
   track: ScoutTrack;
   lastRun: ScoutRunView | null;
@@ -40,7 +43,7 @@ export function ScoutClient({
     <>
       <SettingsPanel profile={profile} lastRun={lastRun} track={track} isAdmin={isAdmin} />
 
-      <FindsSections candidates={candidates} lastRun={lastRun} />
+      <FindsSections candidates={candidates} lastRun={lastRun} unreviewedTotal={unreviewedTotal ?? 0} />
 
       {decided.length > 0 ? (
         <section className="mb-6">
@@ -90,14 +93,19 @@ export function ScoutClient({
  * its skips behind a toggle, and the finds it has not reviewed yet, kept
  * apart with the reason, so nothing unjudged sits among real finds.
  */
-function FindsSections({ candidates, lastRun }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null }) {
+/** BL-SCOUT-REACH — the not-yet-reviewed list opens on its best 20. */
+const UNREVIEWED_SHOWN = 20;
+
+function FindsSections({ candidates, lastRun, unreviewedTotal: total }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null; unreviewedTotal: number }) {
   const [showSkipped, setShowSkipped] = useState(false);
+  const [allUnreviewed, setAllUnreviewed] = useState(false);
   const order = (a: ScoutCandidateView, b: ScoutCandidateView) =>
     (a.recommendation === "pursue" ? 0 : 1) - (b.recommendation === "pursue" ? 0 : 1) || b.fitScore - a.fitScore;
   const recommended = candidates.filter((c) => c.recommendation === "pursue" || c.recommendation === "watch").sort(order);
   const skipped = candidates.filter((c) => c.recommendation === "skip").sort((a, b) => b.fitScore - a.fitScore);
   const unreviewed = candidates.filter((c) => !c.recommendation).sort((a, b) => b.fitScore - a.fitScore);
   const why = unreviewedReason(unreviewed, lastRun);
+  const unreviewedTotal = Math.max(total, unreviewed.length);
 
   return (
     <>
@@ -139,13 +147,25 @@ function FindsSections({ candidates, lastRun }: { candidates: ScoutCandidateView
 
       {unreviewed.length > 0 ? (
         <section className="mb-6">
-          <Panel title="Not yet reviewed" eyebrow={`${unreviewed.length} waiting for the AI's review`}>
+          <Panel
+            title="Not yet reviewed"
+            eyebrow={
+              unreviewedTotal > unreviewed.length
+                ? `${unreviewedTotal} waiting for the AI's review · the best ${unreviewed.length} listed`
+                : `${unreviewed.length} waiting for the AI's review`
+            }
+          >
             <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">{why}</p>
             <ul className="flex flex-col gap-2">
-              {unreviewed.map((c) => (
+              {(allUnreviewed ? unreviewed : unreviewed.slice(0, UNREVIEWED_SHOWN)).map((c) => (
                 <CandidateCard key={c.id} candidate={c} />
               ))}
             </ul>
+            {unreviewed.length > UNREVIEWED_SHOWN ? (
+              <button type="button" className="aur-link mt-3 font-mono text-[10px] uppercase tracking-widest" onClick={() => setAllUnreviewed((v) => !v)}>
+                {allUnreviewed ? "Show the best 20" : `Show all ${unreviewed.length}`}
+              </button>
+            ) : null}
           </Panel>
         </section>
       ) : null}
@@ -159,8 +179,10 @@ function unreviewedReason(unreviewed: ScoutCandidateView[], lastRun: ScoutRunVie
   if (unreviewed.some((c) => c.stubbed) || lastRun?.stubbed) return "AI is in stub mode on this deployment, so the scout scored these but could not review them.";
   const stopped = (lastRun?.note ?? "").split(/\n|(?<=\.)\s+/).find((n) => n.startsWith("Triage stopped"));
   if (stopped) return `${stopped} The scout reviews them on its next run once that is resolved.`;
+  const held = (lastRun?.note ?? "").split(/\n|(?<=\.)\s+/).find((n) => n.startsWith("AI review held to"));
+  if (held) return `${held.replace(/;.*$/, ".")} The rest are listed here by fit, best first.`;
   if (unreviewed.every((c) => c.triageQueued)) return "Queued for tonight's review, which runs as a batch at half price.";
-  return "The scout reviews the ten best finds each run; these wait their turn and are reviewed on the next runs, best first.";
+  return "The scout reviews the 25 best finds each run; these wait their turn and are reviewed on the next runs, best first.";
 }
 
 function trackLine(t: ScoutTrack): string {
@@ -257,7 +279,7 @@ function SettingsPanel({
       >
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <label className="block">
-            <span className="aur-label">Keywords (comma-separated, up to 10; a find mentions at least one)</span>
+            <span className="aur-label">Keywords (comma-separated, up to 10; they raise a find&apos;s score, and with no NAICS codes a find must mention one)</span>
             <input
               className="aur-input mt-1 font-body text-sm"
               value={keywords}
