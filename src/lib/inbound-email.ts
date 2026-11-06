@@ -28,6 +28,7 @@ import {
   splitAddress,
   type PostmarkInbound,
 } from "@/lib/inbound-email-logic";
+import { queueInboundRead } from "@/lib/inbound-bids";
 import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
 
@@ -112,6 +113,8 @@ export async function receivePostmarkEmail(p: PostmarkInbound, rawJson: string):
     resourceId: id,
     metadata: { from, authenticated: auth.authenticated, attachments: p.Attachments.length, size: bytes.length },
   }).catch((err) => log.warn("[inbound-email]", "audit failed", { organizationId, error: err }));
+  // BL-SCOUT-INBOX phase 2 — read its bids in the background (an unverified sender is held there).
+  await queueInboundRead(organizationId, id, classifyInbound(p.Subject, text)).catch((err) => log.warn("[inbound-email]", "read not queued", { organizationId, emailId: id, error: err }));
   return { status: "stored", organizationId, emailId: id };
 }
 
@@ -152,7 +155,7 @@ export async function createInboundAddress(input: { organizationId: string; acto
   return { ok: false, error: "Could not create the address; try again." };
 }
 
-export type InboundEmailView = Pick<InboundEmail, "id" | "fromAddress" | "fromName" | "subject" | "kind" | "status" | "authenticated" | "bidsFound" | "links"> & {
+export type InboundEmailView = Pick<InboundEmail, "id" | "fromAddress" | "fromName" | "subject" | "kind" | "status" | "authenticated" | "bidsFound" | "links" | "error"> & {
   receivedAt: string;
   preview: string;
   attachments: number;
@@ -175,6 +178,7 @@ export async function listInboundEmails(organizationId: string, limit = 50): Pro
     status: r.status,
     authenticated: r.authenticated,
     bidsFound: r.bidsFound,
+    error: r.error,
     links: r.links ?? [],
     receivedAt: r.receivedAt.toISOString(),
     preview: r.textPreview.slice(0, 600),

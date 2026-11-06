@@ -1233,7 +1233,7 @@ export type ScoutTriageSnapshot = {
     capabilities: { title: string; text: string }[];
   };
   candidate: {
-    source: "org_naics" | "keyword" | "watchlist_award";
+    source: "org_naics" | "keyword" | "watchlist_award" | "portal_email";
     title: string;
     agency: string;
     office: string;

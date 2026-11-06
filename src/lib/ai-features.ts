@@ -30,6 +30,8 @@ export const AI_FEATURES = {
   question_generator: "Question generator",
   ebuy_extract: "eBuy extraction",
   gsa_extract: "GSA extraction",
+  // BL-SCOUT-INBOX — the bids in an email a portal sent the company.
+  inbound_bids: "Portal email reading",
   image_ocr: "Image OCR",
   knowledge_classify: "Knowledge classification",
   knowledge_extract: "Knowledge extraction",

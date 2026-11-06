@@ -42,6 +42,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   question_generator: "2026-10-08.1",
   ebuy_extract: "2026-10-05.1",
   gsa_extract: "2026-10-05.1",
+  inbound_bids: "2026-11-06.1",
   image_ocr: "2026-10-05.1",
   knowledge_classify: "2026-10-05.1",
   knowledge_extract: "kb-extract-v1",

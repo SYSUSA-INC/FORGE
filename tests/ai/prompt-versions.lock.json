@@ -53,6 +53,10 @@
       "version": "2026-10-05.1",
       "sha256": "37cbd1917734f252c4543405912854ad46df4e7aae50fdb3f947381e650369ec"
     },
+    "inbound_bids": {
+      "version": "2026-11-06.1",
+      "sha256": "da9913ceb5fe1d707bf9597019241525df3547d65204ae7afd24cde223bbad76"
+    },
     "knowledge_classify": {
       "version": "2026-10-05.1",
       "sha256": "75cadf1714a6d7063d89534b99de6fad247ee5042579ce73986d7a3afea91c03"

@@ -1485,7 +1485,8 @@ export async function decideScoutCandidate(input: {
         stage: stageFor(c.noticeType),
         solicitationNumber: c.solicitationNumber,
         // Award candidates carry a synthetic id; the opportunity gets none.
-        noticeId: c.source === "watchlist_award" ? "" : c.noticeId,
+        // …and a find read from a portal email carries an email-based one (BL-SCOUT-INBOX).
+        noticeId: c.source === "watchlist_award" || c.source === "portal_email" ? "" : c.noticeId,
         responseDueDate: c.responseDueAt,
         releaseDate: c.postedAt,
         naicsCode: c.naicsCode,
@@ -1500,6 +1501,13 @@ export async function decideScoutCandidate(input: {
       .returning({ id: opportunities.id });
     if (!opp) return { ok: false, error: "Could not create the opportunity." };
     opportunityId = opp.id;
+    // BL-SCOUT-INBOX — a find read from a portal email brings that email's attachments.
+    if (c.inboundEmailId) {
+      const { fileInboundAttachments } = await import("@/lib/inbound-bids");
+      await fileInboundAttachments({ organizationId, emailId: c.inboundEmailId, opportunityId: opp.id, userId: input.actor.userId ?? null }).catch((err) =>
+        log.warn("[scout]", "portal email attachments not filed", { organizationId, error: err }),
+      );
+    }
   }
 
   const decided = { status: input.decision, grade, decidedByUserId: input.actor.userId, decidedAt: now, opportunityId, updatedAt: now };

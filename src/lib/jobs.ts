@@ -407,6 +407,8 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   proposal_harvest: handleProposalHarvest,
   section_auto_draft: handleSectionAutoDraft,
   knowledge_artifact_extract: handleKnowledgeArtifactExtract,
+  // BL-SCOUT-INBOX — loaded when run: inbound-bids queues its own jobs through this module.
+  inbound_email_parse: async (job) => (await import("@/lib/inbound-bids")).handleInboundEmailParse(job),
 };
 
 /**

@@ -81,6 +81,7 @@ import {
 } from "@/lib/ai-prompts-bl23";
 import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
+import { buildInboundBidsPrompt, inboundBidsSchema } from "@/lib/inbound-bids-logic";
 import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
 import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
 import { buildCapabilitySuggestionsPrompt } from "@/lib/capability-suggestions-prompt";
@@ -333,6 +334,7 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
   ],
   ebuy_extract: () => [buildEbuyExtractPrompt(RFP_TEXT)],
   gsa_extract: () => [buildGsaExtractPrompt(RFP_TEXT)],
+  inbound_bids: () => [buildInboundBidsPrompt({ from: "noreply@eva.virginia.gov", subject: "New Solicitation: IT Help Desk (RFP 26-001)", text: RFP_TEXT, links: ["https://eva.virginia.gov/bid/26-001"] })],
   image_ocr: () => [buildImageOcrPrompt()],
   knowledge_classify: () => [buildArtifactKindClassifyPrompt({ fileName: "DHS-migration.pdf", contentType: "application/pdf", rawText: "Past performance: DHS migration." })],
   knowledge_extract: () => [
@@ -545,6 +547,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   question_generator: [questionSetSchema],
   ebuy_extract: [ebuyExtractionSchema],
   gsa_extract: [gsaExtractionSchema],
+  inbound_bids: [inboundBidsSchema],
   image_ocr: [],
   knowledge_classify: [artifactKindClassifySchema],
   knowledge_extract: [knowledgeExtractionSchema],
