@@ -7,6 +7,10 @@ import { GsaPasteClient } from "../import/gsa/GsaPasteClient";
 import { SamImportSection } from "../import/SamImportSection";
 import { listOwnSourceRequestsAction } from "../import/source-requests/actions";
 import { SourceRequestPanel } from "../import/source-requests/SourceRequestPanel";
+import { BidEmailPanel } from "@/app/(app)/settings/integrations/BidEmailPanel";
+import { getInboundAddress } from "@/lib/inbound-email";
+import { inboundDomain } from "@/lib/inbound-email-logic";
+import { BidInbox } from "./BidInbox";
 
 /**
  * BL-SCOUT-ONEPAGE (FORGE II, footnote 3) — the Scout's source bar: All
@@ -37,8 +41,9 @@ export function SourceBar({ source }: { source: IdentifySource | null }) {
 }
 
 /** One source's tab: its importer inline, or what it needs before FORGE can read it. */
-export async function SourcePanel({ organizationId, source }: { organizationId: string; source: IdentifySource }) {
-  const ownRequests = !source.live ? await listOwnSourceRequestsAction() : [];
+export async function SourcePanel({ organizationId, source, isAdmin }: { organizationId: string; source: IdentifySource; isAdmin: boolean }) {
+  const ownRequests = !source.live || source.key === "portals" ? await listOwnSourceRequestsAction() : [];
+  const inbound = source.key === "portals" ? await getInboundAddress(organizationId) : null;
   const maxBytes = source.key === "gsa" ? resolvePolicy("document", process.env).maxBytes : 0;
   return (
     <section aria-label={source.label}>
@@ -46,13 +51,23 @@ export async function SourcePanel({ organizationId, source }: { organizationId: 
       {source.key === "sam" ? <SamImportSection organizationId={organizationId} /> : null}
       {source.key === "ebuy" ? <EbuyPasteClient /> : null}
       {source.key === "gsa" ? <GsaPasteClient maxBytes={maxBytes} /> : null}
+      {source.key === "portals" ? (
+        <div className="flex flex-col gap-4">
+          <BidEmailPanel address={inbound?.address ?? null} configured={inboundDomain() !== null} canEdit={isAdmin} />
+          <BidInbox isAdmin={isAdmin} />
+          <Panel title="A portal FORGE should read for you" eyebrow="Ask for it">
+            <p className="font-body text-[13px] leading-[1.5] text-muted">
+              FORGE reads every bid alert with its AI. A portal you rely on can also get a dedicated reader: name it and how its alerts look, and each request decides which comes first.
+            </p>
+          </Panel>
+          <SourceRequestPanel initialOwnRequests={ownRequests} />
+        </div>
+      ) : null}
       {!source.live ? (
         <>
           <Panel title={`${source.label}: coming`} eyebrow="Not connected yet">
             <p className="font-body text-[13px] leading-[1.5] text-muted">
-              {source.key === "portals"
-                ? "FORGE will read state procurement portals, primes' supplier portals and commercial aggregators (such as HigherGov, GovWin IQ, GovTribe or GovSpend) here. Most state and prime portals publish no feed, so the first connectors are an aggregator account you already have and a FORGE address you forward portal alert emails to."
-                : "FORGE will bring in task orders from the contract vehicles you hold (OASIS+, Alliant, SEWP, Polaris and others) here."}{" "}
+              FORGE will bring in task orders from the contract vehicles you hold (OASIS+, Alliant, SEWP, Polaris and others) here.{" "}
               Tell us which ones you use and how their notices reach you today: each request is counted and decides what comes first. Until then, paste a notice under GSA email or add it by hand under Create.
             </p>
           </Panel>

@@ -69,7 +69,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
       {/* BL-STAB-7d — why the SAM.gov searches would come back empty. */}
       {!source || source.key === "sam" ? <SamKeyNotice notice={samKeyNotice(sam)} /> : null}
       {source ? (
-        <SourcePanel organizationId={organizationId} source={source} />
+        <SourcePanel organizationId={organizationId} source={source} isAdmin={isAdmin} />
       ) : (
         <ScoutClient
           profile={profile}

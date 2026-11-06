@@ -58,7 +58,7 @@ Last reviewed 2026-11-06, after PR #457.
 | I-3 | Bring in from SAM.gov on that page | ✅ #453 |
 | I-4 | Bring in from a pasted GSA email | ✅ #453 |
 | I-5 | Bring in from GSA eBuy | ✅ #453 |
-| I-6 | Bring in from **enterprise portals** | 📋 BL-SCOUT-PORTALS. The owner picked state portals, prime portals and commercial aggregators (2026-11-06). Research found no feeds for state or prime portals, but a documented aggregator API (HigherGov), and alert emails that could be forwarded to FORGE. The tab says what is coming and records requests. ❓ The owner confirms the first connectors |
+| I-6 | Bring in from **enterprise portals** | 🔄 BL-SCOUT-INBOX. Research found no feeds for state or prime portals (BL-SCOUT-PORTALS). The owner chose a company bid email address that the portals mail directly, with no forwarding (2026-11-06). Phase 1 (receive, Bid inbox) is in this PR. Next: reading the bids into Scout finds, then the company's own domain, then dedicated portal readers |
 | I-7 | Bring in from the **GWACs** a company holds, current and future | 📋 BL-SCOUT-GWAC (backlog by the owner's choice, 2026-11-03). The tab is on the source bar, marked *soon*, and records requests |
 | I-8 | A one-stop, user-friendly experience | ✅ BL-SCOUT-ONEPAGE (#458, and this PR for eBuy and GSA email). #453 put every source on one page, but as two stacked experiences. The page now has one source bar, one search bar, and the same compact rows for every source |
 | I-9 | An **Add to pipeline** button next to every opportunity the scout finds or a search returns | ✅ #453 |

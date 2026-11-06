@@ -2,10 +2,10 @@
  * BL-NAV-LIFECYCLE phase 1b (FORGE II, footnote 3) — the sources the
  * Scout tab brings opportunities in from, on one page. BL-SCOUT-ONEPAGE —
  * they are the tabs of one source bar: All (the nightly scout's finds),
- * SAM.gov (a live search), GSA eBuy and GSA email (paste); enterprise
- * portals (state, prime and commercial, owner 2026-11-06) and GWACs
- * (BL-SCOUT-GWAC) have no importer yet, so they file a source request,
- * which records the demand. Pure; unit-tested.
+ * SAM.gov (a live search), GSA eBuy and GSA email (paste), enterprise
+ * portals (state and prime portals mail the company's bid email address,
+ * BL-SCOUT-INBOX); GWACs (BL-SCOUT-GWAC) have no importer yet, so they
+ * file a source request, which records the demand. Pure; unit-tested.
  */
 export type IdentifySourceKey = "sam" | "ebuy" | "gsa" | "portals" | "gwacs";
 
@@ -22,7 +22,7 @@ export const IDENTIFY_SOURCES: readonly IdentifySource[] = [
   { key: "sam", label: "SAM.gov", hint: "Search SAM.gov live for something specific: any window up to 90 days, words a notice must mention, GSA vehicles and notice types.", live: true },
   { key: "ebuy", label: "GSA eBuy", hint: "eBuy has no public API: paste an RFQ and FORGE reads its fields.", live: true },
   { key: "gsa", label: "GSA email", hint: "Paste a forwarded GSA notification; drop its attachments alongside.", live: true },
-  { key: "portals", label: "Enterprise portals", hint: "State procurement portals, primes' supplier portals and commercial aggregators: being researched; tell us which ones you use.", live: false },
+  { key: "portals", label: "Enterprise portals", hint: "State procurement portals and primes' supplier portals mail your bid email address directly; every email lands in the Bid inbox.", live: true },
   { key: "gwacs", label: "GWACs", hint: "Task orders under the contract vehicles you hold (OASIS+, Alliant, SEWP and others): on the backlog; tell us which ones you hold.", live: false },
 ] as const;
 
