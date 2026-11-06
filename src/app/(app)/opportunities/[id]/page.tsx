@@ -15,6 +15,9 @@ import { PwinPanel } from "./PwinPanel";
 import { NextActionPanel } from "@/components/intelligence/NextActionPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
 
+// BL-SCOUT-AMEND — "Check SAM.gov now" downloads the solicitation's new attachments.
+export const maxDuration = 300;
+
 export const dynamic = "force-dynamic";
 
 function toIsoOrNull(d: Date | null): string | null {

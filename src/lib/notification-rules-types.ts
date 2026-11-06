@@ -41,6 +41,7 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   comment_mentioned: "Mention in a review comment or section chat",
   opportunity_reviewed: "Opportunity bid/no-bid review submitted",
   solicitation_role_assigned: "Solicitation role assigned",
+  solicitation_amended: "Solicitation amended on SAM.gov",
 };
 
 export const RECIPIENT_STRATEGY_LABELS: Record<

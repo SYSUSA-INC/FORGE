@@ -439,6 +439,12 @@ export const opportunities = pgTable("opportunity", {
   incumbent: text("incumbent").notNull().default(""),
   description: text("description").notNull().default(""),
   pWin: integer("p_win").notNull().default(0),
+  // BL-SCOUT-AMEND — the amendment watch (drizzle/0145): attachment links
+  // and notices already filed, and when SAM.gov was last checked / tried.
+  samWatchSeenLinks: jsonb("sam_watch_seen_links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  samWatchNoticeIds: jsonb("sam_watch_notice_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  samWatchCheckedAt: timestamp("sam_watch_checked_at", { withTimezone: true }),
+  samWatchAttemptedAt: timestamp("sam_watch_attempted_at", { withTimezone: true }),
   ownerUserId: text("owner_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -2093,6 +2099,8 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "review_completed",
   "opportunity_review_completed",
   "solicitation_role_assigned",
+  // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document (drizzle/0145).
+  "solicitation_amended",
 ]);
 
 export const notifications = pgTable("notification", {
@@ -2171,6 +2179,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "review_due_soon",
     // BL-FB-X-CRM Slice 2 — a customer contact's agreed next touch is due (migration 0099).
     "contact_touch_due",
+    // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document for a pursued opportunity (migration 0145).
+    "solicitation_amended",
   ],
 );
 

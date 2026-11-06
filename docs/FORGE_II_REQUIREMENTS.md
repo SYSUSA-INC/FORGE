@@ -20,7 +20,7 @@ developing").
   added to the plan here.
 - ❓ **Owner to decide**: needs an answer before it can be built.
 
-Last reviewed 2026-11-05, after PR #455.
+Last reviewed 2026-11-06, after PR #456.
 
 ---
 
@@ -69,8 +69,8 @@ Last reviewed 2026-11-05, after PR #455.
 | I-14 | One card per solicitation, not one per amendment (owner 2026-11-03) | ✅ #455 |
 | I-15 | Explain what makes a fit score high (owner 2026-11-03) | ✅ #455: the score is earned from zero, and each card lists its reasons |
 | I-16 | Keep **Show skipped** (owner 2026-11-03) | ✅ #455 |
-| I-17 | **Amendment watch:** for every opportunity being pursued, the scout downloads amendments and every other published document, files them on the opportunity and notifies the team (owner 2026-11-03) | 📋 BL-SCOUT-AMEND, next. Watches every open opportunity. Notifies the owner and the proposal and review teams |
-| I-18 | The scout must not miss opportunities in the company's codes ("only 3 opportunities … Scout seems to be broken", owner 2026-11-05) | 🔄 BL-SCOUT-REACH, this PR. There were two causes, both older than #455. (1) Keywords were a hard filter, matched as exact phrases. (2) Only the first 100 notices per NAICS code were read, and the run didn't say when more were cut off. The owner chose to have keywords rank rather than filter. Every open notice in the codes is now a find, up to 1,000 notices are read per code, and the run note shows where the notices went |
+| I-17 | **Amendment watch:** for every opportunity being pursued, the scout downloads amendments and every other published document, files them on the opportunity and notifies the team (owner 2026-11-03) | 🔄 BL-SCOUT-AMEND, this PR. Every open opportunity is checked daily and on demand. New documents are filed and read, the due date follows an amendment, and the owner and the proposal and review teams are told in the app and by email |
+| I-18 | The scout must not miss opportunities in the company's codes ("only 3 opportunities … Scout seems to be broken", owner 2026-11-05) | ✅ #456, BL-SCOUT-REACH. There were two causes, both older than #455. (1) Keywords were a hard filter, matched as exact phrases. (2) Only the first 100 notices per NAICS code were read, and the run didn't say when more were cut off. The owner chose to have keywords rank rather than filter. Every open notice in the codes is now a find, up to 1,000 notices are read per code, and the run note shows where the notices went |
 
 ## E — Evaluate (footnote 5)
 
@@ -161,7 +161,7 @@ Last reviewed 2026-11-05, after PR #455.
 The order is serial, one PR at a time, with a design review before each
 phase:
 
-1. **Now:** BL-SCOUT-REACH (I-18). **Next:** BL-SCOUT-AMEND (I-17).
+1. **Done:** BL-SCOUT-REACH (I-18, #456). **Now:** BL-SCOUT-AMEND (I-17).
 2. **Phase 2, Evaluate:** E-1 to E-15, with the partner hand-off of
    E-13.
 3. **Phase 3, Capture:** C-1 to C-7, C-11, C-12.

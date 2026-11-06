@@ -9,7 +9,9 @@ import {
 } from "@/db/schema";
 import { Panel } from "@/components/ui/Panel";
 import { requireCurrentOrg } from "@/lib/auth-helpers";
+import { watchStatus } from "@/lib/amendment-watch";
 import { OpportunityDocsAndAIClient } from "./OpportunityDocsAndAIClient";
+import { SamWatchControl } from "./SamWatchControl";
 
 /**
  * BL-23b — opportunity-mirror surface for BL-23's AI doc review.
@@ -163,6 +165,9 @@ export async function OpportunityDocsAndAIPanel({
     };
   });
 
+  // BL-SCOUT-AMEND — the amendment watch, for an open opportunity with a SAM.gov notice.
+  const watch = await watchStatus(organizationId, opportunityId);
+
   const reviewsComplete = rows.filter((r) => r.reviewComplete).length;
   const matricesBuilt = rows.filter((r) => r.matrixCount > 0).length;
   const questionsGenerated = rows.filter((r) => r.questionCount > 0).length;
@@ -183,6 +188,7 @@ export async function OpportunityDocsAndAIPanel({
       }
     >
       <OpportunityDocsAndAIClient solicitations={rows} />
+      {watch?.watched ? <SamWatchControl opportunityId={opportunityId} checkedAt={watch.checkedAt ? watch.checkedAt.toISOString() : null} /> : null}
     </Panel>
   );
 }
