@@ -95,7 +95,9 @@ Effort key:
 | 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
 | 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
 | 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | ✅ shipped (PR #456, owner chose: keywords rank) |
-| 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | 🔄 this PR |
+| 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | ✅ shipped (PR #457) |
+| 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | 🔄 this PR (owner chose the layout, 2026-11-06); eBuy and GSA email rows next |
+| 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | ⏳ researched; owner to confirm the first connectors |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3004,6 +3006,76 @@ keep the exact filter. The owner chose (b).
   passing mention in the company's code is a low-ranked find), and
   `tests/ai/scout-logic.test.ts` for the two pure helpers. USER_MANUAL
   §5.2.1 and What's new.
+
+---
+
+### BL-SCOUT-ONEPAGE — Scout as one page
+
+**Owner, 2026-11-06**, quoting FORGE II footnote 3: "a single page that
+combines Import from SAM, paste GSA email, paste from eBuy, enterprise
+portals, and current and future GWACS … into a one-stop, user-friendly
+experience … a button next to each opportunity to add it to the
+Pipeline". **Assessment:** the buttons were there (#453), but the page
+stacked two experiences (the nightly finds on top, a source picker
+about 2,600 px down, each source its own tool) with two SAM.gov search
+forms and large cards. **Owner chose:** one source bar, one search bar
+that also saves the nightly scout, one compact results list for every
+source with Add to pipeline on each row.
+
+**Delivered (this PR):**
+- **Source bar** on top of the Scout tab: All · SAM.gov · GSA eBuy · GSA
+  email · Enterprise portals · GWACs (the last two marked *soon*, each
+  saying what is coming and opening the source-request form).
+  `src/lib/identify-sources.ts` gains GWACs and an All link.
+- **All** is the nightly scout under one search bar (keywords, NAICS
+  codes, look-back): **Search** runs the scout once with the bar's
+  criteria (`runScoutForOrganization({ criteria })`: its finds join the
+  list; it clears and re-scores no waiting find; the saved criteria
+  stay); **Save as nightly scout** saves them. The last run's note and
+  the scout's track sit under the bar.
+- **One row for every source** (`src/components/scout/ResultRow.tsx`):
+  AI call · title and agency · source · due · fit · actions on one
+  line, the reasons, rationale and description opening below. Scout
+  finds and SAM.gov search results use it now; the finds filter by
+  Recommended, Not yet reviewed, All and Skipped (`filterFinds`, pure).
+- **SAM.gov** keeps its precise search (any window to 90 days, words a
+  notice must mention, GSA vehicles, notice types), its results in the
+  shared rows. Its keyword filters, where the scout's ranks: a search is
+  for something specific.
+- **Next:** eBuy and GSA email results in the shared rows.
+
+---
+
+### BL-SCOUT-PORTALS — Enterprise portals as Scout sources
+
+**Owner, 2026-11-06:** first state portals, primes' supplier portals and
+commercial aggregators. **Research (2026-11-06; from search results of
+the cited pages, not the pages themselves — confirm before building):**
+- **State portals** (CA Cal eProcure, NY Contract Reporter, TX ESBD, FL
+  MFMP, PA eMarketplace, IL BidBuy, OH OhioBuys, NJ NJSTART, MA
+  COMMBUYS, MI SIGMA, VA eVA, MD eMMA): no official API or feed for open
+  solicitations found; most send email alerts to registered vendors.
+  Multi-state platforms (Bonfire/Euna, OpenGov, Periscope, BidNet,
+  Jaggaer, Ivalua) offer no vendor API. Terms of use on automated
+  retrieval are unconfirmed, so no scraping.
+- **Primes** (Lockheed Martin, Leidos, SAIC, Booz Allen, GDIT, Northrop
+  Grumman, RTX, CACI, ManTech, Peraton): registration portals; work
+  reaches suppliers by invitation or email; no public feed. SBA SUBNet
+  has a public dataset, but new postings are paused while SBA rebuilds it.
+- **Aggregators:** HigherGov has a documented REST API with saved-search
+  pulls (`search_id`) covering federal and all 50 states (API access
+  with a subscription per its docs; a README says invite-only, so
+  confirm); GovWin IQ has a paid Webservices API add-on (customer client
+  ID and secret); GovTribe a paid API add-on; GovSpend a saved-search API
+  (auth and terms unknown).
+
+**Proposed first connectors:** (1) HigherGov with the customer's API key
+and saved searches, after HigherGov confirms third-party SaaS use;
+(2) an inbound FORGE address per company to forward portal and prime
+alert emails to, parsed per sender (extends the GSA email path, covers
+states and primes without scraping); (3) GovWin IQ for customers with the
+Webservices add-on; (4) GovTribe or GovSpend for customers with API
+access. **To decide:** which first, and whether to approach the vendors.
 
 ---
 
