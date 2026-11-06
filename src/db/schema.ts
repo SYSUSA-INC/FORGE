@@ -5224,3 +5224,75 @@ export const fileUploads = pgTable(
 
 export type FileUpload = typeof fileUploads.$inferSelect;
 export type NewFileUpload = typeof fileUploads.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-SCOUT-INBOX — a company's bid email address and what portals send
+// to it (drizzle/0147). Mail for FORGE's inbound domain arrives through
+// Postmark's inbound webhook; each email is kept once per provider
+// message id, the raw payload in storage.
+// ─────────────────────────────────────────────────────────────────────
+
+export const inboundEmailKindEnum = pgEnum("inbound_email_kind", ["unknown", "bid_alert", "account", "other"]);
+export const inboundEmailStatusEnum = pgEnum("inbound_email_status", ["received", "parsed", "failed", "ignored"]);
+
+export const inboundAddresses = pgTable(
+  "inbound_address",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Lower case, before the @. */
+    localPart: text("local_part").notNull(),
+    /** "" is FORGE's inbound domain; a company's own verified domain comes in a later phase. */
+    domain: text("domain").notNull().default(""),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("inbound_address_org_idx").on(t.organizationId, t.createdAt),
+    localDomainUidx: uniqueIndex("inbound_address_local_domain_uidx").on(t.localPart, t.domain),
+  }),
+);
+
+export type InboundAttachment = { name: string; contentType: string; size: number };
+
+export const inboundEmails = pgTable(
+  "inbound_email",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    addressId: uuid("address_id").references(() => inboundAddresses.id, { onDelete: "set null" }),
+    provider: text("provider").notNull().default("postmark"),
+    providerMessageId: text("provider_message_id").notNull(),
+    fromAddress: text("from_address").notNull().default(""),
+    fromName: text("from_name").notNull().default(""),
+    toAddress: text("to_address").notNull().default(""),
+    subject: text("subject").notNull().default(""),
+    textPreview: text("text_preview").notNull().default(""),
+    links: jsonb("links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    spf: text("spf").notNull().default(""),
+    dkim: text("dkim").notNull().default(""),
+    /** SPF or DKIM passed for the sender's domain. */
+    authenticated: boolean("authenticated").notNull().default(false),
+    kind: inboundEmailKindEnum("kind").notNull().default("unknown"),
+    status: inboundEmailStatusEnum("status").notNull().default("received"),
+    /** The provider's payload as received (attachments inside), in storage. */
+    storagePath: text("storage_path").notNull().default(""),
+    rawSize: integer("raw_size").notNull().default(0),
+    attachments: jsonb("attachments").$type<InboundAttachment[]>().notNull().default(sql`'[]'::jsonb`),
+    bidsFound: integer("bids_found").notNull().default(0),
+    error: text("error").notNull().default(""),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgReceivedIdx: index("inbound_email_org_received_idx").on(t.organizationId, t.receivedAt),
+    providerMsgUidx: uniqueIndex("inbound_email_provider_msg_uidx").on(t.organizationId, t.provider, t.providerMessageId),
+  }),
+);
+
+export type InboundEmail = typeof inboundEmails.$inferSelect;

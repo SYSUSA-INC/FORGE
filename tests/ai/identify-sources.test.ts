@@ -5,7 +5,7 @@ import { IDENTIFY_SOURCES, identifySource, identifySourceHref } from "@/lib/iden
 describe("identify sources", () => {
   it("lists the importers first, then the sources without one", () => {
     expect(IDENTIFY_SOURCES.map((s) => s.key)).toEqual(["sam", "ebuy", "gsa", "portals", "gwacs"]);
-    expect(IDENTIFY_SOURCES.filter((s) => s.live).map((s) => s.key)).toEqual(["sam", "ebuy", "gsa"]);
+    expect(IDENTIFY_SOURCES.filter((s) => s.live).map((s) => s.key)).toEqual(["sam", "ebuy", "gsa", "portals"]);
   });
 
   it("resolves a source by its key, and All for an unknown or missing one", () => {

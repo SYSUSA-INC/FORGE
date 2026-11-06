@@ -97,7 +97,8 @@ Effort key:
 | 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | ✅ shipped (PR #456, owner chose: keywords rank) |
 | 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | ✅ shipped (PR #457) |
 | 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
-| 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | ⏳ researched; owner to confirm the first connectors |
+| 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
+| 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | 🔄 phase 1 (receive, Bid inbox) this PR; 2 read bids into finds; 3 the company's own domain; 4 dedicated portal readers |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3085,6 +3086,45 @@ alert emails to, parsed per sender (extends the GSA email path, covers
 states and primes without scraping); (3) GovWin IQ for customers with the
 Webservices add-on; (4) GovTribe or GovSpend for customers with API
 access. **To decide:** which first, and whether to approach the vendors.
+
+---
+
+### BL-SCOUT-INBOX — Portals mail FORGE directly
+
+**Owner, 2026-11-06:** "I don't want a forwarding address; I want the
+portal to ingest emails directly from the source … a unique Forge domain
+email address that is created for a client, or the client can use their
+own verified domain email address that is routed to Forge … without any
+human in the middle forwarding them, parse them, and create
+opportunities". **Decisions:** each bid read from an email becomes a
+Scout find (AI-reviewed, added with a click), not an opportunity
+directly; mail is received through **Postmark** inbound.
+
+**Phases (one PR each):**
+1. **Receive (this PR).** `inbound_address` and `inbound_email`
+   (drizzle/0147). Settings → Integrations → **Bid email address**: an
+   admin creates the company's address on FORGE's inbound domain
+   (`<company>-<4 random>@INBOUND_EMAIL_DOMAIN`). The Postmark inbound
+   webhook `/api/webhooks/postmark-inbound` (basic credentials
+   `INBOUND_WEBHOOK_SECRET`, constant-time; 401 wrong, refuses with none)
+   routes each email to the company by its recipient address (a `+tag`
+   is ignored), stores the raw payload in the company's storage (counted
+   in the storage meter), records the email once per MessageID with SPF
+   and DKIM (`authenticated` when either passed), a 4,000-character text
+   preview, its links, its attachments' names and a first reading of its
+   kind (bid alert, account, other; `classifyInbound`, pure), and audits
+   `inbound_email.receive`. Mail for an unknown address is dropped with
+   200. The **Bid inbox** on Scout → Enterprise portals lists the latest
+   50 for org admins (account emails carry sign-up links).
+2. **Read the bids:** a durable job reads each bid alert with the AI
+   (several bids per digest), each bid a Scout find (source: the portal),
+   scored and reviewed like SAM.gov finds; attachments go with the find
+   and are filed on the opportunity when it is added; unverified senders
+   held for an admin.
+3. **The company's own domain:** a verified domain (DNS TXT) with its MX
+   pointed at FORGE's inbound, or a server-side rule.
+4. **Dedicated readers** for the portals the owner names, from real alert
+   samples.
 
 ---
 
