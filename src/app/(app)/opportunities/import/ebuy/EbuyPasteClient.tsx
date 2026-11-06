@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ResultHead, ResultRow } from "@/components/scout/ResultRow";
 import { Panel } from "@/components/ui/Panel";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import {
@@ -38,6 +39,8 @@ export function EbuyPasteClient() {
   const [error, setError] = useState<string | null>(null);
   const [parsing, startParsing] = useTransition();
   const [creating, startCreating] = useTransition();
+  // BL-SCOUT-ONEPAGE — added from the Scout page: the row says so and links to it.
+  const [added, setAdded] = useState<string | null>(null);
 
   function set<K extends keyof FormFields>(key: K, value: FormFields[K]) {
     setFields((prev) => ({ ...prev, [key]: value }));
@@ -86,49 +89,39 @@ export function EbuyPasteClient() {
         setError(res.error);
         return;
       }
-      router.push(`/opportunities/${res.opportunityId}`);
+      setAdded(res.opportunityId);
+      router.refresh();
     });
   }
 
+  function another() {
+    setRawText("");
+    setFields(EMPTY);
+    setParsedOnce(false);
+    setAdded(null);
+    setError(null);
+  }
+
+  const days = fields.responseDueDate ? Math.ceil((new Date(fields.responseDueDate).getTime() - Date.now()) / 86_400_000) : null;
+
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-      <Panel
-        title="Paste eBuy RFQ"
-        eyebrow="Step 1 of 2"
-        actions={
-          <Link
-            href="/opportunities/import"
-            className="aur-link"
-          >
-            Back to SAM.gov import
-          </Link>
-        }
-      >
+    <div className="flex flex-col gap-4">
+      <Panel title="Paste an eBuy RFQ" eyebrow="eBuy has no public API">
         <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
-          eBuy RFQs aren&rsquo;t indexed by SAM.gov. Open the RFQ in eBuy,
-          select all, paste below — or paste the body of the eBuy notification
-          email. The AI will extract the title, RFQ number, vehicle, due date,
-          NAICS, set-aside, scope, and CLINs.
+          Open the RFQ in eBuy, select all and paste it below, or paste the body of the eBuy notification email. The AI extracts the title, RFQ number, vehicle, due date, NAICS, set-aside, scope and CLINs into a row below, where you check them and add it to the pipeline.
         </p>
         <textarea
-          className="aur-input min-h-[280px] font-mono text-[12px] leading-relaxed"
+          className="aur-input min-h-[160px] font-mono text-[12px] leading-relaxed"
           placeholder="Paste RFQ text here…"
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           disabled={parsing || creating}
         />
         <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
-            onClick={parse}
-            disabled={parsing || rawText.trim().length === 0}
-          >
+          <button type="button" className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60" onClick={parse} disabled={parsing || rawText.trim().length === 0}>
             {parsing ? "Extracting…" : "Extract with AI"}
           </button>
-          <span className="font-mono text-[10px] text-muted">
-            {rawText.length.toLocaleString()} chars
-          </span>
+          <span className="font-mono text-[10px] text-muted">{rawText.length.toLocaleString()} chars</span>
         </div>
         {stubbed ? (
           <div className="mt-3">
@@ -138,102 +131,58 @@ export function EbuyPasteClient() {
             />
           </div>
         ) : null}
-        {error ? (
-          <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
-            {error}
-          </div>
-        ) : null}
+        {error ? <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
       </Panel>
 
-      <Panel
-        title="Review & confirm"
-        eyebrow="Step 2 of 2"
-        actions={
-          <button
-            type="button"
-            className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
-            disabled={!parsedOnce || creating || fields.title.trim() === ""}
-            onClick={create}
-          >
-            {creating ? "Adding…" : "Add to pipeline"}
-          </button>
-        }
-      >
-        {!parsedOnce ? (
-          <div className="font-mono text-[11px] text-muted">
-            Paste an RFQ on the left and click <strong>Extract with AI</strong>
-            {" "}to populate these fields. You can edit before creating.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field
-              label="Title"
-              value={fields.title}
-              onChange={(v) => set("title", v)}
-              span={2}
+      {parsedOnce ? (
+        <Panel title="Pasted" eyebrow="Check the fields, then add it">
+          <ResultHead />
+          <ul>
+            <ResultRow
+              key={added ?? "pasted"}
+              defaultOpen={!added}
+              call={{ label: "Pasted", tone: "none", title: "Read from the RFQ you pasted; the AI reviews the scout's finds, not pastes" }}
+              title={fields.title.trim() || "Untitled RFQ"}
+              meta={[fields.buyingAgency, fields.vehicle, fields.rfqNumber, fields.naicsCode ? `NAICS ${fields.naicsCode}` : "", fields.setAside].filter(Boolean).join(" · ")}
+              source="GSA eBuy"
+              due={days === null ? null : days < 0 ? `${-days}d ago` : `${days}d`}
+              dueSoon={days !== null && days < 5}
+              fit={null}
+              actions={
+                added ? (
+                  <span className="flex items-center gap-3">
+                    <Link href={`/opportunities/${added}`} className="font-mono text-[11px] text-cobalt hover:underline">
+                      Open →
+                    </Link>
+                    <button type="button" className="aur-link font-mono text-[10px] uppercase tracking-widest" onClick={another}>
+                      Paste another
+                    </button>
+                  </span>
+                ) : (
+                  <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={creating || fields.title.trim() === ""} onClick={create}>
+                    {creating ? "Adding…" : "Add to pipeline"}
+                  </button>
+                )
+              }
+              details={
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <Field label="Title" value={fields.title} onChange={(v) => set("title", v)} span={2} />
+                  <Field label="RFQ number" value={fields.rfqNumber} onChange={(v) => set("rfqNumber", v)} />
+                  <Field label="Vehicle" value={fields.vehicle} onChange={(v) => set("vehicle", v)} placeholder="MAS / OASIS+ / Polaris…" />
+                  <Field label="Buying agency" value={fields.buyingAgency} onChange={(v) => set("buyingAgency", v)} span={2} placeholder="e.g., Department of Veterans Affairs" />
+                  <Field label="NAICS code" value={fields.naicsCode} onChange={(v) => set("naicsCode", v)} />
+                  <Field label="Set-aside" value={fields.setAside} onChange={(v) => set("setAside", v)} />
+                  <Field label="Response due (YYYY-MM-DD)" value={fields.responseDueDate ?? ""} onChange={(v) => set("responseDueDate", v || null)} />
+                  <Field label="Place of performance" value={fields.placeOfPerformance} onChange={(v) => set("placeOfPerformance", v)} />
+                  <TextArea label="Scope summary" value={fields.scopeSummary} onChange={(v) => set("scopeSummary", v)} span={2} rows={4} />
+                  <TextArea label="CLINs / line items" value={fields.clinSummary} onChange={(v) => set("clinSummary", v)} span={2} rows={3} />
+                  <TextArea label="Notes (page caps, eval, PoP)" value={fields.notes} onChange={(v) => set("notes", v)} span={2} rows={2} />
+                </div>
+              }
             />
-            <Field
-              label="RFQ number"
-              value={fields.rfqNumber}
-              onChange={(v) => set("rfqNumber", v)}
-            />
-            <Field
-              label="Vehicle"
-              value={fields.vehicle}
-              onChange={(v) => set("vehicle", v)}
-              placeholder="MAS / OASIS+ / Polaris…"
-            />
-            <Field
-              label="Buying agency"
-              value={fields.buyingAgency}
-              onChange={(v) => set("buyingAgency", v)}
-              span={2}
-              placeholder="e.g., Department of Veterans Affairs"
-            />
-            <Field
-              label="NAICS code"
-              value={fields.naicsCode}
-              onChange={(v) => set("naicsCode", v)}
-            />
-            <Field
-              label="Set-aside"
-              value={fields.setAside}
-              onChange={(v) => set("setAside", v)}
-            />
-            <Field
-              label="Response due (YYYY-MM-DD)"
-              value={fields.responseDueDate ?? ""}
-              onChange={(v) => set("responseDueDate", v || null)}
-            />
-            <Field
-              label="Place of performance"
-              value={fields.placeOfPerformance}
-              onChange={(v) => set("placeOfPerformance", v)}
-            />
-            <TextArea
-              label="Scope summary"
-              value={fields.scopeSummary}
-              onChange={(v) => set("scopeSummary", v)}
-              span={2}
-              rows={4}
-            />
-            <TextArea
-              label="CLINs / line items"
-              value={fields.clinSummary}
-              onChange={(v) => set("clinSummary", v)}
-              span={2}
-              rows={3}
-            />
-            <TextArea
-              label="Notes (page caps, eval, PoP)"
-              value={fields.notes}
-              onChange={(v) => set("notes", v)}
-              span={2}
-              rows={2}
-            />
-          </div>
-        )}
-      </Panel>
+          </ul>
+        </Panel>
+      ) : null}
     </div>
   );
 }
