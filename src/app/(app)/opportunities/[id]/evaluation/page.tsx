@@ -11,6 +11,9 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { EvaluationForm } from "./EvaluationForm";
 import { GateDecisionPanel } from "./GateDecisionPanel";
+import { DecisionPanel } from "./DecisionPanel";
+import { decisionHistory, evaluateSignals, partnerSuggestions } from "@/lib/opportunity-decision-store";
+import { decisionReadiness } from "@/lib/opportunity-decision";
 import { CapabilityMatrixPanel } from "./CapabilityMatrixPanel";
 import { LessonsThatApplyPanel } from "./LessonsThatApplyPanel";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
@@ -69,6 +72,18 @@ export default async function OpportunityEvaluationPage({
     .orderBy(companies.name)
     .limit(200);
 
+  // BL-NAV-LIFECYCLE 2a — the Evaluate decision while the opportunity is in
+  // Evaluate (and its history after; it can still change in Capture, as a
+  // new record); the gate panel moves it on from Capture.
+  const inEvaluate = opp.stage === "identified" || opp.stage === "sources_sought";
+  const [history, suggestions, signals] = await Promise.all([
+    decisionHistory(organizationId, params.id),
+    partnerSuggestions(organizationId, params.id),
+    evaluateSignals(organizationId, [params.id]),
+  ]);
+  const sig = signals.get(params.id);
+  const readiness = decisionReadiness({ analysed: !!sig?.analysed, matrixBuilt: (matrix?.questions?.length ?? 0) > 0 });
+
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="xl:col-span-2">
@@ -77,11 +92,14 @@ export default async function OpportunityEvaluationPage({
         </Panel>
       </div>
       <div className="flex flex-col gap-4">
-        <GateDecisionPanel opportunityId={params.id} currentStage={opp.stage} />
+        {inEvaluate || history.length > 0 ? (
+          <DecisionPanel opportunityId={params.id} history={history} partners={suggestions} readiness={inEvaluate ? readiness : null} naics={opp.naicsCode} canDecide={inEvaluate || opp.stage === "qualification"} />
+        ) : null}
+        {inEvaluate ? null : <GateDecisionPanel opportunityId={params.id} currentStage={opp.stage} />}
         {/* BL-LESSONS-LOOP 4b — confirmed lessons from bids like this one. */}
         <LessonsThatApplyPanel agency={opp.agency} naicsCode={opp.naicsCode} />
       </div>
-      <div className="xl:col-span-3">
+      <div id="capability" className="scroll-mt-24 xl:col-span-3">
         <CapabilityMatrixPanel
           opportunityId={params.id}
           matrix={

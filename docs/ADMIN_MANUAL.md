@@ -358,6 +358,7 @@ FORGE uses three patterns to record what happened:
 | Question | Where to look |
 |---|---|
 | Why was this opportunity moved to Archived · No bid? | Opportunity → Activity tab → look for the gate-decision row, read the reason |
+| Who called GO, NO-GO or PARTNER on this opportunity, and why? | Opportunity → Evaluation tab → the Decision panel's history (each decision with who, when, PWin, coverage and the reason); the Audit Log's `opportunity.decision` rows (BL-NAV-LIFECYCLE 2a, migration 0150: sync it on `/admin/migrations` after deploying) |
 | Who scored this opportunity at 42 last week? | Opportunity → Activity tab → look for the "Evaluation saved" entry |
 | Who closed this Red Team review and with what verdict? | Proposal → Reviews tab → open the review → the close row at the bottom |
 | Who voted Fail on Pink Team? | Proposal → Reviews tab → open the review → reviewer list with verdicts |

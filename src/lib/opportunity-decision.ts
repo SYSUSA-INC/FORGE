@@ -32,7 +32,7 @@ export type DecisionInput = { decision: string; category?: string; reason?: stri
 /** The decision as it will be stored, or why it can't be. */
 export function checkDecision(input: DecisionInput): { ok: true; decision: OpportunityDecisionKind; category: string; reason: string } | { ok: false; error: string } {
   const decision = input.decision as OpportunityDecisionKind;
-  if (!(decision in DECISION_STAGE)) return { ok: false, error: "Choose GO, NO-GO or PARTNER." };
+  if (!Object.prototype.hasOwnProperty.call(DECISION_STAGE, decision)) return { ok: false, error: "Choose GO, NO-GO or PARTNER." };
   const reason = (input.reason ?? "").trim().slice(0, 4000);
   if (decision !== "no_go") return { ok: true, decision, category: "", reason };
   const category = NO_GO_CATEGORIES.find((c) => c.key === input.category)?.key;
@@ -53,4 +53,32 @@ export function decisionReadiness(r: { analysed: boolean; matrixBuilt: boolean }
   if (!r.analysed) return "Analyze it first";
   if (!r.matrixBuilt) return "Build the capability matrix first";
   return null;
+}
+
+/** The Evaluate list's filters. */
+export const EVALUATE_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "needs_analysis", label: "Needs analysis" },
+  { key: "needs_matrix", label: "Needs matrix" },
+  { key: "ready", label: "Ready to decide" },
+] as const;
+export type EvaluateFilter = (typeof EVALUATE_FILTERS)[number]["key"];
+
+export function evaluateFilter(v: string | undefined): EvaluateFilter {
+  return EVALUATE_FILTERS.some((f) => f.key === v) ? (v as EvaluateFilter) : "all";
+}
+
+/** Whether an Evaluate row belongs under a filter: analysed or not, the matrix built or not. */
+export function matchesEvaluateFilter(r: { analysed: boolean; matrixBuilt: boolean }, f: EvaluateFilter): boolean {
+  if (f === "needs_analysis") return !r.analysed;
+  if (f === "needs_matrix") return !r.matrixBuilt;
+  if (f === "ready") return r.analysed && r.matrixBuilt;
+  return true;
+}
+
+/** Days until a due date (negative once past), or null. */
+export function daysLeft(dueIso: string | null, now: Date = new Date()): number | null {
+  if (!dueIso) return null;
+  const t = Date.parse(dueIso);
+  return Number.isNaN(t) ? null : Math.ceil((t - now.getTime()) / 86_400_000);
 }

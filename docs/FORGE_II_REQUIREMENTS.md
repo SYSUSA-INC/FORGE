@@ -76,8 +76,8 @@ Last reviewed 2026-11-06, after PR #457.
 
 | ID | Requirement | Status |
 |---|---|---|
-| E-1 | Evaluate lists the opportunities identified in Identify and **replaces the Solicitations page** | 🟡 The stage page lists them (#452). Replacing Solicitations is phase 2 |
-| E-2 | Two buttons on each opportunity: **Analyze** and **Capability Matrix** | 📋 Phase 2 |
+| E-1 | Evaluate lists the opportunities identified in Identify and **replaces the Solicitations page** | ✅ Phase 2a: the Evaluate list (#452, rows and filters in 2a); `/solicitations` redirects to it, with documents not yet on an opportunity listed there |
+| E-2 | Two buttons on each opportunity: **Analyze** and **Capability Matrix** | 🟡 Phase 2a puts both on every Evaluate row (Analyze opens the PWin and brief until 2c's analysis page; Capability Matrix the questionnaire until 2b's page) |
 | E-3 | Analyze opens a new page where FORGE AI, using what it knows of the company, gives a **PWin score** and a **report** that supports it | 🟡 A PWin panel and AI evaluation exist on the opportunity page today. Phase 2 makes them the Analyze flow |
 | E-4 | The analysis is saved, and an **Analysis Report** button then appears on the opportunity | 📋 Phase 2 |
 | E-5 | Capability Matrix opens a page where the AI extracts the required capabilities from the RFP, RFI or other document into an editable, user-friendly list | 🟡 A capability matrix exists (`capability-matrix-actions.ts`). Phase 2 reshapes it |
@@ -85,12 +85,12 @@ Last reviewed 2026-11-06, after PR #457.
 | E-7 | **Partial** asks for a percentage: how much the company can do without a partner | 📋 Phase 2 |
 | E-8 | Once the matrix is done, a **Matrix Report** button appears | 📋 Phase 2 |
 | E-9 | **Every opportunity has its own page** holding both reports, open to the team for the rest of the process | 🟡 Opportunity pages exist. Phase 2 puts the reports on them |
-| E-10 | The final decision on that page: **GO / NO-GO / PARTNER** | 📋 Phase 2 |
-| E-11 | GO moves the opportunity to Capture | 📋 Phase 2 |
-| E-12 | NO-GO requires a reason, and the opportunity won't close without one, so FORGE learns from it | 📋 Phase 2 |
-| E-13 | PARTNER: the scout engine proposes businesses with similar capabilities, and suggests from the company's own list of partners when it has one | ⚠️ The plan had the partner finder in Capture (phase 3) only. The document wants a first list at the moment of the decision. Phase 2 links to it; phase 3 builds it |
+| E-10 | The final decision on that page: **GO / NO-GO / PARTNER** | ✅ Phase 2a: the Decision panel, each decision kept (`opportunity_decision`) |
+| E-11 | GO moves the opportunity to Capture | ✅ Phase 2a: to Qualified (Capture), then Plan |
+| E-12 | NO-GO requires a reason, and the opportunity won't close without one, so FORGE learns from it | 🟡 Phase 2a: a category and at least 20 characters of the team's words, or it can't be saved; kept with the decision. Feeding Lessons and Loss intelligence from it is to come |
+| E-13 | PARTNER: the scout engine proposes businesses with similar capabilities, and suggests from the company's own list of partners when it has one | 🟡 Phase 2a: the company's own teaming partners and subcontractors, same NAICS first, and Find more partners (Company search with the NAICS). FORGE's own partner finder is phase 3 |
 | E-14 | The opportunity page keeps growing through the lifecycle to submission and beyond, with FORGE learning along the way | 🟡 The opportunity page carries activity, documents and AI today. Each phase adds its part |
-| E-15 | A No-Go stops the amendment watch (owner 2026-11-03) | 📋 Phase 2. Until then the watch stops at No bid |
+| E-15 | A No-Go stops the amendment watch (owner 2026-11-03) | ✅ Phase 2a: a NO-GO closes it as No bid, which the watch skips |
 
 ## C — Capture (footnote 6)
 

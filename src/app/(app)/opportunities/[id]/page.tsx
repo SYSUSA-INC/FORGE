@@ -102,6 +102,8 @@ export default async function OpportunityOverviewPage({
           organizationId={organizationId}
           target={{ kind: "opportunity", id: opp.id }}
         />
+        {/* BL-NAV-LIFECYCLE 2a — Evaluate's Analyze lands here until the analysis page (2c). */}
+        <div id="analysis" className="scroll-mt-24" />
         <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
         {/* BL-FB-X-CRM — who we know at this agency; nothing when the agency is blank. */}
         <CustomerContactsPanel organizationId={organizationId} opportunityId={opp.id} />

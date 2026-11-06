@@ -10,7 +10,9 @@ import { identifySource } from "@/lib/identify-sources";
 import { lifecycleStage, type LifecycleKey } from "@/lib/lifecycle";
 import { safeQuery } from "@/lib/schema-resilience";
 import { ScoutSection } from "@/app/(app)/opportunities/scout/ScoutSection";
+import { evaluateFilter } from "@/lib/opportunity-decision";
 import { CreateSection } from "./CreateSection";
+import { EvaluateSection } from "./EvaluateSection";
 import { StageList, type StageListRow } from "./StageList";
 
 /**
@@ -22,7 +24,7 @@ import { StageList, type StageListRow } from "./StageList";
  * (Analyze, the decision, the plan, the draft, the submission) arrive
  * phase by phase on these pages.
  */
-export type StageSearchParams = { tab?: string; afterCreate?: string; source?: string; from?: string; wait?: string };
+export type StageSearchParams = { tab?: string; afterCreate?: string; source?: string; from?: string; wait?: string; filter?: string };
 
 export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: LifecycleKey; searchParams: StageSearchParams }) {
   const stage = lifecycleStage(stageKey);
@@ -100,7 +102,6 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
   );
 
   const links: Record<string, { href: string; label: string }[]> = {
-    evaluate: [{ href: "/solicitations", label: "Solicitation documents" }],
     develop: [{ href: "/proposals", label: "Proposals in flight" }, { href: "/proposals/new", label: "New proposal" }],
     measure: [
       { href: "/reports", label: "Reports" },
@@ -129,7 +130,11 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
         }
       />
       <LifecycleChevron current={stage.key} />
-      <StageList rows={rows} title={`In ${stage.label}`} empty={`Nothing is in ${stage.label} right now.`} />
+      {stage.key === "evaluate" ? (
+        <EvaluateSection rows={rows} filter={evaluateFilter(searchParams.filter)} />
+      ) : (
+        <StageList rows={rows} title={`In ${stage.label}`} empty={`Nothing is in ${stage.label} right now.`} />
+      )}
     </>
   );
 }

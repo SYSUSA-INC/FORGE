@@ -3259,12 +3259,42 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/isolation/create-from-document.test.ts` (linked from birth
      with amendments, a second save refused, another workspace refused,
      by hand audited as such) and end to end.
-2. **Evaluate:** the stage page replaces Solicitations; a solicitation
-   becomes a document on the opportunity, not a record of its own;
-   Analyze (PWin and its report) and the Capability matrix (Yes / Partial
-   with a percentage / No over the existing six-answer scale) with their
-   reports on the opportunity page; the decision Go, No-Go with a
-   required reason, or Partner.
+2. **Evaluate:** design `docs/design/BL-NAV-LIFECYCLE_PHASE2_EVALUATE.md`,
+   approved by the owner 2026-11-06 with every recommended answer
+   (Solicitations folds into Evaluate; Yes keeps a *proven* tick; GO goes
+   to Capture, then Plan; a NO-GO needs a category and the team's own
+   words). Three PRs:
+   - **2a — the decision and the Evaluate page (this PR).** Migration
+     0150: `opportunity_decision` (decision `go` / `no_go` / `partner`,
+     reason category, reason, PWin and capability coverage at that
+     moment, who, when), one row per decision, never overwritten.
+     `src/lib/opportunity-decision.ts` (pure, tested) holds the rules:
+     GO and PARTNER move the opportunity to Qualified (Capture), NO-GO to
+     No bid, which also takes it off the SAM.gov amendment watch; a NO-GO
+     needs one of eight categories and at least 20 characters of reason.
+     `src/lib/opportunity-decision-store.ts` records it through the one
+     stage-change path (`applyOpportunityStage`: activity note, audit,
+     the rules engine's event) and audits `opportunity.decision`; lists
+     the history; suggests the company's own teaming partners and
+     subcontractors, same NAICS first; and gives the Evaluate list each
+     row's brief call, matrix and latest decision. **Decision panel** on
+     the Evaluation tab replaces the gate panel while the opportunity is
+     in Evaluate (and can change the call in Capture, as a new record);
+     PARTNER lists the suggestions and **Find more partners**, which
+     opens Company search with the opportunity's NAICS. **Evaluate
+     page:** one row per opportunity with days left, **Analyze** (until
+     2c, the PWin and brief on the overview) or PWin and the brief's
+     call, **Capability Matrix** or coverage, and **Decide** or the
+     decision; filters Needs analysis, Needs matrix, Ready to decide,
+     All; below, the solicitation documents not yet on an opportunity,
+     each with **Create opportunity from it**. `/solicitations` redirects
+     to Evaluate; a solicitation's page stays as its document page, its
+     Back link to its opportunity. Tested in
+     `tests/ai/opportunity-decision.test.ts` and
+     `tests/isolation/opportunity-decision.test.ts`.
+   - **2b — the capability matrix:** Yes / Partial with a percentage /
+     No over the six-answer scale, its own page, the Matrix Report.
+   - **2c — Analyze:** the analysis page and the Analysis Report.
 3. **Capture:** the Go and Partner worklist; the partner registry
    (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
    on the 8(a) registry and USAspending; the partner finder with a

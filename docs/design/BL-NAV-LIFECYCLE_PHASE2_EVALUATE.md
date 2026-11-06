@@ -1,6 +1,6 @@
 # Phase 2 — Evaluate: design for review
 
-**Status:** proposed (2026-11-06), for the owner's review before any code.
+**Status:** approved by the owner (2026-11-06) with every recommended answer in §4: Solicitations folds into Evaluate; Yes keeps the **Proven** tick; GO goes to Capture, then Plan; a NO-GO needs a category and your own words. 2a delivered.
 **Requirements:** FORGE II footnote 5, E-1 to E-15 in
 `docs/FORGE_II_REQUIREMENTS.md`. **Plan:** BL-NAV-LIFECYCLE phase 2.
 
@@ -100,12 +100,12 @@ The opportunity page is already each opportunity's own page. Its Overview gets a
 The **Decision** panel replaces the gate panel on the opportunity and on the Evaluate row:
 
 - **GO** moves the opportunity to **Capture** (stage *Qualified*), with a note.
-- **NO-GO** asks for a **reason category** and a **reason in your words** (at least 20 characters). The categories are: scope, capacity, price, competition, timing, customer relationship, compliance, other. It cannot be saved without both. The opportunity closes (*No bid*), and the amendment watch stops. The reason feeds Lessons and Loss intelligence, so FORGE learns from it.
+- **NO-GO** asks for a **reason category** and a **reason in your words** (at least 20 characters). The categories are: scope, capacity, price, competition, timing, customer relationship, compliance, other. It cannot be saved without both. The opportunity closes (*No bid*), and the amendment watch stops. The reason is kept with the decision; feeding it into Lessons and Loss intelligence is a follow-up.
 - **PARTNER** moves the opportunity to **Capture** marked *partner needed*, with:
-  - **suggested partners from your own list:** Companies marked teaming partner or subcontractor whose NAICS codes and capabilities match the matrix's **No** and **Partial** answers, each with the reason it matched;
+  - **suggested partners from your own list:** Companies marked teaming partner or subcontractor, those under the opportunity's NAICS code first, each with the reason it is listed (2a; matching their capabilities to the matrix's **No** and **Partial** answers comes with 2b's answers);
   - **Find more partners**, which opens Company search pre-filled with the NAICS codes. The full partner finder (FORGE's partner database, prioritised list, invitations) is phase 3, Capture.
 
-**Every decision is recorded**, not overwritten, in a new table `opportunity_decision`. Each record has the decision, the category and reason, who decided and when, and the PWin and coverage at that moment. A changed decision is a new record, and the history shows on the Activity tab.
+**Every decision is recorded**, not overwritten, in a new table `opportunity_decision`. Each record has the decision, the category and reason, who decided and when, and the PWin and coverage at that moment. A changed decision is a new record. The history shows under the Decision panel, and each decision is noted on the Activity tab.
 
 ## 3. Delivery (one PR each, in this order)
 
