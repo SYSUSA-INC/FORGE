@@ -144,7 +144,7 @@ Last reviewed 2026-11-06, after PR #457.
 | S-3 | Option 2: **submit by email from the portal**, from an email address assigned to the portal | 📋 Phase 6 |
 | S-4 | A reply to that email **comes back to the portal**, is read and parsed, and is filed on the opportunity, building its history and audit trail | 📋 Phase 6: an inbound provider's webhook |
 | S-5 | Submission through government portals: explore later | 📋 Recorded for later (owner) |
-| S-6 | Suggestions on how to do S-3 and S-4 | 📋 In phase 6's design: one sending domain, a reply address for each opportunity, and inbound parsing by Postmark, SendGrid or Mailgun |
+| S-6 | Suggestions on how to do S-3 and S-4 | 📋 In phase 6's design: one sending domain, a reply address for each opportunity, and replies received in FORGE's Exchange mailbox and read through Microsoft Graph, as the bid inbox does (BL-SCOUT-INBOX; the owner chose Exchange over a separate mail service, 2026-11-06) |
 
 ## R — Measure (footnote 10)
 

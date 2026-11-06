@@ -31,7 +31,7 @@ export function BidEmailPanel({ address, configured, canEdit }: { address: strin
         Register this address on each state portal, prime contractor&apos;s supplier portal and bid service as the email that receives your bid notifications. The portals send their alerts straight to FORGE: no one forwards anything. Every email lands in the Bid inbox on the Scout page; bid alerts are read into Scout finds, and portal account emails (registration, verification, password) wait there for an admin.
       </p>
       {!configured ? (
-        <p className="font-body text-[13px] text-muted">Receiving email isn&apos;t set up on this FORGE yet. A FORGE platform admin turns it on (ADMIN_MANUAL §3.7).</p>
+        <p className="font-body text-[13px] text-muted">Receiving email isn&apos;t set up on this FORGE yet. A FORGE platform admin connects FORGE&apos;s Exchange mailbox (ADMIN_MANUAL §3.7).</p>
       ) : address ? (
         <div className="flex flex-wrap items-center gap-3">
           <code className="rounded border border-layer/10 bg-layer/[0.03] px-2 py-1 font-mono text-[13px] text-text">{address}</code>

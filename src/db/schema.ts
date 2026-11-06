@@ -5233,9 +5233,9 @@ export type NewFileUpload = typeof fileUploads.$inferInsert;
 
 // ─────────────────────────────────────────────────────────────────────
 // BL-SCOUT-INBOX — a company's bid email address and what portals send
-// to it (drizzle/0147). Mail for FORGE's inbound domain arrives through
-// Postmark's inbound webhook; each email is kept once per provider
-// message id, the raw payload in storage.
+// to it (drizzle/0147). Mail for the companies' addresses lands in FORGE's
+// shared Exchange mailbox, read through Microsoft Graph; each email is kept
+// once per Internet Message-ID, the message and attachments in storage.
 // ─────────────────────────────────────────────────────────────────────
 
 export const inboundEmailKindEnum = pgEnum("inbound_email_kind", ["unknown", "bid_alert", "account", "other"]);
@@ -5272,7 +5272,8 @@ export const inboundEmails = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     addressId: uuid("address_id").references(() => inboundAddresses.id, { onDelete: "set null" }),
-    provider: text("provider").notNull().default("postmark"),
+    /** "exchange": FORGE's shared mailbox, read through Microsoft Graph (drizzle/0149). */
+    provider: text("provider").notNull().default("exchange"),
     providerMessageId: text("provider_message_id").notNull(),
     fromAddress: text("from_address").notNull().default(""),
     fromName: text("from_name").notNull().default(""),
@@ -5286,7 +5287,7 @@ export const inboundEmails = pgTable(
     authenticated: boolean("authenticated").notNull().default(false),
     kind: inboundEmailKindEnum("kind").notNull().default("unknown"),
     status: inboundEmailStatusEnum("status").notNull().default("received"),
-    /** The provider's payload as received (attachments inside), in storage. */
+    /** The message as FORGE stores it (JSON), its attachments beside it, in storage. */
     storagePath: text("storage_path").notNull().default(""),
     rawSize: integer("raw_size").notNull().default(0),
     attachments: jsonb("attachments").$type<InboundAttachment[]>().notNull().default(sql`'[]'::jsonb`),

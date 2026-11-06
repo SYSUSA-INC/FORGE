@@ -3098,14 +3098,17 @@ own verified domain email address that is routed to Forge … without any
 human in the middle forwarding them, parse them, and create
 opportunities". **Decisions:** each bid read from an email becomes a
 Scout find (AI-reviewed, added with a click), not an opportunity
-directly; mail is received through **Postmark** inbound.
+directly; mail is received in **FORGE's Exchange (Microsoft 365) shared
+mailbox**, read through Microsoft Graph (owner, 2026-11-06: "remove any
+postmark configurations … and move to exchange instead"; phase 1 first
+shipped on Postmark's inbound webhook, replaced in phase 2b).
 
 **Phases (one PR each):**
 1. **Receive (this PR).** `inbound_address` and `inbound_email`
    (drizzle/0147). Settings → Integrations → **Bid email address**: an
    admin creates the company's address on FORGE's inbound domain
    (`<company>-<4 random>@INBOUND_EMAIL_DOMAIN`). The Postmark inbound
-   webhook `/api/webhooks/postmark-inbound` (basic credentials
+   webhook (removed in 2b) `/api/webhooks/postmark-inbound` (basic credentials
    `INBOUND_WEBHOOK_SECRET`, constant-time; 401 wrong, refuses with none)
    routes each email to the company by its recipient address (a `+tag`
    is ignored), stores the raw payload in the company's storage (counted
@@ -3134,6 +3137,26 @@ directly; mail is received through **Postmark** inbound.
    attachments (10 at most, storage limit) as solicitations on the new
    opportunity, each parsed; the opportunity gets no notice id. Audit
    `inbound_email.read`.
+2b. **Exchange instead of Postmark (this PR).** The Postmark webhook and
+   its settings are gone. `src/lib/inbound-graph.ts` reads FORGE's shared
+   mailbox (`INBOUND_MAILBOX`) through Microsoft Graph with an app-only
+   token (`MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`,
+   `MS_GRAPH_CLIENT_SECRET`; `Mail.ReadWrite`, restricted to the mailbox
+   by an application access policy): the cron route
+   `/api/cron/inbound-mail` (every two minutes, `CRON_SECRET`) lists the
+   Inbox's unread messages with their headers (Exchange's
+   Authentication-Results carry SPF and DKIM), downloads each one's file
+   attachments (20 MB, ten; inline skipped), files it
+   (`receiveInboundMessage`) and marks it read; a message FORGE fails to
+   file stays unread for the next run. Mail reaches the mailbox through an
+   Exchange mail-flow rule that redirects everything for
+   `INBOUND_EMAIL_DOMAIN` (an Internal relay accepted domain); the company
+   is found from the envelope headers Exchange keeps, or plus addressing
+   on the mailbox (`companyLocalPart`). The message is stored as FORGE's
+   own JSON (`inboundMessageSchema`) with each attachment its own object
+   (no request-size limit any more); the storage meter counts both.
+   Provider `exchange` (drizzle/0149 sets the default). ADMIN_MANUAL §3.7
+   is the Microsoft 365 setup for `forgeaxi.com`.
 3. **The company's own domain:** a verified domain (DNS TXT) with its MX
    pointed at FORGE's inbound, or a server-side rule.
 4. **Dedicated readers** for the portals the owner names, from real alert
@@ -3254,9 +3277,10 @@ Every requirement in the FORGE II document, with its status and phase:
    exists), external reviewers with section-level access, scheduling
    links for reviews.
 6. **Deliver:** submit from the portal by email, sent from a platform
-   address with a per-opportunity reply address; replies ingested by an
-   inbound provider's webhook (Postmark, SendGrid Inbound Parse or
-   Mailgun; Resend is outbound-only) and filed on the opportunity.
+   address with a per-opportunity reply address; replies received in
+   FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox
+   does (BL-SCOUT-INBOX; owner's choice, 2026-11-06), and filed on the
+   opportunity.
 7. **Measure:** the stage page consolidating outcome, lessons, loss
    intelligence and reports.
 8. **The partner portal:** partner accounts scoped to their own answers,
