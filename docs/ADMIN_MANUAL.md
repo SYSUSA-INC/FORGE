@@ -434,7 +434,7 @@ Reading the inbox acknowledges deliveries: marking a notification read (or "Mark
 
 ### 5.2 Default rules every tenant gets
 
-On migration, FORGE seeds seven default rules per tenant so the rules engine matches the legacy hardcoded behavior. They're named `Default: <human label>` and noted as auto-seeded in their description. If you already had a rule for one of these trigger kinds, the seed skipped that kind — your custom rule wins.
+On migration, FORGE seeds default rules per tenant (the seven below that match the legacy hardcoded behavior, and later ones as their features arrived). They're named `Default: <human label>` and noted as auto-seeded in their description. If you already had a rule for one of these trigger kinds, the seed skipped that kind — your custom rule wins.
 
 | Default rule | Recipients | Channels |
 |---|---|---|
@@ -445,6 +445,9 @@ On migration, FORGE seeds seven default rules per tenant so the rules engine mat
 | Opportunity bid/no-bid review submitted | Opportunity owner | In-app |
 | Solicitation role assigned | The newly-assigned user | In-app |
 | Proposal section assigned | The newly-assigned section author | In-app + Email |
+| Solicitation amended (BL-SCOUT-AMEND, migration 0146) | The opportunity's owner and everyone assigned to its proposals, reviews and solicitations | In-app + Email |
+
+**Solicitation amended** is on by default. A company created after it was introduced gets it the first time FORGE files an amendment for one of its opportunities, unless the company already has a rule of that kind: switch the default off, rather than deleting it, to stop the messages (the documents are still filed and the Activity tab still notes them). The daily check runs at 09:45 UTC on the company's SAM.gov key, or FORGE's shared one; files count against the plan's storage, and when storage is full the rest wait for the next check and the message names them.
 
 Edit or delete defaults the same way you'd edit a custom rule. Disabling a default doesn't break the legacy hardcoded notification (it still fires in parallel until that legacy path is retired in a future release — duplicate inbox rows are the accepted cost during the parity window).
 

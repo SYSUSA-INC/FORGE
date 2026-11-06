@@ -94,7 +94,8 @@ Effort key:
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
 | 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
 | 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
-| 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | 🔄 this PR (owner chose: keywords rank); then BL-SCOUT-AMEND |
+| 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | ✅ shipped (PR #456, owner chose: keywords rank) |
+| 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | 🔄 this PR |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2876,6 +2877,70 @@ the amendment number, a moved due date and the documents. A new
 "Solicitation amended" notification rule ships on by default. Watched:
 every open opportunity (not won, lost or no-bid); once Evaluate has the
 Go / No-Go decision, a No-Go stops the watch.
+
+---
+
+### BL-SCOUT-AMEND — The amendment watch
+
+**Owner, 2026-11-03:** "as the scout runs and finds amendments to any
+solicitation that we have decided to go on, it must automatically
+download amendments and any other published documents and append them
+to the opportunity and notify the team". Decisions: watch every open
+opportunity; tell the owner and everyone assigned to its proposal or
+review teams.
+
+**Delivered (this PR):**
+- `src/lib/amendment-watch.ts` — `checkOpportunityNotices` asks SAM.gov
+  for every notice of the opportunity's solicitation
+  (`fetchSamNoticesForSolicitation`, `solnum`, the last year, inactive
+  notices included, each checked against the solicitation key), or for
+  its own notice when it has no usable number. `planWatch`
+  (`src/lib/amendment-watch-logic.ts`, pure) decides which notices are
+  amendments (posted after the opportunity's own), which attachments
+  are new, which notices the team hears about (posted after the
+  opportunity was added; earlier documents are filed quietly) and
+  whether the response date moved (the newest amendment not filed yet,
+  so a date set by hand changes only with a later amendment). Each new
+  file (20 MB cap, ten per check, the plan's storage limit) is stored at
+  `org/{org}/solicitation/{id}/{name}` and filed as a solicitation on
+  the opportunity (`source = samgov-watch`), an amendment's under the
+  opportunity's first solicitation with its number, and its parse is
+  queued as a durable job. One record per notice carries the notice ID,
+  so the daily Q&A check reads each notice once. Links that can never
+  be read are marked seen; the rest wait for the next check. Every
+  notice read is remembered, so an amendment is announced and moves the
+  date once; a file of it filed on a later check is reported then. A
+  person's check refuses to start within five minutes of the last try
+  (theirs or the daily run's), so two checks never file the same files.
+- The team: the opportunity's owner; its proposals' manager, capture
+  lead, pricing lead and section authors; its reviewers; its
+  solicitations' assignees; only active members of the organization.
+  Told through the rules engine (`solicitation_amended`, a new inbox
+  kind), by the default rule seeded per company (0146) or added on the
+  first message for a company created later. An activity note and an
+  `opportunity.sam_watch` audit row record each filing.
+- Daily cron `/api/cron/amendment-watch` at 09:45 UTC (after the scout),
+  modelled on the Q&A check: one company at a time in turn, each on its
+  key; a failing key skips that company (or every company on the shared
+  key); three SAM.gov failures in a row end the run; checks start in the
+  first 200 s and no download starts past 260 s. The scout clears an
+  opportunity's last check when it sees a new notice of its solicitation,
+  so the watch takes it first. **Check SAM.gov now** on the opportunity's
+  Documents panel runs one check (the page now allows 300 s).
+- Migrations 0145 (two enum values; `sam_watch_seen_links`,
+  `sam_watch_notice_ids`, `sam_watch_checked_at`,
+  `sam_watch_attempted_at` on `opportunity`) and 0146 (the default rule).
+- Tests: `tests/ai/amendment-watch-logic.test.ts` and
+  `tests/isolation/amendment-watch.test.ts` (three files filed with the
+  amendment under the first solicitation, parse jobs queued, the date
+  moved, the owner and proposal manager told and not another
+  organization's user, the default rule added, nothing twice, the other
+  tenant untouched, a closed pursuit refused, the daily run picking up a
+  new file). USER_MANUAL §5.4 Overview, §5.2.1, What's new;
+  ADMIN_MANUAL §5.
+
+**Later:** a No-Go in Evaluate (phase 2) stops the watch, as won, lost
+and no-bid do now.
 
 ---
 

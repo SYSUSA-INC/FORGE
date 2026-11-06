@@ -52,6 +52,7 @@ import {
   type ScoutCandidateSource,
 } from "@/db/schema";
 import { completeStructuredForTenant, getAIProviderStatus, zodToToolSchema } from "@/lib/ai";
+import { markWatchDue } from "@/lib/amendment-watch";
 import { batchingAvailable, type BatchRequest } from "@/lib/ai-batch";
 import { queueAiBatch, type BatchHandler } from "@/lib/ai-batch-queue";
 import {
@@ -612,7 +613,8 @@ export async function runScoutForOrganization(input: {
   // watch files it there); one already dismissed or added stays decided; one
   // still waiting is replaced by its newer notice.
   const sol = await bySolicitation(organizationId, [...found.values()].filter((f) => !known.has(f.sam.noticeId)));
-  if (sol.inPipeline > 0) notes.push(`${sol.inPipeline} notice${sol.inPipeline === 1 ? " is" : "s are"} a new notice of a solicitation already in your pipeline; no find raised.`);
+  if (sol.inPipeline > 0) notes.push(`${sol.inPipeline} notice${sol.inPipeline === 1 ? " is" : "s are"} a new notice of a solicitation already in your pipeline; no find raised, and the amendment watch files ${sol.inPipeline === 1 ? "it" : "them"} on the opportunit${sol.pipelineIds.length === 1 ? "y" : "ies"} at its next check (09:45 UTC daily).`);
+  await markWatchDue(organizationId, sol.pipelineIds).catch((err) => log.warn("[scout]", "marking the amendment watch failed", { organizationId, error: err }));
   const freshSam = sol.fresh;
   const replaceFor = sol.replaceFor;
   const freshAwards = awardDrafts.filter((d) => !known.has(d.noticeId));
@@ -1091,7 +1093,7 @@ function keyOf(col: typeof scoutCandidates.solicitationNumber | typeof opportuni
 async function bySolicitation<F extends { sam: SamOpportunity }>(
   organizationId: string,
   notices: F[],
-): Promise<{ fresh: F[]; replaceFor: Map<string, string>; inPipeline: number }> {
+): Promise<{ fresh: F[]; replaceFor: Map<string, string>; inPipeline: number; pipelineIds: string[] }> {
   const latest = new Map<string, F>();
   const fresh: F[] = [];
   for (const f of notices) {
@@ -1105,14 +1107,14 @@ async function bySolicitation<F extends { sam: SamOpportunity }>(
   }
   const keys = [...latest.keys()];
   const replaceFor = new Map<string, string>();
-  if (keys.length === 0) return { fresh, replaceFor, inPipeline: 0 };
+  if (keys.length === 0) return { fresh, replaceFor, inPipeline: 0, pipelineIds: [] };
   const [cands, opps] = await Promise.all([
     db
       .select({ id: scoutCandidates.id, status: scoutCandidates.status, key: keyOf(scoutCandidates.solicitationNumber) })
       .from(scoutCandidates)
       .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(keyOf(scoutCandidates.solicitationNumber), keys))),
     db
-      .select({ key: keyOf(opportunities.solicitationNumber) })
+      .select({ id: opportunities.id, key: keyOf(opportunities.solicitationNumber) })
       .from(opportunities)
       .where(and(eq(opportunities.organizationId, organizationId), inArray(keyOf(opportunities.solicitationNumber), keys))),
   ]);
@@ -1129,7 +1131,9 @@ async function bySolicitation<F extends { sam: SamOpportunity }>(
     if (waiting) replaceFor.set(f.sam.noticeId, waiting.id);
     fresh.push(f);
   }
-  return { fresh, replaceFor, inPipeline };
+  // BL-SCOUT-AMEND — the opportunities whose solicitation has a new notice: the amendment watch checks them first.
+  const pipelineIds = opps.map((o) => o.id);
+  return { fresh, replaceFor, inPipeline, pipelineIds };
 }
 
 /** BL-SCOUT-QUALITY — waiting finds of one solicitation fold into the latest notice; returns how many left. */

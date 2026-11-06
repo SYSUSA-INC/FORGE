@@ -633,6 +633,34 @@ export async function fetchSamNotice(
   }
 }
 
+/**
+ * BL-SCOUT-AMEND — every notice of one solicitation posted in the last
+ * year (SAM.gov posts each amendment as its own notice, under the same
+ * solicitation number), oldest first, with their attachment links.
+ * Inactive notices count: an amended notice is often archived.
+ */
+export async function fetchSamNoticesForSolicitation(
+  cred: SamCredential,
+  solicitationNumber: string,
+): Promise<{ ok: true; notices: SamOpportunity[] } | SamFailure> {
+  const solnum = solicitationNumber.trim();
+  if (!solnum) return { ok: false, cls: "bad_request", error: "Provide a solicitation number." };
+  const postedTo = new Date();
+  const postedFrom = new Date(postedTo.getTime() - 364 * 86_400_000);
+  const url = samUrl(SAM_OPP_BASE, { solnum, limit: "100", postedFrom: mmddyyyy(postedFrom), postedTo: mmddyyyy(postedTo) });
+  try {
+    const r = await samGetJson<{ opportunitiesData?: SamOpportunity[] }>(cred, url, "notice");
+    if (!r.ok) return r;
+    const notices = (r.data.opportunitiesData ?? [])
+      .filter((o) => !!o?.noticeId)
+      .map((o) => ({ ...o, resourceLinks: (o.resourceLinks ?? []).filter((l): l is string => typeof l === "string" && isUrl(l)) }))
+      .sort((a, b) => (Date.parse(a.postedDate) || 0) - (Date.parse(b.postedDate) || 0));
+    return { ok: true, notices };
+  } catch {
+    return samFailure(cred, "notice", { cls: "bad_response" });
+  }
+}
+
 export type SamDownloadFailure = {
   ok: false;
   error: string;

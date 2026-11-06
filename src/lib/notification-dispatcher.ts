@@ -421,6 +421,9 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
       // BL-FB-X-CRM Slice 2 — a capture-side reminder, like the
       // opportunity due-soon nudge; the subject carries the meaning.
       return "opportunity_review_completed" as const;
+    case "solicitation_amended":
+      // BL-SCOUT-AMEND — its own inbox kind (drizzle/0145).
+      return "solicitation_amended" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
