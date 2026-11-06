@@ -8,7 +8,7 @@ import { IntegrationsTab } from "../IntegrationsTab";
 import { SamGovKeyPanel, type SamKeyPanelView } from "./SamGovKeyPanel";
 import { BidEmailPanel } from "./BidEmailPanel";
 import { getInboundAddress } from "@/lib/inbound-email";
-import { inboundDomain } from "@/lib/inbound-email-logic";
+import { receivingConfigured } from "@/lib/inbound-email-logic";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +56,7 @@ export default async function IntegrationsPage() {
       <SamGovKeyPanel view={samView} canEdit={canEdit} isImpersonating={isImpersonating} />
       {/* BL-SCOUT-INBOX — the address portals mail bid alerts to. */}
       <div className="mt-4">
-        <BidEmailPanel address={inbound?.address ?? null} configured={inboundDomain() !== null} canEdit={canEdit} />
+        <BidEmailPanel address={inbound?.address ?? null} configured={receivingConfigured()} canEdit={canEdit} />
       </div>
       <IntegrationsTab integrations={integrations} />
     </>

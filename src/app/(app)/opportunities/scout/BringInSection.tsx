@@ -9,7 +9,7 @@ import { listOwnSourceRequestsAction } from "../import/source-requests/actions";
 import { SourceRequestPanel } from "../import/source-requests/SourceRequestPanel";
 import { BidEmailPanel } from "@/app/(app)/settings/integrations/BidEmailPanel";
 import { getInboundAddress } from "@/lib/inbound-email";
-import { inboundDomain } from "@/lib/inbound-email-logic";
+import { receivingConfigured } from "@/lib/inbound-email-logic";
 import { BidInbox } from "./BidInbox";
 
 /**
@@ -53,7 +53,7 @@ export async function SourcePanel({ organizationId, source, isAdmin }: { organiz
       {source.key === "gsa" ? <GsaPasteClient maxBytes={maxBytes} /> : null}
       {source.key === "portals" ? (
         <div className="flex flex-col gap-4">
-          <BidEmailPanel address={inbound?.address ?? null} configured={inboundDomain() !== null} canEdit={isAdmin} />
+          <BidEmailPanel address={inbound?.address ?? null} configured={receivingConfigured()} canEdit={isAdmin} />
           <BidInbox isAdmin={isAdmin} />
           <Panel title="A portal FORGE should read for you" eyebrow="Ask for it">
             <p className="font-body text-[13px] leading-[1.5] text-muted">

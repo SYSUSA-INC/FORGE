@@ -20,7 +20,7 @@ import { inboundEmails, opportunities, organizations, scoutCandidates, scoutProf
 import { completeStructuredForTenant, getAIProviderStatus } from "@/lib/ai";
 import { recordAudit } from "@/lib/audit-log";
 import { bidNoticeId, buildInboundBidsPrompt, cleanBids, inboundBidsSchema, stubBids, type InboundBids } from "@/lib/inbound-bids-logic";
-import { classifyInbound, emailLinks, emailText, postmarkInboundSchema, type PostmarkInbound } from "@/lib/inbound-email-logic";
+import { classifyInbound, emailLinks, emailText, inboundMessageSchema, type InboundMessage } from "@/lib/inbound-email-logic";
 import { enqueueJob, runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import { naicsCodeOf, scoutCodes, scoutFit, solicitationKey } from "@/lib/scout-logic";
@@ -33,12 +33,12 @@ export type ReadResult = { ok: true; bids: number; created: number } | { ok: fal
 
 const HELD = "Held: the sender's domain did not vouch for this email (no SPF or DKIM pass). Read it here if it is real.";
 
-/** The raw payload of a stored email, from the company's storage. */
-async function loadPayload(organizationId: string, storagePath: string): Promise<PostmarkInbound | null> {
+/** A stored email, from the company's storage. */
+async function loadPayload(organizationId: string, storagePath: string): Promise<InboundMessage | null> {
   if (!storagePath.startsWith(`org/${organizationId}/inbound/`)) return null;
   const obj = await getStorageProvider().get(storagePath);
   if (!obj) return null;
-  const parsed = postmarkInboundSchema.safeParse(JSON.parse(new TextDecoder().decode(obj.bytes)));
+  const parsed = inboundMessageSchema.safeParse(JSON.parse(new TextDecoder().decode(obj.bytes)));
   return parsed.success ? parsed.data : null;
 }
 
@@ -73,7 +73,7 @@ export async function readInboundEmail(input: { organizationId: string; emailId:
 
   let read: InboundBids;
   if (getAIProviderStatus().active.name === "stub") {
-    read = stubBids({ subject: p.Subject, kind: classifyInbound(p.Subject, text), links });
+    read = stubBids({ subject: p.subject, kind: classifyInbound(p.subject, text), links });
   } else {
     try {
       await ensureFeature(organizationId, "aiAutoDraft");
@@ -85,7 +85,7 @@ export async function readInboundEmail(input: { organizationId: string; emailId:
       }
       throw err;
     }
-    const prompt = buildInboundBidsPrompt({ from: email.fromAddress, subject: p.Subject, text, links });
+    const prompt = buildInboundBidsPrompt({ from: email.fromAddress, subject: p.subject, text, links });
     const ai = await completeStructuredForTenant({
       organizationId,
       feature: "inbound_bids",
@@ -212,18 +212,20 @@ export async function fileInboundAttachments(input: { organizationId: string; em
     .limit(1);
   if (!email) return 0;
   const p = await loadPayload(organizationId, email.storagePath);
-  const files = (p?.Attachments ?? []).filter((a) => typeof (a as { Content?: unknown }).Content === "string").slice(0, 10);
+  const files = (p?.attachments ?? []).filter((a) => a.storagePath.startsWith(`org/${organizationId}/inbound/`)).slice(0, 10);
+  const storage = getStorageProvider();
   let filed = 0;
   for (const a of files) {
     try {
-      const bytes = Uint8Array.from(Buffer.from(String((a as { Content?: string }).Content), "base64"));
-      if (bytes.length === 0) continue;
+      const obj = await storage.get(a.storagePath);
+      const bytes = obj?.bytes;
+      if (!bytes || bytes.length === 0) continue;
       await enforceStorageQuota(organizationId, bytes.length);
       const id = crypto.randomUUID();
-      const name = String(a.Name || "attachment").replace(/[\u0000-\u001f/\\]+/g, "_").replace(/^\.+/, "_").slice(0, 150) || "attachment";
+      const name = a.name || "attachment";
       const storagePath = `org/${organizationId}/solicitation/${id}/${name}`;
-      const contentType = String(a.ContentType || "application/octet-stream");
-      await getStorageProvider().put({ key: storagePath, bytes, contentType });
+      const contentType = a.contentType || "application/octet-stream";
+      await storage.put({ key: storagePath, bytes, contentType });
       await db.insert(solicitations).values({
         id,
         organizationId,

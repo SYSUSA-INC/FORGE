@@ -3,10 +3,12 @@
  * 2026-11-06): "Forge should have the capability to ingest these emails
  * directly from the sources without any human in the middle forwarding
  * them". A company registers its FORGE address as the bid-notification
- * email on each portal; the portals mail it directly; FORGE receives the
- * mail through Postmark's inbound webhook. These helpers read Postmark's
- * payload: who it was sent to, whether the sender's domain vouched for it
- * (SPF or DKIM), its text, its links and what kind of email it is.
+ * email on each portal; the portals mail it directly; the mail lands in
+ * FORGE's shared mailbox on the company's Microsoft 365 (Exchange), which
+ * FORGE reads through Microsoft Graph (owner, 2026-11-06: Exchange, not a
+ * separate mail service). These helpers work on one message: who it was
+ * sent to, whether the sender's domain vouched for it (SPF or DKIM), its
+ * text, its links and what kind of email it is.
  */
 import { z } from "zod";
 
@@ -29,44 +31,56 @@ export function forgeLocalPart(name: string, random: string): string {
   return `${base || "bids"}-${tail}`;
 }
 
-/** An address split at the last @, lower case, any "+tag" dropped from the local part. */
-export function splitAddress(address: string): { local: string; domain: string } | null {
-  const a = address.trim().toLowerCase().replace(/^<|>$/g, "");
-  const at = a.lastIndexOf("@");
-  if (at < 1 || at === a.length - 1) return null;
-  return { local: a.slice(0, at).replace(/\+.*$/, ""), domain: a.slice(at + 1) };
+/** One email as FORGE stores it (`org/{org}/inbound/{id}.json`), attachments beside it. */
+export const inboundMessageSchema = z.object({
+  /** The message's Internet Message-ID, or the mailbox's id for it when it has none. */
+  messageId: z.string().min(1).max(1000),
+  from: z.string().default(""),
+  fromName: z.string().default(""),
+  /** Every address it was sent to: To, Cc, and the envelope headers Exchange keeps. */
+  recipients: z.array(z.string()).default([]),
+  subject: z.string().default(""),
+  text: z.string().default(""),
+  html: z.string().default(""),
+  /** ISO time it arrived. */
+  date: z.string().default(""),
+  headers: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+  attachments: z.array(z.object({ name: z.string(), contentType: z.string(), size: z.number(), storagePath: z.string().default("") })).default([]),
+});
+export type InboundMessage = z.infer<typeof inboundMessageSchema>;
+
+const ADDRESS = /[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+/** Every address in a header's value ("Name <a@b.c>, d@e.f"), lower case. */
+export function addressesIn(value: string): string[] {
+  return [...value.matchAll(ADDRESS)].map((m) => m[0]!.toLowerCase());
 }
 
-const contact = z.object({ Email: z.string().optional().default(""), Name: z.string().optional().default("") }).passthrough();
+/** Envelope headers Exchange keeps for a message redirected by a mail-flow rule or sent Bcc. */
+const ENVELOPE_HEADERS = ["x-ms-exchange-organization-originalenveloperecipients", "x-original-to", "delivered-to", "envelope-to", "to", "cc"];
 
-/** What FORGE reads of Postmark's inbound payload; anything else is kept, in storage, as received. */
-export const postmarkInboundSchema = z
-  .object({
-    MessageID: z.string().min(1).max(500),
-    From: z.string().optional().default(""),
-    FromName: z.string().optional().default(""),
-    FromFull: contact.optional(),
-    OriginalRecipient: z.string().optional().default(""),
-    ToFull: z.array(contact).optional().default([]),
-    CcFull: z.array(contact).optional().default([]),
-    BccFull: z.array(contact).optional().default([]),
-    Subject: z.string().optional().default(""),
-    TextBody: z.string().optional().default(""),
-    HtmlBody: z.string().optional().default(""),
-    Date: z.string().optional().default(""),
-    Headers: z.array(z.object({ Name: z.string(), Value: z.string() }).passthrough()).optional().default([]),
-    Attachments: z
-      .array(z.object({ Name: z.string().optional().default("attachment"), ContentType: z.string().optional().default(""), ContentLength: z.number().optional().default(0) }).passthrough())
-      .optional()
-      .default([]),
-  })
-  .passthrough();
-export type PostmarkInbound = z.infer<typeof postmarkInboundSchema>;
+/** Every address the email was delivered to, envelope recipients first, each once. */
+export function recipientsOf(input: { recipients: string[]; headers: { name: string; value: string }[] }): string[] {
+  const fromHeaders = ENVELOPE_HEADERS.flatMap((n) => input.headers.filter((h) => h.name.toLowerCase() === n).flatMap((h) => addressesIn(h.value)));
+  return [...new Set([...fromHeaders, ...input.recipients.map((a) => a.trim().toLowerCase())].filter((a) => a.includes("@")))];
+}
 
-/** Every address the email was delivered to, the original recipient first. */
-export function recipientsOf(p: PostmarkInbound): string[] {
-  const all = [p.OriginalRecipient, ...[...p.ToFull, ...p.CcFull, ...p.BccFull].map((c) => c.Email)].map((a) => (a ?? "").trim().toLowerCase()).filter((a) => a.includes("@"));
-  return [...new Set(all)];
+/**
+ * The company local part an address names: `acme-k3q9@<inbound domain>`, or
+ * `<mailbox>+acme-k3q9@<mailbox domain>` (plus addressing on the shared
+ * mailbox); null for any other address.
+ */
+export function companyLocalPart(address: string, inbound: { domain: string | null; mailbox: string | null }): string | null {
+  const a = address.trim().toLowerCase().replace(/^<|>$/g, "");
+  const at = a.lastIndexOf("@");
+  if (at < 1) return null;
+  const local = a.slice(0, at);
+  const domain = a.slice(at + 1);
+  if (inbound.domain && domain === inbound.domain) return local.replace(/\+.*$/, "") || null;
+  const mb = inbound.mailbox?.toLowerCase() ?? "";
+  const mbAt = mb.lastIndexOf("@");
+  if (mbAt > 0 && domain === mb.slice(mbAt + 1) && local.startsWith(`${mb.slice(0, mbAt)}+`)) return local.slice(mbAt + 1) || null;
+  return null;
 }
 
 export type SenderAuth = { spf: string; dkim: string; authenticated: boolean };
@@ -94,15 +108,15 @@ export function htmlToText(html: string): string {
 }
 
 /** The email's text: the text part, else its HTML read as text. */
-export function emailText(p: Pick<PostmarkInbound, "TextBody" | "HtmlBody">): string {
-  return (p.TextBody || "").trim() || htmlToText(p.HtmlBody || "");
+export function emailText(p: { text: string; html: string }): string {
+  return (p.text || "").trim() || htmlToText(p.html || "");
 }
 
 /** The web links in an email (href targets and bare URLs), first 30, each once. */
-export function emailLinks(p: Pick<PostmarkInbound, "TextBody" | "HtmlBody">): string[] {
+export function emailLinks(p: { text: string; html: string }): string[] {
   const found: string[] = [];
-  for (const m of (p.HtmlBody || "").matchAll(/href\s*=\s*["']([^"']+)["']/gi)) found.push(m[1]!);
-  for (const m of `${p.TextBody || ""}\n${htmlToText(p.HtmlBody || "")}`.matchAll(/https?:\/\/[^\s<>"')\]]+/gi)) found.push(m[0]!);
+  for (const m of (p.html || "").matchAll(/href\s*=\s*["']([^"']+)["']/gi)) found.push(m[1]!);
+  for (const m of `${p.text || ""}\n${htmlToText(p.html || "")}`.matchAll(/https?:\/\/[^\s<>"')\]]+/gi)) found.push(m[0]!);
   const ok = found.map((l) => l.trim().replace(/&amp;/g, "&").replace(/[.,;:]+$/, "")).filter((l) => /^https?:\/\//i.test(l));
   return [...new Set(ok)].slice(0, 30);
 }
@@ -122,4 +136,26 @@ export function classifyInbound(subject: string, text: string): InboundKind {
   if (ACCOUNT.test(subject) || (ACCOUNT.test(head) && !BID.test(subject))) return "account";
   if (BID.test(head)) return "bid_alert";
   return "other";
+}
+
+/** The shared mailbox FORGE reads (INBOUND_MAILBOX, e.g. bids@forgeaxi.com), or null. */
+export function inboundMailbox(env: Record<string, string | undefined> = process.env): string | null {
+  const m = (env.INBOUND_MAILBOX ?? "").trim().toLowerCase();
+  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,63}$/.test(m) ? m : null;
+}
+
+export type GraphConfig = { tenantId: string; clientId: string; clientSecret: string; mailbox: string };
+
+/** FORGE's Microsoft Graph app registration and mailbox, or null until all four are set. */
+export function graphConfig(env: Record<string, string | undefined> = process.env): GraphConfig | null {
+  const tenantId = (env.MS_GRAPH_TENANT_ID ?? "").trim();
+  const clientId = (env.MS_GRAPH_CLIENT_ID ?? "").trim();
+  const clientSecret = (env.MS_GRAPH_CLIENT_SECRET ?? "").trim();
+  const mailbox = inboundMailbox(env);
+  return tenantId && clientId && clientSecret && mailbox ? { tenantId, clientId, clientSecret, mailbox } : null;
+}
+
+/** Receiving is set up: the company addresses' domain, and the mailbox they arrive in through Graph. */
+export function receivingConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return inboundDomain(env) !== null && graphConfig(env) !== null;
 }
