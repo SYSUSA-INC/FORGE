@@ -96,7 +96,7 @@ Effort key:
 | 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
 | 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | ✅ shipped (PR #456, owner chose: keywords rank) |
 | 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | ✅ shipped (PR #457) |
-| 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | 🔄 this PR (owner chose the layout, 2026-11-06); eBuy and GSA email rows next |
+| 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
 | 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | ⏳ researched; owner to confirm the first connectors |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
@@ -3042,7 +3042,16 @@ source with Add to pipeline on each row.
   notice must mention, GSA vehicles, notice types), its results in the
   shared rows. Its keyword filters, where the scout's ranks: a search is
   for something specific.
-- **Next:** eBuy and GSA email results in the shared rows.
+- **eBuy and GSA email in the shared rows (second PR):** the paste box on
+  top (GSA email with its attachments beneath it), the extracted notice as
+  one shared row below it, open on its editable fields, with **Add to
+  pipeline** on the row; adding keeps you on the Scout page, and the row
+  links to the new opportunity (**Open →**; eBuy adds **Paste another**).
+  Attachments not filed are named on the row. `ResultRow` gains
+  `defaultOpen`. Also fixed: a button carrying both `aur-btn` and
+  `aur-btn-primary` (194 of them, across 142 files) turned white on white
+  on hover, because the light button's hover rule came later in
+  `globals.css`; the primary hover now wins.
 
 ---
 

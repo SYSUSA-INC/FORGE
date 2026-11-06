@@ -32,6 +32,7 @@ export function ResultRow({
   actions,
   select,
   muted,
+  defaultOpen = false,
 }: {
   call: ResultCall;
   title: string;
@@ -52,8 +53,10 @@ export function ResultRow({
   /** A checkbox for picking several (SAM.gov search). */
   select?: { checked: boolean; disabled?: boolean; onToggle: () => void };
   muted?: boolean;
+  /** Open on arrival (a pasted RFQ, whose fields are reviewed before it is added). */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <li className={`border-b border-layer/10 py-2.5 last:border-b-0 ${muted ? "opacity-60" : ""}`}>
       <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2 md:grid-cols-[auto_minmax(0,1fr)_6rem_5rem_3rem_auto] md:items-center">

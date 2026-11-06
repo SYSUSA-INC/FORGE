@@ -60,7 +60,7 @@ Last reviewed 2026-11-06, after PR #457.
 | I-5 | Bring in from GSA eBuy | ✅ #453 |
 | I-6 | Bring in from **enterprise portals** | 📋 BL-SCOUT-PORTALS. The owner picked state portals, prime portals and commercial aggregators (2026-11-06). Research found no feeds for state or prime portals, but a documented aggregator API (HigherGov), and alert emails that could be forwarded to FORGE. The tab says what is coming and records requests. ❓ The owner confirms the first connectors |
 | I-7 | Bring in from the **GWACs** a company holds, current and future | 📋 BL-SCOUT-GWAC (backlog by the owner's choice, 2026-11-03). The tab is on the source bar, marked *soon*, and records requests |
-| I-8 | A one-stop, user-friendly experience | 🔄 BL-SCOUT-ONEPAGE, this PR. #453 put every source on one page, but as two stacked experiences. The page now has one source bar, one search bar and one compact list for every source. eBuy and GSA email rows come next |
+| I-8 | A one-stop, user-friendly experience | ✅ BL-SCOUT-ONEPAGE (#458, and this PR for eBuy and GSA email). #453 put every source on one page, but as two stacked experiences. The page now has one source bar, one search bar, and the same compact rows for every source |
 | I-9 | An **Add to pipeline** button next to every opportunity the scout finds or a search returns | ✅ #453 |
 | I-10 | Added opportunities show on the Pipeline as part of the current pipeline | ✅ #453 |
 | I-11 | **Create** merges New Opportunity and New Solicitation into one page | ✅ #453: start from a document or fill in by hand |
@@ -161,7 +161,7 @@ Last reviewed 2026-11-06, after PR #457.
 The order is serial, one PR at a time, with a design review before each
 phase:
 
-1. **Done:** BL-SCOUT-REACH (I-18, #456), BL-SCOUT-AMEND (I-17, #457). **Now:** BL-SCOUT-ONEPAGE (I-8). **Then:** BL-SCOUT-PORTALS (I-6), once the owner confirms the first connectors.
+1. **Done:** BL-SCOUT-REACH (I-18, #456), BL-SCOUT-AMEND (I-17, #457). **Now:** BL-SCOUT-ONEPAGE (I-8), its second part. **Then:** BL-SCOUT-PORTALS (I-6), once the owner confirms the first connectors.
 2. **Phase 2, Evaluate:** E-1 to E-15, with the partner hand-off of
    E-13.
 3. **Phase 3, Capture:** C-1 to C-7, C-11, C-12.

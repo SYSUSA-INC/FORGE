@@ -340,6 +340,13 @@
   .aur-btn-primary:not(:disabled):hover {
     transform: translateY(-2px);
   }
+  /* A button carrying both classes ("aur-btn aur-btn-primary") stays blue on
+     hover: the light button's hover above would otherwise paint it paper,
+     white text on white (BL-SCOUT-ONEPAGE, found on Add to pipeline). */
+  .aur-btn.aur-btn-primary:not(:disabled):hover {
+    background-color: rgb(var(--c-action-hover));
+    border-color: rgb(var(--c-action-hover));
+  }
   .aur-btn:disabled,
   .aur-btn-primary:disabled {
     cursor: not-allowed;
