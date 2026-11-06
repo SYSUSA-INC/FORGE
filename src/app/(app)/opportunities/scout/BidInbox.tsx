@@ -2,6 +2,7 @@ import { Panel } from "@/components/ui/Panel";
 import { requireCurrentOrg } from "@/lib/auth-helpers";
 import { listInboundEmails, type InboundEmailView } from "@/lib/inbound-email";
 import { safeQuery } from "@/lib/schema-resilience";
+import { ReadBidsButton } from "./ReadBidsButton";
 
 const KIND: Record<InboundEmailView["kind"], { label: string; cls: string }> = {
   bid_alert: { label: "Bid alert", cls: "border-cobalt/40 bg-cobalt/10 text-text" },
@@ -45,6 +46,7 @@ export async function BidInbox({ isAdmin }: { isAdmin: boolean }) {
                     {e.fromName || e.fromAddress}
                     {e.authenticated ? "" : " · unverified sender"}
                   </span>
+                  <span className="font-mono text-[11px] text-muted">{statusLine(e)}</span>
                   <span className="font-mono text-[11px] text-muted">{new Date(e.receivedAt).toLocaleString()}</span>
                 </summary>
                 <div className="mt-2 pl-0 md:pl-[6.5rem]">
@@ -52,6 +54,12 @@ export async function BidInbox({ isAdmin }: { isAdmin: boolean }) {
                     From {e.fromAddress}
                     {e.attachments ? ` · ${e.attachments} attachment${e.attachments === 1 ? "" : "s"}` : ""}
                   </p>
+                  {e.error ? <p className="mt-1 font-body text-[12px] text-gold">{e.error}</p> : null}
+                  {e.status !== "parsed" || e.kind === "account" ? (
+                    <div className="mt-2">
+                      <ReadBidsButton emailId={e.id} label={e.status === "failed" ? "Read it again" : "Read the bids"} />
+                    </div>
+                  ) : null}
                   {e.preview ? <p className="mt-1 whitespace-pre-line font-body text-[12px] leading-[1.5] text-muted">{e.preview}</p> : null}
                   {e.links.length > 0 ? (
                     <ul className="mt-2 flex flex-col gap-0.5">
@@ -72,4 +80,12 @@ export async function BidInbox({ isAdmin }: { isAdmin: boolean }) {
       )}
     </Panel>
   );
+}
+
+/** What became of the email: its bids read, held for an admin, failed or still being read. */
+function statusLine(e: InboundEmailView): string {
+  if (e.status === "parsed") return e.kind === "bid_alert" ? `${e.bidsFound} bid${e.bidsFound === 1 ? "" : "s"} read` : "nothing to read";
+  if (e.status === "failed") return "not read";
+  if (e.kind === "account") return "for an admin";
+  return e.error ? "held" : "being read";
 }

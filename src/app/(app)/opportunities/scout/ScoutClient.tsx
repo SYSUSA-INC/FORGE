@@ -292,7 +292,7 @@ function FindRow({ candidate: c }: { candidate: ScoutCandidateView }) {
       title={c.title}
       href={c.uiLink || null}
       meta={[c.agency, c.noticeType, c.setAside, c.naicsCode ? `NAICS ${c.naicsCode}` : ""].filter(Boolean).join(" · ")}
-      source={c.source === "watchlist_award" ? "Watchlist" : "SAM.gov"}
+      source={c.source === "watchlist_award" ? "Watchlist" : c.source === "portal_email" ? "Portal email" : "SAM.gov"}
       due={due}
       dueSoon={c.daysToDue !== null && c.daysToDue < 5}
       fit={c.fitScore}

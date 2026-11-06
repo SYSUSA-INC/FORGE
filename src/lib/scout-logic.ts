@@ -10,7 +10,7 @@ import { hasKeyword, matchNotice, matchStored, mentionsExcluded, parseKeyword, p
 export type ScoutRecommendation = "pursue" | "watch" | "skip";
 export type ScoutDecision = "imported" | "dismissed";
 export type ScoutGrade = "correct" | "wrong" | "inconclusive";
-export type ScoutSource = "org_naics" | "keyword" | "watchlist_award";
+export type ScoutSource = "org_naics" | "keyword" | "watchlist_award" | "portal_email";
 
 /** What the page renders — plain JSON, shared by the server lib and the client. */
 export type ScoutCandidateView = {

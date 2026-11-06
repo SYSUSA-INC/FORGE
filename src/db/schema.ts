@@ -4635,6 +4635,8 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "section_auto_draft",
   // BL-STAB-2e — a knowledge-base file's text extraction (drizzle/0133).
   "knowledge_artifact_extract",
+  // BL-SCOUT-INBOX — the bids in an email a portal sent the company (drizzle/0148).
+  "inbound_email_parse",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [
@@ -5025,6 +5027,8 @@ export const scoutCandidateSourceEnum = pgEnum("scout_candidate_source", [
   "org_naics",
   "keyword",
   "watchlist_award",
+  // BL-SCOUT-INBOX — a bid read from an email a portal sent the company (drizzle/0148).
+  "portal_email",
 ]);
 
 export const scoutProfiles = pgTable("scout_profile", {
@@ -5121,6 +5125,8 @@ export const scoutCandidates = pgTable(
     uiLink: text("ui_link").notNull().default(""),
     /** BL-STAB-10d — the keyword the find was kept for (its title, agency, description or an earlier notice's); "" when none. */
     matchedKeyword: text("matched_keyword").notNull().default(""),
+    /** BL-SCOUT-INBOX — the portal email this find was read from (drizzle/0148). */
+    inboundEmailId: uuid("inbound_email_id").references((): AnyPgColumn => inboundEmails.id, { onDelete: "set null" }),
     /** 0..100 heuristic fit before the model's take. */
     fitScore: integer("fit_score").notNull().default(0),
     signals: jsonb("signals").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
