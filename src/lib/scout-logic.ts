@@ -526,3 +526,38 @@ export function scoutSearchFunnel(c: KeywordSearchCounts, keyworded: boolean, pe
   }
   return line;
 }
+
+// ── BL-SCOUT-ONEPAGE ──────────────────────────────────────────────────
+
+export type ScoutListFilter = "recommended" | "unreviewed" | "all" | "skipped";
+
+export const SCOUT_LIST_FILTERS: { key: ScoutListFilter; label: string }[] = [
+  { key: "recommended", label: "Recommended" },
+  { key: "unreviewed", label: "Not yet reviewed" },
+  { key: "all", label: "All" },
+  { key: "skipped", label: "Skipped" },
+];
+
+const CALL_ORDER = (r: ScoutCandidateView["recommendation"]) => (r === "pursue" ? 0 : r === "watch" ? 1 : r === null ? 2 : 3);
+
+/**
+ * The finds a filter shows, Pursue then Watch then not yet reviewed then
+ * Skip, best fit first in each. All leaves the skips out: they are the
+ * AI's no, kept under Skipped so a person can overrule it.
+ */
+export function filterFinds(finds: ScoutCandidateView[], filter: ScoutListFilter): ScoutCandidateView[] {
+  const keep = (c: ScoutCandidateView) =>
+    filter === "recommended"
+      ? c.recommendation === "pursue" || c.recommendation === "watch"
+      : filter === "unreviewed"
+        ? c.recommendation === null
+        : filter === "skipped"
+          ? c.recommendation === "skip"
+          : c.recommendation !== "skip";
+  return finds.filter(keep).sort((a, b) => CALL_ORDER(a.recommendation) - CALL_ORDER(b.recommendation) || b.fitScore - a.fitScore);
+}
+
+/** The filter the list opens on: what the AI recommends, else everything not skipped. */
+export function defaultFindsFilter(finds: ScoutCandidateView[]): ScoutListFilter {
+  return finds.some((c) => c.recommendation === "pursue" || c.recommendation === "watch") ? "recommended" : "all";
+}

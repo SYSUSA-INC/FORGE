@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ResultHead, ResultRow } from "@/components/scout/ResultRow";
 import { Panel } from "@/components/ui/Panel";
 import { GSA_VEHICLES } from "@/lib/gsa-vehicles";
 import { MAX_IMPORT_ROWS } from "@/lib/sam-import-row";
@@ -393,7 +394,9 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
               Nothing matches. Try a longer time window, other NAICS codes or notice types, or a different keyword.
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <>
+            <ResultHead select />
+            <ul>
               {results.map((o) => (
                 <OpportunityRow
                   key={o.noticeId}
@@ -405,6 +408,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
                 />
               ))}
             </ul>
+            </>
           )}
           {unchecked.length > 0 && searchInfo?.scope.keyword ? (
             <details className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
@@ -415,7 +419,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
                   {checking ? "Checking…" : `Check ${Math.min(10, unchecked.length)} more (${Math.min(10, unchecked.length)} SAM.gov requests)`}
                 </button>
               </div>
-              <ul className="mt-3 flex flex-col gap-2">
+              <ul className="mt-3">
                 {unchecked.map((o) => <OpportunityRow key={o.noticeId} o={o} checked={selected.has(o.noticeId)} onToggle={() => toggleSelected(o.noticeId)} onAdd={() => addOne(o)} busy={importing} />)}
               </ul>
             </details>
@@ -426,6 +430,12 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
   );
 }
 
+/**
+ * BL-SCOUT-ONEPAGE — a SAM.gov search result in the Scout's shared row:
+ * no AI call (a live search isn't reviewed), the matched keywords and
+ * codes, a recompete flag and the description open below; Add to
+ * pipeline on the row, a box to add several at once.
+ */
 function OpportunityRow({
   o,
   checked,
@@ -440,72 +450,28 @@ function OpportunityRow({
   onAdd: () => void;
   busy: boolean;
 }) {
-  const due = o.responseDeadLine
-    ? new Date(o.responseDeadLine).toLocaleDateString()
-    : null;
-  const pop = [
-    o.placeOfPerformance?.city?.name,
-    o.placeOfPerformance?.state?.name,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
+  const days = o.responseDeadLine ? Math.ceil((new Date(o.responseDeadLine).getTime() - Date.now()) / 86_400_000) : null;
+  const pop = [o.placeOfPerformance?.city?.name, o.placeOfPerformance?.state?.name].filter(Boolean).join(", ");
   return (
-    <li
-      className={`rounded-lg border p-3 transition-colors ${
-        o.alreadyImported
-          ? "border-layer/10 bg-layer/[0.015] opacity-60"
-          : checked
-            ? "border-teal-400 bg-teal-400/5"
-            : "border-layer/10 bg-layer/[0.02] hover:border-layer/20"
-      }`}
-    >
-      <label className="grid cursor-pointer grid-cols-[auto_1fr_auto] items-start gap-3">
-        <input
-          type="checkbox"
-          className="mt-1 accent-teal-400"
-          checked={checked}
-          disabled={o.alreadyImported}
-          onChange={onToggle}
-        />
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-display text-[14px] font-semibold text-text">
-              {o.title}
-            </span>
-            {o.alreadyImported ? (
-              <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
-                In the pipeline
-              </span>
-            ) : null}
-            {o.recompete ? (
-              <span
-                className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
-                  o.recompete.outcome === "lost"
-                    ? "bg-rose/15 text-rose"
-                    : "bg-emerald-400/15 text-emerald-300"
-                }`}
-                title={o.recompete.signals.join(" · ")}
-              >
-                {o.recompete.confidence === "high" ? "Recompete" : "Possible recompete"} ·{" "}
-                {o.recompete.outcome === "lost"
-                  ? `lost${o.recompete.awardedTo ? ` to ${o.recompete.awardedTo}` : ""}`
-                  : "won"}
-                {o.recompete.decidedAt ? ` ${o.recompete.decidedAt.slice(0, 4)}` : ""}
-              </span>
-            ) : null}
-            {o.type ? (
-              <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">
-                {o.type}
-              </span>
-            ) : null}
-          </div>
-          {/* BL-STAB-10b — which of the search's keywords and NAICS codes this notice matched. */}
+    <ResultRow
+      call={o.recompete ? { label: "Recompete", tone: o.recompete.outcome === "lost" ? "skip" : "pursue", title: o.recompete.signals.join(" · ") } : { label: "Search", tone: "none", title: "A live search result: the AI reviews the scout's finds, not searches" }}
+      title={o.title}
+      href={o.uiLink || null}
+      meta={[noticeAgency(o), o.type, o.solicitationNumber, o.naicsCode ? `NAICS ${o.naicsCode}` : "", o.typeOfSetAsideDescription, pop].filter(Boolean).join(" · ")}
+      source="SAM.gov"
+      due={days === null ? null : days < 0 ? `${-days}d ago` : `${days}d`}
+      dueSoon={days !== null && days < 5}
+      fit={null}
+      muted={o.alreadyImported}
+      select={{ checked, disabled: o.alreadyImported, onToggle }}
+      badges={o.alreadyImported ? <span className="rounded bg-layer/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">In the pipeline</span> : null}
+      details={
+        <div className="flex flex-col gap-2">
           {o.match?.status === "match" || o.viaCodes.length > 0 ? (
-            <div className="mt-1 flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1">
               {o.match?.status === "match"
                 ? o.match.matched.map((m) => (
-                    <span key={`${m.term}|${m.where}`} className="rounded bg-teal/10 px-1.5 py-0.5 font-mono text-[10px] text-teal">
+                    <span key={`${m.term}|${m.where}`} className="rounded bg-cobalt/10 px-1.5 py-0.5 font-mono text-[10px] text-text">
                       {m.term} · {m.where}
                     </span>
                   ))
@@ -517,84 +483,31 @@ function OpportunityRow({
               ))}
             </div>
           ) : null}
-          <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">
-            {noticeAgency(o) || "—"}
-          </div>
-          <div className="mt-1 font-mono text-[11px] text-muted">
-            {o.solicitationNumber ? (
-              <span className="text-text">{o.solicitationNumber}</span>
-            ) : null}
-            {o.naicsCode ? ` · NAICS ${o.naicsCode}` : ""}
-            {o.typeOfSetAsideDescription
-              ? ` · ${o.typeOfSetAsideDescription}`
-              : ""}
-            {pop ? ` · ${pop}` : ""}
-          </div>
           {o.match?.status === "match" && o.match.where === "description" ? (
-            <div className="mt-2 rounded-md border border-teal/20 bg-teal/[0.04] px-2.5 py-1.5 font-body text-[12px] text-text">{o.match.snippet}</div>
+            <p className="font-body text-[12px] text-text">{o.match.snippet}</p>
           ) : o.description || o.preview ? (
-            <div className="mt-2 line-clamp-3 font-body text-[12px] text-muted">
-              {o.description ? plainText(o.description) : o.preview}
-            </div>
+            <p className="line-clamp-6 font-body text-[12px] text-muted">{o.description ? plainText(o.description) : o.preview}</p>
           ) : null}
-          {o.earlierNoticeIds.length > 0 ? (
-            <div className="mt-1 font-mono text-[10px] text-muted">
-              Latest of {o.earlierNoticeIds.length + 1} notices for this solicitation (amendments and updates folded in).
-            </div>
-          ) : null}
+          {o.earlierNoticeIds.length > 0 ? <p className="font-mono text-[10px] text-muted">Latest of {o.earlierNoticeIds.length + 1} notices for this solicitation (amendments folded in).</p> : null}
           {o.recompete ? (
-            <div className="mt-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2.5 py-1.5 font-body text-[12px] text-muted">
+            <p className="font-body text-[12px] text-muted">
               Bid before as{" "}
-              <Link
-                href={`/proposals/${o.recompete.proposalId}/outcome`}
-                onClick={(e) => e.stopPropagation()}
-                className="text-text underline"
-              >
+              <Link href={`/proposals/${o.recompete.proposalId}/outcome`} className="text-text underline">
                 {o.recompete.title}
-              </Link>
-              <span className="font-mono text-[10px] uppercase tracking-widest">
-                {" · "}
-                {o.recompete.signals.join(" · ")}
-              </span>
-              {o.recompete.lessons ? (
-                <span className="mt-0.5 block line-clamp-2">{o.recompete.lessons}</span>
-              ) : null}
-            </div>
+              </Link>{" "}
+              ({o.recompete.outcome === "lost" ? `lost${o.recompete.awardedTo ? ` to ${o.recompete.awardedTo}` : ""}` : "won"}
+              {o.recompete.decidedAt ? ` ${o.recompete.decidedAt.slice(0, 4)}` : ""}).{o.recompete.lessons ? ` ${o.recompete.lessons}` : ""}
+            </p>
           ) : null}
         </div>
-        <div className="shrink-0 text-right">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
-            Due
-          </div>
-          <div className="font-mono text-[12px] text-text">{due ?? "—"}</div>
-          {o.uiLink ? (
-            <a
-              href={o.uiLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="mt-1 inline-block font-mono text-[10px] text-teal hover:underline"
-            >
-              View on SAM.gov ↗
-            </a>
-          ) : null}
-          {!o.alreadyImported ? (
-            <button
-              type="button"
-              className="aur-btn aur-btn-primary mt-2 block text-[11px]"
-              disabled={busy}
-              onClick={(e) => {
-                // Inside the row's label: don't also tick the checkbox.
-                e.preventDefault();
-                e.stopPropagation();
-                onAdd();
-              }}
-            >
-              Add to pipeline
-            </button>
-          ) : null}
-        </div>
-      </label>
-    </li>
+      }
+      actions={
+        o.alreadyImported ? null : (
+          <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={busy} onClick={onAdd}>
+            Add to pipeline
+          </button>
+        )
+      }
+    />
   );
 }

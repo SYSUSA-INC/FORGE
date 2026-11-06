@@ -9,67 +9,57 @@ import { listOwnSourceRequestsAction } from "../import/source-requests/actions";
 import { SourceRequestPanel } from "../import/source-requests/SourceRequestPanel";
 
 /**
- * BL-NAV-LIFECYCLE 1b (FORGE II, footnote 3) — "Bring in an
- * opportunity": every source on the Scout tab. The live importers render
- * inline; a source with no importer yet opens the source-request form,
- * so the demand is recorded and counted.
+ * BL-SCOUT-ONEPAGE (FORGE II, footnote 3) — the Scout's source bar: All
+ * (the nightly scout) and every source, as tabs on top of one page, each
+ * opening in the same place with the same rows and Add to pipeline.
  */
-export async function BringInSection({ organizationId, source }: { organizationId: string; source: IdentifySource | null }) {
-  const ownRequests = source && !source.live ? await listOwnSourceRequestsAction() : [];
-  const maxBytes = source?.key === "gsa" ? resolvePolicy("document", process.env).maxBytes : 0;
-
+export function SourceBar({ source }: { source: IdentifySource | null }) {
+  const tabs = [{ key: null, label: "All", live: true }, ...IDENTIFY_SOURCES];
   return (
-    <section aria-label="Bring in an opportunity" className="mt-8">
-      <Panel title="Bring in an opportunity" eyebrow="Every source, one place">
-        <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
-          Pick where the opportunity comes from. Whatever you add lands in the pipeline and shows under Evaluate.
-        </p>
-        <nav aria-label="Sources" className="flex flex-wrap gap-2">
-          {IDENTIFY_SOURCES.map((s) => {
-            const on = source?.key === s.key;
-            return (
-              <Link
-                key={s.key}
-                href={identifySourceHref(s.key)}
-                aria-current={on ? "page" : undefined}
-                title={s.hint}
-                className={`aur-btn text-[12px] ${on ? "aur-btn-primary" : "aur-btn-ghost"}`}
-              >
-                {s.label}
-                {!s.live ? <span className="ml-1.5 font-mono text-[10px] uppercase tracking-widest opacity-70">request</span> : null}
-              </Link>
-            );
-          })}
-        </nav>
-        {source ? <p className="mt-3 font-body text-[12px] leading-[1.5] text-muted">{source.hint}</p> : null}
-      </Panel>
+    <nav aria-label="Sources" className="mb-4 flex flex-wrap items-center gap-1 border-b border-layer/10">
+      {tabs.map((t) => {
+        const on = (source?.key ?? null) === t.key;
+        return (
+          <Link
+            key={t.key ?? "all"}
+            href={identifySourceHref(t.key)}
+            aria-current={on ? "page" : undefined}
+            className={`relative inline-flex items-center gap-1.5 px-3 py-2 font-mono text-[11px] uppercase tracking-label transition-colors ${on ? "text-text" : "text-muted hover:text-text"}`}
+          >
+            {t.label}
+            {!t.live ? <span className="font-mono text-[10px] normal-case tracking-normal text-subtle">soon</span> : null}
+            {on ? <span className="absolute -bottom-px left-0 right-0 h-[2px] bg-accent" /> : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
-      {source?.key === "sam" ? (
-        <div className="mt-4">
-          <SamImportSection organizationId={organizationId} />
-        </div>
-      ) : null}
-      {source?.key === "ebuy" ? (
-        <div className="mt-4">
-          <EbuyPasteClient />
-        </div>
-      ) : null}
-      {source?.key === "gsa" ? (
-        <div className="mt-4">
-          <GsaPasteClient maxBytes={maxBytes} />
-        </div>
-      ) : null}
-      {source && !source.live ? (
-        <div className="mt-4">
-          <Panel title={`${source.label}: not connected yet`} eyebrow="Request this source">
+/** One source's tab: its importer inline, or what it needs before FORGE can read it. */
+export async function SourcePanel({ organizationId, source }: { organizationId: string; source: IdentifySource }) {
+  const ownRequests = !source.live ? await listOwnSourceRequestsAction() : [];
+  const maxBytes = source.key === "gsa" ? resolvePolicy("document", process.env).maxBytes : 0;
+  return (
+    <section aria-label={source.label}>
+      <p className="mb-3 font-body text-[12px] leading-[1.5] text-muted">{source.hint}</p>
+      {source.key === "sam" ? <SamImportSection organizationId={organizationId} /> : null}
+      {source.key === "ebuy" ? <EbuyPasteClient /> : null}
+      {source.key === "gsa" ? <GsaPasteClient maxBytes={maxBytes} /> : null}
+      {!source.live ? (
+        <>
+          <Panel title={`${source.label}: coming`} eyebrow="Not connected yet">
             <p className="font-body text-[13px] leading-[1.5] text-muted">
-              FORGE does not read enterprise portals yet. Tell us which one and how notices reach you today; each request is counted and shapes which integration comes first. Until then, paste a notice under GSA email or add it by hand under Create.
+              {source.key === "portals"
+                ? "FORGE will read state procurement portals, primes' supplier portals and commercial aggregators (such as HigherGov, GovWin IQ, GovTribe or GovSpend) here. Most state and prime portals publish no feed, so the first connectors are an aggregator account you already have and a FORGE address you forward portal alert emails to."
+                : "FORGE will bring in task orders from the contract vehicles you hold (OASIS+, Alliant, SEWP, Polaris and others) here."}{" "}
+              Tell us which ones you use and how their notices reach you today: each request is counted and decides what comes first. Until then, paste a notice under GSA email or add it by hand under Create.
             </p>
           </Panel>
           <div className="mt-4">
             <SourceRequestPanel initialOwnRequests={ownRequests} />
           </div>
-        </div>
+        </>
       ) : null}
     </section>
   );

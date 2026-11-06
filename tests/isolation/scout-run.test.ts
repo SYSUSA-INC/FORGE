@@ -216,6 +216,34 @@ describe("BL-STAB-10d / BL-SCOUT-REACH — the scout reads every open notice in 
     expect(run!.note).toMatch(/\d+ mentions? a keyword and \d+ (don't|doesn't)/);
   });
 
+  it("a one-off search (the search bar's Search) uses the bar's criteria, clears nothing and saves nothing", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: URL | string) => {
+        const url = new URL(String(input));
+        if (!url.pathname.endsWith("/search")) return new Response("Description Not Found", { status: 404 });
+        const code = url.searchParams.get("ncode") ?? "";
+        asked.push(code);
+        const rows = BY_CODE[code] ?? [];
+        return new Response(JSON.stringify({ totalRecords: rows.length, opportunitiesData: rows }), { status: 200 });
+      }),
+    );
+    // In another code: a normal run would clear it.
+    await db.insert(scoutCandidates).values({ organizationId: fx.orgA.organizationId, source: "org_naics", noticeId: id(40), title: "Elsewhere", naicsCode: "236220", fitScore: 20 });
+    await runScoutForOrganization({ organizationId: fx.orgA.organizationId, trigger: "manual", criteria: { keywords: ["help desk"], extraNaics: ["541512"], postedDaysBack: 7 } });
+    // The bar's code first, then the organization's; not the saved 541519.
+    expect(asked).toEqual(["541512", "518210", "541715"]);
+    const [kept] = await db.select({ id: scoutCandidates.id }).from(scoutCandidates).where(and(eq(scoutCandidates.organizationId, fx.orgA.organizationId), eq(scoutCandidates.noticeId, id(40))));
+    expect(kept).toBeDefined();
+    const [run] = await db.select({ note: scoutRuns.note }).from(scoutRuns).where(eq(scoutRuns.organizationId, fx.orgA.organizationId));
+    expect(run!.note).toContain("A one-off search from the Scout page: the nightly criteria are unchanged, and no waiting find was cleared.");
+    const { getScoutProfile } = await import("@/lib/scout");
+    const profile = await getScoutProfile({ organizationId: fx.orgA.organizationId });
+    expect(profile.extraNaics).toEqual(["541519", "541512"]);
+    expect(profile.keywords).toEqual(["Enterprise IT modernization", "ServiceNow", "Digital Transformation"]);
+  });
+
   it("a saved code FORGE can't read is named and never clears a find", async () => {
     vi.stubGlobal(
       "fetch",

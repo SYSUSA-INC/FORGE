@@ -16,17 +16,13 @@ import {
   type ScoutCandidateView,
   type ScoutRunView,
 } from "@/lib/scout-logic";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { organizations } from "@/db/schema";
+import { naicsCodeOf } from "@/lib/scout-logic";
 import { ScoutClient } from "./ScoutClient";
-import { BringInSection } from "./BringInSection";
+import { SourceBar, SourcePanel } from "./BringInSection";
 import type { IdentifySource } from "@/lib/identify-sources";
-
-function ago(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(ms / 3_600_000);
-  if (h < 1) return "just now";
-  if (h < 48) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 /**
  * BL-AIP-7b — the Scout page: what the nightly scout found, its take on
@@ -60,36 +56,33 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
     safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0 }, { tag: "scout.count" }),
   ]);
 
-  const pursue = fresh.filter((c) => c.recommendation === "pursue").length;
+  // The organization's own codes: the scout searches them after the bar's (BL-STAB-10d).
+  const [org] = await db.select({ primary: organizations.primaryNaics, list: organizations.naicsList }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  const orgCodes = [...new Set([org?.primary ?? "", ...(org?.list ?? [])].map((c) => naicsCodeOf(c)).filter(Boolean))];
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
-          Every night the scout reads every open SAM.gov notice in your NAICS codes (your keywords raise a notice&apos;s score; with no codes, a find must mention one), checks your watchlist for expiring awards, scores each find against your own history and recommends pursue, watch or skip. <strong>Add to pipeline</strong> puts a find in the pipeline; <strong>Not for us</strong> sets it aside; both teach the scout your taste. Every other source is under{" "}
-          <a href="#bring-in" className="font-medium text-cobalt hover:underline">Bring in an opportunity</a> below.
-        </p>
-        <dl className="flex flex-wrap gap-6 font-mono text-[11px] text-muted">
-          <div><dt className="uppercase tracking-label">New finds</dt><dd className="font-display text-xl text-text">{Math.max(waiting.total, fresh.length)}</dd></div>
-          <div><dt className="uppercase tracking-label">Recommended pursue</dt><dd className="font-display text-xl text-text">{pursue}</dd></div>
-          <div><dt className="uppercase tracking-label">Scout accuracy</dt><dd className="font-display text-xl text-text">{track.accuracy === null ? "—" : `${Math.round(track.accuracy * 100)}%`}</dd></div>
-          <div><dt className="uppercase tracking-label">Last run</dt><dd className="font-display text-xl text-text">{lastRun ? ago(lastRun.startedAt) : "never"}</dd></div>
-        </dl>
-      </div>
-      {/* BL-STAB-7d — why the nightly SAM.gov searches would come back empty. */}
-      <SamKeyNotice notice={samKeyNotice(sam)} />
-      <ScoutClient
-        profile={profile}
-        candidates={fresh}
-        unreviewedTotal={waiting.unreviewed}
-        decided={decided}
-        track={track}
-        lastRun={lastRun}
-        isAdmin={isAdmin}
-      />
-      <div id="bring-in" className="scroll-mt-6">
-        <BringInSection organizationId={organizationId} source={source} />
-      </div>
+      <p className="mb-3 max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
+        Every source on one page. <strong>All</strong> is what the scout finds every night on SAM.gov and your watchlist, scored and reviewed by the AI; the other tabs search SAM.gov for something specific, read a pasted GSA eBuy RFQ or GSA email, or ask for a source FORGE doesn&apos;t read yet. <strong>Add to pipeline</strong> on any row puts it in the pipeline under Identified; <strong>Not for us</strong> sets a find aside, and both teach the scout your taste.
+      </p>
+      <SourceBar source={source} />
+      {/* BL-STAB-7d — why the SAM.gov searches would come back empty. */}
+      {!source || source.key === "sam" ? <SamKeyNotice notice={samKeyNotice(sam)} /> : null}
+      {source ? (
+        <SourcePanel organizationId={organizationId} source={source} />
+      ) : (
+        <ScoutClient
+          profile={profile}
+          orgCodes={orgCodes}
+          candidates={fresh}
+          unreviewedTotal={waiting.unreviewed}
+          waitingTotal={Math.max(waiting.total, fresh.length)}
+          decided={decided}
+          track={track}
+          lastRun={lastRun}
+          isAdmin={isAdmin}
+        />
+      )}
     </>
   );
 }

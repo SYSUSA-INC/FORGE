@@ -43,14 +43,18 @@ export async function saveScoutProfileAction(input: {
       },
       actor: { userId: actor.id, email: actor.email },
     });
-    revalidatePath("/opportunities/scout");
+    revalidatePath("/pipeline/identify");
     return { ok: true, profile };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Could not save." };
   }
 }
 
-export async function runScoutNowAction(): Promise<
+/**
+ * Run the scout now: with the saved criteria, or (BL-SCOUT-ONEPAGE, the
+ * search bar's Search) once with the bar's, which changes nothing saved.
+ */
+export async function runScoutNowAction(criteria?: { keywords: string; extraNaics: string; postedDaysBack: number }): Promise<
   { ok: true; summary: ScoutRunSummary } | { ok: false; error: string }
 > {
   const { organizationId } = await requireCurrentOrg();
@@ -60,6 +64,15 @@ export async function runScoutNowAction(): Promise<
       organizationId,
       trigger: "manual",
       requestedByUserId: actor.id,
+      ...(criteria
+        ? {
+            criteria: {
+              keywords: splitTerms(String(criteria.keywords ?? "")),
+              extraNaics: splitTerms(String(criteria.extraNaics ?? "")),
+              postedDaysBack: Number(criteria.postedDaysBack) || 3,
+            },
+          }
+        : {}),
     });
     await recordAudit({
       organizationId,
@@ -67,9 +80,9 @@ export async function runScoutNowAction(): Promise<
       action: "scout.run",
       resourceType: "scout_run",
       resourceId: summary.runId ?? undefined,
-      metadata: { ...summary },
+      metadata: { ...summary, oneOff: !!criteria },
     });
-    revalidatePath("/opportunities/scout");
+    revalidatePath("/pipeline/identify");
     return { ok: true, summary };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Run failed." };
@@ -92,7 +105,7 @@ export async function decideScoutCandidateAction(
     actor: { userId: actor.id, email: actor.email },
   });
   if (res.ok) {
-    revalidatePath("/opportunities/scout");
+    revalidatePath("/pipeline/identify");
     revalidatePath("/opportunities");
     revalidatePath("/");
   }

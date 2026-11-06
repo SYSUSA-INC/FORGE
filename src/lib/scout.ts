@@ -338,6 +338,12 @@ export async function runScoutForOrganization(input: {
   maxTriage?: number;
   /** BL-STAB-7d — the cron's breaker: set once FORGE's shared key fails; later companies on it aren't searched. */
   sharedKey?: { failed: string | null };
+  /**
+   * BL-SCOUT-ONEPAGE — a one-off search from the Scout page's search bar:
+   * these criteria instead of the saved ones. Its finds join the list; it
+   * clears and re-scores no waiting find, and the nightly criteria stay.
+   */
+  criteria?: { keywords: string[]; extraNaics: string[]; postedDaysBack: number };
 }): Promise<ScoutRunSummary> {
   const { organizationId } = input;
   const now = input.now ?? new Date();
@@ -367,7 +373,16 @@ export async function runScoutForOrganization(input: {
     .limit(1);
   if (!org) return { ...summary, note: "Organization not found." };
 
-  const profile = await getScoutProfile({ organizationId });
+  const saved = await getScoutProfile({ organizationId });
+  const oneOff = !!input.criteria;
+  const profile = input.criteria
+    ? {
+        ...saved,
+        keywords: input.criteria.keywords.map((k) => k.trim()).filter(Boolean).slice(0, 10),
+        extraNaics: input.criteria.extraNaics.map((k) => k.trim()).filter(Boolean).slice(0, MAX_SEARCH_CODES),
+        postedDaysBack: clampInt(input.criteria.postedDaysBack, 1, 14),
+      }
+    : saved;
   // BL-STAB-10d — the Scout page's codes first, then the organization's.
   const codes = scoutCodes({ extra: profile.extraNaics, primary: org.primaryNaics, list: org.naicsList }, MAX_SEARCH_CODES);
   const query = scoutKeywordQuery(profile.keywords);
@@ -507,7 +522,8 @@ export async function runScoutForOrganization(input: {
   // mentioning a keyword) are deleted with their triage; a later run finds one again only
   // if it still fits and is in the look-back window. A code that couldn't be read never
   // clears anything; what this run's search kept or couldn't settle is never cleared.
-  try {
+  if (oneOff) notes.push("A one-off search from the Scout page: the nightly criteria are unchanged, and no waiting find was cleared.");
+  else try {
     // Ranked keywords clear nothing: a find in the codes stays whatever it mentions.
     const cleared = await clearStaleFinds(organizationId, { codes: codes.unreadable.length ? [] : codes.all, query: searchQuery, now }, searched ? keepIds : new Set());
     if (cleared > 0) notes.push(`Removed ${cleared} waiting find${cleared === 1 ? "" : "s"} that no longer fit${cleared === 1 ? "s" : ""} your keywords and codes, or ${cleared === 1 ? "is" : "are"} past due.`);
@@ -585,7 +601,7 @@ export async function runScoutForOrganization(input: {
   // BL-SCOUT-QUALITY — every waiting find is scored again each run, so the
   // deadline, the keyword weighting and the customer record are current; a
   // find that is now only a passing mention of a keyword leaves the list.
-  try {
+  if (!oneOff) try {
     const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor);
     if (r.dropped > 0) notes.push(`Removed ${r.dropped} waiting find${r.dropped === 1 ? "" : "s"} that only mention${r.dropped === 1 ? "s" : ""} a keyword in passing.`);
   } catch (err) {

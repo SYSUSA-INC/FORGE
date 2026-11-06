@@ -17,11 +17,15 @@ import {
   scoutKeywordQuery,
   solicitationKey,
   staleReason,
+  defaultFindsFilter,
+  filterFinds,
   scoutSearchFunnel,
   scoutTriageAllowance,
   summarizeScoutTrack,
   type FitContext,
   type FitInput,
+  type ScoutCandidateView,
+  type ScoutListFilter,
 } from "@/lib/scout-logic";
 
 const now = new Date("2026-09-29T09:00:00Z");
@@ -324,5 +328,23 @@ describe("BL-SCOUT-REACH — the AI review's share and the search funnel", () =>
     expect(scoutSearchFunnel({ ...counts, samTotal: 1450, received: 1000, truncated: true }, false, 1000)).toContain(
       'SAM.gov holds 1,450 notices for this search but sends at most 1,000 per code: shorten "Posted in the last" so every one is read.',
     );
+  });
+});
+
+describe("BL-SCOUT-ONEPAGE — the finds list's filters", () => {
+  const find = (id: string, recommendation: "pursue" | "watch" | "skip" | null, fitScore: number) => ({ id, recommendation, fitScore }) as unknown as ScoutCandidateView;
+  const finds = [find("s", "skip", 90), find("u1", null, 30), find("w", "watch", 60), find("p", "pursue", 40), find("u2", null, 50)];
+  const ids = (f: ScoutListFilter) => filterFinds(finds, f).map((c) => c.id);
+
+  it("orders Pursue, Watch, not yet reviewed, then Skip, best fit first", () => {
+    expect(ids("recommended")).toEqual(["p", "w"]);
+    expect(ids("unreviewed")).toEqual(["u2", "u1"]);
+    expect(ids("all")).toEqual(["p", "w", "u2", "u1"]);
+    expect(ids("skipped")).toEqual(["s"]);
+  });
+
+  it("opens on Recommended when the AI recommends something, else on All", () => {
+    expect(defaultFindsFilter(finds)).toBe("recommended");
+    expect(defaultFindsFilter([find("u", null, 10), find("s", "skip", 5)])).toBe("all");
   });
 });

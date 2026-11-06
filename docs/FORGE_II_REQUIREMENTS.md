@@ -20,7 +20,7 @@ developing").
   added to the plan here.
 - ❓ **Owner to decide**: needs an answer before it can be built.
 
-Last reviewed 2026-11-06, after PR #456.
+Last reviewed 2026-11-06, after PR #457.
 
 ---
 
@@ -58,9 +58,9 @@ Last reviewed 2026-11-06, after PR #456.
 | I-3 | Bring in from SAM.gov on that page | ✅ #453 |
 | I-4 | Bring in from a pasted GSA email | ✅ #453 |
 | I-5 | Bring in from GSA eBuy | ✅ #453 |
-| I-6 | Bring in from **enterprise portals** | ⚠️ Only a request form, which counts the demand. No importer. Which portals come first, and how each is read (API, export file or forwarded email), is for the owner to name. Added to the plan as a phase 1 follow-up |
-| I-7 | Bring in from the **GWACs** a company holds, current and future | 📋 BL-SCOUT-GWAC (backlog by the owner's choice, 2026-11-03) |
-| I-8 | A one-stop, user-friendly experience | ✅ #453: one source picker |
+| I-6 | Bring in from **enterprise portals** | 📋 BL-SCOUT-PORTALS. The owner picked state portals, prime portals and commercial aggregators (2026-11-06). Research found no feeds for state or prime portals, but a documented aggregator API (HigherGov), and alert emails that could be forwarded to FORGE. The tab says what is coming and records requests. ❓ The owner confirms the first connectors |
+| I-7 | Bring in from the **GWACs** a company holds, current and future | 📋 BL-SCOUT-GWAC (backlog by the owner's choice, 2026-11-03). The tab is on the source bar, marked *soon*, and records requests |
+| I-8 | A one-stop, user-friendly experience | 🔄 BL-SCOUT-ONEPAGE, this PR. #453 put every source on one page, but as two stacked experiences. The page now has one source bar, one search bar and one compact list for every source. eBuy and GSA email rows come next |
 | I-9 | An **Add to pipeline** button next to every opportunity the scout finds or a search returns | ✅ #453 |
 | I-10 | Added opportunities show on the Pipeline as part of the current pipeline | ✅ #453 |
 | I-11 | **Create** merges New Opportunity and New Solicitation into one page | ✅ #453: start from a document or fill in by hand |
@@ -69,7 +69,7 @@ Last reviewed 2026-11-06, after PR #456.
 | I-14 | One card per solicitation, not one per amendment (owner 2026-11-03) | ✅ #455 |
 | I-15 | Explain what makes a fit score high (owner 2026-11-03) | ✅ #455: the score is earned from zero, and each card lists its reasons |
 | I-16 | Keep **Show skipped** (owner 2026-11-03) | ✅ #455 |
-| I-17 | **Amendment watch:** for every opportunity being pursued, the scout downloads amendments and every other published document, files them on the opportunity and notifies the team (owner 2026-11-03) | 🔄 BL-SCOUT-AMEND, this PR. Every open opportunity is checked daily and on demand. New documents are filed and read, the due date follows an amendment, and the owner and the proposal and review teams are told in the app and by email |
+| I-17 | **Amendment watch:** for every opportunity being pursued, the scout downloads amendments and every other published document, files them on the opportunity and notifies the team (owner 2026-11-03) | ✅ #457, BL-SCOUT-AMEND. Every open opportunity is checked daily and on demand. New documents are filed and read, the due date follows an amendment, and the owner and the proposal and review teams are told in the app and by email |
 | I-18 | The scout must not miss opportunities in the company's codes ("only 3 opportunities … Scout seems to be broken", owner 2026-11-05) | ✅ #456, BL-SCOUT-REACH. There were two causes, both older than #455. (1) Keywords were a hard filter, matched as exact phrases. (2) Only the first 100 notices per NAICS code were read, and the run didn't say when more were cut off. The owner chose to have keywords rank rather than filter. Every open notice in the codes is now a find, up to 1,000 notices are read per code, and the run note shows where the notices went |
 
 ## E — Evaluate (footnote 5)
@@ -161,7 +161,7 @@ Last reviewed 2026-11-06, after PR #456.
 The order is serial, one PR at a time, with a design review before each
 phase:
 
-1. **Done:** BL-SCOUT-REACH (I-18, #456). **Now:** BL-SCOUT-AMEND (I-17).
+1. **Done:** BL-SCOUT-REACH (I-18, #456), BL-SCOUT-AMEND (I-17, #457). **Now:** BL-SCOUT-ONEPAGE (I-8). **Then:** BL-SCOUT-PORTALS (I-6), once the owner confirms the first connectors.
 2. **Phase 2, Evaluate:** E-1 to E-15, with the partner hand-off of
    E-13.
 3. **Phase 3, Capture:** C-1 to C-7, C-11, C-12.
