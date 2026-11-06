@@ -1,9 +1,11 @@
 /**
  * BL-STAB-10d — the owner's scout (Postgres, SAM.gov stubbed): keywords
  * "Enterprise IT modernization, ServiceNow, Digital Transformation", the
- * Scout page's codes and the organization's own. A find must be in one of
- * the codes AND mention a keyword; the Scout page's codes are searched
- * first; waiting finds that no longer fit are cleared, per organization.
+ * Scout page's codes and the organization's own; the Scout page's codes
+ * are searched first; waiting finds that no longer fit are cleared, per
+ * organization. BL-SCOUT-REACH (owner, 2026-11-05) — with codes, every
+ * open notice in them is a find and the keywords rank it; with no codes,
+ * a find must mention a keyword.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
@@ -58,7 +60,7 @@ const STORED: [number, string][] = [
 ];
 const LIVE: Record<string, string> = { [id(9)]: "<p>Digital transformation of pipeline records.</p>" };
 
-describe("BL-STAB-10d — the scout finds what both its keywords and its codes ask for", () => {
+describe("BL-STAB-10d / BL-SCOUT-REACH — the scout reads every open notice in its codes", () => {
   let fx: TwoTenantFixture;
   const clearCopy = async () => {
     await db.delete(samNotices);
@@ -90,7 +92,7 @@ describe("BL-STAB-10d — the scout finds what both its keywords and its codes a
     await fx.cleanup();
   });
 
-  it("keeps only notices in its codes that mention a keyword, searching the Scout page's codes first", async () => {
+  it("keeps every open notice in its codes, keywords or not, searching the Scout page's codes first", async () => {
     const asked: string[] = [];
     const read: string[] = [];
     let byCode = BY_CODE;
@@ -152,32 +154,66 @@ describe("BL-STAB-10d — the scout finds what both its keywords and its codes a
         .where(eq(scoutCandidates.organizationId, fx.orgA.organizationId));
     let rows = await rowsOf();
     const has = (n: number) => rows.some((r) => r.noticeId === id(n));
-    // Finds: a keyword in the description (1, 4), the title (5), an earlier notice of the
-    // solicitation (8, through 7), or a description read live (9). Not the DCSS notice (3),
-    // the help desk (2) or the past-due notice (6).
-    for (const n of [1, 4, 5, 8, 9, 10, 23, 24, 25]) expect(has(n), `kept ${n}`).toBe(true);
-    for (const n of [2, 3, 6, 7, 20, 21, 22]) expect(has(n), `not ${n}`).toBe(false);
-    // Waiting finds the search found again are the same rows, not deleted and re-inserted,
-    // and one saved before the matched keyword was kept now has it.
+    // Every open notice in the codes is a find, whether it names a keyword (1, 4, 5, 9) or
+    // not (the help desk, 2; the DCSS notice, 3); a solicitation is one find, its latest
+    // notice (8, not 7). Not the past-due notice (6). Waiting finds in the codes stay (20, 24);
+    // one in another code (21) or past due (22) is cleared.
+    for (const n of [1, 2, 3, 4, 5, 8, 9, 10, 20, 23, 24, 25]) expect(has(n), `kept ${n}`).toBe(true);
+    for (const n of [6, 7, 21, 22]) expect(has(n), `not ${n}`).toBe(false);
+    // Waiting finds the search found again are the same rows, not deleted and re-inserted.
     expect(rows.find((r) => r.noticeId === id(1))).toMatchObject({ id: before!.id, createdAt: before!.createdAt });
-    expect(rows.find((r) => r.noticeId === id(8))).toMatchObject({ id: before8!.id, matchedKeyword: "ServiceNow" });
+    expect(rows.find((r) => r.noticeId === id(8))).toMatchObject({ id: before8!.id });
+    // The keyword raises the score: the ServiceNow help desk outranks the plain one.
+    const [withKw] = await db.select({ fitScore: scoutCandidates.fitScore, matchedKeyword: scoutCandidates.matchedKeyword }).from(scoutCandidates).where(and(eq(scoutCandidates.organizationId, fx.orgA.organizationId), eq(scoutCandidates.noticeId, id(5))));
+    const [without] = await db.select({ fitScore: scoutCandidates.fitScore }).from(scoutCandidates).where(and(eq(scoutCandidates.organizationId, fx.orgA.organizationId), eq(scoutCandidates.noticeId, id(2))));
+    expect(withKw!.fitScore).toBeGreaterThan(without!.fitScore);
+    expect(withKw!.matchedKeyword.toLowerCase()).toBe("enterprise it modernization");
     expect(rows.find((r) => r.noticeId === id(25))?.status).toBe("dismissed");
     const [b] = await db.select({ id: scoutCandidates.id }).from(scoutCandidates).where(and(eq(scoutCandidates.organizationId, fx.orgB.organizationId), eq(scoutCandidates.noticeId, id(26))));
     expect(b).toBeDefined();
 
     const [run] = await db.select({ note: scoutRuns.note, searches: scoutRuns.searches }).from(scoutRuns).where(eq(scoutRuns.organizationId, fx.orgA.organizationId));
     expect(run!.searches).toBe(4);
-    expect(run!.note).toContain("NAICS searched: 541519, 541512, 518210, 541715; kept notices that mention any of “Enterprise IT modernization”, “ServiceNow” or “Digital Transformation”.");
-    expect(run!.note).toContain("Removed 3 waiting finds that no longer fit your keywords and codes, or are past due.");
+    expect(run!.note).toContain(
+      "NAICS searched: 541519, 541512, 518210, 541715; every open notice in these codes is a find, and mentioning any of “Enterprise IT modernization”, “ServiceNow” or “Digital Transformation” raises its score.",
+    );
+    expect(run!.note).toContain("SAM.gov sent 10 notices: 9 open solicitations once amendments are folded and awards and closed notices left out.");
+    expect(run!.note).toContain("Removed 2 waiting finds that no longer fit your keywords and codes, or are past due.");
     expect(run!.note).toContain("1 notice already past the response date left out.");
 
     // Next night the solicitation's earlier notice has left the window: the amendment stays,
-    // because the keyword it was kept for is still searched; nothing is re-created.
+    // because it is still in the codes; nothing is re-created.
     byCode = { ...BY_CODE, "541512": [notice(8, "541512", "Amendment 0001", { solicitationNumber: "SOL-AMD", postedDate: "2026-10-12" })] };
     const firstIds = new Map(rows.map((r) => [r.noticeId, r.id]));
     await runScoutForOrganization({ organizationId: fx.orgA.organizationId, trigger: "manual" });
     rows = await rowsOf();
     for (const n of [1, 4, 5, 8, 9]) expect(rows.find((r) => r.noticeId === id(n))?.id, `same row ${n}`).toBe(firstIds.get(id(n)));
+  });
+
+  it("with no codes, the keywords are the search: a find must mention one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: URL | string) => {
+        const url = new URL(String(input));
+        if (!url.pathname.endsWith("/search")) {
+          const nid = url.searchParams.get("noticeid") ?? "";
+          return LIVE[nid] ? new Response(JSON.stringify({ description: LIVE[nid] }), { status: 200 }) : new Response("Description Not Found", { status: 404 });
+        }
+        // SAM.gov's title filter is loose; FORGE checks every row itself.
+        const rows = Object.values(BY_CODE).flat();
+        return new Response(JSON.stringify({ totalRecords: rows.length, opportunitiesData: rows }), { status: 200 });
+      }),
+    );
+    await db.update(organizations).set({ primaryNaics: "", naicsList: [] }).where(eq(organizations.id, fx.orgA.organizationId));
+    await saveScoutProfile({ organizationId: fx.orgA.organizationId, patch: { extraNaics: [] }, actor: { userId: fx.orgA.userId } });
+    await runScoutForOrganization({ organizationId: fx.orgA.organizationId, trigger: "manual" });
+    const rows = await db.select({ noticeId: scoutCandidates.noticeId }).from(scoutCandidates).where(eq(scoutCandidates.organizationId, fx.orgA.organizationId));
+    const has = (n: number) => rows.some((r) => r.noticeId === id(n));
+    for (const n of [1, 4, 5, 9]) expect(has(n), `kept ${n}`).toBe(true);
+    for (const n of [2, 3, 6]) expect(has(n), `not ${n}`).toBe(false);
+    const [run] = await db.select({ note: scoutRuns.note }).from(scoutRuns).where(eq(scoutRuns.organizationId, fx.orgA.organizationId));
+    expect(run!.note).toContain("kept notices that mention any of");
+    expect(run!.note).toMatch(/\d+ mentions? a keyword and \d+ (don't|doesn't)/);
   });
 
   it("a saved code FORGE can't read is named and never clears a find", async () => {

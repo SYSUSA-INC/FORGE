@@ -94,6 +94,7 @@ Effort key:
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
 | 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
 | 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
+| 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | 🔄 this PR (owner chose: keywords rank); then BL-SCOUT-AMEND |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2878,6 +2879,69 @@ Go / No-Go decision, a No-Go stops the watch.
 
 ---
 
+### BL-SCOUT-REACH — Scout reads every notice in the company's codes
+
+**Owner, 2026-11-05:** "you telling me there are only 3 opportunities
+that meet our criteria out there on SAM.gov — our Scout seems to be
+broken". The nightly run searched four IT codes (541519, 541511, 541512,
+541513) over 3 days and kept 3 notices.
+
+**Assessment.** The search itself worked: all four codes answered. Two
+rules that came before BL-SCOUT-QUALITY cut the list:
+1. **Keywords are a hard filter, matched as exact phrases.** A notice is
+   kept only if its title, agency or description contains one of
+   "IT consulting", "software engineering", "enterprise IT
+   modernization", "ServiceNow" or "Digital Transformation" word for
+   word. Notices in the company's own codes that say "IT support
+   services" or "application development" are dropped before they are
+   scored.
+2. **Only the first 100 notices per NAICS code are read**
+   (`SAM_LIMIT` in `src/lib/scout.ts`; SAM.gov sends up to 1,000). Busy
+   codes such as 541512 can post more than 100 notices in a few days.
+   The rest are never seen, and the run note doesn't say so: the search
+   reports `truncated`, but the scout ignores it.
+
+The run note also doesn't show the funnel (notices received, open,
+mentioning a keyword, kept), so the owner can't tell where the notices
+went.
+
+**Owner decision (2026-11-05): keywords rank.** Options were (a) keep
+keywords as a filter but match a keyword's words anywhere, (b) every open
+notice in the codes is a find and keywords only raise its score, or (c)
+keep the exact filter. The owner chose (b).
+
+**Delivered (this PR):**
+- `src/lib/scout.ts`: with NAICS codes and keywords, the search sends no
+  keyword query (`rank`); every open notice in the codes is a find
+  (source `org_naics`), scored by `scoutFit`, so the keyword weights of
+  BL-SCOUT-QUALITY rank it, and the keyword the text gave is stored as
+  the find's matched keyword. Excluded words (`-staffing`) still keep a
+  notice out, checked against its text at staging. Ranked keywords clear
+  no waiting find; codes and the due date still do. With no codes the
+  keywords are still the search, as before.
+- `SAM_LIMIT` 100 → 1,000 (SAM.gov's maximum per request).
+- The run note gives the funnel (`scoutSearchFunnel`, pure): notices
+  SAM.gov sent, open solicitations once amendments are folded and awards
+  left out, and with keywords as the search how many mention one; it
+  says when SAM.gov held more than it sends.
+- AI review: 25 finds a run (was 10), never past four fifths of the
+  plan's monthly AI requests (`scoutTriageAllowance`, pure; unlimited
+  plans unaffected), so the scout can't block drafting or chat; the run
+  note says when it held back.
+- The Scout tab: finds load in display order (Pursue, Watch, not yet
+  reviewed, Skip; best fit first; up to 200), so a long list never cuts
+  off an AI recommendation; the header counts every waiting find;
+  **Not yet reviewed** opens on the best 20 with **Show all**, and its
+  heading gives the true number waiting.
+- Tests: `tests/isolation/scout-run.test.ts` (every open notice in the
+  codes kept, the keyword match outranks the plain one, the funnel line;
+  with no codes the keywords still filter), `scout-quality.test.ts` (a
+  passing mention in the company's code is a low-ranked find), and
+  `tests/ai/scout-logic.test.ts` for the two pure helpers. USER_MANUAL
+  §5.2.1 and What's new.
+
+---
+
 ### BL-SCOUT-GWAC — GWACs as a Scout source
 
 **Owner, 2026-11-03:** GWACs go on the backlog; the Scout page does not
@@ -2933,6 +2997,9 @@ lists; the chevron also sits on every opportunity and proposal, lit
 at the stage the pursuit is in. The old Opportunities items that left
 the menu are ⌘K shortcuts. The stage behaviours arrive phase by phase
 on these pages.
+
+Every requirement in the FORGE II document, with its status and phase:
+`docs/FORGE_II_REQUIREMENTS.md`.
 
 **Phases to come, one PR each, design reviewed first:**
 1. **Identify:** on the Identify page's two tabs.

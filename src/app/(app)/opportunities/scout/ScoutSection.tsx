@@ -7,6 +7,7 @@ import {
   getScoutProfile,
   getScoutTrack,
   latestScoutRun,
+  countNewScoutCandidates,
   listScoutCandidates,
 } from "@/lib/scout";
 import {
@@ -41,10 +42,10 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
   const { organizationId } = await requireCurrentOrg();
   const isAdmin = user.role === "admin" || !!user.isSuperadmin;
 
-  const [profile, fresh, decided, track, lastRun, sam] = await Promise.all([
+  const [profile, fresh, decided, track, lastRun, sam, waiting] = await Promise.all([
     safeQuery(() => getScoutProfile({ organizationId }), DEFAULT_SCOUT_PROFILE, { tag: "scout.profile" }),
     safeQuery<ScoutCandidateView[]>(
-      () => listScoutCandidates({ organizationId, status: "new", limit: 60 }),
+      () => listScoutCandidates({ organizationId, status: "new", limit: 200 }),
       [],
       { tag: "scout.new" },
     ),
@@ -56,6 +57,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
     safeQuery(() => getScoutTrack({ organizationId }), EMPTY_SCOUT_TRACK, { tag: "scout.track" }),
     safeQuery<ScoutRunView | null>(() => latestScoutRun({ organizationId }), null, { tag: "scout.run" }),
     getSamKeyStatus(organizationId),
+    safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0 }, { tag: "scout.count" }),
   ]);
 
   const pursue = fresh.filter((c) => c.recommendation === "pursue").length;
@@ -64,11 +66,11 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
-          Every night the scout re-runs your NAICS codes and keywords against SAM.gov, checks your watchlist for expiring awards, scores each find against your own history and recommends pursue, watch or skip. <strong>Add to pipeline</strong> puts a find in the pipeline; <strong>Not for us</strong> sets it aside; both teach the scout your taste. Every other source is under{" "}
+          Every night the scout reads every open SAM.gov notice in your NAICS codes (your keywords raise a notice&apos;s score; with no codes, a find must mention one), checks your watchlist for expiring awards, scores each find against your own history and recommends pursue, watch or skip. <strong>Add to pipeline</strong> puts a find in the pipeline; <strong>Not for us</strong> sets it aside; both teach the scout your taste. Every other source is under{" "}
           <a href="#bring-in" className="font-medium text-cobalt hover:underline">Bring in an opportunity</a> below.
         </p>
         <dl className="flex flex-wrap gap-6 font-mono text-[11px] text-muted">
-          <div><dt className="uppercase tracking-label">New finds</dt><dd className="font-display text-xl text-text">{fresh.length}</dd></div>
+          <div><dt className="uppercase tracking-label">New finds</dt><dd className="font-display text-xl text-text">{Math.max(waiting.total, fresh.length)}</dd></div>
           <div><dt className="uppercase tracking-label">Recommended pursue</dt><dd className="font-display text-xl text-text">{pursue}</dd></div>
           <div><dt className="uppercase tracking-label">Scout accuracy</dt><dd className="font-display text-xl text-text">{track.accuracy === null ? "—" : `${Math.round(track.accuracy * 100)}%`}</dd></div>
           <div><dt className="uppercase tracking-label">Last run</dt><dd className="font-display text-xl text-text">{lastRun ? ago(lastRun.startedAt) : "never"}</dd></div>
@@ -79,6 +81,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
       <ScoutClient
         profile={profile}
         candidates={fresh}
+        unreviewedTotal={waiting.unreviewed}
         decided={decided}
         track={track}
         lastRun={lastRun}

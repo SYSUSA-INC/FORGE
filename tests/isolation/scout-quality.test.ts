@@ -34,7 +34,8 @@ const SEARCH = [
   notice(1, "MCCE OSS and Enterprise AI Integration", { solicitationNumber: "M67854-26-I-4208", postedDate: "2026-10-21" }),
   // A new notice of a solicitation already in the pipeline: no find.
   notice(2, "Help desk modernization, Amendment 0002", { solicitationNumber: "36C10B26R0042" }),
-  // ServiceNow said once in a long description: a passing mention, dropped.
+  // ServiceNow said once in a long description: a passing mention. In the company's code it
+  // is still a find (BL-SCOUT-REACH), ranked below the real keyword match.
   notice(3, "Cyberspace operations support"),
   // ServiceNow in the title: a real find.
   notice(4, "ServiceNow ITSM platform support"),
@@ -117,10 +118,14 @@ describe("BL-SCOUT-QUALITY — one card per solicitation, no passing mentions, s
     expect(mcce[0]!.noticeId).toBe(id(1));
     // Nothing for the solicitation already in the pipeline.
     expect(byNumber("36C10B26R0042")).toHaveLength(0);
-    // The passing mentions are gone, new and waiting alike; the title match stays.
-    expect(byNumber("SOLQ-3")).toHaveLength(0);
+    // A waiting keyword find that is only a passing mention is gone; the title match stays.
     expect(byNumber("SOLQ-53")).toHaveLength(0);
     expect(byNumber("SOLQ-4")).toHaveLength(1);
+    // BL-SCOUT-REACH — a new notice in the company's code stays a find, its passing mention
+    // worth almost nothing: below the title match.
+    const passing = byNumber("SOLQ-3")[0]!;
+    expect(passing.signals).toContain("Your keyword ServiceNow is mentioned once, in passing");
+    expect(passing.fitScore).toBeLessThan(byNumber("SOLQ-4")[0]!.fitScore);
     // The old score is recomputed with the new rules and the near deadline.
     const lic = byNumber("SOLQ-52")[0]!;
     expect(lic.signals).toContain("Your keyword ServiceNow is in the title");
