@@ -24,12 +24,12 @@ describe("appBaseUrl", () => {
 
   it("falls back to the production domain, then the Vercel URL", () => {
     expect(appBaseUrl({ VERCEL_ENV: "production", VERCEL_URL: "x.vercel.app" })).toBe(
-      "https://www.sysgov.com",
+      "https://www.forgeaxi.com",
     );
     expect(appBaseUrl({ VERCEL_ENV: "preview", VERCEL_URL: "forge-abc.vercel.app" })).toBe(
       "https://forge-abc.vercel.app",
     );
-    expect(appBaseUrl({})).toBe("https://www.sysgov.com");
+    expect(appBaseUrl({})).toBe("https://www.forgeaxi.com");
   });
 });
 

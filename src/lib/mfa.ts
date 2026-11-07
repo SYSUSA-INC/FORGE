@@ -9,7 +9,7 @@ import { randomInt } from "node:crypto";
 
 import { MFA_ISSUER, MFA_LIMITS } from "@/lib/mfa-constants";
 
-export { MFA_FACTOR_KINDS, MFA_ISSUER, MFA_LIMITS, type MfaFactorKind } from "@/lib/mfa-constants";
+export { MFA_FACTOR_KINDS, MFA_ISSUER, MFA_LIMITS, MFA_METHOD_LABELS, missingMethods, type MfaFactorKind, type MfaMethod } from "@/lib/mfa-constants";
 
 /** Spaces and dashes people type between groups are not part of a code. */
 export function normalizeTotpCode(input: string): string | null {

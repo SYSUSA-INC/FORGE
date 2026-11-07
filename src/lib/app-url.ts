@@ -9,10 +9,12 @@
 export function appBaseUrl(env: Record<string, string | undefined> = process.env): string {
   const explicit = env.NEXT_PUBLIC_APP_URL ?? env.AUTH_URL;
   if (explicit) return explicit.replace(/\/+$/, "");
-  if (env.VERCEL_ENV === "production") return "https://www.sysgov.com";
+  // FORGE's address since 2026-11 (owner): https://www.forgeaxi.com. Passkeys belong to
+  // this host, so production must never fall back to another domain.
+  if (env.VERCEL_ENV === "production") return "https://www.forgeaxi.com";
   const vercel = env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
-  return "https://www.sysgov.com";
+  return "https://www.forgeaxi.com";
 }
 
 /** The sign-up page pre-filled from an invite; consumed by /api/register. */

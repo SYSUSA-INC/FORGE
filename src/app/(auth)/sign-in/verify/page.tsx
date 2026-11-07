@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
-import { passkeyCount } from "@/lib/passkeys";
+import { passkeysHere } from "@/lib/passkeys";
 import { safeRedirectTarget } from "@/lib/safe-redirect";
 import { GATE_PATHS } from "@/lib/session-policy";
 import { VerifyForm } from "./VerifyForm";
@@ -11,13 +11,17 @@ import { VerifyForm } from "./VerifyForm";
  * Microsoft) step and the app; a session that is already in goes on,
  * one with no factor goes to enrol, none at all goes to sign in.
  */
-export default async function VerifyPage({ searchParams }: { searchParams: { callbackUrl?: string } }) {
+export default async function VerifyPage({ searchParams }: { searchParams: { callbackUrl?: string; recover?: string } }) {
   const target = safeRedirectTarget(searchParams.callbackUrl);
+  const recoverToken = (searchParams.recover ?? "").trim().slice(0, 200) || null;
   const session = await auth();
-  if (!session?.user) redirect("/sign-in");
+  // BL-MFA-RECOVERY — a recovery link opened before signing in: sign in,
+  // then come back here with it.
+  if (!session?.user) redirect(recoverToken ? `/sign-in?callbackUrl=${encodeURIComponent(`/sign-in/verify?recover=${recoverToken}`)}` : "/sign-in");
   if (session.user.mfa === "ok") redirect(target);
   if (session.user.mfa === "enrol") redirect(`${GATE_PATHS.enrol}?callbackUrl=${encodeURIComponent(target)}`);
-  const hasPasskey = (await passkeyCount(session.user.id)) > 0;
+  const passkeys = await passkeysHere(session.user.id);
+  const hasPasskey = passkeys.usable > 0;
 
   return (
     <div className="grid min-h-[calc(100vh-3.5rem)] place-items-center px-4 py-12">
@@ -27,7 +31,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: { cal
           <p className="mt-2 text-sm text-muted">
             Signed in as <span className="text-text">{session.user.email}</span>. {hasPasskey ? "Use your passkey, or enter" : "Enter"} the six-digit code from your authenticator app, or one of your recovery codes.
           </p>
-          <VerifyForm callbackUrl={target} hasPasskey={hasPasskey} />
+          <VerifyForm callbackUrl={target} hasPasskey={hasPasskey} passkeysElsewhere={passkeys.elsewhere} recoverToken={recoverToken} />
           <form
             className="mt-6"
             action={async () => {
@@ -39,7 +43,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: { cal
               Not you? Sign out
             </button>
           </form>
-          <p className="mt-4 font-body text-[12px] leading-[1.5] text-muted">You have ten minutes from signing in. Lost your phone and your codes? Ask a platform administrator to reset your two-step sign-in.</p>
+          <p className="mt-4 font-body text-[12px] leading-[1.5] text-muted">You have ten minutes from signing in. Lost your phone and your codes? Email yourself a recovery link above, or ask an administrator to reset your two-step sign-in.</p>
         </div>
       </div>
     </div>

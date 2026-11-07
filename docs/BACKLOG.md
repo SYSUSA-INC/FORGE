@@ -3181,6 +3181,70 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 
 ---
 
+### BL-MFA-RECOVERY — Nobody, the owner included, is locked out at the second step
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🚧 this PR
+
+**Owner, 2026-11-07:** after the domain move the owner, the only
+superadmin, could not get past the second step: "I need a dynamic
+solution, not a hard-coded one that makes it impossible for even a
+super admin to get in"; "Super admin should be required to have two
+options for fallback … an authentication app and passkey, and give
+him/her the choice"; "if I cannot fix it then no one can". Causes: the
+passkey relying party came from one configured value (falling back to
+the old domain), and a superadmin without a passkey was sent to enrol
+one before anything opened, which a broken passkey domain made
+impossible even with a working app.
+
+Delivered (migration 0151):
+- **Passkeys follow the address in the browser** (`webauthnConfigFor`,
+  pure and tested): the request's host when it is one of the site's own
+  addresses, else the configured one; each passkey records its domain
+  (`user_mfa_factor.rp_id`); the second step offers only passkeys that
+  work there and names the others.
+- **Superadmins keep a passkey and an authenticator app**
+  (`missingMethods`, tested); either passes the step and they choose at
+  sign-in; a missing one is asked for after sign-in (a strip on every
+  page, Security after the step), never as a condition of getting in.
+- **Email me a recovery link** on the second step: single-use, 15
+  minutes, three a day, only in a session past the password step,
+  stored as a hash; lands on Security; the person and every superadmin
+  are emailed; audited.
+- **`npm run auth:recover -- <email> "<reason>"`**: the operator's last
+  resort against the database, no redeploy, audited.
+
+Tested in `tests/ai/webauthn.test.ts`, `tests/ai/mfa-methods.test.ts`
+and `tests/isolation/mfa-recovery.test.ts` (the owner's lockout: a
+superadmin whose only passkey was made on www.sysgov.com, signing in on
+www.forgeaxi.com), and end to end in a browser.
+
+**Next:** Administration → Security for company admins (each member's
+methods, Reset second step), agreed 2026-11-07.
+
+---
+
+### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🚧 phase 1 (this PR)
+
+**Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
+web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
+2026-11-07: "my passkey is not working"). Cause: with no
+`NEXT_PUBLIC_APP_URL` on Vercel, `appBaseUrl()` fell back to the old
+`https://www.sysgov.com` in production, so passkeys were asked for the
+old domain (the browser refuses) and email links pointed there.
+
+- **Phase 1 (this PR):** the production fallback is
+  `https://www.forgeaxi.com` (tested, with the passkey domain it gives);
+  the User Manual's sign-in addresses and the Admin Manual's storage
+  CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old
+  passkeys can't move and how to recover (set the variable, redeploy,
+  password plus authenticator or recovery code, add a new passkey).
+- **Phase 2 (waits on the owner):** the contact addresses
+  (support@ / sales@), the default email sender, the authenticator
+  label and the deliverability canary, once the owner names the
+  forgeaxi.com addresses.
+
+---
+
 ### BL-NAV-LIFECYCLE — The everyday menu is the proposal lifecycle
 
 **Owner, 2026-11-01 (FORGE II document):** the everyday sidebar

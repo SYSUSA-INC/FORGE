@@ -35,12 +35,13 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **No more lockouts at the second step** — a passkey is offered only on the address it was made on (and FORGE names the ones made elsewhere instead of failing); **Email me a recovery link** gets you past the step once when neither your passkey nor your app works; platform administrators keep both a passkey and an authenticator app, and either one gets them in (§1.6).
 - **Evaluate: GO, NO-GO or PARTNER** — Pipeline → Evaluate lists every opportunity waiting for the call, each with **Analyze**, **Capability Matrix** and **Decide**, filtered by what it still needs; the decision is kept with the PWin and coverage of the moment, a NO-GO needs a reason category and your own words, a PARTNER lists the teaming partners and subcontractors you already work with; the Solicitations list folded into Evaluate (§5.3.1).
 - **Bid email address** — your company gets one FORGE address to register on state portals, primes' supplier portals and bid services; they mail FORGE directly, every email lands in the Bid inbox on Identify → Scout → Enterprise portals, and the AI reads the bids in each alert into finds on the All tab, attachments included when you add one (§5.2).
 - **Scout on one page** — Identify → Scout has a source bar (All, SAM.gov, GSA eBuy, GSA email, Enterprise portals, GWACs), one search bar for the nightly scout with Search and Save as nightly scout, and one compact list for every source with Add to pipeline on each row; finds filter by Recommended, Not yet reviewed, All and Skipped; a pasted eBuy RFQ or GSA email appears as the same row, open on its fields, and adding it keeps you on the page (§5.2, §5.2.2).
 - **Amendments filed for you** — for every open pursuit with a SAM.gov notice, FORGE checks SAM.gov daily for amendments and new documents, files them on the opportunity to be read and compared, moves the response date when an amendment does, and tells the owner and the proposal and review teams in the app and by email; **Check SAM.gov now** on the opportunity runs it at once (§5.4 Overview).
 - **Scout reads every notice in your codes** — the nightly scout now keeps every open SAM.gov notice in your NAICS codes and uses your keywords to rank them rather than filter them out, reads up to 1,000 notices per code (it was 100), and its run note shows where the notices went; the AI reviews the 25 best each night and leaves a fifth of your AI allowance for the rest of FORGE (§5.2.1).
-- **Two-step sign-in** — every sign-in now asks for a passkey or a code from your authenticator app (or a recovery code) after the password; the first sign-in sets it up; platform administrators sign in with a passkey; sessions end after 8 hours idle or 24 hours (§1.3, §1.6).
+- **Two-step sign-in** — every sign-in now asks for a passkey or a code from your authenticator app (or a recovery code) after the password; the first sign-in sets it up; platform administrators keep both a passkey and an authenticator app; sessions end after 8 hours idle or 24 hours (§1.3, §1.6).
 - **Next action** — every opportunity and proposal overview opens with what FORGE proposes you do next on that pursuit and why, from rules over its state: the evaluation, the questionnaire, the gate, the proposal, its drafts, compliance, reviews and scan, the outcome and the lessons; an At risk action comes first when the deadline is close; Done and Not now for the owner, Capture and Admin (§5.4 Overview, §6.3 Overview). The Command Center lists the open ones across your pursuits, the pipeline brief builds its priorities from them, the weekly digest email carries yours, and Reports shows how many were taken (§2.2, §5.5, §5.6, §10.1). With **Prepare ahead** on, FORGE does the preparable ones overnight (outline, questionnaire with suggested answers, compliance map, section drafts as tracked insertions, health scan) and the panel says what it prepared for you to review (§4.12).
 - **Lessons** — every decided bid's Outcome tab gets lessons FORGE drafts from the outcome, the debrief, the winner analysis and the reviews; a Capture or Admin user confirms each; the drafter, the Evaluation tab, the pursuit brief and the company model read the confirmed ones, and the Lessons page shows which closed the loop (§6.3 Outcome and lessons, §6.4).
 - **Company model** — Settings → Company model is FORGE's own account of what your company does, drafted from the profile, the Knowledge base, decided bids and confirmed questionnaires, and approved by an admin; the scout, the questionnaire's suggestions, the drafter and the pursuit brief read the approved version, and the Command Center says when it has gone stale (§4.17).
@@ -69,13 +70,13 @@ A short tour of what arrived recently; each line points to the section that expl
 
 ### 1.0 Request a trial
 
-New to FORGE and not invited by a colleague? Open **https://www.sysgov.com/request-trial** (or **Request a trial** on the sign-up page) and enter your name, **company email**, company, and optionally your job title and what you'd like to try. Personal mailboxes (Gmail, Outlook, Yahoo …) and throwaway inboxes can't request a trial, and if your company is already on FORGE you'll be asked to get an invitation from its admin instead. We review every request; once approved you get an email inviting you to your own workspace with a **14-day trial**. When the trial ends your work stays and editing carries on; AI features pause until your admin chooses a plan.
+New to FORGE and not invited by a colleague? Open **https://www.forgeaxi.com/request-trial** (or **Request a trial** on the sign-up page) and enter your name, **company email**, company, and optionally your job title and what you'd like to try. Personal mailboxes (Gmail, Outlook, Yahoo …) and throwaway inboxes can't request a trial, and if your company is already on FORGE you'll be asked to get an invitation from its admin instead. We review every request; once approved you get an email inviting you to your own workspace with a **14-day trial**. When the trial ends your work stays and editing carries on; AI features pause until your admin chooses a plan.
 
 The same deliverability rule as sign-up applies: an address whose domain receives no email is refused with "That domain does not receive email", since the approval would be sent there.
 
 ### 1.1 Create your account
 
-Open **https://www.sysgov.com/sign-up**.
+Open **https://www.forgeaxi.com/sign-up**.
 
 ![Sign-up card](docs/images/sign-up.png)
 
@@ -101,7 +102,7 @@ After verification you land on the sign-in page with an **Email verified** confi
 
 ### 1.3 Sign in
 
-On **https://www.sysgov.com/sign-in** enter your email + password and click **Sign in**.
+On **https://www.forgeaxi.com/sign-in** enter your email + password and click **Sign in**.
 
 ![Sign-in card](docs/images/sign-in.png)
 
@@ -123,7 +124,7 @@ Click **Forgot password?** below the sign-in form. Enter your email — you'll g
 
 If a teammate invited you, your email has a link that looks like:
 ```
-https://www.sysgov.com/sign-up?invite=...&id=...
+https://www.forgeaxi.com/sign-up?invite=...&id=...
 ```
 
 Clicking it lands you on a sign-up page pre-filled with your email (you can't change it). Enter your name + password and click **Accept and create account**. You'll be signed in immediately and placed in your teammate's organization with the role they assigned you.
@@ -146,7 +147,8 @@ FORGE asks for a second step at every sign-in: after your password (or Google / 
 - **Add an authenticator app.** Click **Add an authenticator app**, open any authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy and the like), scan the QR code or type the key shown beside it, then enter the six digits the app shows and click **Confirm**. The app counts only once a code has confirmed it. You can name each one ("Phone", "1Password") and hold up to three.
 - **Recovery codes.** Your first authenticator comes with ten single-use recovery codes, shown once: save or **Download** them. A recovery code works in place of an authenticator code if you lose your phone, and each works once. **Replace** mints ten new ones (and voids the old) when you run low or think they were seen; it asks for a current code first.
 - **Remove one.** **Remove** beside a passkey or an app asks for a current code from one of your authenticator apps (or a recovery code). Removing the last factor also voids your recovery codes; you set up again from the start. Passkeys and apps together count towards the three.
-- **Platform administrators** must hold a passkey: their sign-in stops at **Set up two-step sign-in** until one is added, and an authenticator app alone does not get them in.
+- **Platform administrators** keep two ways in: a passkey **and** an authenticator app, so one that stops working (a new phone, a site address that changed) never locks them out. Either one gets them past the second step, and they choose which at each sign-in. The first sign-in sets up both; while one is missing, a strip across the top of every page says which and links here. It never stops them getting in.
+- **A passkey belongs to the address it was made on.** Made on www.forgeaxi.com, it works there; one made on an older address (www.sysgov.com) can't be used on the new one. The **Second step** page offers only the passkeys that work where you are and names the others, so use your app or a code and add a new passkey here.
 - **Codes and time.** A code is good for about a minute around the moment it is shown. If every code is refused, check that your phone sets its time automatically.
 - **Change your email address.** The **Email address** panel shows the address you sign in with; **Change** asks for the new address and a current code, then sends a confirmation link to the new inbox and a notice to the old one. Nothing changes until the new inbox clicks the link (24 hours); until then you keep signing in as before, and **Cancel the change** withdraws it. Once confirmed, every open session is signed out and you sign in with the new address and your usual password and second step; your authenticators, recovery codes and Google / Microsoft links stay. The new address is checked like a sign-up's: a work address whose domain receives email, not one another account uses. An administrator cannot change your address for you; if you have lost access to the old inbox and have no second factor, ask a platform administrator to reset your two-step sign-in and then change the address yourself, or ask your workspace admin to invite the new address.
 
@@ -156,7 +158,9 @@ FORGE asks for a second step at every sign-in: after your password (or Google / 
 
 **A change of address you did not ask for?** The old inbox is told when a change is requested and again when it goes through. Cancel it under Settings → Security and change your password; if it already went through, contact your administrator at once.
 
-**Lost your phone, passkey and recovery codes?** Ask a platform administrator for a two-step reset. They confirm who you are, then remove your authenticators and recovery codes and email you their reason; your password is unchanged, and your next sign-in takes you through **Set up two-step sign-in** again with new recovery codes. If you get that email without having asked, contact your administrator before signing in.
+**Can't use your passkey or app, and no recovery code?** On the **Second step** page, click **Email me a recovery link**. FORGE sends a link to the address you sign in with. It works once, for 15 minutes, and only in the browser where you just entered your password, so your email alone is not enough. Open it, click **Continue with the recovery link**, and you land on Settings → Security to add a new passkey or app, remove the one you lost, and replace your recovery codes. You and every platform administrator get an email saying a recovery link was used, and the Audit Log records it. Three links a day at most; each new one replaces the last.
+
+**Lost your phone, passkey and recovery codes, and your email too?** Ask a platform administrator for a two-step reset. They confirm who you are, then remove your authenticators and recovery codes and email you their reason; your password is unchanged, and your next sign-in takes you through **Set up two-step sign-in** again with new recovery codes. If you get that email without having asked, contact your administrator before signing in.
 
 **Lost everything?** Without your phone and your recovery codes, a platform administrator resets your two-step sign-in (with a written reason, and you are emailed); you then set it up again at the next sign-in.
 
