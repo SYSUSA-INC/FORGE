@@ -8,6 +8,7 @@ const TABS = [
   { key: "analysis", label: "Analysis" },
   { key: "evaluation", label: "Evaluation" },
   { key: "capability", label: "Capability" },
+  { key: "partners", label: "Partners" },
   { key: "competitors", label: "Competitors" },
   { key: "similar", label: "Similar awards" },
   { key: "activity", label: "Activity" },

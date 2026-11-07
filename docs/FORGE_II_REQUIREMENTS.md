@@ -96,7 +96,7 @@ Last reviewed 2026-11-06, after PR #457.
 
 | ID | Requirement | Status |
 |---|---|---|
-| C-1 | Capture lists every GO and PARTNER opportunity on one page. Each opens its own opportunity page with the fields needed to advance it | 🟡 The stage page lists Qualified opportunities (#452). Listing by the GO / PARTNER decision is phase 3 |
+| C-1 | Capture lists every GO and PARTNER opportunity on one page. Each opens its own opportunity page with the fields needed to advance it | ✅ Phase 3a-1: Pipeline → Capture lists every Qualified opportunity with its GO / PARTNER decision, days left, partners and next step; each opens the opportunity's Partners tab |
 | C-2 | A **partner database**: every company with the same NAICS codes and capabilities serving **federal, state or local** markets, with socio-economic status and certifications (ISO, CMMI, CMMC), kept current | 🟡 Company search and the SBA 8(a) registry cover part of the federal market. ⚠️ The plan named federal sources only. **State and local** are added here. ❓ Their sources (state procurement registries, certification bodies) need the owner's call |
 | C-3 | FORGE AI finds teaming and subcontracting partners in that database and gives a **prioritised list with its rationale** | 📋 Phase 3 |
 | C-4 | FORGE AI can scout for more partners on request | ⚠️ Added to phase 3 |
@@ -106,8 +106,8 @@ Last reviewed 2026-11-06, after PR #457.
 | C-8 | **Agreement templates**: teaming agreement, subcontract, contractor teaming arrangement and others | 📋 Phase 8 |
 | C-9 | The company fills in the agreement and sends its link from the portal | 📋 Phase 8 |
 | C-10 | The partner opens the link, proposes redlines, goes back and forth, then signs, all in the portal | 📋 Phase 8: e-signature through a provider (DocuSign or Dropbox Sign) |
-| C-11 | Once the agreement is final and the partner chosen, the opportunity moves to Plan | 📋 Phase 3 / 8 |
-| C-12 | GO opportunities go straight to Plan | 📋 Phase 3 |
+| C-11 | Once the agreement is final and the partner chosen, the opportunity moves to Plan | 🟡 Phase 3a-1: Choose partner and Move to Plan; a PARTNER opportunity needs a chosen partner, and "Teaming agreement: to do" is recorded until the agreement module (phase 8, owner 2026-11-07) |
+| C-12 | GO opportunities go straight to Plan | ✅ Phase 3a-1: a GO opportunity's Move to Plan is open at once |
 
 ## P — Plan (footnote 7)
 
