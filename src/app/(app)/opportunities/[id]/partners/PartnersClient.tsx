@@ -64,7 +64,7 @@ export function PartnersClient(props: {
             <ul className="flex flex-col divide-y divide-layer/10">
               {props.partners.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[14rem] flex-1">
                     <Link href={`/companies/${p.companyId}`} className="font-body text-[14px] text-text hover:underline">
                       {p.name}
                     </Link>
@@ -153,11 +153,11 @@ export function PartnersClient(props: {
             </button>
           </div>
           <p className="mt-2 font-body text-[12px] text-muted">
-            Not in your Companies?{" "}
+            Not in your Companies? Use <strong className="font-medium text-text">Find partners</strong> below, or{" "}
             <Link href={`/companies/search${props.naics ? `?naics=${encodeURIComponent(props.naics)}` : ""}`} className="aur-link">
-              Search SAM.gov for partners
-            </Link>{" "}
-            and add them to Companies first.
+              search SAM.gov by name
+            </Link>
+            .
           </p>
         </Panel>
       </div>
