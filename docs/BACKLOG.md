@@ -3182,7 +3182,17 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 ---
 
 ### BL-SCOUT-FILES — Add to pipeline brings the notice's documents
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🚧 this PR
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ merged (#469); follow-up 🚧 this PR
+
+**Follow-up (owner, 2026-11-07):** "I am still not able to upload
+multiple documents" under Evaluate. The opportunity's **Add a document
+to this opportunity** reused the new-solicitation form, which takes the
+first file only (one file becomes one solicitation). On an opportunity
+the form now takes every file dropped or picked (`multiple`), files
+each in turn through the same queue, and counts them. Creating a
+solicitation still takes one file. The "did not reach storage" failure
+the owner saw alongside is the storage/CORS check on Admin → Jobs →
+File storage, not a code change (admin manual, File storage).
 
 **Owner, 2026-11-07:** "can you also download attachments that are with
 the opportunity? So that we have everything ready"; and the Scout's
