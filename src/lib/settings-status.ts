@@ -129,7 +129,7 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
       category: "data",
       configured: envSet("AWARDS_INTEL_ENABLED"),
       powers:
-        "BD-side awards search by NAICS / agency / keyword. Flags incumbents whose contracts end within 12 months as recompete prospects.",
+        "BD-side awards search by NAICS / agency / keyword. Flags incumbents whose contracts end within 12 months as recompete prospects. Gives Find partners (Capture) its past performance.",
       detail: envSet("AWARDS_INTEL_ENABLED")
         ? "AWARDS_INTEL_ENABLED=1. Available at /intelligence/awards."
         : "Preview feature. Set AWARDS_INTEL_ENABLED=1 to enable /intelligence/awards. Uses the same public USAspending API (no extra credentials).",

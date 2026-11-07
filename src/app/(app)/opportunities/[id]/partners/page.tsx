@@ -6,6 +6,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { planBlocker } from "@/lib/capture-logic";
 import { companiesToConsider, listOpportunityPartners } from "@/lib/capture-store";
 import { latestDecisions, partnerSuggestions } from "@/lib/opportunity-decision-store";
+import { PartnerSearch } from "./PartnerSearch";
 import { PartnersClient } from "./PartnersClient";
 
 export const dynamic = "force-dynamic";
@@ -34,14 +35,17 @@ export default async function OpportunityPartnersPage({ params }: { params: { id
   const considered = new Set(partners.map((p) => p.companyId));
   const chosen = partners.filter((p) => p.status === "chosen").length;
   return (
-    <PartnersClient
-      opportunityId={params.id}
-      decision={decision}
-      partners={partners}
-      suggestions={suggestions.filter((s) => !considered.has(s.id)).map((s) => ({ id: s.id, name: s.name, why: s.why }))}
-      companies={companies}
-      blocker={planBlocker({ stage: opp.stage, decision, chosen })}
-      naics={opp.naics}
-    />
+    <div className="flex flex-col gap-4">
+      <PartnersClient
+        opportunityId={params.id}
+        decision={decision}
+        partners={partners}
+        suggestions={suggestions.filter((s) => !considered.has(s.id)).map((s) => ({ id: s.id, name: s.name, why: s.why }))}
+        companies={companies}
+        blocker={planBlocker({ stage: opp.stage, decision, chosen })}
+        naics={opp.naics}
+      />
+      <PartnerSearch opportunityId={params.id} naics={opp.naics} />
+    </div>
   );
 }
