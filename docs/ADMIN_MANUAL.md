@@ -694,8 +694,10 @@ Migration 0107 adds `api_token` — sync it on `/admin/migrations` after deployi
 
 1. Check **Resend** dashboard at https://resend.com/emails — was the email sent?
 2. Check the user's spam folder
-3. Check the domain is verified at https://resend.com/domains (sysgov.com should show green SPF/DKIM/DMARC)
-4. Check Vercel env vars: `RESEND_API_KEY` and `EMAIL_FROM` are set on Production, Preview, and Development
+3. Check the sending domain is verified at https://resend.com/domains (forgeaxi.com should show green SPF/DKIM/DMARC). Settings → Integrations (Resend) shows the From address in use and its domain. Since BL-DOMAIN-FORGEAXI phase 2 a message Resend refuses is reported, not silently dropped: the log says `[email] send refused` with the reason, and screens that send mail (a reset, an invite, a recovery link) say the email could not be sent
+4. Check Vercel env vars: `RESEND_API_KEY` is set. `EMAIL_FROM` is optional: without it FORGE sends from `FORGE <noreply@<site domain>>` (`noreply@forgeaxi.com`); set it only to send from another verified address, and remove an old one naming sysgov.com
+
+**Moving the sending domain (forgeaxi.com).** In Resend → Domains, add `forgeaxi.com` and add the DNS records it lists (SPF and DKIM; Resend's bounce records sit on a `send.` subdomain, so they don't touch the Microsoft 365 mail records) at your DNS host, then **Verify**. Only once it shows Verified, remove or update `EMAIL_FROM` on Vercel and redeploy. Until then, every email to forgeaxi.com's sender is refused. The authenticator app entry is named after the site too (`FORGE (forgeaxi.com)`); existing entries keep the name they were scanned with.
 
 ### 7.1.1 What the emails look like
 

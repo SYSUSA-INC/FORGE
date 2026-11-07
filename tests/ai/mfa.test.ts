@@ -1,3 +1,4 @@
+import { mfaIssuer } from "@/lib/site-domain";
 import { describe, expect, it } from "vitest";
 import { cleanFactorLabel, generateRecoveryCodes, MFA_LIMITS, newTotpSecret, normalizeRecoveryCode, normalizeTotpCode, totpCodeAt, totpTimeStep, totpUri, verifyTotp } from "@/lib/mfa";
 
@@ -38,7 +39,9 @@ describe("BL-STAB-8a-1 — the authenticator", () => {
     expect(uri.startsWith("otpauth://totp/")).toBe(true);
     expect(uri).toContain("ana%40example.com");
     expect(uri).toContain(`secret=${secret}`);
-    expect(decodeURIComponent(uri)).toContain("FORGE (sysgov.com)");
+    // BL-DOMAIN-FORGEAXI 2 — named after the site's domain, not a hard-coded one.
+    expect(decodeURIComponent(uri)).toContain(`issuer=${mfaIssuer()}`);
+    expect(decodeURIComponent(uri)).not.toContain("sysgov");
   });
 
   it("accepts the current code and the steps either side, not two steps away", async () => {

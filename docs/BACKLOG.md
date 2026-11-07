@@ -3244,7 +3244,7 @@ www.forgeaxi.com), and end to end in a browser.
 ---
 
 ### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
-**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 waits on the owner
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 in this PR; phase 3 waits on the owner
 
 **Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
 web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
@@ -3259,10 +3259,18 @@ old domain (the browser refuses) and email links pointed there.
   CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old
   passkeys can't move and how to recover (set the variable, redeploy,
   password plus authenticator or recovery code, add a new passkey).
-- **Phase 2 (waits on the owner):** the contact addresses
-  (support@ / sales@), the default email sender, the authenticator
-  label and the deliverability canary, once the owner names the
-  forgeaxi.com addresses.
+- **Phase 2 (this PR; owner, 2026-11-07: "the email is still coming
+  from SYSGOV.com", "the Authenticator app still shows SYSGOV"):** the
+  sender and the authenticator name come from the site's address
+  (`src/lib/site-domain.ts`, pure, tested): `FORGE <noreply@forgeaxi.com>`
+  unless `EMAIL_FROM` says otherwise, and `FORGE (forgeaxi.com)`. Found
+  on the way: Resend reports a refused message in `error` rather than
+  throwing, and `sendEmail` ignored it, so a refusal (an unverified
+  domain) read as sent; it now throws with the reason, logged
+  `[email] send refused`, and every caller already handles a failed
+  send. Settings → Integrations names the From address and its domain.
+- **Phase 3 (waits on the owner):** the contact addresses shown in the
+  app (support@ / sales@sysgov.com), once the owner names them.
 
 ---
 

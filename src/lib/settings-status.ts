@@ -7,6 +7,7 @@
  * browser, so each detection has to run on the server and serialize
  * its result down to the client.
  */
+import { emailFrom, emailFromDomain } from "@/lib/site-domain";
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -212,7 +213,7 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
       powers:
         "Outbound mail: invitations, password resets, opportunity review requests.",
       detail: envSet("RESEND_API_KEY")
-        ? `RESEND_API_KEY is set. From: ${process.env.EMAIL_FROM ?? "Forge <noreply@sysgov.com>"}.`
+        ? `RESEND_API_KEY is set. From: ${emailFrom()} (the domain ${emailFromDomain()} must be verified in Resend, or every email is refused).`
         : "Set RESEND_API_KEY on Vercel. Without it, emails are logged but not sent.",
     },
   ];

@@ -3,9 +3,11 @@ import { log } from "@/lib/log";
 import { appBaseUrl, inviteUrl, passwordResetUrl, verifyEmailUrl } from "@/lib/app-url";
 import { buildDigestEmail, buildRuleNotificationEmail } from "@/lib/notification-email";
 import { EMAIL_HEX } from "@/lib/theme-colors";
+import { emailFrom, emailFromAddress } from "@/lib/site-domain";
 
 const apiKey = process.env.RESEND_API_KEY;
-const from = process.env.EMAIL_FROM ?? "Forge <noreply@sysgov.com>";
+// BL-DOMAIN-FORGEAXI 2 — from the site's domain unless EMAIL_FROM says otherwise.
+const from = emailFrom();
 
 let client: Resend | null = null;
 
@@ -36,14 +38,23 @@ export async function sendEmail(opts: {
     });
     return;
   }
-  await getClient().emails.send({
-    from: opts.from ?? from,
+  // BL-DOMAIN-FORGEAXI 2 — Resend reports a refused message (an
+  // unverified sending domain, a bad address) in `error`, not by
+  // throwing. Ignoring it made every refusal look like a sent email.
+  const sender = opts.from ?? from;
+  const res = await getClient().emails.send({
+    from: sender,
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
     text: opts.text,
     ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
   });
+  if (res?.error) {
+    const message = res.error.message || res.error.name || "the email service refused the message";
+    log.error("[email]", "send refused", { subject: opts.subject, from: sender, error: message });
+    throw new Error(/domain/i.test(message) ? `${message} (the sending domain must be verified in Resend)` : message);
+  }
 }
 
 // BL-AUTH-INVITE — the origin and the invite / reset links are built in
@@ -424,7 +435,7 @@ export async function sendOpportunityReviewRequestEmail(opts: {
   // From line: platform brand. The sender's identity is conveyed in
   // the body ("[Sender Name] from [Sender Company] would like..."),
   // and Reply-To routes replies to the human's real address.
-  const fromAddr = process.env.EMAIL_FROM_ADDRESS ?? "noreply@sysgov.com";
+  const fromAddr = emailFromAddress();
   const platformFrom = `"FORGE" <${fromAddr}>`;
 
   await sendEmail({
