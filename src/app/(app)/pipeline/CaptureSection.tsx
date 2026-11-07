@@ -8,6 +8,7 @@ import { DECISION_LABELS, daysLeft } from "@/lib/opportunity-decision";
 import { latestDecisions, type DecisionView } from "@/lib/opportunity-decision-store";
 import { safeQuery } from "@/lib/schema-resilience";
 import type { StageListRow } from "./StageList";
+import { SourceLink } from "@/components/opportunities/SourceLink";
 
 const DECISION_TONE = { go: "text-green", no_go: "text-red", partner: "text-indigo" } as const;
 
@@ -42,7 +43,11 @@ export async function CaptureSection({ rows }: { rows: StageListRow[] }) {
                   <Link href={`/opportunities/${r.id}`} className="block truncate font-body text-[14px] text-text hover:underline">
                     {r.title}
                   </Link>
-                  <p className="truncate font-mono text-[11px] text-muted">{[r.agency, r.solicitationNumber, r.owner ?? "unassigned"].filter(Boolean).join(" · ")}</p>
+                  <p className="flex min-w-0 items-baseline gap-1 font-mono text-[11px] text-muted">
+                    <span className="truncate">{[r.agency, r.solicitationNumber, r.owner ?? "unassigned"].filter(Boolean).join(" · ")}</span>
+                    {r.sourceUrl ? <span aria-hidden="true">·</span> : null}
+                    <SourceLink source={r.source} url={r.sourceUrl} className="shrink-0" />
+                  </p>
                 </div>
                 <span className={`font-mono text-[11px] uppercase tracking-widest ${decision ? DECISION_TONE[decision] : "text-muted"}`}>{decision ? DECISION_LABELS[decision] : "no decision"}</span>
                 <span className={`font-mono text-[11px] ${days !== null && days < 5 ? "text-red" : "text-muted"}`}>{days === null ? "no due date" : days < 0 ? "past due" : `${days}d left`}</span>

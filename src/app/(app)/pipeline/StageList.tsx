@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import type { OpportunityStage } from "@/db/schema";
 import { STAGE_LABELS } from "@/lib/opportunity-types";
+import { SourceLink } from "@/components/opportunities/SourceLink";
 
 export type StageListRow = {
   id: string;
@@ -9,6 +10,9 @@ export type StageListRow = {
   agency: string;
   stage: OpportunityStage;
   solicitationNumber: string;
+  /** BL-OPP-SOURCE — where it came from, and the link back. */
+  source: string;
+  sourceUrl: string;
   responseDueDate: string | null;
   pWin: number;
   owner: string | null;
@@ -31,6 +35,7 @@ export function StageList({ rows, title, empty }: { rows: StageListRow[]; title:
                 {r.title}
               </Link>
               <span className="font-mono text-[11px] text-muted">{r.agency || "—"}</span>
+              <SourceLink source={r.source} url={r.sourceUrl} className="font-mono text-[11px]" />
               <span className="rounded bg-cobalt/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-cobalt">{STAGE_LABELS[r.stage]}</span>
               <span className="font-mono text-[11px] text-muted">{r.responseDueDate ? `due ${r.responseDueDate.slice(0, 10)}` : "no due date"}</span>
               <span className="font-mono text-[11px] text-muted">PWin {r.pWin}%</span>

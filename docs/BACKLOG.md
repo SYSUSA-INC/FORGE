@@ -3311,6 +3311,9 @@ SAM.gov opportunities filled in; the lighter one-line title on every page.
 - **Overview:** **Source** and **Source link** on the form; a SAM.gov
   opportunity left without a link takes its notice's page. **Under the
   title:** "Source: SAM.gov · sam.gov ↗", the link opening in a new tab.
+  **On every row** (owner, 2026-11-07, "we need the source link at every
+  stage"): Evaluate, Capture, the other stage pages and the Opportunities
+  list show `SourceLink` beside the agency, "notice ↗" as Scout does.
 - **Page titles** (`PageHeader`, every page): one line at any width, 24 to
   28 px at the regular weight instead of 36 to 48 px; a long title ends in
   "…" and shows in full on hover. `docs/DESIGN_SYSTEM.md` §4 rule 6.
