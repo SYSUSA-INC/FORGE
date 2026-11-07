@@ -19,8 +19,8 @@ export default function NotFound() {
           <Link href="/" className="aur-btn-primary">
             Command Center
           </Link>
-          <Link href="/solicitations" className="aur-btn">
-            Solicitations
+          <Link href="/pipeline/evaluate" className="aur-btn">
+            Evaluate
           </Link>
           <Link href="/proposals" className="aur-btn">
             Proposals

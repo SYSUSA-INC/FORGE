@@ -5303,3 +5303,39 @@ export const inboundEmails = pgTable(
 );
 
 export type InboundEmail = typeof inboundEmails.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-NAV-LIFECYCLE phase 2a — the Evaluate decision (drizzle/0150): GO,
+// NO-GO or PARTNER, each a record kept, with a No-Go's reason and the PWin
+// and capability coverage when it was made.
+// ─────────────────────────────────────────────────────────────────────
+
+export const opportunityDecisionKindEnum = pgEnum("opportunity_decision_kind", ["go", "no_go", "partner"]);
+export type OpportunityDecisionKind = (typeof opportunityDecisionKindEnum.enumValues)[number];
+
+export const opportunityDecisions = pgTable(
+  "opportunity_decision",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    decision: opportunityDecisionKindEnum("decision").notNull(),
+    /** A No-Go's category (src/lib/opportunity-decision.ts); "" otherwise. */
+    reasonCategory: text("reason_category").notNull().default(""),
+    reason: text("reason").notNull().default(""),
+    /** The PWin and capability coverage (0..1) when the decision was made. */
+    pwin: integer("pwin"),
+    coverage: real("coverage"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_decision_org_idx").on(t.organizationId, t.createdAt),
+    oppIdx: index("opportunity_decision_opp_idx").on(t.opportunityId, t.createdAt),
+  }),
+);
+export type OpportunityDecision = typeof opportunityDecisions.$inferSelect;

@@ -277,7 +277,7 @@ export default async function SolicitationDetail({
         }
         actions={
           <>
-            <Link href="/solicitations" className="aur-link">
+            <Link href={s.opportunityId ? `/opportunities/${s.opportunityId}` : "/pipeline/evaluate"} className="aur-link">
               Back
             </Link>
             <SolicitationActions

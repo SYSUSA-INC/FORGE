@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Evaluate: GO, NO-GO or PARTNER** — Pipeline → Evaluate lists every opportunity waiting for the call, each with **Analyze**, **Capability Matrix** and **Decide**, filtered by what it still needs; the decision is kept with the PWin and coverage of the moment, a NO-GO needs a reason category and your own words, a PARTNER lists the teaming partners and subcontractors you already work with; the Solicitations list folded into Evaluate (§5.3.1).
 - **Bid email address** — your company gets one FORGE address to register on state portals, primes' supplier portals and bid services; they mail FORGE directly, every email lands in the Bid inbox on Identify → Scout → Enterprise portals, and the AI reads the bids in each alert into finds on the All tab, attachments included when you add one (§5.2).
 - **Scout on one page** — Identify → Scout has a source bar (All, SAM.gov, GSA eBuy, GSA email, Enterprise portals, GWACs), one search bar for the nightly scout with Search and Save as nightly scout, and one compact list for every source with Add to pipeline on each row; finds filter by Recommended, Not yet reviewed, All and Skipped; a pasted eBuy RFQ or GSA email appears as the same row, open on its fields, and adding it keeps you on the page (§5.2, §5.2.2).
 - **Amendments filed for you** — for every open pursuit with a SAM.gov notice, FORGE checks SAM.gov daily for amendments and new documents, files them on the opportunity to be read and compared, moves the response date when an amendment does, and tells the owner and the proposal and review teams in the app and by email; **Check SAM.gov now** on the opportunity runs it at once (§5.4 Overview).
@@ -194,7 +195,7 @@ The sidebar shows one **workspace** at a time, scoped to the hat you are wearing
 | **Company admin** | org admins | People (Users & Roles); Organization (Settings, Billing, Templates, Integrations, AI Engine, API access); Governance (Notification rules, Audit Log); Admin guide |
 | **Platform admin** | platform superadmins | Organizations & users (Overview, Organizations, Platform users, Trial requests, Source requests — the first three are the SuperAdmin portal's tabs, in the portal's order; a menu click opens the tab and a tab click updates the menu); Commercial (Subscription tiers, AI usage & costs, Promo codes); Operations (Background jobs, Production errors, Database migrations, SBA 8(a) registry, cross-tenant Audit Log); Admin guide |
 
-**The lifecycle (BL-NAV-LIFECYCLE).** FORGE's proposal lifecycle is **Identify → Evaluate → Capture → Plan → Develop → Deliver → Measure**. Under **Opportunity Management**, **Pipeline** opens the funnel as before, and the seven stages sit under it in the sidebar: each is a page at `/pipeline/<stage>` with the **chevron** across the top showing where you are, every chevron a link to that stage. The same chevron sits on every opportunity and proposal, lit at the stage that pursuit is in. **Identify** holds two tabs: **Scout**, the nightly finds and every source to bring opportunities in from, on one page (§5.2), and **Create**, one page to start from a solicitation document or fill in an opportunity by hand (§5.3); what you add lands in the pipeline at Identified. **Evaluate** lists what was identified and is waiting for the call; **Capture**, the Go decisions; **Plan**, the captured pursuits being planned; **Develop**, the ones with a response in the works, with the proposals list one click away; **Deliver**, the submitted ones; **Measure**, the wins, losses and no-bids, with Reports, Lessons and Loss intelligence one click away. Today each stage page lists the opportunities at the matching pipeline stage and links to the work; the stage's own tools (Analyze and the Go / No-Go / Partner decision on Evaluate, the plan on Plan, the draft on Develop, submission on Deliver) arrive stage by stage. The other groups are unchanged. ⌘K still finds the old pages by name (Import from SAM.gov, Paste from eBuy, Paste GSA email, Solicitations, New solicitation, In-flight proposals, New proposal).
+**The lifecycle (BL-NAV-LIFECYCLE).** FORGE's proposal lifecycle is **Identify → Evaluate → Capture → Plan → Develop → Deliver → Measure**. Under **Opportunity Management**, **Pipeline** opens the funnel as before, and the seven stages sit under it in the sidebar: each is a page at `/pipeline/<stage>` with the **chevron** across the top showing where you are, every chevron a link to that stage. The same chevron sits on every opportunity and proposal, lit at the stage that pursuit is in. **Identify** holds two tabs: **Scout**, the nightly finds and every source to bring opportunities in from, on one page (§5.2), and **Create**, one page to start from a solicitation document or fill in an opportunity by hand (§5.3); what you add lands in the pipeline at Identified. **Evaluate** lists what was identified and is waiting for the call; **Capture**, the Go decisions; **Plan**, the captured pursuits being planned; **Develop**, the ones with a response in the works, with the proposals list one click away; **Deliver**, the submitted ones; **Measure**, the wins, losses and no-bids, with Reports, Lessons and Loss intelligence one click away. **Evaluate** has its own list and the GO / NO-GO / PARTNER decision (§5.3.1); the other stage pages list the opportunities at the matching pipeline stage and link to the work, and their own tools (the plan on Plan, the draft on Develop, submission on Deliver) arrive stage by stage. The other groups are unchanged. ⌘K still finds the old pages by name (Import from SAM.gov, Paste from eBuy, Paste GSA email, New solicitation, In-flight proposals, New proposal); the Solicitations list is now part of Evaluate.
 
 **A folding menu.** One group is open at a time: opening a group folds the others, and the group of the page you are on is always open. Inside Opportunity Management, Pipeline and Identify fold too: click the **+** beside them, and they open on their own when you are on a page inside them. The fold state of the groups is remembered in this browser.
 
@@ -537,6 +538,29 @@ Fill in:
 
 Click **Create opportunity**. You'll land on the detail page.
 
+### 5.3.1 Evaluate: the list and the decision
+
+**Opportunity Management → Pipeline → Evaluate** lists every opportunity at Identified or Evaluated, waiting for the call, one row each:
+
+| Column | Shows |
+|---|---|
+| Opportunity | Title, agency, number and owner; the title opens the opportunity |
+| Due | Days left, in red under five |
+| Analysis | **Analyze** until the opportunity has a pursuit brief, then its PWin and the brief's call (Pursue, Watch, Consider no-bid) |
+| Capability | **Capability Matrix** until its questionnaire is built, then its coverage |
+| Decision | **Decide** once both exist (before then the button says what is missing: you can still decide), then the decision made |
+
+**Analyze** opens the PWin and the AI pursuit brief on the opportunity's overview; the Analysis Report page comes next. **Capability Matrix** opens the questionnaire on the Evaluation tab. The filters above the list are **All**, **Needs analysis**, **Needs matrix** and **Ready to decide**, each with its count.
+
+**The decision.** **Decide** opens the **Decision** panel on the opportunity's Evaluation tab, which takes the place of the gate panel while the opportunity is in Evaluate. Choose one:
+- **GO** moves the opportunity to Capture (Qualified), on its way to Plan. A note is optional.
+- **NO-GO** closes it as **No bid**, which also stops FORGE watching SAM.gov for its amendments. Choose why (scope isn't ours, no capacity or staff, can't win on price, competition or incumbent too strong, not enough time, no customer relationship, can't meet a requirement or set-aside, other) and say it in your own words, at least 20 characters. It can't be saved without both.
+- **PARTNER** moves it to Capture (Qualified) as needing a partner. The panel lists the companies in your **Companies** marked teaming partner or subcontractor, those working under the opportunity's NAICS code first, each with why it is listed. **Find more partners** opens Company search with the opportunity's NAICS code filled in. FORGE's own partner finder comes with Capture.
+
+The panel says when the analysis or the capability matrix is still missing; the decision is better informed with both. Every decision is **kept**, never overwritten: who made it, when, the PWin and capability coverage at that moment, the category and the reason. The history is listed under the panel, newest first, and each decision is noted on the Activity tab and recorded in the Audit Log. Once the opportunity is in Capture the call can still change, as a new decision; after that the gate panel moves it on.
+
+**Solicitation documents.** The Solicitations list is now part of Evaluate: under the list, **Documents not yet on an opportunity** shows each uploaded solicitation not yet attached to one, with **Create opportunity from it** (the Create tab, filled in from the document) and **+ Upload solicitation**. A document on an opportunity opens from that opportunity; its own page stays, and its **Back** link returns to the opportunity. The old `/solicitations` address opens Evaluate.
+
 ### 5.4 Opportunity detail — tabs
 
 Every opportunity has four tabs.
@@ -570,7 +594,7 @@ A qualification scorecard with 5 weighted dimensions (0–100 sliders):
 
 A live **Rollup score** with a verdict label — **Strong pursue** (≥70), **Watch** (50–69), or **Consider no-bid** (<50). Add a rationale and click **Save evaluation**. The save is stamped with your user id and a timestamp, so anyone reviewing the deal later can see who scored it that way and when.
 
-Right-side **Gate decision** panel lets you:
+While the opportunity is in Evaluate (Identified or Evaluated), the right side shows the **Decision** panel instead: GO, NO-GO or PARTNER, with the decisions so far (§5.3.1). From Capture on, the **Gate decision** panel moves it along, with the decision history above it. The gate panel lets you:
 - **Advance stage** to any non-closed stage
 - **Declare no-bid** (stage → Archived · No bid)
 - **Record as lost** (stage → Lost)
@@ -1008,7 +1032,7 @@ Every stage change writes a row to the **opportunity Activity** timeline (§5.4)
 
 ### 9.2 Gate decisions
 
-No-bid and lost decisions are required to carry a reasoning note (§5.4 Evaluation tab). Like stage history, they live on the Activity timeline and cannot be edited or removed. This is the single most useful trail when leadership asks "why did we walk away?".
+No-bid and lost decisions are required to carry a reasoning note (§5.4 Evaluation tab). The Evaluate decision (GO, NO-GO, PARTNER) is kept as its own record too, with who, when, the PWin and coverage of the moment, and for a NO-GO its category and reason (§5.3.1). Like stage history, they live on the Activity timeline and cannot be edited or removed. This is the single most useful trail when leadership asks "why did we walk away?".
 
 ### 9.3 Evaluation saves
 

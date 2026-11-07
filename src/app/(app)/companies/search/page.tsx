@@ -9,7 +9,7 @@ import { SearchClient } from "./SearchClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function CompanySearchPage() {
+export default async function CompanySearchPage({ searchParams }: { searchParams?: { naics?: string } }) {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
@@ -22,7 +22,9 @@ export default async function CompanySearchPage() {
     .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  const defaultNaics = org?.primaryNaics ?? "";
+  // BL-NAV-LIFECYCLE 2a — Evaluate's "Find more partners" passes the opportunity's NAICS.
+  const asked = (searchParams?.naics ?? "").match(/\d{6}/)?.[0] ?? "";
+  const defaultNaics = asked || (org?.primaryNaics ?? "");
   const orgNaicsList = Array.from(
     new Set(
       [org?.primaryNaics ?? "", ...(org?.naicsList ?? [])].filter(

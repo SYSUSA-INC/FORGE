@@ -193,15 +193,14 @@ const WORK_NAV: WorkspaceNavGroup[] = [
 
 /**
  * BL-NAV-LIFECYCLE — the old Opportunities items that are no longer
- * menu items: the imports (reached from Scout), Solicitations (reached
- * from Evaluate), the proposals list (reached from Develop) and the
+ * menu items: the imports (reached from Scout), New Solicitation (the
+ * Solicitations list folded into Evaluate in phase 2a), the proposals list (reached from Develop) and the
  * creates. ⌘K still offers them; nothing here is admin-only.
  */
 export const WORK_SHORTCUTS: WorkspaceNavItem[] = [
   { href: "/opportunities/import", label: "Import from SAM.gov" },
   { href: "/opportunities/import/ebuy", label: "Paste from eBuy" },
   { href: "/opportunities/import/gsa", label: "Paste GSA email" },
-  { href: "/solicitations", label: "Solicitations" },
   { href: "/solicitations/new", label: "New Solicitation" },
   { href: "/proposals", label: "In-flight Proposals" },
   { href: "/proposals/new", label: "New Proposal" },
