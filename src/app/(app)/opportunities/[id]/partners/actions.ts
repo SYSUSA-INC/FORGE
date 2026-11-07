@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { addPartnerCandidate, moveToPlan, removePartner, setPartnerStatus } from "@/lib/capture-store";
 import { isPartnerCert } from "@/lib/partner-search-logic";
+import { rankPartners, type PartnerRankResult } from "@/lib/partner-rank";
 import { addPartnerFromSearch, searchPartners, type PartnerSearchResult } from "@/lib/partner-search";
 
 /**
@@ -60,16 +61,25 @@ export async function moveToPlanAction(input: { opportunityId: string }): Promis
 }
 
 /** BL-NAV-LIFECYCLE 3a-2 — search the partner database for this opportunity. */
-export async function searchPartnersAction(input: { opportunityId: string; state?: string; cert?: string }): Promise<PartnerSearchResult> {
+export async function searchPartnersAction(input: { opportunityId: string; state?: string; cert?: string; widen?: boolean }): Promise<PartnerSearchResult> {
   const { organizationId, actor } = await who();
   const cert = String(input?.cert ?? "");
   const state = String(input?.state ?? "").trim().toUpperCase();
   if (state && !/^[A-Z]{2}$/.test(state)) return { ok: false, error: "Use a two-letter state code, e.g. VA." };
-  return searchPartners({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor, state, cert: isPartnerCert(cert) ? cert : "" });
+  return searchPartners({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor, state, cert: isPartnerCert(cert) ? cert : "", widen: input?.widen === true });
+}
+
+/** BL-NAV-LIFECYCLE 3b — FORGE AI's best ten from the search, each with a reason from its facts; `widen` is Find more. */
+export async function rankPartnersAction(input: { opportunityId: string; state?: string; cert?: string; widen?: boolean }): Promise<PartnerRankResult> {
+  const { organizationId, actor } = await who();
+  const cert = String(input?.cert ?? "");
+  const state = String(input?.state ?? "").trim().toUpperCase();
+  if (state && !/^[A-Z]{2}$/.test(state)) return { ok: false, error: "Use a two-letter state code, e.g. VA." };
+  return rankPartners({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor, state, cert: isPartnerCert(cert) ? cert : "", widen: input?.widen === true });
 }
 
 /** Add a firm from the search: into Companies (from SAM.gov) and onto this opportunity's partners. */
-export async function addSearchedPartnerAction(input: { opportunityId: string; uei: string; name: string; city?: string; state?: string; relationship: string; reason: string }): Promise<Result> {
+export async function addSearchedPartnerAction(input: { opportunityId: string; uei: string; name: string; city?: string; state?: string; relationship: string; reason: string; fromAi?: boolean }): Promise<Result> {
   const { organizationId, actor } = await who();
   const relationship = input?.relationship === "subcontractor" ? "subcontractor" : "teaming_partner";
   const res = await addPartnerFromSearch({
@@ -81,6 +91,7 @@ export async function addSearchedPartnerAction(input: { opportunityId: string; u
     city: String(input?.city ?? ""),
     state: String(input?.state ?? ""),
     relationship,
+    source: input?.fromAi === true ? "ai" : "search",
     reason: String(input?.reason ?? "").slice(0, 500),
   });
   if (!res.ok) return res;

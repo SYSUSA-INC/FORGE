@@ -3566,8 +3566,36 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/ai/partner-search-logic.test.ts` and
      `tests/isolation/partner-search.test.ts` (USAspending and SAM.gov
      stubbed).
-   - **3b — FORGE AI's ranked partner list** with a reason per partner
-     citing the search's facts, and *Find more*.
+   - **3b — FORGE AI's ranked partner list (this PR).** No migration.
+     **Rank the best 10 with FORGE AI** on the Partners tab
+     (`rankPartners`, `src/lib/partner-rank.ts`) runs the 3a-2 search,
+     hands the AI the top 25 firms with their facts numbered, plus the
+     capability matrix's No and Partial answers (`capabilityGaps`), and
+     keeps its ten picks only where the reason rests on the search.
+     `src/lib/partner-rank-logic.ts` (pure, tested): `citableFacts` (a
+     firm's facts, its place and whether it keeps the set-aside),
+     `buildPartnerRankPrompt` (firm names and facts quoted inside a
+     fence; the prompt says the facts don't show which requirement a
+     firm covers, so a reason never claims a firm closes a gap) and
+     `validateRanking`, which drops a pick that names a UEI the search
+     didn't return, a duplicate, one with no cited fact or a cited fact
+     that doesn't exist, or a reason stating a figure absent from the
+     facts it cites. The panel shows each reason with the facts it rests
+     on, and counts the picks left out. New AI feature `partner_rank`
+     (standard class, prompt version 2026-11-07.1, `aiAutoDraft` gate,
+     the monthly request quota refunded on a stub, a bad format or an
+     answer with nothing kept, 20 per org per hour); recorded as a read,
+     `opportunity.partner.rank`. **Find more** runs the same search
+     widened: the NAICS family (first four digits, which USAspending
+     reads as a prefix; the cert registry is matched with `like`) and
+     any state; SAM.gov's one search stays on the exact code. A partner
+     added from the AI's list has source `ai` and the AI's reason.
+     Tested in `tests/ai/partner-rank-logic.test.ts`,
+     `tests/isolation/partner-rank.test.ts` (AI stubbed) and the widen
+     case in `tests/isolation/partner-search.test.ts`. **Not verified
+     against the live API:** that USAspending accepts the four-digit
+     prefix in `naicsCodes` (documented behaviour; check the first
+     widened search after deploy).
    - **3c — invitations, the partner's own matrix page, Compare and the
      AI's partner rating.**
 4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White

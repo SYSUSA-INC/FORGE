@@ -98,8 +98,8 @@ Last reviewed 2026-11-06, after PR #457.
 |---|---|---|
 | C-1 | Capture lists every GO and PARTNER opportunity on one page. Each opens its own opportunity page with the fields needed to advance it | ✅ Phase 3a-1: Pipeline → Capture lists every Qualified opportunity with its GO / PARTNER decision, days left, partners and next step; each opens the opportunity's Partners tab |
 | C-2 | A **partner database**: every company with the same NAICS codes and capabilities serving **federal, state or local** markets, with socio-economic status and certifications (ISO, CMMI, CMMC), kept current | 🟡 Federal: ✅ phase 3a-2, **Find partners** on the opportunity joins USAspending awards (five years, at the agency first), the SBA certification registry, SAM.gov entities and your Companies by UEI. ISO / CMMI / CMMC come from the partner's own answers (3c). **State and local:** later, one registry at a time as the owner names them (owner, 2026-11-07) |
-| C-3 | FORGE AI finds teaming and subcontracting partners in that database and gives a **prioritised list with its rationale** | 📋 Phase 3 |
-| C-4 | FORGE AI can scout for more partners on request | ⚠️ Added to phase 3 |
+| C-3 | FORGE AI finds teaming and subcontracting partners in that database and gives a **prioritised list with its rationale** | ✅ Phase 3b: **Rank the best 10 with FORGE AI** on the Partners tab, a reason per partner resting on facts the search returned. The AI's partner *rating* from partners' answers is 3c (C-7) |
+| C-4 | FORGE AI can scout for more partners on request | ✅ Phase 3b: **Find more** widens the search to the NAICS family and any state |
 | C-5 | Invite one or more partners from the platform to answer the **same capability matrix** the company answered | 📋 Phase 3: a tokenised link |
 | C-6 | Each partner sees and edits **only its own** answers. The company sees **all partners' answers in one view** | 📋 Phases 3 and 8. ⚠️ The comparison view is added here explicitly |
 | C-7 | FORGE AI rates each partner from its answers and recommends the best-aligned, in priority order | ⚠️ Added to phase 3 |
