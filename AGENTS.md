@@ -114,13 +114,12 @@ continuously, not only at the end:
   of work is big and separable, or the session is going in circles.
   Do not "finish one more thing" first. Commit and push, update the
   handoff (BACKLOG, the PR body), then **start the new session
-  yourself**: in a cloud session, call `create_session` in the same
-  environment with the full handoff prompt (repo, what is merged,
-  the next task and its design doc, the open owner decisions, the
-  process rules, and the local-test setup), tell the user its title,
-  and stop. Where no such tool exists (a local CLI or editor session),
-  give the user the exact restart prompt and stop. Never wait to be
-  asked.
+  yourself**: FORGE sessions run in the cloud, so call
+  `create_session` in the same environment, from `main`, with the
+  full handoff prompt (repo, what is merged, the next task and its
+  design doc, the open owner decisions, the process rules, and the
+  in-container test setup), tell the user its title, and stop. Never
+  wait to be asked, and never fall back to only suggesting a restart.
 - **Spend sparingly while it runs:** read line ranges, not whole files;
   `head`/`tail`/`grep` long outputs; never re-read a file just edited;
   batch independent calls; delegate wide searches to a subagent so the
