@@ -10,6 +10,7 @@ import { formatDollarRange, formatDollars } from "@/lib/money";
 import { StageWidget, spellOutStageCode } from "./StageWidget";
 import { formatDueProximity, type StageStat } from "./stage-stats";
 import { withAlpha } from "@/lib/theme-colors";
+import { SourceLink } from "@/components/opportunities/SourceLink";
 
 type Opp = {
   id: string;
@@ -19,6 +20,9 @@ type Opp = {
   stageLabel: string;
   stageColor: string;
   solicitationNumber: string;
+  /** BL-OPP-SOURCE — where it came from, and the link back. */
+  source: string;
+  sourceUrl: string;
   valueLow: string;
   valueHigh: string;
   responseDueDate: string | null;
@@ -246,15 +250,19 @@ function OppRow({ o }: { o: Opp }) {
         o.capability === undefined ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]"
       }`}
     >
-      <Link href={`/opportunities/${o.id}`} className="min-w-0">
-        <div className="truncate font-display text-[14px] font-semibold text-text">
+      <div className="min-w-0">
+        <Link href={`/opportunities/${o.id}`} className="block truncate font-display text-[14px] font-semibold text-text hover:underline">
           {o.title}
+        </Link>
+        <div className="mt-0.5 flex min-w-0 items-baseline gap-1 font-mono text-[10px] uppercase tracking-label text-muted">
+          <span className="truncate">
+            {o.agency || "—"}
+            {o.solicitationNumber ? ` · ${o.solicitationNumber}` : ""}
+          </span>
+          {o.sourceUrl ? <span aria-hidden="true">·</span> : null}
+          <SourceLink source={o.source} url={o.sourceUrl} className="shrink-0" />
         </div>
-        <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-label text-muted">
-          {o.agency || "—"}
-          {o.solicitationNumber ? ` · ${o.solicitationNumber}` : ""}
-        </div>
-      </Link>
+      </div>
       <span
         className="rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-label"
         style={{

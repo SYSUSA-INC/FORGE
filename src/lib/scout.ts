@@ -87,6 +87,7 @@ import {
   type NoticeMatch,
 } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
+import { scoutSourceFields } from "@/lib/opportunity-source";
 import {
   awardExpiresWithin,
   DEFAULT_SCOUT_PROFILE,
@@ -1487,6 +1488,8 @@ export async function decideScoutCandidate(input: {
         // Award candidates carry a synthetic id; the opportunity gets none.
         // …and a find read from a portal email carries an email-based one (BL-SCOUT-INBOX).
         noticeId: c.source === "watchlist_award" || c.source === "portal_email" ? "" : c.noticeId,
+        // BL-OPP-SOURCE — where it came from, with the find's own link.
+        ...scoutSourceFields(c.source, c.noticeId, c.uiLink),
         responseDueDate: c.responseDueAt,
         releaseDate: c.postedAt,
         naicsCode: c.naicsCode,

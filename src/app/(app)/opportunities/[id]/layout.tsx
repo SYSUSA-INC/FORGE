@@ -12,6 +12,7 @@ import { OpportunityTabs } from "./OpportunityTabs";
 import { DeleteOpportunityButton } from "./DeleteOpportunityButton";
 import { SendForReviewButton } from "./review/SendForReviewButton";
 import { withAlpha } from "@/lib/theme-colors";
+import { normalizeSourceUrl, sourceHost, sourceLabel } from "@/lib/opportunity-source";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export default async function OpportunityDetailLayout({
   const { opp } = row;
   const stageColor = STAGE_COLORS[opp.stage];
   const stageLabel = STAGE_LABELS[opp.stage];
+  const sourceUrl = normalizeSourceUrl(opp.sourceUrl);
 
   return (
     <>
@@ -52,6 +54,19 @@ export default async function OpportunityDetailLayout({
         eyebrow="Opportunity"
         title={opp.title}
         subtitle={[opp.agency, opp.office].filter(Boolean).join(" · ") || undefined}
+        below={
+          <p className="font-mono text-[11px] uppercase tracking-label text-muted">
+            Source: {sourceLabel(opp.source)}
+            {sourceUrl ? (
+              <>
+                {" · "}
+                <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="normal-case tracking-normal text-cobalt hover:underline">
+                  {sourceHost(sourceUrl)} ↗
+                </a>
+              </>
+            ) : null}
+          </p>
+        }
         actions={
           <>
             <Link href="/opportunities" className="aur-link">

@@ -7,11 +7,14 @@ export function PageHeader({
   subtitle,
   actions,
   meta,
+  below,
 }: {
   eyebrow: string;
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  /** A line under the subtitle (the opportunity's source link). */
+  below?: ReactNode;
   meta?: {
     label: string;
     value: string;
@@ -23,19 +26,21 @@ export function PageHeader({
   return (
     <section className="mb-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="min-w-[16rem] flex-1">
           <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-label text-accent">
             <span className="aur-diamond" />
             {eyebrow}
           </div>
-          <h1 className="mt-3 font-display text-4xl font-normal leading-[1.08] tracking-headline text-text md:text-5xl">
+          {/* One line at any width (owner, 2026-11-07): a long title ends in … and shows in full on hover. */}
+          <h1 title={title} className="mt-2 truncate font-display text-2xl font-normal leading-tight tracking-title text-text md:text-[28px]">
             {title}
           </h1>
           {subtitle ? (
-            <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
+            <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted">
               {subtitle}
             </p>
           ) : null}
+          {below ? <div className="mt-1">{below}</div> : null}
         </div>
         {actions ? (
           <div className="flex flex-wrap items-center gap-2">{actions}</div>

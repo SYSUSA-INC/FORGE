@@ -16,6 +16,7 @@ import { aiExtractGsa } from "@/lib/gsa-extract";
 import type { GsaExtractionResult } from "@/lib/ai-prompts";
 import { enqueueJob, queueMissingParse, runDurableBatch } from "@/lib/jobs";
 import { log } from "@/lib/log";
+import { firstLink } from "@/lib/opportunity-source";
 import {
   claimUpload,
   finishClaim,
@@ -197,6 +198,8 @@ export async function createOpportunityFromGsaAction(
         stage: "identified",
         solicitationNumber,
         noticeId: "",
+        source: "gsa_email",
+        sourceUrl: firstLink(rawText, ["ebuy.gsa.gov", "gsa.gov", "sam.gov"]),
         responseDueDate: due,
         naicsCode,
         setAside,

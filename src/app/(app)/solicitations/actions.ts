@@ -16,6 +16,7 @@ import { stripExt } from "@/lib/solicitation-parse";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
 import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseOrphanedClaims, releaseStoredFiles } from "@/lib/uploads";
 import { log } from "@/lib/log";
+import { samNoticeUrl } from "@/lib/opportunity-source";
 
 export type UploadResult =
   | { ok: true; id: string }
@@ -298,6 +299,8 @@ export async function convertToOpportunityAction(
         office: row.office,
         solicitationNumber: row.solicitationNumber,
         noticeId: row.noticeId,
+        source: "document",
+        sourceUrl: samNoticeUrl(row.noticeId),
         naicsCode: row.naicsCode,
         setAside: row.setAside,
         responseDueDate: row.responseDueDate,
