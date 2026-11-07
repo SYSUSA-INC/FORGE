@@ -69,13 +69,13 @@ A short tour of what arrived recently; each line points to the section that expl
 
 ### 1.0 Request a trial
 
-New to FORGE and not invited by a colleague? Open **https://www.sysgov.com/request-trial** (or **Request a trial** on the sign-up page) and enter your name, **company email**, company, and optionally your job title and what you'd like to try. Personal mailboxes (Gmail, Outlook, Yahoo …) and throwaway inboxes can't request a trial, and if your company is already on FORGE you'll be asked to get an invitation from its admin instead. We review every request; once approved you get an email inviting you to your own workspace with a **14-day trial**. When the trial ends your work stays and editing carries on; AI features pause until your admin chooses a plan.
+New to FORGE and not invited by a colleague? Open **https://www.forgeaxi.com/request-trial** (or **Request a trial** on the sign-up page) and enter your name, **company email**, company, and optionally your job title and what you'd like to try. Personal mailboxes (Gmail, Outlook, Yahoo …) and throwaway inboxes can't request a trial, and if your company is already on FORGE you'll be asked to get an invitation from its admin instead. We review every request; once approved you get an email inviting you to your own workspace with a **14-day trial**. When the trial ends your work stays and editing carries on; AI features pause until your admin chooses a plan.
 
 The same deliverability rule as sign-up applies: an address whose domain receives no email is refused with "That domain does not receive email", since the approval would be sent there.
 
 ### 1.1 Create your account
 
-Open **https://www.sysgov.com/sign-up**.
+Open **https://www.forgeaxi.com/sign-up**.
 
 ![Sign-up card](docs/images/sign-up.png)
 
@@ -101,7 +101,7 @@ After verification you land on the sign-in page with an **Email verified** confi
 
 ### 1.3 Sign in
 
-On **https://www.sysgov.com/sign-in** enter your email + password and click **Sign in**.
+On **https://www.forgeaxi.com/sign-in** enter your email + password and click **Sign in**.
 
 ![Sign-in card](docs/images/sign-in.png)
 
@@ -123,7 +123,7 @@ Click **Forgot password?** below the sign-in form. Enter your email — you'll g
 
 If a teammate invited you, your email has a link that looks like:
 ```
-https://www.sysgov.com/sign-up?invite=...&id=...
+https://www.forgeaxi.com/sign-up?invite=...&id=...
 ```
 
 Clicking it lands you on a sign-up page pre-filled with your email (you can't change it). Enter your name + password and click **Accept and create account**. You'll be signed in immediately and placed in your teammate's organization with the role they assigned you.

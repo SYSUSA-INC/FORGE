@@ -3181,6 +3181,29 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 
 ---
 
+### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🚧 phase 1 (this PR)
+
+**Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
+web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
+2026-11-07: "my passkey is not working"). Cause: with no
+`NEXT_PUBLIC_APP_URL` on Vercel, `appBaseUrl()` fell back to the old
+`https://www.sysgov.com` in production, so passkeys were asked for the
+old domain (the browser refuses) and email links pointed there.
+
+- **Phase 1 (this PR):** the production fallback is
+  `https://www.forgeaxi.com` (tested, with the passkey domain it gives);
+  the User Manual's sign-in addresses and the Admin Manual's storage
+  CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old
+  passkeys can't move and how to recover (set the variable, redeploy,
+  password plus authenticator or recovery code, add a new passkey).
+- **Phase 2 (waits on the owner):** the contact addresses
+  (support@ / sales@), the default email sender, the authenticator
+  label and the deliverability canary, once the owner names the
+  forgeaxi.com addresses.
+
+---
+
 ### BL-NAV-LIFECYCLE — The everyday menu is the proposal lifecycle
 
 **Owner, 2026-11-01 (FORGE II document):** the everyday sidebar

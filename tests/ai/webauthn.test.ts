@@ -4,8 +4,8 @@ import { expectedOrigins, WEBAUTHN_CHALLENGE_MS, webauthnConfig } from "@/lib/we
 /** BL-STAB-8a-3 — the relying party from the environment. */
 describe("webauthnConfig", () => {
   it("takes the app's origin and its host as the relying party", () => {
-    const cfg = webauthnConfig({ NEXT_PUBLIC_APP_URL: "https://www.sysgov.com/" });
-    expect(cfg).toEqual({ rpID: "www.sysgov.com", rpName: "FORGE", origin: "https://www.sysgov.com" });
+    const cfg = webauthnConfig({ NEXT_PUBLIC_APP_URL: "https://www.forgeaxi.com/" });
+    expect(cfg).toEqual({ rpID: "www.forgeaxi.com", rpName: "FORGE", origin: "https://www.forgeaxi.com" });
   });
 
   it("prefers an explicit origin and relying-party id (previews on a parent domain)", () => {
@@ -21,7 +21,7 @@ describe("webauthnConfig", () => {
   it("accepts the local dev origin only for a localhost relying party", () => {
     expect(expectedOrigins(webauthnConfig({ NEXT_PUBLIC_APP_URL: "http://localhost:3000" }))).toEqual(["http://localhost:3000"]);
     expect(expectedOrigins(webauthnConfig({ NEXT_PUBLIC_APP_URL: "http://localhost:3100" }))).toEqual(["http://localhost:3100", "http://localhost:3000"]);
-    expect(expectedOrigins(webauthnConfig({ NEXT_PUBLIC_APP_URL: "https://www.sysgov.com" }))).toEqual(["https://www.sysgov.com"]);
+    expect(expectedOrigins(webauthnConfig({ NEXT_PUBLIC_APP_URL: "https://www.forgeaxi.com" }))).toEqual(["https://www.forgeaxi.com"]);
   });
 
   it("keeps a challenge for five minutes", () => {
