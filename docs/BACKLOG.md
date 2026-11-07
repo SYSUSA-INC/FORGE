@@ -3597,7 +3597,39 @@ Every requirement in the FORGE II document, with its status and phase:
      prefix in `naicsCodes` (documented behaviour; check the first
      widened search after deploy).
    - **3c — invitations, the partner's own matrix page, Compare and the
-     AI's partner rating.**
+     AI's partner rating.** Owner decisions 2–4 of the design's §4 taken
+     on 2026-11-07, the recommended option each: a personal emailed link
+     with no account (14 days); partners see only the questions and their
+     own answers; Move to Plan stays open with "agreement: to do".
+     - **3c-1 — invitations and the partner's own matrix page (🚧 this
+       PR; migration 0156).** On the Partners tab, **Invite** on a
+       partner takes the contact's email (prefilled from the company)
+       and name and issues a personal link: 24 random bytes, only its
+       sha256 kept in `opportunity_partner_invite`, 14 days, emailed
+       from the platform address with Reply-To the sender (or shown
+       with **Copy link** when email isn't configured). The partner
+       becomes *invited* (chosen stays chosen); a re-invite replaces the
+       partner's unanswered links. `/partner/[token]` (public, outside
+       the app shell, allowed in `auth.config.ts`) shows the questions'
+       text, weight and area only — never our answers, requirement
+       references or notes — with Yes / Partial % / No, evidence per
+       question, and the partner's certifications (ISO standards, one
+       CMMI level and model, one CMMC level, other in words), saved as
+       a draft or submitted; submitting marks the partner *answered*
+       and the link stays editable until it expires. Answers and
+       certifications live on the partner's `opportunity_partner` row
+       (`partner_answers`, `certifications`, `answered_at`). The
+       Partners tab shows each partner's invite state, answers count
+       and certifications. Audited: `opportunity.partner.invite`, the
+       read `opportunity.partner.invite.open`, and
+       `opportunity.partner.answers.save` / `.submit` with the contact's
+       email as actor. Not yet: a message to the inviter when a partner
+       submits (3c-2), the sweep of expired invites.
+     - **3c-2 — Compare and the AI's partner rating (📋 next).** Our
+       answers and every partner's side by side per requirement, which
+       partner closes which gap; the AI's score per partner (gaps closed
+       weighted like coverage, evidence, certifications) with the
+       grounded pattern of 3b (`partner_rate` prompt).
 4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
    Gloves teams notified automatically, task owners, milestones, the
    compliance matrix and outline fixed here.
