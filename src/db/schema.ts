@@ -4643,6 +4643,8 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "knowledge_artifact_extract",
   // BL-SCOUT-INBOX — the bids in an email a portal sent the company (drizzle/0148).
   "inbound_email_parse",
+  // BL-SCOUT-FILES — a new opportunity's SAM.gov attachments, downloaded at once (drizzle/0153).
+  "sam_notice_files",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [

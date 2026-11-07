@@ -13,7 +13,7 @@ import { createSolicitationFromUploadAction } from "../actions";
  * request-size cap), the server checks it, and it is filed as a new
  * solicitation whose parse then runs in the background.
  */
-export function UploadSolicitationForm({ maxBytes, then = "solicitation" }: { maxBytes: number; /** BL-NAV-LIFECYCLE 1a — "create": go on to Identify → Create with the document. */ then?: "solicitation" | "create" }) {
+export function UploadSolicitationForm({ maxBytes, then = "solicitation", opportunityId }: { maxBytes: number; /** BL-NAV-LIFECYCLE 1a — "create": go on to Identify → Create with the document; BL-SCOUT-FILES — "opportunity": file it on `opportunityId` and stay. */ then?: "solicitation" | "create" | "opportunity"; opportunityId?: string }) {
   const router = useRouter();
   const [dragOver, setDragOver] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -23,11 +23,16 @@ export function UploadSolicitationForm({ maxBytes, then = "solicitation" }: { ma
     concurrency: 1,
     maxBytes,
     claim: async ({ uploadId }) => {
-      const res = await createSolicitationFromUploadAction({ uploadId });
+      const res = await createSolicitationFromUploadAction({ uploadId, opportunityId: then === "opportunity" ? opportunityId : null });
       return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
     },
     onItemDone: (item) => {
       if (item.phase === "done" && item.result) {
+        if (then === "opportunity") {
+          setNotice("Filed on this opportunity. FORGE is reading it now; it shows above.");
+          router.refresh();
+          return;
+        }
         router.push(then === "create" ? `/pipeline/identify?tab=create&from=${item.result}` : `/solicitations/${item.result}`);
       }
     },

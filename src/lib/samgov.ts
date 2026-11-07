@@ -597,10 +597,15 @@ export type SamNotice = {
   resourceLinks: string[];
 };
 
-/** One notice by id: its posted date, description and attachment links. */
+/**
+ * One notice by id: its posted date, description and attachment links.
+ * `withDescription: false` skips the description, a second SAM.gov request
+ * (BL-SCOUT-FILES: the amendment watch needs only the links).
+ */
 export async function fetchSamNotice(
   cred: SamCredential,
   noticeId: string,
+  opts: { withDescription?: boolean } = {},
 ): Promise<{ ok: true; notice: SamNotice } | (SamFailure & { noSuchNotice?: true })> {
   const id = noticeId.trim();
   if (!id) return { ok: false, cls: "bad_request", error: "Provide a notice ID." };
@@ -614,7 +619,7 @@ export async function fetchSamNotice(
     const op = r.data.opportunitiesData?.[0];
     // SAM.gov answered and has no such notice: the one "not found" a caller may count as checked.
     if (!op) return { ok: false, cls: "not_found", noSuchNotice: true, error: "SAM.gov has no notice with that ID posted in the last year." };
-    const desc = (await readNoticeDescriptions(cred, [op], 1)).get(op.noticeId);
+    const desc = opts.withDescription === false ? undefined : (await readNoticeDescriptions(cred, [op], 1)).get(op.noticeId);
     return {
       ok: true,
       notice: {

@@ -141,7 +141,8 @@ export async function checkOpportunityNotices(input: {
       .map((o) => ({ noticeId: o.noticeId, title: o.title ?? "", type: o.type ?? "", postedDate: o.postedDate ?? "", responseDeadLine: o.responseDeadLine ?? null, resourceLinks: o.resourceLinks ?? [] }));
   }
   if (notices.length === 0 && opp.noticeId) {
-    const r = await fetchSamNotice(cred, opp.noticeId);
+    // Only the attachment links are needed: no description request.
+    const r = await fetchSamNotice(cred, opp.noticeId, { withDescription: false });
     if (!r.ok) {
       if (r.noSuchNotice) await stamp(organizationId, opportunityId, {});
       return { ok: false, error: r.error, cls: r.cls };
