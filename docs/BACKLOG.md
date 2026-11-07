@@ -3470,7 +3470,7 @@ Every requirement in the FORGE II document, with its status and phase:
    the questions and their own answers only; a PARTNER opportunity may
    move to Plan with "teaming agreement: to do" until phase 8). PRs:
    - **3a-1 — the Capture page, partners, Choose partner and Move to
-     Plan (this PR).** Migration 0154: `opportunity_partner` (one of the
+     Plan (#470).** Migration 0154: `opportunity_partner` (one of the
      organization's companies considered for one of its opportunities:
      source, status `candidate` / `invited` / `answered` / `chosen` /
      `declined`, reason, who chose it and when; unique per opportunity
@@ -3492,9 +3492,35 @@ Every requirement in the FORGE II document, with its status and phase:
      with its decision, days left, partners (candidates and chosen) and
      the next step. Tested in `tests/ai/capture-logic.test.ts` and
      `tests/isolation/capture.test.ts`.
-   - **3a-2 — the partner database search** (SAM.gov entities, the
-     certification registry, USAspending awards and Companies, joined by
-     UEI).
+   - **3a-2 — the partner database search (this PR).** No migration.
+     **Find partners** on the Partners tab (`searchPartners`,
+     `src/lib/partner-search.ts`) searches, by the opportunity's NAICS
+     code: USAspending (contract awards in the last five years, two pages
+     of 100 by value, and the agency's own under the code, through
+     `agencyAwardAttempts`; behind `AWARDS_INTEL_ENABLED` like the other
+     awards pages), the certification registry (`cert_firm`, current
+     certifications only: under the code, and every one held by a UEI
+     found elsewhere), one SAM.gov entity search (registered and active,
+     ten at most, on the company's or the shared key) and the
+     organization's Companies. `src/lib/partner-search-logic.ts` (pure,
+     tested) joins them by UEI, leaves the organization's own UEI out,
+     filters by state (a firm with no location on record stays) and
+     certification, reads the set-aside (`setAsideNeed`, the PWin
+     model's wording) and says whether a firm keeps it only when the
+     registry can tell, orders by awards at the agency, set-aside kept,
+     value, already a teaming partner or subcontractor, and writes each
+     firm's facts with their source (the facts 3b's AI must cite). A
+     source that is off or fails is named and the others still answer.
+     Recorded as a read, `opportunity.partner.search`. **Add**
+     (`addPartnerFromSearch`) puts the firm in Companies (imported from
+     SAM.gov through `importCompanyFromSam`, now shared with Company
+     search; when SAM.gov can't be reached, written from the search's
+     facts with `sync_source` `partner_search` and a note to refresh it)
+     and on the opportunity's partners with source `search` and its
+     first two facts as the reason. Tested in
+     `tests/ai/partner-search-logic.test.ts` and
+     `tests/isolation/partner-search.test.ts` (USAspending and SAM.gov
+     stubbed).
    - **3b — FORGE AI's ranked partner list** with a reason per partner
      citing the search's facts, and *Find more*.
    - **3c — invitations, the partner's own matrix page, Compare and the

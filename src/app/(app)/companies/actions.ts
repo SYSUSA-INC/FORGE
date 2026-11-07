@@ -12,6 +12,7 @@ import {
   type SamEntitySearchResult,
 } from "@/lib/samgov";
 import { resolveSamCredential } from "@/lib/samgov-key";
+import { importCompanyFromSam } from "@/lib/company-import";
 import { log } from "@/lib/log";
 
 export type CompanyInput = {
@@ -294,77 +295,10 @@ export async function importSamGovCompanyAction(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
-  if (!uei.trim()) return { ok: false, error: "UEI required." };
-
-  const [existing] = await db
-    .select({ id: companies.id })
-    .from(companies)
-    .where(
-      and(
-        eq(companies.organizationId, organizationId),
-        eq(companies.uei, uei.trim().toUpperCase()),
-      ),
-    )
-    .limit(1);
-  if (existing) return { ok: true, id: existing.id };
-
-  const sam = await resolveSamCredential(organizationId);
-  if (!sam.ok) return { ok: false, error: sam.failure.error };
-  const result = await fetchSamGovByUei(sam.cred, uei);
-  if (!result.ok) return { ok: false, error: result.error };
-  const p = result.profile;
-
-  try {
-    const [row] = await db
-      .insert(companies)
-      .values({
-        organizationId,
-        createdByUserId: actor.id,
-        relationship,
-        name: p.name,
-        uei: p.uei,
-        cageCode: p.cageCode,
-        dunsNumber: p.dunsNumber,
-        website: p.website,
-        contactName: p.contactName,
-        contactTitle: p.contactTitle,
-        phone: p.phone,
-        email: p.email,
-        addressLine1: p.address.line1,
-        addressLine2: p.address.line2,
-        city: p.address.city,
-        state: p.address.state,
-        zip: p.address.zip,
-        country: p.address.country,
-        primaryNaics: p.primaryNaics,
-        naicsList: p.naicsList,
-        sbaCertifications: p.sbaDescriptions,
-        registrationStatus: p.registrationStatus,
-        registrationExpirationDate: p.registrationExpirationDate
-          ? new Date(p.registrationExpirationDate)
-          : null,
-        syncSource: "samgov",
-        lastSyncedAt: new Date(),
-      })
-      .returning({ id: companies.id });
-    if (!row) return { ok: false, error: "Insert failed." };
-    await recordAudit({
-      organizationId,
-      actor: { userId: actor.id, email: actor.email },
-      action: "company.import_samgov",
-      resourceType: "company",
-      resourceId: row.id,
-      metadata: { uei: p.uei, relationship },
-    });
-    revalidatePath("/companies");
-    return { ok: true, id: row.id };
-  } catch (err) {
-    log.error("[importSamGovCompanyAction]", "error", { error: err });
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Import failed.",
-    };
-  }
+  const res = await importCompanyFromSam({ organizationId, actor: { userId: actor.id, email: actor.email }, uei, relationship });
+  if (!res.ok) return res;
+  if (res.created) revalidatePath("/companies");
+  return { ok: true, id: res.id };
 }
 
 export async function listCompaniesSorted() {
