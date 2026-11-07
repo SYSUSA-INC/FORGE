@@ -83,6 +83,7 @@ import {
 import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
 import { buildPartnerRankPrompt, partnerRankSchema } from "@/lib/partner-rank-logic";
+import { buildPartnerRatePrompt, partnerRateSchema, scorePartners } from "@/lib/partner-compare-logic";
 import { buildInboundBidsPrompt, inboundBidsSchema } from "@/lib/inbound-bids-logic";
 import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
 import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
@@ -451,6 +452,31 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       widened: false,
     }),
   ],
+  partner_rate: () => [
+    buildPartnerRatePrompt({
+      opportunity: { title: "Help desk modernization", agency: "Department of Veterans Affairs" },
+      gaps: 2,
+      scored: scorePartners(
+        [
+          { id: "s1", text: "Operate a 24x7 tier-2 help desk", refs: [], kind: "shall", area: "Operations" },
+          { id: "q1", text: "Hold a FedRAMP Moderate authorization", refs: ["C.3.2"], kind: "should", area: "Security" },
+        ],
+        {
+          s1: { value: "gap_partner", evidence: "", partnerCompanyId: null, updatedAt: "2026-11-01T00:00:00Z", updatedByUserId: "u1" },
+          q1: { value: "partial", percent: 40, evidence: "", partnerCompanyId: null, updatedAt: "2026-11-01T00:00:00Z", updatedByUserId: "u1" },
+        },
+        [
+          {
+            id: "p-harbor",
+            name: "Harbor Cyber LLC",
+            answers: { s1: { answer: "yes", percent: null, evidence: "VA help desk since 2021", updatedAt: "2026-11-05T00:00:00Z" }, q1: { answer: "partial", percent: 70, evidence: "", updatedAt: "2026-11-05T00:00:00Z" } },
+            certifications: { iso: ["ISO 9001"], cmmiLevel: 3, cmmiModel: "SVC", cmmcLevel: 2 },
+            answeredAt: "2026-11-05T00:00:00Z",
+          },
+        ],
+      ),
+    }),
+  ],
   loss_intelligence: () => [
     buildLossNarrativePrompt({
       organizationName: "Acme Federal",
@@ -595,6 +621,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   lessons_extract: [draftedLessonsSchema],
   loss_intelligence: [lossNarrativeSchema],
   partner_rank: [partnerRankSchema],
+  partner_rate: [partnerRateSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],
   opportunity_triage: [scoutTriageSchema],

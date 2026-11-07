@@ -4,6 +4,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, opportunities, opportunityPartners, users, type OpportunityPartnerStatus } from "@/db/schema";
 import { certificationLabels } from "@/lib/partner-invite-logic";
+import type { ComparePartner } from "@/lib/partner-compare-logic";
 import { recordAudit } from "@/lib/audit-log";
 import { emptyPartnerCounts, planBlocker, planNote, PLAN_STAGE, type PartnerCounts } from "@/lib/capture-logic";
 import { latestDecisions } from "@/lib/opportunity-decision-store";
@@ -78,6 +79,23 @@ export async function listOpportunityPartners(organizationId: string, opportunit
     certifications: certificationLabels(certs),
     answeredAt: answeredAt ? answeredAt.toISOString() : null,
   }));
+}
+
+/**
+ * BL-NAV-LIFECYCLE 3c-2 — the partners that have answered at least one
+ * question, with their answers and certifications, for Compare and the
+ * rating. Declined partners are left out; by name.
+ */
+export async function listPartnerAnswerSheets(organizationId: string, opportunityId: string): Promise<(ComparePartner & { status: OpportunityPartnerStatus })[]> {
+  const rows = await db
+    .select({ id: opportunityPartners.id, name: companies.name, status: opportunityPartners.status, answers: opportunityPartners.partnerAnswers, certifications: opportunityPartners.certifications, answeredAt: opportunityPartners.answeredAt })
+    .from(opportunityPartners)
+    .innerJoin(companies, and(eq(companies.id, opportunityPartners.companyId), eq(companies.organizationId, organizationId)))
+    .where(and(eq(opportunityPartners.organizationId, organizationId), eq(opportunityPartners.opportunityId, opportunityId)))
+    .orderBy(asc(companies.name));
+  return rows
+    .filter((r) => r.status !== "declined" && Object.keys(r.answers ?? {}).length > 0)
+    .map((r) => ({ id: r.id, name: r.name, status: r.status, answers: r.answers ?? {}, certifications: r.certifications ?? {}, answeredAt: r.answeredAt ? r.answeredAt.toISOString() : null }));
 }
 
 /** Each opportunity's partner counts by status, and the chosen partners' names. */

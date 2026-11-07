@@ -3601,8 +3601,8 @@ Every requirement in the FORGE II document, with its status and phase:
      on 2026-11-07, the recommended option each: a personal emailed link
      with no account (14 days); partners see only the questions and their
      own answers; Move to Plan stays open with "agreement: to do".
-     - **3c-1 — invitations and the partner's own matrix page (🚧 this
-       PR; migration 0156).** On the Partners tab, **Invite** on a
+     - **3c-1 — invitations and the partner's own matrix page (🚧 PR
+       #476; migration 0156).** On the Partners tab, **Invite** on a
        partner takes the contact's email (prefilled from the company)
        and name and issues a personal link: 24 random bytes, only its
        sha256 kept in `opportunity_partner_invite`, 14 days, emailed
@@ -3623,13 +3623,34 @@ Every requirement in the FORGE II document, with its status and phase:
        and certifications. Audited: `opportunity.partner.invite`, the
        read `opportunity.partner.invite.open`, and
        `opportunity.partner.answers.save` / `.submit` with the contact's
-       email as actor. Not yet: a message to the inviter when a partner
-       submits (3c-2), the sweep of expired invites.
-     - **3c-2 — Compare and the AI's partner rating (📋 next).** Our
-       answers and every partner's side by side per requirement, which
-       partner closes which gap; the AI's score per partner (gaps closed
-       weighted like coverage, evidence, certifications) with the
-       grounded pattern of 3b (`partner_rate` prompt).
+       email as actor. Not yet: the sweep of expired invites.
+     - **3c-2 — Compare and the AI's partner rating (🚧 this PR;
+       migration 0157).** **Compare answers** on the Partners panel opens
+       `/opportunities/[id]/partners/compare`: one row per question, our
+       answer then every partner's (yes green, partial brass, no red,
+       n/a muted), the partner's evidence under its answer. A gap is our
+       No or Partial; a partner *closes* it (cobalt) when it covers more
+       than we do: Yes, or a Partial with a higher share
+       (`compareMatrix` in `partner-compare-logic.ts`). Declined
+       partners and those with no answers are left out; a draft not yet
+       submitted is shown and said so. **Rate the partners with FORGE
+       AI** below it: `scorePartners` fixes the order first (70% the
+       weighted share of our gaps' uncovered part the partner covers,
+       `KIND_WEIGHT` as coverage; 15% evidence on its gap-closing
+       answers; 15% certifications, each ISO one point, CMMI level/5,
+       CMMC level/3, full at 3), then the `partner_rate` prompt (standard
+       class, `2026-11-07.1`) writes one reason per partner citing
+       numbered facts, and `validateRating` drops a reason that cites no
+       fact, an unknown one, or a figure the cited facts don't hold; the
+       partner keeps its place with no reason. Gated by `aiAutoDraft` and
+       the monthly quota (refunded on failure), 10 per org per hour;
+       recorded as the read `opportunity.partner.rate` (gaps, partners,
+       reasons kept, dropped, the order). Advice only: choosing stays on
+       the Partners tab. Also: the inviter gets an inbox line
+       (`partner_answered`, migration 0157) when a partner submits, once
+       an hour per partner, linking to Compare. Not yet (3c-3): the
+       sweep of expired invites; a Compare column for the partner
+       already named on our own answer.
 4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
    Gloves teams notified automatically, task owners, milestones, the
    compliance matrix and outline fixed here.

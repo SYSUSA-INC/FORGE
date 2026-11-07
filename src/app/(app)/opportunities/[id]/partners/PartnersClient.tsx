@@ -96,7 +96,17 @@ export function PartnersClient(props: {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="flex flex-col gap-4 xl:col-span-2">
-        <Panel title="Partners" eyebrow={`${props.partners.length} considered · ${chosen.length} chosen`}>
+        <Panel
+          title="Partners"
+          eyebrow={`${props.partners.length} considered · ${chosen.length} chosen`}
+          actions={
+            props.questionCount > 0 && props.partners.some((p) => p.answerCount > 0) ? (
+              <Link href={`/opportunities/${props.opportunityId}/partners/compare`} className="font-mono text-[11px] uppercase tracking-label text-cobalt hover:underline">
+                Compare answers →
+              </Link>
+            ) : null
+          }
+        >
           {error ? <p className="mb-2 font-body text-[12px] text-red">{error}</p> : null}
           {props.partners.length === 0 ? (
             <p className="font-body text-[13px] leading-[1.5] text-muted">

@@ -1,8 +1,8 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { companies, opportunities, opportunityCapabilityMatrices, opportunityPartnerInvites, opportunityPartners, organizations, users } from "@/db/schema";
+import { companies, opportunities, opportunityCapabilityMatrices, opportunityPartnerInvites, opportunityPartners, notifications, organizations, users } from "@/db/schema";
 import { appBaseUrl } from "@/lib/app-url";
 import { recordAudit, recordRead } from "@/lib/audit-log";
 import { emailConfigured, sendPartnerInviteEmail } from "@/lib/email";
@@ -18,6 +18,7 @@ import {
   partnerQuestionsOf,
   type InviteState,
   type PartnerAnswers,
+  type PartnerAnswerSummary,
   type PartnerCertifications,
   type PartnerQuestion,
 } from "@/lib/partner-invite-logic";
@@ -178,6 +179,7 @@ async function inviteByToken(raw: string) {
       expiresAt: opportunityPartnerInvites.expiresAt,
       openedAt: opportunityPartnerInvites.openedAt,
       submittedAt: opportunityPartnerInvites.submittedAt,
+      createdByUserId: opportunityPartnerInvites.createdByUserId,
     })
     .from(opportunityPartnerInvites)
     .where(eq(opportunityPartnerInvites.tokenHash, hashToken(token)))
@@ -255,8 +257,9 @@ export async function savePartnerAnswersByToken(input: { token: string; answers:
   const answers = normalizePartnerAnswers(input.answers, questions.map((q) => q.id), now);
   const certifications = normalizeCertifications(input.certifications);
   const [partner] = await db
-    .select({ id: opportunityPartners.id, status: opportunityPartners.status })
+    .select({ id: opportunityPartners.id, status: opportunityPartners.status, name: companies.name })
     .from(opportunityPartners)
+    .innerJoin(companies, and(eq(companies.id, opportunityPartners.companyId), eq(companies.organizationId, organizationId)))
     .where(and(eq(opportunityPartners.id, invite.partnerId), eq(opportunityPartners.organizationId, organizationId)))
     .limit(1);
   if (!partner) return { ok: false, error: "This invitation no longer has a partner behind it." };
@@ -278,6 +281,7 @@ export async function savePartnerAnswersByToken(input: { token: string; answers:
       .where(and(eq(opportunityPartnerInvites.id, invite.id), eq(opportunityPartnerInvites.organizationId, organizationId)));
   }
   const summary = partnerAnswerSummary(questions, answers);
+  if (submit) await notifyInviter({ organizationId, opportunityId, recipientUserId: invite.createdByUserId, partnerName: partner.name, summary });
   await recordAudit({
     organizationId,
     actor: { userId: null, email: invite.email },
@@ -287,4 +291,33 @@ export async function savePartnerAnswersByToken(input: { token: string; answers:
     metadata: { partnerId: partner.id, ...summary, certifications: certificationLabels(certifications) },
   });
   return { ok: true, state: submit || invite.submittedAt ? "submitted" : "open" };
+}
+
+/**
+ * BL-NAV-LIFECYCLE 3c-2 — the inviter's inbox gets one line when a
+ * partner submits (a `notification` row only; no delivery row, so the
+ * inbox-parity rule doesn't apply). The same partner submitting again
+ * within an hour doesn't repeat it. Never fails the submit.
+ */
+async function notifyInviter(input: { organizationId: string; opportunityId: string; recipientUserId: string | null; partnerName: string; summary: PartnerAnswerSummary }) {
+  if (!input.recipientUserId) return;
+  const subject = `${input.partnerName} answered the capability questions`;
+  try {
+    const [dup] = await db
+      .select({ id: notifications.id })
+      .from(notifications)
+      .where(and(eq(notifications.organizationId, input.organizationId), eq(notifications.recipientUserId, input.recipientUserId), eq(notifications.subject, subject), gt(notifications.createdAt, new Date(Date.now() - 3_600_000))))
+      .limit(1);
+    if (dup) return;
+    await db.insert(notifications).values({
+      organizationId: input.organizationId,
+      recipientUserId: input.recipientUserId,
+      kind: "partner_answered",
+      subject,
+      body: `${input.summary.answered} of ${input.summary.total} answered: ${input.summary.yes} yes, ${input.summary.partial} partial, ${input.summary.no} no. Compare the answers beside yours.`,
+      linkPath: `/opportunities/${input.opportunityId}/partners/compare`,
+    });
+  } catch (err) {
+    log.warn("[partner-invite]", "inviter notification failed", { opportunityId: input.opportunityId, error: err });
+  }
 }
