@@ -9,6 +9,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { aiExtractEbuy } from "@/lib/ebuy-extract";
 import type { EbuyExtractionResult } from "@/lib/ai-prompts";
 import { log } from "@/lib/log";
+import { firstLink } from "@/lib/opportunity-source";
 
 export type EbuyParseResult =
   | {
@@ -108,6 +109,8 @@ export async function createOpportunityFromEbuyAction(
         stage: "identified",
         solicitationNumber: input.rfqNumber.trim(),
         noticeId: "",
+        source: "gsa_ebuy",
+        sourceUrl: firstLink(input.rawText ?? "", ["ebuy.gsa.gov", "gsa.gov"]),
         responseDueDate: due,
         naicsCode: input.naicsCode.trim(),
         setAside: input.setAside.trim(),

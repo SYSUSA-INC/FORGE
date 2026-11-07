@@ -432,6 +432,9 @@ export const opportunities = pgTable("opportunity", {
   stage: opportunityStageEnum("stage").notNull().default("identified"),
   solicitationNumber: text("solicitation_number").notNull().default(""),
   noticeId: text("notice_id").notNull().default(""),
+  // BL-OPP-SOURCE (drizzle/0155) — where it came from (src/lib/opportunity-source.ts) and a link back.
+  source: text("source").notNull().default("manual"),
+  sourceUrl: text("source_url").notNull().default(""),
   valueLow: text("value_low").notNull().default(""),
   valueHigh: text("value_high").notNull().default(""),
   releaseDate: timestamp("release_date", { mode: "date" }),

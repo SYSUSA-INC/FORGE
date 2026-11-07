@@ -36,6 +36,9 @@ export type SnapshotOpportunityRow = {
   agency: string;
   stage: OpportunityStage;
   solicitationNumber: string;
+  /** BL-OPP-SOURCE — where it came from, and the link back. */
+  source: string;
+  sourceUrl: string;
   valueLow: string;
   valueHigh: string;
   responseDueDate: Date | null;
@@ -107,6 +110,8 @@ export async function getOrganizationSnapshot(
         agency: opportunities.agency,
         stage: opportunities.stage,
         solicitationNumber: opportunities.solicitationNumber,
+        source: opportunities.source,
+        sourceUrl: opportunities.sourceUrl,
         valueLow: opportunities.valueLow,
         valueHigh: opportunities.valueHigh,
         responseDueDate: opportunities.responseDueDate,

@@ -149,7 +149,10 @@ Utility classes in `globals.css`:
    `font-medium` (500). EnableNow has no heavier weight, so
    `font-semibold` and `font-bold` resolve to 500 (`tailwind.config.ts`)
    and Geist Mono is never given a synthetic bold. Mono labels use
-   `tracking-label`, not wide arbitrary tracking.
+   `tracking-label`, not wide arbitrary tracking. A page title
+   (`PageHeader`) is one line at any width: `text-2xl`, 28px from `md`,
+   `tracking-title`, truncated with … and the full title on hover
+   (owner, 2026-11-07).
 7. **Two ink tiers.** Text is `text-text` or `text-muted` (`text-subtle`
    for the least important line). Don't fade ink with an alpha
    (`text-muted/70`): on paper it drops below a readable contrast.
