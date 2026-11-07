@@ -1501,6 +1501,11 @@ export async function decideScoutCandidate(input: {
       .returning({ id: opportunities.id });
     if (!opp) return { ok: false, error: "Could not create the opportunity." };
     opportunityId = opp.id;
+    // BL-SCOUT-FILES — a SAM.gov notice's attachments are downloaded now, not at the next daily check.
+    if (c.source !== "watchlist_award" && c.source !== "portal_email" && c.noticeId) {
+      const { queueNoticeFiles } = await import("@/lib/sam-notice-files");
+      await queueNoticeFiles({ organizationId, opportunityId: opp.id, userId: input.actor.userId ?? null });
+    }
     // BL-SCOUT-INBOX — a find read from a portal email brings that email's attachments.
     if (c.inboundEmailId) {
       const { fileInboundAttachments } = await import("@/lib/inbound-bids");

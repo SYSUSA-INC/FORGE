@@ -1,5 +1,6 @@
 "use server";
 
+import { queueNoticeFiles } from "@/lib/sam-notice-files";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -274,7 +275,9 @@ export async function importSamGovOpportunitiesAction(
     createdByUserId: actor.id,
   }));
 
-  await db.insert(opportunities).values(rows);
+  const created = await db.insert(opportunities).values(rows).returning({ id: opportunities.id });
+  // BL-SCOUT-FILES — each notice's attachments are downloaded now, not at the next daily check.
+  for (const o of created) await queueNoticeFiles({ organizationId, opportunityId: o.id, userId: actor.id });
 
   await recordAudit({
     organizationId,

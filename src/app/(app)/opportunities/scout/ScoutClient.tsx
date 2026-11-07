@@ -193,6 +193,9 @@ const UNREVIEWED_SHOWN = 20;
 function FindsList({ candidates, lastRun, unreviewedTotal, waitingTotal }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null; unreviewedTotal: number; waitingTotal: number }) {
   const [filter, setFilter] = useState<ScoutListFilter>(() => defaultFindsFilter(candidates));
   const [showAll, setShowAll] = useState(false);
+  // BL-SCOUT-FILES — what was just added or set aside, kept in view: the
+  // list reloads with waiting finds only, so a decided row leaves it.
+  const [recent, setRecent] = useState<{ id: string; title: string; status: ScoutDecision; opportunityId: string | null }[]>([]);
   const counts: Record<ScoutListFilter, number> = {
     recommended: candidates.filter((c) => c.recommendation === "pursue" || c.recommendation === "watch").length,
     unreviewed: Math.max(unreviewedTotal, candidates.filter((c) => !c.recommendation).length),
@@ -226,6 +229,26 @@ function FindsList({ candidates, lastRun, unreviewedTotal, waitingTotal }: { can
         </nav>
       }
     >
+      {recent.length > 0 ? (
+        <ul aria-label="Just decided" className="mb-3 flex flex-col gap-1 rounded-md border border-green/30 bg-green/5 px-3 py-2">
+          {recent.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-baseline gap-x-2 font-body text-[13px] text-text">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted">{d.status === "imported" ? "Added to Evaluate" : "Set aside"}</span>
+              <span className="min-w-0 truncate">{d.title}</span>
+              {d.opportunityId ? (
+                <>
+                  <Link href={`/opportunities/${d.opportunityId}`} className="aur-link font-mono text-[11px]">
+                    Open
+                  </Link>
+                  <Link href="/pipeline/evaluate" className="aur-link font-mono text-[11px]">
+                    Go to Evaluate
+                  </Link>
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {(filter === "unreviewed" || filter === "all") && why ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">{why}</p> : null}
       {filter === "skipped" && shown.length > 0 ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">The AI&apos;s skips, shown so you can overrule it.</p> : null}
       {shown.length === 0 ? (
@@ -239,7 +262,7 @@ function FindsList({ candidates, lastRun, unreviewedTotal, waitingTotal }: { can
           <ResultHead />
           <ul>
             {capped.map((c) => (
-              <FindRow key={c.id} candidate={c} />
+              <FindRow key={c.id} candidate={c} onDecided={(d) => setRecent((prev) => [{ id: c.id, title: c.title, ...d }, ...prev.filter((x) => x.id !== c.id)].slice(0, 8))} />
             ))}
           </ul>
           {capped.length < shown.length || (filter === "unreviewed" && counts.unreviewed > shown.length) ? (
@@ -267,7 +290,7 @@ function callOf(c: ScoutCandidateView): ResultCall {
   };
 }
 
-function FindRow({ candidate: c }: { candidate: ScoutCandidateView }) {
+function FindRow({ candidate: c, onDecided }: { candidate: ScoutCandidateView; onDecided?: (d: { status: ScoutDecision; opportunityId: string | null }) => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -279,6 +302,7 @@ function FindRow({ candidate: c }: { candidate: ScoutCandidateView }) {
       const res = await decideScoutCandidateAction(c.id, decision);
       if (!res.ok) return setError(res.error);
       setDone({ status: res.status, opportunityId: res.opportunityId });
+      onDecided?.({ status: res.status, opportunityId: res.opportunityId });
       router.refresh();
     });
   }

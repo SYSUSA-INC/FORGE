@@ -63,7 +63,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
   return (
     <>
       <p className="mb-3 max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
-        Every source on one page. <strong>All</strong> is what the scout finds every night on SAM.gov and your watchlist, scored and reviewed by the AI; the other tabs search SAM.gov for something specific, read a pasted GSA eBuy RFQ or GSA email, or ask for a source FORGE doesn&apos;t read yet. <strong>Add to pipeline</strong> on any row puts it in the pipeline under Identified; <strong>Not for us</strong> sets a find aside, and both teach the scout your taste.
+        Every source on one page. <strong>All</strong> is what the scout finds every night on SAM.gov and your watchlist, scored and reviewed by the AI; the other tabs search SAM.gov for something specific, read a pasted GSA eBuy RFQ or GSA email, or ask for a source FORGE doesn&apos;t read yet. <strong>Add to pipeline</strong> on any row makes it an opportunity on <strong>Pipeline → Evaluate</strong>, with a SAM.gov notice&apos;s attachments downloaded to it; <strong>Not for us</strong> sets a find aside, and both teach the scout your taste.
       </p>
       <SourceBar source={source} />
       {/* BL-STAB-7d — why the SAM.gov searches would come back empty. */}

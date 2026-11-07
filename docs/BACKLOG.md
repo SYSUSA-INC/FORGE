@@ -3181,6 +3181,42 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 
 ---
 
+### BL-SCOUT-FILES — Add to pipeline brings the notice's documents
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🚧 this PR
+
+**Owner, 2026-11-07:** "can you also download attachments that are with
+the opportunity? So that we have everything ready"; and the Scout's
+"Open →" after Add to pipeline never showed. Assessment: the amendment
+watch already files a notice's attachments, but only at the next daily
+check; the Documents panel showed **Check SAM.gov now** only once a
+document existed (it returned early when there were none), and its
+**Upload a solicitation** went to Create, making a new opportunity; the
+Scout list reloads with waiting finds only, so the decided row (and its
+"Open →") disappeared at once.
+
+Delivered (migration 0153: job kind `sam_notice_files`):
+- An opportunity created from a SAM.gov notice (Scout's Add to pipeline,
+  the SAM.gov search's import) queues `sam_notice_files`, which runs the
+  watch's check for it at once (files every attachment, queues each to be
+  read); two attempts; a refusal fails the job with its reason.
+- **Documents & AI review** always shows the SAM.gov line and **Check
+  SAM.gov now** (and refreshes after it); while the download runs it says
+  so and refreshes every 5 seconds; a failure or pending retry says why.
+  **Add a document to this opportunity** files an upload on this
+  opportunity (`createSolicitationFromUploadAction` takes an
+  `opportunityId`, checked to be this organization's).
+- The Scout keeps what was just added or set aside in a line above the
+  finds, with **Open** and **Go to Evaluate**; its help text says where a
+  find goes.
+- Found on the way: the watch's look-up of a notice by id also fetched
+  its description, a second SAM.gov request it never used, on every
+  check; `fetchSamNotice(…, { withDescription: false })` skips it.
+
+Tested in `tests/isolation/sam-notice-files.test.ts`; end to end in a
+browser.
+
+---
+
 ### BL-MFA-ADMIN — Company admins see and reset members' two-step sign-in
 **Priority:** P1  ·  **Effort:** S  ·  **Status:** 🚧 this PR
 
