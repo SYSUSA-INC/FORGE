@@ -132,7 +132,7 @@ describe("BL-NAV-LIFECYCLE — Opportunity Management is the document's tree; ev
     const adminGroups = visibleNavGroups(NAV_BY_WORKSPACE.work, orgAdmin);
     expect(adminGroups.map((g) => g.id)).toEqual(["command", "opps", "customers", "intel", "ops", "administration", "help"]);
     const admin = adminGroups.find((g) => g.id === "administration")!;
-    expect(visibleNavChildren(admin.children, orgAdmin).map((c) => c.href)).toEqual(["/users", "/settings/billing", "/settings/templates", "/settings/api", "/notifications/rules", "/audit-log"]);
+    expect(visibleNavChildren(admin.children, orgAdmin).map((c) => c.href)).toEqual(["/users", "/users/security", "/settings/billing", "/settings/templates", "/settings/api", "/notifications/rules", "/audit-log"]);
   });
 
   it("keeps the folded-away Opportunities pages reachable as shortcuts, none of them admin-only", () => {
