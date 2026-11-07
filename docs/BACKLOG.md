@@ -3377,8 +3377,21 @@ Every requirement in the FORGE II document, with its status and phase:
      Back link to its opportunity. Tested in
      `tests/ai/opportunity-decision.test.ts` and
      `tests/isolation/opportunity-decision.test.ts`.
-   - **2b — the capability matrix:** Yes / Partial with a percentage /
-     No over the six-answer scale, its own page, the Matrix Report.
+   - **2b-1 — the three answers and the matrix's own page (this PR).**
+     Each question is answered Yes (with *Proven by past performance*),
+     Partial with a percentage (5–95, steps of 5) or No (with *A partner
+     could cover it* and an optional partner), or N/A, mapped onto the six
+     stored values (`threeAnswerOf` / `storedValueOf`, pure and tested), so
+     older answers read the same; the answer gains `percent` (JSON, no
+     migration) and coverage counts a Partial's own percentage (older ones
+     50%). The questionnaire moves to the opportunity's **Capability** tab
+     (`/opportunities/{id}/capability`); the Evaluation tab shows its
+     summary (coverage, Yes / Partial / No counts, partner needed); the
+     Evaluate list and the next actions open it. Tested in
+     `tests/ai/capability-three-answers.test.ts`.
+   - **2b-2 — the Matrix Report:** a dated snapshot on **Save report**
+     (`opportunity_report`), a printable page, and the Reports strip on
+     the opportunity's Overview.
    - **2c — Analyze:** the analysis page and the Analysis Report.
 3. **Capture:** the Go and Partner worklist; the partner registry
    (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
