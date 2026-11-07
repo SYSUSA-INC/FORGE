@@ -83,11 +83,11 @@ export async function EvaluateSection({ rows, filter }: { rows: StageListRow[]; 
                     </Link>
                   )}
                   {matrixBuilt ? (
-                    <Link href={`/opportunities/${r.id}/evaluation#capability`} className="font-mono text-[11px] text-text hover:underline">
+                    <Link href={`/opportunities/${r.id}/capability`} className="font-mono text-[11px] text-text hover:underline">
                       {s?.coverage == null ? `${s?.answered ?? 0} of ${s?.questions ?? 0} answered` : `Coverage ${Math.round(s.coverage * 100)}%`}
                     </Link>
                   ) : (
-                    <Link href={`/opportunities/${r.id}/evaluation#capability`} className="aur-btn aur-btn-ghost justify-self-start whitespace-nowrap">
+                    <Link href={`/opportunities/${r.id}/capability`} className="aur-btn aur-btn-ghost justify-self-start whitespace-nowrap">
                       Capability Matrix
                     </Link>
                   )}
