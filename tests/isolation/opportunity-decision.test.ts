@@ -107,6 +107,6 @@ describe("BL-NAV-LIFECYCLE 2a — the Evaluate decision", () => {
     await recordDecision({ organizationId: fx.orgA.organizationId, opportunityId: fx.orgA.opportunityId, actor: actor(), decision: { decision: "go" } });
     const sig = await evaluateSignals(fx.orgA.organizationId, [fx.orgA.opportunityId, fx.orgB.opportunityId]);
     expect(sig.get(fx.orgA.opportunityId)).toMatchObject({ call: "pursue", analysed: true, questions: 2, answered: 2, decision: { decision: "go" } });
-    expect(sig.get(fx.orgB.opportunityId)).toEqual({ call: null, analysed: false, questions: 0, answered: 0, coverage: null, decision: null });
+    expect(sig.get(fx.orgB.opportunityId)).toEqual({ call: null, analysisPwin: null, analysed: false, questions: 0, answered: 0, coverage: null, decision: null });
   });
 });

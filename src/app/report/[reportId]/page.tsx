@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { asMatrixReport, REPORT_LABELS, type MatrixReportRow } from "@/lib/opportunity-report";
+import { AnalysisReportView } from "@/components/reports/AnalysisReportView";
+import { asAnalysisReport, asMatrixReport, REPORT_LABELS, type MatrixReportRow } from "@/lib/opportunity-report";
 import { getReport } from "@/lib/opportunity-report-store";
 import { PrintButton } from "./PrintButton";
 
@@ -28,6 +29,47 @@ export default async function ReportPage({ params }: { params: { reportId: strin
   const found = await getReport(organizationId, params.reportId);
   if (!found) notFound();
   const { report, versions } = found;
+  // BL-NAV-LIFECYCLE 2c — an Analysis Report prints from the same page.
+  const analysis = asAnalysisReport(report.body);
+  if (analysis) {
+    return (
+      <main className="min-h-screen bg-canvas text-text print:bg-white print:text-black">
+        <div className="mx-auto max-w-4xl px-6 py-8 print:max-w-none print:px-0 print:py-0">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
+            <Link href={`/opportunities/${report.opportunityId}/analysis`} className="aur-link font-mono text-[11px] uppercase tracking-widest">
+              ← Back to the opportunity
+            </Link>
+            <div className="flex items-center gap-3">
+              {versions.length > 1 ? (
+                <nav aria-label="Versions" className="flex flex-wrap gap-1 font-mono text-[11px]">
+                  {versions.map((v) => (
+                    <Link key={v.id} href={`/report/${v.id}`} aria-current={v.id === report.id ? "page" : undefined} className={`rounded border px-1.5 py-0.5 ${v.id === report.id ? "border-accent/50 text-text" : "border-layer/10 text-muted hover:text-text"}`}>
+                      v{v.version}
+                    </Link>
+                  ))}
+                </nav>
+              ) : null}
+              <PrintButton />
+            </div>
+          </div>
+          <header className="border-b border-layer/10 pb-4">
+            <p className="font-mono text-[11px] uppercase tracking-label text-accent print:text-black">
+              {REPORT_LABELS.analysis} · version {report.version} · {day(report.createdAt)}
+              {report.by ? ` · ${report.by}` : ""}
+            </p>
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">{analysis.opportunity.title}</h1>
+            <p className="mt-1 font-body text-[13px] text-muted">
+              {[analysis.opportunity.agency, analysis.opportunity.solicitationNumber, analysis.opportunity.naics ? `NAICS ${analysis.opportunity.naics}` : "", analysis.opportunity.dueDate ? `due ${day(analysis.opportunity.dueDate)}` : ""].filter(Boolean).join(" · ")}
+            </p>
+          </header>
+          <AnalysisReportView body={analysis} />
+          <footer className="mt-6 border-t border-layer/10 pt-3 font-mono text-[10px] text-muted">
+            FORGE · {REPORT_LABELS.analysis} v{report.version} saved {new Date(report.createdAt).toISOString().slice(0, 16).replace("T", " ")} UTC{analysis.model ? ` · ${analysis.model}` : ""}. Running the analysis again keeps this version.
+          </footer>
+        </div>
+      </main>
+    );
+  }
   const m = asMatrixReport(report.body);
   if (!m) notFound();
 

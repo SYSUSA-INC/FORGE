@@ -74,11 +74,11 @@ export async function EvaluateSection({ rows, filter }: { rows: StageListRow[]; 
                   </div>
                   <span className={`font-mono text-[11px] ${days !== null && days < 5 ? "text-red" : "text-muted"}`}>{days === null ? "no due date" : days < 0 ? "past due" : `${days}d left`}</span>
                   {analysed ? (
-                    <Link href={`/opportunities/${r.id}#analysis`} className="font-mono text-[11px] text-text hover:underline">
-                      PWin {r.pWin}%{call ? ` · ${call}` : ""}
+                    <Link href={`/opportunities/${r.id}/analysis`} className="font-mono text-[11px] text-text hover:underline">
+                      PWin {s?.analysisPwin ?? r.pWin}%{call ? ` · ${call}` : ""}
                     </Link>
                   ) : (
-                    <Link href={`/opportunities/${r.id}#analysis`} className="aur-btn aur-btn-ghost justify-self-start">
+                    <Link href={`/opportunities/${r.id}/analysis`} className="aur-btn aur-btn-ghost justify-self-start">
                       Analyze
                     </Link>
                   )}

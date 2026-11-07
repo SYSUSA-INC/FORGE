@@ -43,16 +43,33 @@ export async function saveMatrixReport(input: { organizationId: string; opportun
     now: input.now ?? new Date(),
   });
 
+  return insertReport({ organizationId, opportunityId, kind: "matrix", body: body as unknown as Record<string, unknown>, actor: input.actor, audit: { coverage: body.coverage, questions: body.total } });
+}
+
+/**
+ * Keeps a report as the next version for its opportunity and kind (a
+ * unique index keeps two saves from taking one number; the loser retries
+ * once), audited `opportunity.report.save`.
+ */
+export async function insertReport(input: {
+  organizationId: string;
+  opportunityId: string;
+  kind: OpportunityReportKind;
+  body: Record<string, unknown>;
+  actor: { userId: string | null; email?: string | null };
+  audit: Record<string, unknown>;
+}): Promise<{ ok: true; id: string; version: number } | { ok: false; error: string }> {
+  const { organizationId, opportunityId, kind } = input;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const [last] = await db
       .select({ v: max(opportunityReports.version) })
       .from(opportunityReports)
-      .where(and(eq(opportunityReports.organizationId, organizationId), eq(opportunityReports.opportunityId, opportunityId), eq(opportunityReports.kind, "matrix")));
+      .where(and(eq(opportunityReports.organizationId, organizationId), eq(opportunityReports.opportunityId, opportunityId), eq(opportunityReports.kind, kind)));
     const version = (last?.v ?? 0) + 1;
     try {
       const [row] = await db
         .insert(opportunityReports)
-        .values({ organizationId, opportunityId, kind: "matrix", version, body: body as unknown as Record<string, unknown>, createdByUserId: input.actor.userId })
+        .values({ organizationId, opportunityId, kind, version, body: input.body, createdByUserId: input.actor.userId })
         .returning({ id: opportunityReports.id });
       await recordAudit({
         organizationId,
@@ -60,7 +77,7 @@ export async function saveMatrixReport(input: { organizationId: string; opportun
         action: "opportunity.report.save",
         resourceType: "opportunity",
         resourceId: opportunityId,
-        metadata: { reportId: row!.id, kind: "matrix", version, coverage: body.coverage, questions: body.total },
+        metadata: { reportId: row!.id, kind, version, ...input.audit },
       });
       return { ok: true, id: row!.id, version };
     } catch (err) {
