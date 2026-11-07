@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Capture: choose a partner and move to Plan** — Pipeline → Capture lists every GO and PARTNER opportunity with its decision, days left, partners and the next step (*Find partners*, *Choose a partner* or *Move to Plan*); the opportunity's new **Partners** tab lists the companies you are considering, lets you choose one or several, decline or remove them, and carries **Move to Plan**: at once for a GO, once a partner is chosen for a PARTNER, with the teaming agreement noted as still to do (§5.3.2).
 - **Analyze and the Analysis Report** — Evaluate's **Analyze** opens the opportunity's **Analysis** tab: **Run the analysis** scores the win probability with its factors, reuses or writes the AI pursuit brief, and writes a short report (the call and why, fit, competition, risks, what would raise PWin, what FORGE read), kept as a dated version you can print; the Evaluate row shows its PWin and call (§5.3.1).
 - **Add to pipeline brings the documents** — a SAM.gov find or search result added to the pipeline has the notice's attachments downloaded to the new opportunity straight away, read like uploads; the Scout keeps what you just added in view with **Open** and **Go to Evaluate**; and an opportunity's **Documents & AI review** always offers **Check SAM.gov now** and **Add a document to this opportunity** (§5.2, §5.4).
 - **FORGE's emails and authenticator entry carry forgeaxi.com** — mail comes from `noreply@forgeaxi.com`, and a newly added authenticator app shows **FORGE (forgeaxi.com)**. An entry added before still shows the old name: rename it in your authenticator app, or add the app again under Settings → Security and remove the old one (§1.6).
@@ -566,15 +567,29 @@ Click **Create opportunity**. You'll land on the detail page.
 **The decision.** **Decide** opens the **Decision** panel on the opportunity's Evaluation tab, which takes the place of the gate panel while the opportunity is in Evaluate. Choose one:
 - **GO** moves the opportunity to Capture (Qualified), on its way to Plan. A note is optional.
 - **NO-GO** closes it as **No bid**, which also stops FORGE watching SAM.gov for its amendments. Choose why (scope isn't ours, no capacity or staff, can't win on price, competition or incumbent too strong, not enough time, no customer relationship, can't meet a requirement or set-aside, other) and say it in your own words, at least 20 characters. It can't be saved without both.
-- **PARTNER** moves it to Capture (Qualified) as needing a partner. The panel lists the companies in your **Companies** marked teaming partner or subcontractor, those working under the opportunity's NAICS code first, each with why it is listed. **Find more partners** opens Company search with the opportunity's NAICS code filled in. FORGE's own partner finder comes with Capture.
+- **PARTNER** moves it to Capture (Qualified) as needing a partner. The panel lists the companies in your **Companies** marked teaming partner or subcontractor, those working under the opportunity's NAICS code first, each with why it is listed. **Find more partners** opens Company search with the opportunity's NAICS code filled in. The partners you consider and choose are kept on the opportunity's Partners tab (§5.3.2).
 
 The panel says when the analysis or the capability matrix is still missing; the decision is better informed with both. Every decision is **kept**, never overwritten: who made it, when, the PWin and capability coverage at that moment, the category and the reason. The history is listed under the panel, newest first, and each decision is noted on the Activity tab and recorded in the Audit Log. Once the opportunity is in Capture the call can still change, as a new decision; after that the gate panel moves it on.
 
 **Solicitation documents.** The Solicitations list is now part of Evaluate: under the list, **Documents not yet on an opportunity** shows each uploaded solicitation not yet attached to one, with **Create opportunity from it** (the Create tab, filled in from the document) and **+ Upload solicitation**. A document on an opportunity opens from that opportunity; its own page stays, and its **Back** link returns to the opportunity. The old `/solicitations` address opens Evaluate.
 
+### 5.3.2 Capture: partners and Move to Plan
+
+**Opportunity Management → Pipeline → Capture** lists every opportunity at Qualified, decided GO or PARTNER in Evaluate, one row each: the decision, days left (red under five), the partners (how many are being considered, and the names of the ones chosen) and the next step:
+- **Find partners** — a PARTNER opportunity with no partner yet;
+- **Choose a partner** — a PARTNER opportunity with partners being considered but none chosen;
+- **Move to Plan** — a GO opportunity, or a PARTNER one with a partner chosen.
+
+Each button opens the opportunity's **Partners** tab (BL-NAV-LIFECYCLE 3a-1):
+- **The partners** being considered for this opportunity, each with its relationship, UEI, why it was added, its status (Candidate, Chosen, Declined) and who chose it when. **Choose** marks it chosen; several can be chosen, as a team. **Unchoose** and **Reconsider** put it back as a candidate, **Decline** sets it aside, **Remove** drops it from the list.
+- **Add a partner**: the teaming partners and subcontractors in your **Companies** are suggested first, those under the opportunity's NAICS code ahead; any other company can be picked from the list, with a short reason. **Search SAM.gov for partners** opens Company search with the opportunity's NAICS code filled in; add a company from there to Companies and it appears in the list. FORGE's own partner search across SAM.gov, the certification registry and federal awards, and its ranked list with reasons, follow in the next releases.
+- **Move to Plan** moves the opportunity to Captured (Plan). A GO opportunity can move at once. A PARTNER opportunity needs a chosen partner first; until then the panel says so. A NO-GO can't. The teaming agreement is shown as **to do**: it does not hold the opportunity back until FORGE's agreement module exists, and the Activity tab notes the move with the chosen partners and "Teaming agreement: to do".
+
+Every add, choice, decline and removal, and the move to Plan, is recorded in the Audit Log; the move is also noted on the Activity tab.
+
 ### 5.4 Opportunity detail — tabs
 
-Every opportunity has seven tabs: **Overview**, **Analysis** (the Analysis Report, §5.3.1), **Evaluation**, **Capability** (the capability matrix, below), **Competitors**, **Similar awards** and **Activity**.
+Every opportunity has eight tabs: **Overview**, **Analysis** (the Analysis Report, §5.3.1), **Evaluation**, **Capability** (the capability matrix, below), **Partners** (§5.3.2), **Competitors**, **Similar awards** and **Activity**.
 
 ![Opportunity detail tabs](docs/images/opportunity-detail.png)
 

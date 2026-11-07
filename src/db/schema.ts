@@ -5378,3 +5378,40 @@ export const opportunityReports = pgTable(
   }),
 );
 
+/**
+ * BL-NAV-LIFECYCLE phase 3a — the partners considered for an opportunity
+ * in Capture: a company of the organization each, with its source, why it
+ * fits, and where it stands. Choosing one lets a PARTNER opportunity move
+ * to Plan.
+ */
+export const opportunityPartnerStatusEnum = pgEnum("opportunity_partner_status", ["candidate", "invited", "answered", "chosen", "declined"]);
+export type OpportunityPartnerStatus = (typeof opportunityPartnerStatusEnum.enumValues)[number];
+
+export const opportunityPartners = pgTable(
+  "opportunity_partner",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    /** own (your Companies) | database (the partner search) | ai (the AI's shortlist). */
+    source: text("source").notNull().default("own"),
+    status: opportunityPartnerStatusEnum("status").notNull().default("candidate"),
+    reason: text("reason").notNull().default(""),
+    chosenByUserId: text("chosen_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    chosenAt: timestamp("chosen_at", { withTimezone: true }),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_partner_org_idx").on(t.organizationId, t.createdAt),
+    oppCompanyUq: uniqueIndex("opportunity_partner_opp_company_uq").on(t.opportunityId, t.companyId),
+  }),
+);

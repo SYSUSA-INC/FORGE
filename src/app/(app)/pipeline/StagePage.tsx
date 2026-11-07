@@ -13,6 +13,7 @@ import { ScoutSection } from "@/app/(app)/opportunities/scout/ScoutSection";
 import { evaluateFilter } from "@/lib/opportunity-decision";
 import { CreateSection } from "./CreateSection";
 import { EvaluateSection } from "./EvaluateSection";
+import { CaptureSection } from "./CaptureSection";
 import { StageList, type StageListRow } from "./StageList";
 
 /**
@@ -132,6 +133,8 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
       <LifecycleChevron current={stage.key} />
       {stage.key === "evaluate" ? (
         <EvaluateSection rows={rows} filter={evaluateFilter(searchParams.filter)} />
+      ) : stage.key === "capture" ? (
+        <CaptureSection rows={rows} />
       ) : (
         <StageList rows={rows} title={`In ${stage.label}`} empty={`Nothing is in ${stage.label} right now.`} />
       )}

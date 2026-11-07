@@ -3393,7 +3393,7 @@ Every requirement in the FORGE II document, with its status and phase:
    (Solicitations folds into Evaluate; Yes keeps a *proven* tick; GO goes
    to Capture, then Plan; a NO-GO needs a category and the team's own
    words). Three PRs:
-   - **2a — the decision and the Evaluate page (this PR).** Migration
+   - **2a — the decision and the Evaluate page (#463).** Migration
      0150: `opportunity_decision` (decision `go` / `no_go` / `partner`,
      reason category, reason, PWin and capability coverage at that
      moment, who, when), one row per decision, never overwritten.
@@ -3446,7 +3446,7 @@ Every requirement in the FORGE II document, with its status and phase:
      **Reports** line shows the latest Matrix Report and the decision.
      Tested in `tests/ai/opportunity-report.test.ts` and
      `tests/isolation/opportunity-report.test.ts`.
-   - **2c — Analyze and the Analysis Report (this PR).** The
+   - **2c — Analyze and the Analysis Report (#469).** The
      opportunity's **Analysis** tab (`/opportunities/{id}/analysis`):
      **Run the analysis** (`runAnalysis`) computes the calibrated PWin
      (no AI), reuses or writes the pursuit brief, and makes one AI call,
@@ -3463,11 +3463,42 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/isolation/opportunity-analysis.test.ts` (AI mocked: versions,
      one request counted, refund on failure, facts-only mode, tenant
      isolation).
-3. **Capture:** the Go and Partner worklist; the partner registry
-   (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
-   on the 8(a) registry and USAspending; the partner finder with a
-   prioritised list and rationale; a tokenised link for a partner to
-   answer the capability matrix with no account.
+3. **Capture:** design `docs/design/BL-NAV-LIFECYCLE_PHASE3_CAPTURE.md`,
+   approved by the owner 2026-11-07 with every recommended answer
+   (federal partner sources now, state and local later; partners answer
+   through an emailed link with no account, valid 14 days; partners see
+   the questions and their own answers only; a PARTNER opportunity may
+   move to Plan with "teaming agreement: to do" until phase 8). PRs:
+   - **3a-1 — the Capture page, partners, Choose partner and Move to
+     Plan (this PR).** Migration 0154: `opportunity_partner` (one of the
+     organization's companies considered for one of its opportunities:
+     source, status `candidate` / `invited` / `answered` / `chosen` /
+     `declined`, reason, who chose it and when; unique per opportunity
+     and company). `src/lib/capture-logic.ts` (pure, tested) holds the
+     rules: Move to Plan needs the opportunity in Capture (Qualified), is
+     closed to a NO-GO, and on a PARTNER needs a chosen partner; a GO
+     moves at once; the row's next step is *Find partners*, *Choose a
+     partner* or *Move to Plan*; the activity note names the partners and
+     "Teaming agreement: to do". `src/lib/capture-store.ts` adds,
+     chooses, declines, reconsiders and removes partners (audited
+     `opportunity.partner.add` / `choose` / `decline` / `reconsider` /
+     `remove`; a company and opportunity of another organization are
+     refused) and moves to Plan (stage Captured) through the one
+     stage-change path. The opportunity's **Partners** tab lists the
+     partners with their actions, adds one from the suggested teaming
+     partners or from Companies with a reason, links to Company search by
+     the opportunity's NAICS, and carries **Move to Plan** or what stands
+     in its way. **Pipeline → Capture** lists each Qualified opportunity
+     with its decision, days left, partners (candidates and chosen) and
+     the next step. Tested in `tests/ai/capture-logic.test.ts` and
+     `tests/isolation/capture.test.ts`.
+   - **3a-2 — the partner database search** (SAM.gov entities, the
+     certification registry, USAspending awards and Companies, joined by
+     UEI).
+   - **3b — FORGE AI's ranked partner list** with a reason per partner
+     citing the search's facts, and *Find more*.
+   - **3c — invitations, the partner's own matrix page, Compare and the
+     AI's partner rating.**
 4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
    Gloves teams notified automatically, task owners, milestones, the
    compliance matrix and outline fixed here.
