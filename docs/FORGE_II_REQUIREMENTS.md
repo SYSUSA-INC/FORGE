@@ -77,14 +77,14 @@ Last reviewed 2026-11-06, after PR #457.
 | ID | Requirement | Status |
 |---|---|---|
 | E-1 | Evaluate lists the opportunities identified in Identify and **replaces the Solicitations page** | ✅ Phase 2a: the Evaluate list (#452, rows and filters in 2a); `/solicitations` redirects to it, with documents not yet on an opportunity listed there |
-| E-2 | Two buttons on each opportunity: **Analyze** and **Capability Matrix** | 🟡 Both on every Evaluate row (2a); Capability Matrix opens its own page (2b). Analyze opens the PWin and brief until 2c's analysis page |
-| E-3 | Analyze opens a new page where FORGE AI, using what it knows of the company, gives a **PWin score** and a **report** that supports it | 🟡 A PWin panel and AI evaluation exist on the opportunity page today. Phase 2 makes them the Analyze flow |
-| E-4 | The analysis is saved, and an **Analysis Report** button then appears on the opportunity | 📋 Phase 2 |
+| E-2 | Two buttons on each opportunity: **Analyze** and **Capability Matrix** | ✅ Both on every Evaluate row: Analyze opens the Analysis page (2c), Capability Matrix the Capability page (2b) |
+| E-3 | Analyze opens a new page where FORGE AI, using what it knows of the company, gives a **PWin score** and a **report** that supports it | ✅ Phase 2c: the Analysis tab runs the calibrated PWin with its factors, the pursuit brief and one AI report (the call, fit, competition, risks, what would raise PWin, what FORGE read) |
+| E-4 | The analysis is saved, and an **Analysis Report** button then appears on the opportunity | ✅ Phase 2c: each run is a dated, numbered Analysis Report, printable, on the Overview's Reports line |
 | E-5 | Capability Matrix opens a page where the AI extracts the required capabilities from the RFP, RFI or other document into an editable, user-friendly list | ✅ Phase 2b: the opportunity's **Capability** page, questions drafted by the AI from the solicitation's requirements, each editable and removable |
 | E-6 | Three answers for each capability: **Yes / No / Partial** | ✅ Phase 2b: Yes (proven tick), Partial, No (partner tick), over the six stored answers |
 | E-7 | **Partial** asks for a percentage: how much the company can do without a partner | ✅ Phase 2b: 5 to 95%, counted in coverage |
 | E-8 | Once the matrix is done, a **Matrix Report** button appears | ✅ Phase 2b-2: **Save report** keeps a dated, numbered snapshot; **Matrix Report vN** opens it, printable |
-| E-9 | **Every opportunity has its own page** holding both reports, open to the team for the rest of the process | 🟡 Phase 2b-2: the Overview's **Reports** line (Matrix Report and the decision), kept through every stage. The Analysis Report joins with 2c |
+| E-9 | **Every opportunity has its own page** holding both reports, open to the team for the rest of the process | ✅ The Overview's **Reports** line: Analysis Report, Matrix Report and the decision, kept through every stage |
 | E-10 | The final decision on that page: **GO / NO-GO / PARTNER** | ✅ Phase 2a: the Decision panel, each decision kept (`opportunity_decision`) |
 | E-11 | GO moves the opportunity to Capture | ✅ Phase 2a: to Qualified (Capture), then Plan |
 | E-12 | NO-GO requires a reason, and the opportunity won't close without one, so FORGE learns from it | 🟡 Phase 2a: a category and at least 20 characters of the team's words, or it can't be saved; kept with the decision. Feeding Lessons and Loss intelligence from it is to come |

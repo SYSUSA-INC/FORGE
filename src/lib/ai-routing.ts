@@ -56,6 +56,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   ebuy_extract: "fast",
   gsa_extract: "fast",
   inbound_bids: "fast",
+  analysis_report: "standard",
   // Embeddings go to the embedding provider, not a completion model;
   // listed so the ledger's feature keys stay exhaustive (BL-AIP-4).
   embedding: "fast",

@@ -100,3 +100,101 @@ export function asMatrixReport(body: unknown): MatrixReportBody | null {
 }
 
 export const REPORT_LABELS = { matrix: "Matrix Report", analysis: "Analysis Report" } as const;
+
+// ── BL-NAV-LIFECYCLE 2c — the Analysis Report ─────────────────────────
+
+export const ANALYSIS_REPORT_SCHEMA = 1;
+
+export type AnalysisCall = "pursue" | "watch" | "no_bid";
+export const ANALYSIS_CALL_LABELS: Record<AnalysisCall, string> = { pursue: "Pursue", watch: "Watch", no_bid: "Consider no-bid" };
+
+/**
+ * The Analysis Report (E-3, E-4): the call and why, the win probability
+ * with its factors, fit, competition, risks, what would raise PWin, and
+ * what FORGE read. The PWin and its factors come from the model, never
+ * the AI; the AI writes the call and the lines.
+ */
+export type AnalysisReportBody = {
+  kind: "analysis";
+  schema: number;
+  generatedAt: string;
+  opportunity: MatrixReportBody["opportunity"];
+  call: AnalysisCall;
+  summary: string;
+  pwin: { pwin: number; confidence: string; factors: { label: string; logOdds: number; detail: string }[] } | null;
+  fit: string[];
+  competition: string[];
+  risks: string[];
+  raisePwin: string[];
+  sources: string[];
+  /** The AI wasn't available (no provider configured): the lines are FORGE's own, from the facts. */
+  stubbed: boolean;
+  model: string;
+};
+
+export function buildAnalysisReport(input: {
+  opportunity: MatrixReportBody["opportunity"];
+  pwin: AnalysisReportBody["pwin"];
+  ai: { call: AnalysisCall; summary: string; fit: string[]; competition: string[]; risks: string[]; raisePwin: string[] };
+  sources: string[];
+  stubbed: boolean;
+  model: string;
+  now: Date;
+}): AnalysisReportBody {
+  const clean = (xs: string[], n: number) => xs.map((x) => x.trim()).filter(Boolean).slice(0, n);
+  return {
+    kind: "analysis",
+    schema: ANALYSIS_REPORT_SCHEMA,
+    generatedAt: input.now.toISOString(),
+    opportunity: input.opportunity,
+    call: input.ai.call,
+    summary: input.ai.summary.trim(),
+    pwin: input.pwin,
+    fit: clean(input.ai.fit, 5),
+    competition: clean(input.ai.competition, 5),
+    risks: clean(input.ai.risks, 6),
+    raisePwin: clean(input.ai.raisePwin, 5),
+    sources: input.sources,
+    stubbed: input.stubbed,
+    model: input.model,
+  };
+}
+
+/**
+ * With no AI provider: a report from the facts alone, so the page still
+ * works on a deployment without AI (marked as such).
+ */
+export function factsOnlyAnalysis(input: {
+  pwin: AnalysisReportBody["pwin"];
+  briefCall: AnalysisCall | null;
+  coverage: number | null;
+  partnerNeeded: boolean;
+  gaps: string[];
+  competitors: { name: string; incumbent: boolean }[];
+  incumbent: string;
+}): { call: AnalysisCall; summary: string; fit: string[]; competition: string[]; risks: string[]; raisePwin: string[] } {
+  const p = input.pwin?.pwin ?? null;
+  const call: AnalysisCall = input.briefCall ?? (p === null ? "watch" : p >= 40 ? "pursue" : p >= 20 ? "watch" : "no_bid");
+  const factors = input.pwin?.factors ?? [];
+  const helps = factors.filter((f) => f.logOdds > 0).sort((a, b) => b.logOdds - a.logOdds);
+  const hurts = factors.filter((f) => f.logOdds < 0).sort((a, b) => a.logOdds - b.logOdds);
+  const incumbent = input.competitors.find((c) => c.incumbent)?.name || input.incumbent;
+  return {
+    call,
+    summary: `${ANALYSIS_CALL_LABELS[call]}: PWin ${p === null ? "is not known yet" : `${p}%`}${input.coverage === null ? ", with no capability matrix yet" : `, capability coverage ${Math.round(input.coverage * 100)}%`}.`,
+    fit: helps.slice(0, 5).map((f) => `${f.label}: ${f.detail}`),
+    competition: incumbent ? [`Incumbent: ${incumbent}`, ...input.competitors.filter((c) => !c.incumbent).slice(0, 4).map((c) => `Competitor: ${c.name}`)] : ["No incumbent or competitors logged yet."],
+    risks: [...hurts.slice(0, 4).map((f) => `${f.label}: ${f.detail}`), ...input.gaps.slice(0, 2).map((g) => `Capability gap: ${g}`)],
+    raisePwin: [
+      ...(input.coverage === null ? ["Build and answer the capability matrix."] : []),
+      ...(input.partnerNeeded ? ["Name a partner for the open gaps."] : []),
+      ...(incumbent ? [] : ["Identify the incumbent and the likely competitors."]),
+    ],
+  };
+}
+
+/** A saved body read back as an Analysis Report, or null. */
+export function asAnalysisReport(body: unknown): AnalysisReportBody | null {
+  const b = body as Partial<AnalysisReportBody> | null;
+  return b && b.kind === "analysis" && typeof b.summary === "string" && b.opportunity ? (b as AnalysisReportBody) : null;
+}

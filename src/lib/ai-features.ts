@@ -32,6 +32,7 @@ export const AI_FEATURES = {
   gsa_extract: "GSA extraction",
   // BL-SCOUT-INBOX — the bids in an email a portal sent the company.
   inbound_bids: "Portal email reading",
+  analysis_report: "Analysis Report",
   image_ocr: "Image OCR",
   knowledge_classify: "Knowledge classification",
   knowledge_extract: "Knowledge extraction",

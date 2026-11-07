@@ -3433,7 +3433,7 @@ Every requirement in the FORGE II document, with its status and phase:
      summary (coverage, Yes / Partial / No counts, partner needed); the
      Evaluate list and the next actions open it. Tested in
      `tests/ai/capability-three-answers.test.ts`.
-   - **2b-2 — the Matrix Report (this PR).** Migration 0152:
+   - **2b-2 — the Matrix Report (#467).** Migration 0152:
      `opportunity_report` (kind `matrix` / `analysis`, version, JSON body,
      who, when; a unique index on opportunity + kind + version, a second
      save at the same moment takes the next number). **Save report** on
@@ -3446,7 +3446,23 @@ Every requirement in the FORGE II document, with its status and phase:
      **Reports** line shows the latest Matrix Report and the decision.
      Tested in `tests/ai/opportunity-report.test.ts` and
      `tests/isolation/opportunity-report.test.ts`.
-   - **2c — Analyze:** the analysis page and the Analysis Report.
+   - **2c — Analyze and the Analysis Report (this PR).** The
+     opportunity's **Analysis** tab (`/opportunities/{id}/analysis`):
+     **Run the analysis** (`runAnalysis`) computes the calibrated PWin
+     (no AI), reuses or writes the pursuit brief, and makes one AI call,
+     `analysis_report` (registered, versioned 2026-11-07.1, "standard";
+     `buildAnalysisReportPrompt`, the opportunity's own text fenced as
+     data), under the plan's AI switch and monthly quota, refunded when
+     the answer can't be read; with no AI provider, `factsOnlyAnalysis`
+     writes it from the facts and says so. The PWin and factors come
+     from the model, never the AI. Kept with `insertReport` as the next
+     `opportunity_report` version (kind `analysis`), printable at
+     `/report/{id}` (`AnalysisReportView`), on the Overview's Reports
+     line; Evaluate's Analyze opens it and its row shows the report's PWin
+     and call. Tested in `tests/ai/analysis-report.test.ts` and
+     `tests/isolation/opportunity-analysis.test.ts` (AI mocked: versions,
+     one request counted, refund on failure, facts-only mode, tenant
+     isolation).
 3. **Capture:** the Go and Partner worklist; the partner registry
    (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
    on the 8(a) registry and USAspending; the partner finder with a

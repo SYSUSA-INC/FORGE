@@ -14,7 +14,7 @@ import "server-only";
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { aiBriefs, companies, opportunities, opportunityCapabilityMatrices, opportunityDecisions, users, type OpportunityDecisionKind } from "@/db/schema";
+import { aiBriefs, companies, opportunities, opportunityCapabilityMatrices, opportunityDecisions, opportunityReports, users, type OpportunityDecisionKind } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { computeCapabilityCoverage } from "@/lib/capability-coverage";
 import { checkDecision, decisionNote, DECISION_STAGE, type DecisionInput } from "@/lib/opportunity-decision";
@@ -105,8 +105,10 @@ export async function decisionHistory(organizationId: string, opportunityId: str
 }
 
 export type EvaluateSignals = {
-  /** The latest pursuit brief's call (pursue / watch / no_bid), or null before Analyze. */
+  /** The latest Analysis Report's call, else the pursuit brief's (pursue / watch / no_bid); null before Analyze. */
   call: string | null;
+  /** The latest Analysis Report's modelled PWin (0..100), or null before one ran. */
+  analysisPwin: number | null;
   analysed: boolean;
   /** Questions in the capability matrix (0 before it is built). */
   questions: number;
@@ -119,7 +121,7 @@ export type EvaluateSignals = {
 export async function evaluateSignals(organizationId: string, opportunityIds: string[]): Promise<Map<string, EvaluateSignals>> {
   const out = new Map<string, EvaluateSignals>();
   if (opportunityIds.length === 0) return out;
-  const [briefs, matrices, decisions] = await Promise.all([
+  const [briefs, matrices, decisions, analyses] = await Promise.all([
     db
       .select({ opportunityId: aiBriefs.opportunityId, recommendation: aiBriefs.recommendation })
       .from(aiBriefs)
@@ -130,13 +132,26 @@ export async function evaluateSignals(organizationId: string, opportunityIds: st
       .from(opportunityCapabilityMatrices)
       .where(and(eq(opportunityCapabilityMatrices.organizationId, organizationId), inArray(opportunityCapabilityMatrices.opportunityId, opportunityIds))),
     latestDecisions(organizationId, opportunityIds),
+    // BL-NAV-LIFECYCLE 2c — an Analysis Report's call outranks the brief's.
+    db
+      .select({ opportunityId: opportunityReports.opportunityId, body: opportunityReports.body })
+      .from(opportunityReports)
+      .where(and(eq(opportunityReports.organizationId, organizationId), eq(opportunityReports.kind, "analysis"), inArray(opportunityReports.opportunityId, opportunityIds)))
+      .orderBy(desc(opportunityReports.version)),
   ]);
   const call = new Map<string, string | null>();
+  const analysisPwin = new Map<string, number | null>();
+  for (const a of analyses) {
+    if (call.has(a.opportunityId)) continue;
+    call.set(a.opportunityId, typeof a.body?.call === "string" ? a.body.call : null);
+    const p = (a.body as { pwin?: { pwin?: unknown } | null })?.pwin?.pwin;
+    analysisPwin.set(a.opportunityId, typeof p === "number" ? p : null);
+  }
   for (const b of briefs) if (b.opportunityId && !call.has(b.opportunityId)) call.set(b.opportunityId, b.recommendation);
   const matrix = new Map(matrices.map((m) => [m.opportunityId, computeCapabilityCoverage(m.questions ?? [], m.answers ?? {})]));
   for (const id of opportunityIds) {
     const m = matrix.get(id);
-    out.set(id, { call: call.get(id) ?? null, analysed: call.has(id), questions: m?.total ?? 0, answered: m?.answered ?? 0, coverage: m?.coverage ?? null, decision: decisions.get(id) ?? null });
+    out.set(id, { call: call.get(id) ?? null, analysisPwin: analysisPwin.get(id) ?? null, analysed: call.has(id), questions: m?.total ?? 0, answered: m?.answered ?? 0, coverage: m?.coverage ?? null, decision: decisions.get(id) ?? null });
   }
   return out;
 }
