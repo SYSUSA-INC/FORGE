@@ -3181,8 +3181,30 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 
 ---
 
+### BL-MFA-ADMIN — Company admins see and reset members' two-step sign-in
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🚧 this PR
+
+**Owner, 2026-11-07:** "There should be an option in the admin settings
+to enforce MFA"; chosen: two-step sign-in stays required for everyone
+(no company can weaken it), and company admins get visibility and a
+reset. **Administration → Security** (`/users/security`, also under
+People in the Company admin menu): the policy line (red when the
+platform switch is off), and every member with the methods they hold or
+**Not set up yet** and their recovery codes left
+(`companyMemberSecurity`); **Reset second step** with a written reason
+(`resetMemberSecondStep`): methods and codes removed, sessions ended,
+the member emailed ("Your company's FORGE administrator"),
+`user.mfa.reset` audited with `companyAdmin: true`. Never yourself, a
+platform administrator, someone who also belongs to another company,
+an inactive member or one with nothing set up
+(`companyResetBlocker`, pure, tested); the server re-checks membership
+of this company. Tested in `tests/ai/company-security-logic.test.ts`
+and `tests/isolation/company-security.test.ts`.
+
+---
+
 ### BL-MFA-RECOVERY — Nobody, the owner included, is locked out at the second step
-**Priority:** P0  ·  **Effort:** M  ·  **Status:** 🚧 this PR
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (#464)
 
 **Owner, 2026-11-07:** after the domain move the owner, the only
 superadmin, could not get past the second step: "I need a dynamic
@@ -3217,13 +3239,12 @@ and `tests/isolation/mfa-recovery.test.ts` (the owner's lockout: a
 superadmin whose only passkey was made on www.sysgov.com, signing in on
 www.forgeaxi.com), and end to end in a browser.
 
-**Next:** Administration → Security for company admins (each member's
-methods, Reset second step), agreed 2026-11-07.
+**Followed by** BL-MFA-ADMIN (Administration → Security).
 
 ---
 
 ### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
-**Priority:** P0  ·  **Effort:** S  ·  **Status:** 🚧 phase 1 (this PR)
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 waits on the owner
 
 **Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
 web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
@@ -3232,7 +3253,7 @@ web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, 
 `https://www.sysgov.com` in production, so passkeys were asked for the
 old domain (the browser refuses) and email links pointed there.
 
-- **Phase 1 (this PR):** the production fallback is
+- **Phase 1 (#464):** the production fallback is
   `https://www.forgeaxi.com` (tested, with the passkey domain it gives);
   the User Manual's sign-in addresses and the Admin Manual's storage
   CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old

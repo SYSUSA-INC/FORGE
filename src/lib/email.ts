@@ -443,13 +443,15 @@ export async function sendOpportunityReviewRequestEmail(opts: {
 
 /** BL-AIP-3 — whether a provider key is present; callers record the truth when not. */
 /** BL-STAB-8a-4 — a platform administrator reset the person's two-step sign-in. */
-export async function sendMfaResetEmail(opts: { to: string; reason: string; byEmail: string | null }): Promise<void> {
+export async function sendMfaResetEmail(opts: { to: string; reason: string; byEmail: string | null; byCompanyAdmin?: boolean }): Promise<void> {
   const url = `${appBaseUrl()}/sign-in`;
+  // BL-MFA-ADMIN — a company admin can reset a member too.
+  const who = opts.byCompanyAdmin ? "Your company's FORGE administrator" : "A FORGE platform administrator";
   const reason = escapeHtml(opts.reason);
   const body = `
     <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Your two-step sign-in was reset</h1>
     <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
-      A FORGE platform administrator${opts.byEmail ? ` (${escapeHtml(opts.byEmail)})` : ""} removed the authenticator apps, passkeys and recovery codes from your account and signed you out everywhere. Their reason:
+      ${who}${opts.byEmail ? ` (${escapeHtml(opts.byEmail)})` : ""} removed the authenticator apps, passkeys and recovery codes from your account and signed you out everywhere. Their reason:
     </p>
     <blockquote style="margin:0 0 20px 0;padding:10px 14px;border-left:3px solid ${EMAIL_HEX.accent};font-size:14px;line-height:1.55;color:${EMAIL_HEX.ink};">${reason}</blockquote>
     <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
@@ -466,7 +468,7 @@ export async function sendMfaResetEmail(opts: { to: string; reason: string; byEm
     to: opts.to,
     subject: "Your FORGE two-step sign-in was reset",
     html: emailShell("Two-step sign-in reset", body),
-    text: `A FORGE platform administrator${opts.byEmail ? ` (${opts.byEmail})` : ""} reset your two-step sign-in and signed you out everywhere.\n\nReason: ${opts.reason}\n\nYour password is unchanged. Sign in at ${url} to set it up again.\n\nDid not expect this? Contact your administrator before signing in.`,
+    text: `${who}${opts.byEmail ? ` (${opts.byEmail})` : ""} reset your two-step sign-in and signed you out everywhere.\n\nReason: ${opts.reason}\n\nYour password is unchanged. Sign in at ${url} to set it up again.\n\nDid not expect this? Contact your administrator before signing in.`,
   });
 }
 

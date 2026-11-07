@@ -172,6 +172,7 @@ const WORK_NAV: WorkspaceNavGroup[] = [
     needsWorkspace: true,
     children: [
       { href: "/users", label: "Users & Roles" },
+      { href: "/users/security", label: "Security" },
       { href: "/settings/billing", label: "Billing" },
       { href: "/settings/templates", label: "Templates" },
       { href: "/settings/api", label: "API access" },
@@ -214,7 +215,11 @@ const COMPANY_NAV: WorkspaceNavGroup[] = [
     icon: "◉",
     admin: true,
     needsWorkspace: true,
-    children: [{ href: "/users", label: "Users & Roles" }],
+    children: [
+      { href: "/users", label: "Users & Roles" },
+      // BL-MFA-ADMIN — members' two-step sign-in.
+      { href: "/users/security", label: "Security" },
+    ],
   },
   {
     id: "organization",
