@@ -2,7 +2,6 @@
  * BL-STAB-8a-1 — the second factor's limits and names, with no Node
  * imports so the Security page's client panel can read them.
  */
-export const MFA_ISSUER = "FORGE (sysgov.com)";
 export const MFA_LIMITS = {
   /** Authenticator apps and passkeys together, per user. */
   factors: 3,

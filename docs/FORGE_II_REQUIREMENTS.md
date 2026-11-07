@@ -83,8 +83,8 @@ Last reviewed 2026-11-06, after PR #457.
 | E-5 | Capability Matrix opens a page where the AI extracts the required capabilities from the RFP, RFI or other document into an editable, user-friendly list | ✅ Phase 2b: the opportunity's **Capability** page, questions drafted by the AI from the solicitation's requirements, each editable and removable |
 | E-6 | Three answers for each capability: **Yes / No / Partial** | ✅ Phase 2b: Yes (proven tick), Partial, No (partner tick), over the six stored answers |
 | E-7 | **Partial** asks for a percentage: how much the company can do without a partner | ✅ Phase 2b: 5 to 95%, counted in coverage |
-| E-8 | Once the matrix is done, a **Matrix Report** button appears | 📋 Phase 2b, second part (the report snapshot and its page) |
-| E-9 | **Every opportunity has its own page** holding both reports, open to the team for the rest of the process | 🟡 Opportunity pages exist. Phase 2 puts the reports on them |
+| E-8 | Once the matrix is done, a **Matrix Report** button appears | ✅ Phase 2b-2: **Save report** keeps a dated, numbered snapshot; **Matrix Report vN** opens it, printable |
+| E-9 | **Every opportunity has its own page** holding both reports, open to the team for the rest of the process | 🟡 Phase 2b-2: the Overview's **Reports** line (Matrix Report and the decision), kept through every stage. The Analysis Report joins with 2c |
 | E-10 | The final decision on that page: **GO / NO-GO / PARTNER** | ✅ Phase 2a: the Decision panel, each decision kept (`opportunity_decision`) |
 | E-11 | GO moves the opportunity to Capture | ✅ Phase 2a: to Qualified (Capture), then Plan |
 | E-12 | NO-GO requires a reason, and the opportunity won't close without one, so FORGE learns from it | 🟡 Phase 2a: a category and at least 20 characters of the team's words, or it can't be saved; kept with the decision. Feeding Lessons and Loss intelligence from it is to come |

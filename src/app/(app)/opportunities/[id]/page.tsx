@@ -12,6 +12,7 @@ import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
 import { CustomerContactsPanel } from "./CustomerContactsPanel";
 import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
 import { PwinPanel } from "./PwinPanel";
+import { ReportsStrip } from "./ReportsStrip";
 import { NextActionPanel } from "@/components/intelligence/NextActionPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
 
@@ -64,6 +65,9 @@ export default async function OpportunityOverviewPage({
   ]);
 
   return (
+    <>
+    {/* BL-NAV-LIFECYCLE 2b-2 — the opportunity's reports and decision (E-9). */}
+    <ReportsStrip opportunityId={opp.id} />
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
       <Panel title="Opportunity details">
         <OpportunityForm
@@ -115,5 +119,6 @@ export default async function OpportunityOverviewPage({
         <OpportunityDocsAndAIPanel opportunityId={opp.id} />
       </div>
     </div>
+    </>
   );
 }

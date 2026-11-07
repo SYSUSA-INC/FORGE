@@ -7,6 +7,7 @@ import { companies, opportunityCapabilityMatrices } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { buildCapabilityQuestions, suggestCapabilityAnswers } from "@/lib/capability-matrix-build";
+import { saveMatrixReport } from "@/lib/opportunity-report-store";
 import {
   CAPABILITY_ANSWER_VALUES,
   CAPABILITY_EVIDENCE_MAX,
@@ -250,4 +251,19 @@ export async function dismissCapabilitySuggestionAction(input: {
   });
   revalidateMatrix(input.opportunityId);
   return { ok: true };
+}
+
+/**
+ * BL-NAV-LIFECYCLE 2b-2 — Save report: the Matrix Report as it stands now,
+ * kept as the next dated version on the opportunity.
+ */
+export async function saveMatrixReportAction(input: { opportunityId: string }): Promise<{ ok: true; id: string; version: number } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await saveMatrixReport({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor: { userId: actor.id, email: actor.email } });
+  if (res.ok) {
+    revalidateMatrix(input.opportunityId);
+    revalidatePath(`/opportunities/${input.opportunityId}`);
+  }
+  return res;
 }

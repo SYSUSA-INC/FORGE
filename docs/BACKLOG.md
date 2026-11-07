@@ -3244,7 +3244,7 @@ www.forgeaxi.com), and end to end in a browser.
 ---
 
 ### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
-**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 waits on the owner
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 in this PR; phase 3 waits on the owner
 
 **Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
 web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
@@ -3259,10 +3259,18 @@ old domain (the browser refuses) and email links pointed there.
   CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old
   passkeys can't move and how to recover (set the variable, redeploy,
   password plus authenticator or recovery code, add a new passkey).
-- **Phase 2 (waits on the owner):** the contact addresses
-  (support@ / sales@), the default email sender, the authenticator
-  label and the deliverability canary, once the owner names the
-  forgeaxi.com addresses.
+- **Phase 2 (this PR; owner, 2026-11-07: "the email is still coming
+  from SYSGOV.com", "the Authenticator app still shows SYSGOV"):** the
+  sender and the authenticator name come from the site's address
+  (`src/lib/site-domain.ts`, pure, tested): `FORGE <noreply@forgeaxi.com>`
+  unless `EMAIL_FROM` says otherwise, and `FORGE (forgeaxi.com)`. Found
+  on the way: Resend reports a refused message in `error` rather than
+  throwing, and `sendEmail` ignored it, so a refusal (an unverified
+  domain) read as sent; it now throws with the reason, logged
+  `[email] send refused`, and every caller already handles a failed
+  send. Settings → Integrations names the From address and its domain.
+- **Phase 3 (waits on the owner):** the contact addresses shown in the
+  app (support@ / sales@sysgov.com), once the owner names them.
 
 ---
 
@@ -3377,7 +3385,7 @@ Every requirement in the FORGE II document, with its status and phase:
      Back link to its opportunity. Tested in
      `tests/ai/opportunity-decision.test.ts` and
      `tests/isolation/opportunity-decision.test.ts`.
-   - **2b-1 — the three answers and the matrix's own page (this PR).**
+   - **2b-1 — the three answers and the matrix's own page (#466).**
      Each question is answered Yes (with *Proven by past performance*),
      Partial with a percentage (5–95, steps of 5) or No (with *A partner
      could cover it* and an optional partner), or N/A, mapped onto the six
@@ -3389,9 +3397,19 @@ Every requirement in the FORGE II document, with its status and phase:
      summary (coverage, Yes / Partial / No counts, partner needed); the
      Evaluate list and the next actions open it. Tested in
      `tests/ai/capability-three-answers.test.ts`.
-   - **2b-2 — the Matrix Report:** a dated snapshot on **Save report**
-     (`opportunity_report`), a printable page, and the Reports strip on
-     the opportunity's Overview.
+   - **2b-2 — the Matrix Report (this PR).** Migration 0152:
+     `opportunity_report` (kind `matrix` / `analysis`, version, JSON body,
+     who, when; a unique index on opportunity + kind + version, a second
+     save at the same moment takes the next number). **Save report** on
+     the Capability tab keeps `buildMatrixReport`'s snapshot (pure,
+     tested: each requirement with its answer, percentage, evidence and
+     partner, coverage, counts, gaps, the partner call), audited
+     `opportunity.report.save`. `/report/{id}` shows a saved report
+     outside the app's frame, printable (**Print or save as PDF**), with
+     its other versions; this organization's only. The Overview's
+     **Reports** line shows the latest Matrix Report and the decision.
+     Tested in `tests/ai/opportunity-report.test.ts` and
+     `tests/isolation/opportunity-report.test.ts`.
    - **2c — Analyze:** the analysis page and the Analysis Report.
 3. **Capture:** the Go and Partner worklist; the partner registry
    (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
