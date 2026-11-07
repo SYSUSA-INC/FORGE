@@ -16,6 +16,7 @@ import { descriptionsFor } from "@/lib/samgov-descriptions";
 import { resolveSamCredential } from "@/lib/samgov-key";
 import { hasKeyword, keywordLabel, noticeAgency, parseKeyword, parseNoticeTypes, readableText, type DescriptionState, type KeywordSearchCounts } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities, type FoundNotice } from "@/lib/samgov-search";
+import { samNoticeUrl } from "@/lib/opportunity-source";
 
 export type ImportableOpportunity = FoundNotice & {
   alreadyImported: boolean;
@@ -264,6 +265,8 @@ export async function importSamGovOpportunitiesAction(
     stage: mapStageFromType(o.type) as "identified" | "sources_sought",
     solicitationNumber: o.solicitationNumber ?? "",
     noticeId: o.noticeId,
+    source: "samgov",
+    sourceUrl: samNoticeUrl(o.noticeId),
     responseDueDate: parseSamDate(o.responseDeadLine),
     releaseDate: parseSamDate(o.postedDate),
     naicsCode: o.naicsCode ?? "",

@@ -81,6 +81,8 @@ export default async function OpportunityOverviewPage({
             stage: opp.stage,
             solicitationNumber: opp.solicitationNumber,
             noticeId: opp.noticeId,
+            source: opp.source,
+            sourceUrl: opp.sourceUrl,
             valueLow: opp.valueLow,
             valueHigh: opp.valueHigh,
             releaseDate: toIsoOrNull(opp.releaseDate),

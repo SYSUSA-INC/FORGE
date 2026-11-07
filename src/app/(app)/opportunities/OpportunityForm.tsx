@@ -8,6 +8,7 @@ import {
   SET_ASIDES,
   STAGES,
 } from "@/lib/opportunity-types";
+import { OPPORTUNITY_SOURCES, sourceUrlProblem } from "@/lib/opportunity-source";
 import {
   createOpportunityAction,
   updateOpportunityAction,
@@ -52,6 +53,8 @@ export function OpportunityForm({
     initial?.solicitationNumber ?? "",
   );
   const [noticeId, setNoticeId] = useState(initial?.noticeId ?? "");
+  const [source, setSource] = useState(initial?.source ?? (solicitationId ? "document" : "manual"));
+  const [sourceUrl, setSourceUrl] = useState(initial?.sourceUrl ?? "");
   const [valueLow, setValueLow] = useState(initial?.valueLow ?? "");
   const [valueHigh, setValueHigh] = useState(initial?.valueHigh ?? "");
   const [releaseDate, setReleaseDate] = useState(initial?.releaseDate ?? "");
@@ -81,6 +84,8 @@ export function OpportunityForm({
       stage,
       solicitationNumber,
       noticeId,
+      source,
+      sourceUrl,
       valueLow,
       valueHigh,
       releaseDate: releaseDate || null,
@@ -210,6 +215,28 @@ export function OpportunityForm({
             onChange={(e) => setNoticeId(e.target.value)}
             placeholder="Optional"
           />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_2fr]">
+        <Field label="Source">
+          <select className="aur-input" value={source} onChange={(e) => setSource(e.target.value)}>
+            {OPPORTUNITY_SOURCES.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Source link">
+          <input
+            className="aur-input"
+            inputMode="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder={source === "samgov" ? "Filled in from the Notice ID when left empty" : "https://… the portal page for this opportunity"}
+          />
+          {sourceUrlProblem(sourceUrl) ? <span className="mt-1 block font-body text-[12px] text-red">{sourceUrlProblem(sourceUrl)}</span> : null}
         </Field>
       </div>
 

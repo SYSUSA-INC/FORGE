@@ -3279,6 +3279,48 @@ www.forgeaxi.com), and end to end in a browser.
 
 ---
 
+### BL-OPP-SOURCE — Where an opportunity came from, and lighter page titles
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in this PR
+
+**Owner, 2026-11-07:** "when you create the opportunity page, we need to
+maintain the link to where the opportunity came from, if it is from
+SAM.gov, or GSA, or other GWACs or local, state, or commercial portals";
+and the page title should fit on one line, lighter. Both answered with
+the recommended options: source and link set automatically where FORGE
+knows them, editable on every opportunity, shown under the title, existing
+SAM.gov opportunities filled in; the lighter one-line title on every page.
+
+- **Migration 0155:** `opportunity.source` (text, default `manual`) and
+  `opportunity.source_url`. The vocabulary is in
+  `src/lib/opportunity-source.ts` (pure, tested): SAM.gov, GSA eBuy, GSA
+  email, GWAC, state, local, commercial or prime portal, portal email (bid
+  inbox), USAspending recompete, uploaded document, entered by hand. A
+  link is kept only as http(s), without credentials, at most 2,000
+  characters, so a `javascript:` or `data:` link is never stored or
+  rendered. The migration fills in existing opportunities from what FORGE
+  holds: a SAM.gov notice ID (its public page,
+  `https://sam.gov/opp/{id}/view`), the Scout find it was added from (a
+  portal email's or an expiring award's link), the note an eBuy or GSA
+  email paste left (its first link) or a document's; it only touches rows
+  still `manual` with no link, so it is safe to run again.
+- **Set at every way in:** Scout's Add to pipeline (`scoutSourceFields`),
+  the SAM.gov search import, the eBuy and GSA email pastes (the pasted
+  text's eBuy or gsa.gov link first), Create from a document and the
+  solicitation's Create opportunity (`document`, with the SAM.gov page
+  when the document names a notice), and the New opportunity form.
+- **Overview:** **Source** and **Source link** on the form; a SAM.gov
+  opportunity left without a link takes its notice's page. **Under the
+  title:** "Source: SAM.gov · sam.gov ↗", the link opening in a new tab.
+- **Page titles** (`PageHeader`, every page): one line at any width, 24 to
+  28 px at the regular weight instead of 36 to 48 px; a long title ends in
+  "…" and shows in full on hover. `docs/DESIGN_SYSTEM.md` §4 rule 6.
+
+Tested in `tests/ai/opportunity-source.test.ts` and
+`tests/isolation/opportunity-source-backfill.test.ts` (the migration's
+backfill run twice against Postgres).
+
+---
+
 ### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
 **Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 in this PR; phase 3 waits on the owner
 
@@ -3492,7 +3534,7 @@ Every requirement in the FORGE II document, with its status and phase:
      with its decision, days left, partners (candidates and chosen) and
      the next step. Tested in `tests/ai/capture-logic.test.ts` and
      `tests/isolation/capture.test.ts`.
-   - **3a-2 — the partner database search (this PR).** No migration.
+   - **3a-2 — the partner database search (#471).** No migration.
      **Find partners** on the Partners tab (`searchPartners`,
      `src/lib/partner-search.ts`) searches, by the opportunity's NAICS
      code: USAspending (contract awards in the last five years, two pages

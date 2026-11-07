@@ -15,6 +15,7 @@ import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { log } from "@/lib/log";
+import { isOpportunitySource, normalizeSourceUrl, samNoticeUrl, sourceUrlProblem } from "@/lib/opportunity-source";
 
 export type OpportunityInput = {
   title: string;
@@ -37,7 +38,22 @@ export type OpportunityInput = {
   description?: string;
   pWin?: number;
   ownerUserId?: string | null;
+  /** BL-OPP-SOURCE — left out, an update keeps what is there. */
+  source?: string;
+  sourceUrl?: string;
 };
+
+/**
+ * The source fields to write: only those given, checked. A SAM.gov
+ * opportunity with no link takes its notice's page.
+ */
+function sourceFields(input: OpportunityInput): { source?: string; sourceUrl?: string } {
+  const out: { source?: string; sourceUrl?: string } = {};
+  if (input.source !== undefined && isOpportunitySource(input.source)) out.source = input.source;
+  if (input.sourceUrl !== undefined) out.sourceUrl = normalizeSourceUrl(input.sourceUrl);
+  if (out.source === "samgov" && out.sourceUrl === "") out.sourceUrl = samNoticeUrl(input.noticeId ?? "");
+  return out;
+}
 
 function parseDate(v: string | null | undefined): Date | null {
   if (!v) return null;
@@ -81,6 +97,8 @@ export async function createOpportunityAction(
   if (!input.title?.trim()) {
     return { ok: false, error: "Title is required." };
   }
+  const linkProblem = sourceUrlProblem(input.sourceUrl ?? "");
+  if (linkProblem) return { ok: false, error: linkProblem };
 
   // The document must be this organization's, and not already an opportunity's.
   let source: { id: string; fileName: string } | null = null;
@@ -100,6 +118,8 @@ export async function createOpportunityAction(
       .insert(opportunities)
       .values({
         ...toRow(input),
+        source: source ? "document" : "manual",
+        ...sourceFields(input),
         organizationId,
         createdByUserId: actor.id,
       })
@@ -157,11 +177,13 @@ export async function updateOpportunityAction(
   if (!input.title?.trim()) {
     return { ok: false, error: "Title is required." };
   }
+  const linkProblem = sourceUrlProblem(input.sourceUrl ?? "");
+  if (linkProblem) return { ok: false, error: linkProblem };
 
   try {
     await db
       .update(opportunities)
-      .set({ ...toRow(input), updatedAt: new Date() })
+      .set({ ...toRow(input), ...sourceFields(input), updatedAt: new Date() })
       .where(
         and(
           eq(opportunities.id, id),
