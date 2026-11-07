@@ -470,6 +470,52 @@ export async function sendMfaResetEmail(opts: { to: string; reason: string; byEm
   });
 }
 
+/** BL-MFA-RECOVERY — the single-use link that gets a person past the second step once. */
+export async function sendMfaRecoveryLinkEmail(opts: { to: string; url: string; minutes: number }): Promise<void> {
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Your FORGE recovery link</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      You asked for a way past the second step because your passkey and authenticator app can't be used. Open this link in the browser where you just entered your password. It works once, for ${opts.minutes} minutes.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${opts.url}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Continue signing in</a>
+    </p>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      Once you are in, FORGE takes you to Settings → Security to replace what you lost.
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};">
+      Did not ask for this? Someone has your password. Change it now, and tell your administrator.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: "Your FORGE recovery link",
+    html: emailShell("Recovery link", body),
+    text: `Open this link in the browser where you just entered your password. It works once, for ${opts.minutes} minutes:\n\n${opts.url}\n\nDid not ask for this? Someone has your password: change it now and tell your administrator.`,
+  });
+}
+
+/** BL-MFA-RECOVERY — a recovery link was used: told to the person and to every platform administrator. */
+export async function sendMfaRecoveryUsedEmail(opts: { to: string; who: string; at: string; self: boolean }): Promise<void> {
+  const who = escapeHtml(opts.who);
+  const lead = opts.self ? "You signed in to FORGE with a recovery link" : `${who} signed in to FORGE with a recovery link`;
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">A recovery link was used</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      ${lead} at ${escapeHtml(opts.at)} (UTC), in place of a passkey or authenticator code. It is recorded in the Audit Log.
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};">
+      ${opts.self ? "Not you? Someone has your password and your email. Change both now and tell your administrator." : "Not expected? Reset their two-step sign-in from Platform admin → Users and contact them."}
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: opts.self ? "You used a FORGE recovery link" : `${opts.who} used a FORGE recovery link`,
+    html: emailShell("Recovery link used", body),
+    text: `${opts.self ? "You" : opts.who} signed in to FORGE with a recovery link at ${opts.at} (UTC). It is recorded in the Audit Log.`,
+  });
+}
+
 /** BL-STAB-8b-3 — the link to the new address: click it and the account moves to it. */
 export async function sendEmailChangeConfirmEmail(opts: { to: string; token: string; currentEmail: string }): Promise<void> {
   const url = `${appBaseUrl()}/confirm-email?token=${encodeURIComponent(opts.token)}&email=${encodeURIComponent(opts.to)}`;

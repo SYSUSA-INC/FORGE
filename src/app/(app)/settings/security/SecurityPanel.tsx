@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { browserSupportsWebAuthn, startRegistration, WebAuthnError } from "@simplewebauthn/browser";
 import type { PublicKeyCredentialCreationOptionsJSON } from "@simplewebauthn/types";
 import { Panel } from "@/components/ui/Panel";
-import { MFA_LIMITS } from "@/lib/mfa-constants";
+import { MFA_LIMITS, MFA_METHOD_LABELS, type MfaMethod } from "@/lib/mfa-constants";
 import { beginEnrolmentAction, beginPasskeyRegistrationAction, cancelEmailChangeAction, confirmEnrolmentAction, finishPasskeyRegistrationAction, regenerateRecoveryCodesAction, removeFactorAction, requestEmailChangeAction } from "./actions";
 
 export type FactorRow = { id: string; kind: string; label: string; createdAt: string; lastUsedAt: string | null };
@@ -16,10 +16,11 @@ type Enrolment = { factorId: string; secret: string; uri: string; qrSvg: string 
  * BL-STAB-8a-1 — add an authenticator (QR or key, then a first code),
  * remove one (a current code), and the recovery codes shown once.
  * BL-STAB-8a-3 — or a passkey: the browser's ceremony between two
- * actions. With `requirePasskey` (a platform superadmin at the gate)
- * the passkey is the only way on.
+ * actions. BL-MFA-RECOVERY — `missing` names what the person still owes
+ * (a platform superadmin keeps a passkey and an app); never a condition
+ * of getting in.
  */
-export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref, requirePasskey, pendingEmail = null }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string; requirePasskey?: boolean; /** BL-STAB-8b-3 — a change of address waiting for the new inbox. */ pendingEmail?: string | null }) {
+export function SecurityPanel({ email, factors, recoveryCodesLeft, available, continueHref, missing = [], pendingEmail = null }: { email: string; factors: FactorRow[]; recoveryCodesLeft: number; available: boolean; continueHref?: string; missing?: MfaMethod[]; /** BL-STAB-8b-3 — a change of address waiting for the new inbox. */ pendingEmail?: string | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -80,19 +81,13 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
       setEnrolment(null);
       setLabel("");
       setCode("");
-      afterEnrol(res.recoveryCodes, !!res.passkeyStillNeeded);
+      afterEnrol(res.recoveryCodes);
     });
   }
 
   /** What follows a new factor: the codes once, then on (or a refresh). */
-  function afterEnrol(recoveryCodes: string[] | null, passkeyStillNeeded: boolean) {
+  function afterEnrol(recoveryCodes: string[] | null) {
     if (recoveryCodes) setCodes(recoveryCodes);
-    if (passkeyStillNeeded) {
-      // A superadmin at the gate added an app: the passkey is still owed.
-      setError("Added. As a platform administrator you also need a passkey before you are in: add one below.");
-      router.refresh();
-      return;
-    }
     // At sign-in (8a-2) the session is now in: a refresh would send the
     // enrol page on to the app before the codes were seen, so the person
     // continues from the codes panel; with no codes to show, straight away.
@@ -119,7 +114,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
       const res = await finishPasskeyRegistrationAction({ response, label });
       if (!res.ok) return setError(res.error);
       setLabel("");
-      afterEnrol(res.recoveryCodes, false);
+      afterEnrol(res.recoveryCodes);
     });
   }
 
@@ -155,15 +150,13 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
             !enrolment && available && factors.length < MFA_LIMITS.factors ? (
               <div className="flex flex-wrap gap-2">
                 {webauthn ? (
-                  <button type="button" className={`aur-btn ${requirePasskey || !hasPasskey ? "aur-btn-primary" : ""}`} disabled={pending} onClick={addPasskey}>
+                  <button type="button" className={`aur-btn ${!hasPasskey ? "aur-btn-primary" : ""}`} disabled={pending} onClick={addPasskey}>
                     Add a passkey
                   </button>
                 ) : null}
-                {!requirePasskey ? (
-                  <button type="button" className={`aur-btn ${webauthn && !hasPasskey ? "" : "aur-btn-primary"}`} disabled={pending} onClick={begin}>
-                    Add an authenticator app
-                  </button>
-                ) : null}
+                <button type="button" className={`aur-btn ${webauthn && !hasPasskey ? "" : "aur-btn-primary"}`} disabled={pending} onClick={begin}>
+                  Add an authenticator app
+                </button>
               </div>
             ) : null
           }
@@ -171,12 +164,12 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
           {!available ? (
             <p className="font-body text-[13px] leading-[1.5] text-muted">Two-step sign-in is not available on this deployment yet. An administrator sets FORGE_SECRET_KEYS first.</p>
           ) : null}
-          {requirePasskey ? (
-            <p className="mb-2 font-body text-[13px] leading-[1.5] text-text">
-              Platform administrators sign in with a passkey. {webauthn ? "Add one now: your browser or device (Touch ID, Windows Hello, a security key, or a password manager) does the rest." : "This browser cannot create passkeys; use a current browser on a device with Touch ID, Windows Hello or a security key."}
+          {missing.length > 0 && factors.length > 0 ? (
+            <p className="mb-2 rounded-md border border-brass/40 bg-brass/10 px-3 py-2 font-body text-[13px] leading-[1.5] text-text">
+              Platform administrators keep two ways in, a passkey and an authenticator app, so one that stops working never locks you out. Still to add: {missing.map((m) => MFA_METHOD_LABELS[m]).join(" and ")}.
             </p>
           ) : null}
-          {factors.length === 0 && !enrolment && !requirePasskey ? (
+          {factors.length === 0 && !enrolment ? (
             <p className="font-body text-[13px] leading-[1.5] text-muted">
               Nothing yet. {webauthn ? "A passkey is the quickest: your device (Touch ID, Windows Hello, a security key, or a password manager) keeps it and confirms with a touch. Or add" : "Add"} an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy and the like): scan the code, then type the six digits it shows. This is what the second step asks for.
             </p>

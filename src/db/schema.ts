@@ -84,6 +84,10 @@ export const users = pgTable("user", {
   /** BL-STAB-8a-3 — the one open passkey challenge, good for five minutes. */
   webauthnChallenge: text("webauthn_challenge"),
   webauthnChallengeAt: timestamp("webauthn_challenge_at"),
+  /** BL-MFA-RECOVERY — the emailed single-use recovery link: its SHA-256, when it expires, when the last was sent. */
+  mfaRecoveryTokenHash: text("mfa_recovery_token_hash"),
+  mfaRecoveryExpiresAt: timestamp("mfa_recovery_expires_at"),
+  mfaRecoverySentAt: timestamp("mfa_recovery_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -113,6 +117,8 @@ export const userMfaFactors = pgTable(
     publicKey: text("public_key"),
     counter: integer("counter").notNull().default(0),
     transports: jsonb("transports").$type<string[]>().notNull().default([]),
+    /** BL-MFA-RECOVERY — the domain the passkey was made on (it works only there); null for older ones. */
+    rpId: text("rp_id"),
     confirmedAt: timestamp("confirmed_at"),
     lastUsedAt: timestamp("last_used_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

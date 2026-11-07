@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireAuth } from "@/lib/auth-helpers";
 import { pendingEmailChange } from "@/lib/email-change-store";
-import { getMfaStatus } from "@/lib/mfa-store";
+import { getMfaStatus, missingMethodsOf } from "@/lib/mfa-store";
 import { safeQuery } from "@/lib/schema-resilience";
 import { SecurityPanel } from "./SecurityPanel";
 
@@ -12,11 +12,13 @@ export const dynamic = "force-dynamic";
  * factors and recovery codes. User-scoped, not tenant-scoped: it reads
  * nothing but the person's own rows.
  */
-export default async function SecuritySettingsPage({ searchParams }: { searchParams: { low?: string } }) {
+export default async function SecuritySettingsPage({ searchParams }: { searchParams: { low?: string; recovered?: string } }) {
   const user = await requireAuth();
   const status = await safeQuery(() => getMfaStatus(user.id), { factors: [], enrolledAt: null, recoveryCodesLeft: 0, available: false }, { tag: "settings.security" });
   // BL-STAB-8b-3 — a change of address waiting for the new inbox.
   const pending = await safeQuery(() => pendingEmailChange(user.id), null, { tag: "settings.security.pending-email" });
+  // BL-MFA-RECOVERY — what the person still owes (a superadmin keeps a passkey and an app).
+  const missing = await safeQuery(() => missingMethodsOf(user.id), [], { tag: "settings.security.missing" });
   return (
     <>
       <PageHeader
@@ -34,12 +36,18 @@ export default async function SecuritySettingsPage({ searchParams }: { searchPar
           You are running low on recovery codes. Replace them now so a lost phone does not lock you out.
         </p>
       ) : null}
+      {searchParams.recovered === "1" ? (
+        <p className="mb-4 rounded-md border border-brass/40 bg-brass/10 px-3 py-2 font-body text-[13px] text-text">
+          You signed in with a recovery link. Replace what you lost now: add a new passkey or authenticator app, remove the one you can no longer use, and get new recovery codes.
+        </p>
+      ) : null}
       <SecurityPanel
         email={user.email ?? ""}
         factors={status.factors.map((f) => ({ id: f.id, kind: f.kind, label: f.label, createdAt: f.createdAt.toISOString().slice(0, 10), lastUsedAt: f.lastUsedAt ? f.lastUsedAt.toISOString().slice(0, 10) : null }))}
         recoveryCodesLeft={status.recoveryCodesLeft}
         available={status.available}
         pendingEmail={pending?.email ?? null}
+        missing={missing}
       />
     </>
   );

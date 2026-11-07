@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { db } from "@/db";
 import { memberships, userMfaFactors, userRecoveryCodes, users } from "@/db/schema";
 import { log } from "@/lib/log";
-import { cleanFactorLabel, generateRecoveryCodes, MFA_LIMITS, newTotpSecret, normalizeRecoveryCode, totpUri, verifyTotp } from "@/lib/mfa";
+import { cleanFactorLabel, generateRecoveryCodes, missingMethods, MFA_LIMITS, newTotpSecret, normalizeRecoveryCode, totpUri, verifyTotp, type MfaMethod } from "@/lib/mfa";
 import { hashPassword, verifyPassword } from "@/lib/passwords";
 import { decryptSecret, encryptSecret, SecretBoxError } from "@/lib/secret-box";
 
@@ -230,4 +230,13 @@ export async function resetMfa(userId: string): Promise<{ factors: number; recov
     })
     .where(eq(users.id, userId));
   return { factors: removedFactors.length, recoveryCodes: removedCodes.length };
+}
+
+/** BL-MFA-RECOVERY — the methods a person still has to add (a superadmin keeps a passkey and an app). */
+export async function missingMethodsOf(userId: string): Promise<MfaMethod[]> {
+  const [[u], rows] = await Promise.all([
+    db.select({ isSuperadmin: users.isSuperadmin }).from(users).where(eq(users.id, userId)).limit(1),
+    db.select({ kind: userMfaFactors.kind }).from(userMfaFactors).where(and(eq(userMfaFactors.userId, userId), isNotNull(userMfaFactors.confirmedAt))),
+  ]);
+  return missingMethods({ isSuperadmin: !!u?.isSuperadmin, kinds: rows.map((r) => r.kind) });
 }

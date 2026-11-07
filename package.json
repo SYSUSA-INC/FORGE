@@ -14,6 +14,7 @@
     "db:studio": "drizzle-kit studio",
     "db:apply": "node scripts/apply-schema.mjs",
     "db:info": "node scripts/db-info.mjs",
+    "auth:recover": "node scripts/auth-recover.mjs",
     "check:rsc": "node scripts/check-rsc-boundaries.mjs",
     "check:isolation": "node scripts/check-isolation.mjs",
     "check:firewall": "node scripts/check-tenant-firewall.mjs",
