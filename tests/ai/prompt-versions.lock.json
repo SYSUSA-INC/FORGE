@@ -89,6 +89,10 @@
       "version": "2026-10-13.1",
       "sha256": "2593b487494e9e386e178b4bdba0b18e3c536609552db5032273220f4bc3903d"
     },
+    "partner_rank": {
+      "version": "2026-11-07.1",
+      "sha256": "6372c4b268abfc56a1a1908a4a6df4f9eecabe79c9d025d763cbb748288430a1"
+    },
     "pipeline_brief": {
       "version": "2026-10-31.1",
       "sha256": "5f4300ed081fb5fb961d5598b08bd4b0a4e022d6793dafd7879ee916a5467797"

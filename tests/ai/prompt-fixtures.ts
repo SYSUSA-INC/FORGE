@@ -82,6 +82,7 @@ import {
 } from "@/lib/ai-prompts-bl23";
 import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
+import { buildPartnerRankPrompt, partnerRankSchema } from "@/lib/partner-rank-logic";
 import { buildInboundBidsPrompt, inboundBidsSchema } from "@/lib/inbound-bids-logic";
 import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
 import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
@@ -426,6 +427,30 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       existing: [],
     }),
   ],
+  partner_rank: () => [
+    buildPartnerRankPrompt({
+      opportunity: { title: "Help desk modernization", agency: "Department of Veterans Affairs", setAside: "SDVOSB", placeOfPerformance: "Washington, DC" },
+      criteria: { naics: "541519", need: "sdvosb" },
+      gaps: [{ text: "Operate a 24x7 tier-2 help desk", area: "Operations", kind: "no", percent: null }],
+      candidates: [
+        {
+          uei: "HARB0R123456",
+          name: "Harbor Cyber LLC",
+          city: "Bethesda",
+          state: "MD",
+          certs: ["sdvosb"],
+          awards: null,
+          sam: null,
+          company: null,
+          considered: false,
+          keepsSetAside: true,
+          sources: ["usaspending", "certifications"],
+          facts: ["3 contract awards under NAICS 541519 in the last 5 years, $4.2M (USAspending)", "SDVOSB (SBA certification registry)"],
+        },
+      ],
+      widened: false,
+    }),
+  ],
   loss_intelligence: () => [
     buildLossNarrativePrompt({
       organizationName: "Acme Federal",
@@ -569,6 +594,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   company_model: [companyModelBodySchema],
   lessons_extract: [draftedLessonsSchema],
   loss_intelligence: [lossNarrativeSchema],
+  partner_rank: [partnerRankSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],
   opportunity_triage: [scoutTriageSchema],

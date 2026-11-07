@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, like, or } from "drizzle-orm";
 import { db } from "@/db";
 import { certFirms, companies, opportunities, opportunityPartners, organizations, type CompanyRelationship } from "@/db/schema";
 import { recordAudit, recordRead } from "@/lib/audit-log";
@@ -8,6 +8,7 @@ import { addPartnerCandidate } from "@/lib/capture-store";
 import { companyIdByUei, importCompanyFromSam } from "@/lib/company-import";
 import { agencyAwardAttempts } from "@/lib/crm-logic";
 import { log } from "@/lib/log";
+import { naicsFamily } from "@/lib/partner-rank-logic";
 import {
   aggregateRecipients,
   certsFromSamDescriptions,
@@ -37,7 +38,7 @@ import { searchAwardsByCriteria, type UsaspendingSearchResult } from "@/lib/usas
 type Actor = { userId: string; email?: string | null };
 
 export type PartnerSearchResult =
-  | { ok: true; hits: PartnerHit[]; notes: string[]; criteria: { naics: string; agency: string; setAside: string; need: SetAsideNeed } }
+  | { ok: true; hits: PartnerHit[]; notes: string[]; criteria: { naics: string; agency: string; setAside: string; need: SetAsideNeed; widened: boolean } }
   | { ok: false; error: string };
 
 const AWARD_PAGE = 100;
@@ -109,13 +110,13 @@ async function samEntities(organizationId: string, naics: string, state: string)
 }
 
 /** Current certifications: firms under the NAICS code, and every certification of the UEIs found elsewhere. */
-async function certRecords(naics: string, ueis: string[], now: Date, filters: { state: string; cert: PartnerCert | "" }): Promise<CertRecord[]> {
+async function certRecords(naics: string, family: string | null, ueis: string[], now: Date, filters: { state: string; cert: PartnerCert | "" }): Promise<CertRecord[]> {
   const current = or(isNull(certFirms.certExitDate), gt(certFirms.certExitDate, now));
   const select = { uei: certFirms.uei, name: certFirms.firmName, certType: certFirms.certType, city: certFirms.city, state: certFirms.state, naics: certFirms.naicsPrimary };
   const byNaics = db
     .select(select)
     .from(certFirms)
-    .where(and(eq(certFirms.naicsPrimary, naics), current, filters.state ? eq(certFirms.state, filters.state) : undefined, filters.cert ? eq(certFirms.certType, filters.cert) : undefined))
+    .where(and(family ? like(certFirms.naicsPrimary, `${family}%`) : eq(certFirms.naicsPrimary, naics), current, filters.state ? eq(certFirms.state, filters.state) : undefined, filters.cert ? eq(certFirms.certType, filters.cert) : undefined))
     .limit(300);
   const byUei = ueis.length ? db.select(select).from(certFirms).where(and(inArray(certFirms.uei, ueis), current)).limit(1000) : Promise.resolve([] as CertRecord[]);
   const [a, b] = await Promise.all([byNaics, byUei]);
@@ -128,11 +129,14 @@ export async function searchPartners(input: {
   actor: Actor;
   state?: string;
   cert?: PartnerCert | "";
+  /** Find more: the whole NAICS family (first four digits) and any state, instead of the one code and the chosen state. */
+  widen?: boolean;
   now?: Date;
 }): Promise<PartnerSearchResult> {
   const { organizationId, opportunityId } = input;
   const now = input.now ?? new Date();
-  const state = (input.state ?? "").trim().toUpperCase().slice(0, 2);
+  const widen = input.widen === true;
+  const state = widen ? "" : (input.state ?? "").trim().toUpperCase().slice(0, 2);
   const cert = input.cert ?? "";
   const [opp] = await db
     .select({ naics: opportunities.naicsCode, agency: opportunities.agency, setAside: opportunities.setAside })
@@ -143,9 +147,11 @@ export async function searchPartners(input: {
   const naics = opp.naics.replace(/[^0-9]/g, "").slice(0, 6);
   if (!naics) return { ok: false, error: "Add the opportunity's NAICS code first: every source is searched by it." };
   const agency = opp.agency.trim();
+  const family = widen ? naicsFamily(naics) : null;
+  const searched = family ?? naics;
 
   const [past, samRes, [org], considered] = await Promise.all([
-    pastPerformance(naics, agency, now).catch((err) => {
+    pastPerformance(searched, agency, now).catch((err) => {
       log.warn("[partner-search]", "usaspending failed", { opportunityId, error: err instanceof Error ? err.message : err });
       return { awards: [] as AwardInput[], notes: ["USAspending didn't answer; past performance is missing from this search."] };
     }),
@@ -161,7 +167,7 @@ export async function searchPartners(input: {
   ]);
   const recipients = aggregateRecipients(past.awards, agency);
   const found = [...new Set([...recipients.keys(), ...samRes.sam.map((s) => s.uei.toUpperCase())])].slice(0, 1000);
-  const certs = await certRecords(naics, found, now, { state, cert });
+  const certs = await certRecords(naics, family, found, now, { state, cert });
   const allUeis = [...new Set([...found, ...certs.map((c) => c.uei.toUpperCase())])];
   const own = allUeis.length
     ? await db
@@ -179,7 +185,7 @@ export async function searchPartners(input: {
     consideredCompanyIds: new Set(considered.map((c) => c.companyId)),
     ownUei: org?.uei ?? "",
     need,
-    naics,
+    naics: family ? `${family} (family)` : naics,
     agency,
     filters: { state, cert },
   });
@@ -189,9 +195,9 @@ export async function searchPartners(input: {
     action: "opportunity.partner.search",
     resourceType: "opportunity",
     resourceId: opportunityId,
-    metadata: { naics, agency, state, cert, awards: past.awards.length, certifications: certs.length, sam: samRes.sam.length, hits: hits.length },
+    metadata: { naics: searched, widened: widen, agency, state, cert, awards: past.awards.length, certifications: certs.length, sam: samRes.sam.length, hits: hits.length },
   });
-  return { ok: true, hits, notes: [...past.notes, ...samRes.notes], criteria: { naics, agency, setAside: opp.setAside, need } };
+  return { ok: true, hits, notes: [...past.notes, ...samRes.notes], criteria: { naics: family ? `${family} (family)` : naics, agency, setAside: opp.setAside, need, widened: widen } };
 }
 
 const UEI_RE = /^[A-Z0-9]{12}$/;
@@ -211,6 +217,8 @@ export async function addPartnerFromSearch(input: {
   name: string;
   city?: string;
   state?: string;
+  /** Where the partner came from: the plain search list, or FORGE AI's ranked list. */
+  source?: "search" | "ai";
   relationship: Extract<CompanyRelationship, "teaming_partner" | "subcontractor">;
   reason: string;
 }): Promise<{ ok: true; id: string; companyId: string; fromSam: boolean } | { ok: false; error: string }> {
@@ -252,7 +260,7 @@ export async function addPartnerFromSearch(input: {
       await recordAudit({ organizationId, actor: input.actor, action: "company.create", resourceType: "company", resourceId: row.id, metadata: { uei, relationship: input.relationship, source: "partner_search", samError: imported.error.slice(0, 160) } });
     }
   }
-  const added = await addPartnerCandidate({ organizationId, opportunityId: input.opportunityId, companyId, actor: input.actor, source: "search", reason: input.reason });
+  const added = await addPartnerCandidate({ organizationId, opportunityId: input.opportunityId, companyId, actor: input.actor, source: input.source ?? "search", reason: input.reason });
   if (!added.ok) return added;
   return { ok: true, id: added.id, companyId, fromSam };
 }

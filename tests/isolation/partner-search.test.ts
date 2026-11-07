@@ -80,7 +80,7 @@ vi.mock("@/lib/samgov", async (orig) => {
 
 import { addPartnerFromSearch, searchPartners } from "@/lib/partner-search";
 
-const CERT_UEIS = ["HARB0R123456", "CERTONLY0001"];
+const CERT_UEIS = ["HARB0R123456", "CERTONLY0001", "WIDECERT0001"];
 
 describe("BL-NAV-LIFECYCLE 3a-2 — the partner database search", () => {
   let fx: TwoTenantFixture;
@@ -189,5 +189,20 @@ describe("BL-NAV-LIFECYCLE 3a-2 — the partner database search", () => {
     expect(await addPartnerFromSearch({ ...a(), opportunityId: fx.orgB.opportunityId, uei: "HARB0R123456", name: "x", relationship: "teaming_partner", reason: "" })).toEqual({ ok: false, error: "Opportunity not found." });
     expect(await addPartnerFromSearch({ ...a(), uei: "not-a-uei", name: "x", relationship: "teaming_partner", reason: "" })).toEqual({ ok: false, error: "That isn't a UEI." });
     expect(await db.select().from(opportunityPartners).where(eq(opportunityPartners.opportunityId, fx.orgB.opportunityId))).toHaveLength(0);
+  });
+
+  it("Find more widens to the NAICS family and drops the state", async () => {
+    await db.insert(certFirms).values({ uei: "WIDECERT0001", certType: "sdvosb", firmName: "Wide Cert Inc", naicsPrimary: "541511", city: "Austin", state: "TX" });
+    const narrow = await searchPartners({ ...a(), state: "VA" });
+    expect(narrow.ok && narrow.hits.map((h) => h.uei)).not.toContain("WIDECERT0001");
+    expect(narrow.ok && narrow.criteria.widened).toBe(false);
+    awardsCalls.length = 0;
+    const wide = await searchPartners({ ...a(), state: "VA", widen: true });
+    expect(wide.ok).toBe(true);
+    if (!wide.ok) return;
+    expect(wide.criteria).toMatchObject({ naics: "5415 (family)", widened: true });
+    expect(wide.hits.map((h) => h.uei)).toContain("WIDECERT0001");
+    expect(awardsCalls.every((c) => JSON.stringify((c as { naicsCodes?: string[] }).naicsCodes ?? ["5415"]) === JSON.stringify(["5415"]))).toBe(true);
+    expect(wide.hits.find((h) => h.uei === "HARB0R123456")?.facts[0]).toContain("NAICS 5415 (family)");
   });
 });

@@ -37,6 +37,8 @@ export const AI_FEATURES = {
   knowledge_classify: "Knowledge classification",
   knowledge_extract: "Knowledge extraction",
   loss_intelligence: "Loss intelligence narrative",
+  // BL-NAV-LIFECYCLE 3b — the ranked partner list, a reason per firm from the search's facts.
+  partner_rank: "Partner ranking",
   // BL-AIP-4 — embedding calls were never metered before.
   embedding: "Embeddings (indexing)",
   embedding_query: "Embeddings (query)",

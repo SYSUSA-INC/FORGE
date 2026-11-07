@@ -100,6 +100,26 @@ When writing code yourself (Claude, Cursor, etc.):
     is a feature. Say in the PR which sections changed, or why none
     did.
 
+## Session token discipline (mandatory)
+
+A session that has grown heavy costs tokens on every turn. Assess it
+continuously, not only at the end:
+
+- **At every PR boundary** (before starting the next PR), and whenever
+  a large read, a long tool output or a long debugging loop has just
+  happened, check how much context the session carries and say so in
+  one line.
+- **Restart at once** when the session is a liability: the context is
+  large and mostly stale (files read for finished work), the next piece
+  of work is big and separable, or the session is going in circles.
+  Do not "finish one more thing" first. Commit and push, update the
+  handoff (BACKLOG, the PR body), give the user the exact restart
+  prompt, and stop.
+- **Spend sparingly while it runs:** read line ranges, not whole files;
+  `head`/`tail`/`grep` long outputs; never re-read a file just edited;
+  batch independent calls; delegate wide searches to a subagent so the
+  file dumps stay out of this context.
+
 ## Where to look
 
 - `docs/ENGINEERING_STANDARDS.md` — canonical standards (this is the
