@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
@@ -30,6 +31,7 @@ import {
   buildCapabilityQuestionsAction,
   dismissCapabilitySuggestionAction,
   removeCapabilityQuestionAction,
+  saveMatrixReportAction,
   suggestCapabilityAnswersAction,
   updateCapabilityQuestionAction,
 } from "../capability-matrix-actions";
@@ -54,12 +56,15 @@ export function CapabilityMatrixPanel({
   currentParseVersion,
   hasRequirements,
   partners,
+  latestReport = null,
 }: {
   opportunityId: string;
   matrix: CapabilityMatrixView | null;
   currentParseVersion: string;
   hasRequirements: boolean;
   partners: { id: string; name: string; relationship: string }[];
+  /** BL-NAV-LIFECYCLE 2b-2 — the latest saved Matrix Report. */
+  latestReport?: { id: string; version: number; createdAt: string } | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -125,12 +130,39 @@ export function CapabilityMatrixPanel({
     });
   }
 
+  function saveReport() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await saveMatrixReportAction({ opportunityId });
+      if (!res.ok) return setError(res.error);
+      setNotice(`Saved as Matrix Report v${res.version}. It shows on the opportunity's Overview.`);
+      router.refresh();
+    });
+  }
+
   return (
     <Panel
       title="Capability matrix"
       eyebrow={matrix ? `${answered} of ${total} answered${suggested > 0 ? ` · ${suggested} suggested` : ""}` : "Questionnaire"}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {latestReport ? (
+            <Link href={`/report/${latestReport.id}`} className="aur-link font-mono text-[11px] uppercase tracking-widest" title={`Saved ${latestReport.createdAt.slice(0, 10)}`}>
+              Matrix Report v{latestReport.version}
+            </Link>
+          ) : null}
+          {matrix && answered > 0 ? (
+            <button
+              type="button"
+              className="aur-btn"
+              disabled={pending}
+              onClick={saveReport}
+              title="Keep the matrix as it stands now as a dated Matrix Report on the opportunity. Earlier reports are kept."
+            >
+              Save report
+            </button>
+          ) : null}
           {matrix && answered < total ? (
             <button
               type="button"

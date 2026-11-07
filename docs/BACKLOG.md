@@ -3377,7 +3377,7 @@ Every requirement in the FORGE II document, with its status and phase:
      Back link to its opportunity. Tested in
      `tests/ai/opportunity-decision.test.ts` and
      `tests/isolation/opportunity-decision.test.ts`.
-   - **2b-1 — the three answers and the matrix's own page (this PR).**
+   - **2b-1 — the three answers and the matrix's own page (#466).**
      Each question is answered Yes (with *Proven by past performance*),
      Partial with a percentage (5–95, steps of 5) or No (with *A partner
      could cover it* and an optional partner), or N/A, mapped onto the six
@@ -3389,9 +3389,19 @@ Every requirement in the FORGE II document, with its status and phase:
      summary (coverage, Yes / Partial / No counts, partner needed); the
      Evaluate list and the next actions open it. Tested in
      `tests/ai/capability-three-answers.test.ts`.
-   - **2b-2 — the Matrix Report:** a dated snapshot on **Save report**
-     (`opportunity_report`), a printable page, and the Reports strip on
-     the opportunity's Overview.
+   - **2b-2 — the Matrix Report (this PR).** Migration 0152:
+     `opportunity_report` (kind `matrix` / `analysis`, version, JSON body,
+     who, when; a unique index on opportunity + kind + version, a second
+     save at the same moment takes the next number). **Save report** on
+     the Capability tab keeps `buildMatrixReport`'s snapshot (pure,
+     tested: each requirement with its answer, percentage, evidence and
+     partner, coverage, counts, gaps, the partner call), audited
+     `opportunity.report.save`. `/report/{id}` shows a saved report
+     outside the app's frame, printable (**Print or save as PDF**), with
+     its other versions; this organization's only. The Overview's
+     **Reports** line shows the latest Matrix Report and the decision.
+     Tested in `tests/ai/opportunity-report.test.ts` and
+     `tests/isolation/opportunity-report.test.ts`.
    - **2c — Analyze:** the analysis page and the Analysis Report.
 3. **Capture:** the Go and Partner worklist; the partner registry
    (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built

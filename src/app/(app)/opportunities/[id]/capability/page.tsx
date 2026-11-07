@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { companies, opportunities, opportunityCapabilityMatrices } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { parseVersionOf } from "@/lib/capability-matrix-types";
+import { latestReports } from "@/lib/opportunity-report-store";
 import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
 import { CapabilityMatrixPanel } from "../evaluation/CapabilityMatrixPanel";
 
@@ -25,7 +26,7 @@ export default async function OpportunityCapabilityPage({ params }: { params: { 
     .limit(1);
   if (!opp) notFound();
 
-  const [[matrix], reqs, partners] = await Promise.all([
+  const [[matrix], reqs, partners, reports] = await Promise.all([
     db
       .select()
       .from(opportunityCapabilityMatrices)
@@ -38,7 +39,9 @@ export default async function OpportunityCapabilityPage({ params }: { params: { 
       .where(and(eq(companies.organizationId, organizationId), inArray(companies.relationship, ["teaming_partner", "subcontractor"])))
       .orderBy(companies.name)
       .limit(200),
+    latestReports(organizationId, params.id),
   ]);
+  const matrixReport = reports.find((r) => r.kind === "matrix") ?? null;
 
   return (
     <CapabilityMatrixPanel
@@ -57,6 +60,7 @@ export default async function OpportunityCapabilityPage({ params }: { params: { 
       currentParseVersion={parseVersionOf(reqs)}
       hasRequirements={reqs.requirements.length > 0}
       partners={partners}
+      latestReport={matrixReport ? { id: matrixReport.id, version: matrixReport.version, createdAt: matrixReport.createdAt } : null}
     />
   );
 }

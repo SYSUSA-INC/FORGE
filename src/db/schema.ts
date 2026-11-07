@@ -5345,3 +5345,34 @@ export const opportunityDecisions = pgTable(
   }),
 );
 export type OpportunityDecision = typeof opportunityDecisions.$inferSelect;
+
+/**
+ * BL-NAV-LIFECYCLE phase 2b-2 — an opportunity's reports: each Matrix
+ * Report (and, in 2c, Analysis Report) saved is a dated snapshot, its own
+ * version per opportunity and kind, never overwritten.
+ */
+export const opportunityReportKindEnum = pgEnum("opportunity_report_kind", ["matrix", "analysis"]);
+export type OpportunityReportKind = (typeof opportunityReportKindEnum.enumValues)[number];
+
+export const opportunityReports = pgTable(
+  "opportunity_report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    kind: opportunityReportKindEnum("kind").notNull(),
+    version: integer("version").notNull(),
+    body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_report_org_idx").on(t.organizationId, t.createdAt),
+    versionUq: uniqueIndex("opportunity_report_version_uq").on(t.opportunityId, t.kind, t.version),
+  }),
+);
+
