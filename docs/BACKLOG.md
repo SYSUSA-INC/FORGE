@@ -3652,7 +3652,7 @@ Every requirement in the FORGE II document, with its status and phase:
        sweep of expired invites; a Compare column for the partner
        already named on our own answer.
      - **3c-3 — the sweep of expired invites and the partner we named
-       (🚧 this PR; migration 0158).** **The sweep:** a new daily cron,
+       (✅ shipped (PR #478; migration 0158)).** **The sweep:** a new daily cron,
        `/api/cron/partner-invites` (07:50 UTC, `CRON_SECRET`), runs
        `sweepExpiredPartnerInvites` (`src/lib/partner-invite-cron.ts`):
        every expired link, submitted or not, is retired by clearing its
