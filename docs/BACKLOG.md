@@ -3198,7 +3198,7 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 ---
 
 ### BL-SCOUT-FILES — Add to pipeline brings the notice's documents
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ merged (#469); follow-up 🚧 this PR
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ merged (#469); follow-up ✅ merged (#475)
 
 **Follow-up (owner, 2026-11-07):** "I am still not able to upload
 multiple documents" under Evaluate. The opportunity's **Add a document
@@ -3244,7 +3244,7 @@ browser.
 ---
 
 ### BL-MFA-ADMIN — Company admins see and reset members' two-step sign-in
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🚧 this PR
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #465)
 
 **Owner, 2026-11-07:** "There should be an option in the admin settings
 to enforce MFA"; chosen: two-step sign-in stays required for everyone
