@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { addPartnerCandidate, moveToPlan, removePartner, setPartnerStatus } from "@/lib/capture-store";
+import { invitePartner, type InviteResult } from "@/lib/partner-invite-store";
 import { isPartnerCert } from "@/lib/partner-search-logic";
 import { rankPartners, type PartnerRankResult } from "@/lib/partner-rank";
+import { ratePartners, type PartnerRateResult } from "@/lib/partner-rate";
 import { addPartnerFromSearch, searchPartners, type PartnerSearchResult } from "@/lib/partner-search";
 
 /**
@@ -98,4 +100,22 @@ export async function addSearchedPartnerAction(input: { opportunityId: string; u
   refresh(input.opportunityId);
   revalidatePath("/companies");
   return { ok: true };
+}
+
+/**
+ * BL-NAV-LIFECYCLE phase 3c — email a partner's contact a personal link to
+ * the matrix questions (14 days, no account). The link comes back for
+ * Copy link whether or not email is configured.
+ */
+export async function invitePartnerAction(input: { opportunityId: string; partnerId: string; email: string; contactName?: string }): Promise<InviteResult> {
+  const { organizationId, actor } = await who();
+  const res = await invitePartner({ organizationId, opportunityId: String(input?.opportunityId ?? ""), partnerId: String(input?.partnerId ?? ""), email: input?.email, contactName: input?.contactName, actor });
+  if (res.ok) refresh(input.opportunityId);
+  return res;
+}
+
+/** BL-NAV-LIFECYCLE 3c-2 — FORGE AI's rating of the partners that answered, scored first, one grounded reason each. */
+export async function ratePartnersAction(input: { opportunityId: string }): Promise<PartnerRateResult> {
+  const { organizationId, actor } = await who();
+  return ratePartners({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor });
 }

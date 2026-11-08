@@ -3607,7 +3607,92 @@ Every requirement in the FORGE II document, with its status and phase:
      prefix in `naicsCodes` (documented behaviour; check the first
      widened search after deploy).
    - **3c — invitations, the partner's own matrix page, Compare and the
-     AI's partner rating.**
+     AI's partner rating.** Owner decisions 2–4 of the design's §4 taken
+     on 2026-11-07, the recommended option each: a personal emailed link
+     with no account (14 days); partners see only the questions and their
+     own answers; Move to Plan stays open with "agreement: to do".
+     - **3c-1 — invitations and the partner's own matrix page (✅ shipped
+       (PR #476); migration 0156).** On the Partners tab, **Invite** on a
+       partner takes the contact's email (prefilled from the company)
+       and name and issues a personal link: 24 random bytes, only its
+       sha256 kept in `opportunity_partner_invite`, 14 days, emailed
+       from the platform address with Reply-To the sender (or shown
+       with **Copy link** when email isn't configured). The partner
+       becomes *invited* (chosen stays chosen); a re-invite replaces the
+       partner's unanswered links. `/partner/[token]` (public, outside
+       the app shell, allowed in `auth.config.ts`) shows the questions'
+       text, weight and area only — never our answers, requirement
+       references or notes — with Yes / Partial % / No, evidence per
+       question, and the partner's certifications (ISO standards, one
+       CMMI level and model, one CMMC level, other in words), saved as
+       a draft or submitted; submitting marks the partner *answered*
+       and the link stays editable until it expires. Answers and
+       certifications live on the partner's `opportunity_partner` row
+       (`partner_answers`, `certifications`, `answered_at`). The
+       Partners tab shows each partner's invite state, answers count
+       and certifications. Audited: `opportunity.partner.invite`, the
+       read `opportunity.partner.invite.open`, and
+       `opportunity.partner.answers.save` / `.submit` with the contact's
+       email as actor. Not yet: the sweep of expired invites.
+     - **3c-2 — Compare and the AI's partner rating (✅ shipped (PR #477;
+       migration 0157)).** **Compare answers** on the Partners panel opens
+       `/opportunities/[id]/partners/compare`: one row per question, our
+       answer then every partner's (yes green, partial brass, no red,
+       n/a muted), the partner's evidence under its answer. A gap is our
+       No or Partial; a partner *closes* it (cobalt) when it covers more
+       than we do: Yes, or a Partial with a higher share
+       (`compareMatrix` in `partner-compare-logic.ts`). Declined
+       partners and those with no answers are left out; a draft not yet
+       submitted is shown and said so. **Rate the partners with FORGE
+       AI** below it: `scorePartners` fixes the order first (70% the
+       weighted share of our gaps' uncovered part the partner covers,
+       `KIND_WEIGHT` as coverage; 15% evidence on its gap-closing
+       answers; 15% certifications, each ISO one point, CMMI level/5,
+       CMMC level/3, full at 3), then the `partner_rate` prompt (standard
+       class, `2026-11-07.1`) writes one reason per partner citing
+       numbered facts, and `validateRating` drops a reason that cites no
+       fact, an unknown one, or a figure the cited facts don't hold; the
+       partner keeps its place with no reason. Gated by `aiAutoDraft` and
+       the monthly quota (refunded on failure), 10 per org per hour;
+       recorded as the read `opportunity.partner.rate` (gaps, partners,
+       reasons kept, dropped, the order). Advice only: choosing stays on
+       the Partners tab. Also: the inviter gets an inbox line
+       (`partner_answered`, migration 0157) when a partner submits, once
+       an hour per partner, linking to Compare. Not yet (3c-3): the
+       sweep of expired invites; a Compare column for the partner
+       already named on our own answer.
+     - **3c-3 — the sweep of expired invites and the partner we named
+       (🚧 this PR; migration 0158).** **The sweep:** a new daily cron,
+       `/api/cron/partner-invites` (07:50 UTC, `CRON_SECRET`), runs
+       `sweepExpiredPartnerInvites` (`src/lib/partner-invite-cron.ts`):
+       every expired link, submitted or not, is retired by clearing its
+       `token_hash` (migration 0158 makes the column nullable; the row
+       stays so the Partners tab can still say "invite to … expired on
+       …"), and a partner shown as *invited* whose only links expired
+       unanswered goes back to *candidate* (`planInviteSweep` in
+       `partner-invite-logic.ts`, pure: a partner re-invited since keeps
+       its new link and its status; one that answered stays *answered*;
+       chosen and declined partners are not touched). 500 links per run,
+       grouped by organization, each write scoped by the row's
+       organization; one audit row per affected partner,
+       `opportunity.partner.invite.expire`, actor `system`, with the
+       email, expiry, whether it was submitted and whether the status
+       was reverted. A retired link opens "This link is not valid".
+       **Compare:** a gap row where our own answer names a company
+       ("Gap: partner needed" with a partner chosen under Evaluate,
+       `partnerCompanyId`) now says "we named <company>" (or that the
+       company is not among the partners compared), and when that
+       company is a compared partner its cell is marked *named* beside
+       *closes*; each column's heading counts the gaps we named it on
+       (`compareMatrix`: `row.named`, `cell.named`, `partners[].named`;
+       `ComparePartner.companyId`; `companyNamesById` in
+       `capture-store.ts`). The rating's score is unchanged by it.
+       Tested in `tests/ai/partner-invite-logic.test.ts`,
+       `tests/ai/partner-compare-logic.test.ts` and
+       `tests/isolation/partner-invite-cron.test.ts`. Phase 3 Capture is
+       complete with this PR; the phase 4 design draft is
+       `docs/design/BL-NAV-LIFECYCLE_PHASE4_PLAN.md`, its decisions
+       open for the owner.
 4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
    Gloves teams notified automatically, task owners, milestones, the
    compliance matrix and outline fixed here.
