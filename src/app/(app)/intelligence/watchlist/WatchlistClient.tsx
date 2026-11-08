@@ -80,7 +80,7 @@ export function WatchlistClient({ rows }: { rows: WatchlistRow[] }) {
           type="button"
           onClick={exportCsv}
           disabled={current.length === 0}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+          className="aur-btn aur-btn-ghost disabled:opacity-40"
         >
           ⤓ Export CSV
         </button>
@@ -173,7 +173,7 @@ function WatchlistRowView({
         <button
           type="button"
           onClick={onRemove}
-          className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label text-rose-300 hover:text-rose-200"
+          className="aur-btn aur-btn-ghost text-rose-300 hover:text-rose-200"
         >
           Remove
         </button>

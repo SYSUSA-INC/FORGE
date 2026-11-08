@@ -269,7 +269,7 @@ export function FirmsSearchClient({
             <button
               type="button"
               onClick={() => setSaveSearchOpen((v) => !v)}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
             >
               ★ Save search
             </button>
@@ -277,7 +277,7 @@ export function FirmsSearchClient({
               type="button"
               onClick={search}
               disabled={searching}
-              className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {searching ? "Searching…" : "Search firms"}
             </button>
@@ -303,7 +303,7 @@ export function FirmsSearchClient({
               type="button"
               onClick={saveCurrentSearch}
               disabled={savingSearch}
-              className="aur-btn aur-btn-primary text-[11px]"
+              className="aur-btn aur-btn-primary"
             >
               {savingSearch ? "Saving…" : "Save"}
             </button>
@@ -341,7 +341,7 @@ export function FirmsSearchClient({
               type="button"
               onClick={exportCsv}
               disabled={empty}
-              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+              className="aur-btn aur-btn-ghost disabled:opacity-40"
             >
               ⤓ Export CSV
             </button>
@@ -427,7 +427,7 @@ function FirmRowView({
         type="button"
         onClick={onWatch}
         disabled={watched}
-        className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label disabled:text-emerald-300"
+        className="aur-btn aur-btn-ghost disabled:text-emerald-300"
         title={watched ? "Already on watchlist" : "Save to watchlist"}
       >
         {watched ? "★ Saved" : "☆ Save"}
@@ -439,7 +439,7 @@ function FirmRowView({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-label text-muted">
+      <span className="font-mono text-muted">
         {label}
       </span>
       {children}

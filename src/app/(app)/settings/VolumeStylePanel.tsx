@@ -83,7 +83,7 @@ export function VolumeStylePanel({
           {canEdit ? "" : " · organization admins edit this"}
         </span>
         {canEdit ? (
-          <button type="button" disabled={pending || text === current} onClick={save} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+          <button type="button" disabled={pending || text === current} onClick={save} className="aur-btn aur-btn-primary disabled:opacity-50">
             {pending ? "Saving…" : current.trim() && !text.trim() ? `Clear ${VOLUME_LABELS[volume]} rules` : `Save ${VOLUME_LABELS[volume]} rules`}
           </button>
         ) : null}

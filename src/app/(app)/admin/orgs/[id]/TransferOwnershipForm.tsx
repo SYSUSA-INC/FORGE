@@ -98,7 +98,7 @@ export function TransferOwnershipForm({
         </select>
         <button
           type="submit"
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           disabled={
             pending ||
             admins.length === 0 ||

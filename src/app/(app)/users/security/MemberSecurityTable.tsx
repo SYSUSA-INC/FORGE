@@ -84,7 +84,7 @@ export function MemberSecurityTable({ rows }: { rows: MemberSecurityView[] }) {
                   <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={() => reset(r.userId)}>
                     {pending ? "Resetting…" : "Reset second step"}
                   </button>
-                  <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setOpen(null)}>
+                  <button type="button" className="aur-link" disabled={pending} onClick={() => setOpen(null)}>
                     Cancel
                   </button>
                 </div>

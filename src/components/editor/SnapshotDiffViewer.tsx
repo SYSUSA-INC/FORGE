@@ -132,7 +132,7 @@ export function SnapshotDiffViewer({
             type="button"
             onClick={onClose}
             title="Close (Esc)"
-            className="aur-btn-ghost text-[10px]"
+            className="aur-btn-ghost"
           >
             ✕
           </button>

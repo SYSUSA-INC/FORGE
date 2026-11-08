@@ -13,7 +13,7 @@ export function ReencryptButton({ pending, disabled }: { pending: number; disabl
     <div className="flex flex-wrap items-center gap-3">
       <button
         type="button"
-        className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
+        className="aur-btn aur-btn-primary disabled:opacity-50"
         disabled={busy || disabled}
         onClick={() =>
           start(async () => {
@@ -84,10 +84,10 @@ export function RemoveKeyButton({ organizationId, organizationName, last4, setAt
       </label>
       <input id={`reason-${organizationId}`} className="aur-input w-64 text-[11px]" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} disabled={busy} />
       <span className="flex gap-2">
-        <button type="button" className="font-mono text-[10px] text-muted underline" onClick={() => setOpen(false)} disabled={busy}>
+        <button type="button" className="aur-link" onClick={() => setOpen(false)} disabled={busy}>
           Cancel
         </button>
-        <button type="submit" className="aur-btn aur-btn-ghost text-[10px] text-rose disabled:opacity-50" disabled={busy || reason.trim().length < 3}>
+        <button type="submit" className="aur-btn aur-btn-ghost text-rose disabled:opacity-50" disabled={busy || reason.trim().length < 3}>
           {busy ? "Removing…" : "Remove key"}
         </button>
       </span>

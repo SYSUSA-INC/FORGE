@@ -133,7 +133,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
               type="button"
               onClick={acceptSuggestion}
               disabled={pending}
-              className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost disabled:opacity-60"
               title={artifact.aiClassificationReasoning || undefined}
             >
               Accept
@@ -168,7 +168,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
         </select>
         <a
           href={`/knowledge-base/import/${artifact.id}`}
-          className="aur-btn aur-btn-primary text-[10px]"
+          className="aur-btn aur-btn-primary"
           title="Run Brain extraction on this artifact"
         >
           Open
@@ -177,7 +177,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
           type="button"
           onClick={archive}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
         >
           {artifact.archivedAt ? "Restore" : "Archive"}
         </button>
@@ -185,7 +185,7 @@ export function ArtifactRow({ artifact }: { artifact: ListedArtifact }) {
           type="button"
           onClick={remove}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[10px] text-rose-300 disabled:opacity-60"
+          className="aur-btn aur-btn-ghost text-rose-300 disabled:opacity-60"
         >
           Delete
         </button>

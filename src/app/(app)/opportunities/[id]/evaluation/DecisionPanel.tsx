@@ -109,7 +109,7 @@ export function DecisionPanel({ opportunityId, history, partners, readiness, nai
           ) : null}
           {error ? <p className="font-mono text-[11px] text-red">{error}</p> : null}
           <div>
-            <button type="button" className="aur-btn aur-btn-primary text-[12px]" disabled={pending} onClick={submit}>
+            <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={submit}>
               {pending ? "Saving…" : `Record ${DECISION_LABELS[choice]}`}
             </button>
           </div>

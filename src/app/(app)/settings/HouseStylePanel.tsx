@@ -49,7 +49,7 @@ export function HouseStylePanel({ initialText, orgName, canEdit, className }: { 
           {text.length} / {VOICE_LIMITS.maxHouseStyleChars} characters{canEdit ? "" : " · organization admins edit this"}
         </span>
         {canEdit ? (
-          <button type="button" disabled={pending || text === saved} onClick={save} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+          <button type="button" disabled={pending || text === saved} onClick={save} className="aur-btn aur-btn-primary disabled:opacity-50">
             {pending ? "Saving…" : saved.trim() && !text.trim() ? "Clear house style" : "Save house style"}
           </button>
         ) : null}

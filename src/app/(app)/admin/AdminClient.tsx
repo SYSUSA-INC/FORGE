@@ -151,62 +151,62 @@ export function AdminClient({
           <>
             <Link
               href="/admin/migrations"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Apply pending DB migrations"
             >
               Migrations →
             </Link>
             <Link
               href="/admin/trial-requests"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Request-a-trial submissions waiting for a decision"
             >
               Trial requests{stats.pendingTrialRequests > 0 ? ` (${stats.pendingTrialRequests})` : ""} →
             </Link>
             <Link
               href="/admin/source-requests"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
             >
               Source requests →
             </Link>
             <Link
               href="/admin/sba-8a"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Import the SBA 8(a) participant registry"
             >
               SBA 8(a) →
             </Link>
             <Link
               href="/admin/tiers"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="View subscription tier definitions and per-tier tenant counts"
             >
               Tiers →
             </Link>
             <Link
               href="/admin/promo-codes"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Manage promotional discount codes"
             >
               Promo codes →
             </Link>
             <Link
               href="/admin/errors"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="In-app production error log — uncaught exceptions deduped by fingerprint"
             >
               Errors →
             </Link>
             <Link
               href="/admin/jobs"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Durable background jobs — parses and harvests, with stuck-row recovery"
             >
               Jobs →
             </Link>
             <Link
               href="/platform/audit-log"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Cross-tenant audit log — every recorded action across every org"
             >
               Audit log →
@@ -474,7 +474,7 @@ function CrossDomainApprovalsPanel({ approvals }: { approvals: ApprovalRow[] }) 
                   </div>
                   <button
                     type="button"
-                    className="aur-btn aur-btn-primary text-[11px]"
+                    className="aur-btn aur-btn-primary"
                     disabled={busyId === a.inviteId}
                     onClick={() => approve(a, false)}
                     title="Approve this one person; the invitation is sent now"
@@ -483,7 +483,7 @@ function CrossDomainApprovalsPanel({ approvals }: { approvals: ApprovalRow[] }) 
                   </button>
                   <button
                     type="button"
-                    className="aur-btn aur-btn-ghost text-[11px]"
+                    className="aur-btn aur-btn-ghost"
                     disabled={busyId === a.inviteId || !canAllowDomain}
                     onClick={() => approve(a, true)}
                     title={
@@ -496,7 +496,7 @@ function CrossDomainApprovalsPanel({ approvals }: { approvals: ApprovalRow[] }) 
                   </button>
                   <button
                     type="button"
-                    className="aur-btn aur-btn-danger text-[11px]"
+                    className="aur-btn aur-btn-danger"
                     disabled={busyId === a.inviteId}
                     onClick={() => deny(a)}
                   >
@@ -644,7 +644,7 @@ function InviteUserPanel({ orgs }: { orgs: OrgRow[] }) {
         <button
           type="submit"
           disabled={pending || !email || !tenantId}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Sending…" : "Send invitation"}
         </button>
@@ -741,7 +741,7 @@ function CreateOrgPanel({ className }: { className?: string }) {
         <button
           type="submit"
           disabled={pending || !orgName || !adminEmail}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Creating…" : "Create organization"}
         </button>
@@ -834,14 +834,14 @@ function OrgRowItem({
         </div>
         <Link
           href={`/admin/orgs/${org.id}`}
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
           title="View per-tenant detail + storage + activity"
         >
           Details →
         </Link>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
           disabled={busy}
           onClick={toggleDisabled}
         >
@@ -849,7 +849,7 @@ function OrgRowItem({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-danger text-[11px]"
+          className="aur-btn aur-btn-danger"
           disabled={busy}
           onClick={deleteOrg}
         >
@@ -875,7 +875,7 @@ function OrgRowItem({
                 <span className="flex gap-1">
                   <button
                     type="button"
-                    className="aur-btn aur-btn-ghost text-[10px]"
+                    className="aur-btn aur-btn-ghost"
                     disabled={busy}
                     onClick={() => copyAdminInviteLink(i.id, i.email)}
                     title="Get a fresh invite link to send by chat or ticket"
@@ -884,7 +884,7 @@ function OrgRowItem({
                   </button>
                   <button
                     type="button"
-                    className="aur-btn aur-btn-ghost text-[10px]"
+                    className="aur-btn aur-btn-ghost"
                     disabled={busy}
                     onClick={() => resendAdminInvite(i.id, i.email)}
                   >
@@ -1038,7 +1038,7 @@ function UnverifiedPurgePanel() {
           <label className="aur-label">Unverified for at least (days)</label>
           <input className="aur-input w-28" type="number" min={1} max={365} step={1} value={days} onChange={(e) => setDays(e.target.value)} disabled={pending} />
         </div>
-        <button type="button" onClick={runPreview} disabled={pending} className="aur-btn aur-btn-ghost text-[11px]">
+        <button type="button" onClick={runPreview} disabled={pending} className="aur-btn aur-btn-ghost">
           {pending && !preview ? "Looking…" : "Preview"}
         </button>
       </div>
@@ -1065,7 +1065,7 @@ function UnverifiedPurgePanel() {
                 ))}
                 {preview.candidates.length > shown.length ? <li className="py-0.5">…and {preview.candidates.length - shown.length} more</li> : null}
               </ul>
-              <button type="button" onClick={runPurge} disabled={pending} className="aur-btn aur-btn-danger mt-3 text-[11px]">
+              <button type="button" onClick={runPurge} disabled={pending} className="aur-btn aur-btn-danger mt-3">
                 {pending ? "Deleting…" : `Delete ${preview.candidates.length} account${preview.candidates.length === 1 ? "" : "s"}`}
               </button>
             </>
@@ -1102,7 +1102,7 @@ function EndAllSessionsPanel() {
       eyebrow="Platform-wide"
       actions={
         !open ? (
-          <button type="button" className="aur-btn aur-btn-danger text-[11px]" onClick={() => { setOpen(true); setNote(null); setErr(null); }}>
+          <button type="button" className="aur-btn aur-btn-danger" onClick={() => { setOpen(true); setNote(null); setErr(null); }}>
             End every session…
           </button>
         ) : null
@@ -1118,10 +1118,10 @@ function EndAllSessionsPanel() {
             <input className="aur-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Two-step sign-in release, 2026-11-02" maxLength={500} disabled={pending} />
           </label>
           <div className="mt-2 flex gap-2">
-            <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={pending || reason.trim().length < 10} onClick={run}>
+            <button type="button" className="aur-btn aur-btn-danger" disabled={pending || reason.trim().length < 10} onClick={run}>
               {pending ? "Ending…" : "End every session now"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => setOpen(false)}>
+            <button type="button" className="aur-link" disabled={pending} onClick={() => setOpen(false)}>
               Cancel
             </button>
           </div>
@@ -1266,7 +1266,7 @@ function UserRowItem({
         </div>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
           disabled={busy}
           onClick={forceReset}
         >
@@ -1274,7 +1274,7 @@ function UserRowItem({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
           disabled={busy || isSelf || !u.mfaEnrolled}
           title={isSelf ? "Reset your own from Settings → Security." : !u.mfaEnrolled ? "No second factor to reset." : "Remove their factors and recovery codes; they enrol again at the next sign-in"}
           onClick={() => {
@@ -1287,7 +1287,7 @@ function UserRowItem({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
           disabled={busy || isSelf}
           onClick={toggleSuperadmin}
         >
@@ -1295,7 +1295,7 @@ function UserRowItem({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-danger text-[11px]"
+          className="aur-btn aur-btn-danger"
           disabled={busy || isSelf}
           onClick={toggleDisabled}
         >
@@ -1303,7 +1303,7 @@ function UserRowItem({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-danger text-[11px]"
+          className="aur-btn aur-btn-danger"
           disabled={busy || isSelf || u.isSuperadmin}
           title={isSelf ? "You cannot delete your own account." : u.isSuperadmin ? "Revoke superadmin first." : "Delete this account permanently"}
           onClick={() => {
@@ -1326,10 +1326,10 @@ function UserRowItem({
             <input className="aur-input" value={mfaReason} onChange={(e) => setMfaReason(e.target.value)} placeholder="e.g. Lost phone, identity confirmed by phone call with their manager" maxLength={500} disabled={busy} />
           </label>
           <div className="mt-2 flex gap-2">
-            <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={busy || mfaReason.trim().length < 10} onClick={resetMfa}>
+            <button type="button" className="aur-btn aur-btn-danger" disabled={busy || mfaReason.trim().length < 10} onClick={resetMfa}>
               {busy ? "Resetting…" : "Reset two-step sign-in"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={busy} onClick={() => setConfirmMfa(false)}>
+            <button type="button" className="aur-link" disabled={busy} onClick={() => setConfirmMfa(false)}>
               Cancel
             </button>
           </div>
@@ -1352,10 +1352,10 @@ function UserRowItem({
             </label>
           ) : null}
           <div className="mt-2 flex gap-2">
-            <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={busy} onClick={deleteAccount}>
+            <button type="button" className="aur-btn aur-btn-danger" disabled={busy} onClick={deleteAccount}>
               {busy ? "Deleting…" : "Delete permanently"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={busy} onClick={() => setConfirmDelete(false)}>
+            <button type="button" className="aur-link" disabled={busy} onClick={() => setConfirmDelete(false)}>
               Cancel
             </button>
           </div>

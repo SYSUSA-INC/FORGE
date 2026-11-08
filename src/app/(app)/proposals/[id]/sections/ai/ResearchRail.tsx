@@ -278,7 +278,7 @@ export function ResearchRail({
                       <button
                         type="button"
                         onClick={() => onInsertTracked(h.content.trim())}
-                        className="aur-btn aur-btn-ghost text-[10px]"
+                        className="aur-btn aur-btn-ghost"
                         title="Append this passage as a tracked suggestion by FORGE AI"
                       >
                         Insert as suggestion

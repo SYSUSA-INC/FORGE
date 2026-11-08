@@ -102,7 +102,7 @@ export function SemanticSearchClient({
           type="button"
           onClick={search}
           disabled={pending || query.trim().length < 3}
-          className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending ? "Searching…" : "Search"}
         </button>
@@ -110,7 +110,7 @@ export function SemanticSearchClient({
           type="button"
           onClick={reembedMissing}
           disabled={reembedPending}
-          className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
           title="Embed any indexed artifacts that don't yet have chunks. Safe to run repeatedly."
         >
           {reembedPending ? "Embedding…" : "Embed missing"}

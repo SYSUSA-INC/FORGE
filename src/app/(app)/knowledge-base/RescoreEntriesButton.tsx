@@ -44,7 +44,7 @@ export function RescoreEntriesButton() {
         onClick={run}
         disabled={pending}
         title="Compute quality scores for any entries that don't have one yet. Safe to re-run; idempotent."
-        className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+        className="aur-btn aur-btn-ghost disabled:opacity-60"
       >
         {pending ? "Scoring…" : "Score unscored"}
       </button>

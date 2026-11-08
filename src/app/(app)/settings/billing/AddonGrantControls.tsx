@@ -70,12 +70,12 @@ export function AddonGrantControls({
             disabled={pending}
             title="How many you have"
           />
-          <button type="button" onClick={update} disabled={pending || qty === quantity} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50">
+          <button type="button" onClick={update} disabled={pending || qty === quantity} className="aur-btn aur-btn-ghost disabled:opacity-50">
             Update
           </button>
         </>
       ) : null}
-      <button type="button" onClick={remove} disabled={pending} className="aur-btn aur-btn-ghost text-[11px] text-rose disabled:opacity-50">
+      <button type="button" onClick={remove} disabled={pending} className="aur-btn aur-btn-ghost text-rose disabled:opacity-50">
         {onPlan ? "Remove" : "Cancel"}
       </button>
       {status ? <span className={`font-mono text-[10px] ${status.tone === "ok" ? "text-emerald" : "text-rose"}`}>{status.text}</span> : null}

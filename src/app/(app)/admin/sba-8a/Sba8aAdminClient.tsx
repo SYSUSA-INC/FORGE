@@ -300,7 +300,7 @@ export function Sba8aAdminClient({
             type="button"
             onClick={saveRetention}
             disabled={retentionBusy || !retentionDraftChanged}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+            className="aur-btn aur-btn-ghost disabled:opacity-40"
             title={
               !retentionDraftValid
                 ? "Enter a whole number between 1 and 240"
@@ -316,7 +316,7 @@ export function Sba8aAdminClient({
             type="button"
             onClick={triggerCron}
             disabled={cronBusy}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
             title="Run the same job the monthly cron runs — refresh all verified cert types, then prune stale graduates."
           >
             {cronBusy ? "Refreshing…" : "Trigger refresh now"}
@@ -421,7 +421,7 @@ export function Sba8aAdminClient({
             type="button"
             onClick={pullFromSam}
             disabled={samBusy || !apiKeyPresent}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {samBusy ? "Pulling…" : "Pull batch"}
           </button>
@@ -483,7 +483,7 @@ export function Sba8aAdminClient({
             type="button"
             onClick={importCsv}
             disabled={csvBusy || !csv.trim()}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {csvBusy ? "Importing…" : "Import CSV"}
           </button>

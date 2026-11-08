@@ -207,7 +207,7 @@ export function NewProposalForm({
         <button
           type="submit"
           disabled={pending || !opportunityId}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending
             ? canBootstrap && bootstrap

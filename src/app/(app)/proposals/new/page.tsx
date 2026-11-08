@@ -37,7 +37,7 @@ export default async function NewProposalPage({
           title="New proposal"
           subtitle="Choose how to start. Pick from the existing opportunity queue, or create a new opportunity first."
           actions={
-            <Link href="/proposals" className="aur-btn aur-btn-ghost">
+            <Link href="/proposals" className="aur-link">
               Cancel
             </Link>
           }

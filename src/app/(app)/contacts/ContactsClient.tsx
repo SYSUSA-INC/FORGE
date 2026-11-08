@@ -196,7 +196,7 @@ export function ContactsClient({
                       </div>
                       <div className="flex items-center gap-2">
                         <WarmthChip score={warmthScore({ lastTouchAt: c.lastTouchAt, touchCount: c.touchCount, role: c.role })} />
-                        <Link href={`/contacts/${c.id}`} className="aur-btn aur-btn-ghost text-[11px]">
+                        <Link href={`/contacts/${c.id}`} className="aur-link">
                           Open
                         </Link>
                       </div>

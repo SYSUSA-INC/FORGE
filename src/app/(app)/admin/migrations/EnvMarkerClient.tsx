@@ -76,7 +76,7 @@ export function EnvMarkerClient({ status }: { status: EnvMarkerStatus }) {
           type="button"
           onClick={submit}
           disabled={pending || unchanged || !confirmed}
-          className="aur-btn text-[12px] disabled:opacity-60"
+          className="aur-btn disabled:opacity-60"
         >
           {pending ? "Relabelling…" : unchanged ? "Marker already set" : "Relabel marker"}
         </button>

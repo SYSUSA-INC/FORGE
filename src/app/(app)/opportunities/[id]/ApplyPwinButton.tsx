@@ -38,7 +38,7 @@ export function ApplyPwinButton({
             router.refresh();
           });
         }}
-        className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+        className="aur-btn aur-btn-ghost disabled:opacity-60"
       >
         {pending ? "Applying…" : same ? "Record matches model" : `Set PWin to ${modelPwin}%`}
       </button>

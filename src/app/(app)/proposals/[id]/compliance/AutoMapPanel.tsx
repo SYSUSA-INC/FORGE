@@ -120,7 +120,7 @@ export function AutoMapPanel({
           type="button"
           onClick={runAutoMap}
           disabled={pending || applyPending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title={
             unmappedCount === 0
               ? "All items are already mapped. Re-run to suggest changes."
@@ -160,7 +160,7 @@ export function AutoMapPanel({
               type="button"
               onClick={() => applySelected((s) => s.confidence === "high")}
               disabled={applyPending || highCount === 0}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
               title="Apply only the suggestions the AI is confident about."
             >
               {applyPending
@@ -171,7 +171,7 @@ export function AutoMapPanel({
               type="button"
               onClick={() => applySelected(() => true)}
               disabled={applyPending || selectableCount === 0}
-              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost disabled:opacity-60"
               title="Apply every selected suggestion regardless of confidence."
             >
               Apply all selected ({selectableCount})

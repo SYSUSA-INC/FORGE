@@ -25,7 +25,7 @@ export default async function RequestTrialPage() {
             work stays and editing carries on; AI features pause until you choose a plan.
           </p>
           <RequestTrialForm />
-          <Link href="/sign-in" className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm">
+          <Link href="/sign-in" className="aur-link mt-6">
             Already have an account? Sign in
           </Link>
         </div>

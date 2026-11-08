@@ -457,7 +457,7 @@ export default async function SolicitationDetail({
               allRequirements.length > 0 || s.parseStatus === "parsed" ? (
                 <Link
                   href={`/solicitations/${s.id}/verify`}
-                  className="aur-btn aur-btn-ghost text-[11px]"
+                  className="aur-btn aur-btn-ghost"
                   title="Confirm, edit or reject each requirement against the document"
                 >
                   {allRequirements.length === 0 ? "Add requirements" : `Verify${verdicts.unreviewed > 0 ? ` (${verdicts.unreviewed} to review)` : ""}`}

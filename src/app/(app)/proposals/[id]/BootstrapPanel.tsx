@@ -56,7 +56,7 @@ export function BootstrapPanel({
         hasSectionL ? (
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
             disabled={pending}
             onClick={run}
             title="Read Section L again and refresh the outline. Sections with text are kept."

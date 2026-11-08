@@ -322,7 +322,7 @@ function AddSectionRow({ proposalId }: { proposalId: string }) {
       </div>
       <button
         type="button"
-        className="aur-btn aur-btn-ghost text-[12px] md:w-32"
+        className="aur-btn aur-btn-ghost md:w-32"
         disabled={pending || !title.trim()}
         onClick={onSubmit}
       >
@@ -990,7 +990,7 @@ function SectionRow({
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
-              className="aur-btn aur-btn-primary text-[12px]"
+              className="aur-btn aur-btn-primary"
               disabled={pending}
               onClick={save}
             >
@@ -998,7 +998,7 @@ function SectionRow({
             </button>
             <button
               type="button"
-              className="aur-btn aur-btn-danger text-[11px]"
+              className="aur-btn aur-btn-danger"
               disabled={pending}
               onClick={remove}
             >

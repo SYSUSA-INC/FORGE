@@ -151,7 +151,7 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
         A CSV with a header row (name and agency are required; office, title, role, email, phone, notes and next touch are read when present) or a vCard export from Outlook, Google or Apple Contacts. People we already have, by email or by agency and name, are marked before anything is written.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="aur-btn aur-btn-ghost cursor-pointer text-[11px]">
+        <label className="aur-btn aur-btn-ghost cursor-pointer">
           Choose a .csv or .vcf file
           <input
             type="file"
@@ -199,7 +199,7 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
         />
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={runPreview} disabled={pending || !(file ? file.text : text).trim()} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60">
+        <button type="button" onClick={runPreview} disabled={pending || !(file ? file.text : text).trim()} className="aur-btn aur-btn-ghost disabled:opacity-60">
           {pending && !preview ? "Reading…" : "Preview"}
         </button>
         {preview ? (
@@ -217,7 +217,7 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
                 </select>
               </label>
             ) : null}
-            <button type="button" onClick={runImport} disabled={pending} className="aur-btn aur-btn-primary ml-auto text-[11px] disabled:opacity-60">
+            <button type="button" onClick={runImport} disabled={pending} className="aur-btn aur-btn-primary ml-auto disabled:opacity-60">
               {pending ? "Importing…" : sending ? "Import the rest" : `Import ${plural(importCount, "contact")}`}
             </button>
           </>

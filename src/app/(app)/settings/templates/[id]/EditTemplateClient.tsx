@@ -272,7 +272,7 @@ export function EditTemplateClient({
                 type="button"
                 disabled={pending}
                 onClick={makeDefault}
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
               >
                 Set as default
               </button>
@@ -411,7 +411,7 @@ export function EditTemplateClient({
               type="button"
               onClick={addSeedItem}
               disabled={pending}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
             >
               + Add section
             </button>
@@ -749,7 +749,7 @@ function DocxPanel({
                   inputRef.current?.click();
                 }}
                 disabled={uploading}
-                className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-ghost disabled:opacity-60"
               >
                 Replace file
               </button>
@@ -760,7 +760,7 @@ function DocxPanel({
                   onClear();
                 }}
                 disabled={uploading}
-                className="aur-btn aur-btn-ghost text-[11px] text-rose-300 disabled:opacity-60"
+                className="aur-btn aur-btn-ghost text-rose-300 disabled:opacity-60"
               >
                 Remove
               </button>

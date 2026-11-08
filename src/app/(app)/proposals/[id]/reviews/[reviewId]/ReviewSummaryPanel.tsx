@@ -64,11 +64,11 @@ export function ReviewSummaryPanel({ reviewId, summary, summaryAt }: { reviewId:
       actions={
         <div className="flex items-center gap-2">
           {summary ? (
-            <button type="button" onClick={() => void copy()} className="aur-btn aur-btn-ghost text-[11px]">
+            <button type="button" onClick={() => void copy()} className="aur-btn aur-btn-ghost">
               {copied ? "Copied" : "Copy"}
             </button>
           ) : null}
-          <button type="button" onClick={run} disabled={pending} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+          <button type="button" onClick={run} disabled={pending} className="aur-btn aur-btn-primary disabled:opacity-50">
             {pending ? "Reading…" : summary ? "Summarise again" : "Summarise this round"}
           </button>
         </div>

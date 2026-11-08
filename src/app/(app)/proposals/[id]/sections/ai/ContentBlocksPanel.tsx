@@ -79,7 +79,7 @@ export function ContentBlocksPanel({
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Filter content blocks"
             />
-            <button type="button" onClick={() => void load()} disabled={loading} className="aur-btn aur-btn-ghost text-[10px]" title="Reload">
+            <button type="button" onClick={() => void load()} disabled={loading} className="aur-btn aur-btn-ghost" title="Reload">
               {loading ? "Loading…" : "Reload"}
             </button>
           </div>
@@ -173,7 +173,7 @@ function BlockRow({
           <button
             type="button"
             onClick={onInsert}
-            className="aur-btn aur-btn-ghost text-[10px]"
+            className="aur-btn aur-btn-ghost"
             title="Append this block to the section as a tracked suggestion"
           >
             {justInserted ? "Inserted ✓" : "Insert"}

@@ -32,7 +32,7 @@ export default async function GoldDocPage({ params }: { params: { id: string } }
           .filter(Boolean)
           .join(" · ")}
         actions={
-          <Link href="/admin/gold-set" className="aur-btn aur-btn-ghost text-[11px]">
+          <Link href="/admin/gold-set" className="aur-btn aur-btn-ghost">
             All documents
           </Link>
         }

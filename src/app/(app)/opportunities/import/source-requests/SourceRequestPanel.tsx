@@ -92,7 +92,7 @@ export function SourceRequestPanel({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
         >
           {open ? "Cancel" : "+ Suggest a source"}
         </button>
@@ -146,7 +146,7 @@ export function SourceRequestPanel({
                 setOpen(false);
                 setError(null);
               }}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-link"
             >
               Cancel
             </button>
@@ -154,7 +154,7 @@ export function SourceRequestPanel({
               type="button"
               onClick={submit}
               disabled={pending || !sourceName.trim() || !description.trim()}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Submitting…" : "Submit"}
             </button>

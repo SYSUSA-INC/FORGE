@@ -83,7 +83,7 @@ export function WinThemesPanel({
           type="button"
           onClick={save}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save"}
         </button>

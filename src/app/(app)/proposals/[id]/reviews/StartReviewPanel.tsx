@@ -224,10 +224,10 @@ export function StartReviewPanel({
                   maxLength={CHECKLIST_LIMITS.maxLabelChars}
                   placeholder="Add a line…"
                 />
-                <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={addItem} disabled={!newItem.trim() || checklist.length >= CHECKLIST_LIMITS.maxItems}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={addItem} disabled={!newItem.trim() || checklist.length >= CHECKLIST_LIMITS.maxItems}>
                   Add
                 </button>
-                <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={() => setChecklist(REVIEW_CHECKLIST_TEMPLATES[color])}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => setChecklist(REVIEW_CHECKLIST_TEMPLATES[color])}>
                   Reset
                 </button>
               </div>
@@ -235,7 +235,7 @@ export function StartReviewPanel({
           ) : null}
         </div>
         {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
-        <button type="submit" disabled={pending || selected.size === 0} className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60">
+        <button type="submit" disabled={pending || selected.size === 0} className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60">
           {pending ? "Starting…" : `Start ${colorDef?.label ?? "review"}`}
         </button>
       </form>

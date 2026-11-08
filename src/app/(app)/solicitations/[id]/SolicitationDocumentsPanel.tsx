@@ -195,7 +195,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
             type="button"
             onClick={upload}
             disabled={readyCount === 0}
-            className="aur-btn aur-btn-primary shrink-0 text-[11px] disabled:opacity-40"
+            className="aur-btn aur-btn-primary shrink-0 disabled:opacity-40"
           >
             {readyCount > 1 ? `Add ${readyCount} documents` : "Add document"}
             {queue.busy ? " · uploading…" : ""}
@@ -232,7 +232,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
                 </select>
                 <button
                   type="button"
-                  className="aur-btn aur-btn-ghost text-[10px]"
+                  className="aur-btn aur-btn-ghost"
                   onClick={() => setStaged((list) => list.filter((x) => x.key !== st.key))}
                 >
                   Remove
@@ -326,7 +326,7 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
             type="button"
             onClick={merge}
             disabled={merging || !allDone}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+            className="aur-btn aur-btn-ghost disabled:opacity-40"
             title={!allDone ? "Wait for all documents to finish parsing" : undefined}
           >
             {merging ? "Merging…" : "Recompute merged requirements"}

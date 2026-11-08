@@ -78,7 +78,7 @@ export function IsolationCheckPanel({ organizationId }: Props) {
           type="button"
           onClick={runCheck}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-40"
+          className="aur-btn aur-btn-primary disabled:opacity-40"
         >
           {pending ? "Running…" : "Run isolation check"}
         </button>

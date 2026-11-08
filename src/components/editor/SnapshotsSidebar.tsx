@@ -163,7 +163,7 @@ export function SnapshotsSidebar({
           type="button"
           onClick={takeSnapshot}
           disabled={pending}
-          className="aur-btn-primary text-[10px] disabled:opacity-40"
+          className="aur-btn-primary disabled:opacity-40"
         >
           {pending ? "Saving…" : "Snapshot"}
         </button>

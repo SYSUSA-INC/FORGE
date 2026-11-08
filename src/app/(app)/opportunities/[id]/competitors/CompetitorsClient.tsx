@@ -164,7 +164,7 @@ function AddForm({
         <button
           type="submit"
           disabled={pending || !name.trim()}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Adding…" : "Add competitor"}
         </button>
@@ -236,14 +236,14 @@ function CompetitorCard({
           <div className="flex gap-2">
             <button
               type="button"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               onClick={() => setEditing(true)}
             >
               Edit
             </button>
             <button
               type="button"
-              className="aur-btn aur-btn-danger text-[11px]"
+              className="aur-btn aur-btn-danger"
               disabled={pending}
               onClick={remove}
             >
@@ -335,7 +335,7 @@ function CompetitorCard({
       <div className="mt-3 flex gap-2">
         <button
           type="button"
-          className="aur-btn aur-btn-primary text-[11px]"
+          className="aur-btn aur-btn-primary"
           disabled={pending || !name.trim()}
           onClick={save}
         >
@@ -343,7 +343,7 @@ function CompetitorCard({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-link"
           onClick={() => setEditing(false)}
         >
           Cancel

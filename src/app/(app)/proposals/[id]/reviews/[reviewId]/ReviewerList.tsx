@@ -142,7 +142,7 @@ export function ReviewerList({
           </select>
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[12px]"
+            className="aur-btn aur-btn-ghost"
             disabled={!addUser || pending}
             onClick={add}
           >

@@ -44,7 +44,7 @@ export function ClassifyBackfillButton({
           type="button"
           onClick={run}
           disabled={pending || candidateCount === 0}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending ? "Classifying…" : "Reclassify"}
         </button>

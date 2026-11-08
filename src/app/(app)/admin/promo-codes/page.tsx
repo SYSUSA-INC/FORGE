@@ -37,7 +37,7 @@ export default async function PromoCodesPage() {
           <>
             <Link
               href="/admin/promo-codes/new"
-              className="aur-btn aur-btn-primary text-[11px]"
+              className="aur-btn aur-btn-primary"
             >
               + New code
             </Link>

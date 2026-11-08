@@ -171,7 +171,7 @@ export function TeamPanel({
                         type="button"
                         onClick={() => remove(a.userId, a.role)}
                         disabled={pending}
-                        className="aur-btn aur-btn-ghost text-[10px] text-rose-300 disabled:opacity-60"
+                        className="aur-btn aur-btn-ghost text-rose-300 disabled:opacity-60"
                         title="Remove assignment"
                       >
                         Remove
@@ -245,7 +245,7 @@ export function TeamPanel({
               type="button"
               onClick={add}
               disabled={pending || !pickedUserId}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Working…" : "Add"}
             </button>

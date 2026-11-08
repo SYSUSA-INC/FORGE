@@ -185,7 +185,7 @@ export function CommentsPanel({
           <button
             type="submit"
             disabled={pending || !body.trim()}
-            className="aur-btn aur-btn-primary py-2 text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {pending ? "Adding…" : "Add comment"}
           </button>

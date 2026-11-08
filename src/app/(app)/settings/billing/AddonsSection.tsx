@@ -98,7 +98,7 @@ export async function AddonsSection({
                 ) : a.stripePriceId && isAdmin ? (
                   <AddonCheckoutButton addonSlug={a.slug} addonName={a.name} stackable={stackable} />
                 ) : !a.stripePriceId ? (
-                  <a href="mailto:sales@sysgov.com" className="aur-btn aur-btn-ghost text-[11px]">
+                  <a href="mailto:sales@sysgov.com" className="aur-btn aur-btn-ghost">
                     Contact sales →
                   </a>
                 ) : (

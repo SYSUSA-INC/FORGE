@@ -101,7 +101,7 @@ export function ProposalScanPanel({
           type="button"
           onClick={runScan}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
         >
           {pending ? "Scanning…" : scan ? "Re-scan" : "Scan now"}
         </button>

@@ -101,7 +101,7 @@ export function ReviewCommentsPanel({
                   type="button"
                   onClick={() => resolve(c.id)}
                   disabled={busy !== null}
-                  className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-50"
+                  className="aur-btn aur-btn-ghost disabled:opacity-50"
                 >
                   {busy === c.id ? "Resolving…" : "Resolve"}
                 </button>

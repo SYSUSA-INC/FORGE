@@ -233,7 +233,7 @@ export function EvidenceDock({
                                     snippet: pp.description,
                                   })
                                 }
-                                className="aur-btn aur-btn-ghost shrink-0 text-[10px] disabled:opacity-50"
+                                className="aur-btn aur-btn-ghost shrink-0 disabled:opacity-50"
                               >
                                 Attach
                               </button>
@@ -283,7 +283,7 @@ export function EvidenceDock({
                                   snippet: k.body.slice(0, 500),
                                 })
                               }
-                              className="aur-btn aur-btn-ghost shrink-0 text-[10px] disabled:opacity-50"
+                              className="aur-btn aur-btn-ghost shrink-0 disabled:opacity-50"
                             >
                               Attach
                             </button>
@@ -351,7 +351,7 @@ export function EvidenceDock({
                                         snippet: p,
                                       })
                                     }
-                                    className="aur-btn aur-btn-ghost shrink-0 text-[10px] disabled:opacity-50"
+                                    className="aur-btn aur-btn-ghost shrink-0 disabled:opacity-50"
                                   >
                                     Attach
                                   </button>

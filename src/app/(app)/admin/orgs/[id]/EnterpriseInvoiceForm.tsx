@@ -197,7 +197,7 @@ export function EnterpriseInvoiceForm({
       <div>
         <button
           type="submit"
-          className="aur-btn aur-btn-primary text-[12px] disabled:opacity-50"
+          className="aur-btn aur-btn-primary disabled:opacity-50"
           disabled={pending || !periodAvailable}
         >
           {pending

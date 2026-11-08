@@ -26,7 +26,7 @@ export default async function HelpLayout({
           href="https://github.com/SYSUSA-INC/FORGE/tree/main/docs"
           target="_blank"
           rel="noreferrer"
-          className="aur-btn-ghost text-xs"
+          className="aur-btn-ghost"
         >
           View on GitHub →
         </a>

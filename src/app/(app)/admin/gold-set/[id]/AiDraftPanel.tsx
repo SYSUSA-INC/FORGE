@@ -40,13 +40,13 @@ export function AiDraftPanel({ docId, state, approved }: { docId: string; state:
       eyebrow={state.promptVersion ? `prompt ${state.promptVersion}${state.model ? ` · ${state.model}` : ""}` : "Not started"}
       actions={
         <div className="flex gap-2">
-          <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={pending || approved} onClick={draft}>
+          <button type="button" className="aur-btn aur-btn-primary disabled:opacity-60" disabled={pending || approved} onClick={draft}>
             {pending ? "Drafting…" : started ? "Continue / read new text" : "Draft annotations with AI"}
           </button>
           {started ? (
             <button
               type="button"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {

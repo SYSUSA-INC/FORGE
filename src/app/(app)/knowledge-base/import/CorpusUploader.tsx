@@ -204,7 +204,7 @@ export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
                 type="button"
                 onClick={uploadAll}
                 disabled={staged.length === 0}
-                className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-primary disabled:opacity-60"
               >
                 {`Upload ${staged.length}`}
               </button>
@@ -212,7 +212,7 @@ export function CorpusUploader({ maxBytes }: { maxBytes: number }) {
                 type="button"
                 onClick={clearDone}
                 disabled={doneCount === 0}
-                className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-ghost disabled:opacity-60"
               >
                 Clear done
               </button>

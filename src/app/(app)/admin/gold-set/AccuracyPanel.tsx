@@ -74,7 +74,7 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
               </datalist>
             </>
           )}
-          <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={pending || approvedDocs === 0} onClick={run}>
+          <button type="button" className="aur-btn aur-btn-primary disabled:opacity-60" disabled={pending || approvedDocs === 0} onClick={run}>
             {pending ? "Running…" : running ? "Continue run" : "Run accuracy check"}
           </button>
         </span>

@@ -82,7 +82,7 @@ export function CloseReviewPanel({
           <button
             type="submit"
             disabled={pending}
-            className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+            className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
           >
             {pending ? "Closing…" : "Close review"}
           </button>
@@ -90,7 +90,7 @@ export function CloseReviewPanel({
             type="button"
             disabled={pending}
             onClick={onCancel}
-            className="aur-btn aur-btn-danger py-2.5 text-sm disabled:opacity-60"
+            className="aur-btn aur-btn-danger.5 text-sm disabled:opacity-60"
           >
             Cancel review
           </button>

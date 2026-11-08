@@ -76,13 +76,13 @@ export function GoldReviewClient({
         actions={
           <div className="flex gap-2">
             {status === "approved" ? (
-              <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => run(() => setGoldDocApprovedAction({ docId, approved: false }))}>
+              <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => run(() => setGoldDocApprovedAction({ docId, approved: false }))}>
                 Reopen for review
               </button>
             ) : (
               <button
                 type="button"
-                className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-primary disabled:opacity-60"
                 disabled={pending || !!approveBlockedReason}
                 title={approveBlockedReason ?? "Approve this document as gold."}
                 onClick={() => run(() => setGoldDocApprovedAction({ docId, approved: true }))}
@@ -92,7 +92,7 @@ export function GoldReviewClient({
             )}
             <button
               type="button"
-              className="aur-btn aur-btn-ghost text-[11px] text-rose"
+              className="aur-btn aur-btn-ghost text-rose"
               disabled={pending}
               onClick={() => {
                 if (window.confirm("Delete this document and all its annotations?")) run(() => deleteGoldDocAction(docId), () => router.push("/admin/gold-set"));
@@ -129,7 +129,7 @@ export function GoldReviewClient({
           <input className="aur-input flex-1" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. shall not exceed" />
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
             disabled={pending || query.trim().length < 3}
             onClick={() => startTransition(async () => setHits(await searchGoldDocTextAction({ docId, query })))}
           >
@@ -150,7 +150,7 @@ export function GoldReviewClient({
           <div className="flex justify-end">
             <button
               type="button"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               disabled={pending}
               onClick={() => {
                 const refusal = goldTextRefusal(paste.text.length) ?? pasteRefusal(paste.text, Number.POSITIVE_INFINITY, "Add it in parts.");
@@ -193,7 +193,7 @@ function KindPanel({
       title={GOLD_KIND_LABEL[kind]}
       eyebrow={`${live} kept · ${items.filter((i) => i.status === "proposed").length} to review`}
       actions={
-        <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={() => setEditing(editing === addKey ? null : addKey)}>
+        <button type="button" className="aur-btn aur-btn-ghost" onClick={() => setEditing(editing === addKey ? null : addKey)}>
           Add
         </button>
       }
@@ -221,21 +221,21 @@ function KindPanel({
                 </div>
                 <div className="flex gap-1">
                   {i.status !== "approved" ? (
-                    <button type="button" className="aur-btn aur-btn-ghost text-[10px]" disabled={pending} onClick={() => onDecide(i.id, "approved")}>
+                    <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => onDecide(i.id, "approved")}>
                       Approve
                     </button>
                   ) : null}
                   {i.status !== "rejected" ? (
-                    <button type="button" className="aur-btn aur-btn-ghost text-[10px]" disabled={pending} onClick={() => onDecide(i.id, "rejected")}>
+                    <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => onDecide(i.id, "rejected")}>
                       Reject
                     </button>
                   ) : null}
                   {i.status !== "proposed" ? (
-                    <button type="button" className="aur-btn aur-btn-ghost text-[10px]" disabled={pending} onClick={() => onDecide(i.id, "proposed")}>
+                    <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => onDecide(i.id, "proposed")}>
                       Undo
                     </button>
                   ) : null}
-                  <button type="button" className="aur-btn aur-btn-ghost text-[10px]" disabled={pending} onClick={() => setEditing(i.id)}>
+                  <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setEditing(i.id)}>
                     Edit
                   </button>
                 </div>
@@ -288,10 +288,10 @@ function ItemForm({
       </div>
       <textarea className="aur-input min-h-[60px]" value={d.text} onChange={(e) => setD({ ...d, text: e.target.value })} placeholder="The text as the RFP states it" />
       <div className="flex justify-end gap-2">
-        <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={onCancel}>
+        <button type="button" className="aur-link" onClick={onCancel}>
           Cancel
         </button>
-        <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={pending} onClick={() => onSubmit(d)}>
+        <button type="button" className="aur-btn aur-btn-primary disabled:opacity-60" disabled={pending} onClick={() => onSubmit(d)}>
           {initial ? "Save (approves)" : "Add (approved)"}
         </button>
       </div>

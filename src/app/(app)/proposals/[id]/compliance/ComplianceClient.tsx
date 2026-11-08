@@ -321,7 +321,7 @@ function AddItem({
       <div>
         <button
           type="button"
-          className="aur-btn aur-btn-primary py-2 text-[12px]"
+          className="aur-btn aur-btn-primary"
           onClick={() => setOpen(true)}
         >
           + Add compliance item
@@ -455,14 +455,14 @@ function AddItem({
         <div className="md:col-span-2 flex gap-2">
           <button
             type="submit"
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
             disabled={pending || !requirementText.trim()}
           >
             {pending ? "Adding…" : "Add item"}
           </button>
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[12px]"
+            className="aur-link"
             onClick={() => {
               setOpen(false);
               reset();
@@ -521,7 +521,7 @@ function SeedFromSolicitation({
     <div className="flex flex-wrap items-center gap-3">
       <button
         type="button"
-        className="aur-btn aur-btn-ghost py-2 text-[12px]"
+        className="aur-btn aur-btn-ghost"
         onClick={seed}
         disabled={pending}
         title="Create one row per requirement extracted from the linked solicitation (skips rows already here)"
@@ -574,7 +574,7 @@ function BulkImport({
       <div>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost py-2 text-[12px]"
+          className="aur-btn aur-btn-ghost"
           onClick={() => setOpen(true)}
         >
           Bulk paste shall statements
@@ -627,14 +627,14 @@ function BulkImport({
         <div className="flex gap-2">
           <button
             type="submit"
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
             disabled={pending || !text.trim()}
           >
             {pending ? "Importing…" : "Import"}
           </button>
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[12px]"
+            className="aur-link"
             onClick={() => {
               setOpen(false);
               setText("");
@@ -889,14 +889,14 @@ function ItemRowCard({
             <div className="flex gap-2">
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[10px]"
+                className="aur-btn aur-btn-ghost"
                 onClick={() => setEditing(true)}
               >
                 Edit
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-danger text-[10px]"
+                className="aur-btn aur-btn-danger"
                 onClick={remove}
                 disabled={pending}
               >
@@ -1054,7 +1054,7 @@ function ItemRowCard({
       <div className="mt-3 flex gap-2">
         <button
           type="button"
-          className="aur-btn aur-btn-primary text-[12px]"
+          className="aur-btn aur-btn-primary"
           disabled={pending}
           onClick={save}
         >
@@ -1062,7 +1062,7 @@ function ItemRowCard({
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[12px]"
+          className="aur-link"
           onClick={() => setEditing(false)}
         >
           Cancel
@@ -1255,7 +1255,7 @@ function PreflightBar({
           type="button"
           onClick={runPreflight}
           disabled={pending || mapped === 0}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title={
             mapped === 0
               ? "Map at least one compliance item to a section first."
@@ -1391,7 +1391,7 @@ function AIAssessmentRow({
           type="button"
           onClick={accept}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
           title="Apply the AI's suggested status to this item."
         >
           Accept
@@ -1400,7 +1400,7 @@ function AIAssessmentRow({
           type="button"
           onClick={dismiss}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          className="aur-link disabled:opacity-60"
           title="Dismiss this AI suggestion without changing the human-set status."
         >
           Dismiss

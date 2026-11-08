@@ -90,10 +90,10 @@ export function ChecklistPanel({
                       maxLength={500}
                       autoFocus
                     />
-                    <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => save(item.key, state?.checked ?? false, noteDraft)}>
+                    <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => save(item.key, state?.checked ?? false, noteDraft)}>
                       Save
                     </button>
-                    <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={() => setNoteFor(null)}>
+                    <button type="button" className="aur-link" onClick={() => setNoteFor(null)}>
                       Cancel
                     </button>
                   </div>

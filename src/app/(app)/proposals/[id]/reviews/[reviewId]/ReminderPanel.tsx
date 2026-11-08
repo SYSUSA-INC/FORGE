@@ -97,7 +97,7 @@ export function ReminderPanel({
                 </div>
               ) : null}
               <div>
-                <button type="button" onClick={save} disabled={pending || !dirty} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+                <button type="button" onClick={save} disabled={pending || !dirty} className="aur-btn aur-btn-primary disabled:opacity-50">
                   {pending ? "Saving…" : "Save reminders"}
                 </button>
               </div>

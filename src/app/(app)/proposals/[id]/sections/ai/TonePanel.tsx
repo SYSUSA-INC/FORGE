@@ -121,7 +121,7 @@ export function TonePanel({
             {hint ? (
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost shrink-0 text-[11px]"
+                className="aur-btn aur-btn-ghost shrink-0"
                 disabled={fixBusy}
                 onClick={() => onFix(hint)}
                 title="Open Improve mode with these findings as guidance; the result arrives as tracked changes."

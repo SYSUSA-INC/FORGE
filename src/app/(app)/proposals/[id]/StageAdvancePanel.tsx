@@ -92,7 +92,7 @@ export function StageAdvancePanel({
             </div>
             <button
               type="button"
-              className="aur-btn aur-btn-primary mt-3 w-full py-2 text-sm"
+              className="aur-btn aur-btn-primary mt-3 w-full text-sm"
               disabled={pending}
               onClick={() => doAdvance(next)}
             >
@@ -117,7 +117,7 @@ export function StageAdvancePanel({
                 <button
                   key={s}
                   type="button"
-                  className="aur-btn aur-btn-ghost text-[11px]"
+                  className="aur-btn aur-btn-ghost"
                   disabled={pending || currentStage === s}
                   onClick={() => doAdvance(s)}
                 >

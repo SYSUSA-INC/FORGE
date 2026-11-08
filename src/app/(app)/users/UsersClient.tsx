@@ -401,7 +401,7 @@ function InvitePanel({
         <button
           type="submit"
           disabled={pending || !email || (isSuperadmin && !tenantId)}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Sending…" : willNeedApproval ? "Request approval" : "Send invitation"}
         </button>
@@ -502,7 +502,7 @@ function PendingPanel({
                   <>
                     <button
                       type="button"
-                      className="aur-btn aur-btn-ghost text-[11px]"
+                      className="aur-btn aur-btn-ghost"
                       onClick={() => onCopyLink(i.id, i.email)}
                       disabled={pendingId === i.id}
                       title="Get a fresh invite link to send by chat or ticket"
@@ -511,7 +511,7 @@ function PendingPanel({
                     </button>
                     <button
                       type="button"
-                      className="aur-btn aur-btn-ghost text-[11px]"
+                      className="aur-btn aur-btn-ghost"
                       onClick={() => onResend(i.id, i.email)}
                       disabled={pendingId === i.id}
                     >
@@ -521,7 +521,7 @@ function PendingPanel({
                 )}
                 <button
                   type="button"
-                  className="aur-btn aur-btn-danger text-[11px]"
+                  className="aur-btn aur-btn-danger"
                   onClick={() => onRevoke(i.id)}
                   disabled={pendingId === i.id}
                 >
@@ -672,7 +672,7 @@ function MembersPanel({
               </span>
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
                 disabled={isSelf || pendingId === m.userId}
                 onClick={() => onToggleStatus(m.userId, m.status)}
               >
@@ -680,7 +680,7 @@ function MembersPanel({
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-danger text-[11px]"
+                className="aur-btn aur-btn-danger"
                 disabled={isSelf || pendingId === m.userId}
                 onClick={() => onRemove(m.userId, m.email)}
               >

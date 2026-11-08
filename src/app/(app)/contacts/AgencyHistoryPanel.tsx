@@ -65,7 +65,7 @@ export function AgencyHistoryPanel({ agency, compact }: { agency: string; compac
             </button>
           </>
         ) : null}
-        <button type="button" onClick={() => load(!!data)} disabled={pending || disabled} className="aur-btn aur-btn-ghost ml-auto text-[11px] disabled:opacity-60">
+        <button type="button" onClick={() => load(!!data)} disabled={pending || disabled} className="aur-btn aur-btn-ghost ml-auto disabled:opacity-60">
           {pending ? "Loading…" : data ? "Refresh" : "Load awards"}
         </button>
       </div>

@@ -51,7 +51,7 @@ export function AddonCatalogPanel({ addons, activeGrants }: { addons: AddonCatal
                       <span className="text-subtle">sort_order {a.sortOrder}</span>
                     </div>
                   </div>
-                  <button type="button" onClick={() => setEditing(a.id)} className="aur-btn aur-btn-ghost text-[11px]">
+                  <button type="button" onClick={() => setEditing(a.id)} className="aur-btn aur-btn-ghost">
                     Edit →
                   </button>
                 </div>
@@ -66,7 +66,7 @@ export function AddonCatalogPanel({ addons, activeGrants }: { addons: AddonCatal
         </div>
       ) : (
         <div>
-          <button type="button" onClick={() => setCreating(true)} className="aur-btn aur-btn-primary text-[11px]">
+          <button type="button" onClick={() => setCreating(true)} className="aur-btn aur-btn-primary">
             + New add-on
           </button>
         </div>
@@ -193,10 +193,10 @@ function AddonForm({ initial, onDone }: { initial: AddonCatalogRow | null; onDon
       </div>
       {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
       <div className="flex items-center gap-2">
-        <button type="submit" disabled={pending} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60">
+        <button type="submit" disabled={pending} className="aur-btn aur-btn-primary disabled:opacity-60">
           {pending ? "Saving…" : initial ? "Save" : "Create add-on"}
         </button>
-        <button type="button" onClick={onDone} disabled={pending} className="aur-btn aur-btn-ghost text-[11px]">
+        <button type="button" onClick={onDone} disabled={pending} className="aur-link">
           Cancel
         </button>
       </div>

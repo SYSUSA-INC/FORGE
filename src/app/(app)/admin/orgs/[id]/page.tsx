@@ -224,21 +224,21 @@ export default async function TenantDetailPage({
           <>
             <Link
               href={`/admin/orgs/${org.id}/users`}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Manage tenant users on behalf of platform support (promote, demote, disable, remove, invite resend/revoke)"
             >
               Users →
             </Link>
             <Link
               href={`/admin/orgs/${org.id}/activity`}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Recent activity + health indicators for this tenant"
             >
               Activity →
             </Link>
             <a
               href={`/api/admin/orgs/${org.id}/export`}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Download a JSON bundle of this tenant's metadata + records (no large blobs). Audited."
             >
               Export data ↓

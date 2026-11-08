@@ -401,7 +401,7 @@ function SavedSummary({
           </li>
         ) : null}
       </ul>
-      <button type="button" onClick={onDone} className="aur-btn">
+      <button type="button" onClick={onDone} className="aur-link">
         Done
       </button>
     </div>

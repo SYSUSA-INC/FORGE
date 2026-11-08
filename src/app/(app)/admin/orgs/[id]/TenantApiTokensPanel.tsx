@@ -74,7 +74,7 @@ export function TenantApiTokensPanel({ organizationId, tokens }: { organizationI
                 </td>
                 <td className="text-right">
                   {t.state === "active" ? (
-                    <button type="button" className="aur-btn aur-btn-ghost text-[11px] text-rose" onClick={() => revoke(t)} disabled={pending}>
+                    <button type="button" className="aur-btn aur-btn-ghost text-rose" onClick={() => revoke(t)} disabled={pending}>
                       Revoke
                     </button>
                   ) : null}
@@ -100,7 +100,7 @@ export function TenantApiTokensPanel({ organizationId, tokens }: { organizationI
               onChange={(e) => setReason(e.target.value)}
               disabled={pending}
             />
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px] text-rose" onClick={revokeAll} disabled={pending || reason.trim().length < 3}>
+            <button type="button" className="aur-btn aur-btn-ghost text-rose" onClick={revokeAll} disabled={pending || reason.trim().length < 3}>
               Revoke all active
             </button>
           </div>

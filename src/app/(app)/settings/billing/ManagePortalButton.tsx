@@ -33,7 +33,7 @@ export function ManagePortalButton() {
         type="button"
         onClick={open}
         disabled={pending}
-        className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+        className="aur-btn aur-btn-ghost disabled:opacity-50"
       >
         {pending ? "Opening…" : "Manage subscription →"}
       </button>

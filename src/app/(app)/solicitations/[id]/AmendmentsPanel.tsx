@@ -109,7 +109,7 @@ export function AmendmentsPanel({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
           >
             {open ? "Cancel" : "Add amendment"}
           </button>
@@ -179,7 +179,7 @@ export function AmendmentsPanel({
                   />
                   <button
                     type="button"
-                    className="aur-btn aur-btn-ghost text-[10px]"
+                    className="aur-btn aur-btn-ghost"
                     onClick={() => setStaged((list) => list.filter((x) => x.key !== s.key))}
                   >
                     Remove
@@ -207,7 +207,7 @@ export function AmendmentsPanel({
               type="button"
               onClick={submitUpload}
               disabled={readyCount === 0}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
+              className="aur-btn aur-btn-primary disabled:opacity-50"
             >
               {readyCount > 1 ? `Upload ${readyCount} amendments` : "Upload amendment"}
               {pending ? " · uploading…" : ""}

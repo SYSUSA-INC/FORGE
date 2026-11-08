@@ -151,7 +151,7 @@ export default async function TiersPage() {
                     </span>
                     <Link
                       href={`/admin/tiers/${t.id}`}
-                      className="aur-btn aur-btn-ghost text-[11px]"
+                      className="aur-btn aur-btn-ghost"
                     >
                       Edit →
                     </Link>

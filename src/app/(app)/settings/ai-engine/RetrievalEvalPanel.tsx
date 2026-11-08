@@ -68,7 +68,7 @@ export function RetrievalEvalPanel({
         isAdmin ? (
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
             disabled={pending}
             onClick={run}
             title="Search for sections of won proposals the way the drafter does and check whether their winning text comes back. No AI model call; one search per query."

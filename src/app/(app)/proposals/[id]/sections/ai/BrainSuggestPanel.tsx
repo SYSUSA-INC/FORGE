@@ -71,7 +71,7 @@ export function BrainSuggestPanel({
               type="button"
               onClick={suggest}
               disabled={pending}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Thinking…" : "Suggest"}
             </button>
@@ -145,7 +145,7 @@ function HitRow({
           <button
             type="button"
             onClick={() => onInsert(hit.content.trim() + "\n\n")}
-            className="aur-btn aur-btn-ghost text-[10px]"
+            className="aur-btn aur-btn-ghost"
             title="Insert this passage at the end of the current section"
           >
             Insert

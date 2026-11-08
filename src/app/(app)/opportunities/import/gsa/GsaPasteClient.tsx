@@ -162,7 +162,7 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
         title="Paste a forwarded GSA email"
         eyebrow="With its attachments"
         actions={
-          <button type="button" className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60" onClick={parse} disabled={parsing || rawText.trim().length === 0}>
+          <button type="button" className="aur-btn aur-btn-primary disabled:opacity-60" onClick={parse} disabled={parsing || rawText.trim().length === 0}>
             {parsing ? "Extracting…" : "Extract with AI"}
           </button>
         }
@@ -246,7 +246,7 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
                 ) : (
                   <button
                     type="button"
-                    className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                    className="aur-btn aur-btn-primary disabled:opacity-60"
                     disabled={creating || fields.title.trim() === "" || queue.busy || unfinished > 0}
                     title={queue.busy ? "Wait for the attachments to finish uploading." : unfinished > 0 ? "Retry or remove the attachments that didn't upload." : undefined}
                     onClick={create}

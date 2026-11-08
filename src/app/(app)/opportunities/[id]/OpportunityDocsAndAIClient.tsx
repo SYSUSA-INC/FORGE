@@ -152,7 +152,7 @@ export function OpportunityDocsAndAIClient({
                     )
                   }
                   disabled={!s.hasRawText || anyPending}
-                  className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+                  className="aur-btn aur-btn-ghost disabled:opacity-50"
                   title={
                     !s.hasRawText
                       ? "Solicitation hasn't been parsed yet"
@@ -175,7 +175,7 @@ export function OpportunityDocsAndAIClient({
                     )
                   }
                   disabled={downstreamDisabled}
-                  className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+                  className="aur-btn aur-btn-ghost disabled:opacity-50"
                   title={
                     !s.reviewComplete
                       ? "Run the document review first"
@@ -198,7 +198,7 @@ export function OpportunityDocsAndAIClient({
                     )
                   }
                   disabled={downstreamDisabled}
-                  className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+                  className="aur-btn aur-btn-ghost disabled:opacity-50"
                   title={
                     !s.reviewComplete
                       ? "Run the document review first"

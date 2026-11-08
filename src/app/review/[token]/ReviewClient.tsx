@@ -192,7 +192,7 @@ export function ReviewClient({
             type="button"
             onClick={submit}
             disabled={pending || !recommendation}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {pending ? "Submitting…" : "Submit recommendation"}
           </button>

@@ -81,17 +81,17 @@ export function UploadQueue<R, M>({
             {it.error ? <p className="mt-1 font-mono text-[11px] text-rose">{it.error}</p> : null}
             <div className={`mt-1.5 flex gap-2 ${locked ? "hidden" : ""}`}>
               {failed || it.phase === "cancelled" ? (
-                <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onRetry(it.id)}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => onRetry(it.id)}>
                   {failed && it.stored ? "Retry saving" : "Retry"}
                 </button>
               ) : null}
               {cancellable ? (
-                <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onCancel(it.id)}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => onCancel(it.id)}>
                   Cancel
                 </button>
               ) : null}
               {!active ? (
-                <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onRemove(it.id)}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => onRemove(it.id)}>
                   Remove
                 </button>
               ) : null}

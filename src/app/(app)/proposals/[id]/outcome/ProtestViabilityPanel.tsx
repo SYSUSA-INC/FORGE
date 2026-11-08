@@ -106,7 +106,7 @@ export function ProtestViabilityPanel({
           type="button"
           onClick={runCheck}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title="Analyze debrief weaknesses against GAO protest grounds and controlling cases."
         >
           {pending

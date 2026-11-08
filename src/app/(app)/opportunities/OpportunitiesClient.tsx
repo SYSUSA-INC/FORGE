@@ -131,7 +131,7 @@ export function OpportunitiesClient({
             {stageFilter !== "all" ? ` In ${stages.find((s) => s.key === stageFilter)?.label ?? stageFilter}: ${opportunities.filter((o) => o.stage === stageFilter).length}.` : ""}
           </p>
           <span className="flex items-center gap-3 font-mono text-[11px]">
-            <Link href={drill.backHref} className="text-cobalt-300 underline">
+            <Link href={drill.backHref} className="aur-link">
               Back to the pipeline
             </Link>
             <Link href="/opportunities" className="text-muted underline">
@@ -290,7 +290,7 @@ function OppRow({ o }: { o: Opp }) {
           {o.owner ? (o.owner.name ?? o.owner.email) : "Unassigned"}
         </div>
       </div>
-      <SendForReviewButton opportunityId={o.id} size="sm" />
+      <SendForReviewButton opportunityId={o.id} />
     </div>
   );
 }

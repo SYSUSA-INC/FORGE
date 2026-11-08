@@ -15,7 +15,7 @@ export function RunJobsNowButton() {
       {note ? <span className="font-mono text-[10px] text-muted">{note}</span> : null}
       <button
         type="button"
-        className="aur-btn aur-btn-ghost text-[11px]"
+        className="aur-btn aur-btn-ghost"
         disabled={pending}
         title="Recover stuck rows and run due jobs now, as the cron would"
         onClick={() =>

@@ -223,7 +223,7 @@ export function SolicitationReviewPanel({
             type="button"
             onClick={runReview}
             disabled={!canReview}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
             title={
               !hasRawText || !parsed
                 ? "The review builds on the parsed requirements. Wait for the parse to finish, or re-parse."
@@ -245,7 +245,7 @@ export function SolicitationReviewPanel({
               type="button"
               onClick={() => runMatrix(false)}
               disabled={matrixing}
-              className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+              className="aur-btn aur-btn-ghost disabled:opacity-50"
               title="Score the requirements the matrix does not cover yet; scored ones are kept."
             >
               {matrixing ? "Scoring…" : `Score remaining (${unscored})`}
@@ -255,7 +255,7 @@ export function SolicitationReviewPanel({
             type="button"
             onClick={() => runMatrix(Boolean(matrix))}
             disabled={downstreamDisabled || matrixing}
-            className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
             title={
               downstreamDisabled
                 ? "Run the document review first."
@@ -276,7 +276,7 @@ export function SolicitationReviewPanel({
             type="button"
             onClick={runQuestions}
             disabled={downstreamDisabled || questioning}
-            className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
             title={
               downstreamDisabled
                 ? "Run the document review first."
@@ -726,7 +726,7 @@ function QuestionList({ questions }: { questions: SolicitationQuestion[] }) {
         <button
           type="button"
           onClick={copyAll}
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
         >
           Copy all
         </button>

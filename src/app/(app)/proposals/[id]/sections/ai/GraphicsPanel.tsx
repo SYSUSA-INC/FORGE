@@ -73,7 +73,7 @@ export function GraphicsPanel({
           type="button"
           onClick={suggest}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+          className="aur-btn aur-btn-ghost disabled:opacity-50"
           title="Read the section and propose the diagrams it would benefit from"
         >
           {pending ? "Reading…" : suggestions ? "Suggest again" : "Suggest graphics"}
@@ -113,15 +113,15 @@ export function GraphicsPanel({
                 <button
                   type="button"
                   onClick={() => onInsertImage(s.dataUri, s.title)}
-                  className="aur-btn aur-btn-primary text-[11px]"
+                  className="aur-btn aur-btn-primary"
                   title="Add the diagram at the end of the section as an image; drag it where it belongs"
                 >
                   Insert into section
                 </button>
-                <button type="button" onClick={() => void copyMermaid(s)} className="aur-btn aur-btn-ghost text-[11px]">
+                <button type="button" onClick={() => void copyMermaid(s)} className="aur-btn aur-btn-ghost">
                   {copied === s.title ? "Copied" : "Copy Mermaid"}
                 </button>
-                <button type="button" onClick={() => downloadSvg(s)} className="aur-btn aur-btn-ghost text-[11px]">
+                <button type="button" onClick={() => downloadSvg(s)} className="aur-btn aur-btn-ghost">
                   Download SVG
                 </button>
                 <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">

@@ -185,7 +185,7 @@ export default async function ProposalReviewsPage({
                       </div>
                       <Link
                         href={`/proposals/${params.id}/reviews/${r.id}`}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-link"
                       >
                         Open
                       </Link>

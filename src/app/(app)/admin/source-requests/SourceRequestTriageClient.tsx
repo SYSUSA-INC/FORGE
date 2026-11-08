@@ -299,7 +299,7 @@ function RequestRow({
               type="button"
               onClick={save}
               disabled={pending || !dirty}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Saving…" : "Save changes"}
             </button>

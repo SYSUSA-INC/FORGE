@@ -332,7 +332,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
           <div className="flex items-end">
             <button
               type="button"
-              className="aur-btn aur-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
+              className="aur-btn aur-btn-primary w-full.5 text-sm disabled:opacity-60"
               disabled={loading || checking}
               onClick={search}
             >
@@ -360,7 +360,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
                 disabled={importing || selectableCount === 0}
                 onClick={selectAll}
               >
@@ -368,7 +368,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
                 disabled={importing || selected.size === 0}
                 onClick={clearSelection}
               >
@@ -376,7 +376,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-primary disabled:opacity-60"
                 disabled={importing || selected.size === 0}
                 onClick={importSelected}
               >
@@ -415,7 +415,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
               <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-widest text-muted">Not checked for {searchInfo.scope.keyword} ({unchecked.length})</summary>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <p className="font-body text-[12px] text-muted">FORGE hasn&rsquo;t read these descriptions yet, so it can&rsquo;t tell whether they mention it. They aren&rsquo;t counted as matches or picked by Select all.</p>
-                <button type="button" className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" disabled={checking} onClick={checkMore}>
+                <button type="button" className="aur-btn aur-btn-ghost disabled:opacity-60" disabled={checking} onClick={checkMore}>
                   {checking ? "Checking…" : `Check ${Math.min(10, unchecked.length)} more (${Math.min(10, unchecked.length)} SAM.gov requests)`}
                 </button>
               </div>
@@ -503,7 +503,7 @@ function OpportunityRow({
       }
       actions={
         o.alreadyImported ? null : (
-          <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={busy} onClick={onAdd}>
+          <button type="button" className="aur-btn aur-btn-primary" disabled={busy} onClick={onAdd}>
             Add to pipeline
           </button>
         )

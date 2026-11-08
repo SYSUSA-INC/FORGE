@@ -98,10 +98,10 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
         </div>
         {approved ? null : (
           <div className="flex gap-2">
-            <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={pending} onClick={approve}>
+            <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={approve}>
               {pending && !declining ? "Approving…" : "Approve"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => setDeclining((v) => !v)}>
+            <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setDeclining((v) => !v)}>
               Decline…
             </button>
           </div>
@@ -118,7 +118,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
             maxLength={300}
             disabled={pending}
           />
-          <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={pending} onClick={decline}>
+          <button type="button" className="aur-btn aur-btn-danger" disabled={pending} onClick={decline}>
             {pending ? "Declining…" : "Decline request"}
           </button>
         </div>

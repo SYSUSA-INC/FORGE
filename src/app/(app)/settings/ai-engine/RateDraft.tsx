@@ -83,7 +83,7 @@ export function RateDraft({
             className="aur-input mt-2 w-full text-[12px]"
           />
           <div className="mt-2 flex items-center gap-3">
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={save}>
+            <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={save}>
               {pending ? "Saving…" : "Save rating"}
             </button>
             {msg ? <span className="text-muted">{msg}</span> : null}

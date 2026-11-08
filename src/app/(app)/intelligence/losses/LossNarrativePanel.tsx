@@ -49,7 +49,7 @@ export function LossNarrativePanel({
           type="button"
           onClick={generate}
           disabled={pending || !enough}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending ? "Analysing…" : result ? "Regenerate" : "Explain patterns"}
         </button>
