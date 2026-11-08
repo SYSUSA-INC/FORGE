@@ -59,31 +59,31 @@ export default async function SamgovKeysPage() {
           <p className="font-body text-[13px] text-muted">No company has saved its own SAM.gov key; every company uses FORGE&apos;s shared key.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left font-mono text-[11px]">
-              <thead className="text-[10px] uppercase tracking-widest text-subtle">
+            <table className="aur-table">
+              <thead>
                 <tr>
-                  <th className="py-2 pr-3">Company</th>
-                  <th className="py-2 pr-3">Key</th>
-                  <th className="py-2 pr-3">SAM.gov said</th>
-                  <th className="py-2 pr-3">Set</th>
-                  <th className="py-2 pr-3">Encrypted with</th>
-                  <th className="py-2" />
+                  <th>Company</th>
+                  <th>Key</th>
+                  <th>SAM.gov said</th>
+                  <th>Set</th>
+                  <th>Encrypted with</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.organizationId} className="border-t border-layer/10 align-top">
-                    <td className="py-2 pr-3 font-body text-[13px] text-text">{r.organizationName}</td>
-                    <td className="py-2 pr-3 text-text">••••{r.last4}</td>
-                    <td className={`py-2 pr-3 ${r.status === "ok" ? "text-text" : "text-rose"}`}>
+                  <tr key={r.organizationId} className="align-top">
+                    <td className="text-text">{r.organizationName}</td>
+                    <td className="font-mono text-[12px] text-text">••••{r.last4}</td>
+                    <td className={r.status === "ok" ? "text-text" : "text-rose"}>
                       {STATUS[r.status] ?? r.status} · {day(r.statusAt)}
                       {r.verifiedAt ? <span className="block text-muted">accepted {day(r.verifiedAt)}</span> : null}
                     </td>
-                    <td className="py-2 pr-3 text-muted">
+                    <td className="text-muted">
                       {day(r.setAt)}
                       {r.setBy ? <span className="block">{r.setBy}</span> : null}
                     </td>
-                    <td className={`py-2 pr-3 ${!r.readable ? "text-rose" : r.current ? "text-muted" : "text-gold"}`}>
+                    <td className={`font-mono text-[12px] ${!r.readable ? "text-rose" : r.current ? "text-muted" : "text-gold"}`}>
                       {r.keyId}
                       {r.decrypts === "missing_entry"
                         ? " · not in this keyring"
@@ -95,7 +95,7 @@ export default async function SamgovKeysPage() {
                               ? ""
                               : " · older entry"}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="text-right">
                       <RemoveKeyButton organizationId={r.organizationId} organizationName={r.organizationName} last4={r.last4} setAt={r.setAt.toISOString()} />
                     </td>
                   </tr>

@@ -101,13 +101,13 @@ export function DiffView({
         title="Top-level fields"
         eyebrow={`${diff.summary.fieldsChanged} of ${diff.fieldChanges.length} changed`}
       >
-        <table className="w-full border-collapse text-[12px]">
+        <table className="aur-table">
           <thead>
-            <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-widest text-subtle">
-              <th className="py-2 pr-3">Field</th>
-              <th className="py-2 pr-3">Before</th>
-              <th className="py-2 pr-3">After</th>
-              <th className="py-2 pr-3 text-right">Status</th>
+            <tr>
+              <th>Field</th>
+              <th>Before</th>
+              <th>After</th>
+              <th className="text-right">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -208,25 +208,25 @@ function SummaryCell({
 function FieldRow({ field }: { field: ScalarFieldDiff }) {
   const isChange = field.status === "modified";
   return (
-    <tr className="border-b border-layer/5 last:border-b-0">
-      <td className="py-2 pr-3 font-mono text-[11px] uppercase tracking-widest text-subtle">
+    <tr>
+      <td className="font-mono text-[11px] uppercase tracking-widest text-subtle">
         {field.label}
       </td>
       <td
-        className={`py-2 pr-3 font-body text-text ${
+        className={`font-body text-text ${
           isChange ? "bg-rose/[0.05] text-rose/90 line-through decoration-rose/40" : ""
         }`}
       >
         {field.before || <span className="text-subtle italic">—</span>}
       </td>
       <td
-        className={`py-2 pr-3 font-body text-text ${
+        className={`font-body text-text ${
           isChange ? "bg-emerald/[0.06] text-emerald" : ""
         }`}
       >
         {field.after || <span className="text-subtle italic">—</span>}
       </td>
-      <td className="py-2 pr-3 text-right">
+      <td className="text-right">
         {isChange ? (
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"

@@ -120,33 +120,33 @@ export function ApiTokensClient({ tokens, canCreate }: { tokens: ApiTokenListRow
         <p className="mt-4 font-body text-[13px] text-muted">No tokens yet.</p>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left font-body text-[13px]">
+          <table className="aur-table">
             <thead>
-              <tr className="font-mono text-[10px] uppercase tracking-wider text-muted">
-                <th className="py-2 pr-3">Name</th>
-                <th className="py-2 pr-3">Token</th>
-                <th className="py-2 pr-3">Created by</th>
-                <th className="py-2 pr-3">Created</th>
-                <th className="py-2 pr-3">Last used</th>
-                <th className="py-2 pr-3">Expires</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2" />
+              <tr>
+                <th>Name</th>
+                <th>Token</th>
+                <th>Created by</th>
+                <th>Created</th>
+                <th>Last used</th>
+                <th>Expires</th>
+                <th>Status</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {tokens.map((t) => (
-                <tr key={t.id} className="border-t border-layer/10">
-                  <td className="py-2 pr-3 text-text">{t.name}</td>
-                  <td className="py-2 pr-3 font-mono text-[12px] text-muted">{t.tokenPrefix}…</td>
-                  <td className="py-2 pr-3 text-muted">{t.createdBy}</td>
-                  <td className="py-2 pr-3 font-mono text-[12px] text-muted">{day(t.createdAt)}</td>
-                  <td className="py-2 pr-3 font-mono text-[12px] text-muted">{t.lastUsedAt ? day(t.lastUsedAt) : "Never"}</td>
-                  <td className="py-2 pr-3 font-mono text-[12px] text-muted">{t.expiresAt ? day(t.expiresAt) : "Never"}</td>
-                  <td className="py-2 pr-3">
+                <tr key={t.id}>
+                  <td className="text-text">{t.name}</td>
+                  <td className="font-mono text-[12px] text-muted">{t.tokenPrefix}…</td>
+                  <td className="text-muted">{t.createdBy}</td>
+                  <td className="font-mono text-[12px] text-muted">{day(t.createdAt)}</td>
+                  <td className="font-mono text-[12px] text-muted">{t.lastUsedAt ? day(t.lastUsedAt) : "Never"}</td>
+                  <td className="font-mono text-[12px] text-muted">{t.expiresAt ? day(t.expiresAt) : "Never"}</td>
+                  <td className="pr-3">
                     <span className={`rounded border px-2 py-0.5 font-mono text-[10px] uppercase ${STATE_CLASS[t.state]}`}>{t.state}</span>
                     {t.revokedBy ? <span className="ml-1 font-mono text-[11px] text-muted">by {t.revokedBy}</span> : null}
                   </td>
-                  <td className="py-2 text-right">
+                  <td className="text-right">
                     {t.state === "active" ? (
                       <button type="button" className="aur-btn aur-btn-ghost text-rose" onClick={() => revoke(t)} disabled={pending}>
                         Revoke

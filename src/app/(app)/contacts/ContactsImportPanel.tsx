@@ -234,31 +234,31 @@ export function ContactsImportPanel({ onDone }: { onDone: (notice: string) => vo
           {preview.unmappedHeaders.length > 0 ? (
             <p className="font-mono text-[10px] text-subtle">Columns not read: {preview.unmappedHeaders.join(", ")}</p>
           ) : null}
-          <div className="max-h-[320px] overflow-y-auto rounded-md border border-layer/10">
-            <table className="w-full text-left font-body text-[12px]">
-              <thead className="sticky top-0 bg-canvas font-mono text-[10px] uppercase tracking-widest text-muted">
+          <div className="max-h-[320px] overflow-y-auto">
+            <table className="aur-table">
+              <thead className="sticky top-0 bg-canvas">
                 <tr>
-                  <th className="px-3 py-1.5">Name</th>
-                  <th className="px-3 py-1.5">Agency</th>
-                  <th className="px-3 py-1.5">Role</th>
-                  <th className="px-3 py-1.5">Email</th>
-                  <th className="px-3 py-1.5">Status</th>
+                  <th>Name</th>
+                  <th>Agency</th>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th>Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-layer/5">
+              <tbody>
                 {preview.rows.map((r) => (
                   <tr key={`${r.line}-${r.email}-${r.name}`}>
-                    <td className="px-3 py-1.5 text-text">
+                    <td className="text-text">
                       {r.name}
                       {r.title ? <span className="ml-1 font-mono text-[10px] text-muted">{r.title}</span> : null}
                     </td>
-                    <td className="px-3 py-1.5 text-text">
+                    <td className="text-text">
                       {r.agency}
                       {r.office ? <span className="ml-1 font-mono text-[10px] text-muted">{r.office}</span> : null}
                     </td>
-                    <td className="px-3 py-1.5 font-mono text-[10px] text-muted">{CONTACT_ROLE_LABELS[r.role]}</td>
-                    <td className="px-3 py-1.5 font-mono text-[10px] text-muted">{r.email || "—"}</td>
-                    <td className="px-3 py-1.5">
+                    <td className="font-mono text-[12px] text-muted">{CONTACT_ROLE_LABELS[r.role]}</td>
+                    <td className="font-mono text-[12px] text-muted">{r.email || "—"}</td>
+                    <td>
                       {r.duplicate ? (
                         <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-amber-200" title={`Matches ${r.duplicate.existingName} by ${r.duplicate.by}`}>
                           already known · {r.duplicate.by}

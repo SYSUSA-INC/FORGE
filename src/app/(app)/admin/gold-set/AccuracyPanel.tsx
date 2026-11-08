@@ -93,18 +93,18 @@ export function AccuracyPanel({ runs, approvedDocs }: { runs: EvalRunRow[]; appr
       {runs.length === 0 ? (
         <p className="font-mono text-[11px] text-muted">No runs yet.</p>
       ) : (
-        <table className="w-full font-mono text-[11px]">
-          <thead className="text-[10px] uppercase tracking-label text-subtle">
+        <table className="aur-table">
+          <thead>
             <tr>
-              <th className="py-1 text-left">When</th>
-              <th className="py-1 text-left" title="Requirement sweep / AI review / Sections L and M">Prompts · model</th>
-              <th className="py-1 text-right">Docs</th>
-              <th className="py-1 text-right">Recall</th>
-              <th className="py-1 text-right">Precision</th>
-              <th className="py-1 text-right">Limits</th>
-              <th className="py-1 text-right">Factors</th>
-              <th className="py-1 text-right">Order</th>
-              <th className="py-1 text-right" title="Extracted requirements found word for word in the document">Verbatim</th>
+              <th>When</th>
+              <th title="Requirement sweep / AI review / Sections L and M">Prompts · model</th>
+              <th className="text-right">Docs</th>
+              <th className="text-right">Recall</th>
+              <th className="text-right">Precision</th>
+              <th className="text-right">Limits</th>
+              <th className="text-right">Factors</th>
+              <th className="text-right">Order</th>
+              <th className="text-right" title="Extracted requirements found word for word in the document">Verbatim</th>
             </tr>
           </thead>
           <tbody>
@@ -122,9 +122,9 @@ function RunRows({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTo
   const s = run.summary;
   return (
     <>
-      <tr className="cursor-pointer border-t border-layer/10 hover:bg-layer/[0.03]" onClick={onToggle}>
-        <td className="py-1.5 text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
-        <td className="py-1.5 text-text">
+      <tr className="cursor-pointer hover:bg-layer/[0.03]" onClick={onToggle}>
+        <td className="font-mono text-[12px] text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
+        <td className="text-text">
           {run.promptVersions.solicitation_extract ?? "—"} / {run.promptVersions.solicitation_review ?? "—"}
           {run.promptVersions.solicitation_structure ? ` / ${run.promptVersions.solicitation_structure}` : ""}
           <span className="text-muted">
@@ -133,19 +133,19 @@ function RunRows({ run, open, onToggle }: { run: EvalRunRow; open: boolean; onTo
           </span>
           {run.status !== "done" ? <span className={run.status === "failed" ? "text-rose" : "text-gold"}> · {run.status}</span> : null}
         </td>
-        <td className="py-1.5 text-right tabular-nums">
+        <td className="text-right font-mono text-[12px] tabular-nums">
           {run.results.length}/{run.docsTotal}
         </td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.requirementRecall)}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.requirementPrecision)}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.pageLimitCapture)}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.factorRecall)}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.factorOrder)}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(s.verbatim)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(s.requirementRecall)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(s.requirementPrecision)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(s.pageLimitCapture)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(s.factorRecall)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(s.factorOrder)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(s.verbatim)}</td>
       </tr>
       {open ? (
-        <tr className="border-t border-layer/10">
-          <td colSpan={9} className="py-2">
+        <tr>
+          <td colSpan={9}>
             {run.error ? <p className="mb-2 text-rose">{run.error}</p> : null}
             <ul className="flex flex-col gap-3 text-muted">
               {run.results.map((d) => (

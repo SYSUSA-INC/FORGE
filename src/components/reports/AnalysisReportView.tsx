@@ -41,13 +41,13 @@ export function AnalysisReportView({ body }: { body: AnalysisReportBody }) {
             <p className="font-display text-2xl">
               {body.pwin.pwin}% <span className="font-mono text-[11px] text-muted">{body.pwin.confidence} confidence</span>
             </p>
-            <table className="mt-2 w-full border-collapse font-body text-[13px]">
+            <table className="aur-table mt-2">
               <tbody>
                 {factors.map((f) => (
-                  <tr key={f.label} className="border-t border-layer/10 align-top">
-                    <td className="py-1.5 pr-3 text-text print:text-black">{f.label}</td>
-                    <td className="py-1.5 pr-3 text-muted">{f.detail}</td>
-                    <td className={`w-16 py-1.5 text-right font-mono text-[12px] ${f.logOdds >= 0 ? "text-green" : "text-red"} print:text-black`}>
+                  <tr key={f.label} className="align-top">
+                    <td className="text-text print:text-black">{f.label}</td>
+                    <td className="text-muted">{f.detail}</td>
+                    <td className={`w-16 text-right font-mono text-[12px] ${f.logOdds >= 0 ? "text-green" : "text-red"} print:text-black`}>
                       {f.logOdds >= 0 ? "+" : ""}
                       {f.logOdds.toFixed(2)}
                     </td>

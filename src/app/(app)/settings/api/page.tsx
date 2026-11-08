@@ -63,12 +63,12 @@ export default async function ApiAccessPage() {
         <pre className="mt-3 overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.03] p-3 font-mono text-[12px] text-text">
           {`curl -H "Authorization: Bearer forge_…" \\\n  "${base}/api/v1/opportunities?limit=50&updated_since=2026-10-01T00:00:00Z"`}
         </pre>
-        <table className="mt-3 w-full text-left font-body text-[13px]">
+        <table className="aur-table mt-3">
           <tbody>
             {ENDPOINTS.map((e) => (
-              <tr key={e.path} className="border-t border-layer/10">
-                <td className="py-2 pr-4 font-mono text-[12px] text-text">{e.path}</td>
-                <td className="py-2 text-muted">{e.what}</td>
+              <tr key={e.path}>
+                <td className="font-mono text-[12px] text-text">{e.path}</td>
+                <td className="text-muted">{e.what}</td>
               </tr>
             ))}
           </tbody>

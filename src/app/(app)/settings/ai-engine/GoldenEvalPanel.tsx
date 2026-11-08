@@ -119,15 +119,15 @@ export function GoldenEvalPanel({
             : "No runs yet."}
         </p>
       ) : (
-        <table className="w-full font-mono text-[11px]">
-          <thead className="text-[10px] uppercase tracking-label text-subtle">
+        <table className="aur-table">
+          <thead>
             <tr>
-              <th className="py-1 text-left">When</th>
-              <th className="py-1 text-left">Prompt</th>
-              <th className="py-1 text-left">Model</th>
-              <th className="py-1 text-right">Cases</th>
-              <th className="py-1 text-right">Mean</th>
-              <th className="py-1 text-right">Judge</th>
+              <th>When</th>
+              <th>Prompt</th>
+              <th>Model</th>
+              <th className="text-right">Cases</th>
+              <th className="text-right">Mean</th>
+              <th className="text-right">Judge</th>
             </tr>
           </thead>
           <tbody>
@@ -191,31 +191,31 @@ function RunRow({
   const judged = run.results.flatMap((c) => (c.judge ? [c.judge.scores.overall] : []));
   return (
     <>
-      <tr className="cursor-pointer border-t border-layer/10 hover:bg-layer/[0.03]" onClick={onToggle}>
-        <td className="py-1.5 text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
-        <td className="py-1.5 text-text">
+      <tr className="cursor-pointer hover:bg-layer/[0.03]" onClick={onToggle}>
+        <td className="font-mono text-[12px] text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
+        <td className="text-text">
           {run.promptVersion || "—"}
           {run.results.some((c) => c.holdout) ? <span className="text-muted"> · holdout</span> : null}
         </td>
-        <td className="py-1.5 text-muted">
+        <td className="text-muted">
           {run.model || "—"}
           {run.requestedModel ? " (candidate)" : ""}
           {run.stubbed ? " · stub" : ""}
         </td>
-        <td className="py-1.5 text-right tabular-nums text-text">{run.caseCount}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{pct(run.meanScore)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{run.caseCount}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{pct(run.meanScore)}</td>
         {/* BL-AIX Phase 1i-2 — the judge's run average shows once it is calibrated: before that it is not
             evidence, and a one-case average would anchor the experts still rating. */}
         <td
-          className="py-1.5 text-right tabular-nums text-text"
+          className="text-right font-mono text-[12px] tabular-nums text-text"
           title={showJudge ? "Rubric judge, mean overall score" : "Shows once the judge is calibrated against your experts"}
         >
           {showJudge && judged.length ? `${(judged.reduce((a, b) => a + b, 0) / judged.length).toFixed(1)}/5` : "—"}
         </td>
       </tr>
       {open ? (
-        <tr className="border-t border-layer/10">
-          <td colSpan={6} className="py-2">
+        <tr>
+          <td colSpan={6}>
             <ul className="flex flex-col gap-1 text-muted">
               {run.results.map((c) => (
                 <li key={c.sectionId} className="flex flex-wrap justify-between gap-2">

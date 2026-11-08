@@ -20,25 +20,25 @@ export function LmPanel({ lm }: { lm: LmStructure }) {
           <div className="flex flex-col gap-3">
             <h3 className="font-mono text-[10px] uppercase tracking-label text-subtle">Section L · what to submit</h3>
             {l.volumes.length > 0 ? (
-              <table className="w-full font-body text-[12px]">
-                <thead className="font-mono text-[10px] uppercase tracking-label text-subtle">
+              <table className="aur-table">
+                <thead>
                   <tr>
-                    <th className="py-1 text-left">Volume</th>
-                    <th className="py-1 text-right">Pages</th>
-                    <th className="py-1 pl-3 text-left">Contents</th>
+                    <th>Volume</th>
+                    <th className="text-right">Pages</th>
+                    <th className="pl-3">Contents</th>
                   </tr>
                 </thead>
                 <tbody>
                   {l.volumes.map((v, i) => (
-                    <tr key={i} className="border-t border-layer/10 align-top">
-                      <td className="py-1.5 text-text">
+                    <tr key={i} className="align-top">
+                      <td className="text-text">
                         {v.name}
                         <Where source={v.source} />
                       </td>
-                      <td className="py-1.5 text-right tabular-nums text-text" title={v.pageLimitText || undefined}>
+                      <td className="text-right font-mono text-[12px] tabular-nums text-text" title={v.pageLimitText || undefined}>
                         {v.pageLimit ?? "—"}
                       </td>
-                      <td className="py-1.5 pl-3 text-muted">{v.contents || "—"}</td>
+                      <td className="pl-3 text-muted">{v.contents || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

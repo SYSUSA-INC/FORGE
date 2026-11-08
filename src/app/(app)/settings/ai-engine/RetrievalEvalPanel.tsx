@@ -92,14 +92,14 @@ export function RetrievalEvalPanel({
           No runs yet. Cases come from won proposals harvested into the Brain (Knowledge base → harvest, or the nightly indexer).
         </p>
       ) : (
-        <table className="w-full font-mono text-[11px]">
-          <thead className="text-[10px] uppercase tracking-label text-subtle">
+        <table className="aur-table">
+          <thead>
             <tr>
-              <th className="py-1 text-left">When</th>
-              <th className="py-1 text-left">Ranking</th>
-              <th className="py-1 text-right">Cases</th>
-              <th className="py-1 text-right">Drafter @3 / @8 / MRR</th>
-              <th className="py-1 text-right">Requirements @3 / @8 / MRR</th>
+              <th>When</th>
+              <th>Ranking</th>
+              <th className="text-right">Cases</th>
+              <th className="text-right">Drafter @3 / @8 / MRR</th>
+              <th className="text-right">Requirements @3 / @8 / MRR</th>
             </tr>
           </thead>
           <tbody>
@@ -122,24 +122,24 @@ function RunRow({ run, open, onToggle }: { run: RetrievalRunRow; open: boolean; 
   const errors = run.results.filter((r) => r.error).length;
   return (
     <>
-      <tr className="cursor-pointer border-t border-layer/10 hover:bg-layer/[0.03]" onClick={onToggle}>
-        <td className="py-1.5 text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
-        <td className="py-1.5 text-text">
+      <tr className="cursor-pointer hover:bg-layer/[0.03]" onClick={onToggle}>
+        <td className="font-mono text-[12px] text-muted">{run.createdAt.slice(0, 16).replace("T", " ")}</td>
+        <td className="text-text">
           {run.retrievalVersion || "—"}
           <span className="text-muted">
             {run.stubbed ? " · full-text only (stub embeddings)" : run.embeddingProvider ? ` · ${run.embeddingProvider}` : ""}
           </span>
         </td>
-        <td className="py-1.5 text-right tabular-nums text-text">
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">
           {run.caseCount}
           {errors ? <span className="text-amber-200"> · {errors} failed</span> : null}
         </td>
-        <td className="py-1.5 text-right tabular-nums text-text">{cell(run.summary.drafter)}</td>
-        <td className="py-1.5 text-right tabular-nums text-text">{cell(run.summary.requirements)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{cell(run.summary.drafter)}</td>
+        <td className="text-right font-mono text-[12px] tabular-nums text-text">{cell(run.summary.requirements)}</td>
       </tr>
       {open ? (
-        <tr className="border-t border-layer/10">
-          <td colSpan={5} className="py-2">
+        <tr>
+          <td colSpan={5}>
             {(["drafter", "requirements"] as RetrievalMode[]).map((mode) => {
               const misses = retrievalMisses(run.results, mode);
               if (!run.summary[mode]) return null;

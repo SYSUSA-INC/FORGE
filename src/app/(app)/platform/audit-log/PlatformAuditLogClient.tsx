@@ -288,16 +288,16 @@ export function PlatformAuditLogClient({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-md border border-layer/10 bg-layer/[0.02]">
-        <table className="w-full min-w-[900px] text-left">
-          <thead className="border-b border-layer/10 font-mono text-[10px] uppercase tracking-label text-subtle">
+      <div className="overflow-x-auto">
+        <table className="aur-table min-w-[900px]">
+          <thead>
             <tr>
-              <th className="px-3 py-2 font-normal">Time</th>
-              <th className="px-3 py-2 font-normal">Tenant</th>
-              <th className="px-3 py-2 font-normal">Actor</th>
-              <th className="px-3 py-2 font-normal">Action</th>
-              <th className="px-3 py-2 font-normal">Resource</th>
-              <th className="px-3 py-2 font-normal" aria-label="Detail" />
+              <th>Time</th>
+              <th>Tenant</th>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Resource</th>
+              <th aria-label="Detail" />
             </tr>
           </thead>
           <tbody>
@@ -316,18 +316,18 @@ export function PlatformAuditLogClient({
                 return (
                   <tr
                     key={r.id}
-                    className="border-b border-layer/5 align-top last:border-0"
+                    className="align-top"
                   >
-                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-muted">
+                    <td className="whitespace-nowrap font-mono text-[11px] text-muted">
                       {new Date(r.createdAt).toLocaleString()}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-text">
+                    <td className="whitespace-nowrap font-mono text-[11px] text-text">
                       {r.organizationName}
                       <div className="font-mono text-[10px] text-subtle">
                         {r.organizationSlug}
                       </div>
                     </td>
-                    <td className="px-3 py-2 font-body text-[12px] text-text">
+                    <td className="font-body text-[12px] text-text">
                       {r.actorName ?? r.actorEmail ?? "(token-scoped)"}
                       {r.actorEmail && r.actorName ? (
                         <div className="font-mono text-[10px] text-subtle">
@@ -335,7 +335,7 @@ export function PlatformAuditLogClient({
                         </div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-cobalt">
+                    <td className="font-mono text-[11px] text-cobalt">
                       {r.action}
                       {r.category === "read" ? (
                         <span className="ml-2 rounded border border-layer/15 px-1 py-0.5 font-mono text-[10px] uppercase tracking-widest text-subtle">
@@ -343,7 +343,7 @@ export function PlatformAuditLogClient({
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-text">
+                    <td className="font-mono text-[11px] text-text">
                       {r.resourceType ? (
                         <span className="text-muted">{r.resourceType}</span>
                       ) : null}
@@ -354,7 +354,7 @@ export function PlatformAuditLogClient({
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="text-right">
                       <button
                         type="button"
                         onClick={() =>

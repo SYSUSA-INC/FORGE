@@ -149,20 +149,20 @@ export default async function ReportPage({ params }: { params: { reportId: strin
         {areas.map((area) => (
           <section key={area} aria-label={area} className="break-inside-avoid py-4">
             <h2 className="mb-2 font-mono text-[11px] uppercase tracking-label text-muted">{area}</h2>
-            <table className="w-full border-collapse font-body text-[13px]">
+            <table className="aur-table">
               <tbody>
                 {m.rows
                   .filter((r) => r.area === area)
                   .map((r) => (
-                    <tr key={r.id} className="border-t border-layer/10 align-top">
-                      <td className="py-2 pr-3">
+                    <tr key={r.id} className="align-top">
+                      <td>
                         {r.text}
                         <div className="font-mono text-[10px] text-muted">
                           {[r.kind !== "standing" ? r.kind : "", ...r.refs].filter(Boolean).join(" · ")}
                         </div>
                         {r.evidence ? <div className="mt-1 text-[12px] text-muted">Evidence: {r.evidence}</div> : null}
                       </td>
-                      <td className={`w-48 py-2 font-mono text-[12px] ${r.answer ? ANSWER_TONE[r.answer] : "text-subtle"} print:text-black`}>
+                      <td className={`w-48 font-mono text-[12px] ${r.answer ? ANSWER_TONE[r.answer] : "text-subtle"} print:text-black`}>
                         {r.label}
                         {r.partner ? <div className="text-[11px] text-muted">{r.partner}</div> : null}
                       </td>

@@ -84,7 +84,7 @@ Effort key:
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | ✅ shipped (#387) |
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
-| 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A (#400, #401), B (#402), C1–C10, D (emails), the manuals and the Command Center pass shipped; still open in C: boxed form panels and cards, other secondary actions, one small button size, the remaining hand-styled tables |
+| 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | 🔄 A (#400, #401), B (#402), C1–C10, D (emails), the manuals and the Command Center pass shipped; C11 (tables) in review; still open in C: boxed form panels and cards, other secondary actions, one small button size |
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | ✅ shipped (#418, #419) |
 | 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL), 3 (BL-CAP-MATRIX) and 4 (BL-LESSONS-LOOP) shipped; phase 5 (BL-NEXT-ACTION) shipped; 2 to be sized |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | ✅ shipped (#420) |
@@ -4679,7 +4679,7 @@ proposal's chances. Over time FORGE owns the proposal lifecycle.
   person's approval (phase 5).
 
 ### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 A, B, C1–C10, D, the manuals and the Command Center pass shipped (#400–#417); the rest of C open
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** 🔄 A, B, C1–C10, D, the manuals and the Command Center pass shipped (#400–#417), C11 in review (this PR); the rest of C open
 
 Follow-up to BL-UI-ENABLENOW after a both-theme sweep of every page.
 
@@ -4724,11 +4724,13 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **C10 (this PR):** one table style, `.aur-table` (open hairline rows, mono column heads): the notification rules and audit log tables drop their boxed wrapper and faint rules, the help manuals drop the full cell grid, and the reports tables adopt the class. Still open in C: the other ~20 hand-styled tables, other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
 
+**C11 (this PR):** the remaining 27 hand-styled tables in 23 files move onto `.aur-table`: the admin gold set (documents and accuracy runs), tenant API tokens, SAM.gov keys, SBA 8(a) coverage and import runs, usage (tenants, AI features, model classes), contacts import preview, section signals, losses by competitor, the partner Compare page, the platform audit log, the compliance matrix, review section coverage, voices (authors and the side-by-side), AI engine (routing, golden and retrieval evals), API tokens and endpoints, Section L volumes, the solicitation diff, and the two printable reports (partner questionnaire, analysis). Each drops its boxed wrapper, faint rules, per-cell padding and ad-hoc head styling; numerals sit in mono 12px with tabular figures; status tones, the Compare page's closes/named cobalt and cell washes, the diff's red/green, sticky columns and the dense panels' gutters stay. Still open in C: other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
+
 **Manuals (this PR):** `docs/USER_MANUAL.md` (§2.0 Look and feel, What's new, sign-in notes, templates, compliance category) and `docs/ADMIN_MANUAL.md` (§1, §4, §7.1.1) now describe everything shipped in this item, and AGENTS.md convention 12 requires the manuals to change in the same PR as any user-visible change.
 
 **UX pass, Command Center (this PR):** Won, Lost, No bid and Submitted tiles no longer show a red "past due" (those stages are past the response date by definition; `buildStageStats` skips them, with a test); header figures are no longer zero-padded ("6", not "06") on every page; the Proposal stages, Recent proposals and Quick links panels use hairline rows.
 
-**Next (serial):** rest of C.
+**Next (serial):** C12 — secondary actions ("Cancel", "Open" and the like) as `.aur-link` text links, the one remaining small button size folded into the standard sizes, the boxed rows that are not simple lists onto hairlines; then flip this entry to ✅ shipped.
 
 ### BL-UI-THEME — Corporate colour theme ("Boardroom Navy")
 **Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #272)

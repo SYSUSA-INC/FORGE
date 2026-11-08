@@ -279,31 +279,31 @@ export default async function AdminUsagePage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-[11px]">
+              <table className="aur-table">
                 <thead>
-                  <tr className="border-b border-layer/10 text-muted">
-                    <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                  <tr>
+                    <th>
                       Tenant
                     </th>
-                    <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                    <th>
                       Tier
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Tokens used
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Token cap
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Used
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Requests
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Est. cost
                     </th>
-                    <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                    <th>
                       Status
                     </th>
                   </tr>
@@ -315,9 +315,9 @@ export default async function AdminUsagePage() {
                     return (
                       <tr
                         key={r.organizationId}
-                        className="border-b border-layer/[0.04] text-text/90 hover:bg-layer/[0.03]"
+                        className="hover:bg-layer/[0.03]"
                       >
-                        <td className="px-2 py-1.5">
+                        <td>
                           <Link
                             href={`/admin/orgs/${r.organizationId}`}
                             className="hover:underline"
@@ -328,27 +328,27 @@ export default async function AdminUsagePage() {
                             {r.organizationSlug}
                           </div>
                         </td>
-                        <td className="px-2 py-1.5">{r.tierName}</td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td>{r.tierName}</td>
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           {r.tokensUsed.toLocaleString()}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {r.effectiveTokenCap === 0
                             ? "∞"
                             : r.effectiveTokenCap.toLocaleString()}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           {r.tokenPercent === null
                             ? "—"
                             : `${r.tokenPercent.toFixed(0)}%`}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {r.requestsUsed.toLocaleString()}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           ${rowCost.toFixed(2)}
                         </td>
-                        <td className="px-2 py-1.5">
+                        <td>
                           <span
                             className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${verdict.toneClass}`}
                           >
@@ -383,52 +383,52 @@ export default async function AdminUsagePage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-[11px]">
+              <table className="aur-table">
                 <thead>
-                  <tr className="border-b border-layer/10 text-muted">
-                    <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                  <tr>
+                    <th>
                       Feature
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Calls
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Errors
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Refused
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Parse fail
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Via tool
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Stub
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Tokens in
                     </th>
                     <th
-                      className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest"
+                      className="text-right"
                       title="Share of input tokens read from the prompt cache (BL-AIX Phase 1g)"
                     >
                       Cached
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Tokens out
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Avg latency
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Max
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Tenants
                     </th>
-                    <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">
+                    <th className="text-right">
                       Est. cost
                     </th>
                   </tr>
@@ -461,57 +461,57 @@ export default async function AdminUsagePage() {
                     return (
                       <tr
                         key={f.feature}
-                        className="border-b border-layer/[0.04] text-text/90 hover:bg-layer/[0.03]"
+                        className="hover:bg-layer/[0.03]"
                       >
-                        <td className="px-2 py-1.5">
+                        <td>
                           {aiFeatureLabel(f.feature)}
                           <div className="font-mono text-[10px] text-muted">
                             {f.feature}
                           </div>
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           {f.calls.toLocaleString()}
                         </td>
-                        <td className={`px-2 py-1.5 text-right ${errorTone}`}>
+                        <td className={`text-right font-mono text-[12px] tabular-nums ${errorTone}`}>
                           {f.errors === 0
                             ? "0"
                             : `${f.errors} (${errorRate.toFixed(0)}%)`}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {f.quotaRefused}
                         </td>
                         <td
-                          className={`px-2 py-1.5 text-right ${f.parseFailures > 0 ? "text-amber-200" : "text-muted"}`}
+                          className={`text-right font-mono text-[12px] tabular-nums ${f.parseFailures > 0 ? "text-amber-200" : "text-muted"}`}
                         >
                           {f.parseFailures}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {f.viaTool}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {f.stubbed}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           {f.inputTokens.toLocaleString()}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {f.cacheReadTokens > 0
                             ? `${cachedShare.toFixed(0)}%`
                             : "—"}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           {f.outputTokens.toLocaleString()}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           {formatLatency(f.avgLatencyMs)}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {formatLatency(f.maxLatencyMs)}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-muted">
                           {f.tenants}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="text-right font-mono text-[12px] tabular-nums">
                           ${cost.toFixed(2)}
                         </td>
                       </tr>
@@ -554,16 +554,16 @@ export default async function AdminUsagePage() {
             deployment-pinned and is not routed.
           </p>
           <div className="overflow-x-auto">
-            <table className="w-full text-left font-mono text-[11px]">
+            <table className="aur-table">
               <thead>
-                <tr className="border-b border-layer/10 text-muted">
-                  <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                <tr>
+                  <th>
                     Class
                   </th>
-                  <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                  <th>
                     Model requested
                   </th>
-                  <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">
+                  <th>
                     Features
                   </th>
                 </tr>
@@ -572,20 +572,19 @@ export default async function AdminUsagePage() {
                 {featuresByClass.map((row) => (
                   <tr
                     key={row.cls}
-                    className="border-b border-layer/[0.04] text-text/90"
                   >
-                    <td className="px-2 py-1.5 align-top">
+                    <td className="align-top">
                       {row.cls}
                       <div className="font-mono text-[10px] text-muted">
                         {AI_MODEL_CLASS_LABELS[row.cls]}
                       </div>
                     </td>
-                    <td className="px-2 py-1.5 align-top">
+                    <td className="align-top">
                       {!routingOn
                         ? "provider default (routing off)"
                         : row.model ?? "provider default"}
                     </td>
-                    <td className="px-2 py-1.5 align-top text-muted">
+                    <td className="align-top text-muted">
                       {row.features.map((f) => aiFeatureLabel(f)).join(" · ")}
                     </td>
                   </tr>

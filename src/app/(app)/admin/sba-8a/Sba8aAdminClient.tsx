@@ -214,34 +214,34 @@ export function Sba8aAdminClient({
         eyebrow="Imported firm counts"
         dense
       >
-        <table className="w-full text-left font-mono text-[11px]">
-          <thead className="bg-layer/[0.02] text-muted">
+        <table className="aur-table">
+          <thead>
             <tr>
-              <th className="px-5 py-2">Cert</th>
-              <th className="px-5 py-2 text-right">Total</th>
-              <th className="px-5 py-2 text-right">Active</th>
-              <th className="px-5 py-2 text-right">Graduated</th>
-              <th className="px-5 py-2 text-right">Terminated</th>
-              <th className="px-5 py-2"></th>
+              <th className="px-5">Cert</th>
+              <th className="px-5 text-right">Total</th>
+              <th className="px-5 text-right">Active</th>
+              <th className="px-5 text-right">Graduated</th>
+              <th className="px-5 text-right">Terminated</th>
+              <th className="px-5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-layer/5">
+          <tbody>
             {stats.byCertType.map((row) => (
               <tr key={row.certType}>
-                <td className="px-5 py-2">
+                <td className="px-5">
                   <span className="text-text">{row.label}</span>
                 </td>
-                <td className="px-5 py-2 text-right">{row.total}</td>
-                <td className="px-5 py-2 text-right">{row.active}</td>
+                <td className="px-5 text-right font-mono text-[12px] tabular-nums">{row.total}</td>
+                <td className="px-5 text-right font-mono text-[12px] tabular-nums">{row.active}</td>
                 <td
-                  className={`px-5 py-2 text-right ${
+                  className={`px-5 text-right font-mono text-[12px] tabular-nums ${
                     row.graduated > 0 ? "text-emerald-300" : ""
                   }`}
                 >
                   {row.graduated}
                 </td>
-                <td className="px-5 py-2 text-right">{row.terminated}</td>
-                <td className="px-5 py-2 text-right">
+                <td className="px-5 text-right font-mono text-[12px] tabular-nums">{row.terminated}</td>
+                <td className="px-5 text-right">
                   {row.total > 0 ? (
                     <a
                       href={`/intelligence/firms?certType=${encodeURIComponent(
@@ -506,30 +506,30 @@ export function Sba8aAdminClient({
             No imports yet.
           </p>
         ) : (
-          <table className="w-full text-left font-mono text-[11px]">
-            <thead className="bg-layer/[0.02] text-muted">
+          <table className="aur-table">
+            <thead>
               <tr>
-                <th className="px-5 py-2">Started</th>
-                <th className="px-5 py-2">Cert</th>
-                <th className="px-5 py-2">Source</th>
-                <th className="px-5 py-2">Status</th>
-                <th className="px-5 py-2">Seen</th>
-                <th className="px-5 py-2">Upserted</th>
-                <th className="px-5 py-2">Error</th>
+                <th className="px-5">Started</th>
+                <th className="px-5">Cert</th>
+                <th className="px-5">Source</th>
+                <th className="px-5">Status</th>
+                <th className="px-5">Seen</th>
+                <th className="px-5">Upserted</th>
+                <th className="px-5">Error</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-layer/5">
+            <tbody>
               {runs.map((r) => (
                 <tr key={r.id}>
-                  <td className="px-5 py-2 text-muted">
+                  <td className="px-5 font-mono text-[12px] text-muted">
                     {formatStarted(r.startedAt)}
                   </td>
-                  <td className="px-5 py-2">
+                  <td className="px-5">
                     {CERT_SPECS.find((c) => c.certType === r.certType)?.label ??
                       r.certType}
                   </td>
-                  <td className="px-5 py-2">{r.source}</td>
-                  <td className="px-5 py-2">
+                  <td className="px-5">{r.source}</td>
+                  <td className="px-5">
                     <span
                       className={
                         r.status === "ok"
@@ -542,9 +542,9 @@ export function Sba8aAdminClient({
                       {r.status}
                     </span>
                   </td>
-                  <td className="px-5 py-2">{r.rowsSeen}</td>
-                  <td className="px-5 py-2">{r.rowsUpserted}</td>
-                  <td className="max-w-[280px] truncate px-5 py-2 text-rose-300">
+                  <td className="px-5 font-mono text-[12px] tabular-nums">{r.rowsSeen}</td>
+                  <td className="px-5 font-mono text-[12px] tabular-nums">{r.rowsUpserted}</td>
+                  <td className="max-w-[280px] truncate px-5 text-rose-300">
                     {r.error}
                   </td>
                 </tr>

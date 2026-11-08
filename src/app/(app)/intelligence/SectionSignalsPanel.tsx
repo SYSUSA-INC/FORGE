@@ -72,14 +72,14 @@ export async function SectionSignalsPanel({
         </div>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full font-body text-[13px]">
+          <table className="aur-table">
             <thead>
-              <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-label text-subtle">
-                <th className="pb-2 pr-3">Section kind</th>
-                <th className="pb-2 pr-3 text-right">Won — pass rate</th>
-                <th className="pb-2 pr-3 text-right">Lost — pass rate</th>
-                <th className="pb-2 pr-3 text-right">Delta</th>
-                <th className="pb-2 pr-3 text-right">Signals</th>
+              <tr>
+                <th>Section kind</th>
+                <th className="text-right">Won — pass rate</th>
+                <th className="text-right">Lost — pass rate</th>
+                <th className="text-right">Delta</th>
+                <th className="text-right">Signals</th>
               </tr>
             </thead>
             <tbody>
@@ -92,12 +92,11 @@ export async function SectionSignalsPanel({
                 return (
                   <tr
                     key={row.kind}
-                    className="border-b border-layer/5 last:border-b-0"
                   >
-                    <td className="py-2 pr-3 text-text">
+                    <td className="text-text">
                       {KIND_LABELS[row.kind]}
                     </td>
-                    <td className="py-2 pr-3 text-right">
+                    <td className="text-right">
                       {won.total > 0 ? (
                         <span>
                           <span className="text-emerald-300">
@@ -113,7 +112,7 @@ export async function SectionSignalsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-3 text-right">
+                    <td className="text-right">
                       {lost.total > 0 ? (
                         <span>
                           <span className="text-rose">{pct(lost.passRate)}</span>
@@ -127,7 +126,7 @@ export async function SectionSignalsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-3 text-right">
+                    <td className="text-right">
                       {won.total > 0 && lost.total > 0 ? (
                         <span
                           className={`aur-pill ${deltaPill.tone}`}
@@ -141,7 +140,7 @@ export async function SectionSignalsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-3 text-right font-mono text-[11px] text-muted">
+                    <td className="text-right font-mono text-[11px] text-muted">
                       {noData ? "—" : row.totalSignals}
                     </td>
                   </tr>
