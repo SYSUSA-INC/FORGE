@@ -250,9 +250,9 @@ export function GettingStartedClient({ state }: { state: OnboardingState }) {
                 {proposal.targetAgencies.length ? (
                   <div>
                     <span className="aur-label">Target agencies</span>
-                    <ul className="space-y-1">
+                    <ul>
                       {proposal.targetAgencies.map((a) => (
-                        <li key={a.name} className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.03] px-3 py-1.5">
+                        <li key={a.name} className="flex items-start gap-2 border-t border-layer/10 py-1.5">
                           <span className="min-w-0 flex-1">
                             <span className="block font-body text-[13px] text-text">{a.name}</span>
                             {a.why ? <span className="block font-mono text-[10px] text-muted">{a.why}</span> : null}

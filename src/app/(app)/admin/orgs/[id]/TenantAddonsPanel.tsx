@@ -78,9 +78,9 @@ export function TenantAddonsPanel({
       {grants.length === 0 ? (
         <div className="font-mono text-[11px] text-muted">No add-ons granted or bought.</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {grants.map((g) => (
-            <li key={g.id} className={`rounded-md border px-3 py-2 ${g.live ? "border-layer/10 bg-layer/[0.02]" : "border-layer/5 bg-layer/[0.01] opacity-70"}`}>
+            <li key={g.id} className={`border-t border-layer/10 py-2 ${g.live ? "" : "opacity-70"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
                   <span className="text-text">{g.name}</span>

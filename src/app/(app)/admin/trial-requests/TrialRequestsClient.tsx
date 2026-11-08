@@ -20,7 +20,7 @@ export function TrialRequestsClient({ pending, decided }: { pending: TrialReques
         {pending.length === 0 ? (
           <div className="font-mono text-[11px] text-muted">No trial requests waiting.</div>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col">
             {pending.map((r) => (
               <PendingRow key={r.id} r={r} />
             ))}
@@ -86,7 +86,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
   }
 
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
+    <li className="border-t border-layer/10 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-text">

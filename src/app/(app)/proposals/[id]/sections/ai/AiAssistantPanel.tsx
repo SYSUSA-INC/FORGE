@@ -83,7 +83,7 @@ function SourceLegend({
   const stats = extractCitationStats(text);
   const cited = new Set(stats.citedSources);
   return (
-    <div className="mt-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+    <div className="mt-2 border-t border-layer/10 pt-2">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-label text-muted">
         <span>
           Sources · {cited.size}/{sources.length} cited
@@ -1015,7 +1015,7 @@ export function AiAssistantPanel({
               })}
             </div>
             {/* Cite sources — BL-FB-GEN-CITE */}
-            <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <label className="mt-1 flex cursor-pointer items-start gap-2 border-t border-layer/10 py-2">
               <input
                 type="checkbox"
                 checked={cite}

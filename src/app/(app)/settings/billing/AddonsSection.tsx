@@ -54,13 +54,13 @@ export async function AddonsSection({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col">
         {catalog.map((a) => {
           const held = liveByAddon.get(a.id) ?? 0;
           const stackable = addonStacks(a.kind);
           const bought = grants.filter((g) => g.live && g.addonId === a.id && g.source === "stripe" && g.status === "active");
           return (
-            <div key={a.id} className={`rounded-lg border p-4 ${held > 0 ? "border-teal/40 bg-teal/[0.04]" : "border-layer/10 bg-layer/[0.02]"}`}>
+            <div key={a.id} className={`border-t py-4 ${held > 0 ? "border-teal/40" : "border-layer/10"}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <div>
                   <div className="font-display text-[14px] font-semibold text-text">

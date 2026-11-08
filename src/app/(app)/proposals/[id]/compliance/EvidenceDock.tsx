@@ -108,7 +108,7 @@ export function EvidenceDock({
             return (
               <li
                 key={e.id}
-                className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
+                className="flex items-start gap-2 border-t border-layer/10 py-1.5"
               >
                 <span className="aur-tag mt-0.5 shrink-0 !px-1.5 !py-0.5 text-muted">
                   {KIND_LABELS[e.kind]}
@@ -200,7 +200,7 @@ export function EvidenceDock({
                       .
                     </div>
                   ) : (
-                    <ul className="flex flex-col gap-1">
+                    <ul className="flex flex-col">
                       {available.pastPerformance.map((pp) => {
                         const label =
                           pp.contract
@@ -209,7 +209,7 @@ export function EvidenceDock({
                         return (
                           <li
                             key={pp.refId}
-                            className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
+                            className="border-t border-layer/10 py-1.5"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
@@ -252,11 +252,11 @@ export function EvidenceDock({
                       <code className="text-text">/knowledge</code>.
                     </div>
                   ) : (
-                    <ul className="flex flex-col gap-1">
+                    <ul className="flex flex-col">
                       {available.knowledgeEntries.map((k) => (
                         <li
                           key={k.id}
-                          className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
+                          className="border-t border-layer/10 py-1.5"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
@@ -330,11 +330,11 @@ export function EvidenceDock({
                           );
                         }
                         return (
-                          <ul className="flex flex-col gap-1">
+                          <ul className="flex flex-col">
                             {section.contentSnippets.map((p, i) => (
                               <li
                                 key={i}
-                                className="rounded border border-layer/10 bg-layer/[0.02] px-2 py-1.5"
+                                className="border-t border-layer/10 py-1.5"
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="line-clamp-3 flex-1 font-body text-[11px] text-text">

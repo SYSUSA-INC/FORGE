@@ -290,7 +290,7 @@ function AddSectionRow({ proposalId }: { proposalId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-dashed border-layer/10 bg-layer/[0.02] p-3 md:flex-row md:items-end">
+    <div className="flex flex-col gap-2 border-t border-layer/10 py-3 md:flex-row md:items-end">
       <div className="flex-1">
         <label className="aur-label">Add section</label>
         <input
@@ -706,11 +706,11 @@ function SectionRow({
   );
 
   return (
-    <li className="overflow-hidden rounded-lg border border-layer/10 bg-layer/[0.02]">
+    <li className="border-t border-layer/10">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
+        className="flex w-full items-center justify-between gap-3 py-3 text-left"
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -796,7 +796,7 @@ function SectionRow({
       </button>
 
       {open ? (
-        <div className="border-t border-layer/10 bg-canvas/40 p-3">
+        <div className="border-t border-layer/10 py-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className="aur-label">Section title</label>

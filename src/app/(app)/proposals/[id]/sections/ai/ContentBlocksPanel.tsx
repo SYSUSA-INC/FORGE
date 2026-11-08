@@ -125,7 +125,7 @@ export function ContentBlocksPanel({
             ) : visible.length === 0 ? (
               <div className="mt-3 font-mono text-[11px] text-muted">No block matches that filter.</div>
             ) : (
-              <ul className="mt-3 flex flex-col gap-2">
+              <ul className="mt-3 flex flex-col">
                 {visible.map((b) => (
                   <BlockRow key={b.id} block={b} justInserted={inserted === b.id} onInsert={() => insert(b)} />
                 ))}
@@ -149,7 +149,7 @@ function BlockRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-2">
+    <li className="border-t border-layer/10 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="truncate font-display text-[12px] font-semibold text-text">{block.title}</span>

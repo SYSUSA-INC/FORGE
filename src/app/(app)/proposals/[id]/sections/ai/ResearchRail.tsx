@@ -262,7 +262,7 @@ export function ResearchRail({
                 </li>
               ) : (
                 data.hits.map((h) => (
-                  <li key={h.id} className="rounded border border-layer/10 bg-layer/[0.02] p-2">
+                  <li key={h.id} className="border-t border-layer/10 py-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="truncate font-display text-[12px] font-semibold text-text">
                         {h.title}
@@ -315,7 +315,7 @@ function Group({
         <span>{title}</span>
         {trailing}
       </div>
-      <ul className="flex flex-col gap-1.5">{children}</ul>
+      <ul className="flex flex-col">{children}</ul>
     </div>
   );
 }

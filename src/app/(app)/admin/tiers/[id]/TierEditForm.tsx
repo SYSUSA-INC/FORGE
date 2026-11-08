@@ -201,7 +201,7 @@ export function TierEditForm({
         </label>
       </div>
 
-      <fieldset className="rounded-md border border-layer/10 p-3">
+      <fieldset className="border-t border-layer/10 py-3">
         <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Stripe binding
         </legend>
@@ -234,17 +234,17 @@ export function TierEditForm({
         </div>
       </fieldset>
 
-      <fieldset className="rounded-md border border-layer/10 p-3">
+      <fieldset className="border-t border-layer/10 py-3">
         <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Feature flags
         </legend>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-4">
           {(Object.entries(FLAG_LABELS) as Array<
             [keyof TierFeatureFlags, string]
           >).map(([key, label]) => (
             <label
               key={key}
-              className="flex cursor-pointer items-center gap-2 rounded border border-layer/5 bg-layer/[0.02] px-3 py-2"
+              className="flex cursor-pointer items-center gap-2 border-t border-layer/10 py-2"
             >
               <input
                 type="checkbox"
@@ -257,7 +257,7 @@ export function TierEditForm({
         </div>
       </fieldset>
 
-      <fieldset className="rounded-md border border-layer/10 p-3">
+      <fieldset className="border-t border-layer/10 py-3">
         <legend className="px-2 font-mono text-[10px] uppercase tracking-label text-muted">
           Quotas (0 = unlimited)
         </legend>

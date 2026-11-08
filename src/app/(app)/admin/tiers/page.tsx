@@ -87,11 +87,11 @@ export default async function TiersPage() {
             Platinum / Custom) should have been seeded by migration 0043.
           </div>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col">
             {tierRows.map((t) => (
               <li
                 key={t.id}
-                className="rounded-lg border border-layer/10 bg-layer/[0.02] p-4"
+                className="border-t border-layer/10 py-4"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div className="flex items-baseline gap-3">

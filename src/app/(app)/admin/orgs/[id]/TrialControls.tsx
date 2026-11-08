@@ -41,7 +41,7 @@ export function TrialControls({
   const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+    <div className="mt-3 flex flex-col gap-2 border-t border-layer/10 py-3">
       <div className="aur-label">Trial</div>
       <div className="font-mono text-[11px] text-text">
         {state.kind === "none"

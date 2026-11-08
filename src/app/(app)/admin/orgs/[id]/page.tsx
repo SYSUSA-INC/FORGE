@@ -454,11 +454,11 @@ export default async function TenantDetailPage({
               No audit activity in the last 30 days.
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {topActors.map((a) => (
                 <li
                   key={a.actorEmail}
-                  className="flex items-center justify-between rounded-md border border-layer/5 bg-layer/[0.02] px-3 py-2 font-mono text-[12px]"
+                  className="flex items-center justify-between border-t border-layer/10 py-2 font-mono text-[12px]"
                 >
                   <span className="truncate text-text">{a.actorEmail}</span>
                   <span className="tabular-nums text-muted">

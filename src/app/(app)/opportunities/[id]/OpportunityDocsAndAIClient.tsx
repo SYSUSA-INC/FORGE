@@ -93,7 +93,7 @@ export function OpportunityDocsAndAIClient({
         </div>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col">
         {solicitations.map((s) => {
           const pendingAction = pendingById[s.id] ?? null;
           const reviewing = pendingAction === "review";
@@ -105,7 +105,7 @@ export function OpportunityDocsAndAIClient({
           return (
             <li
               key={s.id}
-              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+              className="border-t border-layer/10 py-3"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="min-w-0">

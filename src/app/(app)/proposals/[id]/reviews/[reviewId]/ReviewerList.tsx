@@ -72,7 +72,7 @@ export function ReviewerList({
           No reviewers yet.
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {assignments.map((a) => {
             const verdictColor = a.verdict
               ? VERDICT_COLORS[a.verdict as "pass" | "conditional" | "fail"]
@@ -80,7 +80,7 @@ export function ReviewerList({
             return (
               <li
                 key={a.userId}
-                className="rounded-md border border-layer/10 bg-layer/[0.02] p-2"
+                className="border-t border-layer/10 py-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0 truncate font-mono text-[12px] text-text">

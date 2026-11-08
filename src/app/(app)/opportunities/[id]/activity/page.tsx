@@ -63,7 +63,7 @@ export default async function OpportunityActivityPage({
             the right.
           </div>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col">
             {rows.map((a) => {
               const color = ACTIVITY_KIND_COLORS[a.kind];
               const label = ACTIVITY_KIND_LABELS[a.kind];
@@ -71,7 +71,7 @@ export default async function OpportunityActivityPage({
               return (
                 <li
                   key={a.id}
-                  className="relative grid grid-cols-[24px_1fr] items-start gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+                  className="relative grid grid-cols-[24px_1fr] items-start gap-3 border-t border-layer/10 py-3"
                 >
                   <span
                     className="mt-1.5 h-3 w-3 rounded-full"

@@ -124,7 +124,7 @@ export function SourceRequestTriageClient({
               : "No requests match the current filter."}
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {filtered.map((r) => (
               <RequestRow
                 key={r.id}
@@ -186,11 +186,11 @@ function RequestRow({
   }
 
   return (
-    <li className="rounded-md border border-layer/10 bg-layer/[0.02]">
+    <li className="border-t border-layer/10">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-layer/[0.03]"
+        className="flex w-full items-start gap-3 py-2.5 text-left transition-colors hover:bg-layer/[0.03]"
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -235,7 +235,7 @@ function RequestRow({
       </button>
 
       {expanded ? (
-        <div className="border-t border-layer/10 px-3 py-3">
+        <div className="border-t border-layer/10 py-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <div className="font-mono text-[10px] uppercase tracking-label text-muted">

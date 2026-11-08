@@ -922,7 +922,7 @@ function ItemRowCard({
   }
 
   return (
-    <li className="rounded-lg border border-teal-400/40 bg-layer/[0.02] p-3">
+    <li className="border-t border-teal-400/40 py-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label className="aur-label">Category</label>

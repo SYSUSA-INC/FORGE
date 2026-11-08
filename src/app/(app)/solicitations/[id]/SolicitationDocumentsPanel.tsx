@@ -202,11 +202,11 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
           </button>
         </div>
         {staged.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {staged.map((st) => (
               <li
                 key={st.key}
-                className={`grid items-center gap-2 rounded-md border px-3 py-2 sm:grid-cols-[1fr_16rem_auto] ${st.error ? "border-rose/40 bg-rose/[0.05]" : "border-layer/15 bg-layer/[0.02]"}`}
+                className={`grid items-center gap-2 border-t py-2 sm:grid-cols-[1fr_16rem_auto] ${st.error ? "border-rose/40" : "border-layer/10"}`}
               >
                 <div className="min-w-0">
                   <div className="truncate font-mono text-[11px] text-text" title={st.file.name}>
@@ -259,12 +259,12 @@ export function SolicitationDocumentsPanel({ solicitationId, initial, maxBytes }
           No companion documents yet. Attach a PWS, SOW, CDRL, or J-attachment to include its requirements in the merged set.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {docs.map((doc) => {
             return (
               <li
                 key={doc.id}
-                className="flex items-center gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex items-center gap-3 border-t border-layer/10 py-2"
               >
                 {/* Type badge */}
                 <span className="shrink-0 rounded border border-layer/15 bg-layer/[0.04] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-muted">

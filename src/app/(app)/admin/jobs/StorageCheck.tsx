@@ -75,7 +75,7 @@ export function StorageCheck() {
       </div>
       {error ? <p className="font-mono text-[11px] text-rose">{error}</p> : null}
       {probe ? (
-        <div className="flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+        <div className="flex flex-col gap-2 border-t border-layer/10 pt-3">
           <p className="font-mono text-[11px] text-text">
             <span className={probe.ready ? "text-emerald" : "text-rose"}>{probe.ready ? "Ready for browser uploads" : "Not ready for browser uploads"}</span>
             {" · "}

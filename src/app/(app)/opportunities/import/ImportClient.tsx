@@ -218,7 +218,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
   return (
     <div className="flex flex-col gap-4">
       <Panel title="Search SAM.gov" eyebrow="Active solicitations">
-        <div className="mb-3 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
+        <div className="mb-3 border-t border-layer/10 py-3">
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex cursor-pointer items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-text">
               <input
@@ -411,7 +411,7 @@ export function ImportClient({ defaultNaics, autoSearch }: { defaultNaics: strin
             </>
           )}
           {unchecked.length > 0 && searchInfo?.scope.keyword ? (
-            <details className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
+            <details className="mt-4 border-t border-layer/10 py-3">
               <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-widest text-muted">Not checked for {searchInfo.scope.keyword} ({unchecked.length})</summary>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <p className="font-body text-[12px] text-muted">FORGE hasn&rsquo;t read these descriptions yet, so it can&rsquo;t tell whether they mention it. They aren&rsquo;t counted as matches or picked by Select all.</p>

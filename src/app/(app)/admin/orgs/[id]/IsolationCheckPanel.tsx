@@ -95,7 +95,7 @@ export function IsolationCheckPanel({ organizationId }: Props) {
           No checks have been run for this tenant yet.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {results.map((r) => (
             <ResultRow key={r.id} result={r} />
           ))}
@@ -116,7 +116,7 @@ function ResultRow({ result }: { result: IsolationCheckSummary }) {
       : "pass";
 
   return (
-    <li className="flex flex-col gap-1 rounded border border-layer/[0.06] bg-layer/[0.03] px-2.5 py-2">
+    <li className="flex flex-col gap-1 border-t border-layer/10 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <StatusBadge tone={tone} />

@@ -173,11 +173,11 @@ export function SourceRequestPanel({
           <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             Your previous requests
           </div>
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {own.map((r) => (
               <li
                 key={r.id}
-                className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex items-start gap-3 border-t border-layer/10 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

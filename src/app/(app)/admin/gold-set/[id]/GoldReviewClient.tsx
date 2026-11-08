@@ -269,7 +269,7 @@ function ItemForm({
     position: initial?.position ?? 0,
   });
   return (
-    <div className="mb-2 flex flex-col gap-2 rounded-md border border-layer/10 p-2">
+    <div className="mb-2 flex flex-col gap-2 border-t border-layer/10 py-2">
       <div className="flex gap-2">
         <input className="aur-input w-32" value={d.ref} onChange={(e) => setD({ ...d, ref: e.target.value })} placeholder="Ref, e.g. L.5.2" />
         {kind === "eval_factor" ? (

@@ -322,11 +322,11 @@ export function EditTemplateClient({
         </Panel>
 
         <Panel title="Section seed" eyebrow="Default sections seeded for new proposals">
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {seed.map((s, i) => (
               <li
                 key={i}
-                className="flex flex-wrap items-end gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex flex-wrap items-end gap-2 border-t border-layer/10 py-2"
               >
                 <span className="font-mono text-[10px] uppercase tracking-widest text-subtle">
                   §{s.ordering}
@@ -811,7 +811,7 @@ function DocxPanel({
       ) : null}
 
       {variablesDetected.length > 0 ? (
-        <div className="rounded-lg border border-layer/10 bg-layer/[0.015] p-4">
+        <div className="border-t border-layer/10 py-4">
           <div className="font-mono text-[10px] uppercase tracking-label text-muted">
             Detected placeholders
           </div>
@@ -876,16 +876,16 @@ function DocxPanel({
         </div>
       ) : null}
 
-      <details className="rounded-lg border border-layer/10 bg-layer/[0.015] p-3">
+      <details className="border-t border-layer/10 py-3">
         <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-label text-muted">
           Available placeholders ({KNOWN_TEMPLATE_VARIABLES.length}) — drop
           these into your Word template using <code>&#123;variableName&#125;</code>
         </summary>
-        <ul className="mt-3 grid grid-cols-1 gap-1 md:grid-cols-2">
+        <ul className="mt-3 grid grid-cols-1 md:grid-cols-2 md:gap-x-4">
           {KNOWN_TEMPLATE_VARIABLES.map((v) => (
             <li
               key={v.key}
-              className="flex items-center justify-between gap-2 rounded border border-layer/5 bg-layer/[0.01] px-2 py-1 font-mono text-[10px]"
+              className="flex items-center justify-between gap-2 border-t border-layer/10 py-1 font-mono text-[10px]"
             >
               <code className="text-text">&#123;{v.key}&#125;</code>
               <span className="text-muted">{v.description}</span>

@@ -189,11 +189,11 @@ export async function OutcomeInsightsPanel() {
             No lessons-learned notes captured yet.
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {recentLessons.map((l) => (
               <li
                 key={l.id}
-                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="border-t border-layer/10 py-2"
               >
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
                   <span
@@ -238,12 +238,12 @@ export async function OutcomeInsightsPanel() {
             when government feedback comes in.
           </div>
         ) : (
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {openDebriefs.map((d) => (
               <li key={d.id}>
                 <Link
                   href={`/proposals/${d.proposalId}/outcome`}
-                  className="flex items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
+                  className="flex items-center justify-between gap-2 border-t border-layer/10 py-2 hover:border-layer/20"
                 >
                   <span className="truncate font-display text-[13px] text-text">
                     {d.proposalTitle}

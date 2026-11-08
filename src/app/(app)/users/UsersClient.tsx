@@ -471,11 +471,11 @@ function PendingPanel({
       {invites.length === 0 ? (
         <div className="font-mono text-[11px] text-muted">No pending invites.</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {invites.map((i) => (
             <li
               key={i.id}
-              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+              className="border-t border-layer/10 py-3"
             >
               <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto]">
                 <div className="min-w-0">
@@ -597,7 +597,7 @@ function MembersPanel({
           {error}
         </div>
       ) : null}
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col">
         {members.map((m) => {
           const isSelf = m.userId === currentUserId;
           const initials =
@@ -610,7 +610,7 @@ function MembersPanel({
           return (
             <li
               key={m.userId}
-              className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 md:grid-cols-[auto_1fr_auto_auto_auto_auto]"
+              className="grid grid-cols-1 items-center gap-3 border-t border-layer/10 py-3 md:grid-cols-[auto_1fr_auto_auto_auto_auto]"
             >
               {m.image ? (
                 // eslint-disable-next-line @next/next/no-img-element

@@ -124,7 +124,7 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
       {shown.length === 0 ? (
         <p className="font-body text-[13px] text-muted">{filter === "todo" ? "Nothing left to review." : "None."}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {shown.map(({ item, rowKey }) => (
             <Row key={rowKey} item={item} pending={pending} solicitationId={solicitationId} run={run} />
           ))}
@@ -147,7 +147,7 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
   const ids = { solicitationId, docKey: item.docKey, originalKey: item.originalKey };
 
   return (
-    <li className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+    <li className="border-t border-layer/10 py-2">
       <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest">
         <span className="text-subtle">{item.kind}</span>
         {item.ref ? <span className="text-subtle">{item.ref}</span> : null}

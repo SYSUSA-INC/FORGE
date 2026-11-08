@@ -366,11 +366,11 @@ export function TenantUsersClient({
             No pending invites for this tenant.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {pendingInvites.map((i) => (
               <li
                 key={i.id}
-                className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+                className="border-t border-layer/10 py-3"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div>

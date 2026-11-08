@@ -101,11 +101,11 @@ export function WinThemesPanel({
         </em>
       </p>
 
-      <ul className="mt-3 flex flex-col gap-3">
+      <ul className="mt-3 flex flex-col">
         {themes.map((t, i) => (
           <li
             key={i}
-            className="rounded-md border border-layer/10 bg-layer/[0.02] p-3"
+            className="border-t border-layer/10 py-3"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="font-mono text-[10px] uppercase tracking-label text-subtle">

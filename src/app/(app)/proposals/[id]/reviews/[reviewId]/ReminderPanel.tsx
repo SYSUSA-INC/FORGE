@@ -103,7 +103,7 @@ export function ReminderPanel({
               </div>
             </div>
           ) : null}
-          <div className="mt-3 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+          <div className="mt-3 border-t border-layer/10 pt-3">
             <div className="font-mono text-[10px] uppercase tracking-widest text-subtle">Next reminder</div>
             {next ? (
               <>

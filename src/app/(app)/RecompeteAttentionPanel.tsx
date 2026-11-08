@@ -31,7 +31,7 @@ export async function RecompeteAttentionPanel({ organizationId }: { organization
           </Link>
         }
       >
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {items.map((it) => {
             const f = it.flag;
             const lost = f.outcome === "lost";
@@ -40,7 +40,7 @@ export async function RecompeteAttentionPanel({ organizationId }: { organization
               <li key={`${it.kind}-${it.id}`}>
                 <Link
                   href={it.kind === "opportunity" ? `/opportunities/${it.id}` : `/solicitations/${it.id}`}
-                  className="block rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
+                  className="block border-t border-layer/10 py-2 hover:border-layer/20"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span

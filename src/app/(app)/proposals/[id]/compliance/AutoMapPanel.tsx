@@ -183,7 +183,7 @@ export function AutoMapPanel({
             ) : null}
           </div>
 
-          <div className="mt-3 flex max-h-[500px] flex-col gap-2 overflow-y-auto">
+          <div className="mt-3 flex max-h-[500px] flex-col overflow-y-auto">
             {suggestions.map((s) => {
               const isExcluded = !!excluded[s.itemId];
               const conf = CONFIDENCE_STYLE[s.confidence];
@@ -191,10 +191,8 @@ export function AutoMapPanel({
               return (
                 <div
                   key={s.itemId}
-                  className={`rounded-md border bg-layer/[0.02] p-3 transition-opacity ${
-                    isExcluded
-                      ? "border-layer/5 opacity-50"
-                      : "border-layer/10"
+                  className={`border-t border-layer/10 py-3 transition-opacity ${
+                    isExcluded ? "opacity-50" : ""
                   }`}
                 >
                   <div className="flex items-start gap-3">

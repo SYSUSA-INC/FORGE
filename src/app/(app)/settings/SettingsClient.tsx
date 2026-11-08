@@ -355,7 +355,7 @@ function OrganizationTab({
       </Panel>
 
       <Panel title="Socio-economic designations" className="xl:col-span-2">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-4 lg:grid-cols-3">
           <CheckboxField
             label="SBA 8(a)"
             checked={draft.socioEconomic.sba8a}
@@ -759,11 +759,11 @@ function PastPerformancePanel({
           No past performance entries yet.
         </div>
       ) : (
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col">
           {rows.map((r) => (
             <li
               key={r.id}
-              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-4"
+              className="border-t border-layer/10 py-4"
             >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <TextField
@@ -915,7 +915,7 @@ function ToggleField({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-3 py-2 ${className ?? ""}`}
+      className={`flex cursor-pointer items-start gap-3 border-t border-layer/10 py-2 ${className ?? ""}`}
     >
       <input
         type="checkbox"
@@ -943,7 +943,7 @@ function CheckboxField({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+    <label className="flex cursor-pointer items-center gap-2 border-t border-layer/10 py-2">
       <input
         type="checkbox"
         className="accent-teal-400"

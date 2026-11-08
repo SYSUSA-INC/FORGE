@@ -333,7 +333,7 @@ function OrganizationsTab({
               No organizations match.
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {filtered.map((org) => (
                 <OrgRowItem
                   key={org.id}
@@ -616,7 +616,7 @@ function InviteUserPanel({ orgs }: { orgs: OrgRow[] }) {
             />
           </div>
         </div>
-        <label className="flex items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 font-mono text-[11px] text-muted">
+        <label className="flex items-start gap-2 border-t border-layer/10 py-2 font-mono text-[11px] text-muted">
           <input
             type="checkbox"
             checked={attestUsPerson}
@@ -815,7 +815,7 @@ function OrgRowItem({
   void currentUserId;
 
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
+    <li className="border-t border-layer/10 py-3">
       <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto]">
         <div className="min-w-0">
           <div className="truncate font-display text-[13px] font-semibold text-text">
@@ -975,7 +975,7 @@ function UsersTab({
       {filtered.length === 0 ? (
         <div className="font-mono text-[11px] text-muted">No users match.</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {filtered.map((u) => (
             <UserRowItem key={u.id} u={u} currentUserId={currentUserId} />
           ))}
@@ -1043,7 +1043,7 @@ function UnverifiedPurgePanel() {
         </button>
       </div>
       {preview ? (
-        <div className="mt-3 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+        <div className="mt-3 border-t border-layer/10 py-3">
           {preview.candidates.length === 0 ? (
             <div className="font-mono text-[11px] text-muted">
               Nothing to clean up for that age.{preview.sharedWorkspace > 0 ? ` ${preview.sharedWorkspace} unverified account(s) share a workspace with someone and were left out.` : ""}
@@ -1224,7 +1224,7 @@ function UserRowItem({
   }
 
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
+    <li className="border-t border-layer/10 py-3">
       <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-text">

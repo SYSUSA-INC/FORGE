@@ -74,11 +74,11 @@ export function LossNarrativePanel({
           <p className="font-display text-[15px] font-semibold leading-snug text-text">
             {result.narrative.headline}
           </p>
-          <ol className="flex flex-col gap-2">
+          <ol className="flex flex-col">
             {result.narrative.insights.map((ins, i) => (
               <li
                 key={i}
-                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="border-t border-layer/10 py-2"
               >
                 <div className="font-display text-[13px] font-semibold text-text">
                   {i + 1}. {ins.title}

@@ -149,7 +149,7 @@ export function CompaniesClient({
             No companies match.
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {filtered.map((c) => (
               <CompanyRowItem
                 key={c.id}
@@ -178,7 +178,7 @@ function CompanyRowItem({
   return (
     <Link
       href={`/companies/${c.id}`}
-      className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 transition-colors hover:border-layer/20 md:grid-cols-[1fr_auto_auto_auto]"
+      className="grid grid-cols-1 items-center gap-3 border-t border-layer/10 py-3 transition-colors hover:border-layer/20 md:grid-cols-[1fr_auto_auto_auto]"
     >
       <div className="min-w-0">
         <div className="truncate font-display text-[14px] font-semibold text-text">

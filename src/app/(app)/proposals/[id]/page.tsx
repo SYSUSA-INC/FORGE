@@ -146,11 +146,11 @@ export default async function ProposalOverviewPage({
         />
 
         <Panel title="Sections" eyebrow={`${approved}/${sections.length} approved · ${totalWords} words`}>
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {sections.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex items-center justify-between gap-3 border-t border-layer/10 py-2"
               >
                 <span className="truncate font-mono text-[12px] text-text">
                   {s.title}

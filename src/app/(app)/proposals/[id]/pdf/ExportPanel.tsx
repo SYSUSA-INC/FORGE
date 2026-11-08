@@ -363,11 +363,11 @@ export function ExportPanel({
               No renders yet.
             </div>
           ) : (
-            <ul className="mt-2 flex flex-col gap-1">
+            <ul className="mt-2 flex flex-col">
               {initialRenders.map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-2 py-1.5 font-mono text-[10px] text-muted"
+                  className="flex items-center justify-between gap-2 border-t border-layer/10 py-1.5 font-mono text-[10px] text-muted"
                 >
                   <div className="min-w-0 flex-1 truncate">
                     <span className="text-text">

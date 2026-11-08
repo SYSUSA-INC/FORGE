@@ -180,7 +180,7 @@ export function SnapshotsSidebar({
           No snapshots yet. Take one to checkpoint the current text.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {snapshots.map((s) => (
             <SnapshotRow
               key={s.id}
@@ -225,7 +225,7 @@ function SnapshotRow({
   const author = snapshot.createdByName || "Unknown";
 
   return (
-    <li className="flex flex-col gap-1 rounded border border-layer/[0.06] bg-layer/[0.03] px-2.5 py-2">
+    <li className="flex flex-col gap-1 border-t border-layer/10 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <span

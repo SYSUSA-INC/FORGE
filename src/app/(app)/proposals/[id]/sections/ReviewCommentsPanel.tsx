@@ -58,11 +58,11 @@ export function ReviewCommentsPanel({
         <span className="font-mono text-[10px] text-muted">Resolve here once the text answers them</span>
       </div>
       {error ? <p className="px-3 pb-2 font-mono text-[11px] text-rose-300">{error}</p> : null}
-      <ul className="flex flex-col gap-1.5 border-t border-amber-400/15 p-3">
+      <ul className="flex flex-col border-t border-amber-400/15 p-3">
         {visible.map((c) => {
           const parsed = parseReviewBody(c.body);
           return (
-            <li key={c.id} className="rounded border border-layer/10 bg-layer/[0.02] p-2">
+            <li key={c.id} className="border-t border-layer/10 py-2">
               <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-muted">
                 <ColorTeamTag color={REVIEW_COLOR_HEX[c.color]}>{REVIEW_COLOR_LABELS[c.color]}</ColorTeamTag>
                 {/* BL-FB-X-COLOR-TEAM Slice 3 — carried forward unresolved from an earlier round */}
