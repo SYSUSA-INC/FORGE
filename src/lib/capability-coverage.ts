@@ -28,7 +28,7 @@ const ANSWER_COVER: Record<CapabilityAnswer["value"], number> = {
 const PARTNER_NAMED_COVER = 0.6;
 
 /** Standing questions weigh like `shall`; the kinds follow the requirement they cover. */
-const KIND_WEIGHT: Record<CapabilityQuestion["kind"], number> = {
+export const KIND_WEIGHT: Record<CapabilityQuestion["kind"], number> = {
   shall: 1,
   standing: 1,
   should: 0.5,

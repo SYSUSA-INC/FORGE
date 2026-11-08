@@ -6,6 +6,7 @@ import { addPartnerCandidate, moveToPlan, removePartner, setPartnerStatus } from
 import { invitePartner, type InviteResult } from "@/lib/partner-invite-store";
 import { isPartnerCert } from "@/lib/partner-search-logic";
 import { rankPartners, type PartnerRankResult } from "@/lib/partner-rank";
+import { ratePartners, type PartnerRateResult } from "@/lib/partner-rate";
 import { addPartnerFromSearch, searchPartners, type PartnerSearchResult } from "@/lib/partner-search";
 
 /**
@@ -111,4 +112,10 @@ export async function invitePartnerAction(input: { opportunityId: string; partne
   const res = await invitePartner({ organizationId, opportunityId: String(input?.opportunityId ?? ""), partnerId: String(input?.partnerId ?? ""), email: input?.email, contactName: input?.contactName, actor });
   if (res.ok) refresh(input.opportunityId);
   return res;
+}
+
+/** BL-NAV-LIFECYCLE 3c-2 — FORGE AI's rating of the partners that answered, scored first, one grounded reason each. */
+export async function ratePartnersAction(input: { opportunityId: string }): Promise<PartnerRateResult> {
+  const { organizationId, actor } = await who();
+  return ratePartners({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor });
 }

@@ -9,8 +9,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, companies, opportunityCapabilityMatrices, opportunityPartnerInvites, opportunityPartners } from "@/db/schema";
-import { addPartnerCandidate, listOpportunityPartners } from "@/lib/capture-store";
+import { auditLogs, companies, notifications, opportunityCapabilityMatrices, opportunityPartnerInvites, opportunityPartners } from "@/db/schema";
+import { addPartnerCandidate, listOpportunityPartners, listPartnerAnswerSheets } from "@/lib/capture-store";
 import { invitePartner, listPartnerInvites, loadPartnerMatrixByToken, savePartnerAnswersByToken } from "@/lib/partner-invite-store";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
@@ -96,6 +96,11 @@ describe("BL-NAV-LIFECYCLE 3c — partner invites", () => {
     const [p] = await listOpportunityPartners(fx.orgA.organizationId, fx.orgA.opportunityId);
     expect(p).toMatchObject({ status: "answered", answerCount: 2, certifications: [] });
     expect(p!.answeredAt).not.toBeNull();
+    // 3c-2: the sheet Compare reads, and the inviter's inbox line (once an hour per partner).
+    expect(await listPartnerAnswerSheets(fx.orgA.organizationId, fx.orgA.opportunityId)).toMatchObject([{ id: partnerId, name: "Alpha Partner", answers: { q1: { answer: "yes" }, q2: { answer: "no" } } }]);
+    await savePartnerAnswersByToken({ token: raw, answers: { q1: { answer: "yes", evidence: "SOC in Reston" } }, certifications: {}, submit: true });
+    const inbox = await db.select({ kind: notifications.kind, recipientUserId: notifications.recipientUserId, linkPath: notifications.linkPath }).from(notifications).where(eq(notifications.organizationId, fx.orgA.organizationId));
+    expect(inbox).toEqual([{ kind: "partner_answered", recipientUserId: fx.orgA.userId, linkPath: `/opportunities/${fx.orgA.opportunityId}/partners/compare` }]);
     expect((await loadPartnerMatrixByToken(raw))).toMatchObject({ ok: true, view: { state: "submitted", answers: { q1: { answer: "yes", percent: null } } } });
 
     const again = await invitePartner({ ...a(), partnerId, email: "pat@alpha.example" });

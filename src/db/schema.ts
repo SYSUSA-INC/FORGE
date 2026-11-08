@@ -2111,6 +2111,8 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "solicitation_role_assigned",
   // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document (drizzle/0145).
   "solicitation_amended",
+  // BL-NAV-LIFECYCLE 3c-2 — a partner submitted its capability answers (drizzle/0157).
+  "partner_answered",
 ]);
 
 export const notifications = pgTable("notification", {
