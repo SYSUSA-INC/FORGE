@@ -88,14 +88,25 @@ export async function listOpportunityPartners(organizationId: string, opportunit
  */
 export async function listPartnerAnswerSheets(organizationId: string, opportunityId: string): Promise<(ComparePartner & { status: OpportunityPartnerStatus })[]> {
   const rows = await db
-    .select({ id: opportunityPartners.id, name: companies.name, status: opportunityPartners.status, answers: opportunityPartners.partnerAnswers, certifications: opportunityPartners.certifications, answeredAt: opportunityPartners.answeredAt })
+    .select({ id: opportunityPartners.id, name: companies.name, companyId: opportunityPartners.companyId, status: opportunityPartners.status, answers: opportunityPartners.partnerAnswers, certifications: opportunityPartners.certifications, answeredAt: opportunityPartners.answeredAt })
     .from(opportunityPartners)
     .innerJoin(companies, and(eq(companies.id, opportunityPartners.companyId), eq(companies.organizationId, organizationId)))
     .where(and(eq(opportunityPartners.organizationId, organizationId), eq(opportunityPartners.opportunityId, opportunityId)))
     .orderBy(asc(companies.name));
   return rows
     .filter((r) => r.status !== "declined" && Object.keys(r.answers ?? {}).length > 0)
-    .map((r) => ({ id: r.id, name: r.name, status: r.status, answers: r.answers ?? {}, certifications: r.certifications ?? {}, answeredAt: r.answeredAt ? r.answeredAt.toISOString() : null }));
+    .map((r) => ({ id: r.id, name: r.name, companyId: r.companyId, status: r.status, answers: r.answers ?? {}, certifications: r.certifications ?? {}, answeredAt: r.answeredAt ? r.answeredAt.toISOString() : null }));
+}
+
+/** BL-NAV-LIFECYCLE 3c-3 — the names of the organization's companies named on our own gap answers, for Compare. */
+export async function companyNamesById(organizationId: string, ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: companies.id, name: companies.name })
+    .from(companies)
+    .where(and(eq(companies.organizationId, organizationId), inArray(companies.id, unique)));
+  return new Map(rows.map((r) => [r.id, r.name]));
 }
 
 /** Each opportunity's partner counts by status, and the chosen partners' names. */

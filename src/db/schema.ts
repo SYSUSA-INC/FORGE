@@ -5447,7 +5447,8 @@ export const opportunityPartnerInvites = pgTable(
       .references(() => opportunityPartners.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     contactName: text("contact_name").notNull().default(""),
-    tokenHash: text("token_hash").notNull(),
+    /** sha256 of the link's token; null once the sweep retired an expired link (BL-NAV-LIFECYCLE 3c-3, migration 0158). */
+    tokenHash: text("token_hash"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     emailedAt: timestamp("emailed_at", { withTimezone: true }),
     openedAt: timestamp("opened_at", { withTimezone: true }),

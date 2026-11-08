@@ -7,7 +7,10 @@
  * we answered No or Partial (`capabilityGaps` in partner-rank-logic reads
  * the same answers); a partner closes it when it covers more of the
  * requirement than we do: Yes on our No or Partial, or Partial with a
- * higher share.
+ * higher share. Where we named a company ourselves on a gap ("Gap:
+ * partner needed" with a partner chosen under Evaluate), the row says so,
+ * and when that company is one of the compared partners its cell is
+ * marked *named* beside *closes* (3c-3).
  *
  * The rating scores each partner deterministically first — the gaps it
  * closes weighted like coverage (`KIND_WEIGHT`), the evidence it gave on
@@ -30,6 +33,8 @@ import { fenced, fenceSafe } from "@/lib/prompt-safety";
 export type ComparePartner = {
   id: string;
   name: string;
+  /** The company behind the partner, to match the one we named on our own answer. */
+  companyId?: string | null;
   answers: PartnerAnswers;
   certifications: PartnerCertifications;
   answeredAt: string | null;
@@ -42,6 +47,8 @@ export type PartnerCell = {
   evidence: string;
   /** This partner covers more of the requirement than we do (only on a gap row). */
   closes: boolean;
+  /** We named this partner's company ourselves on our answer to this gap. */
+  named: boolean;
 };
 
 export type CompareRow = {
@@ -52,12 +59,14 @@ export type CompareRow = {
   cells: Record<string, PartnerCell>;
   /** Partner ids that close the gap, in the partners' order. */
   closedBy: string[];
+  /** The company we named on our own answer to this gap, and the compared partner it is, if any. */
+  named: { companyId: string; partnerId: string | null } | null;
 };
 
 export type CompareResult = {
   rows: CompareRow[];
   gaps: number;
-  partners: { id: string; name: string; closed: number; answered: number }[];
+  partners: { id: string; name: string; closed: number; answered: number; /** Gaps on which we named this partner ourselves. */ named: number }[];
 };
 
 /** How much of a requirement an answer covers: Yes all, Partial its share (50% when unstated), No or N/A none. */
@@ -77,18 +86,26 @@ function ourCellOf(a: CapabilityAnswer | undefined): OurCell {
 export function compareMatrix(questions: readonly CapabilityQuestion[], ourAnswers: Readonly<Record<string, CapabilityAnswer>>, partners: readonly ComparePartner[]): CompareResult {
   const closed = new Map(partners.map((p) => [p.id, 0]));
   const answered = new Map(partners.map((p) => [p.id, 0]));
+  const namedCount = new Map(partners.map((p) => [p.id, 0]));
+  const partnerByCompany = new Map<string, string>();
+  for (const p of partners) if (p.companyId && !partnerByCompany.has(p.companyId)) partnerByCompany.set(p.companyId, p.id);
   let gaps = 0;
   const rows: CompareRow[] = questions.map((question) => {
-    const ours = ourCellOf(ourAnswers[question.id]);
+    const our = ourAnswers[question.id];
+    const ours = ourCellOf(our);
     const gap = ours.answer === "no" || ours.answer === "partial" ? ours.answer : null;
     if (gap) gaps++;
+    const namedCompany = gap && our?.partnerCompanyId ? our.partnerCompanyId : null;
+    const named = namedCompany ? { companyId: namedCompany, partnerId: partnerByCompany.get(namedCompany) ?? null } : null;
+    if (named?.partnerId) namedCount.set(named.partnerId, (namedCount.get(named.partnerId) ?? 0) + 1);
     const ourShare = shareOf(ours.answer, ours.percent);
     const cells: Record<string, PartnerCell> = {};
     const closedBy: string[] = [];
     for (const p of partners) {
       const a = p.answers[question.id];
+      const isNamed = named?.partnerId === p.id;
       if (!a) {
-        cells[p.id] = { answer: null, percent: null, evidence: "", closes: false };
+        cells[p.id] = { answer: null, percent: null, evidence: "", closes: false, named: isNamed };
         continue;
       }
       answered.set(p.id, (answered.get(p.id) ?? 0) + 1);
@@ -98,11 +115,11 @@ export function compareMatrix(questions: readonly CapabilityQuestion[], ourAnswe
         closedBy.push(p.id);
         closed.set(p.id, (closed.get(p.id) ?? 0) + 1);
       }
-      cells[p.id] = { answer: a.answer, percent, evidence: a.evidence ?? "", closes };
+      cells[p.id] = { answer: a.answer, percent, evidence: a.evidence ?? "", closes, named: isNamed };
     }
-    return { question, ours, gap, cells, closedBy };
+    return { question, ours, gap, cells, closedBy, named };
   });
-  return { rows, gaps, partners: partners.map((p) => ({ id: p.id, name: p.name, closed: closed.get(p.id) ?? 0, answered: answered.get(p.id) ?? 0 })) };
+  return { rows, gaps, partners: partners.map((p) => ({ id: p.id, name: p.name, closed: closed.get(p.id) ?? 0, answered: answered.get(p.id) ?? 0, named: namedCount.get(p.id) ?? 0 })) };
 }
 
 // ── the deterministic score ──────────────────────────────────────────
