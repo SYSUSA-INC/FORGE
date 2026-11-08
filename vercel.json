@@ -59,6 +59,10 @@
     {
       "path": "/api/cron/crm-agency-refresh",
       "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/cron/partner-invites",
+      "schedule": "50 7 * * *"
     }
   ]
 }

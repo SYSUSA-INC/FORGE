@@ -5,6 +5,8 @@ import { opportunities } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { planBlocker } from "@/lib/capture-logic";
 import { companiesToConsider, listOpportunityPartners } from "@/lib/capture-store";
+import { loadCapabilityMatrix } from "@/lib/capability-matrix-build";
+import { listPartnerInvites } from "@/lib/partner-invite-store";
 import { latestDecisions, partnerSuggestions } from "@/lib/opportunity-decision-store";
 import { PartnerSearch } from "./PartnerSearch";
 import { PartnersClient } from "./PartnersClient";
@@ -25,11 +27,13 @@ export default async function OpportunityPartnersPage({ params }: { params: { id
     .where(and(eq(opportunities.id, params.id), eq(opportunities.organizationId, organizationId)))
     .limit(1);
   if (!opp) notFound();
-  const [partners, decisions, suggestions, companies] = await Promise.all([
+  const [partners, decisions, suggestions, companies, invites, matrix] = await Promise.all([
     listOpportunityPartners(organizationId, params.id),
     latestDecisions(organizationId, [params.id]),
     partnerSuggestions(organizationId, params.id),
     companiesToConsider(organizationId, params.id),
+    listPartnerInvites(organizationId, params.id),
+    loadCapabilityMatrix(params.id, organizationId),
   ]);
   const decision = decisions.get(params.id)?.decision ?? null;
   const considered = new Set(partners.map((p) => p.companyId));
@@ -39,7 +43,8 @@ export default async function OpportunityPartnersPage({ params }: { params: { id
       <PartnersClient
         opportunityId={params.id}
         decision={decision}
-        partners={partners}
+        partners={partners.map((p) => ({ ...p, invite: invites.get(p.id) ?? null }))}
+        questionCount={matrix?.questions?.length ?? 0}
         suggestions={suggestions.filter((s) => !considered.has(s.id)).map((s) => ({ id: s.id, name: s.name, why: s.why }))}
         companies={companies}
         blocker={planBlocker({ stage: opp.stage, decision, chosen })}

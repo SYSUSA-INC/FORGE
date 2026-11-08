@@ -1,3 +1,4 @@
+import type { PartnerAnswer, PartnerCertifications } from "@/lib/partner-invite-logic";
 import type { CapabilityAnswer, CapabilityQuestion, CapabilitySuggestion } from "@/lib/capability-matrix-types";
 import type { CompanyModelBody, CompanyModelSources } from "@/lib/company-model";
 import type { LessonAppliesTo } from "@/lib/lessons";
@@ -2110,6 +2111,8 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "solicitation_role_assigned",
   // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document (drizzle/0145).
   "solicitation_amended",
+  // BL-NAV-LIFECYCLE 3c-2 — a partner submitted its capability answers (drizzle/0157).
+  "partner_answered",
 ]);
 
 export const notifications = pgTable("notification", {
@@ -5410,11 +5413,52 @@ export const opportunityPartners = pgTable(
     chosenByUserId: text("chosen_by_user_id").references(() => users.id, { onDelete: "set null" }),
     chosenAt: timestamp("chosen_at", { withTimezone: true }),
     createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** BL-NAV-LIFECYCLE 3c — the partner's own answers to the matrix questions (by question id), its certifications, and when it submitted. */
+    partnerAnswers: jsonb("partner_answers").$type<Record<string, PartnerAnswer>>().notNull().default({}),
+    certifications: jsonb("certifications").$type<PartnerCertifications>().notNull().default({}),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     orgIdx: index("opportunity_partner_org_idx").on(t.organizationId, t.createdAt),
     oppCompanyUq: uniqueIndex("opportunity_partner_opp_company_uq").on(t.opportunityId, t.companyId),
+  }),
+);
+
+/**
+ * BL-NAV-LIFECYCLE phase 3c — a partner's personal link to the matrix
+ * questions: emailed to a contact, no FORGE account, 14 days. Only the
+ * token's hash is stored; the link is the credential. A new invite for
+ * the same partner replaces its earlier unanswered ones.
+ */
+export const opportunityPartnerInvites = pgTable(
+  "opportunity_partner_invite",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => opportunityPartners.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    contactName: text("contact_name").notNull().default(""),
+    /** sha256 of the link's token; null once the sweep retired an expired link (BL-NAV-LIFECYCLE 3c-3, migration 0158). */
+    tokenHash: text("token_hash"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    emailedAt: timestamp("emailed_at", { withTimezone: true }),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tokenUq: uniqueIndex("opportunity_partner_invite_token_uq").on(t.tokenHash),
+    partnerIdx: index("opportunity_partner_invite_partner_idx").on(t.partnerId, t.createdAt),
+    orgIdx: index("opportunity_partner_invite_org_idx").on(t.organizationId, t.createdAt),
   }),
 );

@@ -6,9 +6,34 @@ import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { PARTNER_STATUS_LABELS } from "@/lib/capture-logic";
 import type { OpportunityPartnerStatus } from "@/db/schema";
-import { addPartnerAction, moveToPlanAction, removePartnerAction, setPartnerStatusAction } from "./actions";
+import type { PartnerInviteView } from "@/lib/partner-invite-store";
+import { addPartnerAction, invitePartnerAction, moveToPlanAction, removePartnerAction, setPartnerStatusAction } from "./actions";
 
-export type PartnerView = { id: string; companyId: string; name: string; relationship: string; status: OpportunityPartnerStatus; reason: string; chosenAt: string | null; chosenBy: string | null };
+export type PartnerView = {
+  id: string;
+  companyId: string;
+  name: string;
+  relationship: string;
+  status: OpportunityPartnerStatus;
+  reason: string;
+  chosenAt: string | null;
+  chosenBy: string | null;
+  contactEmail: string;
+  contactName: string;
+  answerCount: number;
+  certifications: string[];
+  answeredAt: string | null;
+  invite: PartnerInviteView | null;
+};
+
+/** BL-NAV-LIFECYCLE 3c — one line on where the partner's invite and answers stand. */
+function inviteLine(p: PartnerView, questionCount: number): string {
+  const parts: string[] = [];
+  if (p.answeredAt) parts.push(`answered ${p.answerCount} of ${questionCount} on ${p.answeredAt.slice(0, 10)}`);
+  else if (p.invite) parts.push(p.invite.state === "expired" ? `invite to ${p.invite.email} expired ${p.invite.expiresAt.slice(0, 10)}` : `invited ${p.invite.email}${p.invite.openedAt ? ", opened" : p.invite.emailed ? "" : " (link not emailed)"} · expires ${p.invite.expiresAt.slice(0, 10)}`);
+  if (p.certifications.length) parts.push(p.certifications.join(", "));
+  return parts.join(" · ");
+}
 
 const STATUS_TONE: Record<OpportunityPartnerStatus, string> = {
   candidate: "border-layer/15 text-muted",
@@ -32,12 +57,29 @@ export function PartnersClient(props: {
   companies: { id: string; name: string; relationship: string }[];
   blocker: string | null;
   naics: string;
+  /** BL-NAV-LIFECYCLE 3c — how many questions the matrix has (0: none built yet). */
+  questionCount: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [pick, setPick] = useState("");
   const [reason, setReason] = useState("");
+  const [inviting, setInviting] = useState<{ partnerId: string; email: string; name: string } | null>(null);
+  const [issued, setIssued] = useState<{ partnerId: string; link: string; emailed: boolean; expiresAt: string } | null>(null);
+
+  function sendInvite() {
+    if (!inviting) return;
+    const { partnerId, email, name } = inviting;
+    setError(null);
+    start(async () => {
+      const res = await invitePartnerAction({ opportunityId: props.opportunityId, partnerId, email, contactName: name });
+      if (!res.ok) return setError(res.error);
+      setInviting(null);
+      setIssued({ partnerId, link: res.link, emailed: res.emailed, expiresAt: res.expiresAt });
+      router.refresh();
+    });
+  }
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, after?: () => void) {
     setError(null);
@@ -54,7 +96,17 @@ export function PartnersClient(props: {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="flex flex-col gap-4 xl:col-span-2">
-        <Panel title="Partners" eyebrow={`${props.partners.length} considered · ${chosen.length} chosen`}>
+        <Panel
+          title="Partners"
+          eyebrow={`${props.partners.length} considered · ${chosen.length} chosen`}
+          actions={
+            props.questionCount > 0 && props.partners.some((p) => p.answerCount > 0) ? (
+              <Link href={`/opportunities/${props.opportunityId}/partners/compare`} className="font-mono text-[11px] uppercase tracking-label text-cobalt hover:underline">
+                Compare answers →
+              </Link>
+            ) : null
+          }
+        >
           {error ? <p className="mb-2 font-body text-[12px] text-red">{error}</p> : null}
           {props.partners.length === 0 ? (
             <p className="font-body text-[13px] leading-[1.5] text-muted">
@@ -73,6 +125,7 @@ export function PartnersClient(props: {
                       {p.reason ? ` · ${p.reason}` : ""}
                       {p.status === "chosen" && p.chosenAt ? ` · chosen ${p.chosenAt.slice(0, 10)}${p.chosenBy ? ` by ${p.chosenBy}` : ""}` : ""}
                     </p>
+                    {inviteLine(p, props.questionCount) ? <p className="font-mono text-[11px] text-muted">{inviteLine(p, props.questionCount)}</p> : null}
                   </div>
                   <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${STATUS_TONE[p.status]}`}>{PARTNER_STATUS_LABELS[p.status]}</span>
                   {p.status !== "chosen" ? (
@@ -94,9 +147,47 @@ export function PartnersClient(props: {
                       Reconsider
                     </button>
                   ) : null}
+                  {p.status !== "declined" ? (
+                    <button
+                      type="button"
+                      className="aur-link font-mono text-[10px] uppercase tracking-widest"
+                      disabled={pending}
+                      onClick={() => {
+                        setIssued(null);
+                        setInviting(inviting?.partnerId === p.id ? null : { partnerId: p.id, email: p.invite?.email || p.contactEmail, name: p.invite?.contactName || p.contactName });
+                      }}
+                    >
+                      {p.invite ? "Re-invite" : "Invite"}
+                    </button>
+                  ) : null}
                   <button type="button" className="aur-link font-mono text-[10px] uppercase tracking-widest" disabled={pending} onClick={() => run(() => removePartnerAction({ opportunityId: props.opportunityId, partnerId: p.id }))}>
                     Remove
                   </button>
+                  {inviting?.partnerId === p.id ? (
+                    <div className="flex w-full flex-wrap items-end gap-2 pt-1">
+                      <label className="min-w-[14rem] flex-1">
+                        <span className="aur-label">Contact email</span>
+                        <input className="aur-input mt-1" type="email" value={inviting.email} onChange={(e) => setInviting({ ...inviting, email: e.target.value })} placeholder="name@partner.com" />
+                      </label>
+                      <label className="min-w-[10rem] flex-1">
+                        <span className="aur-label">Contact name (optional)</span>
+                        <input className="aur-input mt-1" value={inviting.name} maxLength={120} onChange={(e) => setInviting({ ...inviting, name: e.target.value })} />
+                      </label>
+                      <button type="button" className="aur-btn aur-btn-primary" disabled={pending || !inviting.email || props.questionCount === 0} onClick={sendInvite}>
+                        Send the questions
+                      </button>
+                      {props.questionCount === 0 ? <span className="font-mono text-[11px] text-muted">Build the capability questions under Evaluate first.</span> : null}
+                    </div>
+                  ) : null}
+                  {issued?.partnerId === p.id ? (
+                    <div className="flex w-full flex-wrap items-center gap-2 pt-1 font-mono text-[11px] text-muted">
+                      <span className="text-text">{issued.emailed ? "Emailed." : "Email isn't set up here, so the link wasn't sent: copy it and send it yourself."}</span>
+                      <span>The link works without an account until {issued.expiresAt.slice(0, 10)}.</span>
+                      <button type="button" className="aur-link uppercase tracking-widest" onClick={() => navigator.clipboard?.writeText(issued.link).catch(() => undefined)}>
+                        Copy link
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
