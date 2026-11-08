@@ -14,6 +14,7 @@ import {
   partnerAnswerSummary,
   partnerInviteExpiry,
   partnerQuestionsOf,
+  planInviteSweep,
 } from "@/lib/partner-invite-logic";
 
 const now = new Date("2026-11-07T12:00:00Z");
@@ -71,6 +72,36 @@ describe("BL-NAV-LIFECYCLE 3c — partner invite logic", () => {
     expect(inviteState({ expiresAt, submittedAt: null }, now)).toBe("open");
     expect(inviteState({ expiresAt, submittedAt: now }, now)).toBe("submitted");
     expect(inviteState({ expiresAt: expiresAt.toISOString(), submittedAt: now }, expiresAt)).toBe("expired");
+  });
+
+  it("the sweep retires every expired link and reverts an invited partner only when its last link expired unanswered", () => {
+    const past = new Date(now.getTime() - 1000);
+    const future = new Date(now.getTime() + 1000);
+    const invites = [
+      // p1: expired, never answered, no other link: reverted.
+      { id: "i1", partnerId: "p1", expiresAt: past, submittedAt: null, tokenHash: "h1" },
+      // p2: expired unanswered, but re-invited since: the new link keeps it invited.
+      { id: "i2", partnerId: "p2", expiresAt: past, submittedAt: null, tokenHash: "h2" },
+      { id: "i3", partnerId: "p2", expiresAt: future, submittedAt: null, tokenHash: "h3" },
+      // p3: submitted, then expired: the link is retired, the partner stays answered.
+      { id: "i4", partnerId: "p3", expiresAt: past, submittedAt: past, tokenHash: "h4" },
+      // p4: link already retired but the partner still reads invited: the status is healed, nothing to clear.
+      { id: "i5", partnerId: "p4", expiresAt: past, submittedAt: null, tokenHash: null },
+      // p5: chosen; its expired link is retired but its status is kept.
+      { id: "i6", partnerId: "p5", expiresAt: past, submittedAt: null, tokenHash: "h6" },
+      // p6: expires this second: expired.
+      { id: "i7", partnerId: "p6", expiresAt: now.toISOString(), submittedAt: null, tokenHash: "h7" },
+    ];
+    const partners = [
+      { id: "p1", status: "invited" },
+      { id: "p2", status: "invited" },
+      { id: "p3", status: "answered" },
+      { id: "p4", status: "invited" },
+      { id: "p5", status: "chosen" },
+      { id: "p6", status: "invited" },
+    ];
+    expect(planInviteSweep(invites, partners, now)).toEqual({ clear: ["i1", "i2", "i4", "i6", "i7"], revert: ["p1", "p4", "p6"] });
+    expect(planInviteSweep([], partners, now)).toEqual({ clear: [], revert: [] });
   });
 
   it("accepts a plain address, lower-cased, and nothing else", () => {

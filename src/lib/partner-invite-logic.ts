@@ -132,3 +132,40 @@ export function normalizeInviteEmail(raw: unknown): string | null {
   const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
   return s.length <= 254 && EMAIL_RE.test(s) ? s : null;
 }
+
+// ── the sweep of expired invites (3c-3) ──────────────────────────────
+
+/** An invite as the sweep sees it: whose it is, when it expires, whether it was answered, and whether its link still works. */
+export type SweepInvite = { id: string; partnerId: string; expiresAt: Date | string; submittedAt: Date | string | null; tokenHash: string | null };
+
+export type InviteSweepPlan = {
+  /** Expired invites whose link still works: the token hash is cleared so the link can never be used again. */
+  clear: string[];
+  /** Partners shown as *invited* whose only links expired unanswered: they go back to *candidate*. */
+  revert: string[];
+};
+
+/**
+ * What the daily sweep does with a partner's invites: retire every expired
+ * link (submitted or not: a submitted link stayed editable only until it
+ * expired), and send an *invited* partner back to *candidate* when it has
+ * no live link left and the one that expired was never submitted. A
+ * partner that answered stays *answered*; a chosen or declined one is not
+ * touched.
+ */
+export function planInviteSweep(invites: readonly SweepInvite[], partners: readonly { id: string; status: string }[], now: Date): InviteSweepPlan {
+  const clear: string[] = [];
+  const live = new Set<string>();
+  const expiredUnanswered = new Set<string>();
+  for (const i of invites) {
+    const expired = inviteState(i, now) === "expired";
+    if (!expired) {
+      live.add(i.partnerId);
+      continue;
+    }
+    if (i.tokenHash !== null) clear.push(i.id);
+    if (!i.submittedAt) expiredUnanswered.add(i.partnerId);
+  }
+  const revert = partners.filter((p) => p.status === "invited" && expiredUnanswered.has(p.id) && !live.has(p.id)).map((p) => p.id);
+  return { clear, revert };
+}

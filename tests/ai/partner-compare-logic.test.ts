@@ -58,10 +58,32 @@ describe("compareMatrix", () => {
     expect(q3!.gap).toBeNull();
     expect(q3!.cells.b!.closes).toBe(false);
     // Unanswered by the partner.
-    expect(q3!.cells.a).toEqual({ answer: null, percent: null, evidence: "", closes: false });
+    expect(q3!.cells.a).toEqual({ answer: null, percent: null, evidence: "", closes: false, named: false });
+    expect(s1!.named).toBeNull();
     expect(cmp.partners).toEqual([
-      { id: "a", name: "A", closed: 2, answered: 3 },
-      { id: "b", name: "B", closed: 1, answered: 3 },
+      { id: "a", name: "A", closed: 2, answered: 3, named: 0 },
+      { id: "b", name: "B", closed: 1, answered: 3, named: 0 },
+    ]);
+  });
+
+  it("says which company we named on a gap and marks that partner's cell named, whether or not it closes the gap", () => {
+    const named = { ...OURS, s1: { ...ours("gap_partner"), partnerCompanyId: "co-a" }, q1: { ...ours("partial", 40), partnerCompanyId: "co-x" }, q2: { ...ours("have_proven"), partnerCompanyId: "co-a" } };
+    const a = partner("a", { s1: pa("no"), q1: pa("yes") }, { companyId: "co-a" });
+    const b = partner("b", { s1: pa("yes") }, { companyId: "co-b" });
+    const cmp = compareMatrix(QUESTIONS, named, [a, b]);
+    const [s1, q1, q2] = cmp.rows;
+    // Named and compared: the cell is marked even though a No closes nothing.
+    expect(s1!.named).toEqual({ companyId: "co-a", partnerId: "a" });
+    expect(s1!.cells.a).toMatchObject({ closes: false, named: true });
+    expect(s1!.cells.b).toMatchObject({ closes: true, named: false });
+    // Named but not among the compared partners.
+    expect(q1!.named).toEqual({ companyId: "co-x", partnerId: null });
+    expect(q1!.cells.a).toMatchObject({ closes: true, named: false });
+    // Not a gap: a stale company id on a Yes is ignored.
+    expect(q2!.named).toBeNull();
+    expect(cmp.partners.map((p) => [p.id, p.named])).toEqual([
+      ["a", 1],
+      ["b", 0],
     ]);
   });
 
