@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, opportunities, opportunityPartners, users, type OpportunityPartnerStatus } from "@/db/schema";
+import { certificationLabels } from "@/lib/partner-invite-logic";
 import { recordAudit } from "@/lib/audit-log";
 import { emptyPartnerCounts, planBlocker, planNote, PLAN_STAGE, type PartnerCounts } from "@/lib/capture-logic";
 import { latestDecisions } from "@/lib/opportunity-decision-store";
@@ -27,6 +28,12 @@ export type PartnerRow = {
   reason: string;
   chosenAt: string | null;
   chosenBy: string | null;
+  contactEmail: string;
+  contactName: string;
+  /** BL-NAV-LIFECYCLE 3c — how many questions the partner answered, its certifications, and when it submitted. */
+  answerCount: number;
+  certifications: string[];
+  answeredAt: string | null;
 };
 
 async function ownOpportunity(organizationId: string, opportunityId: string) {
@@ -51,13 +58,26 @@ export async function listOpportunityPartners(organizationId: string, opportunit
       reason: opportunityPartners.reason,
       chosenAt: opportunityPartners.chosenAt,
       chosenBy: users.name,
+      contactEmail: companies.email,
+      contactName: companies.contactName,
+      partnerAnswers: opportunityPartners.partnerAnswers,
+      certs: opportunityPartners.certifications,
+      answeredAt: opportunityPartners.answeredAt,
     })
     .from(opportunityPartners)
     .innerJoin(companies, and(eq(companies.id, opportunityPartners.companyId), eq(companies.organizationId, organizationId)))
     .leftJoin(users, eq(users.id, opportunityPartners.chosenByUserId))
     .where(and(eq(opportunityPartners.organizationId, organizationId), eq(opportunityPartners.opportunityId, opportunityId)))
     .orderBy(asc(companies.name));
-  return rows.map((r) => ({ ...r, chosenAt: r.chosenAt ? r.chosenAt.toISOString() : null }));
+  return rows.map(({ partnerAnswers, certs, answeredAt, ...r }) => ({
+    ...r,
+    chosenAt: r.chosenAt ? r.chosenAt.toISOString() : null,
+    contactEmail: r.contactEmail ?? "",
+    contactName: r.contactName ?? "",
+    answerCount: Object.keys(partnerAnswers ?? {}).length,
+    certifications: certificationLabels(certs),
+    answeredAt: answeredAt ? answeredAt.toISOString() : null,
+  }));
 }
 
 /** Each opportunity's partner counts by status, and the chosen partners' names. */

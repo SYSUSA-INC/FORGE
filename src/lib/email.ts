@@ -336,6 +336,49 @@ function escapeHtml(s: string): string {
  * external email) for a Bid / No-bid / More-info call. The link is
  * token-authed so external reviewers can answer without a login.
  */
+/**
+ * BL-NAV-LIFECYCLE phase 3c — a partner contact's personal link to the
+ * capability questions. Sent from the platform address with Reply-To the
+ * sender, like a review request.
+ */
+export async function sendPartnerInviteEmail(opts: {
+  to: string;
+  contactName: string;
+  companyName: string;
+  senderName: string;
+  senderEmail: string;
+  organizationName: string;
+  opportunityTitle: string;
+  url: string;
+  days: number;
+}): Promise<void> {
+  const greeting = opts.contactName ? `Hi ${escapeHtml(opts.contactName)},` : "Hello,";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Capability questions — ${escapeHtml(opts.opportunityTitle)}</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">${greeting}</p>
+    <p style="margin:0 0 16px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.senderName)}</strong> from ${escapeHtml(opts.organizationName)}
+      is considering ${escapeHtml(opts.companyName)} as a teaming partner on <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.opportunityTitle)}</strong>
+      and asks how ${escapeHtml(opts.companyName)} covers each capability the work needs: Yes, Partial (with the share you cover) or No, with a line of evidence each, plus your ISO, CMMI and CMMC certifications.
+    </p>
+    <a href="${opts.url}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Answer the questions</a>
+    <p style="margin:16px 0 0 0;font-size:12px;line-height:1.5;color:${EMAIL_HEX.muted};">
+      No FORGE account is needed. This link is personal to you and expires in ${opts.days} days; you can come back and change your answers until then. Only ${escapeHtml(opts.organizationName)} sees them.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    from: `"FORGE" <${emailFromAddress()}>`,
+    replyTo: opts.senderEmail || undefined,
+    subject: `[FORGE] Capability questions — ${opts.opportunityTitle}`.slice(0, 120),
+    html: emailShell(`Capability questions — ${opts.opportunityTitle}`, body),
+    text:
+      `${opts.senderName} from ${opts.organizationName} is considering ${opts.companyName} as a teaming partner on "${opts.opportunityTitle}" and asks how ${opts.companyName} covers each capability the work needs (Yes / Partial / No, with evidence) and which ISO, CMMI and CMMC certifications it holds.` +
+      `\n\nAnswer here (no account needed):\n${opts.url}` +
+      `\n\nThis link is personal to you and expires in ${opts.days} days.`,
+  });
+}
+
 export async function sendOpportunityReviewRequestEmail(opts: {
   to: string;
   reviewerName: string;
