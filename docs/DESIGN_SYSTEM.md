@@ -116,8 +116,10 @@ Utility classes in `globals.css`:
   `aur-card-elevated`. Code and log blocks sit on `bg-bone` with a
   hairline, never a black slab.
 - **Buttons:** EnableNow's three: `aur-btn-primary` (solid action blue),
-  `aur-btn` (the light button), `aur-btn-ghost` (text). Also
-  `aur-btn-danger`.
+  `aur-btn` (the light button), `aur-btn-ghost` (text, for toolbar-level
+  quiet actions). Also `aur-btn-danger`. One size: no `text-[11px]` or
+  `py-2` on a button. A secondary action beside a primary (Cancel, Close,
+  Dismiss, Done, Back, Open) is `aur-link`, a text link, not a button.
 - **Forms and labels:** `aur-input` (Host Grotesk, strong hairline),
   `aur-label` (Geist Mono, uppercase, 0.06em).
 - **Chips and dividers:** `aur-chip`, `aur-pill`, `aur-divider`.
