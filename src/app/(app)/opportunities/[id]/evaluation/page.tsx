@@ -1,20 +1,22 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
   opportunities,
   opportunityEvaluations,
   opportunityCapabilityMatrices,
-  companies,
 } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { Panel } from "@/components/ui/Panel";
 import { EvaluationForm } from "./EvaluationForm";
 import { GateDecisionPanel } from "./GateDecisionPanel";
-import { CapabilityMatrixPanel } from "./CapabilityMatrixPanel";
+import { DecisionPanel } from "./DecisionPanel";
+import { decisionHistory, evaluateSignals, partnerSuggestions } from "@/lib/opportunity-decision-store";
+import { decisionReadiness } from "@/lib/opportunity-decision";
 import { LessonsThatApplyPanel } from "./LessonsThatApplyPanel";
-import { loadOpportunityRequirements } from "@/lib/solicitation-requirements";
-import { parseVersionOf } from "@/lib/capability-matrix-types";
+import Link from "next/link";
+import { computeCapabilityCoverage } from "@/lib/capability-coverage";
+import { answeredCount, threeAnswerCounts } from "@/lib/capability-matrix-types";
 
 export const dynamic = "force-dynamic";
 
@@ -56,18 +58,19 @@ export default async function OpportunityEvaluationPage({
       ),
     )
     .limit(1);
-  const reqs = await loadOpportunityRequirements({ organizationId, opportunityId: params.id });
-  const partners = await db
-    .select({ id: companies.id, name: companies.name, relationship: companies.relationship })
-    .from(companies)
-    .where(
-      and(
-        eq(companies.organizationId, organizationId),
-        inArray(companies.relationship, ["teaming_partner", "subcontractor"]),
-      ),
-    )
-    .orderBy(companies.name)
-    .limit(200);
+  // BL-NAV-LIFECYCLE 2a — the Evaluate decision while the opportunity is in
+  // Evaluate (and its history after; it can still change in Capture, as a
+  // new record); the gate panel moves it on from Capture.
+  const inEvaluate = opp.stage === "identified" || opp.stage === "sources_sought";
+  const [history, suggestions, signals] = await Promise.all([
+    decisionHistory(organizationId, params.id),
+    partnerSuggestions(organizationId, params.id),
+    evaluateSignals(organizationId, [params.id]),
+  ]);
+  const sig = signals.get(params.id);
+  const coverage = matrix ? computeCapabilityCoverage(matrix.questions, matrix.answers) : null;
+  const counts = threeAnswerCounts(matrix?.questions ?? [], matrix?.answers ?? {});
+  const readiness = decisionReadiness({ analysed: !!sig?.analysed, matrixBuilt: (matrix?.questions?.length ?? 0) > 0 });
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -77,28 +80,34 @@ export default async function OpportunityEvaluationPage({
         </Panel>
       </div>
       <div className="flex flex-col gap-4">
-        <GateDecisionPanel opportunityId={params.id} currentStage={opp.stage} />
+        {inEvaluate || history.length > 0 ? (
+          <DecisionPanel opportunityId={params.id} history={history} partners={suggestions} readiness={inEvaluate ? readiness : null} naics={opp.naicsCode} canDecide={inEvaluate || opp.stage === "qualification"} />
+        ) : null}
+        {inEvaluate ? null : <GateDecisionPanel opportunityId={params.id} currentStage={opp.stage} />}
         {/* BL-LESSONS-LOOP 4b — confirmed lessons from bids like this one. */}
         <LessonsThatApplyPanel agency={opp.agency} naicsCode={opp.naicsCode} />
       </div>
-      <div className="xl:col-span-3">
-        <CapabilityMatrixPanel
-          opportunityId={params.id}
-          matrix={
-            matrix
-              ? {
-                  questions: matrix.questions,
-                  answers: matrix.answers,
-                  suggestions: matrix.suggestions,
-                  parseVersion: matrix.parseVersion,
-                  builtAt: matrix.builtAt ? matrix.builtAt.toISOString() : null,
-                }
-              : null
+      <div id="capability" className="scroll-mt-24 xl:col-span-3">
+        {/* BL-NAV-LIFECYCLE 2b — the questionnaire lives on its own page; its summary here. */}
+        <Panel
+          title="Capability Matrix"
+          eyebrow={matrix && matrix.questions.length > 0 ? `${answeredCount(matrix.questions, matrix.answers)} of ${matrix.questions.length} answered` : "Not built yet"}
+          actions={
+            <Link href={`/opportunities/${params.id}/capability`} className="aur-btn aur-btn-ghost">
+              {matrix && matrix.questions.length > 0 ? "Open the Capability Matrix" : "Build the Capability Matrix"}
+            </Link>
           }
-          currentParseVersion={parseVersionOf(reqs)}
-          hasRequirements={reqs.requirements.length > 0}
-          partners={partners}
-        />
+        >
+          {matrix && matrix.questions.length > 0 ? (
+            <p className="font-mono text-[12px] text-text">
+              {coverage?.coverage == null ? "No coverage yet" : `Coverage ${Math.round(coverage.coverage * 100)}%`} · Yes {counts.yes} · Partial {counts.partial} · No {counts.no}
+              {counts.na ? ` · N/A ${counts.na}` : ""}
+              {coverage?.partnerNeeded ? " · partner needed" : ""}
+            </p>
+          ) : (
+            <p className="font-body text-[13px] leading-[1.5] text-muted">FORGE drafts the questions from the solicitation&apos;s requirements; you answer each Yes, Partial with a percentage, or No.</p>
+          )}
+        </Panel>
       </div>
     </div>
   );

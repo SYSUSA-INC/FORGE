@@ -179,7 +179,7 @@ export const NEXT_ACTION_RULES: Rule[] = [
     priority: "this_week",
     holds: (s) =>
       s.stage === "sources_sought" && s.solicitation?.parseStatus === "parsed" && !s.questionnaire?.built
-        ? { title: "Build the capability questionnaire", reason: "The solicitation is parsed and no questionnaire exists; its answers give coverage, the partner call and a PWin factor.", href: oppHref(s, "/evaluation"), evidence: [`solicitation:${s.solicitation.id}`] }
+        ? { title: "Build the capability questionnaire", reason: "The solicitation is parsed and no questionnaire exists; its answers give coverage, the partner call and a PWin factor.", href: oppHref(s, "/capability"), evidence: [`solicitation:${s.solicitation.id}`] }
         : null,
     done: (s) => !!s.questionnaire?.built,
   },
@@ -192,7 +192,7 @@ export const NEXT_ACTION_RULES: Rule[] = [
       const open = q.total - q.answered;
       if (open <= 0) return null;
       const waiting = q.suggestionsWaiting > 0 ? `; ${n(q.suggestionsWaiting, "suggested answer")} waiting to be confirmed` : "";
-      return { title: `Answer the ${n(open, "open questionnaire question")}`, reason: `${q.answered} of ${q.total} answered${waiting}. Coverage, the partner call and PWin read confirmed answers only.`, href: oppHref(s, "/evaluation"), evidence: ["questionnaire"] };
+      return { title: `Answer the ${n(open, "open questionnaire question")}`, reason: `${q.answered} of ${q.total} answered${waiting}. Coverage, the partner call and PWin read confirmed answers only.`, href: oppHref(s, "/capability"), evidence: ["questionnaire"] };
     },
     done: (s) => !!s.questionnaire && s.questionnaire.answered >= s.questionnaire.total,
   },

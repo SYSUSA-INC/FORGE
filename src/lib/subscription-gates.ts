@@ -6,6 +6,7 @@ import {
   fileUploads,
   knowledgeArtifacts,
   memberships,
+  inboundEmails,
   proposalTemplates,
   solicitationDocuments,
   solicitations,
@@ -551,7 +552,8 @@ export async function getActiveMembershipCount(
 /**
  * BL-STAB-2e — every file the tenant stores, in bytes: knowledge files,
  * solicitation and companion-document files, Word templates, and uploads
- * in progress (asked for and not yet expired, arrived, or being filed).
+ * in progress (asked for and not yet expired, arrived, or being filed), and
+ * the emails received at the company's bid address (BL-SCOUT-INBOX).
  * One meter for `enforceStorageQuota` and the admin views; a filed upload
  * counts once, as its record. (BL-16 B-3c counted knowledge files only.)
  */
@@ -574,6 +576,8 @@ export async function getStorageBytesUsed(
         .where(and(eq(solicitationDocuments.organizationId, organizationId), ne(solicitationDocuments.storagePath, ""))),
     ),
     total(db.select({ bytes: sum(proposalTemplates.docxFileSize) }).from(proposalTemplates).where(eq(proposalTemplates.organizationId, organizationId))),
+    // BL-SCOUT-INBOX — the emails portals send to the company's bid address, as received.
+    total(db.select({ bytes: sum(inboundEmails.rawSize) }).from(inboundEmails).where(eq(inboundEmails.organizationId, organizationId))),
     getReservedUploadBytes(organizationId),
   ]);
   return parts.reduce((a, b) => a + b, 0);

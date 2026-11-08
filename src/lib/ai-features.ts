@@ -30,10 +30,17 @@ export const AI_FEATURES = {
   question_generator: "Question generator",
   ebuy_extract: "eBuy extraction",
   gsa_extract: "GSA extraction",
+  // BL-SCOUT-INBOX — the bids in an email a portal sent the company.
+  inbound_bids: "Portal email reading",
+  analysis_report: "Analysis Report",
   image_ocr: "Image OCR",
   knowledge_classify: "Knowledge classification",
   knowledge_extract: "Knowledge extraction",
   loss_intelligence: "Loss intelligence narrative",
+  // BL-NAV-LIFECYCLE 3b — the ranked partner list, a reason per firm from the search's facts.
+  partner_rank: "Partner ranking",
+  // BL-NAV-LIFECYCLE 3c-2 — the partner rating, a reason per partner from its answers.
+  partner_rate: "Partner rating",
   // BL-AIP-4 — embedding calls were never metered before.
   embedding: "Embeddings (indexing)",
   embedding_query: "Embeddings (query)",

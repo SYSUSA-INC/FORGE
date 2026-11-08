@@ -46,9 +46,75 @@ export type CapabilityAnswer = {
   evidence: string;
   /** A company (teaming partner or subcontractor) that would cover a gap. */
   partnerCompanyId: string | null;
+  /** BL-NAV-LIFECYCLE 2b — how much a Partial answer covers, 5..95; absent on older answers (counted as 50). */
+  percent?: number | null;
   updatedAt: string;
   updatedByUserId: string;
 };
+
+/**
+ * BL-NAV-LIFECYCLE 2b (FORGE II footnote 5, E-5 to E-8) — the answers as
+ * people give them: Yes, Partial with a percentage, No (or Not
+ * applicable), over the six stored values, which PWin and coverage keep
+ * reading. Yes carries "proven by past performance" (have_proven, else
+ * have_unproven); No carries "a partner could cover it" (gap_partner,
+ * else gap_none). Pure.
+ */
+export type ThreeAnswer = "yes" | "partial" | "no" | "na";
+
+export const THREE_ANSWER_LABELS: Record<ThreeAnswer, string> = { yes: "Yes", partial: "Partial", no: "No", na: "Not applicable" };
+
+export const PARTIAL_PERCENT = { min: 5, max: 95, step: 5, default: 50 } as const;
+
+/** A Partial's percentage, rounded to the step and kept within 5..95. */
+export function clampPartialPercent(n: unknown): number {
+  const v = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(v)) return PARTIAL_PERCENT.default;
+  const stepped = Math.round(v / PARTIAL_PERCENT.step) * PARTIAL_PERCENT.step;
+  return Math.min(PARTIAL_PERCENT.max, Math.max(PARTIAL_PERCENT.min, stepped));
+}
+
+export function threeAnswerOf(value: CapabilityAnswerValue): { answer: ThreeAnswer; proven: boolean; partnerCould: boolean } {
+  switch (value) {
+    case "have_proven":
+      return { answer: "yes", proven: true, partnerCould: false };
+    case "have_unproven":
+      return { answer: "yes", proven: false, partnerCould: false };
+    case "partial":
+      return { answer: "partial", proven: false, partnerCould: false };
+    case "gap_partner":
+      return { answer: "no", proven: false, partnerCould: true };
+    case "gap_none":
+      return { answer: "no", proven: false, partnerCould: false };
+    default:
+      return { answer: "na", proven: false, partnerCould: false };
+  }
+}
+
+export function storedValueOf(input: { answer: ThreeAnswer; proven?: boolean; partnerCould?: boolean }): CapabilityAnswerValue {
+  if (input.answer === "yes") return input.proven ? "have_proven" : "have_unproven";
+  if (input.answer === "partial") return "partial";
+  if (input.answer === "no") return input.partnerCould ? "gap_partner" : "gap_none";
+  return "na";
+}
+
+/** How an answer reads ("Yes, proven", "Partial, 60%", "No, a partner could cover it"). */
+export function answerLabel(a: { value: CapabilityAnswerValue; percent?: number | null }): string {
+  switch (a.value) {
+    case "have_proven":
+      return "Yes, proven";
+    case "have_unproven":
+      return "Yes";
+    case "partial":
+      return `Partial, ${clampPartialPercent(a.percent ?? PARTIAL_PERCENT.default)}%`;
+    case "gap_partner":
+      return "No, a partner could cover it";
+    case "gap_none":
+      return "No";
+    default:
+      return "Not applicable";
+  }
+}
 
 /** Where a suggested answer came from (phase C). */
 export type CapabilitySuggestionSource =
@@ -174,4 +240,14 @@ export function answeredCount(questions: CapabilityQuestion[], answers: Record<s
 
 function normalise(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** How many questions are answered Yes, Partial, No and Not applicable (questions no longer in the set are left out). */
+export function threeAnswerCounts(questions: Pick<CapabilityQuestion, "id">[], answers: Record<string, Pick<CapabilityAnswer, "value">>): Record<ThreeAnswer, number> {
+  const out: Record<ThreeAnswer, number> = { yes: 0, partial: 0, no: 0, na: 0 };
+  for (const q of questions) {
+    const a = answers[q.id];
+    if (a) out[threeAnswerOf(a.value).answer] += 1;
+  }
+  return out;
 }

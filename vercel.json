@@ -45,12 +45,24 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/inbound-mail",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/amendment-watch",
+      "schedule": "45 9 * * *"
+    },
+    {
       "path": "/api/cron/pwin-snapshots",
       "schedule": "30 9 * * *"
     },
     {
       "path": "/api/cron/crm-agency-refresh",
       "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/cron/partner-invites",
+      "schedule": "50 7 * * *"
     }
   ]
 }

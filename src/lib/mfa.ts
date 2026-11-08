@@ -7,9 +7,10 @@
 import { generate, generateSecret, generateURI, verify } from "otplib";
 import { randomInt } from "node:crypto";
 
-import { MFA_ISSUER, MFA_LIMITS } from "@/lib/mfa-constants";
+import { MFA_LIMITS } from "@/lib/mfa-constants";
+import { mfaIssuer } from "@/lib/site-domain";
 
-export { MFA_FACTOR_KINDS, MFA_ISSUER, MFA_LIMITS, type MfaFactorKind } from "@/lib/mfa-constants";
+export { MFA_FACTOR_KINDS, MFA_LIMITS, MFA_METHOD_LABELS, missingMethods, type MfaFactorKind, type MfaMethod } from "@/lib/mfa-constants";
 
 /** Spaces and dashes people type between groups are not part of a code. */
 export function normalizeTotpCode(input: string): string | null {
@@ -44,7 +45,7 @@ export function newTotpSecret(): string {
 }
 
 export function totpUri(input: { secret: string; email: string }): string {
-  return generateURI({ issuer: MFA_ISSUER, label: input.email, secret: input.secret });
+  return generateURI({ issuer: mfaIssuer(), label: input.email, secret: input.secret });
 }
 
 /** For tests and the preview bypass: the code for a secret at a moment. */

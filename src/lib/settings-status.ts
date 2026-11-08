@@ -7,6 +7,7 @@
  * browser, so each detection has to run on the server and serialize
  * its result down to the client.
  */
+import { emailFrom, emailFromDomain } from "@/lib/site-domain";
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -128,7 +129,7 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
       category: "data",
       configured: envSet("AWARDS_INTEL_ENABLED"),
       powers:
-        "BD-side awards search by NAICS / agency / keyword. Flags incumbents whose contracts end within 12 months as recompete prospects.",
+        "BD-side awards search by NAICS / agency / keyword. Flags incumbents whose contracts end within 12 months as recompete prospects. Gives Find partners (Capture) its past performance.",
       detail: envSet("AWARDS_INTEL_ENABLED")
         ? "AWARDS_INTEL_ENABLED=1. Available at /intelligence/awards."
         : "Preview feature. Set AWARDS_INTEL_ENABLED=1 to enable /intelligence/awards. Uses the same public USAspending API (no extra credentials).",
@@ -212,7 +213,7 @@ export function getIntegrationStatuses(): IntegrationStatus[] {
       powers:
         "Outbound mail: invitations, password resets, opportunity review requests.",
       detail: envSet("RESEND_API_KEY")
-        ? `RESEND_API_KEY is set. From: ${process.env.EMAIL_FROM ?? "Forge <noreply@sysgov.com>"}.`
+        ? `RESEND_API_KEY is set. From: ${emailFrom()} (the domain ${emailFromDomain()} must be verified in Resend, or every email is refused).`
         : "Set RESEND_API_KEY on Vercel. Without it, emails are logged but not sent.",
     },
   ];

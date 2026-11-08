@@ -61,7 +61,13 @@ describe("BL-STAB-7e — company SAM.gov keys for platform admins", () => {
     const c = under(`k2:${K2}`, KEY_A, fx2.orgA.organizationId);
     // Damaged under k1: its tag no longer matches.
     const damaged = under(`k1:${K1}`, KEY_B, fx2.orgB.organizationId);
-    const broken = damaged.ciphertext.replace(/\.([^.]+)\.([^.]+)$/, (_, tag: string, body: string) => `.${tag.slice(0, -2)}AA.${body}`);
+    // Flip a byte of the auth tag: rewriting its text could leave the bytes
+    // unchanged (about 1 run in 256), and then the value still decrypts.
+    const broken = damaged.ciphertext.replace(/\.([^.]+)\.([^.]+)$/, (_, tag: string, body: string) => {
+      const t = Buffer.from(tag, "base64url");
+      t[0] = t[0]! ^ 0xff;
+      return `.${t.toString("base64url")}.${body}`;
+    });
     await db.insert(organizationSamgovKeys).values([
       { organizationId: fx.orgA.organizationId, ciphertext: a.ciphertext, keyId: a.keyId, last4: "AAAA" },
       { organizationId: fx.orgB.organizationId, ciphertext: b.ciphertext, keyId: b.keyId, last4: "BBBB" },

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ResultHead, ResultRow } from "@/components/scout/ResultRow";
 import { Panel } from "@/components/ui/Panel";
 import { StubModeBanner } from "@/components/ui/StubModeBanner";
 import { UploadQueue } from "@/components/uploads/UploadQueue";
@@ -146,33 +147,28 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
         setError(res.error);
         return;
       }
-      // Attachments that couldn't be filed are named here, not lost behind a redirect.
-      if (res.attachmentsSkipped.length > 0) {
-        setCreated({ opportunityId: res.opportunityId, skipped: res.attachmentsSkipped });
-        return;
-      }
-      router.push(`/opportunities/${res.opportunityId}`);
+      // BL-SCOUT-ONEPAGE — added from the Scout page: the row says so, with any attachment not filed.
+      setCreated({ opportunityId: res.opportunityId, skipped: res.attachmentsSkipped });
+      router.refresh();
     });
   }
 
+  const days = fields.responseDueDate ? Math.ceil((new Date(fields.responseDueDate).getTime() - Date.now()) / 86_400_000) : null;
+  const typeLabel = NOTICE_TYPES.find((t) => t.value === fields.noticeType)?.label ?? "";
+
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr]">
+    <div className="flex flex-col gap-4">
       <Panel
-        title="Forwarded GSA email"
-        eyebrow="Step 1 of 2"
+        title="Paste a forwarded GSA email"
+        eyebrow="With its attachments"
         actions={
-          <button
-            type="button"
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
-            onClick={parse}
-            disabled={parsing || rawText.trim().length === 0}
-          >
+          <button type="button" className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60" onClick={parse} disabled={parsing || rawText.trim().length === 0}>
             {parsing ? "Extracting…" : "Extract with AI"}
           </button>
         }
       >
         <textarea
-          className="aur-input min-h-[260px] w-full resize-y font-mono text-[12px] leading-relaxed"
+          className="aur-input min-h-[160px] w-full resize-y font-mono text-[12px] leading-relaxed"
           placeholder={`Paste the full forwarded email body here.\n\nExamples we handle:\n- GSA eBuy RFQ notification or copy of the RFQ body\n- GSA Schedule sub-CO opportunity forward\n- OASIS+ / Polaris / Alliant 2 task order announcement\n- Sources sought or RFI emails`}
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
@@ -181,7 +177,6 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
           <span>{rawText.length.toLocaleString()} chars</span>
           {provider ? <span>provider: {provider}</span> : null}
         </div>
-
         {stubbed ? (
           <div className="mt-3">
             <StubModeBanner
@@ -190,64 +185,95 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
             />
           </div>
         ) : null}
-        {error ? (
-          <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">
-            {error}
-          </div>
-        ) : null}
+        {error ? <div className="mt-3 rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
+        <div className="mt-4 border-t border-layer/10 pt-3">
+          <div className="aur-label mb-1">Attachments · {queue.items.length} of {GSA_MAX_ATTACHMENTS} max</div>
+        <div className="flex flex-col gap-2">
+          <p className="font-body text-[12px] text-muted">
+            Optional. If the email came with the RFP / RFQ as a PDF, drop it
+            here. Each file uploads straight to secure storage, then becomes a
+            Solicitation linked to the new opportunity, parsed in the
+            background. Up to {GSA_MAX_ATTACHMENTS} files, {formatLimit(maxBytes)} each.
+          </p>
+          <input
+            type="file"
+            multiple
+            accept={acceptFor("document")}
+            disabled={queue.items.length >= GSA_MAX_ATTACHMENTS || creating || created !== null}
+            onChange={(e) => {
+              onFilesPicked(e.target.files);
+              // Allow re-adding the same file after removing it.
+              e.target.value = "";
+            }}
+            className="aur-input file:mr-3 file:rounded file:border-0 file:bg-layer/10 file:px-3 file:py-1 file:text-[12px] file:text-text"
+          />
+          {notice ? <div className="font-mono text-[11px] text-muted">{notice}</div> : null}
+          <UploadQueue
+            items={queue.items}
+            onRetry={queue.retry}
+            onCancel={queue.cancel}
+            onRemove={queue.remove}
+            // Once Create is pressed the list is what is being filed: no more changes.
+            locked={creating || created !== null}
+            detail={(it) => {
+              if (!created || !it.uploadId) return "";
+              return created.skipped.some((s) => s.uploadId === it.uploadId) ? "· not filed" : "· filed";
+            }}
+          />
+        </div>
+        </div>
       </Panel>
 
-      <Panel
-        title="Review & confirm"
-        eyebrow="Step 2 of 2"
-        actions={
-          <button
-            type="button"
-            className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
-            disabled={
-              !parsedOnce ||
-              creating ||
-              created !== null ||
-              fields.title.trim() === "" ||
-              queue.busy ||
-              unfinished > 0
-            }
-            title={
-              queue.busy
-                ? "Wait for the attachments to finish uploading."
-                : unfinished > 0
-                  ? "Retry or remove the attachments that didn't upload."
-                  : undefined
-            }
-            onClick={create}
-          >
-            {creating ? "Creating…" : queue.busy ? "Uploading attachments…" : "Create opportunity"}
-          </button>
-        }
-      >
-        {created ? (
-          <div className="mb-3 flex flex-col gap-2 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 font-mono text-[11px] text-text">
-            <span>
-              Opportunity created. {created.skipped.length} attachment{created.skipped.length === 1 ? " wasn't" : "s weren't"} filed with it:
-            </span>
-            <ul className="flex flex-col gap-0.5">
-              {created.skipped.map((s, i) => (
-                <li key={`${s.name}_${i}`}>
-                  {s.name}: <span className="text-muted">{s.reason}</span>
-                </li>
-              ))}
-            </ul>
-            <Link href={`/opportunities/${created.opportunityId}`} className="aur-btn aur-btn-primary self-start text-[11px]">
-              Open the opportunity
-            </Link>
-          </div>
-        ) : null}
-        {!parsedOnce ? (
-          <div className="font-mono text-[11px] text-muted">
-            Paste the email body and click <strong>Extract with AI</strong> to
-            populate these fields. You can edit anything before creating.
-          </div>
-        ) : (
+      {parsedOnce ? (
+        <Panel title="Pasted" eyebrow="Check the fields, then add it">
+          <ResultHead />
+          <ul>
+            <ResultRow
+              key={created ? created.opportunityId : "pasted"}
+              defaultOpen={!created || created.skipped.length > 0}
+              call={{ label: "Pasted", tone: "none", title: "Read from the email you pasted; the AI reviews the scout's finds, not pastes" }}
+              title={fields.title.trim() || "Untitled notice"}
+              meta={[fields.buyingAgency, typeLabel, fields.vehicle, fields.solicitationNumber, fields.naicsCode ? `NAICS ${fields.naicsCode}` : "", fields.setAside].filter(Boolean).join(" · ")}
+              source="GSA email"
+              due={days === null ? null : days < 0 ? `${-days}d ago` : `${days}d`}
+              dueSoon={days !== null && days < 5}
+              fit={null}
+              actions={
+                created ? (
+                  <Link href={`/opportunities/${created.opportunityId}`} className="font-mono text-[11px] text-cobalt hover:underline">
+                    Open →
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                    disabled={creating || fields.title.trim() === "" || queue.busy || unfinished > 0}
+                    title={queue.busy ? "Wait for the attachments to finish uploading." : unfinished > 0 ? "Retry or remove the attachments that didn't upload." : undefined}
+                    onClick={create}
+                  >
+                    {creating ? "Adding…" : queue.busy ? "Uploading…" : "Add to pipeline"}
+                  </button>
+                )
+              }
+              details={
+                created ? (
+                  created.skipped.length > 0 ? (
+                    <div className="flex flex-col gap-1 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 font-mono text-[11px] text-text">
+                      <span>
+                        Added. {created.skipped.length} attachment{created.skipped.length === 1 ? " wasn't" : "s weren't"} filed with it:
+                      </span>
+                      <ul className="flex flex-col gap-0.5">
+                        {created.skipped.map((s, i) => (
+                          <li key={`${s.name}_${i}`}>
+                            {s.name}: <span className="text-muted">{s.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="font-body text-[12px] text-muted">Added to the pipeline{queue.readyUploadIds.length > 0 ? " with its attachments, which are being read" : ""}.</p>
+                  )
+                ) : (
           <div className="grid grid-cols-1 gap-3">
             <Field label="Title" required>
               <input
@@ -356,50 +382,12 @@ export function GsaPasteClient({ maxBytes }: { maxBytes: number }) {
               />
             </Field>
           </div>
-        )}
-      </Panel>
-
-      {/* Attachments span the full width — they're optional and may
-          run to several rows once files are picked. */}
-      <Panel
-        title="Attachments"
-        eyebrow={`${queue.items.length} of ${GSA_MAX_ATTACHMENTS} max`}
-        className="xl:col-span-2"
-      >
-        <div className="flex flex-col gap-2">
-          <p className="font-body text-[12px] text-muted">
-            Optional. If the email came with the RFP / RFQ as a PDF, drop it
-            here. Each file uploads straight to secure storage, then becomes a
-            Solicitation linked to the new opportunity, parsed in the
-            background. Up to {GSA_MAX_ATTACHMENTS} files, {formatLimit(maxBytes)} each.
-          </p>
-          <input
-            type="file"
-            multiple
-            accept={acceptFor("document")}
-            disabled={queue.items.length >= GSA_MAX_ATTACHMENTS || creating || created !== null}
-            onChange={(e) => {
-              onFilesPicked(e.target.files);
-              // Allow re-adding the same file after removing it.
-              e.target.value = "";
-            }}
-            className="aur-input file:mr-3 file:rounded file:border-0 file:bg-layer/10 file:px-3 file:py-1 file:text-[12px] file:text-text"
-          />
-          {notice ? <div className="font-mono text-[11px] text-muted">{notice}</div> : null}
-          <UploadQueue
-            items={queue.items}
-            onRetry={queue.retry}
-            onCancel={queue.cancel}
-            onRemove={queue.remove}
-            // Once Create is pressed the list is what is being filed: no more changes.
-            locked={creating || created !== null}
-            detail={(it) => {
-              if (!created || !it.uploadId) return "";
-              return created.skipped.some((s) => s.uploadId === it.uploadId) ? "· not filed" : "· filed";
-            }}
-          />
-        </div>
-      </Panel>
+                )
+              }
+            />
+          </ul>
+        </Panel>
+      ) : null}
     </div>
   );
 }

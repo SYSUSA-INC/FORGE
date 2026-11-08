@@ -1,5 +1,4 @@
 import { and, asc, eq } from "drizzle-orm";
-import Link from "next/link";
 import { db } from "@/db";
 import {
   solicitations,
@@ -9,7 +8,12 @@ import {
 } from "@/db/schema";
 import { Panel } from "@/components/ui/Panel";
 import { requireCurrentOrg } from "@/lib/auth-helpers";
+import { watchStatus } from "@/lib/amendment-watch";
 import { OpportunityDocsAndAIClient } from "./OpportunityDocsAndAIClient";
+import { SamWatchControl, type NoticeFilesFetch } from "./SamWatchControl";
+import { latestJobForResource } from "@/lib/jobs";
+import { resolvePolicy } from "@/lib/upload-policy";
+import { UploadSolicitationForm } from "@/app/(app)/solicitations/new/UploadSolicitationForm";
 
 /**
  * BL-23b — opportunity-mirror surface for BL-23's AI doc review.
@@ -57,23 +61,33 @@ export async function OpportunityDocsAndAIPanel({
     )
     .orderBy(asc(solicitations.createdAt));
 
+  // BL-SCOUT-AMEND — the amendment watch, for an open opportunity with a SAM.gov notice.
+  const watch = await watchStatus(organizationId, opportunityId);
+  // BL-SCOUT-FILES — the download of a new opportunity's notice attachments.
+  const fetchJob = watch?.watched ? await latestJobForResource({ organizationId, kind: "sam_notice_files", resourceId: opportunityId }).catch(() => null) : null;
+  const fetch: NoticeFilesFetch = fetchJob && (fetchJob.status === "queued" || fetchJob.status === "running" || fetchJob.status === "failed" || fetchJob.status === "done") ? { status: fetchJob.status, error: (fetchJob.error ?? "").slice(0, 200) } : null;
+  // BL-SCOUT-FILES — the SAM.gov status and an upload that files on this
+  // opportunity, whether or not any document is here yet.
+  const samWatch = watch?.watched ? <SamWatchControl opportunityId={opportunityId} checkedAt={watch.checkedAt ? watch.checkedAt.toISOString() : null} fetch={fetch} /> : null;
+  const addDocument = (
+    <details className="mt-4 border-t border-layer/10 pt-3">
+      <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-widest text-accent">Add a document to this opportunity</summary>
+      <div className="mt-3">
+        <UploadSolicitationForm maxBytes={resolvePolicy("document", process.env).maxBytes} then="opportunity" opportunityId={opportunityId} />
+      </div>
+    </details>
+  );
+
   if (linkedSolicitations.length === 0) {
     return (
       <Panel title="Documents & AI review" eyebrow="Linked solicitations">
         <p className="font-body text-[13px] leading-relaxed text-muted">
-          No solicitations are linked to this opportunity yet. Upload a
-          solicitation document and link it here to enable AI document
-          review, capability matrix scoring, and clarification question
-          generation.
+          {fetch && !fetch.error && (fetch.status === "queued" || fetch.status === "running")
+            ? "No documents yet: FORGE is downloading this notice's attachments from SAM.gov (below)."
+            : "No documents on this opportunity yet. Add the solicitation's files below (or, for a SAM.gov notice, Check SAM.gov now) for AI document review, capability matrix scoring and clarification questions."}
         </p>
-        <div className="mt-3">
-          <Link
-            href="/solicitations/new"
-            className="aur-btn aur-btn-primary text-[12px]"
-          >
-            Upload a solicitation →
-          </Link>
-        </div>
+        {samWatch}
+        {addDocument}
       </Panel>
     );
   }
@@ -183,6 +197,8 @@ export async function OpportunityDocsAndAIPanel({
       }
     >
       <OpportunityDocsAndAIClient solicitations={rows} />
+      {samWatch}
+      {addDocument}
     </Panel>
   );
 }

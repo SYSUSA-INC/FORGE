@@ -5,12 +5,12 @@
  * the next prompt is shown, and the expiring-award window. Unit-tested.
  */
 import { setAsideEligibility, type SocioEconomic } from "@/lib/pwin-model";
-import { hasKeyword, matchNotice, matchStored, mentionsExcluded, parseKeyword, plainText, type DescriptionState, type KeywordQuery } from "@/lib/samgov-match";
+import { hasKeyword, matchNotice, matchStored, mentionsExcluded, parseKeyword, plainText, type DescriptionState, type KeywordQuery, type KeywordSearchCounts } from "@/lib/samgov-match";
 
 export type ScoutRecommendation = "pursue" | "watch" | "skip";
 export type ScoutDecision = "imported" | "dismissed";
 export type ScoutGrade = "correct" | "wrong" | "inconclusive";
-export type ScoutSource = "org_naics" | "keyword" | "watchlist_award";
+export type ScoutSource = "org_naics" | "keyword" | "watchlist_award" | "portal_email";
 
 /** What the page renders — plain JSON, shared by the server lib and the client. */
 export type ScoutCandidateView = {
@@ -115,7 +115,101 @@ export type FitContext = {
   now: Date;
 };
 
-export type FitResult = { score: number; signals: string[] };
+/**
+ * BL-SCOUT-QUALITY — how much a keyword is about this notice: in the title
+ * or said three times is the work itself; twice, once in a short notice,
+ * or in an earlier notice of the solicitation (the search saw it there) is
+ * relevant; once in a long description, or only in the agency's name, is a
+ * passing mention.
+ */
+export type KeywordStrength = "strong" | "moderate" | "weak";
+export type KeywordWhere = "title" | "text" | "earlier" | "agency";
+export type KeywordHit = { term: string; strength: KeywordStrength; inTitle: boolean; mentions: number; where: KeywordWhere };
+
+/** A description longer than this makes a single mention a passing one. */
+export const PASSING_MENTION_CHARS = 800;
+
+export type FitResult = { score: number; signals: string[]; keyword: KeywordHit | null };
+
+const STRENGTH_RANK: Record<KeywordStrength, number> = { strong: 3, moderate: 2, weak: 1 };
+
+function countPhrase(haystack: string, phrase: string): number {
+  if (!phrase) return 0;
+  let n = 0;
+  let at = haystack.indexOf(phrase);
+  while (at !== -1) {
+    n += 1;
+    at = haystack.indexOf(phrase, at + phrase.length);
+  }
+  return n;
+}
+
+/**
+ * The strongest keyword evidence in the notice's own title and
+ * description. `confirmed` is the keyword the search kept the notice for
+ * (it may sit in an earlier notice of the solicitation or the agency
+ * name): absent from this text, it counts as a passing mention.
+ */
+export function keywordStrength(title: string, description: string, keywords: string[], confirmed?: string | null, agency = ""): KeywordHit | null {
+  const flat = (s: string) => s.toLowerCase().replace(/\s+/g, " ");
+  const t = flat(title);
+  const d = flat(description);
+  const a = flat(agency);
+  const terms = [...new Set([...(confirmed?.trim() ? [confirmed] : []), ...keywords].map((k) => k.trim()).filter(Boolean))];
+  let best: KeywordHit | null = null;
+  for (const term of terms) {
+    const p = flat(term);
+    const inTitle = t.includes(p);
+    const mentions = countPhrase(d, p) + (inTitle ? 1 : 0);
+    let strength: KeywordStrength | null = null;
+    let where: KeywordWhere = inTitle ? "title" : "text";
+    if (inTitle || mentions >= 3) strength = "strong";
+    else if (mentions === 2) strength = "moderate";
+    else if (mentions === 1) strength = d.length > PASSING_MENTION_CHARS ? "weak" : "moderate";
+    else if (term === confirmed?.trim()) {
+      // The search kept the notice for it, so it is in an earlier notice of
+      // this solicitation, or only in the agency's name.
+      where = a.includes(p) ? "agency" : "earlier";
+      strength = where === "agency" ? "weak" : "moderate";
+    }
+    if (!strength) continue;
+    const hit: KeywordHit = { term, strength, inTitle, mentions, where };
+    if (!best || STRENGTH_RANK[strength] > STRENGTH_RANK[best.strength] || (strength === best.strength && mentions > best.mentions)) best = hit;
+  }
+  return best;
+}
+
+/**
+ * BL-SCOUT-QUALITY — a find kept for a keyword that is only mentioned in
+ * passing, with nothing else that ties it to this company (a recompete, a
+ * win at the agency), is not worth a person's time: the scout drops it.
+ */
+export function passingMentionOnly(fit: FitResult, ctx: { recompete: FitContext["recompete"]; customer: FitContext["customer"] }, source: ScoutSource): boolean {
+  if (source !== "keyword") return false;
+  if (fit.keyword && fit.keyword.strength !== "weak") return false;
+  if (ctx.recompete) return false;
+  if (ctx.customer && ctx.customer.won > 0) return false;
+  return true;
+}
+
+/**
+ * BL-SCOUT-QUALITY — the key that makes two SAM.gov notices one
+ * solicitation (each amendment is its own notice): the solicitation number
+ * with only its letters and digits, upper-cased. Short or generic numbers
+ * ("N/A", "RFI-001") never group.
+ */
+export function solicitationKey(number: string | null | undefined): string | null {
+  const k = (number ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return k.length >= 8 ? k : null;
+}
+
+/** The recompete radar's verdict, read back from the signals a stored find carries (re-scoring keeps it). */
+export function recompeteFromSignals(signals: string[]): FitContext["recompete"] {
+  if (signals.includes("Looks like a recompete of a pursuit you won")) return { outcome: "won", confidence: "stored", hasLessons: false };
+  if (signals.includes("Looks like a recompete of a pursuit you lost; lessons are on file")) return { outcome: "lost", confidence: "stored", hasLessons: true };
+  if (signals.includes("Looks like a recompete of a pursuit you lost")) return { outcome: "lost", confidence: "stored", hasLessons: false };
+  return null;
+}
 
 function norm(s: string): string {
   return s.trim().toLowerCase();
@@ -124,19 +218,24 @@ function norm(s: string): string {
 /**
  * 0..100 heuristic fit, before the model's take. Each rule adds a signal
  * the reader (and the prompt) can see, so the number is never a mystery.
+ *
+ * BL-SCOUT-QUALITY — it starts at zero and is earned: what is being bought
+ * (the keyword in the title or said often) counts most; the company's
+ * codes count less, since a NAICS code covers far more work than any one
+ * company does; a passing mention of a keyword is worth almost nothing.
  */
 export function scoutFit(c: FitInput, ctx: FitContext): FitResult {
-  let score = 35;
+  let score = 0;
   const signals: string[] = [];
 
   const primary = norm(ctx.primaryNaics);
   const list = ctx.naicsList.map(norm).filter(Boolean);
   const naics = norm(c.naicsCode);
   if (naics && primary && naics === primary) {
-    score += 30;
+    score += 25;
     signals.push(`NAICS ${c.naicsCode} is your primary code`);
   } else if (naics && list.includes(naics)) {
-    score += 20;
+    score += 15;
     signals.push(`NAICS ${c.naicsCode} is one of your codes`);
   } else if (naics && (primary || list.length > 0)) {
     score -= 10;
@@ -145,7 +244,7 @@ export function scoutFit(c: FitInput, ctx: FitContext): FitResult {
 
   const eligible = setAsideEligibility(c.setAside, ctx.socio);
   if (eligible === true) {
-    score += 15;
+    score += 10;
     signals.push(`Set-aside you qualify for: ${c.setAside}`);
   } else if (eligible === false) {
     score -= 30;
@@ -180,19 +279,30 @@ export function scoutFit(c: FitInput, ctx: FitContext): FitResult {
     }
   }
 
-  // Line breaks in a description (readableText keeps them) don't split a phrase.
-  const haystack = `${c.title} ${c.description}`.toLowerCase().replace(/\s+/g, " ");
-  const phrase = (k: string) => norm(k).replace(/\s+/g, " ");
-  // BL-STAB-10d — a keyword the search confirmed (in the title, agency, description or an
-  // earlier notice of the solicitation) counts as is; otherwise look for one in the text.
-  const hit = ctx.keyword?.trim() ? ctx.keyword : ctx.keywords.find((k) => k.trim() && haystack.includes(phrase(k)));
-  if (hit) {
-    score += 10;
-    signals.push(`Matches your keyword: ${hit.trim()}`);
+  // Line breaks in a description don't split a phrase (keywordStrength flattens them).
+  const keyword = keywordStrength(c.title, c.description, ctx.keywords, ctx.keyword, c.agency);
+  if (keyword) {
+    const term = keyword.term.trim();
+    if (keyword.strength === "strong") {
+      score += 30;
+      signals.push(keyword.inTitle ? `Your keyword ${term} is in the title` : `Your keyword ${term} is mentioned ${keyword.mentions} times`);
+    } else if (keyword.strength === "moderate") {
+      score += 15;
+      signals.push(
+        keyword.where === "earlier"
+          ? `Your keyword ${term} is in an earlier notice of this solicitation`
+          : keyword.mentions === 2
+            ? `Your keyword ${term} is mentioned twice`
+            : `Your keyword ${term} is mentioned in this short notice`,
+      );
+    } else {
+      score += 3;
+      signals.push(keyword.where === "agency" ? `Your keyword ${term} is only in the agency's name` : `Your keyword ${term} is mentioned once, in passing`);
+    }
   }
 
   if (c.source === "watchlist_award") {
-    score += 10;
+    score += 15;
     signals.push("Expiring award on your watchlist");
   }
 
@@ -207,7 +317,7 @@ export function scoutFit(c: FitInput, ctx: FitContext): FitResult {
     }
   }
 
-  return { score: Math.max(0, Math.min(100, Math.round(score))), signals };
+  return { score: Math.max(0, Math.min(100, Math.round(score))), signals, keyword };
 }
 
 /**
@@ -380,4 +490,74 @@ export function staleReason(
   if (kept && (q.terms.includes(kept) || q.anyOf.some((g) => g.includes(kept)))) return mentionsExcluded(row, q, desc) ? "no_keyword" : null;
   const m = desc ? matchStored(row, q, desc) : matchNotice(row, q, null);
   return m.status === "not_mentioned" || m.status === "no_description" ? "no_keyword" : null;
+}
+
+// ── BL-SCOUT-REACH ────────────────────────────────────────────────────
+
+/** The share of a plan's monthly AI requests the scout leaves for the rest of FORGE. */
+export const SCOUT_AI_RESERVE = 0.2;
+
+/**
+ * How many finds the AI may review this run: what was asked, within the
+ * month's allowance less the reserve. `limit` 0 is an unlimited plan.
+ */
+export function scoutTriageAllowance(limit: number, used: number, wanted: number): number {
+  if (limit <= 0) return Math.max(0, wanted);
+  return Math.max(0, Math.min(wanted, limit - used - Math.ceil(limit * SCOUT_AI_RESERVE)));
+}
+
+/**
+ * The search, in one sentence, so the run note shows where notices went:
+ * what SAM.gov sent, how many are open solicitations, and with keywords
+ * as a filter how many mention one. Says when SAM.gov held more than it
+ * sends.
+ */
+export function scoutSearchFunnel(c: KeywordSearchCounts, keyworded: boolean, perCode: number): string {
+  const n = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString("en-US")} ${x === 1 ? one : many}`;
+  const open = keyworded ? c.matched + c.notMentioned + c.noDescription + c.unchecked : c.matched;
+  const parts = [`SAM.gov sent ${n(c.received, "notice")}: ${n(open, "open solicitation")} once amendments are folded and awards and closed notices left out`];
+  if (keyworded) {
+    const not = c.notMentioned + c.noDescription;
+    parts.push(`, ${c.matched.toLocaleString("en-US")} mention${c.matched === 1 ? "s" : ""} a keyword and ${not.toLocaleString("en-US")} ${not === 1 ? "doesn't" : "don't"}${c.unchecked > 0 ? `, ${c.unchecked.toLocaleString("en-US")} not checked yet` : ""}`);
+  }
+  let line = `${parts.join("")}.`;
+  if (c.truncated) {
+    line += ` SAM.gov holds ${n(c.samTotal, "notice")} for this search but sends at most ${perCode.toLocaleString("en-US")} per code: shorten "Posted in the last" so every one is read.`;
+  }
+  return line;
+}
+
+// ── BL-SCOUT-ONEPAGE ──────────────────────────────────────────────────
+
+export type ScoutListFilter = "recommended" | "unreviewed" | "all" | "skipped";
+
+export const SCOUT_LIST_FILTERS: { key: ScoutListFilter; label: string }[] = [
+  { key: "recommended", label: "Recommended" },
+  { key: "unreviewed", label: "Not yet reviewed" },
+  { key: "all", label: "All" },
+  { key: "skipped", label: "Skipped" },
+];
+
+const CALL_ORDER = (r: ScoutCandidateView["recommendation"]) => (r === "pursue" ? 0 : r === "watch" ? 1 : r === null ? 2 : 3);
+
+/**
+ * The finds a filter shows, Pursue then Watch then not yet reviewed then
+ * Skip, best fit first in each. All leaves the skips out: they are the
+ * AI's no, kept under Skipped so a person can overrule it.
+ */
+export function filterFinds(finds: ScoutCandidateView[], filter: ScoutListFilter): ScoutCandidateView[] {
+  const keep = (c: ScoutCandidateView) =>
+    filter === "recommended"
+      ? c.recommendation === "pursue" || c.recommendation === "watch"
+      : filter === "unreviewed"
+        ? c.recommendation === null
+        : filter === "skipped"
+          ? c.recommendation === "skip"
+          : c.recommendation !== "skip";
+  return finds.filter(keep).sort((a, b) => CALL_ORDER(a.recommendation) - CALL_ORDER(b.recommendation) || b.fitScore - a.fitScore);
+}
+
+/** The filter the list opens on: what the AI recommends, else everything not skipped. */
+export function defaultFindsFilter(finds: ScoutCandidateView[]): ScoutListFilter {
+  return finds.some((c) => c.recommendation === "pursue" || c.recommendation === "watch") ? "recommended" : "all";
 }

@@ -5,13 +5,15 @@ import { db } from "@/db";
 import { opportunities, users } from "@/db/schema";
 import { LifecycleChevron } from "@/components/lifecycle/LifecycleChevron";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Panel } from "@/components/ui/Panel";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { identifySource } from "@/lib/identify-sources";
 import { lifecycleStage, type LifecycleKey } from "@/lib/lifecycle";
 import { safeQuery } from "@/lib/schema-resilience";
-import { listOpportunityOwners } from "@/app/(app)/opportunities/actions";
-import { OpportunityForm } from "@/app/(app)/opportunities/OpportunityForm";
 import { ScoutSection } from "@/app/(app)/opportunities/scout/ScoutSection";
+import { evaluateFilter } from "@/lib/opportunity-decision";
+import { CreateSection } from "./CreateSection";
+import { EvaluateSection } from "./EvaluateSection";
+import { CaptureSection } from "./CaptureSection";
 import { StageList, type StageListRow } from "./StageList";
 
 /**
@@ -23,18 +25,17 @@ import { StageList, type StageListRow } from "./StageList";
  * (Analyze, the decision, the plan, the draft, the submission) arrive
  * phase by phase on these pages.
  */
-export type StageSearchParams = { tab?: string; afterCreate?: string };
+export type StageSearchParams = { tab?: string; afterCreate?: string; source?: string; from?: string; wait?: string; filter?: string };
 
 export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: LifecycleKey; searchParams: StageSearchParams }) {
   const stage = lifecycleStage(stageKey);
   if (!stage) notFound();
-  const user = await requireAuth();
+  await requireAuth();
   const { organizationId } = await requireCurrentOrg();
 
   if (stage.key === "identify") {
     const tab = searchParams.tab === "create" ? "create" : "scout";
     const afterCreate = searchParams.afterCreate === "proposal" ? "proposal" : undefined;
-    const owners = tab === "create" ? await listOpportunityOwners() : [];
     return (
       <>
         <PageHeader eyebrow="Pipeline" title="Identify" subtitle={stage.description} />
@@ -56,18 +57,13 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
           ))}
         </nav>
         {tab === "create" ? (
-          <Panel title="Create an opportunity" eyebrow="By hand">
-            <p className="mb-4 font-body text-[13px] leading-[1.5] text-muted">
-              Add a lead, RFI or pre-RFP notice you want to pursue. It lands in the pipeline at Identified. To start from a solicitation document, upload it under{" "}
-              <Link href="/solicitations/new" className="aur-link">
-                New solicitation
-              </Link>{" "}
-              and convert it; one page for both is coming.
-            </p>
-            <OpportunityForm mode="create" owners={owners} defaultOwnerUserId={user.id} afterCreate={afterCreate} />
-          </Panel>
+          <CreateSection
+            from={searchParams.from}
+            wait={searchParams.wait !== "0"}
+            afterCreate={afterCreate}
+          />
         ) : (
-          <ScoutSection />
+          <ScoutSection source={identifySource(searchParams.source)} />
         )}
       </>
     );
@@ -82,6 +78,8 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
           agency: opportunities.agency,
           stage: opportunities.stage,
           solicitationNumber: opportunities.solicitationNumber,
+          source: opportunities.source,
+          sourceUrl: opportunities.sourceUrl,
           responseDueDate: opportunities.responseDueDate,
           pWin: opportunities.pWin,
           ownerName: users.name,
@@ -97,6 +95,8 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
         agency: r.agency,
         stage: r.stage,
         solicitationNumber: r.solicitationNumber,
+        source: r.source,
+        sourceUrl: r.sourceUrl,
         responseDueDate: r.responseDueDate ? r.responseDueDate.toISOString() : null,
         pWin: r.pWin,
         owner: r.ownerName ?? r.ownerEmail ?? null,
@@ -107,7 +107,6 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
   );
 
   const links: Record<string, { href: string; label: string }[]> = {
-    evaluate: [{ href: "/solicitations", label: "Solicitation documents" }],
     develop: [{ href: "/proposals", label: "Proposals in flight" }, { href: "/proposals/new", label: "New proposal" }],
     measure: [
       { href: "/reports", label: "Reports" },
@@ -136,7 +135,13 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
         }
       />
       <LifecycleChevron current={stage.key} />
-      <StageList rows={rows} title={`In ${stage.label}`} empty={`Nothing is in ${stage.label} right now.`} />
+      {stage.key === "evaluate" ? (
+        <EvaluateSection rows={rows} filter={evaluateFilter(searchParams.filter)} />
+      ) : stage.key === "capture" ? (
+        <CaptureSection rows={rows} />
+      ) : (
+        <StageList rows={rows} title={`In ${stage.label}`} empty={`Nothing is in ${stage.label} right now.`} />
+      )}
     </>
   );
 }

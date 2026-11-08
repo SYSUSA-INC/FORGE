@@ -13,34 +13,57 @@ import { createSolicitationFromUploadAction } from "../actions";
  * request-size cap), the server checks it, and it is filed as a new
  * solicitation whose parse then runs in the background.
  */
-export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
+export function UploadSolicitationForm({ maxBytes, then = "solicitation", opportunityId }: { maxBytes: number; /** BL-NAV-LIFECYCLE 1a — "create": go on to Identify → Create with the document; BL-SCOUT-FILES — "opportunity": file it on `opportunityId` and stay. */ then?: "solicitation" | "create" | "opportunity"; opportunityId?: string }) {
   const router = useRouter();
   const [dragOver, setDragOver] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const filed = useRef(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Filing on an opportunity takes several documents at once; creating a
+  // solicitation takes the one file that becomes it.
+  const many = then === "opportunity";
   const queue = useUploadQueue<string>({
     purpose: "document",
     concurrency: 1,
     maxBytes,
     claim: async ({ uploadId }) => {
-      const res = await createSolicitationFromUploadAction({ uploadId });
+      const res = await createSolicitationFromUploadAction({ uploadId, opportunityId: then === "opportunity" ? opportunityId : null });
       return res.ok ? { ok: true, result: res.id } : { ok: false, error: res.error };
     },
     onItemDone: (item) => {
-      if (item.phase === "done" && item.result) router.push(`/solicitations/${item.result}`);
+      if (item.phase === "done" && item.result) {
+        if (then === "opportunity") {
+          filed.current += 1;
+          setNotice(
+            filed.current === 1
+              ? "Filed on this opportunity. FORGE is reading it now; it shows above."
+              : `Filed ${filed.current} documents on this opportunity. FORGE is reading them now; they show above.`,
+          );
+          router.refresh();
+          return;
+        }
+        router.push(then === "create" ? `/pipeline/identify?tab=create&from=${item.result}` : `/solicitations/${item.result}`);
+      }
     },
   });
   const limit = formatLimit(maxBytes);
 
   function take(files: FileList | null | undefined) {
-    const file = files?.[0];
+    const picked = Array.from(files ?? []);
+    const file = picked[0];
     if (!file) return;
+    if (many) {
+      // On an opportunity every file dropped is filed on it, one after another.
+      setNotice(null);
+      queue.add(picked.map((f) => ({ file: f, meta: undefined })));
+      return;
+    }
     if (queue.busy) {
       setNotice("One upload at a time here: wait for this one to finish.");
       return;
     }
     setNotice(
-      (files?.length ?? 0) > 1
+      picked.length > 1
         ? `Uploading "${file.name}" as the solicitation. Several files at once, sorted automatically, is coming next; until then add attachments from the solicitation's page.`
         : null,
     );
@@ -48,7 +71,7 @@ export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
     queue.add([{ file, meta: undefined }]);
   }
   function browse() {
-    if (!queue.busy) inputRef.current?.click();
+    if (many || !queue.busy) inputRef.current?.click();
   }
 
   return (
@@ -74,22 +97,23 @@ export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
             dragOver ? "border-teal/70 bg-teal/[0.06]" : "border-layer/15 bg-layer/[0.02] hover:border-layer/30"
           }`}
         >
-          <div className="font-display text-2xl font-semibold text-text">{queue.busy ? "Uploading…" : "Drop a file here"}</div>
+          <div className="font-display text-2xl font-semibold text-text">{queue.busy ? "Uploading…" : many ? "Drop files here" : "Drop a file here"}</div>
           <div className="mt-1 font-mono text-[10px] uppercase tracking-label text-muted">or click to browse</div>
           <button
             type="button"
-            disabled={queue.busy}
+            disabled={!many && queue.busy}
             onClick={(e) => {
               e.stopPropagation();
               browse();
             }}
             className="aur-btn aur-btn-primary mt-4 disabled:opacity-50"
           >
-            Select file
+            {many ? "Select files" : "Select file"}
           </button>
           <input
             ref={inputRef}
             type="file"
+            multiple={many}
             accept={acceptFor("document")}
             className="sr-only"
             onChange={(e) => {
@@ -104,7 +128,7 @@ export function UploadSolicitationForm({ maxBytes }: { maxBytes: number }) {
         <UploadQueue items={queue.items} onRetry={queue.retry} onCancel={queue.cancel} onRemove={queue.remove} />
 
         <div className="font-mono text-[10px] uppercase tracking-label text-subtle">
-          The file goes straight to secure storage, then text extraction and the AI parse run in the background.
+          {many ? "Each file goes" : "The file goes"} straight to secure storage, then text extraction and the AI parse run in the background.
         </div>
       </div>
     </Panel>

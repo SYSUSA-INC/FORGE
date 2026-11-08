@@ -8,6 +8,8 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   review_completed: "Review closed",
   opportunity_review_completed: "Opportunity review back",
   solicitation_role_assigned: "Assigned to solicitation",
+  solicitation_amended: "Solicitation amended",
+  partner_answered: "Partner answered",
 };
 
 export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
@@ -17,6 +19,8 @@ export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
   review_completed: "✓",
   opportunity_review_completed: "✉",
   solicitation_role_assigned: "👥",
+  solicitation_amended: "±",
+  partner_answered: "✓",
 };
 
 export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
@@ -26,4 +30,8 @@ export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
   review_completed: THEME.green,
   opportunity_review_completed: THEME.cobalt,
   solicitation_role_assigned: THEME.brass,
+  // Attention: the solicitation changed under the team.
+  solicitation_amended: THEME.brass,
+  // Done: the partner's answers are in.
+  partner_answered: THEME.green,
 };

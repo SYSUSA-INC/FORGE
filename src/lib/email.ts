@@ -3,9 +3,11 @@ import { log } from "@/lib/log";
 import { appBaseUrl, inviteUrl, passwordResetUrl, verifyEmailUrl } from "@/lib/app-url";
 import { buildDigestEmail, buildRuleNotificationEmail } from "@/lib/notification-email";
 import { EMAIL_HEX } from "@/lib/theme-colors";
+import { emailFrom, emailFromAddress } from "@/lib/site-domain";
 
 const apiKey = process.env.RESEND_API_KEY;
-const from = process.env.EMAIL_FROM ?? "Forge <noreply@sysgov.com>";
+// BL-DOMAIN-FORGEAXI 2 — from the site's domain unless EMAIL_FROM says otherwise.
+const from = emailFrom();
 
 let client: Resend | null = null;
 
@@ -36,14 +38,23 @@ export async function sendEmail(opts: {
     });
     return;
   }
-  await getClient().emails.send({
-    from: opts.from ?? from,
+  // BL-DOMAIN-FORGEAXI 2 — Resend reports a refused message (an
+  // unverified sending domain, a bad address) in `error`, not by
+  // throwing. Ignoring it made every refusal look like a sent email.
+  const sender = opts.from ?? from;
+  const res = await getClient().emails.send({
+    from: sender,
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
     text: opts.text,
     ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
   });
+  if (res?.error) {
+    const message = res.error.message || res.error.name || "the email service refused the message";
+    log.error("[email]", "send refused", { subject: opts.subject, from: sender, error: message });
+    throw new Error(/domain/i.test(message) ? `${message} (the sending domain must be verified in Resend)` : message);
+  }
 }
 
 // BL-AUTH-INVITE — the origin and the invite / reset links are built in
@@ -325,6 +336,49 @@ function escapeHtml(s: string): string {
  * external email) for a Bid / No-bid / More-info call. The link is
  * token-authed so external reviewers can answer without a login.
  */
+/**
+ * BL-NAV-LIFECYCLE phase 3c — a partner contact's personal link to the
+ * capability questions. Sent from the platform address with Reply-To the
+ * sender, like a review request.
+ */
+export async function sendPartnerInviteEmail(opts: {
+  to: string;
+  contactName: string;
+  companyName: string;
+  senderName: string;
+  senderEmail: string;
+  organizationName: string;
+  opportunityTitle: string;
+  url: string;
+  days: number;
+}): Promise<void> {
+  const greeting = opts.contactName ? `Hi ${escapeHtml(opts.contactName)},` : "Hello,";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Capability questions — ${escapeHtml(opts.opportunityTitle)}</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">${greeting}</p>
+    <p style="margin:0 0 16px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.senderName)}</strong> from ${escapeHtml(opts.organizationName)}
+      is considering ${escapeHtml(opts.companyName)} as a teaming partner on <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.opportunityTitle)}</strong>
+      and asks how ${escapeHtml(opts.companyName)} covers each capability the work needs: Yes, Partial (with the share you cover) or No, with a line of evidence each, plus your ISO, CMMI and CMMC certifications.
+    </p>
+    <a href="${opts.url}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Answer the questions</a>
+    <p style="margin:16px 0 0 0;font-size:12px;line-height:1.5;color:${EMAIL_HEX.muted};">
+      No FORGE account is needed. This link is personal to you and expires in ${opts.days} days; you can come back and change your answers until then. Only ${escapeHtml(opts.organizationName)} sees them.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    from: `"FORGE" <${emailFromAddress()}>`,
+    replyTo: opts.senderEmail || undefined,
+    subject: `[FORGE] Capability questions — ${opts.opportunityTitle}`.slice(0, 120),
+    html: emailShell(`Capability questions — ${opts.opportunityTitle}`, body),
+    text:
+      `${opts.senderName} from ${opts.organizationName} is considering ${opts.companyName} as a teaming partner on "${opts.opportunityTitle}" and asks how ${opts.companyName} covers each capability the work needs (Yes / Partial / No, with evidence) and which ISO, CMMI and CMMC certifications it holds.` +
+      `\n\nAnswer here (no account needed):\n${opts.url}` +
+      `\n\nThis link is personal to you and expires in ${opts.days} days.`,
+  });
+}
+
 export async function sendOpportunityReviewRequestEmail(opts: {
   to: string;
   reviewerName: string;
@@ -424,7 +478,7 @@ export async function sendOpportunityReviewRequestEmail(opts: {
   // From line: platform brand. The sender's identity is conveyed in
   // the body ("[Sender Name] from [Sender Company] would like..."),
   // and Reply-To routes replies to the human's real address.
-  const fromAddr = process.env.EMAIL_FROM_ADDRESS ?? "noreply@sysgov.com";
+  const fromAddr = emailFromAddress();
   const platformFrom = `"FORGE" <${fromAddr}>`;
 
   await sendEmail({
@@ -443,13 +497,15 @@ export async function sendOpportunityReviewRequestEmail(opts: {
 
 /** BL-AIP-3 — whether a provider key is present; callers record the truth when not. */
 /** BL-STAB-8a-4 — a platform administrator reset the person's two-step sign-in. */
-export async function sendMfaResetEmail(opts: { to: string; reason: string; byEmail: string | null }): Promise<void> {
+export async function sendMfaResetEmail(opts: { to: string; reason: string; byEmail: string | null; byCompanyAdmin?: boolean }): Promise<void> {
   const url = `${appBaseUrl()}/sign-in`;
+  // BL-MFA-ADMIN — a company admin can reset a member too.
+  const who = opts.byCompanyAdmin ? "Your company's FORGE administrator" : "A FORGE platform administrator";
   const reason = escapeHtml(opts.reason);
   const body = `
     <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Your two-step sign-in was reset</h1>
     <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
-      A FORGE platform administrator${opts.byEmail ? ` (${escapeHtml(opts.byEmail)})` : ""} removed the authenticator apps, passkeys and recovery codes from your account and signed you out everywhere. Their reason:
+      ${who}${opts.byEmail ? ` (${escapeHtml(opts.byEmail)})` : ""} removed the authenticator apps, passkeys and recovery codes from your account and signed you out everywhere. Their reason:
     </p>
     <blockquote style="margin:0 0 20px 0;padding:10px 14px;border-left:3px solid ${EMAIL_HEX.accent};font-size:14px;line-height:1.55;color:${EMAIL_HEX.ink};">${reason}</blockquote>
     <p style="margin:0 0 20px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
@@ -466,7 +522,53 @@ export async function sendMfaResetEmail(opts: { to: string; reason: string; byEm
     to: opts.to,
     subject: "Your FORGE two-step sign-in was reset",
     html: emailShell("Two-step sign-in reset", body),
-    text: `A FORGE platform administrator${opts.byEmail ? ` (${opts.byEmail})` : ""} reset your two-step sign-in and signed you out everywhere.\n\nReason: ${opts.reason}\n\nYour password is unchanged. Sign in at ${url} to set it up again.\n\nDid not expect this? Contact your administrator before signing in.`,
+    text: `${who}${opts.byEmail ? ` (${opts.byEmail})` : ""} reset your two-step sign-in and signed you out everywhere.\n\nReason: ${opts.reason}\n\nYour password is unchanged. Sign in at ${url} to set it up again.\n\nDid not expect this? Contact your administrator before signing in.`,
+  });
+}
+
+/** BL-MFA-RECOVERY — the single-use link that gets a person past the second step once. */
+export async function sendMfaRecoveryLinkEmail(opts: { to: string; url: string; minutes: number }): Promise<void> {
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">Your FORGE recovery link</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      You asked for a way past the second step because your passkey and authenticator app can't be used. Open this link in the browser where you just entered your password. It works once, for ${opts.minutes} minutes.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${opts.url}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Continue signing in</a>
+    </p>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      Once you are in, FORGE takes you to Settings → Security to replace what you lost.
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};">
+      Did not ask for this? Someone has your password. Change it now, and tell your administrator.
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: "Your FORGE recovery link",
+    html: emailShell("Recovery link", body),
+    text: `Open this link in the browser where you just entered your password. It works once, for ${opts.minutes} minutes:\n\n${opts.url}\n\nDid not ask for this? Someone has your password: change it now and tell your administrator.`,
+  });
+}
+
+/** BL-MFA-RECOVERY — a recovery link was used: told to the person and to every platform administrator. */
+export async function sendMfaRecoveryUsedEmail(opts: { to: string; who: string; at: string; self: boolean }): Promise<void> {
+  const who = escapeHtml(opts.who);
+  const lead = opts.self ? "You signed in to FORGE with a recovery link" : `${who} signed in to FORGE with a recovery link`;
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">A recovery link was used</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      ${lead} at ${escapeHtml(opts.at)} (UTC), in place of a passkey or authenticator code. It is recorded in the Audit Log.
+    </p>
+    <p style="margin:24px 0 0 0;font-size:12px;color:${EMAIL_HEX.muted};">
+      ${opts.self ? "Not you? Someone has your password and your email. Change both now and tell your administrator." : "Not expected? Reset their two-step sign-in from Platform admin → Users and contact them."}
+    </p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: opts.self ? "You used a FORGE recovery link" : `${opts.who} used a FORGE recovery link`,
+    html: emailShell("Recovery link used", body),
+    text: `${opts.self ? "You" : opts.who} signed in to FORGE with a recovery link at ${opts.at} (UTC). It is recorded in the Audit Log.`,
   });
 }
 

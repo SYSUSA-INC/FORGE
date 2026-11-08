@@ -73,6 +73,8 @@ export default async function OpportunitiesPage({
     stageLabel: STAGE_LABELS[r.stage],
     stageColor: STAGE_COLORS[r.stage],
     solicitationNumber: r.solicitationNumber,
+    source: r.source,
+    sourceUrl: r.sourceUrl,
     valueLow: r.valueLow,
     valueHigh: r.valueHigh,
     responseDueDate: r.responseDueDate ? r.responseDueDate.toISOString() : null,

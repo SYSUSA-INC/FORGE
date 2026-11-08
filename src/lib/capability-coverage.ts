@@ -1,4 +1,4 @@
-import type { CapabilityAnswer, CapabilityQuestion } from "@/lib/capability-matrix-types";
+import { clampPartialPercent, PARTIAL_PERCENT, type CapabilityAnswer, type CapabilityQuestion } from "@/lib/capability-matrix-types";
 
 /**
  * BL-CAP-MATRIX phase B — what the questionnaire's answers add up to:
@@ -28,7 +28,7 @@ const ANSWER_COVER: Record<CapabilityAnswer["value"], number> = {
 const PARTNER_NAMED_COVER = 0.6;
 
 /** Standing questions weigh like `shall`; the kinds follow the requirement they cover. */
-const KIND_WEIGHT: Record<CapabilityQuestion["kind"], number> = {
+export const KIND_WEIGHT: Record<CapabilityQuestion["kind"], number> = {
   shall: 1,
   standing: 1,
   should: 0.5,
@@ -86,7 +86,8 @@ export function computeCapabilityCoverage(
     applicable += 1;
     const w = KIND_WEIGHT[q.kind];
     const partnerNamed = a.value === "gap_partner" && !!a.partnerCompanyId;
-    const cover = partnerNamed ? PARTNER_NAMED_COVER : ANSWER_COVER[a.value];
+    // BL-NAV-LIFECYCLE 2b — a Partial covers its own percentage (older ones: 50%).
+    const cover = partnerNamed ? PARTNER_NAMED_COVER : a.value === "partial" ? clampPartialPercent(a.percent ?? PARTIAL_PERCENT.default) / 100 : ANSWER_COVER[a.value];
     num += w * cover;
     den += w;
     const isShall = q.kind === "shall" || q.kind === "standing";

@@ -7,8 +7,10 @@
  *
  *   find    — asks SAM.gov once for the open notices posted in the last
  *             few days under the tenant's NAICS codes (the Scout page's
- *             first, then the organization's, 10 at most) and keeps those
- *             that mention any of its keywords (BL-STAB-10d); clears
+ *             first, then the organization's, 10 at most). Every open
+ *             notice in the codes is a find and the keywords raise its
+ *             score (BL-SCOUT-REACH); with no codes, the keywords are the
+ *             search and a find mentions one (BL-STAB-10d). Clears
  *             waiting finds that no longer fit; and turns watchlisted
  *             awards whose period of performance ends within six months
  *             into recompete candidates.
@@ -21,7 +23,8 @@
  *             grounded in the score, the recompete match, the customer
  *             record and what this team imported / dismissed from earlier
  *             finds. Gated per tenant by `aiAutoDraft` and the monthly
- *             request quota; skipped in stub mode; ten per run.
+ *             request quota, leaving a fifth of the month's requests for
+ *             the rest of FORGE; skipped in stub mode; 25 per run.
  *   learn   — a person imports (creates the opportunity) or dismisses
  *             each candidate; the decision grades the triage
  *             (`gradeTriage`) and the newest decisions are shown to the
@@ -33,7 +36,7 @@
  */
 import "server-only";
 
-import { and, count, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne, notInArray, sql, type SQL } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/db";
 import {
@@ -49,6 +52,7 @@ import {
   type ScoutCandidateSource,
 } from "@/db/schema";
 import { completeStructuredForTenant, getAIProviderStatus, zodToToolSchema } from "@/lib/ai";
+import { markWatchDue } from "@/lib/amendment-watch";
 import { batchingAvailable, type BatchRequest } from "@/lib/ai-batch";
 import { queueAiBatch, type BatchHandler } from "@/lib/ai-batch-queue";
 import {
@@ -74,6 +78,7 @@ import {
   OPEN_NOTICE_TYPES,
   escapeHtml,
   keywordLabel,
+  mentionsExcluded,
   noticeAgency,
   readableText,
   withEarlierHit,
@@ -82,6 +87,7 @@ import {
   type NoticeMatch,
 } from "@/lib/samgov-match";
 import { DESCRIPTION_READS, findSamOpportunities } from "@/lib/samgov-search";
+import { scoutSourceFields } from "@/lib/opportunity-source";
 import {
   awardExpiresWithin,
   DEFAULT_SCOUT_PROFILE,
@@ -89,10 +95,15 @@ import {
   isScoutRecommendation,
   learningExamples,
   naicsCodeOf,
+  passingMentionOnly,
+  recompeteFromSignals,
   SCOUT_DESCRIPTION_CHARS,
   scoutCodes,
   scoutFit,
   scoutKeywordQuery,
+  scoutSearchFunnel,
+  scoutTriageAllowance,
+  solicitationKey,
   staleReason,
   summarizeScoutTrack,
   type ScoutCandidateView,
@@ -106,6 +117,8 @@ import {
   enforceQuota,
   ensureFeature,
   FeatureGateError,
+  getCurrentTier,
+  getCurrentUsage,
   QuotaExceededError,
   refundQuota,
 } from "@/lib/subscription-gates";
@@ -114,12 +127,13 @@ export { DEFAULT_SCOUT_PROFILE } from "@/lib/scout-logic";
 export type { ScoutCandidateView, ScoutProfileView, ScoutRunSummary, ScoutRunView } from "@/lib/scout-logic";
 
 const DAY_MS = 24 * 60 * 60_000;
-/** Model calls per tenant per run. */
-const MAX_TRIAGE_PER_RUN = 10;
+/** Model calls per tenant per run (BL-SCOUT-REACH: every open notice in the codes is a find). */
+const MAX_TRIAGE_PER_RUN = 25;
 const MAX_CUSTOMER_LOOKUPS = 8;
 /** Watchlisted awards ending within this window become recompete candidates. */
 const WATCHLIST_HORIZON_DAYS = 180;
-const SAM_LIMIT = 100;
+/** Rows per NAICS code: everything SAM.gov sends (BL-SCOUT-REACH; it was 100, and the rest went unseen). */
+const SAM_LIMIT = 1000;
 /** NAICS codes searched per run (one SAM.gov request each, BL-STAB-10). */
 const MAX_SEARCH_CODES = 10;
 /** A tenant is scouted again once this much time has passed. */
@@ -325,6 +339,12 @@ export async function runScoutForOrganization(input: {
   maxTriage?: number;
   /** BL-STAB-7d — the cron's breaker: set once FORGE's shared key fails; later companies on it aren't searched. */
   sharedKey?: { failed: string | null };
+  /**
+   * BL-SCOUT-ONEPAGE — a one-off search from the Scout page's search bar:
+   * these criteria instead of the saved ones. Its finds join the list; it
+   * clears and re-scores no waiting find, and the nightly criteria stay.
+   */
+  criteria?: { keywords: string[]; extraNaics: string[]; postedDaysBack: number };
 }): Promise<ScoutRunSummary> {
   const { organizationId } = input;
   const now = input.now ?? new Date();
@@ -354,11 +374,26 @@ export async function runScoutForOrganization(input: {
     .limit(1);
   if (!org) return { ...summary, note: "Organization not found." };
 
-  const profile = await getScoutProfile({ organizationId });
-  // BL-STAB-10d — the Scout page's codes first, then the organization's; a find is in
-  // one of them AND mentions a keyword (the owner's rule for Import, 2026-10-13).
+  const saved = await getScoutProfile({ organizationId });
+  const oneOff = !!input.criteria;
+  const profile = input.criteria
+    ? {
+        ...saved,
+        keywords: input.criteria.keywords.map((k) => k.trim()).filter(Boolean).slice(0, 10),
+        extraNaics: input.criteria.extraNaics.map((k) => k.trim()).filter(Boolean).slice(0, MAX_SEARCH_CODES),
+        postedDaysBack: clampInt(input.criteria.postedDaysBack, 1, 14),
+      }
+    : saved;
+  // BL-STAB-10d — the Scout page's codes first, then the organization's.
   const codes = scoutCodes({ extra: profile.extraNaics, primary: org.primaryNaics, list: org.naicsList }, MAX_SEARCH_CODES);
   const query = scoutKeywordQuery(profile.keywords);
+  // BL-SCOUT-REACH (owner, 2026-11-05) — with codes, every open notice in them is a
+  // find and the keywords only raise its score; with none, the keywords are the search.
+  // An excluded word ("-staffing") still keeps a notice out either way.
+  const rank = codes.searched.length > 0 && query !== null;
+  const searchQuery = rank ? null : query;
+  const excludedOnly: KeywordQuery | null =
+    rank && query && query.excluded.length > 0 ? { terms: [], anyOf: [], excluded: query.excluded, labels: query.labels, notes: [] } : null;
 
   const [run] = await db
     .insert(scoutRuns)
@@ -403,7 +438,7 @@ export async function runScoutForOrganization(input: {
     try {
       const r = await findSamOpportunities(sam.cred, {
         naicsCodes: codes.searched,
-        query: query ?? undefined,
+        query: searchQuery ?? undefined,
         noticeTypes: OPEN_NOTICE_TYPES,
         postedDaysBack: profile.postedDaysBack,
         limit: SAM_LIMIT,
@@ -421,7 +456,12 @@ export async function runScoutForOrganization(input: {
       } else {
         searched = true;
         summary.searches = codes.searched.length || Math.min(5, query?.anyOf[0]?.length ?? 1);
-        notes.push(`${codes.searched.length ? `NAICS searched: ${codes.searched.join(", ")}` : "All NAICS codes"}${query ? `; kept notices that mention ${keywordLabel(query)}` : ""}.`);
+        notes.push(
+          `${codes.searched.length ? `NAICS searched: ${codes.searched.join(", ")}` : "All NAICS codes"}${
+            rank && query ? `; every open notice in these codes is a find, and mentioning ${keywordLabel(query)} raises its score` : searchQuery ? `; kept notices that mention ${keywordLabel(searchQuery)}` : ""
+          }.`,
+        );
+        notes.push(scoutSearchFunnel(r.counts, !!searchQuery, SAM_LIMIT));
         if (r.warning) notes.push(r.warning);
         let overdue = 0;
         const keep = (o: SamOpportunity, m: NoticeMatch | null) => {
@@ -429,12 +469,12 @@ export async function runScoutForOrganization(input: {
           // Past its response date: the clearing rule would only take it out again.
           if (pastDue(o)) return void overdue++;
           keepIds.add(o.noticeId);
-          found.set(o.noticeId, { sam: o, source: query ? "keyword" : "org_naics", keyword: m?.status === "match" ? (m.matched[0]?.term ?? null) : null });
+          found.set(o.noticeId, { sam: o, source: searchQuery ? "keyword" : "org_naics", keyword: m?.status === "match" ? (m.matched[0]?.term ?? null) : null });
         };
         for (const o of r.notices) keep(o, o.match);
         // What FORGE's copy can't settle (cut off, only a link, run together, newer than the
         // copy): read SAM.gov live, newest first, for notices this organization hasn't seen.
-        if (query && r.unchecked.length > 0) {
+        if (searchQuery && r.unchecked.length > 0) {
           for (const o of r.unchecked) if (!pastDue(o)) keepIds.add(o.noticeId);
           const ids = r.unchecked.map((o) => o.noticeId);
           const [seenU, importedU] = await Promise.all([
@@ -450,7 +490,7 @@ export async function runScoutForOrganization(input: {
             const read = await descriptionsFor(sam.cred, ask.map((o) => o.noticeId), ask.length, { liveFirst: true });
             for (const o of ask) {
               const d = read.get(o.noticeId);
-              const m = d && !("unread" in d) ? withEarlierHit({ title: o.title, agency: noticeAgency(o) }, query, d, o.earlierMatch) : null;
+              const m = d && !("unread" in d) ? withEarlierHit({ title: o.title, agency: noticeAgency(o) }, searchQuery, d, o.earlierMatch) : null;
               if (m?.status === "match") keep({ ...o, description: d && "text" in d && !d.partial ? d.text : o.description }, m);
               else if (!m || m.status === "unchecked") unsettled++;
             }
@@ -483,11 +523,23 @@ export async function runScoutForOrganization(input: {
   // mentioning a keyword) are deleted with their triage; a later run finds one again only
   // if it still fits and is in the look-back window. A code that couldn't be read never
   // clears anything; what this run's search kept or couldn't settle is never cleared.
-  try {
-    const cleared = await clearStaleFinds(organizationId, { codes: codes.unreadable.length ? [] : codes.all, query, now }, searched ? keepIds : new Set());
+  if (oneOff) notes.push("A one-off search from the Scout page: the nightly criteria are unchanged, and no waiting find was cleared.");
+  else try {
+    // Ranked keywords clear nothing: a find in the codes stays whatever it mentions.
+    const cleared = await clearStaleFinds(organizationId, { codes: codes.unreadable.length ? [] : codes.all, query: searchQuery, now }, searched ? keepIds : new Set());
     if (cleared > 0) notes.push(`Removed ${cleared} waiting find${cleared === 1 ? "" : "s"} that no longer fit${cleared === 1 ? "s" : ""} your keywords and codes, or ${cleared === 1 ? "is" : "are"} past due.`);
   } catch (err) {
     log.warn("[scout]", "clearing stale finds failed", { organizationId, error: err });
+  }
+
+  // BL-SCOUT-QUALITY — one card per solicitation: waiting finds that are
+  // notices of the same solicitation (each amendment is its own notice)
+  // fold into the latest.
+  try {
+    const folded = await foldWaitingFinds(organizationId);
+    if (folded > 0) notes.push(`Folded ${folded} waiting find${folded === 1 ? "" : "s"} into the latest notice of the same solicitation.`);
+  } catch (err) {
+    log.warn("[scout]", "folding waiting finds failed", { organizationId, error: err });
   }
 
   // 2. Watchlisted awards ending soon.
@@ -514,24 +566,74 @@ export async function runScoutForOrganization(input: {
   }
   summary.found = found.size + awardDrafts.length;
 
+  // Customer records, read once per agency per run.
+  const customers = new Map<string, CustomerCounts | null>();
+  async function customerFor(agency: string, naicsCode: string): Promise<CustomerCounts | null> {
+    const key = agency.trim().toLowerCase();
+    if (!key) return null;
+    if (customers.has(key)) return customers.get(key) ?? null;
+    if (customers.size >= MAX_CUSTOMER_LOOKUPS) return null;
+    let counts: CustomerCounts | null = null;
+    try {
+      const ci = await getCustomerIntelligence({ organizationId, agency, naicsCode });
+      if (ci) {
+        counts = {
+          pursuits: ci.history.pursuits,
+          won: ci.history.won,
+          lost: ci.history.lost,
+          winRate: ci.history.winRate,
+        };
+      }
+    } catch (err) {
+      log.warn("[scout]", "customer intel failed", { organizationId, error: err });
+    }
+    customers.set(key, counts);
+    return counts;
+  }
+
+  const ctxBase = {
+    primaryNaics: naicsCodeOf(org.primaryNaics),
+    naicsList: codes.all,
+    socio: org.socio,
+    keywords: profile.keywords,
+    now,
+  };
+
+  // BL-SCOUT-QUALITY — every waiting find is scored again each run, so the
+  // deadline, the keyword weighting and the customer record are current; a
+  // find that is now only a passing mention of a keyword leaves the list.
+  if (!oneOff) try {
+    const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor);
+    if (r.dropped > 0) notes.push(`Removed ${r.dropped} waiting find${r.dropped === 1 ? "" : "s"} that only mention${r.dropped === 1 ? "s" : ""} a keyword in passing.`);
+  } catch (err) {
+    log.warn("[scout]", "re-scoring waiting finds failed", { organizationId, error: err });
+  }
+
   // 3. Drop what the tenant already has or already saw.
   const allIds = [...found.keys(), ...awardDrafts.map((d) => d.noticeId)];
-  if (allIds.length === 0) {
-    await finishRun(organizationId, run?.id ?? null, summary, notes, now);
-    return summary;
-  }
-  const [seen, imported] = await Promise.all([
-    db
-      .select({ noticeId: scoutCandidates.noticeId })
-      .from(scoutCandidates)
-      .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(scoutCandidates.noticeId, allIds))),
-    db
-      .select({ noticeId: opportunities.noticeId })
-      .from(opportunities)
-      .where(and(eq(opportunities.organizationId, organizationId), inArray(opportunities.noticeId, allIds))),
-  ]);
+  const triageOnly = allIds.length === 0;
+  const [seen, imported] = triageOnly
+    ? [[], []]
+    : await Promise.all([
+        db
+          .select({ noticeId: scoutCandidates.noticeId })
+          .from(scoutCandidates)
+          .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(scoutCandidates.noticeId, allIds))),
+        db
+          .select({ noticeId: opportunities.noticeId })
+          .from(opportunities)
+          .where(and(eq(opportunities.organizationId, organizationId), inArray(opportunities.noticeId, allIds))),
+      ]);
   const known = new Set([...seen, ...imported].map((r) => r.noticeId));
-  const freshSam = [...found.values()].filter((f) => !known.has(f.sam.noticeId));
+  // BL-SCOUT-QUALITY — one card per solicitation, across runs: a new notice
+  // of a solicitation already in the pipeline raises no find (the amendment
+  // watch files it there); one already dismissed or added stays decided; one
+  // still waiting is replaced by its newer notice.
+  const sol = await bySolicitation(organizationId, [...found.values()].filter((f) => !known.has(f.sam.noticeId)));
+  if (sol.inPipeline > 0) notes.push(`${sol.inPipeline} notice${sol.inPipeline === 1 ? " is" : "s are"} a new notice of a solicitation already in your pipeline; no find raised, and the amendment watch files ${sol.inPipeline === 1 ? "it" : "them"} on the opportunit${sol.pipelineIds.length === 1 ? "y" : "ies"} at its next check (09:45 UTC daily).`);
+  await markWatchDue(organizationId, sol.pipelineIds).catch((err) => log.warn("[scout]", "marking the amendment watch failed", { organizationId, error: err }));
+  const freshSam = sol.fresh;
+  const replaceFor = sol.replaceFor;
   const freshAwards = awardDrafts.filter((d) => !known.has(d.noticeId));
 
   // BL-STAB-10 — the searches read no descriptions; read the new finds'
@@ -561,44 +663,20 @@ export async function runScoutForOrganization(input: {
   } catch (err) {
     log.warn("[scout]", "recompete flagging failed", { organizationId, error: err });
   }
-  const customers = new Map<string, CustomerCounts | null>();
-  async function customerFor(agency: string, naicsCode: string): Promise<CustomerCounts | null> {
-    const key = agency.trim().toLowerCase();
-    if (!key) return null;
-    if (customers.has(key)) return customers.get(key) ?? null;
-    if (customers.size >= MAX_CUSTOMER_LOOKUPS) return null;
-    let counts: CustomerCounts | null = null;
-    try {
-      const ci = await getCustomerIntelligence({ organizationId, agency, naicsCode });
-      if (ci) {
-        counts = {
-          pursuits: ci.history.pursuits,
-          won: ci.history.won,
-          lost: ci.history.lost,
-          winRate: ci.history.winRate,
-        };
-      }
-    } catch (err) {
-      log.warn("[scout]", "customer intel failed", { organizationId, error: err });
-    }
-    customers.set(key, counts);
-    return counts;
-  }
-
   // 5. Score and store.
-  const ctxBase = {
-    primaryNaics: naicsCodeOf(org.primaryNaics),
-    naicsList: codes.all,
-    socio: org.socio,
-    keywords: profile.keywords,
-    now,
-  };
   type Staged = { draft: CandidateDraft; fit: { score: number; signals: string[] }; flag: RecompeteFlag | null; customer: CustomerCounts | null };
   const staged: Staged[] = [];
+  let passing = 0;
+  let excluded = 0;
   for (const f of freshSam) {
     const draft = fromSam(f.sam, f.source, f.keyword);
+    if (excludedOnly && mentionsExcluded({ title: draft.title ?? "", agency: draft.agency ?? "" }, excludedOnly, { text: escapeHtml(draft.description ?? "") })) {
+      excluded += 1;
+      continue;
+    }
     const flag = flags[f.sam.noticeId] ?? null;
     const customer = await customerFor(draft.agency ?? "", draft.naicsCode ?? "");
+    const recompete = flag ? { outcome: flag.outcome, confidence: flag.confidence, hasLessons: !!flag.lessons } : null;
     const fit = scoutFit(
       {
         source: draft.source,
@@ -609,13 +687,15 @@ export async function runScoutForOrganization(input: {
         setAside: draft.setAside ?? "",
         responseDueAt: draft.responseDueAt ?? null,
       },
-      {
-        ...ctxBase,
-        keyword: f.keyword,
-        recompete: flag ? { outcome: flag.outcome, confidence: flag.confidence, hasLessons: !!flag.lessons } : null,
-        customer,
-      },
+      { ...ctxBase, keyword: f.keyword, recompete, customer },
     );
+    // BL-SCOUT-QUALITY — a keyword mentioned once in passing, with nothing else tying the notice to you, is not a find.
+    if (passingMentionOnly(fit, { recompete, customer }, draft.source)) {
+      passing += 1;
+      continue;
+    }
+    // BL-SCOUT-REACH — the keyword the text gave, shown on the card and kept by later runs.
+    if (!draft.matchedKeyword && fit.keyword) draft.matchedKeyword = fit.keyword.term.slice(0, 200);
     staged.push({ draft, fit, flag, customer });
   }
   for (const draft of freshAwards) {
@@ -634,23 +714,34 @@ export async function runScoutForOrganization(input: {
     );
     staged.push({ draft, fit, flag: null, customer });
   }
-  if (staged.length === 0) {
-    await finishRun(organizationId, run?.id ?? null, summary, notes, now);
-    return summary;
+  if (excluded > 0) notes.push(`Left out ${excluded} notice${excluded === 1 ? "" : "s"} that mention${excluded === 1 ? "s" : ""} a word you excluded.`);
+  if (passing > 0) notes.push(`Left out ${passing} notice${passing === 1 ? "" : "s"} that only mention${passing === 1 ? "s" : ""} a keyword in passing.`);
+
+  // A newer notice of a solicitation still waiting replaces that find in place.
+  const replacements = staged.filter((x) => replaceFor.has(x.draft.noticeId));
+  for (const x of replacements) {
+    await db
+      .update(scoutCandidates)
+      .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, updatedAt: now })
+      .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, replaceFor.get(x.draft.noticeId)!), eq(scoutCandidates.status, "new")));
   }
-  const inserted = await db
-    .insert(scoutCandidates)
-    .values(
-      staged.map((s) => ({
-        ...s.draft,
-        organizationId,
-        runId: run?.id ?? null,
-        fitScore: s.fit.score,
-        signals: s.fit.signals,
-      })),
-    )
-    .onConflictDoNothing()
-    .returning();
+  const toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
+  const inserted =
+    toInsert.length === 0
+      ? []
+      : await db
+          .insert(scoutCandidates)
+          .values(
+            toInsert.map((x) => ({
+              ...x.draft,
+              organizationId,
+              runId: run?.id ?? null,
+              fitScore: x.fit.score,
+              signals: x.fit.signals,
+            })),
+          )
+          .onConflictDoNothing()
+          .returning();
   summary.created = inserted.length;
 
   // 6. Triage the best-fitting new finds.
@@ -659,7 +750,30 @@ export async function runScoutForOrganization(input: {
     notes.push("AI provider is in stub mode; candidates were scored but not triaged.");
   } else {
     const byNotice = new Map(staged.map((s) => [s.draft.noticeId, s]));
-    const queue = [...inserted].sort((a, b) => b.fitScore - a.fitScore).slice(0, maxTriage);
+    // BL-SCOUT-QUALITY — the review takes the best of the new finds and of
+    // the waiting finds it has not reviewed yet, so no find stays unjudged
+    // just because it arrived on a busy run.
+    const backlog = await db
+      .select()
+      .from(scoutCandidates)
+      .where(
+        and(
+          eq(scoutCandidates.organizationId, organizationId),
+          eq(scoutCandidates.status, "new"),
+          isNull(scoutCandidates.recommendation),
+          isNull(scoutCandidates.triageBatchId),
+          inserted.length ? notInArray(scoutCandidates.id, inserted.map((r) => r.id)) : sql`true`,
+        ),
+      )
+      .orderBy(desc(scoutCandidates.fitScore))
+      .limit(maxTriage);
+    const ranked = [...inserted, ...backlog].sort((a, b) => b.fitScore - a.fitScore);
+    // BL-SCOUT-REACH — never the whole month's AI allowance: a fifth stays for the rest of FORGE.
+    const allowed = await triageAllowance(organizationId, Math.min(maxTriage, ranked.length));
+    const queue = ranked.slice(0, allowed);
+    if (allowed < Math.min(maxTriage, ranked.length)) {
+      notes.push(`AI review held to ${allowed} find${allowed === 1 ? "" : "s"} this run, so a fifth of this month's AI requests stays for the rest of FORGE; the others wait for next month or a larger allowance.`);
+    }
     const history = await learningHistory(organizationId);
     const track = await getScoutTrack({ organizationId });
     const capabilities = await capabilitiesOf(organizationId);
@@ -734,6 +848,23 @@ export async function runScoutForOrganization(input: {
 
   await finishRun(organizationId, run?.id ?? null, summary, notes, now);
   return summary;
+}
+
+/**
+ * BL-SCOUT-REACH — how many finds the AI may review this run, within the
+ * plan's monthly requests less the fifth kept for the rest of FORGE. A
+ * lookup that fails allows the run's number; `enforceQuota` still stops it.
+ */
+async function triageAllowance(organizationId: string, wanted: number): Promise<number> {
+  try {
+    const tier = await getCurrentTier(organizationId);
+    const limit = tier?.effectiveQuotas.aiRequestsPerMonth ?? 0;
+    if (!tier || limit === 0) return wanted;
+    return scoutTriageAllowance(limit, await getCurrentUsage(organizationId, "aiRequestsPerMonth"), wanted);
+  } catch (err) {
+    log.warn("[scout]", "AI allowance lookup failed", { organizationId, error: err });
+    return wanted;
+  }
 }
 
 const TRIAGE_TOOL = { name: "record_scout_triage", description: "Record the scout's triage of this candidate." };
@@ -965,6 +1096,136 @@ async function learningHistory(organizationId: string): Promise<{ imported: stri
  * (staleReason). A find with no description of its own is judged on FORGE's
  * copy of SAM.gov; one that can't be judged yet is kept.
  */
+/** The solicitation key of a column, computed in SQL the way solicitationKey does it. */
+function keyOf(col: typeof scoutCandidates.solicitationNumber | typeof opportunities.solicitationNumber): SQL<string> {
+  return sql<string>`upper(regexp_replace(${col}, '[^A-Za-z0-9]', '', 'g'))`;
+}
+
+/**
+ * BL-SCOUT-QUALITY — this run's new notices, one per solicitation (the
+ * latest), set against what the tenant already has: a solicitation in the
+ * pipeline raises no find, a decided one stays decided, a waiting one is
+ * replaced by its newer notice. Notices without a usable number pass as is.
+ */
+async function bySolicitation<F extends { sam: SamOpportunity }>(
+  organizationId: string,
+  notices: F[],
+): Promise<{ fresh: F[]; replaceFor: Map<string, string>; inPipeline: number; pipelineIds: string[] }> {
+  const latest = new Map<string, F>();
+  const fresh: F[] = [];
+  for (const f of notices) {
+    const k = solicitationKey(f.sam.solicitationNumber);
+    if (!k) {
+      fresh.push(f);
+      continue;
+    }
+    const prev = latest.get(k);
+    if (!prev || (Date.parse(f.sam.postedDate) || 0) > (Date.parse(prev.sam.postedDate) || 0)) latest.set(k, f);
+  }
+  const keys = [...latest.keys()];
+  const replaceFor = new Map<string, string>();
+  if (keys.length === 0) return { fresh, replaceFor, inPipeline: 0, pipelineIds: [] };
+  const [cands, opps] = await Promise.all([
+    db
+      .select({ id: scoutCandidates.id, status: scoutCandidates.status, key: keyOf(scoutCandidates.solicitationNumber) })
+      .from(scoutCandidates)
+      .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(keyOf(scoutCandidates.solicitationNumber), keys))),
+    db
+      .select({ id: opportunities.id, key: keyOf(opportunities.solicitationNumber) })
+      .from(opportunities)
+      .where(and(eq(opportunities.organizationId, organizationId), inArray(keyOf(opportunities.solicitationNumber), keys))),
+  ]);
+  const pipeline = new Set(opps.map((o) => o.key));
+  let inPipeline = 0;
+  for (const [k, f] of latest) {
+    if (pipeline.has(k)) {
+      inPipeline += 1;
+      continue;
+    }
+    const rows = cands.filter((c) => c.key === k);
+    if (rows.some((c) => c.status !== "new")) continue;
+    const waiting = rows.find((c) => c.status === "new");
+    if (waiting) replaceFor.set(f.sam.noticeId, waiting.id);
+    fresh.push(f);
+  }
+  // BL-SCOUT-AMEND — the opportunities whose solicitation has a new notice: the amendment watch checks them first.
+  const pipelineIds = opps.map((o) => o.id);
+  return { fresh, replaceFor, inPipeline, pipelineIds };
+}
+
+/** BL-SCOUT-QUALITY — waiting finds of one solicitation fold into the latest notice; returns how many left. */
+async function foldWaitingFinds(organizationId: string): Promise<number> {
+  const rows = await db
+    .select({ id: scoutCandidates.id, number: scoutCandidates.solicitationNumber, postedAt: scoutCandidates.postedAt, createdAt: scoutCandidates.createdAt })
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), ne(scoutCandidates.solicitationNumber, "")));
+  const groups = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const k = solicitationKey(r.number);
+    if (k) groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  const drop: string[] = [];
+  const when = (r: (typeof rows)[number]) => (r.postedAt ?? r.createdAt).getTime();
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    const keep = members.reduce((a, b) => (when(b) > when(a) ? b : a));
+    for (const m of members) if (m.id !== keep.id) drop.push(m.id);
+  }
+  if (drop.length === 0) return 0;
+  await db.delete(scoutCandidates).where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), inArray(scoutCandidates.id, drop)));
+  return drop.length;
+}
+
+/**
+ * BL-SCOUT-QUALITY — score every waiting find again with today's rules and
+ * dates; a find that is now only a passing mention of a keyword is removed.
+ */
+async function rescoreWaitingFinds(
+  organizationId: string,
+  ctxBase: Omit<Parameters<typeof scoutFit>[1], "keyword" | "recompete" | "customer">,
+  customerFor: (agency: string, naicsCode: string) => Promise<CustomerCounts | null>,
+): Promise<{ rescored: number; dropped: number }> {
+  const rows = await db
+    .select()
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new")))
+    .orderBy(desc(scoutCandidates.fitScore))
+    .limit(300);
+  const drop: string[] = [];
+  let rescored = 0;
+  for (const row of rows) {
+    const recompete = recompeteFromSignals(row.signals ?? []);
+    const customer = await customerFor(row.agency, row.naicsCode);
+    const fit = scoutFit(
+      {
+        source: row.source,
+        title: row.title,
+        description: row.description,
+        agency: row.agency,
+        naicsCode: row.naicsCode,
+        setAside: row.setAside,
+        responseDueAt: row.responseDueAt,
+      },
+      { ...ctxBase, keyword: row.matchedKeyword || null, recompete, customer },
+    );
+    if (passingMentionOnly(fit, { recompete, customer }, row.source)) {
+      drop.push(row.id);
+      continue;
+    }
+    if (fit.score !== row.fitScore || JSON.stringify(fit.signals) !== JSON.stringify(row.signals ?? [])) {
+      await db
+        .update(scoutCandidates)
+        .set({ fitScore: fit.score, signals: fit.signals, updatedAt: new Date() })
+        .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, row.id), eq(scoutCandidates.status, "new")));
+      rescored += 1;
+    }
+  }
+  if (drop.length > 0) {
+    await db.delete(scoutCandidates).where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), inArray(scoutCandidates.id, drop)));
+  }
+  return { rescored, dropped: drop.length };
+}
+
 async function clearStaleFinds(organizationId: string, rules: { codes: string[]; query: KeywordQuery | null; now: Date }, keep: Set<string>): Promise<number> {
   const waiting = await db
     .select({
@@ -1127,7 +1388,11 @@ function toView(row: ScoutCandidate, now: Date): ScoutCandidateView {
   };
 }
 
-/** New finds fit-first; decided ones newest decision first. */
+/**
+ * New finds in the order the page shows them (BL-SCOUT-REACH: Pursue,
+ * Watch, not yet reviewed, Skip; each best fit first), so a long list
+ * never cuts an AI recommendation off; decided ones newest decision first.
+ */
 export async function listScoutCandidates(input: {
   organizationId: string;
   status: "new" | "decided";
@@ -1142,9 +1407,24 @@ export async function listScoutCandidates(input: {
   const q = db.select().from(scoutCandidates).where(base);
   const rows =
     input.status === "new"
-      ? await q.orderBy(desc(scoutCandidates.fitScore), desc(scoutCandidates.createdAt)).limit(input.limit ?? 50)
+      ? await q
+          .orderBy(
+            sql`case ${scoutCandidates.recommendation} when 'pursue' then 0 when 'watch' then 1 when 'skip' then 3 else 2 end`,
+            desc(scoutCandidates.fitScore),
+            desc(scoutCandidates.createdAt),
+          )
+          .limit(input.limit ?? 50)
       : await q.orderBy(desc(scoutCandidates.decidedAt)).limit(input.limit ?? 20);
   return rows.map((r) => toView(r, now));
+}
+
+/** BL-SCOUT-REACH — how many finds are waiting, and how many of them the AI hasn't reviewed, for the page's counts (the list itself is capped). */
+export async function countNewScoutCandidates(input: { organizationId: string }): Promise<{ total: number; unreviewed: number }> {
+  const [row] = await db
+    .select({ total: count(), unreviewed: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} is null)`.mapWith(Number) })
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, input.organizationId), eq(scoutCandidates.status, "new")));
+  return { total: row?.total ?? 0, unreviewed: row?.unreviewed ?? 0 };
 }
 
 export type ScoutDecideResult =
@@ -1206,7 +1486,10 @@ export async function decideScoutCandidate(input: {
         stage: stageFor(c.noticeType),
         solicitationNumber: c.solicitationNumber,
         // Award candidates carry a synthetic id; the opportunity gets none.
-        noticeId: c.source === "watchlist_award" ? "" : c.noticeId,
+        // …and a find read from a portal email carries an email-based one (BL-SCOUT-INBOX).
+        noticeId: c.source === "watchlist_award" || c.source === "portal_email" ? "" : c.noticeId,
+        // BL-OPP-SOURCE — where it came from, with the find's own link.
+        ...scoutSourceFields(c.source, c.noticeId, c.uiLink),
         responseDueDate: c.responseDueAt,
         releaseDate: c.postedAt,
         naicsCode: c.naicsCode,
@@ -1221,6 +1504,18 @@ export async function decideScoutCandidate(input: {
       .returning({ id: opportunities.id });
     if (!opp) return { ok: false, error: "Could not create the opportunity." };
     opportunityId = opp.id;
+    // BL-SCOUT-FILES — a SAM.gov notice's attachments are downloaded now, not at the next daily check.
+    if (c.source !== "watchlist_award" && c.source !== "portal_email" && c.noticeId) {
+      const { queueNoticeFiles } = await import("@/lib/sam-notice-files");
+      await queueNoticeFiles({ organizationId, opportunityId: opp.id, userId: input.actor.userId ?? null });
+    }
+    // BL-SCOUT-INBOX — a find read from a portal email brings that email's attachments.
+    if (c.inboundEmailId) {
+      const { fileInboundAttachments } = await import("@/lib/inbound-bids");
+      await fileInboundAttachments({ organizationId, emailId: c.inboundEmailId, opportunityId: opp.id, userId: input.actor.userId ?? null }).catch((err) =>
+        log.warn("[scout]", "portal email attachments not filed", { organizationId, error: err }),
+      );
+    }
   }
 
   const decided = { status: input.decision, grade, decidedByUserId: input.actor.userId, decidedAt: now, opportunityId, updatedAt: now };

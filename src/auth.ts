@@ -15,7 +15,6 @@ import { findHomeOrganizationForEmail } from "@/lib/invite-approval";
 import { domainOf, isPublicEmailDomain } from "@/lib/email-domain";
 import { log } from "@/lib/log";
 import { decideOAuthSignIn, ENTRA_PROVIDER, entraAllowedTenants, oauthErrorParam } from "@/lib/oauth-policy";
-import { superadminNeedsPasskey } from "@/lib/passkeys";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { evaluateSession, mfaEnforcementNow, needsRecheck, SESSION_POLICY, touchSession } from "@/lib/session-policy";
 import { recordAudit } from "@/lib/audit-log";
@@ -378,10 +377,11 @@ export const { auth, handlers, signIn, signOut, unstable_update } = NextAuth({
         token.epoch = await currentSessionEpoch();
         token.pid = crypto.randomUUID();
         if (enforcement.on) {
-          // BL-STAB-8a-3 — a platform superadmin must hold a passkey: with
-          // none, the first sign-in enrols one before anything opens.
-          const needsPasskey = !!row?.isSuperadmin && (await superadminNeedsPasskey(user.id));
-          token.mfa = row?.mfaEnrolledAt && !needsPasskey ? "pending" : "enrol";
+          // Any confirmed method passes the step. BL-MFA-RECOVERY: a
+          // superadmin is no longer sent to enrol a passkey before anything
+          // opens (with passkeys broken by a domain change, that locked
+          // them out); a missing method is asked for after sign-in.
+          token.mfa = row?.mfaEnrolledAt ? "pending" : "enrol";
           token.pendingAt = now;
           token.amr = undefined;
         } else {

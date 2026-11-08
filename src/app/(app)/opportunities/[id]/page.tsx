@@ -12,8 +12,12 @@ import { OpportunityBriefPanel } from "./ai/OpportunityBriefPanel";
 import { CustomerContactsPanel } from "./CustomerContactsPanel";
 import { OpportunityDocsAndAIPanel } from "./OpportunityDocsAndAIPanel";
 import { PwinPanel } from "./PwinPanel";
+import { ReportsStrip } from "./ReportsStrip";
 import { NextActionPanel } from "@/components/intelligence/NextActionPanel";
 import { RecompeteRadarPanel } from "@/components/intelligence/RecompeteRadarPanel";
+
+// BL-SCOUT-AMEND — "Check SAM.gov now" downloads the solicitation's new attachments.
+export const maxDuration = 300;
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +65,9 @@ export default async function OpportunityOverviewPage({
   ]);
 
   return (
+    <>
+    {/* BL-NAV-LIFECYCLE 2b-2 — the opportunity's reports and decision (E-9). */}
+    <ReportsStrip opportunityId={opp.id} />
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
       <Panel title="Opportunity details">
         <OpportunityForm
@@ -74,6 +81,8 @@ export default async function OpportunityOverviewPage({
             stage: opp.stage,
             solicitationNumber: opp.solicitationNumber,
             noticeId: opp.noticeId,
+            source: opp.source,
+            sourceUrl: opp.sourceUrl,
             valueLow: opp.valueLow,
             valueHigh: opp.valueHigh,
             releaseDate: toIsoOrNull(opp.releaseDate),
@@ -99,6 +108,8 @@ export default async function OpportunityOverviewPage({
           organizationId={organizationId}
           target={{ kind: "opportunity", id: opp.id }}
         />
+        {/* BL-NAV-LIFECYCLE 2a — Evaluate's Analyze lands here until the analysis page (2c). */}
+        <div id="analysis" className="scroll-mt-24" />
         <PwinPanel organizationId={organizationId} opportunityId={opp.id} />
         {/* BL-FB-X-CRM — who we know at this agency; nothing when the agency is blank. */}
         <CustomerContactsPanel organizationId={organizationId} opportunityId={opp.id} />
@@ -110,5 +121,6 @@ export default async function OpportunityOverviewPage({
         <OpportunityDocsAndAIPanel opportunityId={opp.id} />
       </div>
     </div>
+    </>
   );
 }

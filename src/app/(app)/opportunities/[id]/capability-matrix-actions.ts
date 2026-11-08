@@ -7,10 +7,12 @@ import { companies, opportunityCapabilityMatrices } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { buildCapabilityQuestions, suggestCapabilityAnswers } from "@/lib/capability-matrix-build";
+import { saveMatrixReport } from "@/lib/opportunity-report-store";
 import {
   CAPABILITY_ANSWER_VALUES,
   CAPABILITY_EVIDENCE_MAX,
   CAPABILITY_QUESTION_TEXT_MAX,
+  clampPartialPercent,
   type CapabilityAnswer,
   type CapabilityAnswerValue,
 } from "@/lib/capability-matrix-types";
@@ -44,13 +46,20 @@ function evaluationPath(opportunityId: string): string {
   return `/opportunities/${opportunityId}/evaluation`;
 }
 
+/** BL-NAV-LIFECYCLE 2b — the questionnaire's own page, the Evaluation tab's summary and the Evaluate list. */
+function revalidateMatrix(opportunityId: string): void {
+  revalidatePath(`/opportunities/${opportunityId}/capability`);
+  revalidatePath(evaluationPath(opportunityId));
+  revalidatePath("/pipeline/evaluate");
+}
+
 export async function buildCapabilityQuestionsAction(input: {
   opportunityId: string;
 }): Promise<{ ok: true; questions: number; carried: number } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const res = await buildCapabilityQuestions({ organizationId, opportunityId: input.opportunityId, actor: { userId: actor.id, email: actor.email } });
-  if (res.ok) revalidatePath(evaluationPath(input.opportunityId));
+  if (res.ok) revalidateMatrix(input.opportunityId);
   return res;
 }
 
@@ -60,6 +69,8 @@ export async function answerCapabilityQuestionAction(input: {
   value: CapabilityAnswerValue;
   evidence: string;
   partnerCompanyId: string | null;
+  /** BL-NAV-LIFECYCLE 2b — a Partial's percentage (5..95). */
+  percent?: number | null;
   /** True when the person confirmed FORGE's suggestion as given. */
   fromSuggestion?: boolean;
 }): Promise<Result> {
@@ -90,6 +101,7 @@ export async function answerCapabilityQuestionAction(input: {
     value: input.value,
     evidence,
     partnerCompanyId,
+    percent: input.value === "partial" ? clampPartialPercent(input.percent) : null,
     updatedAt: new Date().toISOString(),
     updatedByUserId: actor.id,
   };
@@ -113,9 +125,9 @@ export async function answerCapabilityQuestionAction(input: {
     action: "opportunity.capability_questions.answer",
     resourceType: "opportunity",
     resourceId: input.opportunityId,
-    metadata: { questionId: input.questionId, value: input.value, partnerCompanyId, fromSuggestion: !!input.fromSuggestion },
+    metadata: { questionId: input.questionId, value: input.value, percent: answer.percent, partnerCompanyId, fromSuggestion: !!input.fromSuggestion },
   });
-  revalidatePath(evaluationPath(input.opportunityId));
+  revalidateMatrix(input.opportunityId);
   return { ok: true };
 }
 
@@ -151,7 +163,7 @@ export async function updateCapabilityQuestionAction(input: {
     resourceId: input.opportunityId,
     metadata: { questionId: input.questionId },
   });
-  revalidatePath(evaluationPath(input.opportunityId));
+  revalidateMatrix(input.opportunityId);
   return { ok: true };
 }
 
@@ -188,7 +200,7 @@ export async function removeCapabilityQuestionAction(input: {
     resourceId: input.opportunityId,
     metadata: { questionId: input.questionId },
   });
-  revalidatePath(evaluationPath(input.opportunityId));
+  revalidateMatrix(input.opportunityId);
   return { ok: true };
 }
 
@@ -208,7 +220,7 @@ export async function suggestCapabilityAnswersAction(input: {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const res = await suggestCapabilityAnswers({ organizationId, opportunityId: input.opportunityId, actor: { userId: actor.id, email: actor.email } });
-  if (res.ok) revalidatePath(evaluationPath(input.opportunityId));
+  if (res.ok) revalidateMatrix(input.opportunityId);
   return res;
 }
 
@@ -237,6 +249,21 @@ export async function dismissCapabilitySuggestionAction(input: {
     resourceId: input.opportunityId,
     metadata: { questionId: input.questionId },
   });
-  revalidatePath(evaluationPath(input.opportunityId));
+  revalidateMatrix(input.opportunityId);
   return { ok: true };
+}
+
+/**
+ * BL-NAV-LIFECYCLE 2b-2 — Save report: the Matrix Report as it stands now,
+ * kept as the next dated version on the opportunity.
+ */
+export async function saveMatrixReportAction(input: { opportunityId: string }): Promise<{ ok: true; id: string; version: number } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await saveMatrixReport({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor: { userId: actor.id, email: actor.email } });
+  if (res.ok) {
+    revalidateMatrix(input.opportunityId);
+    revalidatePath(`/opportunities/${input.opportunityId}`);
+  }
+  return res;
 }

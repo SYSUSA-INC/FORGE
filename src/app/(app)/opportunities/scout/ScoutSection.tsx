@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { SamKeyNotice } from "@/components/ui/SamKeyNotice";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { getSamKeyStatus } from "@/lib/samgov-key";
@@ -8,6 +7,7 @@ import {
   getScoutProfile,
   getScoutTrack,
   latestScoutRun,
+  countNewScoutCandidates,
   listScoutCandidates,
 } from "@/lib/scout";
 import {
@@ -16,30 +16,32 @@ import {
   type ScoutCandidateView,
   type ScoutRunView,
 } from "@/lib/scout-logic";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { organizations } from "@/db/schema";
+import { naicsCodeOf } from "@/lib/scout-logic";
 import { ScoutClient } from "./ScoutClient";
-
-function ago(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(ms / 3_600_000);
-  if (h < 1) return "just now";
-  if (h < 48) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+import { SourceBar, SourcePanel } from "./BringInSection";
+import type { IdentifySource } from "@/lib/identify-sources";
 
 /**
  * BL-AIP-7b — the Scout page: what the nightly scout found, its take on
  * each find, and the import / dismiss decisions that grade it.
  */
-/** The Scout page's body, shown under Identify. */
-export async function ScoutSection() {
+/**
+ * BL-NAV-LIFECYCLE 1b — the Scout tab under Pipeline → Identify: what the
+ * nightly scout found, each with Add to pipeline and Not for us, then
+ * every other source on the same page.
+ */
+export async function ScoutSection({ source }: { source: IdentifySource | null }) {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const isAdmin = user.role === "admin" || !!user.isSuperadmin;
 
-  const [profile, fresh, decided, track, lastRun, sam] = await Promise.all([
+  const [profile, fresh, decided, track, lastRun, sam, waiting] = await Promise.all([
     safeQuery(() => getScoutProfile({ organizationId }), DEFAULT_SCOUT_PROFILE, { tag: "scout.profile" }),
     safeQuery<ScoutCandidateView[]>(
-      () => listScoutCandidates({ organizationId, status: "new", limit: 60 }),
+      () => listScoutCandidates({ organizationId, status: "new", limit: 200 }),
       [],
       { tag: "scout.new" },
     ),
@@ -51,36 +53,36 @@ export async function ScoutSection() {
     safeQuery(() => getScoutTrack({ organizationId }), EMPTY_SCOUT_TRACK, { tag: "scout.track" }),
     safeQuery<ScoutRunView | null>(() => latestScoutRun({ organizationId }), null, { tag: "scout.run" }),
     getSamKeyStatus(organizationId),
+    safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0 }, { tag: "scout.count" }),
   ]);
 
-  const pursue = fresh.filter((c) => c.recommendation === "pursue").length;
+  // The organization's own codes: the scout searches them after the bar's (BL-STAB-10d).
+  const [org] = await db.select({ primary: organizations.primaryNaics, list: organizations.naicsList }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  const orgCodes = [...new Set([org?.primary ?? "", ...(org?.list ?? [])].map((c) => naicsCodeOf(c)).filter(Boolean))];
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
-          Every night the scout re-runs your NAICS codes and keywords against SAM.gov, checks your watchlist for expiring awards, scores each find against your own history and recommends pursue, watch or skip. Importing a find adds it to the pipeline; dismissing one grades the scout. Bring in more from{" "}
-          <Link href="/opportunities/import" className="aur-link">SAM.gov search</Link>,{" "}
-          <Link href="/opportunities/import/ebuy" className="aur-link">GSA eBuy</Link> or a{" "}
-          <Link href="/opportunities/import/gsa" className="aur-link">GSA email</Link>; one page for every source is coming.
-        </p>
-        <dl className="flex flex-wrap gap-6 font-mono text-[11px] text-muted">
-          <div><dt className="uppercase tracking-label">New finds</dt><dd className="font-display text-xl text-text">{fresh.length}</dd></div>
-          <div><dt className="uppercase tracking-label">Recommended pursue</dt><dd className="font-display text-xl text-text">{pursue}</dd></div>
-          <div><dt className="uppercase tracking-label">Scout accuracy</dt><dd className="font-display text-xl text-text">{track.accuracy === null ? "—" : `${Math.round(track.accuracy * 100)}%`}</dd></div>
-          <div><dt className="uppercase tracking-label">Last run</dt><dd className="font-display text-xl text-text">{lastRun ? ago(lastRun.startedAt) : "never"}</dd></div>
-        </dl>
-      </div>
-      {/* BL-STAB-7d — why the nightly SAM.gov searches would come back empty. */}
-      <SamKeyNotice notice={samKeyNotice(sam)} />
-      <ScoutClient
-        profile={profile}
-        candidates={fresh}
-        decided={decided}
-        track={track}
-        lastRun={lastRun}
-        isAdmin={isAdmin}
-      />
+      <p className="mb-3 max-w-3xl font-body text-[13px] leading-[1.5] text-muted">
+        Every source on one page. <strong>All</strong> is what the scout finds every night on SAM.gov and your watchlist, scored and reviewed by the AI; the other tabs search SAM.gov for something specific, read a pasted GSA eBuy RFQ or GSA email, or ask for a source FORGE doesn&apos;t read yet. <strong>Add to pipeline</strong> on any row makes it an opportunity on <strong>Pipeline → Evaluate</strong>, with a SAM.gov notice&apos;s attachments downloaded to it; <strong>Not for us</strong> sets a find aside, and both teach the scout your taste.
+      </p>
+      <SourceBar source={source} />
+      {/* BL-STAB-7d — why the SAM.gov searches would come back empty. */}
+      {!source || source.key === "sam" ? <SamKeyNotice notice={samKeyNotice(sam)} /> : null}
+      {source ? (
+        <SourcePanel organizationId={organizationId} source={source} isAdmin={isAdmin} />
+      ) : (
+        <ScoutClient
+          profile={profile}
+          orgCodes={orgCodes}
+          candidates={fresh}
+          unreviewedTotal={waiting.unreviewed}
+          waitingTotal={Math.max(waiting.total, fresh.length)}
+          decided={decided}
+          track={track}
+          lastRun={lastRun}
+          isAdmin={isAdmin}
+        />
+      )}
     </>
   );
 }

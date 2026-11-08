@@ -16,6 +16,7 @@ import { stripExt } from "@/lib/solicitation-parse";
 import { hasAnyJob, runDurable } from "@/lib/jobs";
 import { claimUpload, finishClaim, inlineBytesForMemoryMode, releaseClaim, releaseOrphanedClaims, releaseStoredFiles } from "@/lib/uploads";
 import { log } from "@/lib/log";
+import { samNoticeUrl } from "@/lib/opportunity-source";
 
 export type UploadResult =
   | { ok: true; id: string }
@@ -34,6 +35,8 @@ export async function createSolicitationFromUploadAction(input: {
   uploadId: string;
   parentSolicitationId?: string | null;
   amendmentNumber?: string;
+  /** BL-SCOUT-FILES — file the document on this opportunity (it must be this organization's). */
+  opportunityId?: string | null;
 }): Promise<UploadResult> {
   const user = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
@@ -53,6 +56,15 @@ export async function createSolicitationFromUploadAction(input: {
       .limit(1);
     if (!parentRow) return { ok: false, error: "Parent solicitation not found in this organization." };
     parentOpportunityId = parentRow.opportunityId;
+  }
+  if (!parentOpportunityId && typeof input?.opportunityId === "string" && input.opportunityId.trim()) {
+    const [opp] = await db
+      .select({ id: opportunities.id })
+      .from(opportunities)
+      .where(and(eq(opportunities.id, input.opportunityId.trim()), eq(opportunities.organizationId, organizationId)))
+      .limit(1);
+    if (!opp) return { ok: false, error: "Opportunity not found in this organization." };
+    parentOpportunityId = opp.id;
   }
 
   const claim = await claimUpload({ organizationId, userId: user.id, uploadId: String(input?.uploadId ?? ""), resourceType: "solicitation" });
@@ -115,10 +127,12 @@ export async function createSolicitationFromUploadAction(input: {
       fileSize: file.size,
       contentType: file.contentType,
       ...(parentSolicitationId ? { parentSolicitationId, amendmentNumber } : {}),
+      ...(parentOpportunityId ? { opportunityId: parentOpportunityId } : {}),
     },
   });
 
   revalidatePath("/solicitations");
+  if (parentOpportunityId) revalidatePath(`/opportunities/${parentOpportunityId}`);
   return { ok: true, id: file.resourceId };
 }
 
@@ -285,6 +299,8 @@ export async function convertToOpportunityAction(
         office: row.office,
         solicitationNumber: row.solicitationNumber,
         noticeId: row.noticeId,
+        source: "document",
+        sourceUrl: samNoticeUrl(row.noticeId),
         naicsCode: row.naicsCode,
         setAside: row.setAside,
         responseDueDate: row.responseDueDate,

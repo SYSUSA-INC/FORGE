@@ -89,12 +89,19 @@ function groupIdsOf(workspace: Workspace): string[] {
   return NAV_BY_WORKSPACE[workspace].filter((g) => (g.children?.length ?? 0) > 0).map((g) => g.id);
 }
 
-/** Query-tab links (e.g. /admin?tab=users) only match on the client with that tab. */
+/**
+ * Query-tab links (e.g. /admin?tab=users) only match on the client with
+ * that tab. BL-NAV-LIFECYCLE 1b — every parameter the link names must be
+ * on the page; the page may carry more (Scout with `&source=ebuy` is
+ * still the Scout tab).
+ */
 function itemMatches(pathname: string | null, search: string, href: string): boolean {
   const [path, query] = href.split("?");
   if (!hrefMatches(pathname, path!)) return false;
   if (!query) return true;
-  return search === `?${query}`;
+  const have = new URLSearchParams(search);
+  for (const [k, v] of new URLSearchParams(query)) if (have.get(k) !== v) return false;
+  return true;
 }
 
 /**

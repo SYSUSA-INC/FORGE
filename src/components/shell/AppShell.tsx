@@ -6,6 +6,7 @@ import { MobileNav } from "@/components/shell/MobileNav";
 import { SessionClock } from "@/components/shell/SessionClock";
 import { NonProdBanner } from "@/components/shell/NonProdBanner";
 import { MfaOffBanner } from "@/components/shell/MfaOffBanner";
+import { MfaMissingBanner } from "@/components/shell/MfaMissingBanner";
 import { ImpersonationBanner } from "@/components/shell/ImpersonationBanner";
 import { TrialBanner } from "@/components/shell/TrialBanner";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
@@ -51,6 +52,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <NonProdBanner />
       {/* BL-STAB-8a-2 — loud while the second step is skipped */}
       <MfaOffBanner />
+      {/* BL-MFA-RECOVERY — a superadmin still owing a second method */}
+      <MfaMissingBanner userId={user?.id ?? null} isSuperadmin={isSuperadmin} />
       {/* BL-15 Phase B-3b — visible when a super-admin is impersonating */}
       <ImpersonationBanner />
       {/* BL-AUTH-ABUSE Slice 2a — days left on a trial; AI paused once it ends */}

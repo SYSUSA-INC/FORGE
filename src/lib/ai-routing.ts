@@ -55,6 +55,8 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   image_ocr: "fast",
   ebuy_extract: "fast",
   gsa_extract: "fast",
+  inbound_bids: "fast",
+  analysis_report: "standard",
   // Embeddings go to the embedding provider, not a completion model;
   // listed so the ledger's feature keys stay exhaustive (BL-AIP-4).
   embedding: "fast",
@@ -78,6 +80,8 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   compliance_preflight: "standard",
   compliance_automap: "standard",
   loss_intelligence: "standard",
+  partner_rank: "standard",
+  partner_rate: "standard",
   review_preflight: "standard",
   // BL-AIP-7d — grounded in six Brain hits, short answer, must cite.
   brain_answer: "standard",

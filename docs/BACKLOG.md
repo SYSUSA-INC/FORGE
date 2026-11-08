@@ -92,6 +92,13 @@ Effort key:
 | 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
 | 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
 | 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
+| 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
+| 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
+| 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | ✅ shipped (PR #456, owner chose: keywords rank) |
+| 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | ✅ shipped (PR #457) |
+| 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
+| 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
+| 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -2837,6 +2844,543 @@ out to deliver; new AI work starts a new ticket.
 
 ---
 
+### BL-SCOUT-QUALITY — Scout raises real finds, not every notice that names a keyword
+
+**Owner, 2026-11-03:** two cards for one Marine Corps RFI (Amendments 03
+and 04), both "Scored · not triaged", fit 65 for a single mention of
+ServiceNow: "Our Scout has to be smarter … this is going to make our
+platform a junkyard." **Causes found:** the scout knew a notice by its
+own id, so each amendment was a new find; the fit score started at 35
+and gave the same +10 to a keyword in the title and one passing mention;
+the score was frozen at the first run (a find due tomorrow kept its old
+number); the AI review covered only the ten best new finds of a run, so
+the rest were shown unjudged among the judged ones.
+
+**Shipped (this PR).** `src/lib/scout-logic.ts`: `keywordStrength` (in
+the title or three mentions strong; twice, once in a short notice, or in
+an earlier notice of the solicitation moderate; once in a long
+description, over 800 characters, or only in the agency's name weak),
+`scoutFit` rebalanced to start at zero (keyword +30 / +15 / +3, primary
+NAICS +25, another code +15, set-aside +10, recompete won +25, lost +5 or
++10, a win at the agency +10, watchlisted award +15; the penalties as
+before), `passingMentionOnly` (a keyword find with only a weak mention
+and no recompete or win at the agency is dropped), `solicitationKey`
+(letters and digits of the number, 8 or more), `recompeteFromSignals`.
+`src/lib/scout.ts`: waiting finds of one solicitation fold into the
+latest (`foldWaitingFinds`); a new notice of a solicitation already in
+the pipeline raises no find, a decided one stays decided, a waiting one
+is replaced in place (`bySolicitation`); every waiting find is
+re-scored each run and a now-passing mention removed
+(`rescoreWaitingFinds`); the AI review takes the ten best of the new and
+the waiting unreviewed finds. Scout tab: **New finds** shows Pursue then
+Watch; **Show skipped (N)** reveals the skips; **Not yet reviewed** holds
+unjudged finds with the reason (stub mode, plan or quota, queued batch,
+waiting their turn). Tests: `tests/ai/scout-logic.test.ts` rewritten for
+the formula and the new rules; `tests/isolation/scout-quality.test.ts`
+(fold, replace, pipeline skip, passing mentions dropped, re-score, another
+tenant untouched).
+
+**Owner decisions:** keep **Show skipped** (2026-11-03). The AI review
+stays behind the plan's general AI switch (`aiAutoDraft`, which also
+gates chat, the company model and loss intelligence); a separate switch
+would be a pricing change.
+
+**Next: BL-SCOUT-AMEND — the amendment watch** (owner, 2026-11-03). When
+the scout, or a daily check of every open opportunity with a SAM.gov
+notice, finds a new notice of a solicitation in the pipeline: download
+every published attachment (size cap and storage limit as today), file
+each as an amendment document under the opportunity's solicitation so
+it is read and compared, and notify the opportunity's owner and everyone
+assigned to its proposal or review teams, in the app and by email, with
+the amendment number, a moved due date and the documents. A new
+"Solicitation amended" notification rule ships on by default. Watched:
+every open opportunity (not won, lost or no-bid); once Evaluate has the
+Go / No-Go decision, a No-Go stops the watch.
+
+---
+
+### BL-SCOUT-AMEND — The amendment watch
+
+**Owner, 2026-11-03:** "as the scout runs and finds amendments to any
+solicitation that we have decided to go on, it must automatically
+download amendments and any other published documents and append them
+to the opportunity and notify the team". Decisions: watch every open
+opportunity; tell the owner and everyone assigned to its proposal or
+review teams.
+
+**Delivered (this PR):**
+- `src/lib/amendment-watch.ts` — `checkOpportunityNotices` asks SAM.gov
+  for every notice of the opportunity's solicitation
+  (`fetchSamNoticesForSolicitation`, `solnum`, the last year, inactive
+  notices included, each checked against the solicitation key), or for
+  its own notice when it has no usable number. `planWatch`
+  (`src/lib/amendment-watch-logic.ts`, pure) decides which notices are
+  amendments (posted after the opportunity's own), which attachments
+  are new, which notices the team hears about (posted after the
+  opportunity was added; earlier documents are filed quietly) and
+  whether the response date moved (the newest amendment not filed yet,
+  so a date set by hand changes only with a later amendment). Each new
+  file (20 MB cap, ten per check, the plan's storage limit) is stored at
+  `org/{org}/solicitation/{id}/{name}` and filed as a solicitation on
+  the opportunity (`source = samgov-watch`), an amendment's under the
+  opportunity's first solicitation with its number, and its parse is
+  queued as a durable job. One record per notice carries the notice ID,
+  so the daily Q&A check reads each notice once. Links that can never
+  be read are marked seen; the rest wait for the next check. Every
+  notice read is remembered, so an amendment is announced and moves the
+  date once; a file of it filed on a later check is reported then. A
+  person's check refuses to start within five minutes of the last try
+  (theirs or the daily run's), so two checks never file the same files.
+- The team: the opportunity's owner; its proposals' manager, capture
+  lead, pricing lead and section authors; its reviewers; its
+  solicitations' assignees; only active members of the organization.
+  Told through the rules engine (`solicitation_amended`, a new inbox
+  kind), by the default rule seeded per company (0146) or added on the
+  first message for a company created later. An activity note and an
+  `opportunity.sam_watch` audit row record each filing.
+- Daily cron `/api/cron/amendment-watch` at 09:45 UTC (after the scout),
+  modelled on the Q&A check: one company at a time in turn, each on its
+  key; a failing key skips that company (or every company on the shared
+  key); three SAM.gov failures in a row end the run; checks start in the
+  first 200 s and no download starts past 260 s. The scout clears an
+  opportunity's last check when it sees a new notice of its solicitation,
+  so the watch takes it first. **Check SAM.gov now** on the opportunity's
+  Documents panel runs one check (the page now allows 300 s).
+- Migrations 0145 (two enum values; `sam_watch_seen_links`,
+  `sam_watch_notice_ids`, `sam_watch_checked_at`,
+  `sam_watch_attempted_at` on `opportunity`) and 0146 (the default rule).
+- Tests: `tests/ai/amendment-watch-logic.test.ts` and
+  `tests/isolation/amendment-watch.test.ts` (three files filed with the
+  amendment under the first solicitation, parse jobs queued, the date
+  moved, the owner and proposal manager told and not another
+  organization's user, the default rule added, nothing twice, the other
+  tenant untouched, a closed pursuit refused, the daily run picking up a
+  new file). USER_MANUAL §5.4 Overview, §5.2.1, What's new;
+  ADMIN_MANUAL §5.
+
+**Later:** a No-Go in Evaluate (phase 2) stops the watch, as won, lost
+and no-bid do now.
+
+---
+
+### BL-SCOUT-REACH — Scout reads every notice in the company's codes
+
+**Owner, 2026-11-05:** "you telling me there are only 3 opportunities
+that meet our criteria out there on SAM.gov — our Scout seems to be
+broken". The nightly run searched four IT codes (541519, 541511, 541512,
+541513) over 3 days and kept 3 notices.
+
+**Assessment.** The search itself worked: all four codes answered. Two
+rules that came before BL-SCOUT-QUALITY cut the list:
+1. **Keywords are a hard filter, matched as exact phrases.** A notice is
+   kept only if its title, agency or description contains one of
+   "IT consulting", "software engineering", "enterprise IT
+   modernization", "ServiceNow" or "Digital Transformation" word for
+   word. Notices in the company's own codes that say "IT support
+   services" or "application development" are dropped before they are
+   scored.
+2. **Only the first 100 notices per NAICS code are read**
+   (`SAM_LIMIT` in `src/lib/scout.ts`; SAM.gov sends up to 1,000). Busy
+   codes such as 541512 can post more than 100 notices in a few days.
+   The rest are never seen, and the run note doesn't say so: the search
+   reports `truncated`, but the scout ignores it.
+
+The run note also doesn't show the funnel (notices received, open,
+mentioning a keyword, kept), so the owner can't tell where the notices
+went.
+
+**Owner decision (2026-11-05): keywords rank.** Options were (a) keep
+keywords as a filter but match a keyword's words anywhere, (b) every open
+notice in the codes is a find and keywords only raise its score, or (c)
+keep the exact filter. The owner chose (b).
+
+**Delivered (this PR):**
+- `src/lib/scout.ts`: with NAICS codes and keywords, the search sends no
+  keyword query (`rank`); every open notice in the codes is a find
+  (source `org_naics`), scored by `scoutFit`, so the keyword weights of
+  BL-SCOUT-QUALITY rank it, and the keyword the text gave is stored as
+  the find's matched keyword. Excluded words (`-staffing`) still keep a
+  notice out, checked against its text at staging. Ranked keywords clear
+  no waiting find; codes and the due date still do. With no codes the
+  keywords are still the search, as before.
+- `SAM_LIMIT` 100 → 1,000 (SAM.gov's maximum per request).
+- The run note gives the funnel (`scoutSearchFunnel`, pure): notices
+  SAM.gov sent, open solicitations once amendments are folded and awards
+  left out, and with keywords as the search how many mention one; it
+  says when SAM.gov held more than it sends.
+- AI review: 25 finds a run (was 10), never past four fifths of the
+  plan's monthly AI requests (`scoutTriageAllowance`, pure; unlimited
+  plans unaffected), so the scout can't block drafting or chat; the run
+  note says when it held back.
+- The Scout tab: finds load in display order (Pursue, Watch, not yet
+  reviewed, Skip; best fit first; up to 200), so a long list never cuts
+  off an AI recommendation; the header counts every waiting find;
+  **Not yet reviewed** opens on the best 20 with **Show all**, and its
+  heading gives the true number waiting.
+- Tests: `tests/isolation/scout-run.test.ts` (every open notice in the
+  codes kept, the keyword match outranks the plain one, the funnel line;
+  with no codes the keywords still filter), `scout-quality.test.ts` (a
+  passing mention in the company's code is a low-ranked find), and
+  `tests/ai/scout-logic.test.ts` for the two pure helpers. USER_MANUAL
+  §5.2.1 and What's new.
+
+---
+
+### BL-SCOUT-ONEPAGE — Scout as one page
+
+**Owner, 2026-11-06**, quoting FORGE II footnote 3: "a single page that
+combines Import from SAM, paste GSA email, paste from eBuy, enterprise
+portals, and current and future GWACS … into a one-stop, user-friendly
+experience … a button next to each opportunity to add it to the
+Pipeline". **Assessment:** the buttons were there (#453), but the page
+stacked two experiences (the nightly finds on top, a source picker
+about 2,600 px down, each source its own tool) with two SAM.gov search
+forms and large cards. **Owner chose:** one source bar, one search bar
+that also saves the nightly scout, one compact results list for every
+source with Add to pipeline on each row.
+
+**Delivered (this PR):**
+- **Source bar** on top of the Scout tab: All · SAM.gov · GSA eBuy · GSA
+  email · Enterprise portals · GWACs (the last two marked *soon*, each
+  saying what is coming and opening the source-request form).
+  `src/lib/identify-sources.ts` gains GWACs and an All link.
+- **All** is the nightly scout under one search bar (keywords, NAICS
+  codes, look-back): **Search** runs the scout once with the bar's
+  criteria (`runScoutForOrganization({ criteria })`: its finds join the
+  list; it clears and re-scores no waiting find; the saved criteria
+  stay); **Save as nightly scout** saves them. The last run's note and
+  the scout's track sit under the bar.
+- **One row for every source** (`src/components/scout/ResultRow.tsx`):
+  AI call · title and agency · source · due · fit · actions on one
+  line, the reasons, rationale and description opening below. Scout
+  finds and SAM.gov search results use it now; the finds filter by
+  Recommended, Not yet reviewed, All and Skipped (`filterFinds`, pure).
+- **SAM.gov** keeps its precise search (any window to 90 days, words a
+  notice must mention, GSA vehicles, notice types), its results in the
+  shared rows. Its keyword filters, where the scout's ranks: a search is
+  for something specific.
+- **eBuy and GSA email in the shared rows (second PR):** the paste box on
+  top (GSA email with its attachments beneath it), the extracted notice as
+  one shared row below it, open on its editable fields, with **Add to
+  pipeline** on the row; adding keeps you on the Scout page, and the row
+  links to the new opportunity (**Open →**; eBuy adds **Paste another**).
+  Attachments not filed are named on the row. `ResultRow` gains
+  `defaultOpen`. Also fixed: a button carrying both `aur-btn` and
+  `aur-btn-primary` (194 of them, across 142 files) turned white on white
+  on hover, because the light button's hover rule came later in
+  `globals.css`; the primary hover now wins.
+
+---
+
+### BL-SCOUT-PORTALS — Enterprise portals as Scout sources
+
+**Owner, 2026-11-06:** first state portals, primes' supplier portals and
+commercial aggregators. **Research (2026-11-06; from search results of
+the cited pages, not the pages themselves — confirm before building):**
+- **State portals** (CA Cal eProcure, NY Contract Reporter, TX ESBD, FL
+  MFMP, PA eMarketplace, IL BidBuy, OH OhioBuys, NJ NJSTART, MA
+  COMMBUYS, MI SIGMA, VA eVA, MD eMMA): no official API or feed for open
+  solicitations found; most send email alerts to registered vendors.
+  Multi-state platforms (Bonfire/Euna, OpenGov, Periscope, BidNet,
+  Jaggaer, Ivalua) offer no vendor API. Terms of use on automated
+  retrieval are unconfirmed, so no scraping.
+- **Primes** (Lockheed Martin, Leidos, SAIC, Booz Allen, GDIT, Northrop
+  Grumman, RTX, CACI, ManTech, Peraton): registration portals; work
+  reaches suppliers by invitation or email; no public feed. SBA SUBNet
+  has a public dataset, but new postings are paused while SBA rebuilds it.
+- **Aggregators:** HigherGov has a documented REST API with saved-search
+  pulls (`search_id`) covering federal and all 50 states (API access
+  with a subscription per its docs; a README says invite-only, so
+  confirm); GovWin IQ has a paid Webservices API add-on (customer client
+  ID and secret); GovTribe a paid API add-on; GovSpend a saved-search API
+  (auth and terms unknown).
+
+**Proposed first connectors:** (1) HigherGov with the customer's API key
+and saved searches, after HigherGov confirms third-party SaaS use;
+(2) an inbound FORGE address per company to forward portal and prime
+alert emails to, parsed per sender (extends the GSA email path, covers
+states and primes without scraping); (3) GovWin IQ for customers with the
+Webservices add-on; (4) GovTribe or GovSpend for customers with API
+access. **To decide:** which first, and whether to approach the vendors.
+
+---
+
+### BL-SCOUT-INBOX — Portals mail FORGE directly
+
+**Owner, 2026-11-06:** "I don't want a forwarding address; I want the
+portal to ingest emails directly from the source … a unique Forge domain
+email address that is created for a client, or the client can use their
+own verified domain email address that is routed to Forge … without any
+human in the middle forwarding them, parse them, and create
+opportunities". **Decisions:** each bid read from an email becomes a
+Scout find (AI-reviewed, added with a click), not an opportunity
+directly; mail is received in **FORGE's Exchange (Microsoft 365) shared
+mailbox**, read through Microsoft Graph (owner, 2026-11-06: "remove any
+postmark configurations … and move to exchange instead"; phase 1 first
+shipped on Postmark's inbound webhook, replaced in phase 2b).
+
+**Phases (one PR each):**
+1. **Receive (this PR).** `inbound_address` and `inbound_email`
+   (drizzle/0147). Settings → Integrations → **Bid email address**: an
+   admin creates the company's address on FORGE's inbound domain
+   (`<company>-<4 random>@INBOUND_EMAIL_DOMAIN`). The Postmark inbound
+   webhook (removed in 2b) `/api/webhooks/postmark-inbound` (basic credentials
+   `INBOUND_WEBHOOK_SECRET`, constant-time; 401 wrong, refuses with none)
+   routes each email to the company by its recipient address (a `+tag`
+   is ignored), stores the raw payload in the company's storage (counted
+   in the storage meter), records the email once per MessageID with SPF
+   and DKIM (`authenticated` when either passed), a 4,000-character text
+   preview, its links, its attachments' names and a first reading of its
+   kind (bid alert, account, other; `classifyInbound`, pure), and audits
+   `inbound_email.receive`. Mail for an unknown address is dropped with
+   200. The **Bid inbox** on Scout → Enterprise portals lists the latest
+   50 for org admins (account emails carry sign-up links).
+2. **Read the bids (this PR).** Receiving queues a durable job
+   (`inbound_email_parse`, drizzle/0148) for every email but an account
+   one. `readInboundEmail` holds an unverified sender (an admin's **Read
+   the bids** in the Bid inbox reads it, or an account email, or retries
+   a failed one); gates the AI like the scout's review (`aiAutoDraft`,
+   `aiRequestsPerMonth`, refunded on failure); reads the email with the
+   `inbound_bids` prompt (kind and every bid: title, agency, number, due
+   date, link, NAICS, set-aside, summary; the email named untrusted) or,
+   in stub mode, one bid from the subject (`stubBids`); cleans the bids
+   (`cleanBids`: 25 at most, real links and dates only); and makes each a
+   Scout find (source `portal_email`, linked to its email by
+   `inbound_email_id`, notice id `email:<id>:<n>` so a second reading adds
+   nothing, scored by `scoutFit`), skipping a solicitation number already
+   a find or in the pipeline. The nightly review takes the finds with the
+   rest. Adding a portal find to the pipeline files the email's
+   attachments (10 at most, storage limit) as solicitations on the new
+   opportunity, each parsed; the opportunity gets no notice id. Audit
+   `inbound_email.read`.
+2b. **Exchange instead of Postmark (this PR).** The Postmark webhook and
+   its settings are gone. `src/lib/inbound-graph.ts` reads FORGE's shared
+   mailbox (`INBOUND_MAILBOX`) through Microsoft Graph with an app-only
+   token (`MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`,
+   `MS_GRAPH_CLIENT_SECRET`; `Mail.ReadWrite`, restricted to the mailbox
+   by an application access policy): the cron route
+   `/api/cron/inbound-mail` (every two minutes, `CRON_SECRET`) lists the
+   Inbox's unread messages with their headers (Exchange's
+   Authentication-Results carry SPF and DKIM), downloads each one's file
+   attachments (20 MB, ten; inline skipped), files it
+   (`receiveInboundMessage`) and marks it read; a message FORGE fails to
+   file stays unread for the next run. Mail reaches the mailbox through an
+   Exchange mail-flow rule that redirects everything for
+   `INBOUND_EMAIL_DOMAIN` (an Internal relay accepted domain); the company
+   is found from the envelope headers Exchange keeps, or plus addressing
+   on the mailbox (`companyLocalPart`). The message is stored as FORGE's
+   own JSON (`inboundMessageSchema`) with each attachment its own object
+   (no request-size limit any more); the storage meter counts both.
+   Provider `exchange` (drizzle/0149 sets the default). ADMIN_MANUAL §3.7
+   is the Microsoft 365 setup for `forgeaxi.com`.
+3. **The company's own domain:** a verified domain (DNS TXT) with its MX
+   pointed at FORGE's inbound, or a server-side rule.
+4. **Dedicated readers** for the portals the owner names, from real alert
+   samples.
+
+---
+
+### BL-SCOUT-GWAC — GWACs as a Scout source
+
+**Owner, 2026-11-03:** GWACs go on the backlog; the Scout page does not
+list them until they are built. **Ask (FORGE II, footnote 3):** Scout
+brings in opportunities from "current and future GWACs business users
+may have", alongside SAM.gov, GSA eBuy, GSA email and enterprise
+portals. **To decide before building:** which vehicles first (GSA MAS
+through eBuy is partly covered by the eBuy paste; OASIS+, Alliant 2/3,
+SEWP, Polaris, CIO-SP each have their own ordering portal and access
+rules); whether a vehicle's task-order notices can be read through an
+API or only by forwarded email (in which case the GSA-email paste is
+the bridge); and how a company records which vehicles it holds, so the
+scout only looks where it may bid. Lands as a source in the Bring-in
+picker on the Scout tab (`src/lib/identify-sources.ts`).
+
+---
+
+### BL-SCOUT-FILES — Add to pipeline brings the notice's documents
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ merged (#469); follow-up 🚧 this PR
+
+**Follow-up (owner, 2026-11-07):** "I am still not able to upload
+multiple documents" under Evaluate. The opportunity's **Add a document
+to this opportunity** reused the new-solicitation form, which takes the
+first file only (one file becomes one solicitation). On an opportunity
+the form now takes every file dropped or picked (`multiple`), files
+each in turn through the same queue, and counts them. Creating a
+solicitation still takes one file. The "did not reach storage" failure
+the owner saw alongside is the storage/CORS check on Admin → Jobs →
+File storage, not a code change (admin manual, File storage).
+
+**Owner, 2026-11-07:** "can you also download attachments that are with
+the opportunity? So that we have everything ready"; and the Scout's
+"Open →" after Add to pipeline never showed. Assessment: the amendment
+watch already files a notice's attachments, but only at the next daily
+check; the Documents panel showed **Check SAM.gov now** only once a
+document existed (it returned early when there were none), and its
+**Upload a solicitation** went to Create, making a new opportunity; the
+Scout list reloads with waiting finds only, so the decided row (and its
+"Open →") disappeared at once.
+
+Delivered (migration 0153: job kind `sam_notice_files`):
+- An opportunity created from a SAM.gov notice (Scout's Add to pipeline,
+  the SAM.gov search's import) queues `sam_notice_files`, which runs the
+  watch's check for it at once (files every attachment, queues each to be
+  read); two attempts; a refusal fails the job with its reason.
+- **Documents & AI review** always shows the SAM.gov line and **Check
+  SAM.gov now** (and refreshes after it); while the download runs it says
+  so and refreshes every 5 seconds; a failure or pending retry says why.
+  **Add a document to this opportunity** files an upload on this
+  opportunity (`createSolicitationFromUploadAction` takes an
+  `opportunityId`, checked to be this organization's).
+- The Scout keeps what was just added or set aside in a line above the
+  finds, with **Open** and **Go to Evaluate**; its help text says where a
+  find goes.
+- Found on the way: the watch's look-up of a notice by id also fetched
+  its description, a second SAM.gov request it never used, on every
+  check; `fetchSamNotice(…, { withDescription: false })` skips it.
+
+Tested in `tests/isolation/sam-notice-files.test.ts`; end to end in a
+browser.
+
+---
+
+### BL-MFA-ADMIN — Company admins see and reset members' two-step sign-in
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🚧 this PR
+
+**Owner, 2026-11-07:** "There should be an option in the admin settings
+to enforce MFA"; chosen: two-step sign-in stays required for everyone
+(no company can weaken it), and company admins get visibility and a
+reset. **Administration → Security** (`/users/security`, also under
+People in the Company admin menu): the policy line (red when the
+platform switch is off), and every member with the methods they hold or
+**Not set up yet** and their recovery codes left
+(`companyMemberSecurity`); **Reset second step** with a written reason
+(`resetMemberSecondStep`): methods and codes removed, sessions ended,
+the member emailed ("Your company's FORGE administrator"),
+`user.mfa.reset` audited with `companyAdmin: true`. Never yourself, a
+platform administrator, someone who also belongs to another company,
+an inactive member or one with nothing set up
+(`companyResetBlocker`, pure, tested); the server re-checks membership
+of this company. Tested in `tests/ai/company-security-logic.test.ts`
+and `tests/isolation/company-security.test.ts`.
+
+---
+
+### BL-MFA-RECOVERY — Nobody, the owner included, is locked out at the second step
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (#464)
+
+**Owner, 2026-11-07:** after the domain move the owner, the only
+superadmin, could not get past the second step: "I need a dynamic
+solution, not a hard-coded one that makes it impossible for even a
+super admin to get in"; "Super admin should be required to have two
+options for fallback … an authentication app and passkey, and give
+him/her the choice"; "if I cannot fix it then no one can". Causes: the
+passkey relying party came from one configured value (falling back to
+the old domain), and a superadmin without a passkey was sent to enrol
+one before anything opened, which a broken passkey domain made
+impossible even with a working app.
+
+Delivered (migration 0151):
+- **Passkeys follow the address in the browser** (`webauthnConfigFor`,
+  pure and tested): the request's host when it is one of the site's own
+  addresses, else the configured one; each passkey records its domain
+  (`user_mfa_factor.rp_id`); the second step offers only passkeys that
+  work there and names the others.
+- **Superadmins keep a passkey and an authenticator app**
+  (`missingMethods`, tested); either passes the step and they choose at
+  sign-in; a missing one is asked for after sign-in (a strip on every
+  page, Security after the step), never as a condition of getting in.
+- **Email me a recovery link** on the second step: single-use, 15
+  minutes, three a day, only in a session past the password step,
+  stored as a hash; lands on Security; the person and every superadmin
+  are emailed; audited.
+- **`npm run auth:recover -- <email> "<reason>"`**: the operator's last
+  resort against the database, no redeploy, audited.
+
+Tested in `tests/ai/webauthn.test.ts`, `tests/ai/mfa-methods.test.ts`
+and `tests/isolation/mfa-recovery.test.ts` (the owner's lockout: a
+superadmin whose only passkey was made on www.sysgov.com, signing in on
+www.forgeaxi.com), and end to end in a browser.
+
+**Followed by** BL-MFA-ADMIN (Administration → Security).
+
+---
+
+### BL-OPP-SOURCE — Where an opportunity came from, and lighter page titles
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in this PR
+
+**Owner, 2026-11-07:** "when you create the opportunity page, we need to
+maintain the link to where the opportunity came from, if it is from
+SAM.gov, or GSA, or other GWACs or local, state, or commercial portals";
+and the page title should fit on one line, lighter. Both answered with
+the recommended options: source and link set automatically where FORGE
+knows them, editable on every opportunity, shown under the title, existing
+SAM.gov opportunities filled in; the lighter one-line title on every page.
+
+- **Migration 0155:** `opportunity.source` (text, default `manual`) and
+  `opportunity.source_url`. The vocabulary is in
+  `src/lib/opportunity-source.ts` (pure, tested): SAM.gov, GSA eBuy, GSA
+  email, GWAC, state, local, commercial or prime portal, portal email (bid
+  inbox), USAspending recompete, uploaded document, entered by hand. A
+  link is kept only as http(s), without credentials, at most 2,000
+  characters, so a `javascript:` or `data:` link is never stored or
+  rendered. The migration fills in existing opportunities from what FORGE
+  holds: a SAM.gov notice ID (its public page,
+  `https://sam.gov/opp/{id}/view`), the Scout find it was added from (a
+  portal email's or an expiring award's link), the note an eBuy or GSA
+  email paste left (its first link) or a document's; it only touches rows
+  still `manual` with no link, so it is safe to run again.
+- **Set at every way in:** Scout's Add to pipeline (`scoutSourceFields`),
+  the SAM.gov search import, the eBuy and GSA email pastes (the pasted
+  text's eBuy or gsa.gov link first), Create from a document and the
+  solicitation's Create opportunity (`document`, with the SAM.gov page
+  when the document names a notice), and the New opportunity form.
+- **Overview:** **Source** and **Source link** on the form; a SAM.gov
+  opportunity left without a link takes its notice's page. **Under the
+  title:** "Source: SAM.gov · sam.gov ↗", the link opening in a new tab.
+  **On every row** (owner, 2026-11-07, "we need the source link at every
+  stage"): Evaluate, Capture, the other stage pages and the Opportunities
+  list show `SourceLink` beside the agency, "notice ↗" as Scout does.
+- **Page titles** (`PageHeader`, every page): one line at any width, 24 to
+  28 px at the regular weight instead of 36 to 48 px; a long title ends in
+  "…" and shows in full on hover. `docs/DESIGN_SYSTEM.md` §4 rule 6.
+
+Tested in `tests/ai/opportunity-source.test.ts` and
+`tests/isolation/opportunity-source-backfill.test.ts` (the migration's
+backfill run twice against Postgres).
+
+---
+
+### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 in this PR; phase 3 waits on the owner
+
+**Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
+web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
+2026-11-07: "my passkey is not working"). Cause: with no
+`NEXT_PUBLIC_APP_URL` on Vercel, `appBaseUrl()` fell back to the old
+`https://www.sysgov.com` in production, so passkeys were asked for the
+old domain (the browser refuses) and email links pointed there.
+
+- **Phase 1 (#464):** the production fallback is
+  `https://www.forgeaxi.com` (tested, with the passkey domain it gives);
+  the User Manual's sign-in addresses and the Admin Manual's storage
+  CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old
+  passkeys can't move and how to recover (set the variable, redeploy,
+  password plus authenticator or recovery code, add a new passkey).
+- **Phase 2 (this PR; owner, 2026-11-07: "the email is still coming
+  from SYSGOV.com", "the Authenticator app still shows SYSGOV"):** the
+  sender and the authenticator name come from the site's address
+  (`src/lib/site-domain.ts`, pure, tested): `FORGE <noreply@forgeaxi.com>`
+  unless `EMAIL_FROM` says otherwise, and `FORGE (forgeaxi.com)`. Found
+  on the way: Resend reports a refused message in `error` rather than
+  throwing, and `sendEmail` ignored it, so a refusal (an unverified
+  domain) read as sent; it now throws with the reason, logged
+  `[email] send refused`, and every caller already handles a failed
+  send. Settings → Integrations names the From address and its domain.
+- **Phase 3 (waits on the owner):** the contact addresses shown in the
+  app (support@ / sales@sysgov.com), once the owner names them.
+
+---
+
 ### BL-NAV-LIFECYCLE — The everyday menu is the proposal lifecycle
 
 **Owner, 2026-11-01 (FORGE II document):** the everyday sidebar
@@ -2876,22 +3420,295 @@ at the stage the pursuit is in. The old Opportunities items that left
 the menu are ⌘K shortcuts. The stage behaviours arrive phase by phase
 on these pages.
 
+Every requirement in the FORGE II document, with its status and phase:
+`docs/FORGE_II_REQUIREMENTS.md`.
+
 **Phases to come, one PR each, design reviewed first:**
-1. **Identify:** on the Identify page's two tabs: Scout as the one-stop
-   import (SAM.gov, GSA eBuy, GSA email, enterprise portals, GWACs) with
-   **Add to pipeline** on each find; Create as one page merging New
-   Opportunity and New Solicitation (design in #451, folded in here).
-2. **Evaluate:** the stage page replaces Solicitations; a solicitation
-   becomes a document on the opportunity, not a record of its own;
-   Analyze (PWin and its report) and the Capability matrix (Yes / Partial
-   with a percentage / No over the existing six-answer scale) with their
-   reports on the opportunity page; the decision Go, No-Go with a
-   required reason, or Partner.
-3. **Capture:** the Go and Partner worklist; the partner registry
-   (NAICS, capabilities, socio-economic status, ISO / CMMI / CMMC) built
-   on the 8(a) registry and USAspending; the partner finder with a
-   prioritised list and rationale; a tokenised link for a partner to
-   answer the capability matrix with no account.
+1. **Identify:** on the Identify page's two tabs.
+   - **1b — Scout, the one-stop page (this PR, with 1a).** The Scout tab keeps the
+     nightly finds on top, each with **Add to pipeline** and **Not for
+     us** (the old Import and Dismiss, same decision and grading), then
+     **Bring in an opportunity** with a source picker (`?source=`):
+     SAM.gov search, GSA eBuy and GSA email render inline (the three
+     import pages' bodies, now sections; their URLs redirect to the
+     picker); enterprise portals and GWACs, which have no importer, open
+     the existing source-request form so the demand is counted. SAM.gov
+     results gained **Add to pipeline** beside every notice next to the
+     bulk **Add N selected to pipeline**; eBuy and GSA email say **Add to
+     pipeline** too. `src/lib/identify-sources.ts` (pure, tested) holds
+     the sources. The Identify route carries the import pages'
+     five-minute budget for their server actions. A sidebar tab link now
+     matches when its own query is a subset of the page's, so Scout stays
+     lit with a source chosen. Stages are unchanged: a find or an import
+     lands where it did (Identified, or the notice type's stage).
+   - **1a — Create as one page (this PR, with 1b).** New Opportunity and
+     New Solicitation on the Create tab. **Start from a document** uses
+     the existing upload and parse (`createSolicitationFromUploadAction`,
+     a durable parse job) and hands over to
+     `/pipeline/identify?tab=create&from=<id>`: while the document is read
+     the page waits (`ParseWaiter` refreshes every 4 seconds; **Don't
+     wait** opens the form at once), then shows the opportunity form
+     pre-filled from the parsed fields. Saving calls
+     `createOpportunityAction(input, { solicitationId })`, which checks
+     the document is this workspace's and not already linked, links it and
+     its amendments, notes the activity, and audits
+     `opportunity.create` with `from: document | hand`. **Or fill in by
+     hand** is the form as before. `/solicitations/new` redirects to
+     Create; the proposal launcher's `afterCreate` hand-off survives.
+     `CreateSection` calls the org gate itself. Tested in
+     `tests/isolation/create-from-document.test.ts` (linked from birth
+     with amendments, a second save refused, another workspace refused,
+     by hand audited as such) and end to end.
+2. **Evaluate:** design `docs/design/BL-NAV-LIFECYCLE_PHASE2_EVALUATE.md`,
+   approved by the owner 2026-11-06 with every recommended answer
+   (Solicitations folds into Evaluate; Yes keeps a *proven* tick; GO goes
+   to Capture, then Plan; a NO-GO needs a category and the team's own
+   words). Three PRs:
+   - **2a — the decision and the Evaluate page (#463).** Migration
+     0150: `opportunity_decision` (decision `go` / `no_go` / `partner`,
+     reason category, reason, PWin and capability coverage at that
+     moment, who, when), one row per decision, never overwritten.
+     `src/lib/opportunity-decision.ts` (pure, tested) holds the rules:
+     GO and PARTNER move the opportunity to Qualified (Capture), NO-GO to
+     No bid, which also takes it off the SAM.gov amendment watch; a NO-GO
+     needs one of eight categories and at least 20 characters of reason.
+     `src/lib/opportunity-decision-store.ts` records it through the one
+     stage-change path (`applyOpportunityStage`: activity note, audit,
+     the rules engine's event) and audits `opportunity.decision`; lists
+     the history; suggests the company's own teaming partners and
+     subcontractors, same NAICS first; and gives the Evaluate list each
+     row's brief call, matrix and latest decision. **Decision panel** on
+     the Evaluation tab replaces the gate panel while the opportunity is
+     in Evaluate (and can change the call in Capture, as a new record);
+     PARTNER lists the suggestions and **Find more partners**, which
+     opens Company search with the opportunity's NAICS. **Evaluate
+     page:** one row per opportunity with days left, **Analyze** (until
+     2c, the PWin and brief on the overview) or PWin and the brief's
+     call, **Capability Matrix** or coverage, and **Decide** or the
+     decision; filters Needs analysis, Needs matrix, Ready to decide,
+     All; below, the solicitation documents not yet on an opportunity,
+     each with **Create opportunity from it**. `/solicitations` redirects
+     to Evaluate; a solicitation's page stays as its document page, its
+     Back link to its opportunity. Tested in
+     `tests/ai/opportunity-decision.test.ts` and
+     `tests/isolation/opportunity-decision.test.ts`.
+   - **2b-1 — the three answers and the matrix's own page (#466).**
+     Each question is answered Yes (with *Proven by past performance*),
+     Partial with a percentage (5–95, steps of 5) or No (with *A partner
+     could cover it* and an optional partner), or N/A, mapped onto the six
+     stored values (`threeAnswerOf` / `storedValueOf`, pure and tested), so
+     older answers read the same; the answer gains `percent` (JSON, no
+     migration) and coverage counts a Partial's own percentage (older ones
+     50%). The questionnaire moves to the opportunity's **Capability** tab
+     (`/opportunities/{id}/capability`); the Evaluation tab shows its
+     summary (coverage, Yes / Partial / No counts, partner needed); the
+     Evaluate list and the next actions open it. Tested in
+     `tests/ai/capability-three-answers.test.ts`.
+   - **2b-2 — the Matrix Report (#467).** Migration 0152:
+     `opportunity_report` (kind `matrix` / `analysis`, version, JSON body,
+     who, when; a unique index on opportunity + kind + version, a second
+     save at the same moment takes the next number). **Save report** on
+     the Capability tab keeps `buildMatrixReport`'s snapshot (pure,
+     tested: each requirement with its answer, percentage, evidence and
+     partner, coverage, counts, gaps, the partner call), audited
+     `opportunity.report.save`. `/report/{id}` shows a saved report
+     outside the app's frame, printable (**Print or save as PDF**), with
+     its other versions; this organization's only. The Overview's
+     **Reports** line shows the latest Matrix Report and the decision.
+     Tested in `tests/ai/opportunity-report.test.ts` and
+     `tests/isolation/opportunity-report.test.ts`.
+   - **2c — Analyze and the Analysis Report (#469).** The
+     opportunity's **Analysis** tab (`/opportunities/{id}/analysis`):
+     **Run the analysis** (`runAnalysis`) computes the calibrated PWin
+     (no AI), reuses or writes the pursuit brief, and makes one AI call,
+     `analysis_report` (registered, versioned 2026-11-07.1, "standard";
+     `buildAnalysisReportPrompt`, the opportunity's own text fenced as
+     data), under the plan's AI switch and monthly quota, refunded when
+     the answer can't be read; with no AI provider, `factsOnlyAnalysis`
+     writes it from the facts and says so. The PWin and factors come
+     from the model, never the AI. Kept with `insertReport` as the next
+     `opportunity_report` version (kind `analysis`), printable at
+     `/report/{id}` (`AnalysisReportView`), on the Overview's Reports
+     line; Evaluate's Analyze opens it and its row shows the report's PWin
+     and call. Tested in `tests/ai/analysis-report.test.ts` and
+     `tests/isolation/opportunity-analysis.test.ts` (AI mocked: versions,
+     one request counted, refund on failure, facts-only mode, tenant
+     isolation).
+3. **Capture:** design `docs/design/BL-NAV-LIFECYCLE_PHASE3_CAPTURE.md`,
+   approved by the owner 2026-11-07 with every recommended answer
+   (federal partner sources now, state and local later; partners answer
+   through an emailed link with no account, valid 14 days; partners see
+   the questions and their own answers only; a PARTNER opportunity may
+   move to Plan with "teaming agreement: to do" until phase 8). PRs:
+   - **3a-1 — the Capture page, partners, Choose partner and Move to
+     Plan (#470).** Migration 0154: `opportunity_partner` (one of the
+     organization's companies considered for one of its opportunities:
+     source, status `candidate` / `invited` / `answered` / `chosen` /
+     `declined`, reason, who chose it and when; unique per opportunity
+     and company). `src/lib/capture-logic.ts` (pure, tested) holds the
+     rules: Move to Plan needs the opportunity in Capture (Qualified), is
+     closed to a NO-GO, and on a PARTNER needs a chosen partner; a GO
+     moves at once; the row's next step is *Find partners*, *Choose a
+     partner* or *Move to Plan*; the activity note names the partners and
+     "Teaming agreement: to do". `src/lib/capture-store.ts` adds,
+     chooses, declines, reconsiders and removes partners (audited
+     `opportunity.partner.add` / `choose` / `decline` / `reconsider` /
+     `remove`; a company and opportunity of another organization are
+     refused) and moves to Plan (stage Captured) through the one
+     stage-change path. The opportunity's **Partners** tab lists the
+     partners with their actions, adds one from the suggested teaming
+     partners or from Companies with a reason, links to Company search by
+     the opportunity's NAICS, and carries **Move to Plan** or what stands
+     in its way. **Pipeline → Capture** lists each Qualified opportunity
+     with its decision, days left, partners (candidates and chosen) and
+     the next step. Tested in `tests/ai/capture-logic.test.ts` and
+     `tests/isolation/capture.test.ts`.
+   - **3a-2 — the partner database search (#471).** No migration.
+     **Find partners** on the Partners tab (`searchPartners`,
+     `src/lib/partner-search.ts`) searches, by the opportunity's NAICS
+     code: USAspending (contract awards in the last five years, two pages
+     of 100 by value, and the agency's own under the code, through
+     `agencyAwardAttempts`; behind `AWARDS_INTEL_ENABLED` like the other
+     awards pages), the certification registry (`cert_firm`, current
+     certifications only: under the code, and every one held by a UEI
+     found elsewhere), one SAM.gov entity search (registered and active,
+     ten at most, on the company's or the shared key) and the
+     organization's Companies. `src/lib/partner-search-logic.ts` (pure,
+     tested) joins them by UEI, leaves the organization's own UEI out,
+     filters by state (a firm with no location on record stays) and
+     certification, reads the set-aside (`setAsideNeed`, the PWin
+     model's wording) and says whether a firm keeps it only when the
+     registry can tell, orders by awards at the agency, set-aside kept,
+     value, already a teaming partner or subcontractor, and writes each
+     firm's facts with their source (the facts 3b's AI must cite). A
+     source that is off or fails is named and the others still answer.
+     Recorded as a read, `opportunity.partner.search`. **Add**
+     (`addPartnerFromSearch`) puts the firm in Companies (imported from
+     SAM.gov through `importCompanyFromSam`, now shared with Company
+     search; when SAM.gov can't be reached, written from the search's
+     facts with `sync_source` `partner_search` and a note to refresh it)
+     and on the opportunity's partners with source `search` and its
+     first two facts as the reason. Tested in
+     `tests/ai/partner-search-logic.test.ts` and
+     `tests/isolation/partner-search.test.ts` (USAspending and SAM.gov
+     stubbed).
+   - **3b — FORGE AI's ranked partner list (this PR).** No migration.
+     **Rank the best 10 with FORGE AI** on the Partners tab
+     (`rankPartners`, `src/lib/partner-rank.ts`) runs the 3a-2 search,
+     hands the AI the top 25 firms with their facts numbered, plus the
+     capability matrix's No and Partial answers (`capabilityGaps`), and
+     keeps its ten picks only where the reason rests on the search.
+     `src/lib/partner-rank-logic.ts` (pure, tested): `citableFacts` (a
+     firm's facts, its place and whether it keeps the set-aside),
+     `buildPartnerRankPrompt` (firm names and facts quoted inside a
+     fence; the prompt says the facts don't show which requirement a
+     firm covers, so a reason never claims a firm closes a gap) and
+     `validateRanking`, which drops a pick that names a UEI the search
+     didn't return, a duplicate, one with no cited fact or a cited fact
+     that doesn't exist, or a reason stating a figure absent from the
+     facts it cites. The panel shows each reason with the facts it rests
+     on, and counts the picks left out. New AI feature `partner_rank`
+     (standard class, prompt version 2026-11-07.1, `aiAutoDraft` gate,
+     the monthly request quota refunded on a stub, a bad format or an
+     answer with nothing kept, 20 per org per hour); recorded as a read,
+     `opportunity.partner.rank`. **Find more** runs the same search
+     widened: the NAICS family (first four digits, which USAspending
+     reads as a prefix; the cert registry is matched with `like`) and
+     any state; SAM.gov's one search stays on the exact code. A partner
+     added from the AI's list has source `ai` and the AI's reason.
+     Tested in `tests/ai/partner-rank-logic.test.ts`,
+     `tests/isolation/partner-rank.test.ts` (AI stubbed) and the widen
+     case in `tests/isolation/partner-search.test.ts`. **Not verified
+     against the live API:** that USAspending accepts the four-digit
+     prefix in `naicsCodes` (documented behaviour; check the first
+     widened search after deploy).
+   - **3c — invitations, the partner's own matrix page, Compare and the
+     AI's partner rating.** Owner decisions 2–4 of the design's §4 taken
+     on 2026-11-07, the recommended option each: a personal emailed link
+     with no account (14 days); partners see only the questions and their
+     own answers; Move to Plan stays open with "agreement: to do".
+     - **3c-1 — invitations and the partner's own matrix page (✅ shipped
+       (PR #476); migration 0156).** On the Partners tab, **Invite** on a
+       partner takes the contact's email (prefilled from the company)
+       and name and issues a personal link: 24 random bytes, only its
+       sha256 kept in `opportunity_partner_invite`, 14 days, emailed
+       from the platform address with Reply-To the sender (or shown
+       with **Copy link** when email isn't configured). The partner
+       becomes *invited* (chosen stays chosen); a re-invite replaces the
+       partner's unanswered links. `/partner/[token]` (public, outside
+       the app shell, allowed in `auth.config.ts`) shows the questions'
+       text, weight and area only — never our answers, requirement
+       references or notes — with Yes / Partial % / No, evidence per
+       question, and the partner's certifications (ISO standards, one
+       CMMI level and model, one CMMC level, other in words), saved as
+       a draft or submitted; submitting marks the partner *answered*
+       and the link stays editable until it expires. Answers and
+       certifications live on the partner's `opportunity_partner` row
+       (`partner_answers`, `certifications`, `answered_at`). The
+       Partners tab shows each partner's invite state, answers count
+       and certifications. Audited: `opportunity.partner.invite`, the
+       read `opportunity.partner.invite.open`, and
+       `opportunity.partner.answers.save` / `.submit` with the contact's
+       email as actor. Not yet: the sweep of expired invites.
+     - **3c-2 — Compare and the AI's partner rating (✅ shipped (PR #477;
+       migration 0157)).** **Compare answers** on the Partners panel opens
+       `/opportunities/[id]/partners/compare`: one row per question, our
+       answer then every partner's (yes green, partial brass, no red,
+       n/a muted), the partner's evidence under its answer. A gap is our
+       No or Partial; a partner *closes* it (cobalt) when it covers more
+       than we do: Yes, or a Partial with a higher share
+       (`compareMatrix` in `partner-compare-logic.ts`). Declined
+       partners and those with no answers are left out; a draft not yet
+       submitted is shown and said so. **Rate the partners with FORGE
+       AI** below it: `scorePartners` fixes the order first (70% the
+       weighted share of our gaps' uncovered part the partner covers,
+       `KIND_WEIGHT` as coverage; 15% evidence on its gap-closing
+       answers; 15% certifications, each ISO one point, CMMI level/5,
+       CMMC level/3, full at 3), then the `partner_rate` prompt (standard
+       class, `2026-11-07.1`) writes one reason per partner citing
+       numbered facts, and `validateRating` drops a reason that cites no
+       fact, an unknown one, or a figure the cited facts don't hold; the
+       partner keeps its place with no reason. Gated by `aiAutoDraft` and
+       the monthly quota (refunded on failure), 10 per org per hour;
+       recorded as the read `opportunity.partner.rate` (gaps, partners,
+       reasons kept, dropped, the order). Advice only: choosing stays on
+       the Partners tab. Also: the inviter gets an inbox line
+       (`partner_answered`, migration 0157) when a partner submits, once
+       an hour per partner, linking to Compare. Not yet (3c-3): the
+       sweep of expired invites; a Compare column for the partner
+       already named on our own answer.
+     - **3c-3 — the sweep of expired invites and the partner we named
+       (✅ shipped (PR #478; migration 0158)).** **The sweep:** a new daily cron,
+       `/api/cron/partner-invites` (07:50 UTC, `CRON_SECRET`), runs
+       `sweepExpiredPartnerInvites` (`src/lib/partner-invite-cron.ts`):
+       every expired link, submitted or not, is retired by clearing its
+       `token_hash` (migration 0158 makes the column nullable; the row
+       stays so the Partners tab can still say "invite to … expired on
+       …"), and a partner shown as *invited* whose only links expired
+       unanswered goes back to *candidate* (`planInviteSweep` in
+       `partner-invite-logic.ts`, pure: a partner re-invited since keeps
+       its new link and its status; one that answered stays *answered*;
+       chosen and declined partners are not touched). 500 links per run,
+       grouped by organization, each write scoped by the row's
+       organization; one audit row per affected partner,
+       `opportunity.partner.invite.expire`, actor `system`, with the
+       email, expiry, whether it was submitted and whether the status
+       was reverted. A retired link opens "This link is not valid".
+       **Compare:** a gap row where our own answer names a company
+       ("Gap: partner needed" with a partner chosen under Evaluate,
+       `partnerCompanyId`) now says "we named <company>" (or that the
+       company is not among the partners compared), and when that
+       company is a compared partner its cell is marked *named* beside
+       *closes*; each column's heading counts the gaps we named it on
+       (`compareMatrix`: `row.named`, `cell.named`, `partners[].named`;
+       `ComparePartner.companyId`; `companyNamesById` in
+       `capture-store.ts`). The rating's score is unchanged by it.
+       Tested in `tests/ai/partner-invite-logic.test.ts`,
+       `tests/ai/partner-compare-logic.test.ts` and
+       `tests/isolation/partner-invite-cron.test.ts`. Phase 3 Capture is
+       complete with this PR; the phase 4 design draft is
+       `docs/design/BL-NAV-LIFECYCLE_PHASE4_PLAN.md`, its decisions
+       open for the owner.
 4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
    Gloves teams notified automatically, task owners, milestones, the
    compliance matrix and outline fixed here.
@@ -2899,9 +3716,10 @@ on these pages.
    exists), external reviewers with section-level access, scheduling
    links for reviews.
 6. **Deliver:** submit from the portal by email, sent from a platform
-   address with a per-opportunity reply address; replies ingested by an
-   inbound provider's webhook (Postmark, SendGrid Inbound Parse or
-   Mailgun; Resend is outbound-only) and filed on the opportunity.
+   address with a per-opportunity reply address; replies received in
+   FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox
+   does (BL-SCOUT-INBOX; owner's choice, 2026-11-06), and filed on the
+   opportunity.
 7. **Measure:** the stage page consolidating outcome, lessons, loss
    intelligence and reports.
 8. **The partner portal:** partner accounts scoped to their own answers,

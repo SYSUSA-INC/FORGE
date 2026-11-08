@@ -1,3 +1,4 @@
+import type { PartnerAnswer, PartnerCertifications } from "@/lib/partner-invite-logic";
 import type { CapabilityAnswer, CapabilityQuestion, CapabilitySuggestion } from "@/lib/capability-matrix-types";
 import type { CompanyModelBody, CompanyModelSources } from "@/lib/company-model";
 import type { LessonAppliesTo } from "@/lib/lessons";
@@ -84,6 +85,10 @@ export const users = pgTable("user", {
   /** BL-STAB-8a-3 — the one open passkey challenge, good for five minutes. */
   webauthnChallenge: text("webauthn_challenge"),
   webauthnChallengeAt: timestamp("webauthn_challenge_at"),
+  /** BL-MFA-RECOVERY — the emailed single-use recovery link: its SHA-256, when it expires, when the last was sent. */
+  mfaRecoveryTokenHash: text("mfa_recovery_token_hash"),
+  mfaRecoveryExpiresAt: timestamp("mfa_recovery_expires_at"),
+  mfaRecoverySentAt: timestamp("mfa_recovery_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -113,6 +118,8 @@ export const userMfaFactors = pgTable(
     publicKey: text("public_key"),
     counter: integer("counter").notNull().default(0),
     transports: jsonb("transports").$type<string[]>().notNull().default([]),
+    /** BL-MFA-RECOVERY — the domain the passkey was made on (it works only there); null for older ones. */
+    rpId: text("rp_id"),
     confirmedAt: timestamp("confirmed_at"),
     lastUsedAt: timestamp("last_used_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -426,6 +433,9 @@ export const opportunities = pgTable("opportunity", {
   stage: opportunityStageEnum("stage").notNull().default("identified"),
   solicitationNumber: text("solicitation_number").notNull().default(""),
   noticeId: text("notice_id").notNull().default(""),
+  // BL-OPP-SOURCE (drizzle/0155) — where it came from (src/lib/opportunity-source.ts) and a link back.
+  source: text("source").notNull().default("manual"),
+  sourceUrl: text("source_url").notNull().default(""),
   valueLow: text("value_low").notNull().default(""),
   valueHigh: text("value_high").notNull().default(""),
   releaseDate: timestamp("release_date", { mode: "date" }),
@@ -439,6 +449,12 @@ export const opportunities = pgTable("opportunity", {
   incumbent: text("incumbent").notNull().default(""),
   description: text("description").notNull().default(""),
   pWin: integer("p_win").notNull().default(0),
+  // BL-SCOUT-AMEND — the amendment watch (drizzle/0145): attachment links
+  // and notices already filed, and when SAM.gov was last checked / tried.
+  samWatchSeenLinks: jsonb("sam_watch_seen_links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  samWatchNoticeIds: jsonb("sam_watch_notice_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  samWatchCheckedAt: timestamp("sam_watch_checked_at", { withTimezone: true }),
+  samWatchAttemptedAt: timestamp("sam_watch_attempted_at", { withTimezone: true }),
   ownerUserId: text("owner_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -2093,6 +2109,10 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "review_completed",
   "opportunity_review_completed",
   "solicitation_role_assigned",
+  // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document (drizzle/0145).
+  "solicitation_amended",
+  // BL-NAV-LIFECYCLE 3c-2 — a partner submitted its capability answers (drizzle/0157).
+  "partner_answered",
 ]);
 
 export const notifications = pgTable("notification", {
@@ -2171,6 +2191,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "review_due_soon",
     // BL-FB-X-CRM Slice 2 — a customer contact's agreed next touch is due (migration 0099).
     "contact_touch_due",
+    // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document for a pursued opportunity (migration 0145).
+    "solicitation_amended",
   ],
 );
 
@@ -4625,6 +4647,10 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "section_auto_draft",
   // BL-STAB-2e — a knowledge-base file's text extraction (drizzle/0133).
   "knowledge_artifact_extract",
+  // BL-SCOUT-INBOX — the bids in an email a portal sent the company (drizzle/0148).
+  "inbound_email_parse",
+  // BL-SCOUT-FILES — a new opportunity's SAM.gov attachments, downloaded at once (drizzle/0153).
+  "sam_notice_files",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [
@@ -5015,6 +5041,8 @@ export const scoutCandidateSourceEnum = pgEnum("scout_candidate_source", [
   "org_naics",
   "keyword",
   "watchlist_award",
+  // BL-SCOUT-INBOX — a bid read from an email a portal sent the company (drizzle/0148).
+  "portal_email",
 ]);
 
 export const scoutProfiles = pgTable("scout_profile", {
@@ -5111,6 +5139,8 @@ export const scoutCandidates = pgTable(
     uiLink: text("ui_link").notNull().default(""),
     /** BL-STAB-10d — the keyword the find was kept for (its title, agency, description or an earlier notice's); "" when none. */
     matchedKeyword: text("matched_keyword").notNull().default(""),
+    /** BL-SCOUT-INBOX — the portal email this find was read from (drizzle/0148). */
+    inboundEmailId: uuid("inbound_email_id").references((): AnyPgColumn => inboundEmails.id, { onDelete: "set null" }),
     /** 0..100 heuristic fit before the model's take. */
     fitScore: integer("fit_score").notNull().default(0),
     signals: jsonb("signals").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
@@ -5214,3 +5244,221 @@ export const fileUploads = pgTable(
 
 export type FileUpload = typeof fileUploads.$inferSelect;
 export type NewFileUpload = typeof fileUploads.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-SCOUT-INBOX — a company's bid email address and what portals send
+// to it (drizzle/0147). Mail for the companies' addresses lands in FORGE's
+// shared Exchange mailbox, read through Microsoft Graph; each email is kept
+// once per Internet Message-ID, the message and attachments in storage.
+// ─────────────────────────────────────────────────────────────────────
+
+export const inboundEmailKindEnum = pgEnum("inbound_email_kind", ["unknown", "bid_alert", "account", "other"]);
+export const inboundEmailStatusEnum = pgEnum("inbound_email_status", ["received", "parsed", "failed", "ignored"]);
+
+export const inboundAddresses = pgTable(
+  "inbound_address",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Lower case, before the @. */
+    localPart: text("local_part").notNull(),
+    /** "" is FORGE's inbound domain; a company's own verified domain comes in a later phase. */
+    domain: text("domain").notNull().default(""),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("inbound_address_org_idx").on(t.organizationId, t.createdAt),
+    localDomainUidx: uniqueIndex("inbound_address_local_domain_uidx").on(t.localPart, t.domain),
+  }),
+);
+
+export type InboundAttachment = { name: string; contentType: string; size: number };
+
+export const inboundEmails = pgTable(
+  "inbound_email",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    addressId: uuid("address_id").references(() => inboundAddresses.id, { onDelete: "set null" }),
+    /** "exchange": FORGE's shared mailbox, read through Microsoft Graph (drizzle/0149). */
+    provider: text("provider").notNull().default("exchange"),
+    providerMessageId: text("provider_message_id").notNull(),
+    fromAddress: text("from_address").notNull().default(""),
+    fromName: text("from_name").notNull().default(""),
+    toAddress: text("to_address").notNull().default(""),
+    subject: text("subject").notNull().default(""),
+    textPreview: text("text_preview").notNull().default(""),
+    links: jsonb("links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    spf: text("spf").notNull().default(""),
+    dkim: text("dkim").notNull().default(""),
+    /** SPF or DKIM passed for the sender's domain. */
+    authenticated: boolean("authenticated").notNull().default(false),
+    kind: inboundEmailKindEnum("kind").notNull().default("unknown"),
+    status: inboundEmailStatusEnum("status").notNull().default("received"),
+    /** The message as FORGE stores it (JSON), its attachments beside it, in storage. */
+    storagePath: text("storage_path").notNull().default(""),
+    rawSize: integer("raw_size").notNull().default(0),
+    attachments: jsonb("attachments").$type<InboundAttachment[]>().notNull().default(sql`'[]'::jsonb`),
+    bidsFound: integer("bids_found").notNull().default(0),
+    error: text("error").notNull().default(""),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgReceivedIdx: index("inbound_email_org_received_idx").on(t.organizationId, t.receivedAt),
+    providerMsgUidx: uniqueIndex("inbound_email_provider_msg_uidx").on(t.organizationId, t.provider, t.providerMessageId),
+  }),
+);
+
+export type InboundEmail = typeof inboundEmails.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-NAV-LIFECYCLE phase 2a — the Evaluate decision (drizzle/0150): GO,
+// NO-GO or PARTNER, each a record kept, with a No-Go's reason and the PWin
+// and capability coverage when it was made.
+// ─────────────────────────────────────────────────────────────────────
+
+export const opportunityDecisionKindEnum = pgEnum("opportunity_decision_kind", ["go", "no_go", "partner"]);
+export type OpportunityDecisionKind = (typeof opportunityDecisionKindEnum.enumValues)[number];
+
+export const opportunityDecisions = pgTable(
+  "opportunity_decision",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    decision: opportunityDecisionKindEnum("decision").notNull(),
+    /** A No-Go's category (src/lib/opportunity-decision.ts); "" otherwise. */
+    reasonCategory: text("reason_category").notNull().default(""),
+    reason: text("reason").notNull().default(""),
+    /** The PWin and capability coverage (0..1) when the decision was made. */
+    pwin: integer("pwin"),
+    coverage: real("coverage"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_decision_org_idx").on(t.organizationId, t.createdAt),
+    oppIdx: index("opportunity_decision_opp_idx").on(t.opportunityId, t.createdAt),
+  }),
+);
+export type OpportunityDecision = typeof opportunityDecisions.$inferSelect;
+
+/**
+ * BL-NAV-LIFECYCLE phase 2b-2 — an opportunity's reports: each Matrix
+ * Report (and, in 2c, Analysis Report) saved is a dated snapshot, its own
+ * version per opportunity and kind, never overwritten.
+ */
+export const opportunityReportKindEnum = pgEnum("opportunity_report_kind", ["matrix", "analysis"]);
+export type OpportunityReportKind = (typeof opportunityReportKindEnum.enumValues)[number];
+
+export const opportunityReports = pgTable(
+  "opportunity_report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    kind: opportunityReportKindEnum("kind").notNull(),
+    version: integer("version").notNull(),
+    body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_report_org_idx").on(t.organizationId, t.createdAt),
+    versionUq: uniqueIndex("opportunity_report_version_uq").on(t.opportunityId, t.kind, t.version),
+  }),
+);
+
+/**
+ * BL-NAV-LIFECYCLE phase 3a — the partners considered for an opportunity
+ * in Capture: a company of the organization each, with its source, why it
+ * fits, and where it stands. Choosing one lets a PARTNER opportunity move
+ * to Plan.
+ */
+export const opportunityPartnerStatusEnum = pgEnum("opportunity_partner_status", ["candidate", "invited", "answered", "chosen", "declined"]);
+export type OpportunityPartnerStatus = (typeof opportunityPartnerStatusEnum.enumValues)[number];
+
+export const opportunityPartners = pgTable(
+  "opportunity_partner",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    /** own (your Companies) | database (the partner search) | ai (the AI's shortlist). */
+    source: text("source").notNull().default("own"),
+    status: opportunityPartnerStatusEnum("status").notNull().default("candidate"),
+    reason: text("reason").notNull().default(""),
+    chosenByUserId: text("chosen_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    chosenAt: timestamp("chosen_at", { withTimezone: true }),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** BL-NAV-LIFECYCLE 3c — the partner's own answers to the matrix questions (by question id), its certifications, and when it submitted. */
+    partnerAnswers: jsonb("partner_answers").$type<Record<string, PartnerAnswer>>().notNull().default({}),
+    certifications: jsonb("certifications").$type<PartnerCertifications>().notNull().default({}),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_partner_org_idx").on(t.organizationId, t.createdAt),
+    oppCompanyUq: uniqueIndex("opportunity_partner_opp_company_uq").on(t.opportunityId, t.companyId),
+  }),
+);
+
+/**
+ * BL-NAV-LIFECYCLE phase 3c — a partner's personal link to the matrix
+ * questions: emailed to a contact, no FORGE account, 14 days. Only the
+ * token's hash is stored; the link is the credential. A new invite for
+ * the same partner replaces its earlier unanswered ones.
+ */
+export const opportunityPartnerInvites = pgTable(
+  "opportunity_partner_invite",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    partnerId: uuid("partner_id")
+      .notNull()
+      .references(() => opportunityPartners.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    contactName: text("contact_name").notNull().default(""),
+    /** sha256 of the link's token; null once the sweep retired an expired link (BL-NAV-LIFECYCLE 3c-3, migration 0158). */
+    tokenHash: text("token_hash"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    emailedAt: timestamp("emailed_at", { withTimezone: true }),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tokenUq: uniqueIndex("opportunity_partner_invite_token_uq").on(t.tokenHash),
+    partnerIdx: index("opportunity_partner_invite_partner_idx").on(t.partnerId, t.createdAt),
+    orgIdx: index("opportunity_partner_invite_org_idx").on(t.organizationId, t.createdAt),
+  }),
+);

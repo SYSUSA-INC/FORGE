@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
@@ -11,11 +12,16 @@ import {
   computeCapabilityCoverage,
 } from "@/lib/capability-coverage";
 import {
-  CAPABILITY_ANSWER_LABELS,
-  CAPABILITY_ANSWER_VALUES,
+  answerLabel,
   answeredCount,
+  clampPartialPercent,
+  PARTIAL_PERCENT,
+  storedValueOf,
+  THREE_ANSWER_LABELS,
+  threeAnswerOf,
   type CapabilityAnswer,
   type CapabilityAnswerValue,
+  type ThreeAnswer,
   type CapabilityQuestion,
   type CapabilitySuggestion,
 } from "@/lib/capability-matrix-types";
@@ -25,6 +31,7 @@ import {
   buildCapabilityQuestionsAction,
   dismissCapabilitySuggestionAction,
   removeCapabilityQuestionAction,
+  saveMatrixReportAction,
   suggestCapabilityAnswersAction,
   updateCapabilityQuestionAction,
 } from "../capability-matrix-actions";
@@ -49,12 +56,15 @@ export function CapabilityMatrixPanel({
   currentParseVersion,
   hasRequirements,
   partners,
+  latestReport = null,
 }: {
   opportunityId: string;
   matrix: CapabilityMatrixView | null;
   currentParseVersion: string;
   hasRequirements: boolean;
   partners: { id: string; name: string; relationship: string }[];
+  /** BL-NAV-LIFECYCLE 2b-2 — the latest saved Matrix Report. */
+  latestReport?: { id: string; version: number; createdAt: string } | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -120,12 +130,39 @@ export function CapabilityMatrixPanel({
     });
   }
 
+  function saveReport() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const res = await saveMatrixReportAction({ opportunityId });
+      if (!res.ok) return setError(res.error);
+      setNotice(`Saved as Matrix Report v${res.version}. It shows on the opportunity's Overview.`);
+      router.refresh();
+    });
+  }
+
   return (
     <Panel
       title="Capability matrix"
       eyebrow={matrix ? `${answered} of ${total} answered${suggested > 0 ? ` · ${suggested} suggested` : ""}` : "Questionnaire"}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {latestReport ? (
+            <Link href={`/report/${latestReport.id}`} className="aur-link font-mono text-[11px] uppercase tracking-widest" title={`Saved ${latestReport.createdAt.slice(0, 10)}`}>
+              Matrix Report v{latestReport.version}
+            </Link>
+          ) : null}
+          {matrix && answered > 0 ? (
+            <button
+              type="button"
+              className="aur-btn"
+              disabled={pending}
+              onClick={saveReport}
+              title="Keep the matrix as it stands now as a dated Matrix Report on the opportunity. Earlier reports are kept."
+            >
+              Save report
+            </button>
+          ) : null}
           {matrix && answered < total ? (
             <button
               type="button"
@@ -155,8 +192,10 @@ export function CapabilityMatrixPanel({
     >
       <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
         FORGE drafts the questions from the solicitation&apos;s requirements and Section M, plus the standing
-        questions every bid gets. Review them, drop or reword any, and answer each one honestly: the answers
-        are what the coverage score, the partner decision and PWin read. <strong className="font-medium text-text">Suggest answers</strong> pre-fills
+        questions every bid gets. Review them, drop or reword any, and answer each one honestly: <strong className="font-medium text-text">Yes</strong> (tick
+        proven when past performance shows it), <strong className="font-medium text-text">Partial</strong> with how much you cover, or{" "}
+        <strong className="font-medium text-text">No</strong> (tick when a partner could cover it). The answers are what the coverage score, the
+        partner decision and PWin read. <strong className="font-medium text-text">Suggest answers</strong> pre-fills
         what FORGE can show evidence for; a suggestion counts only once you confirm it.
       </p>
       {stale ? (
@@ -273,15 +312,21 @@ function QuestionRow({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [value, setValue] = useState<CapabilityAnswerValue | "">(answer?.value ?? "");
+  // BL-NAV-LIFECYCLE 2b — Yes / Partial % / No over the six stored values.
+  const initial = answer ? threeAnswerOf(answer.value) : null;
+  const [three, setThree] = useState<ThreeAnswer | "">(initial?.answer ?? "");
+  const [proven, setProven] = useState(initial?.proven ?? false);
+  const [partnerCould, setPartnerCould] = useState(initial?.partnerCould ?? false);
+  const [percent, setPercent] = useState<number>(clampPartialPercent(answer?.percent ?? PARTIAL_PERCENT.default));
   const [evidence, setEvidence] = useState(answer?.evidence ?? "");
   const [partner, setPartner] = useState<string>(answer?.partnerCompanyId ?? "");
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(question.text);
 
-  function save(next: { value?: CapabilityAnswerValue | ""; evidence?: string; partner?: string }) {
-    const v = next.value ?? value;
-    if (!v) return;
+  function save(next: { three?: ThreeAnswer | ""; proven?: boolean; partnerCould?: boolean; percent?: number; evidence?: string; partner?: string }) {
+    const t = next.three ?? three;
+    if (!t) return;
+    const v: CapabilityAnswerValue = storedValueOf({ answer: t, proven: next.proven ?? proven, partnerCould: next.partnerCould ?? partnerCould });
     onError(null);
     startTransition(async () => {
       const res = await answerCapabilityQuestionAction({
@@ -289,7 +334,8 @@ function QuestionRow({
         questionId: question.id,
         value: v,
         evidence: next.evidence ?? evidence,
-        partnerCompanyId: (next.partner ?? partner) || null,
+        partnerCompanyId: v === "gap_partner" ? (next.partner ?? partner) || null : null,
+        percent: v === "partial" ? next.percent ?? percent : null,
       });
       if (!res.ok) onError(res.error);
       else router.refresh();
@@ -299,7 +345,10 @@ function QuestionRow({
   function confirmSuggestion() {
     if (!suggestion) return;
     onError(null);
-    setValue(suggestion.value);
+    const s3 = threeAnswerOf(suggestion.value);
+    setThree(s3.answer);
+    setProven(s3.proven);
+    setPartnerCould(s3.partnerCould);
     setEvidence(suggestion.evidence);
     startTransition(async () => {
       const res = await answerCapabilityQuestionAction({
@@ -388,7 +437,7 @@ function QuestionRow({
           <div className="mt-2 border-l-2 border-cobalt/40 pl-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-[10px] uppercase tracking-label text-cobalt">Suggested</span>
-              <span className="font-body text-[13px] text-text">{CAPABILITY_ANSWER_LABELS[suggestion.value]}</span>
+              <span className="font-body text-[13px] text-text">{answerLabel({ value: suggestion.value })}</span>
               <button type="button" className="aur-btn aur-btn-ghost" onClick={confirmSuggestion} disabled={pending}>
                 Confirm
               </button>
@@ -426,29 +475,93 @@ function QuestionRow({
         />
       </div>
       <div className="flex flex-col gap-2">
-        <select
-          className="aur-input"
-          value={value}
-          disabled={pending}
-          onChange={(e) => {
-            const v = e.target.value as CapabilityAnswerValue | "";
-            setValue(v);
-            save({ value: v });
-          }}
-        >
-          <option value="">— choose —</option>
-          {CAPABILITY_ANSWER_VALUES.map((v) => (
-            <option key={v} value={v}>
-              {CAPABILITY_ANSWER_LABELS[v]}
-            </option>
+        <div role="radiogroup" aria-label="Answer" className="flex flex-wrap gap-1">
+          {(["yes", "partial", "no"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={three === t}
+              disabled={pending}
+              onClick={() => {
+                setThree(t);
+                save({ three: t });
+              }}
+              className={`rounded border px-2.5 py-1 font-mono text-[11px] uppercase tracking-widest ${three === t ? (t === "yes" ? "border-green/50 bg-green/10 text-green" : t === "partial" ? "border-brass/50 bg-brass/10 text-brass" : "border-red/50 bg-red/10 text-red") : "border-layer/15 text-muted hover:text-text"}`}
+            >
+              {THREE_ANSWER_LABELS[t]}
+            </button>
           ))}
-        </select>
-        {value === "gap_partner" && partners.length === 0 ? (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={three === "na"}
+            disabled={pending}
+            onClick={() => {
+              setThree("na");
+              save({ three: "na" });
+            }}
+            className={`rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-widest ${three === "na" ? "border-layer/30 bg-layer/5 text-text" : "border-transparent text-subtle hover:text-text"}`}
+            title="The requirement doesn't apply: left out of coverage"
+          >
+            N/A
+          </button>
+        </div>
+        {three === "yes" ? (
+          <label className="flex items-center gap-2 font-body text-[12px] text-text">
+            <input
+              type="checkbox"
+              checked={proven}
+              disabled={pending}
+              onChange={(e) => {
+                setProven(e.target.checked);
+                save({ proven: e.target.checked });
+              }}
+            />
+            Proven by past performance
+          </label>
+        ) : null}
+        {three === "partial" ? (
+          <label className="flex items-center gap-2 font-body text-[12px] text-text">
+            We cover
+            <input
+              type="number"
+              className="aur-input w-20 py-1"
+              min={PARTIAL_PERCENT.min}
+              max={PARTIAL_PERCENT.max}
+              step={PARTIAL_PERCENT.step}
+              value={percent}
+              disabled={pending}
+              onChange={(e) => setPercent(Number(e.target.value))}
+              onBlur={() => {
+                const p = clampPartialPercent(percent);
+                setPercent(p);
+                save({ percent: p });
+              }}
+            />
+            %
+          </label>
+        ) : null}
+        {three === "no" ? (
+          <label className="flex items-center gap-2 font-body text-[12px] text-text">
+            <input
+              type="checkbox"
+              checked={partnerCould}
+              disabled={pending}
+              onChange={(e) => {
+                setPartnerCould(e.target.checked);
+                save({ partnerCould: e.target.checked });
+              }}
+            />
+            A partner could cover it
+          </label>
+        ) : null}
+        {three === "no" && partnerCould && partners.length === 0 ? (
           <a href="/companies/new" className="font-body text-[13px] text-accent hover:underline">
             Add a teaming partner or subcontractor in Companies →
           </a>
         ) : null}
-        {value === "gap_partner" && partners.length > 0 ? (
+        {three === "no" && partnerCould && partners.length > 0 ? (
           <select
             className="aur-input"
             value={partner}
