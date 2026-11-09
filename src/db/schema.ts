@@ -2115,6 +2115,8 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "partner_answered",
   // BL-NAV-LIFECYCLE 4a — named to a role on an opportunity's plan (drizzle/0159).
   "plan_role_assigned",
+  // BL-NAV-LIFECYCLE 4b-1 — a milestone you own is due in 7, 3 or 1 days (drizzle/0161).
+  "milestone_due_soon",
 ]);
 
 export const notifications = pgTable("notification", {
@@ -2197,6 +2199,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "solicitation_amended",
     // BL-NAV-LIFECYCLE 4a — someone is named to a role, or a colour team, on an opportunity's plan (migration 0159; default rule seeded by 0160).
     "plan_role_assigned",
+    // BL-NAV-LIFECYCLE 4b-1 — a planned milestone on an opportunity's plan is 7, 3 or 1 days away; fired by the daily cron to its owner (migration 0161; default rule seeded by 0162).
+    "milestone_due_soon",
   ],
 );
 
@@ -5551,3 +5555,60 @@ export const opportunityPlanRoles = pgTable(
   }),
 );
 export type OpportunityPlanRoleRow = typeof opportunityPlanRoles.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// BL-NAV-LIFECYCLE 4b-1 — the Plan's milestones and the schedule (migration 0161).
+// ---------------------------------------------------------------------------
+
+/** What a milestone marks: the kick-off, the outline frozen, each colour team's round, pricing complete, final production, the submission, or something else. */
+export const milestoneKindEnum = pgEnum("milestone_kind", [
+  "kick_off",
+  "outline_frozen",
+  "pink_team",
+  "red_team",
+  "gold_team",
+  "white_gloves",
+  "pricing_complete",
+  "final_production",
+  "submit",
+  "other",
+]);
+export type MilestoneKind = (typeof milestoneKindEnum.enumValues)[number];
+
+export const milestoneStatusEnum = pgEnum("milestone_status", ["planned", "done", "missed"]);
+export type MilestoneStatus = (typeof milestoneStatusEnum.enumValues)[number];
+
+export const opportunityMilestones = pgTable(
+  "opportunity_milestone",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => opportunityPlans.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    kind: milestoneKindEnum("kind").notNull().default("other"),
+    /** The day, as YYYY-MM-DD: a schedule has no hours. */
+    date: date("date", { mode: "string" }).notNull(),
+    /** Who carries it; a colour-team milestone has no owner by default, its reviewers are on the plan's colour team. */
+    ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "set null" }),
+    status: milestoneStatusEnum("status").notNull().default("planned"),
+    /** The key date it was counted back from: "response_due", a solicitation key-date type (qa_cutoff, proposal_due, …), or null when set by hand. */
+    anchorKey: text("anchor_key"),
+    notes: text("notes").notNull().default(""),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgOppDateIdx: index("opportunity_milestone_org_opp_date_idx").on(t.organizationId, t.opportunityId, t.date),
+    ownerIdx: index("opportunity_milestone_owner_idx").on(t.ownerUserId),
+    dateIdx: index("opportunity_milestone_date_idx").on(t.status, t.date),
+  }),
+);
+export type OpportunityMilestoneRow = typeof opportunityMilestones.$inferSelect;

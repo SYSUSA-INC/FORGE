@@ -124,9 +124,11 @@ export type PlanState = {
   /** Members named per colour team. */
   colorTeams: Record<PlanColorTeam, number>;
   colorTeamsNamed: number;
+  /** Milestones on the schedule (4b-1); zero until Build the schedule or a milestone added by hand. */
+  milestones: number;
 };
 
-export function planState(rows: PlanRoleLike[]): PlanState {
+export function planState(rows: PlanRoleLike[], milestones = 0): PlanState {
   const people = new Set(rows.map((r) => r.userId)).size;
   const accountable = RACI_AREAS.filter((area) => rows.some((r) => normalizeRaci(r.raci)[area] === "A"));
   const colorTeams = { pink: 0, red: 0, gold: 0, white_gloves: 0 } as Record<PlanColorTeam, number>;
@@ -139,15 +141,17 @@ export function planState(rows: PlanRoleLike[]): PlanState {
     missingAccountable: RACI_AREAS.filter((a) => !accountable.includes(a)),
     colorTeams,
     colorTeamsNamed: PLAN_COLOR_TEAMS.filter((c) => colorTeams[c] > 0).length,
+    milestones,
   };
 }
 
-export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "plan_ready";
+export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "plan_ready";
 
 export const PLAN_NEXT_STEP_LABELS: Record<PlanNextStep, string> = {
   name_team: "Name the team",
   assign_raci: "Assign the RACI",
   name_color_teams: "Name the colour teams",
+  build_schedule: "Build the schedule",
   plan_ready: "Open the plan",
 };
 
@@ -156,15 +160,17 @@ export function planNextStep(state: PlanState): PlanNextStep {
   if (state.people === 0) return "name_team";
   if (state.missingAccountable.length > 0) return "assign_raci";
   if (state.colorTeamsNamed < PLAN_COLOR_TEAMS.length) return "name_color_teams";
+  if (state.milestones === 0) return "build_schedule";
   return "plan_ready";
 }
 
-/** One line for the Pipeline → Plan row: "4 people · A for 2 of 6 areas · 1 of 4 colour teams". */
+/** One line for the Pipeline → Plan row: "4 people · A for 2 of 6 areas · 1 of 4 colour teams · 6 milestones". */
 export function planStateLine(state: PlanState): string {
   return [
     `${state.people} ${state.people === 1 ? "person" : "people"}`,
     `A for ${state.accountable.length} of ${RACI_AREAS.length} areas`,
     `${state.colorTeamsNamed} of ${PLAN_COLOR_TEAMS.length} colour teams`,
+    state.milestones === 0 ? "no schedule" : `${state.milestones} ${state.milestones === 1 ? "milestone" : "milestones"}`,
   ].join(" · ");
 }
 

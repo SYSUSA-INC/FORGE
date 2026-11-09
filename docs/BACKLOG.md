@@ -3717,7 +3717,7 @@ Every requirement in the FORGE II document, with its status and phase:
    budget an estimate only; a default rule per tenant for
    `plan_role_assigned` and `milestone_due_soon`). PRs:
    - **4a — the Plan page, the team and the RACI, the colour teams,
-     `plan_role_assigned` (this PR).** Migrations 0159 and 0160:
+     `plan_role_assigned` (✅ shipped, PR #483).** Migrations 0159 and 0160:
      `opportunity_plan` (one per opportunity, created on the first visit
      to the Plan tab; the solicitation it is kept in step with; when the
      team was seeded) and `opportunity_plan_role` (a member, one of the
@@ -3750,8 +3750,46 @@ Every requirement in the FORGE II document, with its status and phase:
      Open the plan). Not in 4a: the round's planned date (4b, the
      milestones), the round created from the named team (4c). Tested in
      `tests/ai/plan-logic.test.ts` and `tests/isolation/plan.test.ts`.
-   - **4b — milestones** (`opportunity_milestone`, Build the schedule,
-     `milestone_due_soon`), section due dates and the overdue trigger.
+   - **4b-1 — milestones, Build the schedule, `milestone_due_soon` (this
+     PR).** Migrations 0161 and 0162: `opportunity_milestone` (one row per
+     milestone on the plan: title, kind — kick-off, outline frozen, Pink,
+     Red, Gold, White Gloves, pricing complete, final production, submit,
+     other — the day, the owner, status planned / done / missed, the key
+     date it was counted back from, notes; indexed by tenant, opportunity
+     and date, by owner, and by status and date for the cron); the
+     `milestone_due_soon` trigger kind and inbox kind, and a default rule
+     per tenant (in-app + email to the owner; a tenant created later gets
+     it the first time a milestone of its comes due). `src/lib/milestone-
+     logic.ts` (pure, tested) holds the kinds, the owner's count-back
+     (submit T-2, White Gloves T-4, Gold T-10, Red T-20, Pink T-30, the
+     kick-off today; a round that would fall before today is moved to
+     today and says so; a kind already on the plan is left out, so building
+     twice adds only what is missing), the anchor (the response due date,
+     else the solicitation's proposal_due key date), the schedule's state
+     and the reminder's wording. `src/lib/milestone-store.ts` loads the
+     schedule with the solicitation's key dates, builds it (audited
+     `opportunity.milestone.build`), adds, moves / re-owns / marks and
+     removes milestones (`opportunity.milestone.add` / `update` /
+     `remove`); a colour team's round gets no owner, its reviewers are the
+     plan's colour team. `src/lib/milestone-due-soon-cron.ts` runs on the
+     daily 08:00 UTC tick (`/api/cron/solicitation-key-dates`) and fires
+     `milestone_due_soon` to a planned milestone's owner at T-7 / T-3 /
+     T-1, deduplicated against the delivery ledger. The Plan tab's **The
+     schedule** panel: **Build the schedule**, the key dates line, one
+     `.aur-table` row per milestone with a date input, an owner select and
+     a status select (green done, red missed or overdue), **Remove**, and
+     **Add a milestone** by hand. The plan's state gains the milestone
+     count; the next step order is team → RACI → colour teams → **Build
+     the schedule** → Open the plan, and the Pipeline → Plan line ends
+     "· 6 milestones" or "· no schedule". Tested in
+     `tests/ai/milestone-logic.test.ts` and
+     `tests/isolation/milestones.test.ts`.
+   - **4b-2 — section due dates and the timeline:** `proposal_section.dueDate`
+     set in Plan per section with its owner (`proposal_section_assigned`
+     carries the date), the daily cron firing the defined-but-never-fired
+     `proposal_section_overdue` for a section past its date with no draft,
+     and the schedule drawn as a timeline with the key dates on it
+     (`GanttRow`).
    - **4c — the charter** with the AI draft, the agreement record, the
      budget and risk list, the freeze, Move to Develop, the review round
      created from the named team.
