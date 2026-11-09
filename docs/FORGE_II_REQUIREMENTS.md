@@ -166,7 +166,7 @@ phase:
    E-13.
 3. **Phase 3, Capture:** C-1 to C-7, C-11, C-12.
 4. **Phase 4, Plan:** P-1 to P-8.
-5. **Phase 5, Develop:** D-1 to D-8.
+5. **Phase 5, Develop:** D-1 to D-8. Design for review: `docs/design/BL-NAV-LIFECYCLE_PHASE5_DEVELOP.md`.
 6. **Phase 6, Deliver:** S-1 to S-6.
 7. **Phase 7, Measure:** R-1 to R-3.
 8. **Phase 8, the partner portal:** C-6, C-8 to C-10, P-6, D-4 for
