@@ -77,7 +77,7 @@ export function InviteLinkNotice({
           className="aur-input flex-1 text-[10px]"
           aria-label={`${noun} link`}
         />
-        <button type="button" onClick={copy} className="aur-btn text-[11px]">
+        <button type="button" onClick={copy} className="aur-btn">
           {copied ? "Copied" : "Copy link"}
         </button>
       </div>

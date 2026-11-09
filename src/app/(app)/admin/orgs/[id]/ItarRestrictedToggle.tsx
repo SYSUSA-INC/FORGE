@@ -61,7 +61,7 @@ export function ItarRestrictedToggle({ organizationId, initialValue }: Props) {
           type="button"
           onClick={toggle}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+          className="aur-btn aur-btn-ghost disabled:opacity-40"
           aria-pressed={current}
         >
           {pending

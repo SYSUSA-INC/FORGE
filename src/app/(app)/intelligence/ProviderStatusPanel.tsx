@@ -51,11 +51,11 @@ export function ProviderStatusPanel({
           fall back to stub so dev and preview always work.
         </p>
 
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {all.map((p) => (
             <li
               key={p.name}
-              className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+              className="flex items-start gap-3 border-t border-layer/10 py-2"
             >
               <span
                 className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${

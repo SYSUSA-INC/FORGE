@@ -106,7 +106,7 @@ export function ProtestViabilityPanel({
           type="button"
           onClick={runCheck}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title="Analyze debrief weaknesses against GAO protest grounds and controlling cases."
         >
           {pending
@@ -167,21 +167,21 @@ export function ProtestViabilityPanel({
               <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-muted">
                 Identified grounds ({check.grounds.length})
               </div>
-              <ul className="space-y-2">
+              <ul>
                 {check.grounds.map((g, i) => {
                   const gc = STRENGTH_COLOR[g.strength];
                   const expanded = expandedGround === i;
                   return (
                     <li
                       key={i}
-                      className="rounded-md border border-layer/10 bg-layer/[0.02]"
+                      className="border-t border-layer/10"
                     >
                       <button
                         type="button"
                         onClick={() =>
                           setExpandedGround(expanded ? null : i)
                         }
-                        className="flex w-full items-start gap-3 px-3 py-2.5 text-left"
+                        className="flex w-full items-start gap-3 py-2.5 text-left"
                       >
                         <span
                           className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"

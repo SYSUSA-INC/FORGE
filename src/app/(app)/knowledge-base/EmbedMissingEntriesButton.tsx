@@ -46,7 +46,7 @@ export function EmbedMissingEntriesButton() {
         onClick={run}
         disabled={pending}
         title="Embed any curated entries that don't yet have a vector. Safe to re-run; idempotent. Needs OPENAI_API_KEY for live embeddings."
-        className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+        className="aur-btn aur-btn-ghost disabled:opacity-60"
       >
         {pending ? "Embedding…" : "Embed missing"}
       </button>

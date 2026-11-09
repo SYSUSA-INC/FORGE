@@ -636,7 +636,7 @@ export function RichSectionEditor({
               setComposerOpen(false);
               setDraftComment("");
             }}
-            className="aur-btn-ghost text-[10px]"
+            className="aur-link"
           >
             Cancel
           </button>
@@ -649,7 +649,7 @@ export function RichSectionEditor({
               setDraftComment("");
               setComposerOpen(false);
             }}
-            className="aur-btn-primary text-[10px] disabled:opacity-40"
+            className="aur-btn-primary disabled:opacity-40"
           >
             Comment
           </button>

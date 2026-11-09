@@ -65,7 +65,7 @@ export default async function ConfirmEmailPage({ searchParams }: { searchParams:
               <h1 className="font-display text-2xl font-semibold tracking-tight text-text">Address not changed</h1>
               <p className="mt-2 text-sm text-muted">{messages[state]}</p>
               {state === "missing" ? <ResendVerification email={email} /> : null}
-              <Link href="/sign-in" className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm">
+              <Link href="/sign-in" className="aur-link mt-6">
                 Go to sign in
               </Link>
             </>

@@ -13,7 +13,7 @@ export function ReadBidsButton({ emailId, label }: { emailId: string; label: str
     <span className="inline-flex flex-wrap items-center gap-2">
       <button
         type="button"
-        className="aur-btn text-[11px]"
+        className="aur-btn"
         disabled={pending}
         onClick={() =>
           start(async () => {

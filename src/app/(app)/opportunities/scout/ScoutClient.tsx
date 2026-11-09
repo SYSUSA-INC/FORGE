@@ -354,10 +354,10 @@ function FindRow({ candidate: c, onDecided }: { candidate: ScoutCandidateView; o
           )
         ) : (
           <>
-            <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={pending} onClick={() => decide("imported")}>
+            <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={() => decide("imported")}>
               {pending ? "…" : "Add to pipeline"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => decide("dismissed")}>
+            <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => decide("dismissed")}>
               Not for us
             </button>
             {error ? <span className="font-mono text-[11px] text-rose-300">{error}</span> : null}

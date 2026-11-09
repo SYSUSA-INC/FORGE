@@ -65,17 +65,17 @@ export function StorageCheck() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" disabled={pending} onClick={runProbe}>
+        <button type="button" className="aur-btn aur-btn-ghost disabled:opacity-60" disabled={pending} onClick={runProbe}>
           {pending ? "Checking…" : "Check storage"}
         </button>
-        <button type="button" className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" disabled={testing} onClick={runSelfTest}>
+        <button type="button" className="aur-btn aur-btn-ghost disabled:opacity-60" disabled={testing} onClick={runSelfTest}>
           {testing ? "Uploading…" : "Test from this browser"}
         </button>
         {selfTest ? <span className={`font-mono text-[11px] ${selfTest.ok ? "text-emerald" : "text-rose"}`}>{selfTest.text}</span> : null}
       </div>
       {error ? <p className="font-mono text-[11px] text-rose">{error}</p> : null}
       {probe ? (
-        <div className="flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+        <div className="flex flex-col gap-2 border-t border-layer/10 pt-3">
           <p className="font-mono text-[11px] text-text">
             <span className={probe.ready ? "text-emerald" : "text-rose"}>{probe.ready ? "Ready for browser uploads" : "Not ready for browser uploads"}</span>
             {" · "}

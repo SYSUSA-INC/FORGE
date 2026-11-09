@@ -66,7 +66,7 @@ export function ReviewClient({
           {state.sender.name} has been notified. You can close this tab.
         </p>
         {state.recommendation !== "pending" ? (
-          <div className="mt-4 rounded-lg border border-layer/10 bg-layer/[0.02] p-4">
+          <div className="mt-4 border-t border-layer/10 pt-4">
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted">
               Your recommendation
             </div>
@@ -192,7 +192,7 @@ export function ReviewClient({
             type="button"
             onClick={submit}
             disabled={pending || !recommendation}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {pending ? "Submitting…" : "Submit recommendation"}
           </button>

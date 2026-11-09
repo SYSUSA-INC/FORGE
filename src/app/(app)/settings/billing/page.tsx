@@ -94,7 +94,7 @@ export default async function BillingPage({
         title="Billing &amp; subscription"
         subtitle="Manage your FORGE plan. Upgrades take effect immediately; downgrades and cancellations apply at the end of the current period."
         actions={
-          <Link href="/pricing" className="aur-btn aur-btn-ghost text-[11px]">
+          <Link href="/pricing" className="aur-btn aur-btn-ghost">
             See all plans →
           </Link>
         }
@@ -272,7 +272,7 @@ export default async function BillingPage({
                       ) : !canBuy ? (
                         <a
                           href="mailto:sales@sysgov.com"
-                          className="aur-btn aur-btn-ghost text-[11px]"
+                          className="aur-btn aur-btn-ghost"
                         >
                           Contact sales →
                         </a>

@@ -119,11 +119,11 @@ export default async function OnboardingPage() {
         )}
 
         {rows.length > 0 ? (
-          <ul className="mt-4 flex flex-col gap-1.5">
+          <ul className="mt-4 flex flex-col">
             {rows.map((r) => (
               <li
                 key={r.organizationId}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 border-t border-layer/10 py-2"
               >
                 <span className="font-display text-[13px] text-text">{r.orgName}</span>
                 <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest">

@@ -38,7 +38,7 @@ export function ConsolidatedReport({
       title="Consolidated comments"
       eyebrow={`${open} open across ${groups.length} section${groups.length === 1 ? "" : "s"}`}
       actions={
-        <button type="button" onClick={() => void copy()} className="aur-btn aur-btn-ghost text-[11px]" disabled={groups.length === 0} title="Copy the Markdown hand-off report">
+        <button type="button" onClick={() => void copy()} className="aur-btn aur-btn-ghost" disabled={groups.length === 0} title="Copy the Markdown hand-off report">
           {copied ? "Copied" : "Copy report"}
         </button>
       }

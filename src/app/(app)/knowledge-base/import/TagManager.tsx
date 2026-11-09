@@ -140,7 +140,7 @@ function TagRow({ tag, count }: { tag: string; count: number }) {
               type="button"
               onClick={save}
               disabled={pending || !draft.trim()}
-              className="aur-btn aur-btn-primary text-[10px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Saving…" : "Save"}
             </button>
@@ -152,7 +152,7 @@ function TagRow({ tag, count }: { tag: string; count: number }) {
                 setError(null);
               }}
               disabled={pending}
-              className="aur-btn aur-btn-ghost text-[10px]"
+              className="aur-link"
             >
               Cancel
             </button>
@@ -162,7 +162,7 @@ function TagRow({ tag, count }: { tag: string; count: number }) {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="aur-btn aur-btn-ghost text-[10px]"
+              className="aur-btn aur-btn-ghost"
             >
               Rename
             </button>
@@ -170,7 +170,7 @@ function TagRow({ tag, count }: { tag: string; count: number }) {
               type="button"
               onClick={remove}
               disabled={pending}
-              className="aur-btn aur-btn-ghost text-[10px] text-rose-300 disabled:opacity-60"
+              className="aur-btn aur-btn-ghost text-rose-300 disabled:opacity-60"
             >
               Delete
             </button>

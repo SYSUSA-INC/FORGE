@@ -174,7 +174,7 @@ export function CandidateReviewClient({
             type="button"
             onClick={runExtraction}
             disabled={!canRun}
-            className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
             title={
               !canRun
                 ? "Wait for the artifact to finish indexing first."
@@ -187,7 +187,7 @@ export function CandidateReviewClient({
             type="button"
             onClick={reextract}
             disabled={pending}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+            className="aur-btn aur-btn-ghost disabled:opacity-60"
             title="Re-run text extraction (useful for image artifacts whose first OCR pass failed, or when ANTHROPIC_API_KEY was added after upload)."
           >
             Re-extract text
@@ -197,7 +197,7 @@ export function CandidateReviewClient({
               type="button"
               onClick={approveAll}
               disabled={pending}
-              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost disabled:opacity-60"
             >
               Approve all {pendingCandidates.length}
             </button>
@@ -206,7 +206,7 @@ export function CandidateReviewClient({
             type="button"
             onClick={embedNow}
             disabled={!canRun}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+            className="aur-btn aur-btn-ghost disabled:opacity-60"
             title="Index this artifact for semantic search."
           >
             {pending ? "…" : "Embed for search"}
@@ -401,7 +401,7 @@ function CandidateCard({
                   else setEditing(true);
                 }}
                 disabled={disabled}
-                className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60"
+                className="aur-btn aur-btn-ghost disabled:opacity-60"
               >
                 {editing ? "Cancel edits" : "Edit"}
               </button>
@@ -422,7 +422,7 @@ function CandidateCard({
                   }
                 }}
                 disabled={disabled}
-                className="aur-btn aur-btn-primary text-[10px] disabled:opacity-60"
+                className="aur-btn aur-btn-primary disabled:opacity-60"
               >
                 Approve
               </button>
@@ -430,7 +430,7 @@ function CandidateCard({
                 type="button"
                 onClick={onReject}
                 disabled={disabled}
-                className="aur-btn aur-btn-ghost text-[10px] text-rose-300 disabled:opacity-60"
+                className="aur-btn aur-btn-ghost text-rose-300 disabled:opacity-60"
               >
                 Reject
               </button>
@@ -440,7 +440,7 @@ function CandidateCard({
               type="button"
               onClick={onReset}
               disabled={disabled}
-              className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost disabled:opacity-60"
             >
               Re-open
             </button>

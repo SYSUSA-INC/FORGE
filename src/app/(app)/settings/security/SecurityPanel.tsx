@@ -214,7 +214,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
                 <button type="button" className="aur-btn aur-btn-primary" disabled={pending || code.replace(/\D/g, "").length !== 6} onClick={confirm}>
                   Confirm
                 </button>
-                <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => { setEnrolment(null); setError(null); }}>
+                <button type="button" className="aur-link" disabled={pending} onClick={() => { setEnrolment(null); setError(null); }}>
                   Cancel
                 </button>
               </div>
@@ -227,7 +227,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
               <button type="button" className="aur-btn aur-btn-primary" disabled={pending || askCode.trim().length < 6} onClick={runAskCode}>
                 {askCodeFor.kind === "remove" ? "Remove" : "Replace codes"}
               </button>
-              <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setAskCodeFor(null)}>
+              <button type="button" className="aur-link" disabled={pending} onClick={() => setAskCodeFor(null)}>
                 Cancel
               </button>
             </div>
@@ -254,7 +254,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
                 <p className="font-body text-[12px] leading-[1.5] text-muted">
                   Moving to <span className="text-text">{pendingEmail}</span> once that inbox clicks its link (24 hours). Until then you sign in with the address above.
                 </p>
-                <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={cancelEmailChange}>
+                <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={cancelEmailChange}>
                   Cancel the change
                 </button>
               </div>
@@ -273,7 +273,7 @@ export function SecurityPanel({ email, factors, recoveryCodesLeft, available, co
                   <button type="button" className="aur-btn aur-btn-primary" disabled={pending || !newEmail.includes("@") || emailCode.trim().length < 6} onClick={requestEmailChange}>
                     Send confirmation link
                   </button>
-                  <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => { setChanging(false); setEmailError(null); }}>
+                  <button type="button" className="aur-link" disabled={pending} onClick={() => { setChanging(false); setEmailError(null); }}>
                     Cancel
                   </button>
                 </div>

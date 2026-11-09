@@ -52,7 +52,7 @@ export function RateDraft({
         {open ? "Hide draft" : mine ? `Your rating ${mine.overall}/5 · edit` : "Read & rate"}
       </button>
       {open ? (
-        <div className="mt-2 rounded border border-layer/10 p-3">
+        <div className="mt-2 border-t border-layer/10 py-3">
           <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap font-body text-[12px] leading-relaxed text-text">{kase.draft}</pre>
           <div className="mt-3 grid gap-1">
             {([...JUDGE_DIMENSIONS, "overall"] as Key[]).map((k) => (
@@ -83,7 +83,7 @@ export function RateDraft({
             className="aur-input mt-2 w-full text-[12px]"
           />
           <div className="mt-2 flex items-center gap-3">
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={save}>
+            <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={save}>
               {pending ? "Saving…" : "Save rating"}
             </button>
             {msg ? <span className="text-muted">{msg}</span> : null}

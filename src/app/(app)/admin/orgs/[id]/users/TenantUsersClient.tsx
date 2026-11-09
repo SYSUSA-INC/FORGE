@@ -316,7 +316,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending || isOnlyAdmin}
                         onClick={() => setStatus(m.userId, "disabled")}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-btn aur-btn-ghost"
                         title={
                           isOnlyAdmin
                             ? "Last active admin — promote someone else first"
@@ -330,7 +330,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending}
                         onClick={() => setStatus(m.userId, "active")}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-btn aur-btn-ghost"
                       >
                         Re-enable
                       </button>
@@ -340,7 +340,7 @@ export function TenantUsersClient({
                       type="button"
                       disabled={pending || isOnlyAdmin}
                       onClick={() => remove(m.userId, m.name || m.email)}
-                      className="aur-btn aur-btn-danger text-[11px]"
+                      className="aur-btn aur-btn-danger"
                       title={
                         isOnlyAdmin
                           ? "Last active admin — promote someone else first"
@@ -366,11 +366,11 @@ export function TenantUsersClient({
             No pending invites for this tenant.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {pendingInvites.map((i) => (
               <li
                 key={i.id}
-                className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+                className="border-t border-layer/10 py-3"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <div>
@@ -397,7 +397,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending}
                         onClick={() => approveInvite(i.id, i.email, i.domain, false)}
-                        className="aur-btn aur-btn-primary text-[11px]"
+                        className="aur-btn aur-btn-primary"
                         title="Approve this one person; the invitation is sent now"
                       >
                         Approve
@@ -406,7 +406,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending || !i.domain || isPublicEmailDomain(i.domain)}
                         onClick={() => approveInvite(i.id, i.email, i.domain, true)}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-btn aur-btn-ghost"
                         title={
                           i.domain && !isPublicEmailDomain(i.domain)
                             ? `Approve and add ${i.domain} to this tenant's approved external domains`
@@ -419,7 +419,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending}
                         onClick={() => denyInvite(i.id, i.email)}
-                        className="aur-btn aur-btn-danger text-[11px]"
+                        className="aur-btn aur-btn-danger"
                       >
                         Deny
                       </button>
@@ -430,7 +430,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending}
                         onClick={() => copyInviteLink(i.id, i.email)}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-btn aur-btn-ghost"
                         title="Get a fresh invite link to send by chat or ticket"
                       >
                         Copy link
@@ -439,7 +439,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending}
                         onClick={() => resendInvite(i.id, i.email)}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-btn aur-btn-ghost"
                       >
                         Resend
                       </button>
@@ -447,7 +447,7 @@ export function TenantUsersClient({
                         type="button"
                         disabled={pending}
                         onClick={() => revokeInvite(i.id, i.email)}
-                        className="aur-btn aur-btn-danger text-[11px]"
+                        className="aur-btn aur-btn-danger"
                       >
                         Revoke
                       </button>
@@ -624,7 +624,7 @@ function TenantInvitePanel({
           <button
             type="submit"
             disabled={pending || !email}
-            className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+            className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
           >
             {pending ? "Sending…" : "Send invitation"}
           </button>

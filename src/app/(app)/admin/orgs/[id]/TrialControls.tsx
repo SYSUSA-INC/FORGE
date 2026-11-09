@@ -41,7 +41,7 @@ export function TrialControls({
   const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+    <div className="mt-3 flex flex-col gap-2 border-t border-layer/10 py-3">
       <div className="aur-label">Trial</div>
       <div className="font-mono text-[11px] text-text">
         {state.kind === "none"
@@ -54,7 +54,7 @@ export function TrialControls({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {state.kind === "none" ? (
-          <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => run("start")}>
+          <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => run("start")}>
             Start {TRIAL_DAYS}-day trial
           </button>
         ) : (
@@ -70,10 +70,10 @@ export function TrialControls({
               disabled={pending}
               aria-label="Days to add"
             />
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => run("extend")}>
+            <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => run("extend")}>
               Extend
             </button>
-            <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={pending} onClick={() => run("convert")}>
+            <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={() => run("convert")}>
               Convert to full access
             </button>
           </>

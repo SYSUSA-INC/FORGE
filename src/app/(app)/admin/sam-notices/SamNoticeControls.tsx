@@ -38,7 +38,7 @@ export function SamNoticeControls({ switches }: { switches: { load: boolean; rea
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           disabled={pending}
           onClick={() =>
             act(async () => {
@@ -53,7 +53,7 @@ export function SamNoticeControls({ switches }: { switches: { load: boolean; rea
         </button>
         <button
           type="button"
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
           disabled={pending}
           title="Reads 13 stored notices live from SAM.gov on the shared key (three times a day)"
           onClick={() =>
@@ -67,10 +67,10 @@ export function SamNoticeControls({ switches }: { switches: { load: boolean; rea
         >
           Spot-check against SAM.gov
         </button>
-        <button type="button" className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" disabled={pending} onClick={() => toggle("load", !switches.load)}>
+        <button type="button" className="aur-btn aur-btn-ghost disabled:opacity-60" disabled={pending} onClick={() => toggle("load", !switches.load)}>
           {switches.load ? "Pause nightly load" : "Resume nightly load"}
         </button>
-        <button type="button" className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" disabled={pending} onClick={() => toggle("reads", !switches.reads)}>
+        <button type="button" className="aur-btn aur-btn-ghost disabled:opacity-60" disabled={pending} onClick={() => toggle("reads", !switches.reads)}>
           {switches.reads ? "Stop searches reading the copy" : "Let searches read the copy"}
         </button>
       </div>

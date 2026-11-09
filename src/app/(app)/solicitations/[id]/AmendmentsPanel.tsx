@@ -109,7 +109,7 @@ export function AmendmentsPanel({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
           >
             {open ? "Cancel" : "Add amendment"}
           </button>
@@ -156,9 +156,9 @@ export function AmendmentsPanel({
             />
           </div>
           {staged.length > 0 ? (
-            <ul className="mt-2 flex flex-col gap-1.5">
+            <ul className="mt-2 flex flex-col">
               {staged.map((s) => (
-                <li key={s.key} className={`grid items-center gap-2 rounded-md border px-3 py-2 sm:grid-cols-[1fr_10rem_auto] ${s.error ? "border-rose/40 bg-rose/[0.05]" : "border-layer/15 bg-layer/[0.02]"}`}>
+                <li key={s.key} className={`grid items-center gap-2 border-t py-2 sm:grid-cols-[1fr_10rem_auto] ${s.error ? "border-rose/40" : "border-layer/10"}`}>
                   <div className="min-w-0">
                     <div className="truncate font-mono text-[12px] text-text" title={s.file.name}>
                       {s.file.name}
@@ -179,7 +179,7 @@ export function AmendmentsPanel({
                   />
                   <button
                     type="button"
-                    className="aur-btn aur-btn-ghost text-[10px]"
+                    className="aur-btn aur-btn-ghost"
                     onClick={() => setStaged((list) => list.filter((x) => x.key !== s.key))}
                   >
                     Remove
@@ -207,7 +207,7 @@ export function AmendmentsPanel({
               type="button"
               onClick={submitUpload}
               disabled={readyCount === 0}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
+              className="aur-btn aur-btn-primary disabled:opacity-50"
             >
               {readyCount > 1 ? `Upload ${readyCount} amendments` : "Upload amendment"}
               {pending ? " · uploading…" : ""}
@@ -223,12 +223,12 @@ export function AmendmentsPanel({
             : "No amendments yet. Click “Add amendment” when a new mod drops."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {amendments.map((a) => {
             return (
               <li
                 key={a.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex items-center justify-between gap-2 border-t border-layer/10 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="font-mono text-[12px] text-text">

@@ -55,7 +55,7 @@ export function DraftPreview({
         <button
           type="button"
           onClick={onBack}
-          className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text"
+          className="aur-link"
         >
           Back to draft
         </button>
@@ -81,7 +81,7 @@ export function DraftPreview({
         </span>
         <button
           type="button"
-          className="aur-btn aur-btn-primary shrink-0 text-[11px] disabled:opacity-50"
+          className="aur-btn aur-btn-primary shrink-0 disabled:opacity-50"
           disabled={streaming || taken.size === 0}
           onClick={() => onApply(composeSelection(ops, taken))}
         >

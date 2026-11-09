@@ -149,7 +149,7 @@ export function UsaspendingImportClient() {
               type="button"
               onClick={search}
               disabled={searching}
-              className="aur-btn aur-btn-primary w-full text-[12px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary w-full disabled:opacity-60"
             >
               {searching ? "Searching…" : "Search"}
             </button>
@@ -178,7 +178,7 @@ export function UsaspendingImportClient() {
                 type="button"
                 onClick={selectAll}
                 disabled={importing || selectableCount === 0}
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
               >
                 Select all {selectableCount}
               </button>
@@ -186,7 +186,7 @@ export function UsaspendingImportClient() {
                 type="button"
                 onClick={clear}
                 disabled={importing || picked.size === 0}
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
               >
                 Clear
               </button>
@@ -194,7 +194,7 @@ export function UsaspendingImportClient() {
                 type="button"
                 onClick={importPicked}
                 disabled={importing || picked.size === 0}
-                className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-primary disabled:opacity-60"
               >
                 {importing
                   ? "Importing…"

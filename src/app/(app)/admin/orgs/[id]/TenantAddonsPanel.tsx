@@ -78,9 +78,9 @@ export function TenantAddonsPanel({
       {grants.length === 0 ? (
         <div className="font-mono text-[11px] text-muted">No add-ons granted or bought.</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {grants.map((g) => (
-            <li key={g.id} className={`rounded-md border px-3 py-2 ${g.live ? "border-layer/10 bg-layer/[0.02]" : "border-layer/5 bg-layer/[0.01] opacity-70"}`}>
+            <li key={g.id} className={`border-t border-layer/10 py-2 ${g.live ? "" : "opacity-70"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
                   <span className="text-text">{g.name}</span>
@@ -89,7 +89,7 @@ export function TenantAddonsPanel({
                   <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-widest ${g.live ? "bg-emerald/15 text-emerald" : "bg-layer/10 text-muted"}`}>{g.live ? "Live" : g.status === "canceled" ? "Ended" : "Not counting"}</span>
                 </div>
                 {g.status === "active" ? (
-                  <button type="button" onClick={() => revoke(g)} disabled={pending} className="aur-btn aur-btn-ghost text-[10px] disabled:opacity-60">
+                  <button type="button" onClick={() => revoke(g)} disabled={pending} className="aur-btn aur-btn-ghost disabled:opacity-60">
                     End now
                   </button>
                 ) : null}
@@ -120,7 +120,7 @@ export function TenantAddonsPanel({
             <input className="aur-input" type="number" min={ADDON_LIMITS.quantity.min} max={ADDON_LIMITS.quantity.max} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} disabled={pending} title="Quantity" />
             <input className="aur-input" value={note} onChange={(e) => setNote(e.target.value)} disabled={pending} placeholder="Note (why; e.g. pilot through Q4)" maxLength={ADDON_LIMITS.noteMax} />
             <input className="aur-input" type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} disabled={pending} title="Ends on (optional)" />
-            <button type="submit" disabled={pending || !addonId} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60">
+            <button type="submit" disabled={pending || !addonId} className="aur-btn aur-btn-primary disabled:opacity-60">
               {pending ? "Saving…" : "Grant"}
             </button>
           </div>

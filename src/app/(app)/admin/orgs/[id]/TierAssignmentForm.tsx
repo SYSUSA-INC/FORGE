@@ -106,7 +106,7 @@ export function TierAssignmentForm({
         </select>
         <button
           type="submit"
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           disabled={pending || (!firstAssignment && selected === currentTierId) || !selected}
         >
           {pending ? "Updating…" : firstAssignment ? "Assign tier" : "Change tier"}

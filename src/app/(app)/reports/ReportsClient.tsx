@@ -37,7 +37,7 @@ export function ReportsClient({ report }: { report: Report }) {
   ];
 
   const csvButton = (onClick: () => void) => (
-    <button type="button" onClick={onClick} disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50">
+    <button type="button" onClick={onClick} disabled={pending} className="aur-btn aur-btn-ghost disabled:opacity-50">
       Download CSV
     </button>
   );

@@ -261,7 +261,7 @@ function LessonRow({
               >
                 {lesson.status === "proposed" ? "Confirm" : "Save"}
               </button>
-              <button type="button" className="aur-btn" disabled={pending} onClick={() => setEditing(false)}>
+              <button type="button" className="aur-link" disabled={pending} onClick={() => setEditing(false)}>
                 Cancel
               </button>
             </>

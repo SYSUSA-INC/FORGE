@@ -235,7 +235,7 @@ function ThreadCard({
             type="button"
             onClick={submitReply}
             disabled={!reply.trim()}
-            className="aur-btn-primary text-[10px] disabled:opacity-40"
+            className="aur-btn-primary disabled:opacity-40"
           >
             Reply
           </button>

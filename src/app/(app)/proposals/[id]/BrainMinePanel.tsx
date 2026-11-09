@@ -99,7 +99,7 @@ export function BrainMinePanel({
           type="button"
           onClick={mineNow}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title={
             status.mined
               ? "Re-run the harvest to pick up new content edits."

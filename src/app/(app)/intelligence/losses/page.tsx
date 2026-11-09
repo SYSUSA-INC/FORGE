@@ -100,14 +100,14 @@ export default async function LossIntelligencePage() {
                 ineligible set-asides.
               </p>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col">
                 {intel.patterns.map((p) => {
                   const sev = SEVERITY_STYLE[p.severity];
                   return (
                     <li
                       key={p.id}
                       id={`pattern-${encodeURIComponent(p.id)}`}
-                      className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                      className="border-t border-layer/10 py-2"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span

@@ -100,7 +100,7 @@ export function WinnerAnalysisPanel({
           type="button"
           onClick={runAnalysis}
           disabled={pending || !hasCompetitor}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title={
             !hasCompetitor
               ? "Set 'Awarded to' on the outcome (the winning competitor's name) before running."

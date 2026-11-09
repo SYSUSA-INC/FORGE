@@ -20,7 +20,7 @@ export function TrialRequestsClient({ pending, decided }: { pending: TrialReques
         {pending.length === 0 ? (
           <div className="font-mono text-[11px] text-muted">No trial requests waiting.</div>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col">
             {pending.map((r) => (
               <PendingRow key={r.id} r={r} />
             ))}
@@ -86,7 +86,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
   }
 
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
+    <li className="border-t border-layer/10 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-text">
@@ -98,10 +98,10 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
         </div>
         {approved ? null : (
           <div className="flex gap-2">
-            <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={pending} onClick={approve}>
+            <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={approve}>
               {pending && !declining ? "Approving…" : "Approve"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" disabled={pending} onClick={() => setDeclining((v) => !v)}>
+            <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setDeclining((v) => !v)}>
               Decline…
             </button>
           </div>
@@ -118,7 +118,7 @@ function PendingRow({ r }: { r: TrialRequestRow }) {
             maxLength={300}
             disabled={pending}
           />
-          <button type="button" className="aur-btn aur-btn-danger text-[11px]" disabled={pending} onClick={decline}>
+          <button type="button" className="aur-btn aur-btn-danger" disabled={pending} onClick={decline}>
             {pending ? "Declining…" : "Decline request"}
           </button>
         </div>

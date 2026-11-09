@@ -86,7 +86,7 @@ export function SolicitationActions({
       {opportunityId ? (
         <a
           href={`/opportunities/${opportunityId}`}
-          className="aur-btn aur-btn-ghost"
+          className="aur-link"
         >
           Open opportunity
         </a>

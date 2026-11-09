@@ -61,7 +61,7 @@ export function ErrorRowActions({
               type="button"
               disabled={pending}
               onClick={() => run(() => acknowledgeErrorAction(id))}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
             >
               Acknowledge
             </button>
@@ -71,7 +71,7 @@ export function ErrorRowActions({
               type="button"
               disabled={pending}
               onClick={() => run(() => resolveErrorAction(id))}
-              className="aur-btn aur-btn-primary text-[11px]"
+              className="aur-btn aur-btn-primary"
             >
               Mark resolved
             </button>
@@ -80,7 +80,7 @@ export function ErrorRowActions({
               type="button"
               disabled={pending}
               onClick={() => run(() => unresolveErrorAction(id))}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
             >
               Re-open
             </button>
@@ -91,7 +91,7 @@ export function ErrorRowActions({
               setEditingNotes((v) => !v);
               if (!editingNotes) setDraftNotes(notes);
             }}
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
           >
             {editingNotes ? "Cancel notes" : notes ? "Edit notes" : "Add notes"}
           </button>
@@ -119,7 +119,7 @@ export function ErrorRowActions({
               type="button"
               disabled={pending}
               onClick={() => setEditingNotes(false)}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-link"
             >
               Cancel
             </button>
@@ -127,7 +127,7 @@ export function ErrorRowActions({
               type="button"
               disabled={pending}
               onClick={saveNotes}
-              className="aur-btn aur-btn-primary text-[11px]"
+              className="aur-btn aur-btn-primary"
             >
               {pending ? "Saving…" : "Save notes"}
             </button>

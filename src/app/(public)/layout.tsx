@@ -35,7 +35,7 @@ export default async function PublicLayout({
             Pricing
           </Link>
           {signedIn ? (
-            <Link href="/" className="aur-btn aur-btn-primary text-[12px]">
+            <Link href="/" className="aur-btn aur-btn-primary">
               Go to app →
             </Link>
           ) : (
@@ -48,7 +48,7 @@ export default async function PublicLayout({
               </Link>
               <Link
                 href="/sign-up"
-                className="aur-btn aur-btn-primary text-[12px]"
+                className="aur-btn aur-btn-primary"
               >
                 Get started →
               </Link>

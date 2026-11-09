@@ -84,7 +84,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="aur-btn aur-btn-primary text-[12px]"
+        className="aur-btn aur-btn-primary"
         title="Auto-draft every empty section on the server, grounded in your won proposals."
       >
         Auto-draft proposal
@@ -102,7 +102,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
                   window — the run carries on and the sections fill in as each draft lands.
                 </p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="aur-btn aur-btn-ghost text-[11px]">
+              <button type="button" onClick={() => setOpen(false)} className="aur-link">
                 Close
               </button>
             </div>
@@ -120,7 +120,7 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
                 type="button"
                 onClick={start}
                 disabled={active || pending || eligible.length === 0}
-                className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                className="aur-btn aur-btn-primary disabled:opacity-60"
               >
                 {active ? "Drafting…" : `Draft ${eligible.length} section${eligible.length === 1 ? "" : "s"}`}
               </button>

@@ -189,7 +189,7 @@ export default async function TenantActivityPage({
             </Link>
             <Link
               href={`/platform/audit-log?tenant=${org.id}`}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               title="Full audit log filtered to this tenant"
             >
               Full audit log →

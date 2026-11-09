@@ -11,11 +11,9 @@ type Reviewer = { id: string; name: string; email: string };
 export function SendForReviewButton({
   opportunityId,
   className,
-  size = "md",
 }: {
   opportunityId: string;
   className?: string;
-  size?: "md" | "sm";
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -27,12 +25,7 @@ export function SendForReviewButton({
           e.preventDefault();
           setOpen(true);
         }}
-        className={
-          className ??
-          (size === "sm"
-            ? "aur-btn aur-btn-ghost text-[11px]"
-            : "aur-btn aur-btn-ghost")
-        }
+        className={className ?? "aur-btn aur-btn-ghost"}
         title="Send to a teammate or external reviewer for a Bid / No-bid call"
       >
         Send for review
@@ -222,7 +215,7 @@ function SendForReviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-link"
             disabled={pending}
           >
             {success ? "Close" : "Cancel"}
@@ -237,7 +230,7 @@ function SendForReviewModal({
                   ? !reviewerUserId
                   : !extEmail.includes("@"))
               }
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Sending…" : "Send"}
             </button>

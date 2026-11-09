@@ -41,7 +41,7 @@ export function MigrationsClient({
           type="button"
           onClick={() => apply(false)}
           disabled={pending || initialStatus.pendingFiles.length === 0}
-          className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending
             ? "Applying…"
@@ -119,7 +119,7 @@ export function MigrationsClient({
             type="button"
             onClick={() => apply(true)}
             disabled={pending || !acknowledged}
-            className="aur-btn mt-3 text-[12px] disabled:opacity-60"
+            className="aur-btn mt-3 disabled:opacity-60"
           >
             {pending ? "Applying…" : "Apply with acknowledgement"}
           </button>

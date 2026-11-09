@@ -357,10 +357,10 @@ function AnswerPanel({ view, onBack, onClose }: { view: BrainAnswerView; onBack:
       ) : null}
 
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" onClick={onBack} className="aur-btn-ghost px-0">
+        <button type="button" onClick={onBack} className="aur-link">
           ← Ask another
         </button>
-        <Link href="/knowledge-base" onClick={onClose} className="aur-btn-ghost px-0">
+        <Link href="/knowledge-base" onClick={onClose} className="aur-link">
           Open Knowledge
         </Link>
       </div>

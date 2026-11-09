@@ -60,7 +60,7 @@ export function StartImpersonationForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="aur-btn aur-btn-ghost text-[11px] text-amber-300 hover:text-amber-200"
+        className="aur-btn aur-btn-ghost text-amber-300 hover:text-amber-200"
         title={`Browse the app as ${organizationName} (read-only)`}
       >
         🪪 Assume identity
@@ -102,7 +102,7 @@ export function StartImpersonationForm({
             setError(null);
           }}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[10px]"
+          className="aur-link"
         >
           Cancel
         </button>
@@ -110,7 +110,7 @@ export function StartImpersonationForm({
           type="button"
           onClick={submit}
           disabled={pending || reason.trim().length < 8}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           style={{ background: `linear-gradient(180deg, ${THEME.brass}, ${THEME.brassDeep})` }}
         >
           {pending ? "Starting…" : "Start session"}

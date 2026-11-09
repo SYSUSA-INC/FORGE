@@ -136,7 +136,7 @@ export default async function TenantUsersPage({
             </Link>
             <Link
               href={`/admin/orgs/${org.id}/activity`}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
             >
               Activity →
             </Link>

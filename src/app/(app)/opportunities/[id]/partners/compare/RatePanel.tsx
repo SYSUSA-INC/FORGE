@@ -26,7 +26,7 @@ export function RatePanel({ opportunityId, partnerCount }: { opportunityId: stri
       title="FORGE AI's rating"
       eyebrow={result?.ok ? `${result.rated.length} rated · ${result.gaps} gaps` : "Advice only: you choose"}
       actions={
-        <button type="button" onClick={rate} disabled={pending} className="aur-btn aur-btn-primary text-[12px] disabled:opacity-50">
+        <button type="button" onClick={rate} disabled={pending} className="aur-btn aur-btn-primary disabled:opacity-50">
           {pending ? "Rating…" : result ? "Rate again" : `Rate the ${partnerCount === 1 ? "partner" : `${partnerCount} partners`} with FORGE AI`}
         </button>
       }

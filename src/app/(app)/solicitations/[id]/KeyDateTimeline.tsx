@@ -104,7 +104,7 @@ export function KeyDateTimeline({
       </div>
 
       {/* Date list */}
-      <ul className="space-y-2">
+      <ul>
         {sorted.map((kd) => {
           const days = daysUntil(kd.isoDate as string);
           const urgency = urgencyStyle(days);
@@ -113,7 +113,7 @@ export function KeyDateTimeline({
           return (
             <li
               key={`${kd.isoDate}-${kd.label}`}
-              className="flex items-center gap-2.5 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+              className="flex items-center gap-2.5 border-t border-layer/10 py-2"
               style={{ opacity: isPast ? 0.5 : 1 }}
             >
               {/* Type badge */}

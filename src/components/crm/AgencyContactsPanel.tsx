@@ -27,7 +27,7 @@ export function AgencyContactsView({ agency, contacts, className }: { agency: st
       eyebrow={contacts.length === 0 ? "No contacts yet" : `${contacts.length} contact${contacts.length === 1 ? "" : "s"}`}
       className={className}
       actions={
-        <Link href={contacts.length === 0 ? addHref : "/contacts"} className="aur-btn aur-btn-ghost text-[11px]">
+        <Link href={contacts.length === 0 ? addHref : "/contacts"} className="aur-btn aur-btn-ghost">
           {contacts.length === 0 ? "+ Add" : "All contacts"}
         </Link>
       }

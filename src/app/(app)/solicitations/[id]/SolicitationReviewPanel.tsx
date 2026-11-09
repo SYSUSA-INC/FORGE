@@ -223,7 +223,7 @@ export function SolicitationReviewPanel({
             type="button"
             onClick={runReview}
             disabled={!canReview}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
             title={
               !hasRawText || !parsed
                 ? "The review builds on the parsed requirements. Wait for the parse to finish, or re-parse."
@@ -245,7 +245,7 @@ export function SolicitationReviewPanel({
               type="button"
               onClick={() => runMatrix(false)}
               disabled={matrixing}
-              className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+              className="aur-btn aur-btn-ghost disabled:opacity-50"
               title="Score the requirements the matrix does not cover yet; scored ones are kept."
             >
               {matrixing ? "Scoring…" : `Score remaining (${unscored})`}
@@ -255,7 +255,7 @@ export function SolicitationReviewPanel({
             type="button"
             onClick={() => runMatrix(Boolean(matrix))}
             disabled={downstreamDisabled || matrixing}
-            className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
             title={
               downstreamDisabled
                 ? "Run the document review first."
@@ -276,7 +276,7 @@ export function SolicitationReviewPanel({
             type="button"
             onClick={runQuestions}
             disabled={downstreamDisabled || questioning}
-            className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
             title={
               downstreamDisabled
                 ? "Run the document review first."
@@ -409,12 +409,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-layer/10 bg-layer/[0.02]">
+    <div className="border-t border-layer/10">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-layer/[0.03]"
+        className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-layer/[0.03]"
       >
         <div className="min-w-0 flex-1">
           <div className="font-display text-[13px] font-semibold text-text">
@@ -432,7 +432,7 @@ function Section({
         </span>
       </button>
       {open ? (
-        <div className="border-t border-layer/10 px-3 py-3">{children}</div>
+        <div className="border-t border-layer/10 py-3">{children}</div>
       ) : null}
     </div>
   );
@@ -484,11 +484,11 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
           <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Evaluation factors
           </div>
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col">
             {result.evaluationFactors.map((f, i) => (
               <li
                 key={i}
-                className="flex items-start justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5 font-mono text-[11px]"
+                className="flex items-start justify-between gap-3 border-t border-layer/10 py-1.5 font-mono text-[11px]"
               >
                 <span className="min-w-0 flex-1 truncate text-text">
                   {f.name}
@@ -512,11 +512,11 @@ function ReviewView({ result }: { result: SolicitationReviewResult }) {
           <div className="mb-1 font-mono text-[10px] uppercase tracking-label text-subtle">
             Requirements ({result.requirements.length})
           </div>
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {result.requirements.map((r) => (
               <li
                 key={r.id}
-                className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex items-start gap-3 border-t border-layer/10 py-2"
               >
                 <span
                   className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${
@@ -628,7 +628,7 @@ function MatrixView({
         </span>
       </div>
 
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col">
         {shown.map((cell) => {
           const req = reqsById.get(cell.requirementId);
           const knowledgeId = cell.capabilityRef.startsWith("knowledge:")
@@ -641,7 +641,7 @@ function MatrixView({
           return (
             <li
               key={cell.requirementId}
-              className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+              className="border-t border-layer/10 py-2"
             >
               <div className="flex items-start gap-3">
                 <span
@@ -726,7 +726,7 @@ function QuestionList({ questions }: { questions: SolicitationQuestion[] }) {
         <button
           type="button"
           onClick={copyAll}
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
         >
           Copy all
         </button>
@@ -739,11 +739,11 @@ function QuestionList({ questions }: { questions: SolicitationQuestion[] }) {
               category}{" "}
             · {list.length}
           </div>
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col">
             {list.map((q) => (
               <li
                 key={q.id}
-                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="border-t border-layer/10 py-2"
               >
                 <div className="font-body text-[13px] leading-relaxed text-text">
                   {q.text}

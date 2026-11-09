@@ -401,7 +401,7 @@ function InvitePanel({
         <button
           type="submit"
           disabled={pending || !email || (isSuperadmin && !tenantId)}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Sending…" : willNeedApproval ? "Request approval" : "Send invitation"}
         </button>
@@ -471,11 +471,11 @@ function PendingPanel({
       {invites.length === 0 ? (
         <div className="font-mono text-[11px] text-muted">No pending invites.</div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {invites.map((i) => (
             <li
               key={i.id}
-              className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+              className="border-t border-layer/10 py-3"
             >
               <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_auto_auto]">
                 <div className="min-w-0">
@@ -502,7 +502,7 @@ function PendingPanel({
                   <>
                     <button
                       type="button"
-                      className="aur-btn aur-btn-ghost text-[11px]"
+                      className="aur-btn aur-btn-ghost"
                       onClick={() => onCopyLink(i.id, i.email)}
                       disabled={pendingId === i.id}
                       title="Get a fresh invite link to send by chat or ticket"
@@ -511,7 +511,7 @@ function PendingPanel({
                     </button>
                     <button
                       type="button"
-                      className="aur-btn aur-btn-ghost text-[11px]"
+                      className="aur-btn aur-btn-ghost"
                       onClick={() => onResend(i.id, i.email)}
                       disabled={pendingId === i.id}
                     >
@@ -521,7 +521,7 @@ function PendingPanel({
                 )}
                 <button
                   type="button"
-                  className="aur-btn aur-btn-danger text-[11px]"
+                  className="aur-btn aur-btn-danger"
                   onClick={() => onRevoke(i.id)}
                   disabled={pendingId === i.id}
                 >
@@ -597,7 +597,7 @@ function MembersPanel({
           {error}
         </div>
       ) : null}
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col">
         {members.map((m) => {
           const isSelf = m.userId === currentUserId;
           const initials =
@@ -610,7 +610,7 @@ function MembersPanel({
           return (
             <li
               key={m.userId}
-              className="grid grid-cols-1 items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] p-3 md:grid-cols-[auto_1fr_auto_auto_auto_auto]"
+              className="grid grid-cols-1 items-center gap-3 border-t border-layer/10 py-3 md:grid-cols-[auto_1fr_auto_auto_auto_auto]"
             >
               {m.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -672,7 +672,7 @@ function MembersPanel({
               </span>
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
                 disabled={isSelf || pendingId === m.userId}
                 onClick={() => onToggleStatus(m.userId, m.status)}
               >
@@ -680,7 +680,7 @@ function MembersPanel({
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-danger text-[11px]"
+                className="aur-btn aur-btn-danger"
                 disabled={isSelf || pendingId === m.userId}
                 onClick={() => onRemove(m.userId, m.email)}
               >

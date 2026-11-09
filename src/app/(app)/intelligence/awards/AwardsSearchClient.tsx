@@ -451,7 +451,7 @@ export function AwardsSearchClient({
           <button
             type="button"
             onClick={() => setSaveSearchOpen((v) => !v)}
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
           >
             ★ Save search
           </button>
@@ -459,14 +459,14 @@ export function AwardsSearchClient({
             type="button"
             onClick={search}
             disabled={searching}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {searching ? "Searching…" : "Search awards"}
           </button>
         </div>
 
         {saveSearchOpen ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-layer/10 bg-layer/[0.02] px-3 py-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-layer/10 py-2">
             <input
               className="aur-input min-w-[200px] flex-1"
               placeholder="Name this search"
@@ -485,7 +485,7 @@ export function AwardsSearchClient({
               type="button"
               onClick={saveCurrentSearch}
               disabled={savingSearch}
-              className="aur-btn aur-btn-primary text-[11px]"
+              className="aur-btn aur-btn-primary"
             >
               {savingSearch ? "Saving…" : "Save"}
             </button>
@@ -522,7 +522,7 @@ export function AwardsSearchClient({
               type="button"
               onClick={exportCsv}
               disabled={filteredResults.length === 0}
-              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-40"
+              className="aur-btn aur-btn-ghost disabled:opacity-40"
             >
               ⤓ Export CSV
             </button>

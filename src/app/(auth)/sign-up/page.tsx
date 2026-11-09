@@ -110,7 +110,7 @@ export default async function SignUpPage({
               </p>
               <Link
                 href="/sign-in"
-                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+                className="aur-link mt-6"
               >
                 Go to sign in
               </Link>
@@ -125,7 +125,7 @@ export default async function SignUpPage({
               </p>
               <Link
                 href="/sign-in"
-                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+                className="aur-link mt-6"
               >
                 Go to sign in
               </Link>
@@ -143,7 +143,7 @@ export default async function SignUpPage({
               </p>
               <Link
                 href="/sign-in"
-                className="aur-btn aur-btn-ghost mt-6 flex w-full items-center justify-center py-3 text-sm"
+                className="aur-link mt-6"
               >
                 Go to sign in
               </Link>
@@ -229,7 +229,7 @@ export default async function SignUpPage({
               </Link>
               <Link
                 href="/sign-in"
-                className="aur-btn aur-btn-ghost mt-3 flex w-full items-center justify-center py-3 text-sm"
+                className="aur-link mt-3"
               >
                 Already have an account? Sign in
               </Link>

@@ -107,7 +107,7 @@ export function ApiTokensClient({ tokens, canCreate }: { tokens: ApiTokenListRow
             <button type="button" className="aur-btn aur-btn-ghost" onClick={copy}>
               {copied ? "Copied" : "Copy"}
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost" onClick={() => setFresh(null)}>
+            <button type="button" className="aur-link" onClick={() => setFresh(null)}>
               Done
             </button>
           </div>

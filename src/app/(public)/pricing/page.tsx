@@ -201,7 +201,7 @@ export default async function PricingPage() {
                 <div className="mt-auto pt-6">
                   <Link
                     href={upgradeHref}
-                    className="aur-btn aur-btn-primary w-full justify-center text-[12px]"
+                    className="aur-btn aur-btn-primary w-full justify-center"
                   >
                     {signedIn ? "Upgrade" : "Get started"} →
                   </Link>

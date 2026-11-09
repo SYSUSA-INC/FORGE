@@ -120,7 +120,7 @@ export function AutoMapPanel({
           type="button"
           onClick={runAutoMap}
           disabled={pending || applyPending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           title={
             unmappedCount === 0
               ? "All items are already mapped. Re-run to suggest changes."
@@ -160,7 +160,7 @@ export function AutoMapPanel({
               type="button"
               onClick={() => applySelected((s) => s.confidence === "high")}
               disabled={applyPending || highCount === 0}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
               title="Apply only the suggestions the AI is confident about."
             >
               {applyPending
@@ -171,7 +171,7 @@ export function AutoMapPanel({
               type="button"
               onClick={() => applySelected(() => true)}
               disabled={applyPending || selectableCount === 0}
-              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost disabled:opacity-60"
               title="Apply every selected suggestion regardless of confidence."
             >
               Apply all selected ({selectableCount})
@@ -183,7 +183,7 @@ export function AutoMapPanel({
             ) : null}
           </div>
 
-          <div className="mt-3 flex max-h-[500px] flex-col gap-2 overflow-y-auto">
+          <div className="mt-3 flex max-h-[500px] flex-col overflow-y-auto">
             {suggestions.map((s) => {
               const isExcluded = !!excluded[s.itemId];
               const conf = CONFIDENCE_STYLE[s.confidence];
@@ -191,10 +191,8 @@ export function AutoMapPanel({
               return (
                 <div
                   key={s.itemId}
-                  className={`rounded-md border bg-layer/[0.02] p-3 transition-opacity ${
-                    isExcluded
-                      ? "border-layer/5 opacity-50"
-                      : "border-layer/10"
+                  className={`border-t border-layer/10 py-3 transition-opacity ${
+                    isExcluded ? "opacity-50" : ""
                   }`}
                 >
                   <div className="flex items-start gap-3">

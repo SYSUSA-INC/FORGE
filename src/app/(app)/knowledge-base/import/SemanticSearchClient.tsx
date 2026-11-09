@@ -102,7 +102,7 @@ export function SemanticSearchClient({
           type="button"
           onClick={search}
           disabled={pending || query.trim().length < 3}
-          className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending ? "Searching…" : "Search"}
         </button>
@@ -110,7 +110,7 @@ export function SemanticSearchClient({
           type="button"
           onClick={reembedMissing}
           disabled={reembedPending}
-          className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
           title="Embed any indexed artifacts that don't yet have chunks. Safe to run repeatedly."
         >
           {reembedPending ? "Embedding…" : "Embed missing"}
@@ -146,7 +146,7 @@ export function SemanticSearchClient({
                   <StubModeBanner variant="inline" />
                 ) : null}
               </div>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col">
                 {hits.map((h) => (
                   <SearchHitCard key={h.chunkId} hit={h} query={query} />
                 ))}
@@ -162,7 +162,7 @@ export function SemanticSearchClient({
 function SearchHitCard({ hit, query }: { hit: SearchHit; query: string }) {
   const sim = Math.max(0, Math.min(1, hit.similarity));
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3">
+    <li className="border-t border-layer/10 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Link

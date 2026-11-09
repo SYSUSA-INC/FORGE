@@ -627,7 +627,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
                 onClick={onTestSend}
                 disabled={pending || !form.active}
                 title={
@@ -640,7 +640,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
                 onClick={onToggleActive}
                 disabled={pending}
               >
@@ -648,7 +648,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
               </button>
               <button
                 type="button"
-                className="aur-btn aur-btn-ghost text-[11px] border-rose/40 text-rose"
+                className="aur-btn aur-btn-ghost border-rose/40 text-rose"
                 onClick={onDelete}
                 disabled={pending}
               >
@@ -680,7 +680,7 @@ export function RuleEditorForm({ mode, ruleId, initial, orgUsers }: Props) {
         >
           {pending ? "Saving…" : mode === "create" ? "Create rule" : "Save changes"}
         </button>
-        <Link href="/notifications/rules" className="aur-btn aur-btn-ghost">
+        <Link href="/notifications/rules" className="aur-link">
           Cancel
         </Link>
       </div>

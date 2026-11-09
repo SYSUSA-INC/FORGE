@@ -809,7 +809,7 @@ function DebriefRequestPanel({ proposalId }: { proposalId: string }) {
           <button
             type="button"
             onClick={copy}
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
           >
             {copied ? "Copied!" : "Copy"}
           </button>
@@ -828,7 +828,7 @@ function DebriefRequestPanel({ proposalId }: { proposalId: string }) {
             type="button"
             onClick={generate}
             disabled={pending}
-            className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {pending ? "Generating…" : "Generate letter"}
           </button>
@@ -848,14 +848,14 @@ function DebriefRequestPanel({ proposalId }: { proposalId: string }) {
             <button
               type="button"
               onClick={copy}
-              className="aur-btn aur-btn-primary text-[12px]"
+              className="aur-btn aur-btn-primary"
             >
               {copied ? "Copied!" : "Copy to clipboard"}
             </button>
             <button
               type="button"
               onClick={() => setLetter(null)}
-              className="aur-btn aur-btn-ghost text-[12px]"
+              className="aur-btn aur-btn-ghost"
             >
               Regenerate
             </button>

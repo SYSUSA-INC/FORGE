@@ -59,7 +59,7 @@ export function VoicePanel({ profile, samples, authorName }: { profile: Profile;
           type="button"
           disabled={pending}
           onClick={() => run(() => rebuildMyVoiceAction(), (r) => setNotice(`Voice rebuilt from ${String(r.sections)} section${r.sections === 1 ? "" : "s"} and ${String(r.pasted)} pasted sample${r.pasted === 1 ? "" : "s"}.`))}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
+          className="aur-btn aur-btn-primary disabled:opacity-50"
         >
           {pending ? "Reading…" : profile?.builtAt ? "Rebuild from my writing" : "Build my voice"}
         </button>
@@ -90,7 +90,7 @@ export function VoicePanel({ profile, samples, authorName }: { profile: Profile;
       ) : null}
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+        <div className="border-t border-layer/10 py-3">
           <label className="flex cursor-pointer items-center gap-2 font-body text-[12px] text-text">
             <input type="checkbox" className="accent-teal-400" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
             Write my sections in my voice
@@ -104,11 +104,11 @@ export function VoicePanel({ profile, samples, authorName }: { profile: Profile;
             onChange={(e) => setNotes(e.target.value)}
             placeholder='e.g. "Never use leverage or synergy. Open sections with the customer’s outcome, not our history."'
           />
-          <button type="button" disabled={pending} onClick={() => run(() => updateMyVoiceSettingsAction({ enabled, customGuidance: notes }), () => setNotice("Voice settings saved."))} className="aur-btn aur-btn-ghost mt-2 text-[11px] disabled:opacity-50">
+          <button type="button" disabled={pending} onClick={() => run(() => updateMyVoiceSettingsAction({ enabled, customGuidance: notes }), () => setNotice("Voice settings saved."))} className="aur-btn aur-btn-ghost mt-2 disabled:opacity-50">
             Save settings
           </button>
         </div>
-        <form onSubmit={addSample} className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+        <form onSubmit={addSample} className="border-t border-layer/10 py-3">
           <label className="aur-label">Paste something you wrote</label>
           <input className="aur-input text-[12px]" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={VOICE_LIMITS.maxTitleChars} placeholder="Title (optional) — e.g. Past performance write-up, 2025" />
           <textarea className="aur-input mt-2 text-[12px]" rows={5} value={text} onChange={(e) => setText(e.target.value)} maxLength={VOICE_LIMITS.maxSampleChars} placeholder="A section, a white paper, an email thread you are proud of…" />
@@ -116,7 +116,7 @@ export function VoicePanel({ profile, samples, authorName }: { profile: Profile;
             <span className={`font-mono text-[10px] ${words >= VOICE_LIMITS.minSampleWords ? "text-emerald" : "text-subtle"}`}>
               {words} / {VOICE_LIMITS.minSampleWords} words
             </span>
-            <button type="submit" disabled={pending || words < VOICE_LIMITS.minSampleWords} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50">
+            <button type="submit" disabled={pending || words < VOICE_LIMITS.minSampleWords} className="aur-btn aur-btn-ghost disabled:opacity-50">
               Add sample
             </button>
           </div>

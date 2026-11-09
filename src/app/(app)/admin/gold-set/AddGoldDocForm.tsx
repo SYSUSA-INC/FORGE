@@ -51,7 +51,7 @@ export function AddGoldDocForm() {
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={`aur-btn text-[11px] ${mode === m ? "aur-btn-primary" : "aur-btn-ghost"}`}
+            className={`aur-btn ${mode === m ? "aur-btn-primary" : "aur-btn-ghost"}`}
           >
             {m === "notice" ? "SAM.gov notice ID" : "Paste text"}
           </button>
@@ -80,7 +80,7 @@ export function AddGoldDocForm() {
       )}
       {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
       <div className="flex justify-end">
-        <button type="button" onClick={submit} disabled={pending} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60">
+        <button type="button" onClick={submit} disabled={pending} className="aur-btn aur-btn-primary disabled:opacity-60">
           {pending ? (mode === "notice" ? "Downloading…" : "Saving…") : "Add to gold set"}
         </button>
       </div>

@@ -60,7 +60,7 @@ export default async function ProposalDetailLayout({
           <>
             <Link
               href={`/opportunities/${row.oppId}`}
-              className="aur-btn aur-btn-ghost"
+              className="aur-link"
             >
               View opportunity
             </Link>

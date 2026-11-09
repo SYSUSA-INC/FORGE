@@ -17,7 +17,7 @@ export default async function NewCompanyPage() {
         title="Add company"
         subtitle="Enter fields manually or use Search SAM.gov to auto-fill from a UEI."
         actions={
-          <Link href="/companies" className="aur-btn aur-btn-ghost">
+          <Link href="/companies" className="aur-link">
             Cancel
           </Link>
         }

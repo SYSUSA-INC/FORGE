@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **One button size, and links where a button only steps back** — every button is now the same size on every page; "Cancel", "Close", "Dismiss", "Done" and "Open" beside a main button are text links; and the rows and small forms inside a panel sit on hairlines instead of in boxes (§2.0).
 - **Compare partners' answers, and FORGE AI's rating** — **Compare answers** on the Partners tab shows your capability answers and every partner's side by side, one row per question, and marks the partner that closes each of your gaps; **Rate the partners with FORGE AI** scores each partner on the gaps it closes, its evidence and its certifications, best first, with one reason each resting on the partner's own answers. Your inbox tells you when a partner submits. Compare also says which company you named yourself on each gap; an expired invite link is retired every morning and a partner that never answered goes back to *candidate* (§5.3.2).
 - **Invite a partner to answer the capability questions** — on the Partners tab, **Invite** emails a partner contact a personal link (no FORGE account, 14 days) to the matrix questions; the partner answers Yes / Partial % / No with evidence and lists its ISO, CMMI and CMMC certifications, and the tab shows what came back (§5.3.2).
 - **Several documents at once on an opportunity** — **Add a document to this opportunity** under Documents & AI review takes every file you drop or pick and files each on the opportunity (§5.4).
@@ -189,8 +190,8 @@ FORGE follows the EnableNow design system. A few conventions hold on every page,
 - **Tags are neutral.** Colour-team and stage tags (Pink, Red, Gold, White Gloves, S1–S6) are an ink label with a small diamond in the team's colour. Compliance categories (Section L, M, C, FAR), evidence kinds, knowledge kinds, company relationships and key-date types are plain grey labels. On a solicitation's key dates, the colour shows how close a date is: grey for past, amber within 7 days, ink otherwise.
 - **Tabs** are plain text; the diamond shows on the current tab and on the one under your cursor. The sidebar's group headers are small mono labels with a **+** or **−**.
 - **Page titles** sit on one line at any width, at a regular weight; a long title ends in "…" and shows in full when you hover over it.
-- **Figures and lists.** The tiles under a page title are ink figures on a thin line (only error counts use red). Lists and tables are open rows with a hairline between them, and hover shades a row.
-- **Back and secondary links.** "Back", "← Platform admin" and similar are text links next to the page's buttons.
+- **Figures and lists.** The tiles under a page title are ink figures on a thin line (only error counts use red). Lists and tables are open rows with a hairline between them, and hover shades a row. The same holds for the rows inside a panel that carry their own controls (a teammate with its remove button, a reviewer with its checkbox, a setting with its toggle) and for a form that opens inside a panel: a hairline above, no box around it.
+- **Buttons and secondary links.** Every button is the same size, in one of three looks: solid blue for the main action, a light button for the others, and plain text for quiet toolbar actions. The action beside a main button that only steps back ("Cancel", "Close", "Dismiss", "Done", "Back", "Open …") is a text link in ink, blue when you hover, not a button.
 - **Text.** Running sentences are set in the body font; mono is for labels, numbers and identifiers.
 
 After signing in you'll see the main **app shell**:

@@ -97,7 +97,7 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`aur-btn text-[11px] ${filter === f ? "aur-btn-primary" : "aur-btn-ghost"}`}
+            className={`aur-btn ${filter === f ? "aur-btn-primary" : "aur-btn-ghost"}`}
           >
             {label}
           </button>
@@ -106,7 +106,7 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
           <button
             type="button"
             disabled={pending}
-            className="aur-btn aur-btn-ghost ml-auto text-[11px] disabled:opacity-60"
+            className="aur-btn aur-btn-ghost ml-auto disabled:opacity-60"
             onClick={() =>
               run(
                 () => confirmVerbatimRequirementsAction(solicitationId),
@@ -124,7 +124,7 @@ export function VerifyClient({ solicitationId, items, verbatimToConfirm }: { sol
       {shown.length === 0 ? (
         <p className="font-body text-[13px] text-muted">{filter === "todo" ? "Nothing left to review." : "None."}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {shown.map(({ item, rowKey }) => (
             <Row key={rowKey} item={item} pending={pending} solicitationId={solicitationId} run={run} />
           ))}
@@ -147,7 +147,7 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
   const ids = { solicitationId, docKey: item.docKey, originalKey: item.originalKey };
 
   return (
-    <li className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+    <li className="border-t border-layer/10 py-2">
       <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest">
         <span className="text-subtle">{item.kind}</span>
         {item.ref ? <span className="text-subtle">{item.ref}</span> : null}
@@ -177,7 +177,7 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
             <button
               type="button"
               disabled={pending}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
               onClick={() => {
                 setEditing(false);
                 run(() => reviewRequirementAction({ ...ids, action: "edited", corrected: { kind, text, ref } }));
@@ -185,7 +185,7 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
             >
               Save
             </button>
-            <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={() => setEditing(false)}>
+            <button type="button" className="aur-link" onClick={() => setEditing(false)}>
               Cancel
             </button>
           </div>
@@ -207,13 +207,13 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
       <div className="mt-2 flex flex-wrap gap-2">
         {item.status === null ? (
           <>
-            <button type="button" disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" onClick={() => run(() => reviewRequirementAction({ ...ids, action: "confirmed" }))}>
+            <button type="button" disabled={pending} className="aur-btn aur-btn-ghost disabled:opacity-60" onClick={() => run(() => reviewRequirementAction({ ...ids, action: "confirmed" }))}>
               Confirm
             </button>
             <button
               type="button"
               disabled={pending}
-              className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost disabled:opacity-60"
               onClick={() => {
                 // Start from the requirement as it is now, not as it was when the row first rendered.
                 setKind(item.kind);
@@ -224,14 +224,14 @@ function Row({ item, pending, solicitationId, run }: { item: VerifyItem; pending
             >
               Edit
             </button>
-            <button type="button" disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" onClick={() => run(() => reviewRequirementAction({ ...ids, action: "rejected" }))}>
+            <button type="button" disabled={pending} className="aur-btn aur-btn-ghost disabled:opacity-60" onClick={() => run(() => reviewRequirementAction({ ...ids, action: "rejected" }))}>
               Reject
             </button>
           </>
         ) : item.carried ? (
           <span className="font-body text-[11px] text-muted">Change this verdict on the solicitation where it was made.</span>
         ) : (
-          <button type="button" disabled={pending} className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60" onClick={() => run(() => undoRequirementReviewAction(ids))}>
+          <button type="button" disabled={pending} className="aur-btn aur-btn-ghost disabled:opacity-60" onClick={() => run(() => undoRequirementReviewAction(ids))}>
             {item.status === "added" ? "Remove" : "Undo"}
           </button>
         )}
@@ -266,7 +266,7 @@ function AddForm({ solicitationId, pending, run }: { solicitationId: string; pen
         <button
           type="button"
           disabled={pending || !text.trim()}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
           onClick={() =>
             run(() => addRequirementAction({ solicitationId, kind, text, ref }), "Requirement added.", () => {
               setText("");

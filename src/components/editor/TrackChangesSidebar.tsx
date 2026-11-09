@@ -116,7 +116,7 @@ export function TrackChangesSidebar({ editor, visible, isOwner = true }: Props) 
                 : "No pending changes."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {changes.map((c) => (
             <ChangeRow
               key={c.id}
@@ -176,7 +176,7 @@ function ChangeRow({
   const timeAgo = formatTimeAgo(change.ts);
 
   return (
-    <li className="flex flex-col gap-1 rounded border border-layer/[0.06] bg-layer/[0.03] px-2.5 py-2">
+    <li className="flex flex-col gap-1 border-t border-layer/10 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span

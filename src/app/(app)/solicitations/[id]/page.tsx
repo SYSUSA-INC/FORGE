@@ -457,7 +457,7 @@ export default async function SolicitationDetail({
               allRequirements.length > 0 || s.parseStatus === "parsed" ? (
                 <Link
                   href={`/solicitations/${s.id}/verify`}
-                  className="aur-btn aur-btn-ghost text-[11px]"
+                  className="aur-btn aur-btn-ghost"
                   title="Confirm, edit or reject each requirement against the document"
                 >
                   {allRequirements.length === 0 ? "Add requirements" : `Verify${verdicts.unreviewed > 0 ? ` (${verdicts.unreviewed} to review)` : ""}`}
@@ -487,7 +487,7 @@ export default async function SolicitationDetail({
                     : "Parsing in progress…"}
               </p>
             ) : (
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col">
                 {requirements.map((r, i) => {
                   const color = KIND_COLOR[r.kind] ?? THEME.muted;
                   const sourceDoc = r.sourceDocId
@@ -497,7 +497,7 @@ export default async function SolicitationDetail({
                   return (
                     <li
                       key={i}
-                      className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                      className="flex items-start gap-3 border-t border-layer/10 py-2"
                     >
                       <span
                         className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest"

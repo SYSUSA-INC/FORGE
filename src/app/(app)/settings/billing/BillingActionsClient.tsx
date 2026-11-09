@@ -51,7 +51,7 @@ export function BillingActionsClient({
           type="button"
           onClick={() => checkout("monthly")}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50"
+          className="aur-btn aur-btn-primary disabled:opacity-50"
         >
           {pending ? "Redirecting…" : `${label} (monthly)`}
         </button>
@@ -61,7 +61,7 @@ export function BillingActionsClient({
           type="button"
           onClick={() => checkout("yearly")}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+          className="aur-btn aur-btn-ghost disabled:opacity-50"
         >
           {`${label} (yearly)`}
         </button>

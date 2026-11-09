@@ -43,7 +43,7 @@ export function UploadQueue<R, M>({
 }) {
   if (items.length === 0) return null;
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col">
       {items.map((it) => {
         const pct = it.total > 0 ? Math.min(100, Math.round((it.loaded / it.total) * 100)) : 0;
         const active = it.phase === "uploading" || it.phase === "verifying" || it.phase === "saving";
@@ -52,7 +52,7 @@ export function UploadQueue<R, M>({
         const indeterminate = it.phase === "verifying" || it.phase === "saving";
         const extra = detail?.(it);
         return (
-          <li key={it.id} className={`rounded-md border px-3 py-2 ${failed ? "border-rose/40 bg-rose/[0.05]" : "border-layer/15 bg-layer/[0.02]"}`}>
+          <li key={it.id} className={`border-t py-2 ${failed ? "border-rose/40" : "border-layer/10"}`}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <span className="min-w-0 truncate font-mono text-[12px] text-text" title={it.file.name}>
                 {it.file.name}
@@ -81,17 +81,17 @@ export function UploadQueue<R, M>({
             {it.error ? <p className="mt-1 font-mono text-[11px] text-rose">{it.error}</p> : null}
             <div className={`mt-1.5 flex gap-2 ${locked ? "hidden" : ""}`}>
               {failed || it.phase === "cancelled" ? (
-                <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onRetry(it.id)}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => onRetry(it.id)}>
                   {failed && it.stored ? "Retry saving" : "Retry"}
                 </button>
               ) : null}
               {cancellable ? (
-                <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onCancel(it.id)}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => onCancel(it.id)}>
                   Cancel
                 </button>
               ) : null}
               {!active ? (
-                <button type="button" className="aur-btn aur-btn-ghost text-[10px]" onClick={() => onRemove(it.id)}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => onRemove(it.id)}>
                   Remove
                 </button>
               ) : null}

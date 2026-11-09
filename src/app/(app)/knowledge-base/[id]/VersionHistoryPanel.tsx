@@ -39,7 +39,7 @@ export function VersionHistoryPanel({ id, versions }: { id: string; versions: En
   return (
     <div className="flex flex-col gap-2">
       {error ? <p className="font-mono text-[11px] text-rose-300">{error}</p> : null}
-      <ol className="flex flex-col gap-1.5">
+      <ol className="flex flex-col">
         {versions.map((v) => {
           const delta = describeDelta({
             wordsAdded: v.wordsAdded,
@@ -49,7 +49,7 @@ export function VersionHistoryPanel({ id, versions }: { id: string; versions: En
           });
           const open = openVersion === v.version;
           return (
-            <li key={v.id} className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <li key={v.id} className="border-t border-layer/10 py-2">
               <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted">
                 <span className={`rounded px-1.5 py-0.5 ${v.version === latest ? "border border-emerald/40 bg-emerald/10 text-emerald" : "border border-layer/10 bg-layer/5"}`}>
                   v{v.version}

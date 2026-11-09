@@ -133,13 +133,13 @@ export function FunnelLegend({ stages }: { stages: FunnelStage[] }) {
       : "—";
 
   return (
-    <ol className="flex flex-col gap-2">
+    <ol className="flex flex-col">
       {stages.map((s, i) => {
         const [a, b] = STAGE_GRADIENTS[i % STAGE_GRADIENTS.length];
         return (
           <li
             key={s.key}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-layer/10 bg-layer/[0.02] px-3 py-2"
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-t border-layer/10 py-2"
           >
             <span
               className="h-6 w-2 rounded-sm"

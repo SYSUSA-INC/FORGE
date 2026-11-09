@@ -83,7 +83,7 @@ export function SubmitVerdictPanel({
         <button
           type="submit"
           disabled={pending}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Submitting…" : alreadySubmitted ? "Update" : "Submit"}
         </button>

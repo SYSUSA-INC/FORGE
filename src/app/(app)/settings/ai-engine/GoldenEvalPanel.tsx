@@ -88,7 +88,7 @@ export function GoldenEvalPanel({
             </select>
             <button
               type="button"
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-btn aur-btn-ghost"
               disabled={pending || goldenCases === 0}
               onClick={run}
               title="Re-draft up to three won sections from the solicitation context, score them against the text that won and have the rubric judge score them. Up to six AI requests."

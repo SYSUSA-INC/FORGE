@@ -148,13 +148,13 @@ export function StartReviewPanel({
           {reviewers.length === 0 ? (
             <div className="font-mono text-[11px] text-muted">No org members to assign.</div>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col">
               {reviewers.map((r) => {
                 const isSelected = selected.has(r.id);
                 const scope = sectionAssignments[r.id] ?? [];
                 return (
                   <li key={r.id}>
-                    <div className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-1.5">
+                    <div className="border-t border-layer/10 py-1.5">
                       <label className="flex cursor-pointer items-center gap-2">
                         <input type="checkbox" className="accent-teal-400" checked={isSelected} onChange={() => toggle(r.id)} />
                         <span className="min-w-0 truncate font-mono text-[12px] text-text">{r.name ?? r.email}</span>
@@ -196,7 +196,7 @@ export function StartReviewPanel({
             <span className="font-mono text-[10px] text-muted">{showChecklist ? "Hide" : "Edit"}</span>
           </button>
           {showChecklist ? (
-            <div className="mt-1 flex flex-col gap-1 rounded-md border border-layer/10 bg-layer/[0.02] p-2">
+            <div className="mt-1 flex flex-col gap-1 border-t border-layer/10 py-2">
               {checklist.map((item) => (
                 <div key={item.key} className="flex items-start gap-2">
                   <span className="min-w-0 flex-1 font-body text-[11px] text-text">{item.label}</span>
@@ -224,10 +224,10 @@ export function StartReviewPanel({
                   maxLength={CHECKLIST_LIMITS.maxLabelChars}
                   placeholder="Add a line…"
                 />
-                <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={addItem} disabled={!newItem.trim() || checklist.length >= CHECKLIST_LIMITS.maxItems}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={addItem} disabled={!newItem.trim() || checklist.length >= CHECKLIST_LIMITS.maxItems}>
                   Add
                 </button>
-                <button type="button" className="aur-btn aur-btn-ghost text-[11px]" onClick={() => setChecklist(REVIEW_CHECKLIST_TEMPLATES[color])}>
+                <button type="button" className="aur-btn aur-btn-ghost" onClick={() => setChecklist(REVIEW_CHECKLIST_TEMPLATES[color])}>
                   Reset
                 </button>
               </div>
@@ -235,7 +235,7 @@ export function StartReviewPanel({
           ) : null}
         </div>
         {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose">{error}</div> : null}
-        <button type="submit" disabled={pending || selected.size === 0} className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60">
+        <button type="submit" disabled={pending || selected.size === 0} className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60">
           {pending ? "Starting…" : `Start ${colorDef?.label ?? "review"}`}
         </button>
       </form>

@@ -73,7 +73,7 @@ export function GraphicsPanel({
           type="button"
           onClick={suggest}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+          className="aur-btn aur-btn-ghost disabled:opacity-50"
           title="Read the section and propose the diagrams it would benefit from"
         >
           {pending ? "Reading…" : suggestions ? "Suggest again" : "Suggest graphics"}
@@ -99,7 +99,7 @@ export function GraphicsPanel({
             </p>
           ) : null}
           {(suggestions ?? []).map((s) => (
-            <div key={`${s.kind}-${s.title}`} className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+            <div key={`${s.kind}-${s.title}`} className="border-t border-layer/10 py-3">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <span className="rounded border border-plum-400/40 bg-plum-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-plum-300">
                   {GRAPHIC_KIND_LABELS[s.kind]}
@@ -113,15 +113,15 @@ export function GraphicsPanel({
                 <button
                   type="button"
                   onClick={() => onInsertImage(s.dataUri, s.title)}
-                  className="aur-btn aur-btn-primary text-[11px]"
+                  className="aur-btn aur-btn-primary"
                   title="Add the diagram at the end of the section as an image; drag it where it belongs"
                 >
                   Insert into section
                 </button>
-                <button type="button" onClick={() => void copyMermaid(s)} className="aur-btn aur-btn-ghost text-[11px]">
+                <button type="button" onClick={() => void copyMermaid(s)} className="aur-btn aur-btn-ghost">
                   {copied === s.title ? "Copied" : "Copy Mermaid"}
                 </button>
-                <button type="button" onClick={() => downloadSvg(s)} className="aur-btn aur-btn-ghost text-[11px]">
+                <button type="button" onClick={() => downloadSvg(s)} className="aur-btn aur-btn-ghost">
                   Download SVG
                 </button>
                 <span className="font-mono text-[10px] uppercase tracking-wider text-subtle">

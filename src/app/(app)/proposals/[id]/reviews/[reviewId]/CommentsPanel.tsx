@@ -141,7 +141,7 @@ export function CommentsPanel({
       }
     >
       <form
-        className="mb-3 flex flex-col gap-2 rounded-md border border-dashed border-layer/10 bg-layer/[0.02] p-3"
+        className="mb-3 flex flex-col gap-2 border-t border-layer/10 py-3"
         onSubmit={onSubmit}
       >
         <div className="flex flex-wrap items-end gap-2">
@@ -185,7 +185,7 @@ export function CommentsPanel({
           <button
             type="submit"
             disabled={pending || !body.trim()}
-            className="aur-btn aur-btn-primary py-2 text-[12px] disabled:opacity-60"
+            className="aur-btn aur-btn-primary disabled:opacity-60"
           >
             {pending ? "Adding…" : "Add comment"}
           </button>

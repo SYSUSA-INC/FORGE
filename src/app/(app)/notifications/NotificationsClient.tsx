@@ -78,7 +78,7 @@ export function NotificationsClient({ initial }: { initial: NotificationRow[] })
             type="button"
             disabled={pending || initial.every((r) => r.readAt)}
             onClick={markAllRead}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
           >
             {pending ? "Updating…" : "Mark all read"}
           </button>

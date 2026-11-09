@@ -125,7 +125,7 @@ export function SamGovKeyPanel({ view, canEdit, isImpersonating }: { view: SamKe
               </button>
             </span>
           </label>
-          <button type="button" disabled={pending || !key.trim()} onClick={() => run(() => setCompanySamKeyAction({ key }))} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+          <button type="button" disabled={pending || !key.trim()} onClick={() => run(() => setCompanySamKeyAction({ key }))} className="aur-btn aur-btn-primary disabled:opacity-50">
             {pending ? "Testing with SAM.gov…" : "Test and save"}
           </button>
         </div>

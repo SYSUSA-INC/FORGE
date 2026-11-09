@@ -88,7 +88,7 @@ export default async function IntelligencePage() {
         <div className="mb-3 flex items-center justify-end">
           <Link
             href="/intelligence/losses"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
           >
             Cross-loss patterns →
           </Link>

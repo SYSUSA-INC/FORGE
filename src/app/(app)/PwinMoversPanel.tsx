@@ -40,14 +40,14 @@ export async function PwinMoversPanel({
           </Link>
         }
       >
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col">
           {movers.map((m) => {
             const rising = m.delta > 0;
             return (
               <li key={m.opportunityId}>
                 <Link
                   href={`/opportunities/${m.opportunityId}`}
-                  className="block rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 hover:border-layer/20"
+                  className="block border-t border-layer/10 py-2 hover:border-layer/20"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span

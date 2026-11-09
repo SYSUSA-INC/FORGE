@@ -74,7 +74,7 @@ export function MemberSecurityTable({ rows }: { rows: MemberSecurityView[] }) {
               </div>
             </div>
             {open === r.userId ? (
-              <div className="mt-2 flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/5 px-3 py-3">
+              <div className="mt-2 flex flex-col gap-2 border-t border-layer/10 py-3">
                 <p className="font-body text-[12px] leading-[1.5] text-muted">
                   This removes {r.name}&apos;s passkeys, authenticator apps and recovery codes and signs them out everywhere. Their password stays; they set two-step sign-in up again at their next sign-in. Confirm who they are first (a call to them or their manager, not an email thread alone). Your reason is emailed to them and kept in the Audit Log.
                 </p>
@@ -84,7 +84,7 @@ export function MemberSecurityTable({ rows }: { rows: MemberSecurityView[] }) {
                   <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={() => reset(r.userId)}>
                     {pending ? "Resetting…" : "Reset second step"}
                   </button>
-                  <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setOpen(null)}>
+                  <button type="button" className="aur-link" disabled={pending} onClick={() => setOpen(null)}>
                     Cancel
                   </button>
                 </div>

@@ -71,7 +71,7 @@ export function BrainSuggestPanel({
               type="button"
               onClick={suggest}
               disabled={pending}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Thinking…" : "Suggest"}
             </button>
@@ -98,7 +98,7 @@ export function BrainSuggestPanel({
                 and try again.
               </div>
             ) : (
-              <ul className="mt-3 flex flex-col gap-2">
+              <ul className="mt-3 flex flex-col">
                 {hits.map((h) => (
                   <HitRow key={h.id} hit={h} onInsert={onInsert} />
                 ))}
@@ -122,7 +122,7 @@ function HitRow({
   const sim = Math.max(0, Math.min(1, hit.similarity));
 
   return (
-    <li className="rounded-lg border border-layer/10 bg-layer/[0.02] p-2">
+    <li className="border-t border-layer/10 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <SourceTag hit={hit} />
@@ -145,7 +145,7 @@ function HitRow({
           <button
             type="button"
             onClick={() => onInsert(hit.content.trim() + "\n\n")}
-            className="aur-btn aur-btn-ghost text-[10px]"
+            className="aur-btn aur-btn-ghost"
             title="Insert this passage at the end of the current section"
           >
             Insert

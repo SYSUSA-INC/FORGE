@@ -94,7 +94,7 @@ function BudgetPanel(p: AiControlPanelProps) {
       eyebrow={`${p.monthLabel} · ${p.tierName ? `${p.tierName} tier` : "no tier assigned"} · resets on the 1st (UTC)`}
       actions={
         p.isAdmin && p.hasSubscription ? (
-          <button type="button" className="aur-btn aur-btn-primary text-[11px]" disabled={pending} onClick={save}>
+          <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={save}>
             {pending ? "Saving…" : "Save budget"}
           </button>
         ) : undefined

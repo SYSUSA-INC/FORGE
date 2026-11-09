@@ -158,7 +158,7 @@ export function SearchClient({
         </Field>
         <button
           type="button"
-          className="aur-btn aur-btn-primary px-5 py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary px-5.5 text-sm disabled:opacity-60"
           disabled={loading}
           onClick={search}
         >
@@ -231,7 +231,7 @@ export function SearchClient({
                       ) : (
                         <button
                           type="button"
-                          className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+                          className="aur-btn aur-btn-primary disabled:opacity-60"
                           disabled={importingId === e.ueiSAM}
                           onClick={() => importOne(e.ueiSAM)}
                         >

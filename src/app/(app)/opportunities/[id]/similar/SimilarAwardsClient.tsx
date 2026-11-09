@@ -106,7 +106,7 @@ export function SimilarAwardsClient({
         actions={
           <Link
             href="/intelligence/awards"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
             title="Refine the search on the intel page"
           >
             Refine search →

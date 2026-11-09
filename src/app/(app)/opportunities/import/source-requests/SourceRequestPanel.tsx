@@ -92,7 +92,7 @@ export function SourceRequestPanel({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="aur-btn aur-btn-ghost text-[11px]"
+          className="aur-btn aur-btn-ghost"
         >
           {open ? "Cancel" : "+ Suggest a source"}
         </button>
@@ -146,7 +146,7 @@ export function SourceRequestPanel({
                 setOpen(false);
                 setError(null);
               }}
-              className="aur-btn aur-btn-ghost text-[11px]"
+              className="aur-link"
             >
               Cancel
             </button>
@@ -154,7 +154,7 @@ export function SourceRequestPanel({
               type="button"
               onClick={submit}
               disabled={pending || !sourceName.trim() || !description.trim()}
-              className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary disabled:opacity-60"
             >
               {pending ? "Submitting…" : "Submit"}
             </button>
@@ -173,11 +173,11 @@ export function SourceRequestPanel({
           <div className="mb-2 font-mono text-[10px] uppercase tracking-label text-subtle">
             Your previous requests
           </div>
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {own.map((r) => (
               <li
                 key={r.id}
-                className="flex items-start gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="flex items-start gap-3 border-t border-layer/10 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

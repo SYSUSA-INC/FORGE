@@ -93,7 +93,7 @@ export function ProposalOverviewForm({
         <button
           type="submit"
           disabled={pending || !title.trim()}
-          className="aur-btn aur-btn-primary py-2.5 text-sm disabled:opacity-60"
+          className="aur-btn aur-btn-primary.5 text-sm disabled:opacity-60"
         >
           {pending ? "Saving…" : "Save changes"}
         </button>

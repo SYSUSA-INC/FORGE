@@ -192,14 +192,14 @@ export function AuditLogClient({
           type="button"
           onClick={applyFilters}
           disabled={pending}
-          className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-primary disabled:opacity-60"
         >
           {pending ? "Applying…" : "Apply filters"}
         </button>
         <button
           type="button"
           onClick={clearFilters}
-          className="aur-btn aur-btn-ghost text-[12px]"
+          className="aur-btn aur-btn-ghost"
         >
           Clear
         </button>
@@ -207,7 +207,7 @@ export function AuditLogClient({
           type="button"
           onClick={exportCsv}
           disabled={exporting}
-          className="aur-btn aur-btn-ghost text-[12px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
         >
           {exporting ? "Exporting…" : "Export CSV"}
         </button>
@@ -317,7 +317,7 @@ export function AuditLogClient({
             type="button"
             onClick={() => gotoPage(initialResult.page - 1)}
             disabled={initialResult.page <= 1 || pending}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
           >
             ← Previous
           </button>
@@ -328,7 +328,7 @@ export function AuditLogClient({
             type="button"
             onClick={() => gotoPage(initialResult.page + 1)}
             disabled={initialResult.page >= totalPages || pending}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
           >
             Next →
           </button>

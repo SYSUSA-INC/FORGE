@@ -101,11 +101,11 @@ export function QaPanel({
             onClick={poll}
             disabled={pending || !noticeId || !hasSamKey}
             title={pollTitle}
-            className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-50"
+            className="aur-btn aur-btn-ghost disabled:opacity-50"
           >
             {pending ? "Checking…" : "Check SAM.gov now"}
           </button>
-          <button type="button" onClick={() => setPasteOpen((v) => !v)} className="aur-btn aur-btn-ghost text-[11px]">
+          <button type="button" onClick={() => setPasteOpen((v) => !v)} className="aur-btn aur-btn-ghost">
             {pasteOpen ? "Cancel" : "Paste Q&A"}
           </button>
         </div>
@@ -127,7 +127,7 @@ export function QaPanel({
             placeholder={"Q1: Does Section L.5.2.1 require resumes for all key personnel?\nA1: Only the program manager and technical lead."}
           />
           <div className="mt-2 flex justify-end">
-            <button type="button" onClick={addPasted} disabled={pending || !text.trim()} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+            <button type="button" onClick={addPasted} disabled={pending || !text.trim()} className="aur-btn aur-btn-primary disabled:opacity-50">
               {pending ? "Adding…" : "Add answers"}
             </button>
           </div>

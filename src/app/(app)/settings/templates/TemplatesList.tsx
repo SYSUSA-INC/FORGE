@@ -146,11 +146,11 @@ export function TemplatesList({ templates }: { templates: TemplateRow[] }) {
           title="Archived"
           eyebrow={`${archived.length}`}
         >
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {archived.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2 text-muted"
+                className="flex items-center justify-between gap-3 border-t border-layer/10 py-2 text-muted"
               >
                 <div className="min-w-0 flex-1">
                   <span className="font-display text-[13px]">{t.name}</span>

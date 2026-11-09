@@ -113,7 +113,7 @@ export function ContactDetailClient({ contact, touches, owners, opportunities }:
               <div className="flex flex-wrap items-center gap-2">
                 <label className="aur-label mb-0">Next touch</label>
                 <input className="aur-input w-auto text-[12px]" type="date" value={nextTouchAt} onChange={(e) => setNextTouchAt(e.target.value)} />
-                <button type="submit" disabled={pending || !summary.trim()} className="aur-btn aur-btn-primary ml-auto text-[12px] disabled:opacity-60">
+                <button type="submit" disabled={pending || !summary.trim()} className="aur-btn aur-btn-primary ml-auto disabled:opacity-60">
                   {pending ? "Logging…" : "Log touch"}
                 </button>
               </div>

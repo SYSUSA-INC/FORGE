@@ -44,7 +44,7 @@ export async function RecompeteRadarPanel({
           ? "This looks like work you bid and lost before. The record, the debrief and the winner analysis are below so the team starts from what it learned, not from scratch."
           : "This looks like work you have won before. Your record and what the evaluators credited are below; plan the incumbent defence around them."}
       </p>
-      <ul className="space-y-3">
+      <ul>
         {matches.map((m) => (
           <MatchCard key={m.prior.proposalId} m={m} />
         ))}
@@ -65,7 +65,7 @@ function MatchCard({ m }: { m: RecompeteMatch }) {
   const lessons = p.lessonsLearned.trim();
 
   return (
-    <li className="rounded-md border border-layer/10 bg-layer/[0.02] p-3">
+    <li className="border-t border-layer/10 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-widest ${

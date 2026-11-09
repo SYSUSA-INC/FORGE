@@ -37,7 +37,7 @@ export default async function PromoCodesPage() {
           <>
             <Link
               href="/admin/promo-codes/new"
-              className="aur-btn aur-btn-primary text-[11px]"
+              className="aur-btn aur-btn-primary"
             >
               + New code
             </Link>
@@ -64,7 +64,7 @@ export default async function PromoCodesPage() {
             create one.
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {rows.map((r) => {
               const expired = r.validUntil
                 ? r.validUntil < new Date()
@@ -74,7 +74,7 @@ export default async function PromoCodesPage() {
               return (
                 <li
                   key={r.id}
-                  className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+                  className="border-t border-layer/10 py-3"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <Link

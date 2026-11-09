@@ -124,7 +124,7 @@ export default async function DashboardPage() {
             actions={
               <Link
                 href={`/opportunities/${snap.nextDue.id}`}
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-link"
               >
                 Open opportunity
               </Link>

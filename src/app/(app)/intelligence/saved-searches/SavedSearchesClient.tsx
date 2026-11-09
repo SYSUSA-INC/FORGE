@@ -126,14 +126,14 @@ function SavedSearchRowView({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-muted">
+            <span className="rounded bg-layer/5 px-1.5 py-0.5 font-mono text-muted">
               {row.kind}
             </span>
             <span className="truncate font-display text-[13px] text-text">
               {row.name}
             </span>
             {row.shared ? (
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-label text-emerald-200">
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-emerald-200">
                 Shared
               </span>
             ) : null}
@@ -151,7 +151,7 @@ function SavedSearchRowView({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <a href={runUrl} className="aur-btn aur-btn-primary text-[11px]">
+          <a href={runUrl} className="aur-btn aur-btn-primary">
             Run
           </a>
           {row.mine ? (
@@ -160,14 +160,14 @@ function SavedSearchRowView({
                 type="button"
                 disabled={savingShared}
                 onClick={() => startShared(onToggleShared)}
-                className="aur-btn aur-btn-ghost text-[11px]"
+                className="aur-btn aur-btn-ghost"
               >
                 {row.shared ? "Make private" : "Share"}
               </button>
               <button
                 type="button"
                 onClick={onRemove}
-                className="aur-btn aur-btn-ghost text-[10px] uppercase tracking-label text-rose-300 hover:text-rose-200"
+                className="aur-btn aur-btn-ghost text-rose-300 hover:text-rose-200"
               >
                 Delete
               </button>

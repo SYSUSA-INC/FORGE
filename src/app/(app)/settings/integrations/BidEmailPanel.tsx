@@ -37,7 +37,7 @@ export function BidEmailPanel({ address, configured, canEdit }: { address: strin
           <code className="rounded border border-layer/10 bg-layer/[0.03] px-2 py-1 font-mono text-[13px] text-text">{address}</code>
           <button
             type="button"
-            className="aur-btn text-[11px]"
+            className="aur-btn"
             onClick={() => {
               void navigator.clipboard?.writeText(address).then(() => setCopied(true));
             }}
@@ -46,7 +46,7 @@ export function BidEmailPanel({ address, configured, canEdit }: { address: strin
           </button>
         </div>
       ) : canEdit ? (
-        <button type="button" className="aur-btn aur-btn-primary text-[12px]" disabled={pending} onClick={create}>
+        <button type="button" className="aur-btn aur-btn-primary" disabled={pending} onClick={create}>
           {pending ? "Creating…" : "Create your bid email address"}
         </button>
       ) : (

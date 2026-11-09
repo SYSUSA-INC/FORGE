@@ -69,7 +69,7 @@ export function OpportunityBriefPanel({
       actions={
         <button
           type="button"
-          className={`aur-btn text-[11px] ${brief ? "aur-btn-ghost" : "aur-btn-primary"}`}
+          className={`aur-btn ${brief ? "aur-btn-ghost" : "aur-btn-primary"}`}
           disabled={pending}
           onClick={() => generate(!!brief)}
         >
@@ -171,7 +171,7 @@ export function OpportunityBriefPanel({
               <span className="text-muted">Was this useful?</span>
               <button
                 type="button"
-                className={`aur-btn aur-btn-ghost text-[11px] ${brief.feedback === "useful" ? "text-emerald-300" : ""}`}
+                className={`aur-btn aur-btn-ghost ${brief.feedback === "useful" ? "text-emerald-300" : ""}`}
                 disabled={pending}
                 onClick={() => feedback("useful")}
               >
@@ -179,7 +179,7 @@ export function OpportunityBriefPanel({
               </button>
               <button
                 type="button"
-                className={`aur-btn aur-btn-ghost text-[11px] ${brief.feedback === "not_useful" ? "text-rose-300" : ""}`}
+                className={`aur-btn aur-btn-ghost ${brief.feedback === "not_useful" ? "text-rose-300" : ""}`}
                 disabled={pending}
                 onClick={() => feedback("not_useful")}
               >

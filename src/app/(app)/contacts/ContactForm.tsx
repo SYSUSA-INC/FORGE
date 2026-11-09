@@ -92,7 +92,7 @@ export function ContactForm({
       {field("Notes", <textarea className="aur-input text-[12px]" rows={3} value={v.notes} onChange={set("notes")} maxLength={CONTACT_LIMITS.notes} placeholder="How we know them, what they care about, who introduced us." />, true)}
       {error ? <div className="rounded-md border border-rose/40 bg-rose/10 px-3 py-2 font-mono text-[11px] text-rose sm:col-span-2">{error}</div> : null}
       <div className="sm:col-span-2">
-        <button type="submit" disabled={pending || !v.name.trim() || !v.agency.trim()} className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60">
+        <button type="submit" disabled={pending || !v.name.trim() || !v.agency.trim()} className="aur-btn aur-btn-primary disabled:opacity-60">
           {pending ? "Saving…" : submitLabel}
         </button>
       </div>

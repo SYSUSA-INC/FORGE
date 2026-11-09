@@ -118,7 +118,7 @@ export function EbuyPasteClient() {
           disabled={parsing || creating}
         />
         <div className="mt-3 flex items-center gap-2">
-          <button type="button" className="aur-btn aur-btn-primary text-[12px] disabled:opacity-60" onClick={parse} disabled={parsing || rawText.trim().length === 0}>
+          <button type="button" className="aur-btn aur-btn-primary disabled:opacity-60" onClick={parse} disabled={parsing || rawText.trim().length === 0}>
             {parsing ? "Extracting…" : "Extract with AI"}
           </button>
           <span className="font-mono text-[10px] text-muted">{rawText.length.toLocaleString()} chars</span>
@@ -159,7 +159,7 @@ export function EbuyPasteClient() {
                     </button>
                   </span>
                 ) : (
-                  <button type="button" className="aur-btn aur-btn-primary text-[11px] disabled:opacity-60" disabled={creating || fields.title.trim() === ""} onClick={create}>
+                  <button type="button" className="aur-btn aur-btn-primary disabled:opacity-60" disabled={creating || fields.title.trim() === ""} onClick={create}>
                     {creating ? "Adding…" : "Add to pipeline"}
                   </button>
                 )

@@ -91,7 +91,7 @@ export async function CreateSection({
           <p className="font-body text-[13px] leading-[1.5] text-muted">
             FORGE is reading it for the title, agency, solicitation number, NAICS, set-aside and due date, and for its requirements and Sections L and M. The form opens filled in when it is done; a large document can take a few minutes.
           </p>
-          <Link href={`/pipeline/identify?tab=create&from=${doc.id}&wait=0`} className="aur-btn aur-btn-ghost mt-3 inline-flex">
+          <Link href={`/pipeline/identify?tab=create&from=${doc.id}&wait=0`} className="aur-link mt-3">
             Don&apos;t wait: fill in the rest by hand
           </Link>
         </Panel>

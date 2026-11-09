@@ -92,7 +92,7 @@ export default async function ProposalReviewsPage({
               right.
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {data.reviews.map((r) => {
                 const assigns = assignmentsByReview.get(r.id) ?? [];
                 const colorHex = REVIEW_COLOR_HEX[r.color];
@@ -111,7 +111,7 @@ export default async function ProposalReviewsPage({
                 return (
                   <li
                     key={r.id}
-                    className="rounded-lg border border-layer/10 bg-layer/[0.02] p-3"
+                    className="border-t border-layer/10 py-3"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -185,7 +185,7 @@ export default async function ProposalReviewsPage({
                       </div>
                       <Link
                         href={`/proposals/${params.id}/reviews/${r.id}`}
-                        className="aur-btn aur-btn-ghost text-[11px]"
+                        className="aur-link"
                       >
                         Open
                       </Link>

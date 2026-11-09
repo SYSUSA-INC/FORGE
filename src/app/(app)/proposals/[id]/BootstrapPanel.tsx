@@ -56,7 +56,7 @@ export function BootstrapPanel({
         hasSectionL ? (
           <button
             type="button"
-            className="aur-btn aur-btn-ghost text-[11px]"
+            className="aur-btn aur-btn-ghost"
             disabled={pending}
             onClick={run}
             title="Read Section L again and refresh the outline. Sections with text are kept."
@@ -75,11 +75,11 @@ export function BootstrapPanel({
         </p>
       ) : (
         <>
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col">
             {record.sections.map((s, i) => (
               <li
                 key={`${s.title}-${i}`}
-                className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                className="border-t border-layer/10 py-2"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-mono text-[12px] text-text">

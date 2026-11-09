@@ -101,7 +101,7 @@ export function ProposalScanPanel({
           type="button"
           onClick={runScan}
           disabled={pending}
-          className="aur-btn aur-btn-ghost text-[11px] disabled:opacity-60"
+          className="aur-btn aur-btn-ghost disabled:opacity-60"
         >
           {pending ? "Scanning…" : scan ? "Re-scan" : "Scan now"}
         </button>
@@ -165,11 +165,11 @@ export function ProposalScanPanel({
               <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Section issues ({scan.sectionIssues.length})
               </div>
-              <ul className="space-y-2">
+              <ul>
                 {scan.sectionIssues.map((issue) => (
                   <li
                     key={issue.sectionId}
-                    className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                    className="border-t border-layer/10 py-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-[12px] text-text">
@@ -205,11 +205,11 @@ export function ProposalScanPanel({
               <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Win-theme coverage
               </div>
-              <ul className="space-y-1.5">
+              <ul>
                 {scan.sectionThemeCoverage.map((c) => (
                   <li
                     key={c.sectionId}
-                    className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                    className="border-t border-layer/10 py-2"
                   >
                     <div className="mb-1.5 font-mono text-[11px] text-text">
                       {c.sectionTitle}
@@ -254,11 +254,11 @@ export function ProposalScanPanel({
               <div className="mb-1.5 font-mono text-[10px] uppercase tracking-label text-muted">
                 Cross-volume contradictions ({scan.contradictions.length})
               </div>
-              <ul className="space-y-2">
+              <ul>
                 {scan.contradictions.map((c, i) => (
                   <li
                     key={i}
-                    className="rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2"
+                    className="border-t border-layer/10 py-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-mono text-[11px] text-text">

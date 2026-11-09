@@ -101,7 +101,7 @@ export function CompanyModelPanel({
             <div className="flex items-center gap-2">
               {draft ? (
                 <>
-                  <button type="button" className="aur-btn" disabled={pending} onClick={() => run("Draft discarded.", discardCompanyModelDraftAction)}>
+                  <button type="button" className="aur-link" disabled={pending} onClick={() => run("Draft discarded.", discardCompanyModelDraftAction)}>
                     Discard
                   </button>
                   <button type="button" className="aur-btn" disabled={pending} onClick={() => run("Draft saved.", () => saveCompanyModelDraftAction({ body: draft }))}>

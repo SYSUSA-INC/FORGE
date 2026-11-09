@@ -83,7 +83,7 @@ function SourceLegend({
   const stats = extractCitationStats(text);
   const cited = new Set(stats.citedSources);
   return (
-    <div className="mt-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+    <div className="mt-2 border-t border-layer/10 pt-2">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-label text-muted">
         <span>
           Sources · {cited.size}/{sources.length} cited
@@ -867,7 +867,7 @@ export function AiAssistantPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="aur-btn aur-btn-ghost text-[11px]"
+        className="aur-btn aur-btn-ghost"
       >
         ✨ AI assist
       </button>
@@ -920,7 +920,7 @@ export function AiAssistantPanel({
                 setResult(null);
                 setError(null);
               }}
-              className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text"
+              className="aur-link"
             >
               Close
             </button>
@@ -969,7 +969,7 @@ export function AiAssistantPanel({
                     <button
                       type="button"
                       onClick={() => acceptAB(v)}
-                      className="aur-btn aur-btn-primary text-[11px]"
+                      className="aur-btn aur-btn-primary"
                     >
                       Use Variant {v.toUpperCase()}
                     </button>
@@ -980,7 +980,7 @@ export function AiAssistantPanel({
             <button
               type="button"
               onClick={() => { setAbResult(null); setAbError(null); }}
-              className="self-start font-mono text-[10px] uppercase tracking-wider text-muted hover:text-text"
+              className="aur-link self-start"
             >
               Discard comparison
             </button>
@@ -1015,7 +1015,7 @@ export function AiAssistantPanel({
               })}
             </div>
             {/* Cite sources — BL-FB-GEN-CITE */}
-            <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <label className="mt-1 flex cursor-pointer items-start gap-2 border-t border-layer/10 py-2">
               <input
                 type="checkbox"
                 checked={cite}
@@ -1166,7 +1166,7 @@ export function AiAssistantPanel({
                   type="button"
                   disabled={pending}
                   onClick={() => generate(result.mode, guidance ?? undefined)}
-                  className="aur-btn aur-btn-ghost text-[11px]"
+                  className="aur-btn aur-btn-ghost"
                 >
                   Regenerate
                 </button>
@@ -1176,7 +1176,7 @@ export function AiAssistantPanel({
                     setResult(null);
                     setError(null);
                   }}
-                  className="aur-btn aur-btn-ghost text-[11px]"
+                  className="aur-link"
                 >
                   Discard
                 </button>
@@ -1184,7 +1184,7 @@ export function AiAssistantPanel({
                   <button
                     type="button"
                     onClick={applyTracked}
-                    className="aur-btn aur-btn-primary text-[11px]"
+                    className="aur-btn aur-btn-primary"
                     title="Show the AI's edits as tracked changes by FORGE AI; accept or reject each one in the editor"
                   >
                     Apply as tracked changes
@@ -1193,7 +1193,7 @@ export function AiAssistantPanel({
                 <button
                   type="button"
                   onClick={accept}
-                  className={`aur-btn ${canApplyTracked ? "aur-btn-ghost" : "aur-btn-primary"} text-[11px]`}
+                  className={`aur-btn ${canApplyTracked ? "aur-btn-ghost" : "aur-btn-primary"}`}
                   title={canApplyTracked ? "Discard the current text and use this draft as is" : undefined}
                 >
                   {canApplyTracked ? "Replace section" : "Replace section with this"}
@@ -1531,7 +1531,7 @@ export function AiAssistantPanel({
                     ? "Record a clip (up to 2 minutes); it is transcribed on the server"
                     : "Dictate with the browser's speech recognition; nothing leaves the device"
               }
-              className={`aur-btn aur-btn-ghost shrink-0 self-end text-[11px] disabled:opacity-40 ${
+              className={`aur-btn aur-btn-ghost shrink-0 self-end disabled:opacity-40 ${
                 dictation.status === "listening" || dictation.status === "recording" ? "border-rose-400/60 text-rose-300" : ""
               }`}
             >
@@ -1542,7 +1542,7 @@ export function AiAssistantPanel({
               type="button"
               onClick={() => void postNote()}
               disabled={chatPending || !chatInput.trim()}
-              className="aur-btn aur-btn-ghost shrink-0 self-end text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-ghost shrink-0 self-end disabled:opacity-60"
               title="Post this to the team on the section's thread without asking the AI (@ to mention someone)"
             >
               Note
@@ -1551,7 +1551,7 @@ export function AiAssistantPanel({
               type="button"
               onClick={sendChat}
               disabled={chatPending || !chatInput.trim()}
-              className="aur-btn aur-btn-primary shrink-0 self-end text-[11px] disabled:opacity-60"
+              className="aur-btn aur-btn-primary shrink-0 self-end disabled:opacity-60"
             >
               Send
             </button>

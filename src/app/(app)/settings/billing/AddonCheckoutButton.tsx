@@ -51,7 +51,7 @@ export function AddonCheckoutButton({ addonSlug, addonName, stackable }: { addon
           title="How many"
         />
       ) : null}
-      <button type="button" onClick={buy} disabled={pending} className="aur-btn aur-btn-primary text-[11px] disabled:opacity-50">
+      <button type="button" onClick={buy} disabled={pending} className="aur-btn aur-btn-primary disabled:opacity-50">
         {pending ? "Working…" : `Add ${addonName}`}
       </button>
       {error ? <span className="font-mono text-[10px] text-rose">{error}</span> : null}
