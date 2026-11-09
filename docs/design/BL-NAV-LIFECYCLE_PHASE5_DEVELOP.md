@@ -1,7 +1,6 @@
 # Phase 5 — Develop: design for review
 
-**Status:** for the owner's review. Nothing is built. The decisions in §4
-each carry a recommended answer; the delivery split in §3 follows them.
+**Status:** approved by the owner (2026-11-09, "all recommended") with every recommended answer in §4. Nothing is built yet; 5a follows, then 5b to 5d, one PR each. One open point: decision 2's search provider is not yet named (FORGE has none), and 5b waits on it.
 **Requirements:** FORGE II footnote 8, D-1 to D-8 in
 `docs/FORGE_II_REQUIREMENTS.md`. **Plan:** BL-NAV-LIFECYCLE phase 5.
 **Shape:** the same as `BL-NAV-LIFECYCLE_PHASE4_PLAN.md`.
@@ -145,3 +144,5 @@ reports the kept share through each review.
    multi-tenant line).
 7. **Order.** 5a, 5b, 5c, 5d as above (recommended: each is usable
    alone)? Or research (5b) last, because it needs the provider?
+
+**Decided 2026-11-09: all recommended** — one click from the plan (1); research cited by URL behind a per-tenant switch, provider still to be named by the owner (2); external reviewers wait for phase 8 (3); meeting link and `.ics` invite (4); ready for Pink advises and never blocks (5); learning per tenant only (6); order 5a, 5b, 5c, 5d (7). With decision 3 answered, 5c carries no guest page or token table.

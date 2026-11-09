@@ -3883,8 +3883,11 @@ Every requirement in the FORGE II document, with its status and phase:
    links for reviews.
    Design for review: `docs/design/BL-NAV-LIFECYCLE_PHASE5_DEVELOP.md`
    (5a Develop tab, Create a Draft, ready for Pink; 5b draft all sections
-   with research; 5c meetings and invited reviewers; 5d learning). Not
-   approved yet: seven owner decisions are open.
+   with research; 5c meetings and invited reviewers; 5d learning). Approved
+   by the owner 2026-11-09 with every recommended answer (one-click Create
+   a Draft from the plan; research cited by URL, search provider still to
+   be named; external reviewers wait for phase 8; meeting link + .ics;
+   ready for Pink advisory; learning per tenant only).
 6. **Deliver:** submit from the portal by email, sent from a platform
    address with a per-opportunity reply address; replies received in
    FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox
