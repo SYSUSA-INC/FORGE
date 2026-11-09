@@ -161,21 +161,21 @@ export default async function LossIntelligencePage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-[11px]">
+                <table className="aur-table">
                   <thead>
-                    <tr className="border-b border-layer/10 text-muted">
-                      <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Competitor</th>
-                      <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Faced</th>
-                      <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Lost to</th>
-                      <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Won against</th>
-                      <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Leading reason</th>
-                      <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Last loss</th>
+                    <tr>
+                      <th>Competitor</th>
+                      <th className="text-right">Faced</th>
+                      <th className="text-right">Lost to</th>
+                      <th className="text-right">Won against</th>
+                      <th>Leading reason</th>
+                      <th>Last loss</th>
                     </tr>
                   </thead>
                   <tbody>
                     {intel.competitors.slice(0, 25).map((c) => (
-                      <tr key={c.name} className="border-b border-layer/[0.04] text-text/90">
-                        <td className="px-2 py-1.5">
+                      <tr key={c.name}>
+                        <td>
                           {c.name}
                           {c.agencies.length ? (
                             <div className="font-mono text-[10px] text-muted">
@@ -183,15 +183,15 @@ export default async function LossIntelligencePage() {
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-2 py-1.5 text-right">{c.faced}</td>
-                        <td className={`px-2 py-1.5 text-right ${c.lostTo >= 2 ? "text-rose" : ""}`}>
+                        <td className="text-right font-mono text-[12px] tabular-nums">{c.faced}</td>
+                        <td className={`text-right font-mono text-[12px] tabular-nums ${c.lostTo >= 2 ? "text-rose" : ""}`}>
                           {c.lostTo}
                         </td>
-                        <td className="px-2 py-1.5 text-right text-emerald-300">{c.wonAgainst}</td>
-                        <td className="px-2 py-1.5 text-muted">
+                        <td className="text-right font-mono text-[12px] tabular-nums text-emerald-300">{c.wonAgainst}</td>
+                        <td className="text-muted">
                           {c.leadingReason ? reasonLabel(c.leadingReason) : "—"}
                         </td>
-                        <td className="px-2 py-1.5 text-muted">
+                        <td className="text-muted">
                           {c.lastLossAt ? c.lastLossAt.slice(0, 10) : "—"}
                         </td>
                       </tr>

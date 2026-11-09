@@ -18,7 +18,7 @@ function AnswerCell({ cell, closes, named }: { cell: OurCell | PartnerCell; clos
   const a = cell.answer;
   const label = a === "yes" ? "Yes" : a === "partial" ? `Partial ${cell.percent ?? 50}%` : a === "no" ? "No" : a === "na" ? "N/A" : "—";
   return (
-    <td className={`align-top px-3 py-2 ${closes ? "bg-cobalt/10" : ""}`}>
+    <td className={`align-top px-3 ${closes ? "bg-cobalt/10" : ""}`}>
       <div className={`font-mono text-[11px] uppercase tracking-label ${a ? TONE[a] : "text-muted"}`}>
         {label}
         {closes ? <span className="ml-1 text-cobalt">closes</span> : null}
@@ -65,13 +65,13 @@ export default async function ComparePartnersPage({ params }: { params: { id: st
               Your answer first, then each partner&apos;s. A gap is a question you answered No or Partial; a partner <span className="text-cobalt">closes</span> it when it covers more than you do (Yes, or a Partial with a higher share). Where you named a company yourself on a gap under Evaluate, the row says so, and that partner&apos;s cell is marked <span className="text-cobalt">named</span>. Each partner saw the questions only, never your answers.
             </p>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse font-body text-[13px]">
+              <table className="aur-table">
                 <thead>
-                  <tr className="border-b border-layer/10 text-left font-mono text-[10px] uppercase tracking-label text-muted">
-                    <th className="px-3 py-2">Question</th>
-                    <th className="px-3 py-2">Us</th>
+                  <tr>
+                    <th className="px-3">Question</th>
+                    <th className="px-3">Us</th>
                     {cmp.partners.map((p) => (
-                      <th key={p.id} className="px-3 py-2">
+                      <th key={p.id} className="px-3">
                         {p.name}
                         <span className="ml-1 normal-case tracking-normal text-subtle">
                           {p.answered}/{questions.length} · closes {p.closed} of {cmp.gaps}
@@ -83,8 +83,8 @@ export default async function ComparePartnersPage({ params }: { params: { id: st
                 </thead>
                 <tbody>
                   {cmp.rows.map((row) => (
-                    <tr key={row.question.id} className={`border-b border-layer/10 align-top ${row.gap ? "bg-layer/5" : ""}`}>
-                      <td className="px-3 py-2">
+                    <tr key={row.question.id} className={`align-top ${row.gap ? "bg-layer/5" : ""}`}>
+                      <td className="px-3">
                         <p className="text-text">{row.question.text}</p>
                         <p className="font-mono text-[10px] uppercase tracking-label text-muted">
                           {KIND_LABEL[row.question.kind]} · {row.question.area || "General"}

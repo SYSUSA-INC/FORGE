@@ -55,14 +55,14 @@ export function CoveragePanel({
   return (
     <Panel title="Section coverage" eyebrow={describeCoverage(coverage)} dense>
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse font-mono text-[11px]">
+        <table className="aur-table">
           <thead>
-            <tr className="border-b border-layer/10">
-              <th className="px-3 py-2 text-left font-normal uppercase tracking-label text-subtle">Section</th>
+            <tr>
+              <th className="px-3">Section</th>
               {reviewers.map((r) => (
-                <th key={r.userId} className="px-2 py-2 text-center font-normal text-muted" title={r.email}>
+                <th key={r.userId} className="px-2 text-center" title={r.email}>
                   <span className={r.userId === currentUserId ? "text-text" : ""}>{(r.name ?? r.email.split("@")[0]) || "?"}</span>
-                  {whole.has(r.userId) ? <div className="text-[10px] uppercase tracking-widest text-subtle">all</div> : null}
+                  {whole.has(r.userId) ? <div className="text-subtle">all</div> : null}
                 </th>
               ))}
             </tr>
@@ -71,15 +71,15 @@ export function CoveragePanel({
             {sections.map((s) => {
               const bare = uncovered.has(s.id);
               return (
-                <tr key={s.id} className={`border-b border-layer/5 ${bare ? "bg-amber-400/5" : ""}`}>
-                  <td className="px-3 py-1.5 text-text">
+                <tr key={s.id} className={bare ? "bg-amber-400/5" : undefined}>
+                  <td className="px-3 text-text">
                     §{s.ordering}. {s.title}
                     {bare ? <span className="ml-2 rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 text-[10px] uppercase tracking-widest text-amber-200">no reviewer</span> : null}
                   </td>
                   {reviewers.map((r) => {
                     const scoped = sectionAssignments.some((a) => a.userId === r.userId && a.sectionId === s.id);
                     return (
-                      <td key={r.userId} className="px-2 py-1.5 text-center">
+                      <td key={r.userId} className="px-2 text-center">
                         <input
                           type="checkbox"
                           className="accent-teal-400 disabled:opacity-50"

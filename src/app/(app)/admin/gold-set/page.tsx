@@ -57,33 +57,33 @@ export default async function GoldSetPage() {
           {docs.length === 0 ? (
             <p className="font-mono text-[11px] text-muted">No documents yet.</p>
           ) : (
-            <table className="w-full font-mono text-[11px]">
-              <thead className="text-[10px] uppercase tracking-label text-subtle">
+            <table className="aur-table">
+              <thead>
                 <tr>
-                  <th className="py-1 text-left">Document</th>
-                  <th className="py-1 text-left">Status</th>
-                  <th className="py-1 text-right">Text</th>
-                  <th className="py-1 text-right">Requirements</th>
-                  <th className="py-1 text-right">Limits</th>
-                  <th className="py-1 text-right">Factors</th>
-                  <th className="py-1 text-right">To review</th>
+                  <th>Document</th>
+                  <th>Status</th>
+                  <th className="text-right">Text</th>
+                  <th className="text-right">Requirements</th>
+                  <th className="text-right">Limits</th>
+                  <th className="text-right">Factors</th>
+                  <th className="text-right">To review</th>
                 </tr>
               </thead>
               <tbody>
                 {docs.map((d) => (
-                  <tr key={d.id} className="border-t border-layer/10">
-                    <td className="py-1.5">
+                  <tr key={d.id}>
+                    <td>
                       <Link href={`/admin/gold-set/${d.id}`} className="text-text underline-offset-2 hover:underline">
                         {d.title}
                       </Link>
                       <span className="text-muted">{d.solicitationNumber ? ` · ${d.solicitationNumber}` : ""}</span>
                     </td>
-                    <td className={`py-1.5 ${STATUS_TONE[d.status] ?? "text-muted"}`}>{d.status.replace("_", " ")}</td>
-                    <td className="py-1.5 text-right tabular-nums text-muted">{Math.round(d.chars / 1000)}k chars</td>
-                    <td className="py-1.5 text-right tabular-nums text-text">{d.progress.byKind.requirement.approved}</td>
-                    <td className="py-1.5 text-right tabular-nums text-text">{d.progress.byKind.page_limit.approved}</td>
-                    <td className="py-1.5 text-right tabular-nums text-text">{d.progress.byKind.eval_factor.approved}</td>
-                    <td className="py-1.5 text-right tabular-nums text-gold">{d.progress.proposed || ""}</td>
+                    <td className={STATUS_TONE[d.status] ?? "text-muted"}>{d.status.replace("_", " ")}</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums text-muted">{Math.round(d.chars / 1000)}k chars</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums text-text">{d.progress.byKind.requirement.approved}</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums text-text">{d.progress.byKind.page_limit.approved}</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums text-text">{d.progress.byKind.eval_factor.approved}</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums text-gold">{d.progress.proposed || ""}</td>
                   </tr>
                 ))}
               </tbody>

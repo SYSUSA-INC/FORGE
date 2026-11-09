@@ -1103,29 +1103,29 @@ function ComplianceHeatmap({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-layer/10 bg-layer/[0.02]">
-      <table className="w-full border-collapse text-[11px]">
+    <div className="overflow-x-auto">
+      <table className="aur-table">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-paper px-3 py-2 text-left font-mono text-[10px] uppercase tracking-label text-muted">
+            <th className="sticky left-0 z-10 min-w-[160px] max-w-[240px] bg-paper">
               Requirement
             </th>
             {cols.map((s) => (
               <th
                 key={s.id}
-                className="min-w-[80px] px-2 py-2 font-mono text-[10px] text-muted"
+                className="min-w-[80px] text-center"
                 title={s.title}
               >
-                <div className="max-w-[80px] truncate text-center uppercase tracking-wider">
+                <div className="max-w-[80px] truncate">
                   §{s.ordering}
                 </div>
-                <div className="max-w-[80px] truncate text-center text-[10px] text-subtle">
+                <div className="max-w-[80px] truncate normal-case tracking-normal text-subtle">
                   {s.title}
                 </div>
               </th>
             ))}
             {hasUnmapped ? (
-              <th className="min-w-[80px] px-2 py-2 font-mono text-[10px] uppercase tracking-wider text-subtle">
+              <th className="min-w-[80px] text-center text-subtle">
                 Unassigned
               </th>
             ) : null}
@@ -1133,8 +1133,8 @@ function ComplianceHeatmap({
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} className="border-t border-layer/[0.04] hover:bg-layer/[0.02]">
-              <td className="sticky left-0 z-10 bg-paper px-3 py-2 font-body text-[12px] text-text">
+            <tr key={item.id} className="hover:bg-layer/[0.02]">
+              <td className="sticky left-0 z-10 bg-paper text-text">
                 <div className="flex items-center gap-1.5">
                   {item.number ? (
                     <span className="shrink-0 font-mono text-[10px] text-muted">
@@ -1152,7 +1152,7 @@ function ComplianceHeatmap({
                   return (
                     <td
                       key={s.id}
-                      className="px-2 py-2 text-center"
+                      className="text-center"
                     >
                       <div className="mx-auto h-5 w-5 rounded bg-layer/[0.03]" />
                     </td>
@@ -1160,7 +1160,7 @@ function ComplianceHeatmap({
                 }
                 const color = statusColors[item.status];
                 return (
-                  <td key={s.id} className="px-2 py-2 text-center">
+                  <td key={s.id} className="text-center">
                     <div
                       className="mx-auto h-5 w-5 rounded"
                       style={{ backgroundColor: withAlpha(color, 0.8) }}
@@ -1170,7 +1170,7 @@ function ComplianceHeatmap({
                 );
               })}
               {hasUnmapped ? (
-                <td className="px-2 py-2 text-center">
+                <td className="text-center">
                   {!item.proposalSectionId ? (
                     <div
                       className="mx-auto h-5 w-5 rounded"

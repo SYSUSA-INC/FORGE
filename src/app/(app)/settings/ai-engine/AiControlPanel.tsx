@@ -285,17 +285,17 @@ function RoutingPanel(p: AiControlPanelProps) {
           gateway requests that class&apos;s model on the next call. A model pinned by a platform admin stays as it is.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full text-left font-mono text-[11px]">
+          <table className="aur-table">
             <thead>
-              <tr className="border-b border-layer/10 text-muted">
-                <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Feature</th>
-                <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Default</th>
-                <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Model requested</th>
-                <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Source</th>
-                <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Calls</th>
-                <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Tokens</th>
-                <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-widest">Errors</th>
-                <th className="px-2 py-1.5 font-semibold uppercase tracking-widest">Class</th>
+              <tr>
+                <th>Feature</th>
+                <th>Default</th>
+                <th>Model requested</th>
+                <th>Source</th>
+                <th className="text-right">Calls</th>
+                <th className="text-right">Tokens</th>
+                <th className="text-right">Errors</th>
+                <th>Class</th>
               </tr>
             </thead>
             <tbody>
@@ -304,22 +304,22 @@ function RoutingPanel(p: AiControlPanelProps) {
                 const pinned = r.override?.kind === "model";
                 const value = r.override?.kind === "class" ? r.override.cls : "default";
                 return (
-                  <tr key={r.feature} className="border-b border-layer/[0.04] text-text/90 hover:bg-layer/[0.03]">
-                    <td className="px-2 py-1.5">
+                  <tr key={r.feature} className="hover:bg-layer/[0.03]">
+                    <td>
                       {r.label}
                       <div className="font-mono text-[10px] text-muted">{r.feature}</div>
                     </td>
-                    <td className="px-2 py-1.5 text-muted">{r.defaultClass}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="text-muted">{r.defaultClass}</td>
+                    <td>
                       {p.routingOn ? r.effectiveModel ?? "provider default" : "provider default (routing off)"}
                     </td>
-                    <td className="px-2 py-1.5 text-muted">{SOURCE_LABEL[r.source]}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{u ? n(u.calls) : "—"}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{u ? n(u.tokens) : "—"}</td>
-                    <td className={`px-2 py-1.5 text-right tabular-nums ${u && u.errors + u.refused > 0 ? "text-rose-300" : "text-muted"}`}>
+                    <td className="text-muted">{SOURCE_LABEL[r.source]}</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums tabular-nums">{u ? n(u.calls) : "—"}</td>
+                    <td className="text-right font-mono text-[12px] tabular-nums tabular-nums">{u ? n(u.tokens) : "—"}</td>
+                    <td className={`text-right font-mono text-[12px] tabular-nums tabular-nums ${u && u.errors + u.refused > 0 ? "text-rose-300" : "text-muted"}`}>
                       {u ? n(u.errors + u.refused) : "—"}
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td>
                       <select
                         className="aur-input py-1 font-mono text-[11px]"
                         value={value}
