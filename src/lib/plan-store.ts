@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   memberships,
   notificationRules,
   opportunities,
+  opportunityMilestones,
   opportunityPlanRoles,
   opportunityPlans,
   solicitationAssignments,
@@ -32,8 +33,9 @@ import {
 /**
  * BL-NAV-LIFECYCLE 4a — the Plan's store: one plan per opportunity, its
  * team (seeded from the solicitation's assignments and kept in step with
- * them), the RACI letters and the colour teams. Callers own the auth
- * gate; every function scopes by organizationId.
+ * them), the RACI letters and the colour teams; the milestones (4b-1)
+ * live in milestone-store.ts and are counted here for the plan's state.
+ * Callers own the auth gate; every function scopes by organizationId.
  */
 
 type Actor = { userId: string; email?: string | null; name?: string | null };
@@ -168,7 +170,21 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
       rows = await planRows(organizationId, plan.id);
     }
   }
-  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows) };
+  const milestones = await milestoneCounts(organizationId, [opportunityId]);
+  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0) };
+}
+
+/** Milestones per opportunity (BL-NAV-LIFECYCLE 4b-1), for the plan's state. */
+async function milestoneCounts(organizationId: string, opportunityIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (opportunityIds.length === 0) return out;
+  const rows = await db
+    .select({ opportunityId: opportunityMilestones.opportunityId, n: count() })
+    .from(opportunityMilestones)
+    .where(and(eq(opportunityMilestones.organizationId, organizationId), inArray(opportunityMilestones.opportunityId, opportunityIds)))
+    .groupBy(opportunityMilestones.opportunityId);
+  for (const r of rows) out.set(r.opportunityId, Number(r.n));
+  return out;
 }
 
 /** Active members of the organization, for the person picker. */
@@ -327,6 +343,7 @@ export async function planSummaries(organizationId: string, opportunityIds: stri
     .select({ id: opportunityPlanRoles.id, opportunityId: opportunityPlanRoles.opportunityId, userId: opportunityPlanRoles.userId, role: opportunityPlanRoles.role, colorTeam: opportunityPlanRoles.colorTeam, raci: opportunityPlanRoles.raci })
     .from(opportunityPlanRoles)
     .where(and(eq(opportunityPlanRoles.organizationId, organizationId), inArray(opportunityPlanRoles.opportunityId, opportunityIds)));
-  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id)));
+  const milestones = await milestoneCounts(organizationId, opportunityIds);
+  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0));
   return out;
 }

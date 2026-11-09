@@ -16,8 +16,10 @@ import {
   planNextStep,
   type PlanColorTeam,
 } from "@/lib/plan-logic";
+import type { ScheduleView } from "@/lib/milestone-store";
 import type { PlanMember, PlanView } from "@/lib/plan-store";
 import { addPlanRoleAction, removePlanRoleAction, setPlanRaciAction } from "./actions";
+import { SchedulePanel } from "./SchedulePanel";
 
 /** Status means the same thing everywhere: plum is the pink team; red, brass and muted follow the review colours. */
 const COLOR_TONE: Record<PlanColorTeam, string> = {
@@ -29,7 +31,7 @@ const COLOR_TONE: Record<PlanColorTeam, string> = {
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-export function PlanClient({ opportunityId, plan, members }: { opportunityId: string; plan: PlanView; members: PlanMember[] }) {
+export function PlanClient({ opportunityId, plan, members, schedule }: { opportunityId: string; plan: PlanView; members: PlanMember[]; schedule: ScheduleView }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export function PlanClient({ opportunityId, plan, members }: { opportunityId: st
       >
         {error ? <p className="mb-2 font-body text-[12px] text-red">{error}</p> : null}
         <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
-          One list with the solicitation&apos;s team: a role named here appears there, and the other way round. Each area needs one <strong className="text-text">A</strong>; whoever is R or A for an area gets its milestones and parts.
+          One list with the solicitation&apos;s team: a role named here appears there, and the other way round. Each area needs one <strong className="text-text">A</strong>; whoever is R or A for an area owns its milestones and parts.
           {plan.solicitationId ? "" : " This opportunity has no solicitation yet, so the team lives on the plan alone."}
         </p>
         {teamRows.length === 0 ? (
@@ -156,7 +158,7 @@ export function PlanClient({ opportunityId, plan, members }: { opportunityId: st
 
       <Panel title="The colour teams" eyebrow={`${plan.state.colorTeamsNamed} of ${PLAN_COLOR_TEAMS.length} named`}>
         <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
-          Name the reviewers ahead of their round. Each person named is told now; when the proposal reaches their colour, the round starts with them on it (4c), and the schedule gives each round its date (4b).
+          Name the reviewers ahead of their round. Each person named is told now; the schedule below gives each round its date, and when the proposal reaches their colour, the round starts with them on it (4c).
         </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {PLAN_COLOR_TEAMS.map((c) => {
@@ -198,6 +200,8 @@ export function PlanClient({ opportunityId, plan, members }: { opportunityId: st
           })}
         </div>
       </Panel>
+
+      <SchedulePanel opportunityId={opportunityId} schedule={schedule} members={members} />
     </div>
   );
 }

@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { isPlanColorTeam, isPlanRole, isRaciArea, isRaciLetter } from "@/lib/plan-logic";
+import { isIsoDay, isMilestoneKind, isMilestoneStatus } from "@/lib/milestone-logic";
+import { addMilestone, buildSchedule, removeMilestone, updateMilestone, type MilestonePatch } from "@/lib/milestone-store";
 import { addPlanRole, removePlanRole, setPlanRaci } from "@/lib/plan-store";
 
-type Result = { ok: true; id?: string } | { ok: false; error: string };
+type Result = { ok: true; id?: string; added?: number } | { ok: false; error: string };
 
 function refresh(opportunityId: string) {
   revalidatePath(`/opportunities/${opportunityId}`);
@@ -53,6 +55,76 @@ export async function setPlanRaciAction(input: { opportunityId: string; roleId: 
   const letter = input?.letter ? String(input.letter) : "";
   if (letter && !isRaciLetter(letter)) return { ok: false, error: "Choose R, A, C or I." };
   const res = await setPlanRaci({ organizationId, opportunityId: String(input?.opportunityId ?? ""), roleId: String(input?.roleId ?? ""), area, letter: isRaciLetter(letter) ? letter : null, actor });
+  if (res.ok) refresh(input.opportunityId);
+  return res;
+}
+
+// ---------------------------------------------------------------------------
+// BL-NAV-LIFECYCLE 4b-1 — the schedule: Build the schedule, add, move / mark, remove.
+// ---------------------------------------------------------------------------
+
+function cleanPatch(input: { title?: string; date?: string; ownerUserId?: string | null; status?: string; notes?: string }): { patch: MilestonePatch } | { error: string } {
+  const patch: MilestonePatch = {};
+  if (input.title !== undefined) {
+    const title = String(input.title).trim().slice(0, 200);
+    if (!title) return { error: "Give the milestone a title." };
+    patch.title = title;
+  }
+  if (input.date !== undefined) {
+    const date = String(input.date);
+    if (!isIsoDay(date)) return { error: "Choose a day." };
+    patch.date = date;
+  }
+  if (input.ownerUserId !== undefined) patch.ownerUserId = input.ownerUserId ? String(input.ownerUserId) : null;
+  if (input.status !== undefined) {
+    const status = String(input.status);
+    if (!isMilestoneStatus(status)) return { error: "Choose planned, done or missed." };
+    patch.status = status;
+  }
+  if (input.notes !== undefined) patch.notes = String(input.notes).trim().slice(0, 500);
+  return { patch };
+}
+
+/** Proposes the count-back schedule from the due date and writes the milestones the plan lacks. */
+export async function buildScheduleAction(input: { opportunityId: string }): Promise<Result> {
+  const { organizationId, actor } = await who();
+  const res = await buildSchedule({ organizationId, opportunityId: String(input?.opportunityId ?? ""), actor });
+  if (res.ok) refresh(input.opportunityId);
+  return res;
+}
+
+export async function addMilestoneAction(input: { opportunityId: string; title: string; kind: string; date: string; ownerUserId?: string | null; notes?: string }): Promise<Result> {
+  const { organizationId, actor } = await who();
+  const kind = String(input?.kind ?? "");
+  if (!isMilestoneKind(kind)) return { ok: false, error: "Choose what the milestone marks." };
+  const cleaned = cleanPatch({ title: input?.title ?? "", date: input?.date ?? "", ownerUserId: input?.ownerUserId ?? null, notes: input?.notes ?? "" });
+  if ("error" in cleaned) return { ok: false, error: cleaned.error };
+  const res = await addMilestone({
+    organizationId,
+    opportunityId: String(input?.opportunityId ?? ""),
+    title: cleaned.patch.title!,
+    kind,
+    date: cleaned.patch.date!,
+    ownerUserId: cleaned.patch.ownerUserId ?? null,
+    notes: cleaned.patch.notes ?? "",
+    actor,
+  });
+  if (res.ok) refresh(input.opportunityId);
+  return res;
+}
+
+export async function updateMilestoneAction(input: { opportunityId: string; milestoneId: string; title?: string; date?: string; ownerUserId?: string | null; status?: string; notes?: string }): Promise<Result> {
+  const { organizationId, actor } = await who();
+  const cleaned = cleanPatch(input ?? {});
+  if ("error" in cleaned) return { ok: false, error: cleaned.error };
+  const res = await updateMilestone({ organizationId, opportunityId: String(input?.opportunityId ?? ""), milestoneId: String(input?.milestoneId ?? ""), patch: cleaned.patch, actor });
+  if (res.ok) refresh(input.opportunityId);
+  return res;
+}
+
+export async function removeMilestoneAction(input: { opportunityId: string; milestoneId: string }): Promise<Result> {
+  const { organizationId, actor } = await who();
+  const res = await removeMilestone({ organizationId, opportunityId: String(input?.opportunityId ?? ""), milestoneId: String(input?.milestoneId ?? ""), actor });
   if (res.ok) refresh(input.opportunityId);
   return res;
 }

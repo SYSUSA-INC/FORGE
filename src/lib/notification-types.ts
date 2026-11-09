@@ -11,6 +11,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   solicitation_amended: "Solicitation amended",
   partner_answered: "Partner answered",
   plan_role_assigned: "Named on a plan",
+  milestone_due_soon: "Milestone due soon",
 };
 
 export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
@@ -23,6 +24,7 @@ export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
   solicitation_amended: "±",
   partner_answered: "✓",
   plan_role_assigned: "👥",
+  milestone_due_soon: "◷",
 };
 
 export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
@@ -38,4 +40,6 @@ export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
   partner_answered: THEME.green,
   // In progress: a duty on the plan.
   plan_role_assigned: THEME.cobalt,
+  // Attention: a milestone you own is close.
+  milestone_due_soon: THEME.brass,
 };

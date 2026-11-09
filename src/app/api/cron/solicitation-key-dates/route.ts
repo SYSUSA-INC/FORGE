@@ -3,6 +3,7 @@ import { dispatchKeyDateReminders } from "@/lib/solicitation-key-date-cron";
 import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
 import { dispatchReviewDueReminders } from "@/lib/review-reminders";
 import { dispatchContactTouchReminders } from "@/lib/crm-reminders";
+import { dispatchMilestoneDueSoon } from "@/lib/milestone-due-soon-cron";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -24,6 +25,10 @@ export const maxDuration = 60;
  * is due in 1, 3 or 7 days (see `dispatchOpportunityDueSoon`). The two
  * scans are independent; a failure in one is reported in the response
  * without blocking the other.
+ *
+ * BL-NAV-LIFECYCLE 4b-1 — the same tick fires `milestone_due_soon` to
+ * the owner of a planned milestone 7, 3 or 1 days away
+ * (`dispatchMilestoneDueSoon`).
  *
  * BL-STAB-7d — the Q&A check (BL-FB-SOL-QA) moved to its own route,
  * /api/cron/solicitation-qa, which has the time SAM.gov calls need.
@@ -54,16 +59,23 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon, reviewReminders, contactReminders] = await Promise.allSettled([
+  const [keyDates, dueSoon, reviewReminders, contactReminders, milestones] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
     // BL-FB-X-COLOR-TEAM Slice 2 — day-before nudge to unsubmitted reviewers.
     dispatchReviewDueReminders(),
     // BL-FB-X-CRM Slice 2 — follow-up owed to a customer contact's owner.
     dispatchContactTouchReminders(),
+    // BL-NAV-LIFECYCLE 4b-1 — a planned milestone's owner, at T-7 / T-3 / T-1.
+    dispatchMilestoneDueSoon(),
   ]);
 
   const failures: string[] = [];
+  if (milestones.status === "rejected") {
+    const message = milestones.reason instanceof Error ? milestones.reason.message : String(milestones.reason);
+    log.error("[solicitation-key-date-cron]", "milestone reminders failed", { error: message });
+    failures.push(`milestoneDueSoon: ${message}`);
+  }
   if (contactReminders.status === "rejected") {
     const message = contactReminders.reason instanceof Error ? contactReminders.reason.message : String(contactReminders.reason);
     log.error("[solicitation-key-date-cron]", "contact reminders failed", { error: message });
@@ -101,6 +113,7 @@ export async function GET(req: NextRequest) {
       dueSoon.status === "fulfilled" ? dueSoon.value : null,
     reviewReminders: reviewReminders.status === "fulfilled" ? reviewReminders.value : null,
     contactReminders: contactReminders.status === "fulfilled" ? contactReminders.value : null,
+    milestoneDueSoon: milestones.status === "fulfilled" ? milestones.value : null,
   };
 
   if (failures.length > 0) {

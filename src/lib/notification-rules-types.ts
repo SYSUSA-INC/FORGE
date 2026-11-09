@@ -43,6 +43,7 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   solicitation_role_assigned: "Solicitation role assigned",
   solicitation_amended: "Solicitation amended on SAM.gov",
   plan_role_assigned: "Plan role assigned",
+  milestone_due_soon: "Milestone due soon",
 };
 
 export const RECIPIENT_STRATEGY_LABELS: Record<

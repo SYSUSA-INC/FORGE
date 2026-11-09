@@ -427,6 +427,9 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
     case "plan_role_assigned":
       // BL-NAV-LIFECYCLE 4a — its own inbox kind (drizzle/0159).
       return "plan_role_assigned" as const;
+    case "milestone_due_soon":
+      // BL-NAV-LIFECYCLE 4b-1 — its own inbox kind (drizzle/0161).
+      return "milestone_due_soon" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;

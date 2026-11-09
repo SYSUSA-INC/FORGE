@@ -67,11 +67,16 @@ describe("BL-NAV-LIFECYCLE 4a — plan logic", () => {
     const covered = [row({ id: "1", userId: "u1", role: "proposal_manager", raci: allA })];
     expect(planNextStep(planState(covered))).toBe("name_color_teams");
     const named = [...covered, ...PLAN_COLOR_TEAMS.map((c, i) => row({ id: `c${i}`, userId: `r${i}`, role: "color_team_reviewer", colorTeam: c }))];
-    const state = planState(named);
-    expect(state.colorTeamsNamed).toBe(4);
-    expect(state.people).toBe(5);
+    const noSchedule = planState(named);
+    expect(noSchedule.colorTeamsNamed).toBe(4);
+    expect(noSchedule.people).toBe(5);
+    // 4b-1: the schedule comes after the colour teams.
+    expect(planNextStep(noSchedule)).toBe("build_schedule");
+    expect(planStateLine(noSchedule)).toBe("5 people · A for 6 of 6 areas · 4 of 4 colour teams · no schedule");
+    const state = planState(named, 6);
     expect(planNextStep(state)).toBe("plan_ready");
-    expect(planStateLine(state)).toBe("5 people · A for 6 of 6 areas · 4 of 4 colour teams");
+    expect(planStateLine(state)).toBe("5 people · A for 6 of 6 areas · 4 of 4 colour teams · 6 milestones");
+    expect(planStateLine(planState([], 1))).toContain("· 1 milestone");
   });
 
   it("does not count a colour-less reviewer, or green, as a named colour team", () => {

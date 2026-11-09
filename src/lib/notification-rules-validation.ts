@@ -54,6 +54,7 @@ const TRIGGER_EVENT_KIND_VALUES: [
   "proposal_section_assigned",
   "solicitation_amended",
   "plan_role_assigned",
+  "milestone_due_soon",
 ];
 
 const RECIPIENT_STRATEGY_VALUES: [
