@@ -178,3 +178,80 @@ export function milestoneDueSoonMessage(input: { horizon: MilestoneHorizon; titl
     body: `The ${input.title} milestone on the plan for ${opp} is ${when} (${input.dateIso}).`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// BL-NAV-LIFECYCLE 4b-2 — the schedule drawn as a timeline (design §2.6).
+// ---------------------------------------------------------------------------
+
+export type TimelineBar = {
+  id: string;
+  label: string;
+  kind: MilestoneKind;
+  status: MilestoneStatus;
+  date: string;
+  /** The stretch of work that ends at this milestone: from the one before it (or the start) to its day. */
+  startPct: number;
+  endPct: number;
+  /** Planned and past its day. */
+  overdue: boolean;
+};
+
+export type TimelineMark = { label: string; iso: string; pct: number; kind: "due" | "key_date" | "parts" };
+
+export type TimelineLayout = {
+  /** The earliest day drawn: today, or the earliest milestone or part if earlier. */
+  startIso: string;
+  /** The last day drawn: the due date the schedule hangs on, else the latest milestone or part. */
+  endIso: string;
+  days: number;
+  /** Where today falls, or null when today is outside the span. */
+  todayPct: number | null;
+  bars: TimelineBar[];
+  marks: TimelineMark[];
+};
+
+export type TimelineMilestone = MilestoneLike & { id: string; title: string };
+
+const MIN_BAR_PCT = 1.5;
+
+/**
+ * Positions for the timeline, as percentages of the span from the
+ * earliest date to the due date. Milestones become bars, each running
+ * from the milestone before it to its own day, so the rounds read as the
+ * stretches of work they close; the key dates and the parts' due dates
+ * are marks on the axis; today is the marker. Null when there is nothing
+ * to draw.
+ */
+export function timelineLayout(input: { todayIso: string; anchor: { iso: string; key: string } | null; keyDates: KeyDateLike[]; milestones: TimelineMilestone[]; partDueDates?: string[] }): TimelineLayout | null {
+  const parts = (input.partDueDates ?? []).filter(isIsoDay);
+  if (input.milestones.length === 0 && !input.anchor && parts.length === 0) return null;
+  const dated = [...input.milestones.map((m) => m.date), ...parts];
+  const startIso = [input.todayIso, ...dated].sort()[0];
+  const endCandidate = input.anchor?.iso ?? [...dated].sort().slice(-1)[0] ?? input.todayIso;
+  const endIso = endCandidate < startIso ? startIso : endCandidate;
+  const days = Math.max(1, daysBetween(startIso, endIso));
+  const pct = (iso: string) => Math.min(100, Math.max(0, (daysBetween(startIso, iso) / days) * 100));
+  const inSpan = (iso: string) => iso >= startIso && iso <= endIso;
+
+  const sorted = [...input.milestones].sort((a, b) => (a.date === b.date ? PROPOSED_KINDS.indexOf(a.kind) - PROPOSED_KINDS.indexOf(b.kind) : a.date.localeCompare(b.date)));
+  let cursor = 0;
+  const bars: TimelineBar[] = sorted.map((m) => {
+    const startPct = cursor;
+    const endPct = Math.min(100, Math.max(pct(m.date), startPct + MIN_BAR_PCT));
+    cursor = Math.min(pct(m.date), 100 - MIN_BAR_PCT);
+    return { id: m.id, label: m.title, kind: m.kind, status: m.status, date: m.date, startPct, endPct, overdue: m.status === "planned" && daysBetween(input.todayIso, m.date) < 0 };
+  });
+
+  const marks: TimelineMark[] = [];
+  if (input.anchor) marks.push({ label: input.anchor.key === RESPONSE_DUE_ANCHOR ? "Response due" : "Proposal due", iso: input.anchor.iso, pct: pct(input.anchor.iso), kind: "due" });
+  for (const k of input.keyDates) {
+    if (!isIsoDay(k.isoDate) || !inSpan(k.isoDate) || k.isoDate === input.anchor?.iso) continue;
+    marks.push({ label: k.label, iso: k.isoDate, pct: pct(k.isoDate), kind: "key_date" });
+  }
+  const byDay = new Map<string, number>();
+  for (const p of parts) if (inSpan(p)) byDay.set(p, (byDay.get(p) ?? 0) + 1);
+  for (const [iso, n] of byDay) marks.push({ label: `${n} ${n === 1 ? "part" : "parts"} due`, iso, pct: pct(iso), kind: "parts" });
+  marks.sort((a, b) => a.iso.localeCompare(b.iso));
+
+  return { startIso, endIso, days, todayPct: inSpan(input.todayIso) ? pct(input.todayIso) : null, bars, marks };
+}

@@ -3750,8 +3750,8 @@ Every requirement in the FORGE II document, with its status and phase:
      Open the plan). Not in 4a: the round's planned date (4b, the
      milestones), the round created from the named team (4c). Tested in
      `tests/ai/plan-logic.test.ts` and `tests/isolation/plan.test.ts`.
-   - **4b-1 — milestones, Build the schedule, `milestone_due_soon` (this
-     PR).** Migrations 0161 and 0162: `opportunity_milestone` (one row per
+   - **4b-1 — milestones, Build the schedule, `milestone_due_soon` (✅
+     shipped, PR #484).** Migrations 0161 and 0162: `opportunity_milestone` (one row per
      milestone on the plan: title, kind — kick-off, outline frozen, Pink,
      Red, Gold, White Gloves, pricing complete, final production, submit,
      other — the day, the owner, status planned / done / missed, the key
@@ -3784,12 +3784,51 @@ Every requirement in the FORGE II document, with its status and phase:
      "· 6 milestones" or "· no schedule". Tested in
      `tests/ai/milestone-logic.test.ts` and
      `tests/isolation/milestones.test.ts`.
-   - **4b-2 — section due dates and the timeline:** `proposal_section.dueDate`
-     set in Plan per section with its owner (`proposal_section_assigned`
-     carries the date), the daily cron firing the defined-but-never-fired
-     `proposal_section_overdue` for a section past its date with no draft,
-     and the schedule drawn as a timeline with the key dates on it
-     (`GanttRow`).
+   - **4b-2 — section due dates, `proposal_section_overdue`, the timeline
+     (this PR).** Migrations 0163 and 0164: `proposal_section.due_date`
+     (a day, no hours, indexed for the cron) and the `proposal_section_overdue`
+     inbox kind; a default rule per tenant for `proposal_section_overdue`
+     (in-app + email to the section's owner; a tenant created later gets
+     it the first time a part of its falls overdue — decision 6 named
+     only `plan_role_assigned` and `milestone_due_soon`, this one follows
+     `proposal_section_assigned`'s own default from 0080, and the PR says
+     so). `src/lib/section-plan-logic.ts` (pure, tested) says when a
+     section has a draft (left not_started with words written), when it
+     is overdue (past its date with no draft), counts the parts for the
+     plan's state, and words `proposal_section_assigned` (now with the
+     date) and `proposal_section_overdue`. `src/lib/section-plan-store.ts`
+     lists the opportunity's proposals' sections as parts (scoped through
+     `proposal.organizationId`: `proposal_section` carries no tenant
+     column), sets the owner — the section author, as Develop sees it —
+     (audited `proposal.section.owner.set`; the owner is told through
+     `proposal_section_assigned`, with the date, only when the author
+     changed to someone else, as the section editor does, whose emitter
+     also carries the date now) and the due date (audited
+     `proposal.section.due_date.set`). `src/lib/section-overdue-cron.ts`
+     runs on the daily 08:00 UTC tick and fires `proposal_section_overdue`
+     to the owner of a section past its date with no draft, once per
+     section per due date (deduplicated against the delivery ledger by
+     `sectionId` and `dueDate`, so a moved date that passes again fires
+     again and a retry does not); the label lost its "(not yet active)"
+     suffix (`compliance_overdue` and `audit_anomaly` keep theirs). The
+     Plan tab gains **The parts and their owners** below the schedule:
+     one `.aur-table` row per section (the proposal named when there are
+     several) with an owner select, a date input (*in 5 days*, or
+     *overdue* in red) and the status (red *Overdue, no draft*), and
+     **Open the sections**. **The schedule** is drawn as a timeline above
+     its table (`timelineLayout` in `src/lib/milestone-logic.ts`, pure,
+     tested): one `GanttRow` per milestone running from the one before it
+     to its own day (green done, red missed or overdue, plum Pink, red
+     Red, brass Gold, muted White Gloves, cobalt the rest — Tailwind
+     tokens, both themes), the due date, the key dates inside the span
+     and the parts' due dates as marks on the axis, today as the marker.
+     The plan's state gains the parts count (`parts owned 2 of 3` on the
+     Pipeline → Plan line when the outline exists), and the next step
+     order is team → RACI → colour teams → Build the schedule → **Own the
+     parts** → Open the plan. Tested in
+     `tests/ai/section-plan-logic.test.ts`, the timeline cases in
+     `tests/ai/milestone-logic.test.ts`, and
+     `tests/isolation/section-plan.test.ts`.
    - **4c — the charter** with the AI draft, the agreement record, the
      budget and risk list, the freeze, Move to Develop, the review round
      created from the named team.

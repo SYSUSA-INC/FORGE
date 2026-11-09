@@ -10,6 +10,7 @@ import {
   proposeSchedule,
   scheduleAnchor,
   scheduleState,
+  timelineLayout,
 } from "@/lib/milestone-logic";
 
 describe("BL-NAV-LIFECYCLE 4b-1 — milestone logic", () => {
@@ -94,5 +95,61 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestone logic", () => {
       body: "The Red team milestone on the plan for Zero Trust is tomorrow (2026-11-10).",
     });
     expect(milestoneDueSoonMessage({ horizon: 7, title: "Submit", dateIso: "2026-11-16", opportunityTitle: "" }).body).toBe("The Submit milestone on the plan for an opportunity is in 7 days (2026-11-16).");
+  });
+
+  describe("the timeline (4b-2)", () => {
+    const today = "2026-11-09";
+    const anchor = { iso: "2026-12-19", key: "response_due" };
+    const ms = (id: string, kind: Parameters<typeof timelineLayout>[0]["milestones"][number]["kind"], date: string, status: "planned" | "done" | "missed" = "planned") => ({ id, title: id, kind, date, status });
+
+    it("draws nothing when there is nothing to draw", () => {
+      expect(timelineLayout({ todayIso: today, anchor: null, keyDates: [], milestones: [] })).toBeNull();
+    });
+
+    it("spans from the earliest day to the due date, with today as the marker and the key dates as marks", () => {
+      const layout = timelineLayout({
+        todayIso: today,
+        anchor,
+        keyDates: [
+          { label: "Q&A cut-off", isoDate: "2026-11-19", type: "qa_cutoff" },
+          { label: "Award", isoDate: "2027-02-01", type: "award" },
+          { label: "Due", isoDate: "2026-12-19", type: "proposal_due" },
+        ],
+        milestones: [ms("submit", "submit", "2026-12-17"), ms("kick", "kick_off", today), ms("pink", "pink_team", "2026-11-19"), ms("red", "red_team", "2026-11-29", "done")],
+        partDueDates: ["2026-11-25", "2026-11-25", "2027-01-01"],
+      })!;
+      expect(layout.startIso).toBe(today);
+      expect(layout.endIso).toBe("2026-12-19");
+      expect(layout.days).toBe(40);
+      expect(layout.todayPct).toBe(0);
+      // Bars in date order, each from the one before it to its own day; the first gets the minimum width.
+      expect(layout.bars.map((b) => [b.id, b.startPct, Math.round(b.endPct * 10) / 10, b.overdue])).toEqual([
+        ["kick", 0, 1.5, false],
+        ["pink", 0, 25, false],
+        ["red", 25, 50, false],
+        ["submit", 50, 95, false],
+      ]);
+      // The due date once (not again as the proposal_due key date), the key dates inside the span, the parts folded per day; the award and the January part fall outside.
+      expect(layout.marks.map((m) => [m.kind, m.label, m.iso, m.pct])).toEqual([
+        ["key_date", "Q&A cut-off", "2026-11-19", 25],
+        ["parts", "2 parts due", "2026-11-25", 40],
+        ["due", "Response due", "2026-12-19", 100],
+      ]);
+    });
+
+    it("starts before today when a milestone is in the past, marks it overdue, and ends at the latest date without a due date", () => {
+      const layout = timelineLayout({ todayIso: today, anchor: null, keyDates: [], milestones: [ms("late", "other", "2026-11-05"), ms("next", "other", "2026-11-15")] })!;
+      expect([layout.startIso, layout.endIso, layout.days]).toEqual(["2026-11-05", "2026-11-15", 10]);
+      expect(layout.todayPct).toBe(40);
+      expect(layout.bars[0].overdue).toBe(true);
+      expect(layout.bars[1].endPct).toBe(100);
+      expect(layout.marks).toEqual([]);
+    });
+
+    it("never divides by zero when everything falls on one day", () => {
+      const layout = timelineLayout({ todayIso: today, anchor: { iso: today, key: "response_due" }, keyDates: [], milestones: [ms("a", "kick_off", today), ms("b", "submit", today)] })!;
+      expect(layout.days).toBe(1);
+      expect(layout.bars.every((b) => b.endPct >= b.startPct && b.endPct <= 100)).toBe(true);
+    });
   });
 });

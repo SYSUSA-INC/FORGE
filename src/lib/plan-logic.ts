@@ -7,6 +7,7 @@
 import type { OpportunityStage, PlanRaci, PlanRole } from "@/db/schema";
 import type { SolicitationRole } from "@/db/schema";
 import { SOLICITATION_ROLE_LABELS, SOLICITATION_ROLES } from "@/lib/solicitation-roles";
+import { NO_PARTS, type PartsCount } from "@/lib/section-plan-logic";
 
 /** Plan lists stage Captured; Move to Develop (4c) moves it on. */
 export const PLAN_LISTS_STAGE: OpportunityStage = "capture";
@@ -126,9 +127,11 @@ export type PlanState = {
   colorTeamsNamed: number;
   /** Milestones on the schedule (4b-1); zero until Build the schedule or a milestone added by hand. */
   milestones: number;
+  /** The proposals' sections and how many have an owner and a date (4b-2); all zero until the outline exists. */
+  parts: PartsCount;
 };
 
-export function planState(rows: PlanRoleLike[], milestones = 0): PlanState {
+export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCount = NO_PARTS): PlanState {
   const people = new Set(rows.map((r) => r.userId)).size;
   const accountable = RACI_AREAS.filter((area) => rows.some((r) => normalizeRaci(r.raci)[area] === "A"));
   const colorTeams = { pink: 0, red: 0, gold: 0, white_gloves: 0 } as Record<PlanColorTeam, number>;
@@ -142,16 +145,18 @@ export function planState(rows: PlanRoleLike[], milestones = 0): PlanState {
     colorTeams,
     colorTeamsNamed: PLAN_COLOR_TEAMS.filter((c) => colorTeams[c] > 0).length,
     milestones,
+    parts,
   };
 }
 
-export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "plan_ready";
+export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "own_parts" | "plan_ready";
 
 export const PLAN_NEXT_STEP_LABELS: Record<PlanNextStep, string> = {
   name_team: "Name the team",
   assign_raci: "Assign the RACI",
   name_color_teams: "Name the colour teams",
   build_schedule: "Build the schedule",
+  own_parts: "Own the parts",
   plan_ready: "Open the plan",
 };
 
@@ -161,6 +166,7 @@ export function planNextStep(state: PlanState): PlanNextStep {
   if (state.missingAccountable.length > 0) return "assign_raci";
   if (state.colorTeamsNamed < PLAN_COLOR_TEAMS.length) return "name_color_teams";
   if (state.milestones === 0) return "build_schedule";
+  if (state.parts.total > 0 && state.parts.owned < state.parts.total) return "own_parts";
   return "plan_ready";
 }
 
@@ -171,7 +177,10 @@ export function planStateLine(state: PlanState): string {
     `A for ${state.accountable.length} of ${RACI_AREAS.length} areas`,
     `${state.colorTeamsNamed} of ${PLAN_COLOR_TEAMS.length} colour teams`,
     state.milestones === 0 ? "no schedule" : `${state.milestones} ${state.milestones === 1 ? "milestone" : "milestones"}`,
-  ].join(" · ");
+    state.parts.total > 0 ? `parts owned ${state.parts.owned} of ${state.parts.total}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Subject and body of the plan_role_assigned notification. */

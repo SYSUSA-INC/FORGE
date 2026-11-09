@@ -9,6 +9,8 @@ import {
   opportunityMilestones,
   opportunityPlanRoles,
   opportunityPlans,
+  proposalSections,
+  proposals,
   solicitationAssignments,
   solicitations,
   users,
@@ -29,6 +31,7 @@ import {
   type RaciArea,
   type RaciLetter,
 } from "@/lib/plan-logic";
+import { partsCount, type PartsCount } from "@/lib/section-plan-logic";
 
 /**
  * BL-NAV-LIFECYCLE 4a — the Plan's store: one plan per opportunity, its
@@ -170,8 +173,21 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
       rows = await planRows(organizationId, plan.id);
     }
   }
-  const milestones = await milestoneCounts(organizationId, [opportunityId]);
-  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0) };
+  const [milestones, parts] = await Promise.all([milestoneCounts(organizationId, [opportunityId]), partsCounts(organizationId, [opportunityId])]);
+  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0, parts.get(opportunityId)) };
+}
+
+/** The proposals' sections per opportunity (BL-NAV-LIFECYCLE 4b-2), for the plan's state; scoped through the proposal, which carries the organization. */
+async function partsCounts(organizationId: string, opportunityIds: string[]): Promise<Map<string, PartsCount>> {
+  const out = new Map<string, PartsCount>();
+  if (opportunityIds.length === 0) return out;
+  const rows = await db
+    .select({ opportunityId: proposals.opportunityId, authorUserId: proposalSections.authorUserId, dueDate: proposalSections.dueDate })
+    .from(proposalSections)
+    .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+    .where(and(eq(proposals.organizationId, organizationId), inArray(proposals.opportunityId, opportunityIds)));
+  for (const id of opportunityIds) out.set(id, partsCount(rows.filter((r) => r.opportunityId === id)));
+  return out;
 }
 
 /** Milestones per opportunity (BL-NAV-LIFECYCLE 4b-1), for the plan's state. */
@@ -343,7 +359,7 @@ export async function planSummaries(organizationId: string, opportunityIds: stri
     .select({ id: opportunityPlanRoles.id, opportunityId: opportunityPlanRoles.opportunityId, userId: opportunityPlanRoles.userId, role: opportunityPlanRoles.role, colorTeam: opportunityPlanRoles.colorTeam, raci: opportunityPlanRoles.raci })
     .from(opportunityPlanRoles)
     .where(and(eq(opportunityPlanRoles.organizationId, organizationId), inArray(opportunityPlanRoles.opportunityId, opportunityIds)));
-  const milestones = await milestoneCounts(organizationId, opportunityIds);
-  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0));
+  const [milestones, parts] = await Promise.all([milestoneCounts(organizationId, opportunityIds), partsCounts(organizationId, opportunityIds)]);
+  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0, parts.get(id)));
   return out;
 }

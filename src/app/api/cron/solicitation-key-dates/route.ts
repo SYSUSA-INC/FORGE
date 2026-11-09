@@ -4,6 +4,7 @@ import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
 import { dispatchReviewDueReminders } from "@/lib/review-reminders";
 import { dispatchContactTouchReminders } from "@/lib/crm-reminders";
 import { dispatchMilestoneDueSoon } from "@/lib/milestone-due-soon-cron";
+import { dispatchSectionOverdue } from "@/lib/section-overdue-cron";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -29,6 +30,9 @@ export const maxDuration = 60;
  * BL-NAV-LIFECYCLE 4b-1 — the same tick fires `milestone_due_soon` to
  * the owner of a planned milestone 7, 3 or 1 days away
  * (`dispatchMilestoneDueSoon`).
+ *
+ * BL-NAV-LIFECYCLE 4b-2 — and `proposal_section_overdue` to the owner of
+ * a section past its due date with no draft (`dispatchSectionOverdue`).
  *
  * BL-STAB-7d — the Q&A check (BL-FB-SOL-QA) moved to its own route,
  * /api/cron/solicitation-qa, which has the time SAM.gov calls need.
@@ -59,7 +63,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon, reviewReminders, contactReminders, milestones] = await Promise.allSettled([
+  const [keyDates, dueSoon, reviewReminders, contactReminders, milestones, sectionsOverdue] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
     // BL-FB-X-COLOR-TEAM Slice 2 — day-before nudge to unsubmitted reviewers.
@@ -68,9 +72,16 @@ export async function GET(req: NextRequest) {
     dispatchContactTouchReminders(),
     // BL-NAV-LIFECYCLE 4b-1 — a planned milestone's owner, at T-7 / T-3 / T-1.
     dispatchMilestoneDueSoon(),
+    // BL-NAV-LIFECYCLE 4b-2 — a part past its due date with no draft, once per date.
+    dispatchSectionOverdue(),
   ]);
 
   const failures: string[] = [];
+  if (sectionsOverdue.status === "rejected") {
+    const message = sectionsOverdue.reason instanceof Error ? sectionsOverdue.reason.message : String(sectionsOverdue.reason);
+    log.error("[solicitation-key-date-cron]", "section overdue scan failed", { error: message });
+    failures.push(`sectionOverdue: ${message}`);
+  }
   if (milestones.status === "rejected") {
     const message = milestones.reason instanceof Error ? milestones.reason.message : String(milestones.reason);
     log.error("[solicitation-key-date-cron]", "milestone reminders failed", { error: message });
@@ -114,6 +125,7 @@ export async function GET(req: NextRequest) {
     reviewReminders: reviewReminders.status === "fulfilled" ? reviewReminders.value : null,
     contactReminders: contactReminders.status === "fulfilled" ? contactReminders.value : null,
     milestoneDueSoon: milestones.status === "fulfilled" ? milestones.value : null,
+    sectionOverdue: sectionsOverdue.status === "fulfilled" ? sectionsOverdue.value : null,
   };
 
   if (failures.length > 0) {
