@@ -2113,6 +2113,8 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "solicitation_amended",
   // BL-NAV-LIFECYCLE 3c-2 — a partner submitted its capability answers (drizzle/0157).
   "partner_answered",
+  // BL-NAV-LIFECYCLE 4a — named to a role on an opportunity's plan (drizzle/0159).
+  "plan_role_assigned",
 ]);
 
 export const notifications = pgTable("notification", {
@@ -2193,6 +2195,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "contact_touch_due",
     // BL-SCOUT-AMEND — SAM.gov posted an amendment or a document for a pursued opportunity (migration 0145).
     "solicitation_amended",
+    // BL-NAV-LIFECYCLE 4a — someone is named to a role, or a colour team, on an opportunity's plan (migration 0159; default rule seeded by 0160).
+    "plan_role_assigned",
   ],
 );
 
@@ -5462,3 +5466,88 @@ export const opportunityPartnerInvites = pgTable(
     orgIdx: index("opportunity_partner_invite_org_idx").on(t.organizationId, t.createdAt),
   }),
 );
+
+// ---------------------------------------------------------------------------
+// BL-NAV-LIFECYCLE 4a — the Plan: one plan per opportunity, and its team with
+// the RACI and the colour teams (migration 0159).
+// ---------------------------------------------------------------------------
+
+/** The nine solicitation roles plus the two a plan adds (BL-NAV-LIFECYCLE 4a, migration 0159). */
+export const planRoleEnum = pgEnum("plan_role", [
+  "capture_lead",
+  "proposal_manager",
+  "technical_lead",
+  "pricing_lead",
+  "compliance_reviewer",
+  "color_team_reviewer",
+  "subject_matter_expert",
+  "contributor",
+  "observer",
+  "executive_sponsor",
+  "contracts",
+]);
+export type PlanRole = (typeof planRoleEnum.enumValues)[number];
+
+/** A RACI letter per area of the proposal: management, technical, past_performance, pricing, compliance, production. */
+export type PlanRaci = Partial<Record<string, "R" | "A" | "C" | "I">>;
+
+export const opportunityPlans = pgTable(
+  "opportunity_plan",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    /** The solicitation whose assignments seed the team and stay in step with it; null when the opportunity has none. */
+    solicitationId: uuid("solicitation_id").references(() => solicitations.id, { onDelete: "set null" }),
+    /** When the team was first seeded from the solicitation's assignments. */
+    teamSeededAt: timestamp("team_seeded_at", { withTimezone: true }),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    oppUq: uniqueIndex("opportunity_plan_opp_uq").on(t.opportunityId),
+    orgIdx: index("opportunity_plan_org_idx").on(t.organizationId, t.createdAt),
+  }),
+);
+
+export const opportunityPlanRoles = pgTable(
+  "opportunity_plan_role",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => opportunityPlans.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: planRoleEnum("role").notNull(),
+    /** Set only for a colour-team reviewer: which team (pink, red, gold, white_gloves). Null: on the team, colour not yet named. */
+    colorTeam: reviewColorEnum("color_team"),
+    /** The RACI letter per area of the proposal. */
+    raci: jsonb("raci").$type<PlanRaci>().notNull().default({}),
+    notes: text("notes").notNull().default(""),
+    /** seeded (from the solicitation's assignments) | manual (named on the plan). */
+    source: text("source").notNull().default("manual"),
+    assignedByUserId: text("assigned_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("opportunity_plan_role_org_idx").on(t.organizationId, t.assignedAt),
+    oppIdx: index("opportunity_plan_role_opp_idx").on(t.opportunityId),
+    userIdx: index("opportunity_plan_role_user_idx").on(t.userId),
+    colorUq: uniqueIndex("opportunity_plan_role_color_uq").on(t.planId, t.userId, t.role, t.colorTeam).where(sql`color_team IS NOT NULL`),
+    plainUq: uniqueIndex("opportunity_plan_role_plain_uq").on(t.planId, t.userId, t.role).where(sql`color_team IS NULL`),
+  }),
+);
+export type OpportunityPlanRoleRow = typeof opportunityPlanRoles.$inferSelect;

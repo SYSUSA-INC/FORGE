@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **Plan: the team, the RACI and the colour teams** — **Pipeline → Plan** lists every Captured opportunity with days left, the plan's state and the next step; the opportunity's new **Plan** tab holds the team as one list with the solicitation's (seeded from it on the first visit and kept in step), a RACI letter per person for each of the six areas, and the Pink, Red, Gold and White Gloves teams named ahead of their round. Everyone named is told at once, in the inbox and by email (§5.3.3).
 - **One button size, and links where a button only steps back** — every button is now the same size on every page; "Cancel", "Close", "Dismiss", "Done" and "Open" beside a main button are text links; and the rows and small forms inside a panel sit on hairlines instead of in boxes (§2.0).
 - **Compare partners' answers, and FORGE AI's rating** — **Compare answers** on the Partners tab shows your capability answers and every partner's side by side, one row per question, and marks the partner that closes each of your gaps; **Rate the partners with FORGE AI** scores each partner on the gaps it closes, its evidence and its certifications, best first, with one reason each resting on the partner's own answers. Your inbox tells you when a partner submits. Compare also says which company you named yourself on each gap; an expired invite link is retired every morning and a partner that never answered goes back to *candidate* (§5.3.2).
 - **Invite a partner to answer the capability questions** — on the Partners tab, **Invite** emails a partner contact a personal link (no FORGE account, 14 days) to the matrix questions; the partner answers Yes / Partial % / No with evidence and lists its ISO, CMMI and CMMC certifications, and the tab shows what came back (§5.3.2).
@@ -608,6 +609,21 @@ Each button opens the opportunity's **Partners** tab (BL-NAV-LIFECYCLE 3a-1):
 - **Move to Plan** moves the opportunity to Captured (Plan). A GO opportunity can move at once. A PARTNER opportunity needs a chosen partner first; until then the panel says so. A NO-GO can't. The teaming agreement is shown as **to do**: it does not hold the opportunity back until FORGE's agreement module exists, and the Activity tab notes the move with the chosen partners and "Teaming agreement: to do".
 
 Every search, add, invitation, rating, choice, decline and removal, and the move to Plan, is recorded in the Audit Log; a partner opening its link and saving or submitting its answers is recorded with the contact's email; the move is also noted on the Activity tab.
+
+### 5.3.3 Plan: the team, the RACI and the colour teams
+
+**Opportunity Management → Pipeline → Plan** lists every opportunity that passed Capture (stage Captured), one row each: days left (red under five), the plan's state (*4 people · A for 2 of 6 areas · 1 of 4 colour teams*) and the next step, in the order a proposal manager fills a plan:
+- **Name the team** — nobody is on the plan yet;
+- **Assign the RACI** — an area still has no A;
+- **Name the colour teams** — a colour team is still empty;
+- **Open the plan** — the team, the RACI and the colour teams are set.
+
+Each button opens the opportunity's **Plan** tab (BL-NAV-LIFECYCLE 4a):
+- **The team and the RACI.** One list with the solicitation's team: the first visit seeds it from the solicitation's assignments (marked *from the solicitation*), and every visit keeps the two in step — a person assigned on the solicitation appears here, a person removed there leaves here, and a role named here (one of the nine solicitation roles) appears on the solicitation's Team panel. Two roles live on the plan only: **Executive sponsor** and **Contracts**. For each person, one select per area — Management, Technical, Past performance, Pricing, Compliance, Production — holds the RACI letter: **R** responsible, **A** accountable, **C** consulted, **I** informed. Each area needs one A; whoever is R or A for an area will get its milestones and parts when they arrive (4b). **Name to the team** adds a person with a role and a note; **Remove** takes a row off (and, for a shared role, off the solicitation).
+- **The colour teams.** Pink, Red, Gold and White Gloves side by side, each a list of reviewers with **Add** and **Remove**. Naming the teams ahead of time is the point: when the proposal reaches a colour, the round will start with these reviewers on it (4c), and the schedule will give each round its date (4b).
+- **Being told.** Whoever is named to a role or a colour team gets an inbox line, *"Named Technical lead on the plan for …"*, and an email, at once, through the default rule **Plan role assigned** (admins can edit or switch it off under Settings → Notification rules, §10). Naming yourself tells nobody; seeding from the solicitation tells nobody either, because the solicitation already did.
+
+Creating the plan, seeding the team, every naming, removal and RACI letter is recorded in the Audit Log.
 
 ### 5.4 Opportunity detail — tabs
 

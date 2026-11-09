@@ -1,6 +1,6 @@
 # Phase 4 — Plan: design for review
 
-**Status:** draft for the owner (2026-11-08); nothing built. The decisions in §4 are open.
+**Status:** approved by the owner (2026-11-09, "All recommended") with every recommended answer in §4: the team lives on the plan, seeded from the solicitation's assignments and kept in step; a structured charter with a cited AI draft; a PARTNER opportunity is held in Plan until the agreement is signed; the count-back schedule is proposed and the manager moves it; hours and budget are an estimate only; a default rule per tenant for `plan_role_assigned` and `milestone_due_soon`. 4a shipped in this PR; 4b and 4c follow, one PR each.
 **Requirements:** FORGE II footnote 7, P-1 to P-8 in
 `docs/FORGE_II_REQUIREMENTS.md`. **Plan:** BL-NAV-LIFECYCLE phase 4.
 **Shape:** the same as `BL-NAV-LIFECYCLE_PHASE3_CAPTURE.md`.
@@ -136,20 +136,35 @@ the Plan page shows the schedule as a timeline, with the key dates on it.
    from the solicitation's assignments and kept in step with them
    (recommended)? Or keep the solicitation's TeamPanel as the only team
    and add the RACI letters there?
+   **Decided 2026-11-09:** one table on the plan, seeded from the
+   solicitation's assignments and kept in step with them (4a).
 2. **The charter's shape.** A structured record with an AI draft that
    cites its sources (recommended)? Or a free-text document in the
    proposal's files?
+   **Decided 2026-11-09:** a structured record with an AI draft that
+   cites its sources (4c).
 3. **Moving to Develop without a signed agreement.** Hold a PARTNER
    opportunity in Plan until the agreement is recorded as signed
    (recommended: Plan is where P-6 says it is finalised)? Or allow it
    with "agreement: to do" carried forward, as Capture does today?
+   **Decided 2026-11-09:** hold a PARTNER opportunity in Plan until the
+   agreement is recorded as signed (4c).
 4. **Milestone defaults.** The count-back above (submit T-2, White
    Gloves T-4, Gold T-10, Red T-20, Pink T-30) as the proposed schedule
    (recommended; the manager moves any of them)? Or no proposal, dates
    set by hand?
+   **Decided 2026-11-09:** the count-back schedule is proposed (submit
+   T-2, White Gloves T-4, Gold T-10, Red T-20, Pink T-30) and the manager
+   moves any of them (4b).
 5. **Hours and budget (P-7).** An estimate only, with no time logging in
    FORGE (recommended for phase 4)? Or add time logging now?
+   **Decided 2026-11-09:** an estimate only; no time logging in phase 4
+   (4c).
 6. **Default notification rules.** Seed a rule per tenant for
    `plan_role_assigned` and `milestone_due_soon` (in-app + email to the
    person named), as the CRM follow-up did (recommended)? Or leave each
    tenant to create them under Settings → Notification rules?
+   **Decided 2026-11-09:** seed a rule per tenant for `plan_role_assigned`
+   (4a, migration 0160) and `milestone_due_soon` (4b), in-app + email to
+   the person named, as the CRM follow-up did; a tenant created later
+   gets the rule the first time the event fires for it.
