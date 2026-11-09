@@ -42,9 +42,9 @@ describe("BL-NAV-LIFECYCLE 4b-2 — the parts' rules", () => {
       row("u4", "color_team_reviewer", "gold", {}),
       row("u5", "color_team_reviewer", "white_gloves", {}),
     ];
-    expect(planNextStep(planState(full, 6, undefined, "signed"))).toBe("plan_ready");
+    expect(planNextStep(planState(full, 6, undefined, "signed"))).toBe("freeze");
     expect(planNextStep(planState(full, 6, { total: 4, owned: 3, dated: 4 }, "signed"))).toBe("own_parts");
-    expect(planNextStep(planState(full, 6, { total: 4, owned: 4, dated: 0 }, "signed"))).toBe("plan_ready");
+    expect(planNextStep(planState(full, 6, { total: 4, owned: 4, dated: 0 }, "signed"))).toBe("freeze");
     expect(planNextStep(planState(full, 0, { total: 4, owned: 3, dated: 4 }))).toBe("build_schedule");
   });
 

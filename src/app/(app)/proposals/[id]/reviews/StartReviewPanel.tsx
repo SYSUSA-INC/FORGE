@@ -23,6 +23,7 @@ export function StartReviewPanel({
   reviewers,
   sections = [],
   carryCandidates = [],
+  planned = {},
 }: {
   proposalId: string;
   colors: ColorDef[];
@@ -30,13 +31,15 @@ export function StartReviewPanel({
   sections?: SectionRow[];
   /** Slice 2 — earlier rounds with open comments the new round can take over. */
   carryCandidates?: { reviewId: string; label: string }[];
+  /** BL-NAV-LIFECYCLE 4c-2 — what the opportunity's plan holds per colour: the reviewers named and the planned date. */
+  planned?: Record<string, { reviewerUserIds: string[]; dueDate: string | null }>;
 }) {
   const router = useRouter();
   const [color, setColor] = useState<ReviewColor>("pink");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(planned.pink?.dueDate ?? "");
   const [instructions, setInstructions] = useState("");
   const [carryFrom, setCarryFrom] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set(planned.pink?.reviewerUserIds ?? []));
   const [sectionAssignments, setSectionAssignments] = useState<Record<string, string[]>>({});
   const [checklist, setChecklist] = useState<ReviewChecklistItem[]>(REVIEW_CHECKLIST_TEMPLATES.pink);
   const [newItem, setNewItem] = useState("");
@@ -63,6 +66,10 @@ export function StartReviewPanel({
   function pickColor(next: ReviewColor) {
     setColor(next);
     setChecklist(REVIEW_CHECKLIST_TEMPLATES[next]);
+    // The plan's colour team and date fill in for the colour chosen; the lead can change both.
+    const plan = planned[next];
+    setSelected(new Set(plan?.reviewerUserIds ?? []));
+    setDueDate(plan?.dueDate ?? "");
   }
 
   function addItem() {
@@ -117,6 +124,7 @@ export function StartReviewPanel({
         <div>
           <label className="aur-label">Due date (optional)</label>
           <input className="aur-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          {planned[color]?.dueDate || (planned[color]?.reviewerUserIds.length ?? 0) > 0 ? <div className="mt-1 font-mono text-[10px] text-muted">From the plan: its {colorDef?.label ?? "team"} and date. Change either to start another way.</div> : null}
         </div>
         <div>
           <label className="aur-label">Instructions to reviewers (optional)</label>

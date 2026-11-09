@@ -5337,7 +5337,7 @@ export type InboundEmail = typeof inboundEmails.$inferSelect;
 // and capability coverage when it was made.
 // ─────────────────────────────────────────────────────────────────────
 
-export const opportunityDecisionKindEnum = pgEnum("opportunity_decision_kind", ["go", "no_go", "partner"]);
+export const opportunityDecisionKindEnum = pgEnum("opportunity_decision_kind", ["go", "no_go", "partner", "plan"]);
 export type OpportunityDecisionKind = (typeof opportunityDecisionKindEnum.enumValues)[number];
 
 export const opportunityDecisions = pgTable(
@@ -5545,6 +5545,10 @@ export const opportunityPlans = pgTable(
     qaCutoffDate: date("qa_cutoff_date", { mode: "string" }),
     amendmentCutoffDate: date("amendment_cutoff_date", { mode: "string" }),
     risks: jsonb("risks").$type<PlanRisk[]>().notNull().default([]),
+    /** BL-NAV-LIFECYCLE 4c-2 — the freeze (P-7): when the compliance matrix and the outline were stamped; a change after it is written to the Activity. */
+    complianceMatrixFrozenAt: timestamp("compliance_matrix_frozen_at", { withTimezone: true }),
+    outlineFrozenAt: timestamp("outline_frozen_at", { withTimezone: true }),
+    frozenByUserId: text("frozen_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

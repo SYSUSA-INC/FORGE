@@ -13,6 +13,7 @@ const TONE: Record<OpportunityDecisionKind, string> = {
   go: "border-green/40 bg-green/10 text-green",
   no_go: "border-red/40 bg-red/10 text-red",
   partner: "border-indigo/40 bg-indigo/10 text-indigo",
+  plan: "border-cobalt/40 bg-cobalt/10 text-cobalt",
 };
 
 /**

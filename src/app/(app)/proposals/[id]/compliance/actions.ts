@@ -33,6 +33,8 @@ import {
   type AutoMapSuggestion,
 } from "@/lib/compliance-automap";
 import { seedComplianceItemsFromRequirements } from "@/lib/compliance-seed";
+import { noteFrozenChange } from "@/lib/plan-freeze-store";
+import { isMaterialComplianceChange } from "@/lib/plan-freeze-logic";
 import { requirementKey } from "@/lib/requirements-text";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
@@ -75,6 +77,12 @@ async function sectionBelongsToProposal(
     )
     .limit(1);
   return !!row;
+}
+
+/** BL-NAV-LIFECYCLE 4c-2 — a matrix change after the plan's freeze is noted on the opportunity's Activity. */
+function labelOf(number: string | null | undefined, text: string | null | undefined): string {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  return [number?.trim(), t.length > 120 ? `${t.slice(0, 117)}...` : t].filter(Boolean).join(" ") || "(untitled)";
 }
 
 export type ComplianceItemInput = {
@@ -152,6 +160,7 @@ export async function createComplianceItemAction(
       },
     });
 
+    await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "matrix", action: "added", label: labelOf(input.number, input.requirementText) } });
     revalidatePath(`/proposals/${proposalId}/compliance`);
     return { ok: true, id: row.id };
   } catch (err) {
@@ -184,6 +193,9 @@ export async function updateComplianceItemAction(
   }
 
   try {
+    const [before] = isMaterialComplianceChange(Object.keys(input))
+      ? await db.select({ number: complianceItems.number, requirementText: complianceItems.requirementText }).from(complianceItems).where(and(eq(complianceItems.id, itemId), eq(complianceItems.proposalId, proposalId))).limit(1)
+      : [];
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (input.category !== undefined) update.category = input.category;
     if (input.number !== undefined) update.number = input.number.trim();
@@ -225,6 +237,7 @@ export async function updateComplianceItemAction(
       resourceId: itemId,
       metadata: { proposalId, fields: Object.keys(input) },
     });
+    if (before) await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "matrix", action: "changed", label: labelOf(before.number, before.requirementText), fields: Object.keys(input) } });
 
     revalidatePath(`/proposals/${proposalId}/compliance`);
     return { ok: true };
@@ -254,7 +267,7 @@ export async function deleteComplianceItemAction(
         eq(complianceItems.proposalId, proposalId),
       ),
     )
-    .returning({ requirementText: complianceItems.requirementText });
+    .returning({ requirementText: complianceItems.requirementText, number: complianceItems.number });
   // BL-AIX Phase 0d — remember it, so "Seed from solicitation" doesn't
   // bring a row the team removed back into the matrix.
   const key = deleted ? requirementKey(deleted.requirementText) : "";
@@ -278,6 +291,7 @@ export async function deleteComplianceItemAction(
     resourceId: itemId,
     metadata: { proposalId, rememberedForSeed: !!key },
   });
+  if (deleted) await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "matrix", action: "removed", label: labelOf(deleted.number, deleted.requirementText) } });
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true };
 }
@@ -341,6 +355,7 @@ export async function bulkImportComplianceItemsAction(
       imported: cleaned.length,
     },
   });
+  await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "matrix", action: "imported", label: "", count: cleaned.length } });
 
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true, imported: cleaned.length };
@@ -854,6 +869,7 @@ export async function applyComplianceAutoMapAction(
     resourceId: proposalId,
     metadata: { proposalId, requested: mappings.length, applied: res.applied },
   });
+  if (res.applied > 0) await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "matrix", action: "remapped", label: "", count: res.applied } });
 
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return { ok: true, applied: res.applied };
@@ -895,6 +911,7 @@ export async function seedComplianceFromSolicitationAction(
     actor: { id: actor.id, email: actor.email },
   });
   if (!res.ok) return res;
+  if (res.inserted > 0) await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "matrix", action: "imported", label: "", count: res.inserted } });
   revalidatePath(`/proposals/${proposalId}/compliance`);
   return res;
 }

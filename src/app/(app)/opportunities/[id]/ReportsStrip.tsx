@@ -6,7 +6,7 @@ import { REPORT_LABELS } from "@/lib/opportunity-report";
 import { latestReports } from "@/lib/opportunity-report-store";
 import { safeQuery } from "@/lib/schema-resilience";
 
-const DECISION_TONE = { go: "text-green", no_go: "text-red", partner: "text-indigo" } as const;
+const DECISION_TONE = { go: "text-green", no_go: "text-red", partner: "text-indigo", plan: "text-cobalt" } as const;
 
 /**
  * BL-NAV-LIFECYCLE phase 2b-2 (FORGE II E-9) — the opportunity's reports

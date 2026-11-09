@@ -41,6 +41,7 @@ import {
 } from "@/lib/ai-prompts";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
+import { noteFrozenChange } from "@/lib/plan-freeze-store";
 import {
   normalizeBootstrapPlan,
   outlineRequirements,
@@ -289,6 +290,11 @@ export async function applyProposalBootstrap(input: {
         instructions: s.instructions,
       })),
     );
+  }
+
+  // BL-NAV-LIFECYCLE 4c-2 — a rebuild after the plan's freeze is noted on the Activity.
+  if (input.mode === "rebuild" && (diff.insert.length > 0 || diff.remove.length > 0)) {
+    await noteFrozenChange({ organizationId, proposalId, userId: input.actor.userId, change: { area: "outline", action: "rebuilt", label: "", count: diff.insert.length + diff.remove.length } });
   }
 
   // Themes: only when the proposal has none — a team's own themes win.

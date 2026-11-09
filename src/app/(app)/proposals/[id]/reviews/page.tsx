@@ -21,6 +21,7 @@ import {
   listReviewsForProposal,
 } from "./actions";
 import { StartReviewPanel } from "./StartReviewPanel";
+import { plannedRoundsForProposal } from "@/lib/plan-store";
 import { withAlpha } from "@/lib/theme-colors";
 import { ColorTeamTag } from "@/components/ui/ColorTeamTag";
 
@@ -43,10 +44,11 @@ export default async function ProposalReviewsPage({
     .limit(1);
   if (!p) notFound();
 
-  const [data, reviewers, sections] = await Promise.all([
+  const [data, reviewers, sections, planned] = await Promise.all([
     listReviewsForProposal(params.id),
     listOrgReviewers(),
     listProposalSectionsForReview(params.id),
+    plannedRoundsForProposal(organizationId, params.id),
   ]);
 
   // BL-FB-X-COLOR-TEAM Slice 2 — closed rounds with open comments the next round can carry.
@@ -204,6 +206,7 @@ export default async function ProposalReviewsPage({
         reviewers={reviewers}
         sections={sections}
         carryCandidates={carryCandidates}
+        planned={planned}
       />
     </div>
   );
