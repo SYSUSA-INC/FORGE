@@ -3750,8 +3750,8 @@ Every requirement in the FORGE II document, with its status and phase:
      Open the plan). Not in 4a: the round's planned date (4b, the
      milestones), the round created from the named team (4c). Tested in
      `tests/ai/plan-logic.test.ts` and `tests/isolation/plan.test.ts`.
-   - **4b-1 — milestones, Build the schedule, `milestone_due_soon` (this
-     PR).** Migrations 0161 and 0162: `opportunity_milestone` (one row per
+   - **4b-1 — milestones, Build the schedule, `milestone_due_soon` (✅
+     shipped, PR #484).** Migrations 0161 and 0162: `opportunity_milestone` (one row per
      milestone on the plan: title, kind — kick-off, outline frozen, Pink,
      Red, Gold, White Gloves, pricing complete, final production, submit,
      other — the day, the owner, status planned / done / missed, the key
