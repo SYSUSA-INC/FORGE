@@ -3829,9 +3829,34 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/ai/section-plan-logic.test.ts`, the timeline cases in
      `tests/ai/milestone-logic.test.ts`, and
      `tests/isolation/section-plan.test.ts`.
-   - **4c — the charter** with the AI draft, the agreement record, the
-     budget and risk list, the freeze, Move to Develop, the review round
-     created from the named team.
+   - **4c-1 (delivered; split from 4c, which would pass 1,500 lines) —
+     the charter, the agreement, the budget and the risks** (P-2, P-6,
+     P-7). Migration `0165` adds to `opportunity_plan` the `charter`
+     jsonb (strategy, win themes, discriminators, pricing posture, the
+     partner's share, the `sources` the draft cited) and its sign-off, the
+     agreement by hand (`agreement_status` todo / negotiating / signed,
+     date, file), the budget estimate (hours, dollars; decision 5), the
+     Q&A and amendment cut-offs (null reads the *qa_cutoff* / *final_rfp*
+     key dates) and the `risks` jsonb. Pure rules in
+     `src/lib/plan-charter-logic.ts` (`validateCharterDraft` keeps a claim
+     only when it cites a real numbered fact and every figure in it is in
+     the facts cited); store `plan-charter-store.ts` (scoped, audited);
+     draft `plan-charter-draft.ts` (feature `plan_charter_draft`, the 3c-2
+     pattern, read audit `opportunity.plan.charter.draft_ai`) over the
+     decision, matrix, chosen partners, key dates and proposal themes (the
+     Analysis Report body is not read). Changing a signed charter
+     withdraws the signature; signing writes its win themes to the newest
+     proposal when it has none. The agreement file uses `uploadFile()` +
+     `claimUpload` / `finishClaim` (`plan_agreement`), downloads at
+     `/api/opportunities/[id]/plan-agreement`. Next step after the parts:
+     **Sign the charter**. Tests: `plan-charter-logic` and `plan-charter`.
+   - **4c-2 (open) — the freeze** (`frozenAt` for the matrix and outline,
+     the Activity row for each later change), **Move to Develop** (an
+     `opportunity_decision` of kind `plan`, stage `pre_proposal`, blockers
+     shown: an A for every area, the charter signed, milestones, the freeze
+     and, for PARTNER, the agreement signed), and `startReviewAction`
+     creating the round with the plan's colour team and the planned
+     milestone date.
 5. **Develop:** Create a draft on the opportunity page (the bootstrap
    exists), external reviewers with section-level access, scheduling
    links for reviews.

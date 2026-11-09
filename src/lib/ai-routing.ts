@@ -82,6 +82,7 @@ export const AI_FEATURE_MODEL_CLASS: Record<AiFeature, AiModelClass> = {
   loss_intelligence: "standard",
   partner_rank: "standard",
   partner_rate: "standard",
+  plan_charter_draft: "standard",
   review_preflight: "standard",
   // BL-AIP-7d — grounded in six Brain hits, short answer, must cite.
   brain_answer: "standard",

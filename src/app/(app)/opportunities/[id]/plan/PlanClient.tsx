@@ -18,9 +18,12 @@ import {
 } from "@/lib/plan-logic";
 import type { ScheduleView } from "@/lib/milestone-store";
 import type { PlanMember, PlanView } from "@/lib/plan-store";
+import type { CharterPanelView } from "@/lib/plan-charter-store";
 import type { PartsView } from "@/lib/section-plan-store";
 import { addPlanRoleAction, removePlanRoleAction, setPlanRaciAction } from "./actions";
 import { PartsPanel } from "./PartsPanel";
+import { CharterPanel } from "./CharterPanel";
+import { PlanRecordPanel } from "./PlanRecordPanel";
 import { SchedulePanel } from "./SchedulePanel";
 
 /** Status means the same thing everywhere: plum is the pink team; red, brass and muted follow the review colours. */
@@ -33,7 +36,7 @@ const COLOR_TONE: Record<PlanColorTeam, string> = {
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-export function PlanClient({ opportunityId, plan, members, schedule, parts }: { opportunityId: string; plan: PlanView; members: PlanMember[]; schedule: ScheduleView; parts: PartsView }) {
+export function PlanClient({ opportunityId, plan, members, schedule, parts, charter }: { opportunityId: string; plan: PlanView; members: PlanMember[]; schedule: ScheduleView; parts: PartsView; charter: CharterPanelView }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +208,8 @@ export function PlanClient({ opportunityId, plan, members, schedule, parts }: { 
 
       <SchedulePanel opportunityId={opportunityId} schedule={schedule} members={members} partDueDates={parts.parts.map((p) => p.dueDate).filter((d): d is string => !!d)} />
       <PartsPanel opportunityId={opportunityId} parts={parts} members={members} />
+      <CharterPanel key={`${charter.charter.draftedAt ?? ""}|${charter.signedAt ?? ""}`} opportunityId={opportunityId} view={charter} />
+      <PlanRecordPanel opportunityId={opportunityId} view={charter} members={members} />
     </div>
   );
 }

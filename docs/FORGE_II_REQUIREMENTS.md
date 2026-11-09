@@ -114,12 +114,12 @@ Last reviewed 2026-11-06, after PR #457.
 | ID | Requirement | Status |
 |---|---|---|
 | P-1 | A development plan with a **RACI** matrix (responsible, accountable, consulted / kept informed, notified) | ✅ Phase 4a: the RACI letter per person per area on the opportunity's Plan tab |
-| P-2 | A team and a **charter** for the proposal | 🟡 Phase 4a: the team on the plan, one list with the solicitation's, told their duty at once. The charter is phase 4c |
+| P-2 | A team and a **charter** for the proposal | 🟡 Phase 4a: the team on the plan, one list with the solicitation's, told their duty at once. ✅ Phase 4c-1: the charter, drafted by FORGE AI from cited records, edited and signed (it gates Develop in 4c-2) |
 | P-3 | Name the **Pink, Red, Gold and White Gloves** team members, notified automatically when the proposal reaches their review | 🟡 Phase 4a: the four teams named on the plan and each person told now. The round created from the named team is phase 4c |
 | P-4 | Assign the proposal's parts (implementation plan, financial, compliance and so on) to owners, who are told their duties | ✅ Phase 4b-2: the proposal's sections as parts on the Plan tab, each with an owner (the section author, told with the date) and a due date; the owner of a part past its date with no draft is told by the daily cron |
 | P-5 | **Timelines and milestones** for each task, to meet the deadline | ✅ Phase 4b-1: the milestones on the plan, built by the count-back from the due date and moved by the manager, each with an owner reminded at T-7 / T-3 / T-1. Phase 4b-2: the schedule drawn as a timeline with the due date, the key dates and the parts' dates on it |
-| P-6 | Finalise the teaming or subcontract agreement in Plan, so partner staff can join the review groups | 📋 Phases 4 and 8 |
-| P-7 | Anything else a plan needs ("you can think of anything else") | ⚠️ Proposed for the phase 4 design: bid / no-bid budget and hours, a win-theme and discriminator sign-off, a compliance matrix and outline frozen at the end of Plan, the Q&A and amendment cut-off dates, and the risk list |
+| P-6 | Finalise the teaming or subcontract agreement in Plan, so partner staff can join the review groups | 🟡 Phase 4c-1: the agreement kept by hand (to do / in negotiation / signed, with a date and a file); a PARTNER bid moves only on signed (4c-2). Phase 8 replaces the hand record |
+| P-7 | Anything else a plan needs ("you can think of anything else") | ⚠️ Proposed for the phase 4 design: bid / no-bid budget and hours, a win-theme and discriminator sign-off, a compliance matrix and outline frozen at the end of Plan, the Q&A and amendment cut-off dates, and the risk list. 🟡 Phase 4c-1: the budget estimate, the cut-offs, the risk list and the win-theme and discriminator sign-off (in the charter); the freeze is 4c-2 |
 | P-8 | Once the plan is set, the opportunity moves to Develop | 📋 Phase 4 |
 
 ## D — Develop (footnote 8)

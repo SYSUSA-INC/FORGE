@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { loadSchedule } from "@/lib/milestone-store";
+import { loadCharterPanel } from "@/lib/plan-charter-store";
 import { listPlanMembers, loadPlan } from "@/lib/plan-store";
 import { loadParts } from "@/lib/section-plan-store";
 import { PlanClient } from "./PlanClient";
@@ -26,6 +27,8 @@ export default async function OpportunityPlanPage({ params }: { params: { id: st
     loadSchedule({ organizationId, opportunityId: params.id }),
     loadParts({ organizationId, opportunityId: params.id }),
   ]);
-  if (!plan || !schedule || !parts) notFound();
-  return <PlanClient opportunityId={params.id} plan={plan} members={members} schedule={schedule} parts={parts} />;
+  // After the plan: the first visit creates it.
+  const charter = plan ? await loadCharterPanel({ organizationId, opportunityId: params.id }) : null;
+  if (!plan || !schedule || !parts || !charter) notFound();
+  return <PlanClient opportunityId={params.id} plan={plan} members={members} schedule={schedule} parts={parts} charter={charter} />;
 }

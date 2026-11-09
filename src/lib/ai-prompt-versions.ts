@@ -50,6 +50,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   loss_intelligence: "2026-10-05.1",
   partner_rank: "2026-11-07.1",
   partner_rate: "2026-11-07.1",
+  plan_charter_draft: "2026-11-09.1",
   review_preflight: "2026-10-05.1",
   proposal_bootstrap: "2026-10-07.1",
   opportunity_triage: "2026-10-13.1",

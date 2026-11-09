@@ -5500,6 +5500,20 @@ export type PlanRole = (typeof planRoleEnum.enumValues)[number];
 /** A RACI letter per area of the proposal: management, technical, past_performance, pricing, compliance, production. */
 export type PlanRaci = Partial<Record<string, "R" | "A" | "C" | "I">>;
 
+/** BL-NAV-LIFECYCLE 4c-1 — the charter: bid strategy, win themes, discriminators, pricing posture, the partner's share, and where the draft came from. The sign-off is on the plan's own columns. */
+export type PlanCharter = {
+  strategy?: string;
+  winThemes?: { title: string; statement: string }[];
+  discriminators?: string[];
+  pricingPosture?: string;
+  partnerShare?: string;
+  /** The cited facts the FORGE AI draft rested on, kept so the manager sees what each sentence stood on. */
+  sources?: string[];
+  draftedAt?: string;
+};
+
+export type PlanRisk = { id: string; title: string; likelihood: "low" | "medium" | "high"; impact: "low" | "medium" | "high"; ownerUserId: string | null; mitigation: string };
+
 export const opportunityPlans = pgTable(
   "opportunity_plan",
   {
@@ -5514,6 +5528,23 @@ export const opportunityPlans = pgTable(
     solicitationId: uuid("solicitation_id").references(() => solicitations.id, { onDelete: "set null" }),
     /** When the team was first seeded from the solicitation's assignments. */
     teamSeededAt: timestamp("team_seeded_at", { withTimezone: true }),
+    /** BL-NAV-LIFECYCLE 4c-1 — the charter (P-2) and its sign-off; editing a signed charter clears the sign-off. */
+    charter: jsonb("charter").$type<PlanCharter>().notNull().default({}),
+    charterSignedByUserId: text("charter_signed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    charterSignedAt: timestamp("charter_signed_at", { withTimezone: true }),
+    /** The teaming agreement by hand until phase 8: todo | negotiating | signed, with the date and the file. */
+    agreementStatus: text("agreement_status").notNull().default("todo"),
+    agreementDate: date("agreement_date", { mode: "string" }),
+    agreementFileName: text("agreement_file_name").notNull().default(""),
+    agreementStorageKey: text("agreement_storage_key").notNull().default(""),
+    agreementFileSize: integer("agreement_file_size").notNull().default(0),
+    /** The bid budget (P-7): an estimate only, no time logging. */
+    budgetHours: integer("budget_hours"),
+    budgetDollars: bigint("budget_dollars", { mode: "number" }),
+    /** The Q&A and amendment cut-offs; null reads the solicitation's key date. */
+    qaCutoffDate: date("qa_cutoff_date", { mode: "string" }),
+    amendmentCutoffDate: date("amendment_cutoff_date", { mode: "string" }),
+    risks: jsonb("risks").$type<PlanRisk[]>().notNull().default([]),
     createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

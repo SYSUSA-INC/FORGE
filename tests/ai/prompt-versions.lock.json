@@ -101,6 +101,10 @@
       "version": "2026-10-31.1",
       "sha256": "5f4300ed081fb5fb961d5598b08bd4b0a4e022d6793dafd7879ee916a5467797"
     },
+    "plan_charter_draft": {
+      "version": "2026-11-09.1",
+      "sha256": "d569b543a138917aaad4092bce4cee9bd950de38125e501f02470ccca44c267e"
+    },
     "proposal_bootstrap": {
       "version": "2026-10-07.1",
       "sha256": "6e92cdb14970d16c0a63947d20258344fed09130af365c4b8f29676b30faa996"

@@ -28,7 +28,7 @@ describe("BL-NAV-LIFECYCLE 4b-2 — the parts' rules", () => {
     ];
     expect(partsCount(parts)).toEqual({ total: 3, owned: 2, dated: 2 });
     const line = planStateLine(planState([], 6, partsCount(parts)));
-    expect(line).toBe("0 people · A for 0 of 6 areas · 0 of 4 colour teams · 6 milestones · parts owned 2 of 3");
+    expect(line).toBe("0 people · A for 0 of 6 areas · 0 of 4 colour teams · 6 milestones · parts owned 2 of 3 · no charter");
     expect(planStateLine(planState([], 6))).not.toContain("parts");
   });
 
@@ -42,9 +42,9 @@ describe("BL-NAV-LIFECYCLE 4b-2 — the parts' rules", () => {
       row("u4", "color_team_reviewer", "gold", {}),
       row("u5", "color_team_reviewer", "white_gloves", {}),
     ];
-    expect(planNextStep(planState(full, 6))).toBe("plan_ready");
-    expect(planNextStep(planState(full, 6, { total: 4, owned: 3, dated: 4 }))).toBe("own_parts");
-    expect(planNextStep(planState(full, 6, { total: 4, owned: 4, dated: 0 }))).toBe("plan_ready");
+    expect(planNextStep(planState(full, 6, undefined, "signed"))).toBe("plan_ready");
+    expect(planNextStep(planState(full, 6, { total: 4, owned: 3, dated: 4 }, "signed"))).toBe("own_parts");
+    expect(planNextStep(planState(full, 6, { total: 4, owned: 4, dated: 0 }, "signed"))).toBe("plan_ready");
     expect(planNextStep(planState(full, 0, { total: 4, owned: 3, dated: 4 }))).toBe("build_schedule");
   });
 

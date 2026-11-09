@@ -41,6 +41,8 @@ export const AI_FEATURES = {
   partner_rank: "Partner ranking",
   // BL-NAV-LIFECYCLE 3c-2 — the partner rating, a reason per partner from its answers.
   partner_rate: "Partner rating",
+  // BL-NAV-LIFECYCLE 4c-1 — the bid charter draft, every claim citing a fact.
+  plan_charter_draft: "Plan charter draft",
   // BL-AIP-4 — embedding calls were never metered before.
   embedding: "Embeddings (indexing)",
   embedding_query: "Embeddings (query)",
