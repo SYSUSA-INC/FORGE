@@ -9,7 +9,7 @@ import { draftCharterAction, reopenCharterAction, saveCharterAction, signCharter
 
 type Result = { ok: true; note?: string } | { ok: false; error: string };
 
-/** BL-NAV-LIFECYCLE 4c-1 (P-2) — the charter: written or drafted by FORGE AI from cited records, edited, then signed by the manager. */
+/** BL-NAV-LIFECYCLE 4c-1 (P-2) — the charter: written or drafted by FORGE AI from cited records, edited, then signed. The page remounts it (key) when a draft or signature arrives. */
 export function CharterPanel({ opportunityId, view }: { opportunityId: string; view: CharterPanelView }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -47,18 +47,6 @@ export function CharterPanel({ opportunityId, view }: { opportunityId: string; v
       after?.();
       router.refresh();
     });
-  }
-
-  // A draft from FORGE AI replaces the form's words after the page refreshes with the stored charter.
-  const storedKey = `${c.draftedAt ?? ""}|${view.signedAt ?? ""}`;
-  const [seen, setSeen] = useState(storedKey);
-  if (seen !== storedKey) {
-    setSeen(storedKey);
-    setStrategy(c.strategy ?? "");
-    setPricing(c.pricingPosture ?? "");
-    setShare(c.partnerShare ?? "");
-    setDiscriminators((c.discriminators ?? []).join("\n"));
-    setThemes((c.winThemes ?? []).length > 0 ? c.winThemes ?? [] : view.proposalThemes);
   }
 
   const eyebrow = signed ? `Signed${view.signedByName ? ` by ${view.signedByName}` : ""}${view.signedAt ? ` · ${view.signedAt.slice(0, 10)}` : ""}` : view.status === "draft" ? "In draft" : "Not started";
@@ -127,10 +115,7 @@ export function CharterPanel({ opportunityId, view }: { opportunityId: string; v
           </button>
         ) : (
           <>
-            <button type="button" className="aur-btn aur-btn-primary" disabled={pending || view.blockers.length > 0} onClick={() => run(async () => {
-              const saved = await saveCharterAction({ opportunityId, charter: collect() });
-              return saved.ok ? signCharterAction({ opportunityId }) : saved;
-            })}>
+            <button type="button" className="aur-btn aur-btn-primary" disabled={pending || view.blockers.length > 0} onClick={() => run(async () => ((await saveCharterAction({ opportunityId, charter: collect() })).ok ? signCharterAction({ opportunityId }) : { ok: false, error: "Could not save the charter." }))}>
               Sign the charter
             </button>
             <button type="button" className="aur-link font-mono text-[10px] uppercase tracking-widest" disabled={pending} onClick={() => run(() => saveCharterAction({ opportunityId, charter: collect() }))}>

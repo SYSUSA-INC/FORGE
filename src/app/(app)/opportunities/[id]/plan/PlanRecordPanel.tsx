@@ -69,9 +69,7 @@ export function PlanRecordPanel({ opportunityId, view, members }: { opportunityI
           <div className="flex flex-wrap items-center gap-3">
             <select className="aur-input w-44" aria-label="Agreement status" value={status} disabled={busy} onChange={(e) => setStatus(e.target.value)}>
               {AGREEMENT_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {AGREEMENT_LABELS[s]}
-                </option>
+                <option key={s} value={s}>{AGREEMENT_LABELS[s]}</option>
               ))}
             </select>
             <input type="date" className="aur-input w-40" aria-label="Agreement date" value={date} disabled={busy} onChange={(e) => setDate(e.target.value)} />

@@ -10,9 +10,6 @@ import { buildCharterPrompt, charterDraftSchema, charterFacts, validateCharterDr
 import { keyDatesOf, loadCharterPanel, opportunityTitleOf, storeCharterDraft } from "@/lib/plan-charter-store";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { enforceQuota, ensureFeature, FeatureGateError, QuotaExceededError, refundQuota } from "@/lib/subscription-gates";
-import { db } from "@/db";
-import { opportunityPlans } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
 
 /**
  * BL-NAV-LIFECYCLE 4c-1 (P-2) — FORGE AI's draft of the bid charter,
@@ -49,13 +46,12 @@ export async function draftCharter(input: { organizationId: string; opportunityI
     const opp = await opportunityTitleOf(organizationId, opportunityId);
     if (!panel || !opp) return fail("Open the plan first.");
     if (panel.status === "signed") return fail("The charter is signed. Reopen it to redraft.");
-    const [decision, matrix, partners, plan] = await Promise.all([
+    const [decision, matrix, partners] = await Promise.all([
       latestDecisions(organizationId, [opportunityId]).then((m) => m.get(opportunityId) ?? null),
       loadCapabilityMatrix(opportunityId, organizationId),
       listOpportunityPartners(organizationId, opportunityId),
-      db.select({ solicitationId: opportunityPlans.solicitationId }).from(opportunityPlans).where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.opportunityId, opportunityId))).limit(1).then((r) => r[0] ?? null),
     ]);
-    const keyDates = await keyDatesOf(organizationId, plan?.solicitationId ?? null);
+    const keyDates = await keyDatesOf(organizationId, panel.solicitationId);
     const answered: Record<string, number> = {};
     for (const a of Object.values(matrix?.answers ?? {})) answered[a.value] = (answered[a.value] ?? 0) + 1;
     const facts = charterFacts({

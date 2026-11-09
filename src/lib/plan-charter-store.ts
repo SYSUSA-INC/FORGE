@@ -34,6 +34,7 @@ type Actor = { userId: string; email?: string | null; name?: string | null };
 type Result = { ok: true } | { ok: false; error: string };
 
 export type CharterPanelView = {
+  solicitationId: string | null;
   isPartner: boolean;
   charter: PlanCharter;
   status: CharterStatus;
@@ -97,6 +98,7 @@ export async function loadCharterPanel(input: { organizationId: string; opportun
   const qa = resolveCutoff(plan.qaCutoffDate, keyDates, "qa");
   const amendment = resolveCutoff(plan.amendmentCutoffDate, keyDates, "amendment");
   return {
+    solicitationId: plan.solicitationId,
     isPartner,
     charter,
     status: charterStatus(charter, plan.charterSignedAt),

@@ -15,7 +15,6 @@ const MAX_LIST = 8;
 const MAX_TEXT = 2000;
 const MAX_SHORT = 300;
 
-// ── the charter ──────────────────────────────────────────────────────
 
 function clean(v: unknown, max: number): string {
   return typeof v === "string" ? v.replace(/\r\n/g, "\n").trim().slice(0, max) : "";
@@ -72,7 +71,6 @@ export function sameCharter(a: PlanCharter, b: PlanCharter): boolean {
   return JSON.stringify([x.strategy, x.winThemes, x.discriminators, x.pricingPosture, x.partnerShare]) === JSON.stringify([y.strategy, y.winThemes, y.discriminators, y.pricingPosture, y.partnerShare]);
 }
 
-// ── the agreement ────────────────────────────────────────────────────
 
 export const AGREEMENT_STATUSES = ["todo", "negotiating", "signed"] as const;
 export type AgreementStatus = (typeof AGREEMENT_STATUSES)[number];
@@ -94,7 +92,6 @@ export function agreementBlocker(isPartner: boolean, status: string): string | n
   return isPartner && status !== "signed" ? "Record the teaming agreement as signed." : null;
 }
 
-// ── the budget and the cut-offs ──────────────────────────────────────
 
 /** A whole, non-negative number or null (cleared). */
 export function parseEstimate(v: unknown, max: number): number | null | "invalid" {
@@ -117,7 +114,6 @@ export function resolveCutoff(own: string | null, keyDates: readonly { type: str
   return k?.isoDate ? { date: k.isoDate.slice(0, 10), fromKeyDate: true } : { date: null, fromKeyDate: false };
 }
 
-// ── the risk list ────────────────────────────────────────────────────
 
 export const RISK_LEVELS = ["low", "medium", "high"] as const;
 export type RiskLevel = (typeof RISK_LEVELS)[number];
@@ -155,7 +151,6 @@ export function byExposure(risks: readonly PlanRisk[]): PlanRisk[] {
   return [...risks].sort((a, b) => riskExposure(b) - riskExposure(a));
 }
 
-// ── the AI draft ─────────────────────────────────────────────────────
 
 const claim = z.object({ text: z.string(), facts: z.array(z.number()) });
 export const charterDraftSchema = z.object({
@@ -237,7 +232,6 @@ export function validateCharterDraft(answer: CharterDraftAnswer, facts: readonly
   };
 }
 
-// ── the facts the draft rests on ─────────────────────────────────────
 
 export type CharterFactsInput = {
   decision: { decision: string; reason: string; pwin: number | null; coverage: number | null } | null;

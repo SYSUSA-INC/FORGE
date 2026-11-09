@@ -6,12 +6,7 @@ import { loadCharterPanel, reopenCharter, saveBudgetAndCutoffs, saveCharter, sav
 import { loadPlan, planSummaries } from "@/lib/plan-store";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
-/**
- * BL-NAV-LIFECYCLE 4c-1 — the charter and its sign-off, the agreement by
- * hand, the budget estimate, cut-offs and risks on the opportunity's plan:
- * each audited, signing needs the words, changing a signed charter withdraws
- * the signature, and nothing crosses tenants.
- */
+/** BL-NAV-LIFECYCLE 4c-1 — the charter, its sign-off, the agreement, budget and risks: audited, and tenant-scoped. */
 describe("BL-NAV-LIFECYCLE 4c-1 — the charter, agreement, budget and risks", () => {
   let fx: TwoTenantFixture;
   let outsider: string;

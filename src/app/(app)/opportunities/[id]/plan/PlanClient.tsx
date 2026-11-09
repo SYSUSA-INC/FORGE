@@ -208,7 +208,7 @@ export function PlanClient({ opportunityId, plan, members, schedule, parts, char
 
       <SchedulePanel opportunityId={opportunityId} schedule={schedule} members={members} partDueDates={parts.parts.map((p) => p.dueDate).filter((d): d is string => !!d)} />
       <PartsPanel opportunityId={opportunityId} parts={parts} members={members} />
-      <CharterPanel opportunityId={opportunityId} view={charter} />
+      <CharterPanel key={`${charter.charter.draftedAt ?? ""}|${charter.signedAt ?? ""}`} opportunityId={opportunityId} view={charter} />
       <PlanRecordPanel opportunityId={opportunityId} view={charter} members={members} />
     </div>
   );
