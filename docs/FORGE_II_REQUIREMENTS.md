@@ -113,9 +113,9 @@ Last reviewed 2026-11-06, after PR #457.
 
 | ID | Requirement | Status |
 |---|---|---|
-| P-1 | A development plan with a **RACI** matrix (responsible, accountable, consulted / kept informed, notified) | 📋 Phase 4 |
-| P-2 | A team and a **charter** for the proposal | 📋 Phase 4 |
-| P-3 | Name the **Pink, Red, Gold and White Gloves** team members, notified automatically when the proposal reaches their review | 🟡 Color-team review rounds exist on proposals today. Naming the teams in Plan and notifying them automatically is phase 4 |
+| P-1 | A development plan with a **RACI** matrix (responsible, accountable, consulted / kept informed, notified) | ✅ Phase 4a: the RACI letter per person per area on the opportunity's Plan tab |
+| P-2 | A team and a **charter** for the proposal | 🟡 Phase 4a: the team on the plan, one list with the solicitation's, told their duty at once. The charter is phase 4c |
+| P-3 | Name the **Pink, Red, Gold and White Gloves** team members, notified automatically when the proposal reaches their review | 🟡 Phase 4a: the four teams named on the plan and each person told now. The round created from the named team is phase 4c |
 | P-4 | Assign the proposal's parts (implementation plan, financial, compliance and so on) to owners, who are told their duties | 🟡 Section assignments with notifications exist. Phase 4 adds the plan view |
 | P-5 | **Timelines and milestones** for each task, to meet the deadline | 📋 Phase 4 |
 | P-6 | Finalise the teaming or subcontract agreement in Plan, so partner staff can join the review groups | 📋 Phases 4 and 8 |

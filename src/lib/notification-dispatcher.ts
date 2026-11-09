@@ -424,6 +424,9 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
     case "solicitation_amended":
       // BL-SCOUT-AMEND — its own inbox kind (drizzle/0145).
       return "solicitation_amended" as const;
+    case "plan_role_assigned":
+      // BL-NAV-LIFECYCLE 4a — its own inbox kind (drizzle/0159).
+      return "plan_role_assigned" as const;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;

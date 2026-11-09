@@ -10,6 +10,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   solicitation_role_assigned: "Assigned to solicitation",
   solicitation_amended: "Solicitation amended",
   partner_answered: "Partner answered",
+  plan_role_assigned: "Named on a plan",
 };
 
 export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
@@ -21,6 +22,7 @@ export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
   solicitation_role_assigned: "👥",
   solicitation_amended: "±",
   partner_answered: "✓",
+  plan_role_assigned: "👥",
 };
 
 export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
@@ -34,4 +36,6 @@ export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
   solicitation_amended: THEME.brass,
   // Done: the partner's answers are in.
   partner_answered: THEME.green,
+  // In progress: a duty on the plan.
+  plan_role_assigned: THEME.cobalt,
 };

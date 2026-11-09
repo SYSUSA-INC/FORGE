@@ -3706,12 +3706,55 @@ Every requirement in the FORGE II document, with its status and phase:
        Tested in `tests/ai/partner-invite-logic.test.ts`,
        `tests/ai/partner-compare-logic.test.ts` and
        `tests/isolation/partner-invite-cron.test.ts`. Phase 3 Capture is
-       complete with this PR; the phase 4 design draft is
-       `docs/design/BL-NAV-LIFECYCLE_PHASE4_PLAN.md`, its decisions
-       open for the owner.
-4. **Plan:** RACI, team and charter, the named Pink / Red / Gold / White
-   Gloves teams notified automatically, task owners, milestones, the
-   compliance matrix and outline fixed here.
+       complete with #478; the phase 4 design is
+       `docs/design/BL-NAV-LIFECYCLE_PHASE4_PLAN.md`.
+4. **Plan:** design `docs/design/BL-NAV-LIFECYCLE_PHASE4_PLAN.md`,
+   approved by the owner 2026-11-09 with every recommended answer (the
+   team lives on the plan, seeded from the solicitation's assignments
+   and kept in step; a structured charter with a cited AI draft; a
+   PARTNER opportunity waits in Plan for a signed agreement; the
+   count-back schedule is proposed and the manager moves it; hours and
+   budget an estimate only; a default rule per tenant for
+   `plan_role_assigned` and `milestone_due_soon`). PRs:
+   - **4a — the Plan page, the team and the RACI, the colour teams,
+     `plan_role_assigned` (this PR).** Migrations 0159 and 0160:
+     `opportunity_plan` (one per opportunity, created on the first visit
+     to the Plan tab; the solicitation it is kept in step with; when the
+     team was seeded) and `opportunity_plan_role` (a member, one of the
+     nine solicitation roles plus *executive sponsor* and *contracts*, the
+     colour for a colour-team reviewer, the RACI letter per area —
+     management, technical, past performance, pricing, compliance,
+     production — notes, and whether the row was seeded or named on the
+     plan; unique per plan, person, role and colour); the
+     `plan_role_assigned` trigger kind and inbox kind, and a default rule
+     per tenant (in-app + email to the person named; a tenant created
+     later gets it the first time a plan names someone; a tenant with its
+     own rule keeps it). `src/lib/plan-logic.ts` (pure, tested) holds the
+     roles, areas, letters and colour teams, how the solicitation's
+     assignments and the plan's shared roles stay one list (an assignment
+     with no row is added as *seeded*, a shared row whose assignment is
+     gone is removed; executive sponsor and contracts live on the plan
+     only), the plan's state (people, areas with an A, colour teams
+     named) and the next step. `src/lib/plan-store.ts` creates and loads
+     the plan (audited `opportunity.plan.create` and
+     `opportunity.plan.team.seed`; seeding never notifies, the
+     solicitation already did), names and removes people (audited
+     `opportunity.plan.role.add` / `remove`; a shared role is written to
+     the solicitation's assignments too and leaves them with the last
+     colour row), sets RACI letters (`opportunity.plan.raci.set`) and
+     summarises the plans for the stage page. The opportunity's **Plan**
+     tab holds the team as an `.aur-table` with one select per area and
+     the four colour teams side by side; **Pipeline → Plan** lists each
+     Captured opportunity with days left, the plan's state line and the
+     next step (Name the team, Assign the RACI, Name the colour teams,
+     Open the plan). Not in 4a: the round's planned date (4b, the
+     milestones), the round created from the named team (4c). Tested in
+     `tests/ai/plan-logic.test.ts` and `tests/isolation/plan.test.ts`.
+   - **4b — milestones** (`opportunity_milestone`, Build the schedule,
+     `milestone_due_soon`), section due dates and the overdue trigger.
+   - **4c — the charter** with the AI draft, the agreement record, the
+     budget and risk list, the freeze, Move to Develop, the review round
+     created from the named team.
 5. **Develop:** Create a draft on the opportunity page (the bootstrap
    exists), external reviewers with section-level access, scheduling
    links for reviews.
