@@ -32,6 +32,7 @@ import {
   knowledgeArtifacts,
   proposalTemplates,
   sectionChatAttachments,
+  opportunityPlans,
   solicitationDocuments,
   solicitations,
   type FileUpload,
@@ -904,6 +905,14 @@ async function recordHoldsUpload(row: Pick<FileUpload, "organizationId" | "resou
           .select({ id: solicitations.id })
           .from(solicitations)
           .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.id, resourceId), eq(solicitations.storagePath, storageKey)))
+          .limit(1),
+      );
+    case "plan_agreement":
+      return found(
+        db
+          .select({ id: opportunityPlans.id })
+          .from(opportunityPlans)
+          .where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.agreementStorageKey, storageKey)))
           .limit(1),
       );
     case "solicitation_document":

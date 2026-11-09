@@ -83,6 +83,7 @@ import {
 import type { SolicitationReviewResult } from "@/db/schema";
 import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-loss";
 import { buildPartnerRankPrompt, partnerRankSchema } from "@/lib/partner-rank-logic";
+import { buildCharterPrompt, charterDraftSchema } from "@/lib/plan-charter-logic";
 import { buildPartnerRatePrompt, partnerRateSchema, scorePartners } from "@/lib/partner-compare-logic";
 import { buildInboundBidsPrompt, inboundBidsSchema } from "@/lib/inbound-bids-logic";
 import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
@@ -452,6 +453,13 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       widened: false,
     }),
   ],
+  plan_charter_draft: () => [
+    buildCharterPrompt({
+      opportunity: { title: "Help desk modernization", agency: "Department of Veterans Affairs" },
+      isPartner: true,
+      facts: ["The decision on this opportunity was Partner.", "The probability of winning (PWin) at the decision was 55%.", "Chosen partner Harbor Systems (teaming partner) answered 12 capability questions."],
+    }),
+  ],
   partner_rate: () => [
     buildPartnerRatePrompt({
       opportunity: { title: "Help desk modernization", agency: "Department of Veterans Affairs" },
@@ -622,6 +630,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   loss_intelligence: [lossNarrativeSchema],
   partner_rank: [partnerRankSchema],
   partner_rate: [partnerRateSchema],
+  plan_charter_draft: [charterDraftSchema],
   review_preflight: [reviewPreflightSchema],
   proposal_bootstrap: [proposalBootstrapSchema],
   opportunity_triage: [scoutTriageSchema],

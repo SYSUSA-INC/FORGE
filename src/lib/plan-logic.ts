@@ -7,6 +7,7 @@
 import type { OpportunityStage, PlanRaci, PlanRole } from "@/db/schema";
 import type { SolicitationRole } from "@/db/schema";
 import { SOLICITATION_ROLE_LABELS, SOLICITATION_ROLES } from "@/lib/solicitation-roles";
+import type { CharterStatus } from "@/lib/plan-charter-logic";
 import { NO_PARTS, type PartsCount } from "@/lib/section-plan-logic";
 
 /** Plan lists stage Captured; Move to Develop (4c) moves it on. */
@@ -129,9 +130,11 @@ export type PlanState = {
   milestones: number;
   /** The proposals' sections and how many have an owner and a date (4b-2); all zero until the outline exists. */
   parts: PartsCount;
+  /** The charter (4c-1): not started, in draft, or signed. */
+  charter: CharterStatus;
 };
 
-export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCount = NO_PARTS): PlanState {
+export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCount = NO_PARTS, charter: CharterStatus = "none"): PlanState {
   const people = new Set(rows.map((r) => r.userId)).size;
   const accountable = RACI_AREAS.filter((area) => rows.some((r) => normalizeRaci(r.raci)[area] === "A"));
   const colorTeams = { pink: 0, red: 0, gold: 0, white_gloves: 0 } as Record<PlanColorTeam, number>;
@@ -146,10 +149,11 @@ export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCoun
     colorTeamsNamed: PLAN_COLOR_TEAMS.filter((c) => colorTeams[c] > 0).length,
     milestones,
     parts,
+    charter,
   };
 }
 
-export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "own_parts" | "plan_ready";
+export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "own_parts" | "sign_charter" | "plan_ready";
 
 export const PLAN_NEXT_STEP_LABELS: Record<PlanNextStep, string> = {
   name_team: "Name the team",
@@ -157,6 +161,7 @@ export const PLAN_NEXT_STEP_LABELS: Record<PlanNextStep, string> = {
   name_color_teams: "Name the colour teams",
   build_schedule: "Build the schedule",
   own_parts: "Own the parts",
+  sign_charter: "Sign the charter",
   plan_ready: "Open the plan",
 };
 
@@ -167,6 +172,7 @@ export function planNextStep(state: PlanState): PlanNextStep {
   if (state.colorTeamsNamed < PLAN_COLOR_TEAMS.length) return "name_color_teams";
   if (state.milestones === 0) return "build_schedule";
   if (state.parts.total > 0 && state.parts.owned < state.parts.total) return "own_parts";
+  if (state.charter !== "signed") return "sign_charter";
   return "plan_ready";
 }
 
@@ -178,6 +184,7 @@ export function planStateLine(state: PlanState): string {
     `${state.colorTeamsNamed} of ${PLAN_COLOR_TEAMS.length} colour teams`,
     state.milestones === 0 ? "no schedule" : `${state.milestones} ${state.milestones === 1 ? "milestone" : "milestones"}`,
     state.parts.total > 0 ? `parts owned ${state.parts.owned} of ${state.parts.total}` : null,
+    state.charter === "signed" ? "charter signed" : state.charter === "draft" ? "charter in draft" : "no charter",
   ]
     .filter(Boolean)
     .join(" · ");

@@ -21,7 +21,8 @@ export type UploadResourceType =
   | "solicitation_document"
   | "knowledge_artifact"
   | "proposal_template"
-  | "section_chat_attachment";
+  | "section_chat_attachment"
+  | "plan_agreement";
 
 export type PurposePolicy = {
   maxBytes: number;
@@ -51,7 +52,7 @@ export const UPLOAD_POLICIES: Record<UploadPurpose, PurposePolicy> = {
     formats: ["pdf", "docx", "xlsx", "pptx", "text", "image"],
     transient: false,
     countsTowardQuota: true,
-    claimableAs: ["solicitation", "solicitation_document", "knowledge_artifact"],
+    claimableAs: ["solicitation", "solicitation_document", "knowledge_artifact", "plan_agreement"],
   },
   template_docx: {
     maxBytes: 50 * MiB,

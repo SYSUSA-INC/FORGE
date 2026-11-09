@@ -31,6 +31,7 @@ import {
   type RaciArea,
   type RaciLetter,
 } from "@/lib/plan-logic";
+import { charterStatus } from "@/lib/plan-charter-logic";
 import { partsCount, type PartsCount } from "@/lib/section-plan-logic";
 
 /**
@@ -119,7 +120,7 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
   if (!opp) return null;
 
   let [plan] = await db
-    .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt })
+    .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt })
     .from(opportunityPlans)
     .where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.opportunityId, opportunityId)))
     .limit(1);
@@ -129,13 +130,13 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
       .insert(opportunityPlans)
       .values({ organizationId, opportunityId, solicitationId, createdByUserId: input.actor.userId })
       .onConflictDoNothing({ target: opportunityPlans.opportunityId })
-      .returning({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt });
+      .returning({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt });
     if (created) {
       plan = created;
       await recordAudit({ organizationId, actor: input.actor, action: "opportunity.plan.create", resourceType: "opportunity", resourceId: opportunityId, metadata: { planId: plan.id, solicitationId } });
     } else {
       [plan] = await db
-        .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt })
+        .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt })
         .from(opportunityPlans)
         .where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.opportunityId, opportunityId)))
         .limit(1);
@@ -174,7 +175,8 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
     }
   }
   const [milestones, parts] = await Promise.all([milestoneCounts(organizationId, [opportunityId]), partsCounts(organizationId, [opportunityId])]);
-  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0, parts.get(opportunityId)) };
+  const charter = charterStatus(plan.charter, plan.charterSignedAt);
+  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0, parts.get(opportunityId), charter) };
 }
 
 /** The proposals' sections per opportunity (BL-NAV-LIFECYCLE 4b-2), for the plan's state; scoped through the proposal, which carries the organization. */
@@ -360,6 +362,11 @@ export async function planSummaries(organizationId: string, opportunityIds: stri
     .from(opportunityPlanRoles)
     .where(and(eq(opportunityPlanRoles.organizationId, organizationId), inArray(opportunityPlanRoles.opportunityId, opportunityIds)));
   const [milestones, parts] = await Promise.all([milestoneCounts(organizationId, opportunityIds), partsCounts(organizationId, opportunityIds)]);
-  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0, parts.get(id)));
+  const charters = await db
+    .select({ opportunityId: opportunityPlans.opportunityId, charter: opportunityPlans.charter, signedAt: opportunityPlans.charterSignedAt })
+    .from(opportunityPlans)
+    .where(and(eq(opportunityPlans.organizationId, organizationId), inArray(opportunityPlans.opportunityId, opportunityIds)));
+  const status = new Map(charters.map((c) => [c.opportunityId, charterStatus(c.charter, c.signedAt)]));
+  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0, parts.get(id), status.get(id) ?? "none"));
   return out;
 }

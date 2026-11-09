@@ -3829,9 +3829,53 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/ai/section-plan-logic.test.ts`, the timeline cases in
      `tests/ai/milestone-logic.test.ts`, and
      `tests/isolation/section-plan.test.ts`.
-   - **4c — the charter** with the AI draft, the agreement record, the
-     budget and risk list, the freeze, Move to Develop, the review round
-     created from the named team.
+   - **4c-1 (delivered, this PR) — the charter, the agreement, the budget
+     and the risks** (P-2, P-6, P-7; split from 4c because the whole of 4c
+     would pass 1,500 lines). Migration `0165` adds to `opportunity_plan`
+     the `charter` jsonb (`PlanCharter`: strategy, win themes, discriminators,
+     pricing posture, the partner's share, and the `sources` the draft
+     rested on), its sign-off (`charter_signed_by_user_id` / `_at`), the
+     agreement by hand (`agreement_status` todo / negotiating / signed,
+     `agreement_date`, and the file as `agreement_file_name` /
+     `_storage_key` / `_file_size`), the budget estimate
+     (`budget_hours`, `budget_dollars`; no time logging, decision 5), the
+     `qa_cutoff_date` and `amendment_cutoff_date` (null reads the
+     solicitation's *qa_cutoff* and *final_rfp* key dates) and `risks`
+     jsonb (title, likelihood, impact, owner, mitigation). The rules are
+     pure in `src/lib/plan-charter-logic.ts` (normalize, sign-off
+     blockers, agreement and cut-off rules, risk exposure order, the
+     draft's prompt and `validateCharterDraft`, which keeps a claim only
+     when it cites a real numbered fact and every figure in it appears in
+     the facts it cites); the store is `src/lib/plan-charter-store.ts`
+     (every function scopes by organization and audits: save, sign,
+     reopen, agreement, agreement file, budget, risks); the draft is
+     `src/lib/plan-charter-draft.ts` (feature `plan_charter_draft`, the
+     3c-2 pattern: gate, quota with refund, rate limit, read audit
+     `opportunity.plan.charter.draft_ai`) over facts from the decision,
+     the capability matrix, the chosen partners' answers, the key dates
+     and the proposal's win themes (the Analysis Report's body is not read:
+     its sentences are not numbered records). Editing the words of a signed
+     charter withdraws the signature; signing writes the charter's win
+     themes to the opportunity's newest proposal when it has none. The
+     agreement's file goes through `uploadFile()` + `claimUpload` /
+     `finishClaim` (convention 11; new resource type `plan_agreement`,
+     claimable by the `document` purpose) and downloads from
+     `/api/opportunities/[id]/plan-agreement`. The Plan tab gains **The
+     charter** and **Agreement, budget and risks** panels
+     (`CharterPanel.tsx`, `PlanRecordPanel.tsx`, `charter-actions.ts`);
+     the plan's state gains the charter (`no charter` / `charter in draft`
+     / `charter signed` on the Pipeline → Plan line) and the next step order
+     is team → RACI → colour teams → schedule → parts → **Sign the
+     charter** → Open the plan. Tested in
+     `tests/ai/plan-charter-logic.test.ts` and
+     `tests/isolation/plan-charter.test.ts`.
+   - **4c-2 (open) — the freeze** (`frozenAt` for the matrix and outline,
+     the Activity row for each later change), **Move to Develop** (an
+     `opportunity_decision` of kind `plan`, stage `pre_proposal`, blockers
+     shown: an A for every area, the charter signed, milestones, the freeze
+     and, for PARTNER, the agreement signed), and `startReviewAction`
+     creating the round with the plan's colour team and the planned
+     milestone date.
 5. **Develop:** Create a draft on the opportunity page (the bootstrap
    exists), external reviewers with section-level access, scheduling
    links for reviews.
