@@ -6,6 +6,7 @@ import { isPlanColorTeam, isPlanRole, isRaciArea, isRaciLetter } from "@/lib/pla
 import { isIsoDay, isMilestoneKind, isMilestoneStatus } from "@/lib/milestone-logic";
 import { addMilestone, buildSchedule, removeMilestone, updateMilestone, type MilestonePatch } from "@/lib/milestone-store";
 import { addPlanRole, removePlanRole, setPlanRaci } from "@/lib/plan-store";
+import { setPartDueDate, setPartOwner } from "@/lib/section-plan-store";
 
 type Result = { ok: true; id?: string; added?: number } | { ok: false; error: string };
 
@@ -126,5 +127,33 @@ export async function removeMilestoneAction(input: { opportunityId: string; mile
   const { organizationId, actor } = await who();
   const res = await removeMilestone({ organizationId, opportunityId: String(input?.opportunityId ?? ""), milestoneId: String(input?.milestoneId ?? ""), actor });
   if (res.ok) refresh(input.opportunityId);
+  return res;
+}
+
+// ---------------------------------------------------------------------------
+// BL-NAV-LIFECYCLE 4b-2 — the parts: the owner and the due date per section.
+// ---------------------------------------------------------------------------
+
+function refreshParts(opportunityId: string, proposalId: string) {
+  refresh(opportunityId);
+  revalidatePath(`/proposals/${proposalId}`);
+  revalidatePath(`/proposals/${proposalId}/sections`);
+}
+
+/** Names the part's owner (the section author); the owner is told, with the date, when it is someone else. */
+export async function setPartOwnerAction(input: { opportunityId: string; proposalId: string; sectionId: string; authorUserId: string | null }): Promise<Result> {
+  const { organizationId, actor } = await who();
+  const res = await setPartOwner({ organizationId, opportunityId: String(input?.opportunityId ?? ""), sectionId: String(input?.sectionId ?? ""), authorUserId: input?.authorUserId ? String(input.authorUserId) : null, actor });
+  if (res.ok) refreshParts(input.opportunityId, String(input?.proposalId ?? ""));
+  return res;
+}
+
+/** Sets or clears the day the part is due. */
+export async function setPartDueDateAction(input: { opportunityId: string; proposalId: string; sectionId: string; dueDate: string | null }): Promise<Result> {
+  const { organizationId, actor } = await who();
+  const dueDate = input?.dueDate ? String(input.dueDate) : null;
+  if (dueDate && !isIsoDay(dueDate)) return { ok: false, error: "Choose a day." };
+  const res = await setPartDueDate({ organizationId, opportunityId: String(input?.opportunityId ?? ""), sectionId: String(input?.sectionId ?? ""), dueDate, actor });
+  if (res.ok) refreshParts(input.opportunityId, String(input?.proposalId ?? ""));
   return res;
 }

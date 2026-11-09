@@ -23,6 +23,7 @@ import { recordAudit } from "@/lib/audit-log";
 import { autoMapAndApply } from "@/lib/compliance-automap";
 import { seedComplianceItemsFromRequirements } from "@/lib/compliance-seed";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
+import { sectionAssignedMessage } from "@/lib/section-plan-logic";
 import {
   enforceQuota,
   ensureFeature,
@@ -696,6 +697,7 @@ export async function saveSectionAction(input: {
           wordCount: number;
           authorUserId: string | null;
           title: string;
+          dueDate: string | null;
         }
       | undefined;
     if (input.status !== undefined || input.authorUserId !== undefined) {
@@ -706,6 +708,7 @@ export async function saveSectionAction(input: {
           wordCount: proposalSections.wordCount,
           authorUserId: proposalSections.authorUserId,
           title: proposalSections.title,
+          dueDate: proposalSections.dueDate,
         })
         .from(proposalSections)
         .where(
@@ -766,6 +769,9 @@ export async function saveSectionAction(input: {
       const sectionTitle =
         (input.title !== undefined ? input.title.trim() : prior?.title) ||
         "Untitled section";
+      // BL-NAV-LIFECYCLE 4b-2 — the part's due date (set in Plan) rides along.
+      const dueDate = prior?.dueDate ?? null;
+      const msg = sectionAssignedMessage({ sectionTitle, byName: actor.name ?? actor.email ?? "", dueDate });
       try {
         await dispatchTriggerEvent({
           organizationId,
@@ -774,11 +780,12 @@ export async function saveSectionAction(input: {
             proposalId: input.proposalId,
             sectionId: input.sectionId,
             sectionTitle,
+            dueDate,
             mentionedUserIds: [newAuthor],
             assignedByUserId: actor.id,
           },
-          subject: `You were assigned "${sectionTitle}"`,
-          body: `${actor.name ?? actor.email ?? "A teammate"} assigned you the "${sectionTitle}" section. Open the section editor to start drafting.`,
+          subject: msg.subject,
+          body: msg.body,
           linkPath: `/proposals/${input.proposalId}/sections`,
           proposalId: input.proposalId,
           actorUserId: actor.id,

@@ -1373,10 +1373,13 @@ export const proposalSections = pgTable("proposal_section", {
   authorUserId: text("author_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
+  /** BL-NAV-LIFECYCLE 4b-2 (P-4) — the day the part is due, set on the opportunity's Plan tab; YYYY-MM-DD, no hours (drizzle/0163). */
+  dueDate: date("due_date", { mode: "string" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   proposalIdIdx: index("proposal_section_proposal_id_idx").on(t.proposalId),
+  dueDateIdx: index("proposal_section_due_date_idx").on(t.dueDate),
 }));
 
 /**
@@ -2117,6 +2120,8 @@ export const notificationKindEnum = pgEnum("notification_kind", [
   "plan_role_assigned",
   // BL-NAV-LIFECYCLE 4b-1 — a milestone you own is due in 7, 3 or 1 days (drizzle/0161).
   "milestone_due_soon",
+  // BL-NAV-LIFECYCLE 4b-2 — a section you own is past its due date with no draft (drizzle/0163).
+  "proposal_section_overdue",
 ]);
 
 export const notifications = pgTable("notification", {

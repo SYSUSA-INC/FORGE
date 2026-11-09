@@ -12,6 +12,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   partner_answered: "Partner answered",
   plan_role_assigned: "Named on a plan",
   milestone_due_soon: "Milestone due soon",
+  proposal_section_overdue: "Section overdue",
 };
 
 export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
@@ -25,6 +26,7 @@ export const NOTIFICATION_KIND_ICONS: Record<NotificationKind, string> = {
   partner_answered: "✓",
   plan_role_assigned: "👥",
   milestone_due_soon: "◷",
+  proposal_section_overdue: "!",
 };
 
 export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
@@ -42,4 +44,6 @@ export const NOTIFICATION_KIND_COLORS: Record<NotificationKind, string> = {
   plan_role_assigned: THEME.cobalt,
   // Attention: a milestone you own is close.
   milestone_due_soon: THEME.brass,
+  // Blocked: a part past its date with nothing written.
+  proposal_section_overdue: THEME.red,
 };

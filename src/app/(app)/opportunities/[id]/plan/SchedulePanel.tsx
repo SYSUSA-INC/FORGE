@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { GanttRow } from "@/components/ui/GanttRow";
 import { Panel } from "@/components/ui/Panel";
+import type { MilestoneKind, MilestoneStatus } from "@/db/schema";
 import {
   COUNT_BACK_DAYS,
   daysBetween,
@@ -12,6 +14,7 @@ import {
   MILESTONE_STATUSES,
   PROPOSED_KINDS,
   RESPONSE_DUE_ANCHOR,
+  timelineLayout,
 } from "@/lib/milestone-logic";
 import type { ScheduleView } from "@/lib/milestone-store";
 import type { PlanMember } from "@/lib/plan-store";
@@ -28,6 +31,65 @@ function relative(todayIso: string, iso: string): string {
   return d > 0 ? `in ${d} days` : `${-d} days ago`;
 }
 
+/** The bar's colour: status first (green done, red missed or overdue), then the colour team's own colour, cobalt for the rest. */
+function barColor(kind: MilestoneKind, status: MilestoneStatus, overdue: boolean): string {
+  if (status === "done") return "bg-green";
+  if (status === "missed" || overdue) return "bg-red";
+  switch (kind) {
+    case "pink_team":
+      return "bg-plum";
+    case "red_team":
+      return "bg-red";
+    case "gold_team":
+      return "bg-brass";
+    case "white_gloves":
+      return "bg-muted";
+    default:
+      return "bg-cobalt";
+  }
+}
+
+/**
+ * BL-NAV-LIFECYCLE 4b-2 (P-5) — the schedule drawn as a timeline: one bar
+ * per milestone, running from the one before it to its own day, the key
+ * dates and the parts' due dates as marks on the axis, today as the
+ * marker. The layout is pure (`timelineLayout`); this only draws it.
+ */
+function Timeline({ todayIso, anchor, keyDates, milestones, partDueDates }: { todayIso: string; anchor: ScheduleView["anchor"]; keyDates: ScheduleView["keyDates"]; milestones: ScheduleView["milestones"]; partDueDates: string[] }) {
+  const layout = timelineLayout({ todayIso, anchor, keyDates, milestones, partDueDates });
+  if (!layout || layout.bars.length === 0) return null;
+  return (
+    <div className="mb-4" aria-label="The schedule as a timeline">
+      <div className="relative mb-1 h-8">
+        {layout.marks.map((m) => (
+          <span
+            key={`${m.kind}-${m.iso}-${m.label}`}
+            className={`absolute top-0 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] ${m.kind === "due" ? "font-semibold text-red" : m.kind === "parts" ? "text-cobalt" : "text-muted"}`}
+            style={{ left: `${m.pct}%` }}
+            title={`${m.label} · ${m.iso}`}
+          >
+            <span className="block text-center">{m.label}</span>
+            <span className={`mx-auto block h-2 w-px ${m.kind === "due" ? "bg-red" : "bg-layer/40"}`} />
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        {layout.bars.map((b) => (
+          <div key={b.id} className="flex items-center gap-2">
+            <GanttRow startPct={b.startPct} endPct={b.endPct} label={b.label} color={barColor(b.kind, b.status, b.overdue)} marker={layout.todayPct ?? undefined} />
+            <span className="w-24 shrink-0 font-mono text-[10px] text-muted">{b.date}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 flex justify-between font-mono text-[10px] text-muted">
+        <span>{layout.startIso}</span>
+        <span>{layout.todayPct !== null ? "the marker is today" : "today is outside the span"}</span>
+        <span>{layout.endIso}</span>
+      </p>
+    </div>
+  );
+}
+
 /**
  * BL-NAV-LIFECYCLE 4b-1 (P-5) — the schedule on the Plan tab: Build the
  * schedule proposes the kick-off today and counts back from the due date;
@@ -35,7 +97,7 @@ function relative(todayIso: string, iso: string): string {
  * others by hand. Status reads the same as everywhere: green done, red
  * missed or overdue, muted planned.
  */
-export function SchedulePanel({ opportunityId, schedule, members }: { opportunityId: string; schedule: ScheduleView; members: PlanMember[] }) {
+export function SchedulePanel({ opportunityId, schedule, members, partDueDates = [] }: { opportunityId: string; schedule: ScheduleView; members: PlanMember[]; partDueDates?: string[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +157,7 @@ export function SchedulePanel({ opportunityId, schedule, members }: { opportunit
           Key dates: {[anchor?.key === RESPONSE_DUE_ANCHOR ? `Response due ${anchor.iso}` : null, ...keyDates.map((k) => `${k.label} ${k.isoDate}`)].filter(Boolean).join(" · ")}
         </p>
       ) : null}
+      <Timeline todayIso={todayIso} anchor={anchor} keyDates={keyDates} milestones={milestones} partDueDates={partDueDates} />
       {milestones.length === 0 ? (
         <p className="font-body text-[13px] leading-[1.5] text-muted">No milestones yet. Build the schedule, or add one below.</p>
       ) : (
