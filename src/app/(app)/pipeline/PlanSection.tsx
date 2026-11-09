@@ -41,7 +41,7 @@ export async function PlanSection({ rows }: { rows: StageListRow[] }) {
                 </div>
                 <span className={`font-mono text-[11px] ${days !== null && days < 5 ? "text-red" : "text-muted"}`}>{days === null ? "no due date" : days < 0 ? "past due" : `${days}d left`}</span>
                 <span className="font-mono text-[11px] text-muted">{planStateLine(state)}</span>
-                <Link href={`/opportunities/${r.id}/plan`} className={`aur-btn justify-self-start whitespace-nowrap ${step === "plan_ready" ? "aur-btn-ghost" : "aur-btn-primary"}`}>
+                <Link href={`/opportunities/${r.id}/plan`} className="aur-btn aur-btn-primary justify-self-start whitespace-nowrap">
                   {PLAN_NEXT_STEP_LABELS[step]}
                 </Link>
               </li>

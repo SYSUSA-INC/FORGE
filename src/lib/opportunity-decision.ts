@@ -7,10 +7,13 @@
  */
 import type { OpportunityDecisionKind, OpportunityStage } from "@/db/schema";
 
-export const DECISION_LABELS: Record<OpportunityDecisionKind, string> = { go: "GO", no_go: "NO-GO", partner: "PARTNER" };
+/** The three calls the team makes at Evaluate; `plan` is what a plan's Move to Develop writes (4c-2), never chosen here. */
+export type EvaluateDecisionKind = Exclude<OpportunityDecisionKind, "plan">;
+
+export const DECISION_LABELS: Record<OpportunityDecisionKind, string> = { go: "GO", no_go: "NO-GO", partner: "PARTNER", plan: "PLAN" };
 
 /** Where each decision takes the opportunity. */
-export const DECISION_STAGE: Record<OpportunityDecisionKind, OpportunityStage> = { go: "qualification", no_go: "no_bid", partner: "qualification" };
+export const DECISION_STAGE: Record<EvaluateDecisionKind, OpportunityStage> = { go: "qualification", no_go: "no_bid", partner: "qualification" };
 
 export const NO_GO_CATEGORIES = [
   { key: "scope", label: "Scope isn't ours" },
@@ -30,8 +33,8 @@ export const NO_GO_REASON_MIN = 20;
 export type DecisionInput = { decision: string; category?: string; reason?: string };
 
 /** The decision as it will be stored, or why it can't be. */
-export function checkDecision(input: DecisionInput): { ok: true; decision: OpportunityDecisionKind; category: string; reason: string } | { ok: false; error: string } {
-  const decision = input.decision as OpportunityDecisionKind;
+export function checkDecision(input: DecisionInput): { ok: true; decision: EvaluateDecisionKind; category: string; reason: string } | { ok: false; error: string } {
+  const decision = input.decision as EvaluateDecisionKind;
   if (!Object.prototype.hasOwnProperty.call(DECISION_STAGE, decision)) return { ok: false, error: "Choose GO, NO-GO or PARTNER." };
   const reason = (input.reason ?? "").trim().slice(0, 4000);
   if (decision !== "no_go") return { ok: true, decision, category: "", reason };

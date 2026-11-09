@@ -10,7 +10,7 @@ import { safeQuery } from "@/lib/schema-resilience";
 import type { StageListRow } from "./StageList";
 import { SourceLink } from "@/components/opportunities/SourceLink";
 
-const DECISION_TONE = { go: "text-green", no_go: "text-red", partner: "text-indigo" } as const;
+const DECISION_TONE = { go: "text-green", no_go: "text-red", partner: "text-indigo", plan: "text-cobalt" } as const;
 
 /**
  * BL-NAV-LIFECYCLE phase 3a (FORGE II footnote 6, C-1) — the Capture page:

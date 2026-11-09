@@ -22,6 +22,8 @@ import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import {
   diffTeam,
   isSharedRole,
+  plannedRound,
+  PLAN_COLOR_TEAMS,
   normalizeRaci,
   planRoleAssignedMessage,
   planState,
@@ -32,6 +34,7 @@ import {
   type RaciLetter,
 } from "@/lib/plan-logic";
 import { charterStatus } from "@/lib/plan-charter-logic";
+import { frozenState, type FrozenState } from "@/lib/plan-freeze-logic";
 import { partsCount, type PartsCount } from "@/lib/section-plan-logic";
 
 /**
@@ -120,7 +123,7 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
   if (!opp) return null;
 
   let [plan] = await db
-    .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt })
+    .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt, complianceMatrixFrozenAt: opportunityPlans.complianceMatrixFrozenAt, outlineFrozenAt: opportunityPlans.outlineFrozenAt })
     .from(opportunityPlans)
     .where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.opportunityId, opportunityId)))
     .limit(1);
@@ -130,13 +133,13 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
       .insert(opportunityPlans)
       .values({ organizationId, opportunityId, solicitationId, createdByUserId: input.actor.userId })
       .onConflictDoNothing({ target: opportunityPlans.opportunityId })
-      .returning({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt });
+      .returning({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt, complianceMatrixFrozenAt: opportunityPlans.complianceMatrixFrozenAt, outlineFrozenAt: opportunityPlans.outlineFrozenAt });
     if (created) {
       plan = created;
       await recordAudit({ organizationId, actor: input.actor, action: "opportunity.plan.create", resourceType: "opportunity", resourceId: opportunityId, metadata: { planId: plan.id, solicitationId } });
     } else {
       [plan] = await db
-        .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt })
+        .select({ id: opportunityPlans.id, solicitationId: opportunityPlans.solicitationId, teamSeededAt: opportunityPlans.teamSeededAt, charter: opportunityPlans.charter, charterSignedAt: opportunityPlans.charterSignedAt, complianceMatrixFrozenAt: opportunityPlans.complianceMatrixFrozenAt, outlineFrozenAt: opportunityPlans.outlineFrozenAt })
         .from(opportunityPlans)
         .where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.opportunityId, opportunityId)))
         .limit(1);
@@ -176,7 +179,7 @@ export async function loadPlan(input: { organizationId: string; opportunityId: s
   }
   const [milestones, parts] = await Promise.all([milestoneCounts(organizationId, [opportunityId]), partsCounts(organizationId, [opportunityId])]);
   const charter = charterStatus(plan.charter, plan.charterSignedAt);
-  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0, parts.get(opportunityId), charter) };
+  return { id: plan.id, opportunityId, solicitationId: plan.solicitationId, teamSeededAt, roles: rows, state: planState(rows, milestones.get(opportunityId) ?? 0, parts.get(opportunityId), charter, frozenState(plan)) };
 }
 
 /** The proposals' sections per opportunity (BL-NAV-LIFECYCLE 4b-2), for the plan's state; scoped through the proposal, which carries the organization. */
@@ -363,10 +366,40 @@ export async function planSummaries(organizationId: string, opportunityIds: stri
     .where(and(eq(opportunityPlanRoles.organizationId, organizationId), inArray(opportunityPlanRoles.opportunityId, opportunityIds)));
   const [milestones, parts] = await Promise.all([milestoneCounts(organizationId, opportunityIds), partsCounts(organizationId, opportunityIds)]);
   const charters = await db
-    .select({ opportunityId: opportunityPlans.opportunityId, charter: opportunityPlans.charter, signedAt: opportunityPlans.charterSignedAt })
+    .select({ opportunityId: opportunityPlans.opportunityId, charter: opportunityPlans.charter, signedAt: opportunityPlans.charterSignedAt, complianceMatrixFrozenAt: opportunityPlans.complianceMatrixFrozenAt, outlineFrozenAt: opportunityPlans.outlineFrozenAt })
     .from(opportunityPlans)
     .where(and(eq(opportunityPlans.organizationId, organizationId), inArray(opportunityPlans.opportunityId, opportunityIds)));
   const status = new Map(charters.map((c) => [c.opportunityId, charterStatus(c.charter, c.signedAt)]));
-  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0, parts.get(id), status.get(id) ?? "none"));
+  const frozen = new Map<string, FrozenState>(charters.map((c) => [c.opportunityId, frozenState(c)]));
+  for (const id of opportunityIds) out.set(id, planState(rows.filter((r) => r.opportunityId === id), milestones.get(id) ?? 0, parts.get(id), status.get(id) ?? "none", frozen.get(id)));
+  return out;
+}
+
+/**
+ * What the plan of a proposal's opportunity holds for each colour team's
+ * round (4c-2, P-3): the reviewers named and the milestone's date. Reads
+ * only: it never creates a plan. A proposal with no opportunity or plan
+ * has nothing planned.
+ */
+export async function plannedRoundsForProposal(organizationId: string, proposalId: string): Promise<Record<PlanColorTeam, { reviewerUserIds: string[]; dueDate: string | null }>> {
+  const none = Object.fromEntries(PLAN_COLOR_TEAMS.map((c) => [c, { reviewerUserIds: [], dueDate: null }])) as unknown as Record<PlanColorTeam, { reviewerUserIds: string[]; dueDate: string | null }>;
+  const [p] = await db
+    .select({ opportunityId: proposals.opportunityId })
+    .from(proposals)
+    .where(and(eq(proposals.id, proposalId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  if (!p?.opportunityId) return none;
+  const [rows, milestones] = await Promise.all([
+    db
+      .select({ userId: opportunityPlanRoles.userId, role: opportunityPlanRoles.role, colorTeam: opportunityPlanRoles.colorTeam })
+      .from(opportunityPlanRoles)
+      .where(and(eq(opportunityPlanRoles.organizationId, organizationId), eq(opportunityPlanRoles.opportunityId, p.opportunityId), eq(opportunityPlanRoles.role, "color_team_reviewer"))),
+    db
+      .select({ kind: opportunityMilestones.kind, date: opportunityMilestones.date, status: opportunityMilestones.status })
+      .from(opportunityMilestones)
+      .where(and(eq(opportunityMilestones.organizationId, organizationId), eq(opportunityMilestones.opportunityId, p.opportunityId))),
+  ]);
+  const out = { ...none };
+  for (const c of PLAN_COLOR_TEAMS) out[c] = plannedRound(rows, milestones.map((m) => ({ kind: m.kind, date: String(m.date), status: m.status })), c);
   return out;
 }

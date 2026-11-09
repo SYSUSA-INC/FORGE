@@ -8,9 +8,11 @@ import type { OpportunityStage, PlanRaci, PlanRole } from "@/db/schema";
 import type { SolicitationRole } from "@/db/schema";
 import { SOLICITATION_ROLE_LABELS, SOLICITATION_ROLES } from "@/lib/solicitation-roles";
 import type { CharterStatus } from "@/lib/plan-charter-logic";
+import type { MilestoneKind } from "@/db/schema";
+import type { ReviewColor } from "@/db/schema";
 import { NO_PARTS, type PartsCount } from "@/lib/section-plan-logic";
 
-/** Plan lists stage Captured; Move to Develop (4c) moves it on. */
+/** Plan lists stage Captured; Move to Develop (4c-2, plan-freeze-logic.ts) moves it on to Pre-proposal, which Develop lists. */
 export const PLAN_LISTS_STAGE: OpportunityStage = "capture";
 
 export const PLAN_ROLES: PlanRole[] = [...SOLICITATION_ROLES, "executive_sponsor", "contracts"];
@@ -132,9 +134,11 @@ export type PlanState = {
   parts: PartsCount;
   /** The charter (4c-1): not started, in draft, or signed. */
   charter: CharterStatus;
+  /** The freeze (4c-2): the compliance matrix and the outline stamped at the end of Plan. */
+  frozen: { matrix: boolean; outline: boolean };
 };
 
-export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCount = NO_PARTS, charter: CharterStatus = "none"): PlanState {
+export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCount = NO_PARTS, charter: CharterStatus = "none", frozen: { matrix: boolean; outline: boolean } = { matrix: false, outline: false }): PlanState {
   const people = new Set(rows.map((r) => r.userId)).size;
   const accountable = RACI_AREAS.filter((area) => rows.some((r) => normalizeRaci(r.raci)[area] === "A"));
   const colorTeams = { pink: 0, red: 0, gold: 0, white_gloves: 0 } as Record<PlanColorTeam, number>;
@@ -150,10 +154,11 @@ export function planState(rows: PlanRoleLike[], milestones = 0, parts: PartsCoun
     milestones,
     parts,
     charter,
+    frozen,
   };
 }
 
-export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "own_parts" | "sign_charter" | "plan_ready";
+export type PlanNextStep = "name_team" | "assign_raci" | "name_color_teams" | "build_schedule" | "own_parts" | "sign_charter" | "freeze" | "move_to_develop";
 
 export const PLAN_NEXT_STEP_LABELS: Record<PlanNextStep, string> = {
   name_team: "Name the team",
@@ -162,7 +167,8 @@ export const PLAN_NEXT_STEP_LABELS: Record<PlanNextStep, string> = {
   build_schedule: "Build the schedule",
   own_parts: "Own the parts",
   sign_charter: "Sign the charter",
-  plan_ready: "Open the plan",
+  freeze: "Freeze the matrix and outline",
+  move_to_develop: "Move to Develop",
 };
 
 /** The next thing the plan needs, in the order a proposal manager fills it. */
@@ -173,7 +179,8 @@ export function planNextStep(state: PlanState): PlanNextStep {
   if (state.milestones === 0) return "build_schedule";
   if (state.parts.total > 0 && state.parts.owned < state.parts.total) return "own_parts";
   if (state.charter !== "signed") return "sign_charter";
-  return "plan_ready";
+  if (!state.frozen.matrix || !state.frozen.outline) return "freeze";
+  return "move_to_develop";
 }
 
 /** One line for the Pipeline → Plan row: "4 people · A for 2 of 6 areas · 1 of 4 colour teams · 6 milestones". */
@@ -185,6 +192,7 @@ export function planStateLine(state: PlanState): string {
     state.milestones === 0 ? "no schedule" : `${state.milestones} ${state.milestones === 1 ? "milestone" : "milestones"}`,
     state.parts.total > 0 ? `parts owned ${state.parts.owned} of ${state.parts.total}` : null,
     state.charter === "signed" ? "charter signed" : state.charter === "draft" ? "charter in draft" : "no charter",
+    state.frozen.matrix && state.frozen.outline ? "frozen" : state.frozen.matrix || state.frozen.outline ? "partly frozen" : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -204,4 +212,26 @@ export function planRoleAssignedMessage(input: {
     subject: `Named ${what} on the plan for ${title}`,
     body: `${input.actorName} named you ${what} on the plan for ${title}.` + (input.notes ? `\n\nNotes: ${input.notes}` : ""),
   };
+}
+
+/** The milestone kind that carries each colour team's planned date. */
+const COLOR_MILESTONE: Partial<Record<ReviewColor, MilestoneKind>> = { pink: "pink_team", red: "red_team", gold: "gold_team", white_gloves: "white_gloves" };
+
+/**
+ * What the plan already holds for a colour team's round (4c-2, P-3): the
+ * reviewers named for that colour, once each, and the date of its
+ * milestone (the earliest not missed, else the earliest). Green is not
+ * planned here, so it has no round to prefill.
+ */
+export function plannedRound(
+  rows: readonly Pick<PlanRoleLike, "userId" | "role" | "colorTeam">[],
+  milestones: readonly { kind: MilestoneKind; date: string; status: string }[],
+  color: ReviewColor,
+): { reviewerUserIds: string[]; dueDate: string | null } {
+  const kind = COLOR_MILESTONE[color];
+  if (!kind) return { reviewerUserIds: [], dueDate: null };
+  const reviewerUserIds = [...new Set(rows.filter((r) => r.role === "color_team_reviewer" && r.colorTeam === color).map((r) => r.userId))];
+  const dates = milestones.filter((m) => m.kind === kind).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const live = dates.find((m) => m.status !== "missed") ?? dates[0];
+  return { reviewerUserIds, dueDate: live?.date ?? null };
 }

@@ -3850,13 +3850,34 @@ Every requirement in the FORGE II document, with its status and phase:
      `claimUpload` / `finishClaim` (`plan_agreement`), downloads at
      `/api/opportunities/[id]/plan-agreement`. Next step after the parts:
      **Sign the charter**. Tests: `plan-charter-logic` and `plan-charter`.
-   - **4c-2 (open) — the freeze** (`frozenAt` for the matrix and outline,
-     the Activity row for each later change), **Move to Develop** (an
-     `opportunity_decision` of kind `plan`, stage `pre_proposal`, blockers
-     shown: an A for every area, the charter signed, milestones, the freeze
-     and, for PARTNER, the agreement signed), and `startReviewAction`
-     creating the round with the plan's colour team and the planned
-     milestone date.
+   - **4c-2 (delivered) — the freeze, Move to Develop and the planned
+     round.** Migration 0166 adds `plan` to `opportunity_decision_kind`
+     (alone in its file) and 0167 adds `compliance_matrix_frozen_at`,
+     `outline_frozen_at` and `frozen_by_user_id` to `opportunity_plan`.
+     **Freeze / Unfreeze** on the Plan tab stamps both (audit
+     `opportunity.plan.freeze` / `unfreeze`, an Activity note each);
+     after the stamp `noteFrozenChange` (`src/lib/plan-freeze-store.ts`)
+     writes an Activity row for a requirement added, removed, imported,
+     remapped or changed in what it requires or where it maps (status,
+     notes and owner are Develop's work and not noted), and for a section
+     added, removed or an outline rebuilt from Section L. It never fails
+     the change it describes. **Move to Develop** (`moveToDevelop`) is
+     offered when every area has an A, the charter is signed, milestones
+     exist, both are frozen and, for PARTNER, the agreement is signed;
+     the blockers are listed on the Plan tab. It writes an
+     `opportunity_decision` of kind `plan` and moves `capture` →
+     `pre_proposal` through `applyOpportunityStage` (source
+     `gate_decision`); audit `opportunity.plan.move_to_develop`.
+     `latestDecisions` skips the `plan` kind, so a PARTNER call stays the
+     Evaluate call (the Decision panel's history shows the plan row).
+     `planNextStep` is now team → RACI → colour teams → schedule → parts →
+     charter → **freeze** → **Move to Develop**. `startReviewAction` fills
+     what the caller leaves out from the plan (`plannedRoundsForProposal`):
+     the colour's reviewers, and the colour's milestone date as the due
+     date; Start review pre-selects both; each reviewer the plan named is
+     told by `review_assignment_added` (the actor is not). Starting early
+     or with other reviewers stays possible. Tests: `plan-freeze-logic`,
+     `plan-freeze`.
 5. **Develop:** Create a draft on the opportunity page (the bootstrap
    exists), external reviewers with section-level access, scheduling
    links for reviews.

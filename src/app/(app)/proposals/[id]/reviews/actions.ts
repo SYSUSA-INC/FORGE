@@ -20,6 +20,8 @@ import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { runInBackground } from "@/lib/background";
 import { extractMentionUserIds } from "@/lib/mentions";
+import { plannedRoundsForProposal } from "@/lib/plan-store";
+import { isPlanColorTeam } from "@/lib/plan-logic";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { runReviewPreflight } from "@/lib/review-preflight";
 import { summarizeReview, type SummarizeReviewResult } from "@/lib/review-summary";
@@ -94,7 +96,21 @@ export async function startReviewAction(input: {
   if (!(await assertProposalOwned(input.proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
-  if (input.reviewerUserIds.length === 0) {
+  // BL-NAV-LIFECYCLE 4c-2 (P-3) — the plan's colour team and planned date
+  // fill what the caller leaves out; starting early or with other
+  // reviewers stays possible because anything passed in wins.
+  const plannedAll = await plannedRoundsForProposal(organizationId, input.proposalId);
+  const planned = isPlanColorTeam(input.color) ? plannedAll[input.color] : { reviewerUserIds: [], dueDate: null };
+  let reviewerUserIds = input.reviewerUserIds;
+  if (reviewerUserIds.length === 0 && planned.reviewerUserIds.length > 0) {
+    const active = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(and(eq(memberships.organizationId, organizationId), eq(memberships.status, "active"), inArray(memberships.userId, planned.reviewerUserIds)));
+    reviewerUserIds = active.map((m) => m.userId);
+  }
+  const dueDate = input.dueDate || planned.dueDate;
+  if (reviewerUserIds.length === 0) {
     return { ok: false, error: "Assign at least one reviewer." };
   }
 
@@ -135,7 +151,7 @@ export async function startReviewAction(input: {
         proposalId: input.proposalId,
         color: input.color,
         status: "in_progress",
-        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        dueDate: dueDate ? new Date(dueDate) : null,
         startedByUserId: actor.id,
         startedAt: new Date(),
         instructions,
@@ -144,14 +160,14 @@ export async function startReviewAction(input: {
       .returning({ id: proposalReviews.id });
     if (!review) return { ok: false, error: "Could not create review." };
 
-    const assignmentRows = input.reviewerUserIds.map((uid) => ({
+    const assignmentRows = reviewerUserIds.map((uid) => ({
       reviewId: review.id,
       userId: uid,
       // The legacy single scope mirrors the first of the reviewer's sections.
       sectionId: scopeByUser.get(uid)?.[0] ?? null,
     }));
     await db.insert(proposalReviewAssignments).values(assignmentRows);
-    const scopeRows = input.reviewerUserIds.flatMap((uid) =>
+    const scopeRows = reviewerUserIds.flatMap((uid) =>
       (scopeByUser.get(uid) ?? []).map((sectionId) => ({ reviewId: review.id, userId: uid, sectionId })),
     );
     if (scopeRows.length > 0) {
@@ -182,7 +198,8 @@ export async function startReviewAction(input: {
       metadata: {
         proposalId: input.proposalId,
         color: input.color,
-        reviewerCount: input.reviewerUserIds.length,
+        reviewerCount: reviewerUserIds.length,
+        fromPlan: reviewerUserIds.filter((u) => planned.reviewerUserIds.includes(u)).length,
         carriedFromReviewId: input.carryFromReviewId ?? null,
         carried,
       },
@@ -203,6 +220,21 @@ export async function startReviewAction(input: {
       reviewId: review.id,
       actorUserId: actor.id,
     });
+
+    // BL-NAV-LIFECYCLE 4c-2 — whoever the plan named for this colour is told
+    // they are on the round (the actor, who started it, already knows).
+    for (const uid of reviewerUserIds.filter((u) => planned.reviewerUserIds.includes(u) && u !== actor.id)) {
+      await dispatchTriggerEvent({
+        organizationId,
+        kind: "review_assignment_added",
+        payload: { proposalId: input.proposalId, reviewId: review.id, color: input.color, addedUserId: uid, sectionId: null, fromPlan: true, mentionedUserIds: [uid] },
+        subject: `${input.color} review — you're on the team the plan named`,
+        linkPath: `/proposals/${input.proposalId}/reviews/${review.id}`,
+        proposalId: input.proposalId,
+        reviewId: review.id,
+        actorUserId: actor.id,
+      });
+    }
 
     // BL-AIP-6 — AI colour-team pre-review: each section is read against
     // its mapped requirements and the win themes, and the findings land

@@ -73,12 +73,16 @@ describe("BL-NAV-LIFECYCLE 4a — plan logic", () => {
     // 4b-1: the schedule comes after the colour teams.
     expect(planNextStep(noSchedule)).toBe("build_schedule");
     expect(planStateLine(noSchedule)).toBe("5 people · A for 6 of 6 areas · 4 of 4 colour teams · no schedule · no charter");
-    // 4c-1: the charter comes after the parts; a signed one opens the plan.
+    // 4c-1: the charter comes after the parts; 4c-2: then the freeze, then Move to Develop.
     const state = planState(named, 6);
     expect(planNextStep(state)).toBe("sign_charter");
     const signed = planState(named, 6, undefined, "signed");
-    expect(planNextStep(signed)).toBe("plan_ready");
+    expect(planNextStep(signed)).toBe("freeze");
+    expect(planNextStep(planState(named, 6, undefined, "signed", { matrix: true, outline: false }))).toBe("freeze");
+    const frozen = planState(named, 6, undefined, "signed", { matrix: true, outline: true });
+    expect(planNextStep(frozen)).toBe("move_to_develop");
     expect(planStateLine(signed)).toBe("5 people · A for 6 of 6 areas · 4 of 4 colour teams · 6 milestones · charter signed");
+    expect(planStateLine(frozen)).toBe("5 people · A for 6 of 6 areas · 4 of 4 colour teams · 6 milestones · charter signed · frozen");
     expect(planStateLine(planState([], 1))).toContain("· 1 milestone");
   });
 

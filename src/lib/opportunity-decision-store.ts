@@ -12,12 +12,12 @@
  */
 import "server-only";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { aiBriefs, companies, opportunities, opportunityCapabilityMatrices, opportunityDecisions, opportunityReports, users, type OpportunityDecisionKind } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { computeCapabilityCoverage } from "@/lib/capability-coverage";
-import { checkDecision, decisionNote, DECISION_STAGE, type DecisionInput } from "@/lib/opportunity-decision";
+import { checkDecision, decisionNote, DECISION_STAGE, type DecisionInput, type EvaluateDecisionKind } from "@/lib/opportunity-decision";
 import { applyOpportunityStage } from "@/lib/opportunity-stage";
 
 type Actor = { userId: string; email?: string | null };
@@ -76,19 +76,19 @@ export async function recordDecision(input: { organizationId: string; opportunit
   return { ok: true, decision: checked.decision };
 }
 
-export type DecisionView = { decision: OpportunityDecisionKind; category: string; reason: string; pwin: number | null; coverage: number | null; by: string | null; at: string };
+export type DecisionView<K extends OpportunityDecisionKind = OpportunityDecisionKind> = { decision: K; category: string; reason: string; pwin: number | null; coverage: number | null; by: string | null; at: string };
 
-/** Each opportunity's latest decision, for the Evaluate list. */
-export async function latestDecisions(organizationId: string, opportunityIds: string[]): Promise<Map<string, DecisionView>> {
-  const out = new Map<string, DecisionView>();
+/** Each opportunity's latest Evaluate decision (GO, NO-GO or PARTNER), for the Evaluate, Capture and Plan lists; the `plan` decision Move to Develop writes (4c-2) is history, not the call. */
+export async function latestDecisions(organizationId: string, opportunityIds: string[]): Promise<Map<string, DecisionView<EvaluateDecisionKind>>> {
+  const out = new Map<string, DecisionView<EvaluateDecisionKind>>();
   if (opportunityIds.length === 0) return out;
   const rows = await db
     .select({ opportunityId: opportunityDecisions.opportunityId, decision: opportunityDecisions.decision, category: opportunityDecisions.reasonCategory, reason: opportunityDecisions.reason, pwin: opportunityDecisions.pwin, coverage: opportunityDecisions.coverage, by: users.name, at: opportunityDecisions.createdAt })
     .from(opportunityDecisions)
     .leftJoin(users, eq(users.id, opportunityDecisions.decidedByUserId))
-    .where(and(eq(opportunityDecisions.organizationId, organizationId), inArray(opportunityDecisions.opportunityId, opportunityIds)))
+    .where(and(eq(opportunityDecisions.organizationId, organizationId), ne(opportunityDecisions.decision, "plan"), inArray(opportunityDecisions.opportunityId, opportunityIds)))
     .orderBy(desc(opportunityDecisions.createdAt));
-  for (const r of rows) if (!out.has(r.opportunityId)) out.set(r.opportunityId, { ...r, at: r.at.toISOString() });
+  for (const r of rows) if (!out.has(r.opportunityId)) out.set(r.opportunityId, { ...r, decision: r.decision as EvaluateDecisionKind, at: r.at.toISOString() });
   return out;
 }
 
@@ -114,7 +114,7 @@ export type EvaluateSignals = {
   questions: number;
   answered: number;
   coverage: number | null;
-  decision: DecisionView | null;
+  decision: DecisionView<EvaluateDecisionKind> | null;
 };
 
 /** What the Evaluate list shows for each opportunity: analysed or not, the matrix, the latest decision. */

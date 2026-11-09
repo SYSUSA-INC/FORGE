@@ -41,6 +41,7 @@ import {
   validateDoc,
 } from "@/lib/tiptap-doc";
 import { getDefaultTemplate } from "@/lib/template-defaults";
+import { noteFrozenChange } from "@/lib/plan-freeze-store";
 import { runInBackground } from "@/lib/background";
 import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
@@ -880,7 +881,7 @@ export async function addCustomSectionAction(input: {
   kind: ProposalSectionKind;
   title: string;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(input.proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
@@ -904,6 +905,7 @@ export async function addCustomSectionAction(input: {
     })
     .returning({ id: proposalSections.id });
 
+  await noteFrozenChange({ organizationId, proposalId: input.proposalId, userId: actor.id, change: { area: "outline", action: "added", label: input.title.trim() } });
   revalidatePath(`/proposals/${input.proposalId}/sections`);
   return { ok: true, id: row!.id };
 }
@@ -912,19 +914,21 @@ export async function removeSectionAction(
   proposalId: string,
   sectionId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAuth();
+  const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(proposalId, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
-  await db
+  const [removed] = await db
     .delete(proposalSections)
     .where(
       and(
         eq(proposalSections.id, sectionId),
         eq(proposalSections.proposalId, proposalId),
       ),
-    );
+    )
+    .returning({ title: proposalSections.title });
+  if (removed) await noteFrozenChange({ organizationId, proposalId, userId: actor.id, change: { area: "outline", action: "removed", label: removed.title } });
   revalidatePath(`/proposals/${proposalId}/sections`);
   return { ok: true };
 }

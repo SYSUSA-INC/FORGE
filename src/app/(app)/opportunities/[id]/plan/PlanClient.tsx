@@ -20,9 +20,11 @@ import type { ScheduleView } from "@/lib/milestone-store";
 import type { PlanMember, PlanView } from "@/lib/plan-store";
 import type { CharterPanelView } from "@/lib/plan-charter-store";
 import type { PartsView } from "@/lib/section-plan-store";
+import type { DevelopView } from "@/lib/plan-freeze-store";
 import { addPlanRoleAction, removePlanRoleAction, setPlanRaciAction } from "./actions";
 import { PartsPanel } from "./PartsPanel";
 import { CharterPanel } from "./CharterPanel";
+import { DevelopPanel } from "./DevelopPanel";
 import { PlanRecordPanel } from "./PlanRecordPanel";
 import { SchedulePanel } from "./SchedulePanel";
 
@@ -36,7 +38,7 @@ const COLOR_TONE: Record<PlanColorTeam, string> = {
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
-export function PlanClient({ opportunityId, plan, members, schedule, parts, charter }: { opportunityId: string; plan: PlanView; members: PlanMember[]; schedule: ScheduleView; parts: PartsView; charter: CharterPanelView }) {
+export function PlanClient({ opportunityId, plan, members, schedule, parts, charter, develop }: { opportunityId: string; plan: PlanView; members: PlanMember[]; schedule: ScheduleView; parts: PartsView; charter: CharterPanelView; develop: DevelopView }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +165,7 @@ export function PlanClient({ opportunityId, plan, members, schedule, parts, char
 
       <Panel title="The colour teams" eyebrow={`${plan.state.colorTeamsNamed} of ${PLAN_COLOR_TEAMS.length} named`}>
         <p className="mb-3 font-body text-[13px] leading-[1.5] text-muted">
-          Name the reviewers ahead of their round. Each person named is told now; the schedule below gives each round its date, and when the proposal reaches their colour, the round starts with them on it (4c).
+          Name the reviewers ahead of their round. Each person named is told now; the schedule below gives each round its date, and when the proposal reaches their colour, Start review opens with them and that date already filled in.
         </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {PLAN_COLOR_TEAMS.map((c) => {
@@ -210,6 +212,7 @@ export function PlanClient({ opportunityId, plan, members, schedule, parts, char
       <PartsPanel opportunityId={opportunityId} parts={parts} members={members} />
       <CharterPanel key={`${charter.charter.draftedAt ?? ""}|${charter.signedAt ?? ""}`} opportunityId={opportunityId} view={charter} />
       <PlanRecordPanel opportunityId={opportunityId} view={charter} members={members} />
+      <DevelopPanel opportunityId={opportunityId} view={develop} />
     </div>
   );
 }
