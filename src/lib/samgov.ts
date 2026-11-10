@@ -385,6 +385,11 @@ export type SamOpportunityQuery = {
   postedDaysBack?: number;
   /** Rows per request; SAM.gov returns at most 1,000. */
   limit?: number;
+  /**
+   * BL-SCOUT-BACKFILL — pages read per code (default 1): each further page is one more
+   * request, asked with SAM.gov's `offset`, until a page comes short or this many are read.
+   */
+  maxPages?: number;
   /** SAM.gov's `deptname`; callers also check the agency themselves (the parameter is deprecated). */
   department?: string;
 };
@@ -435,7 +440,24 @@ export async function fetchSamOpportunities(cred: SamCredential, q: SamOpportuni
     if (ask.code) params.ncode = ask.code;
     if (ask.title) params.title = ask.title;
     if (q.department?.trim()) params.deptname = q.department.trim();
-    return { ask, r: await samGetJson<SamSearchPage>(cred, samUrl(SAM_OPP_BASE, params), "oppSearch") };
+    const size = Number(params.limit);
+    const first = await samGetJson<SamSearchPage>(cred, samUrl(SAM_OPP_BASE, params), "oppSearch");
+    if (!first.ok) return { ask, r: first };
+    // BL-SCOUT-BACKFILL — the rest of a long answer, a page at a time. A failed later page keeps
+    // what was read (the answer then reads as cut off, which the run note says).
+    const data: SamSearchPage = { totalRecords: first.data.totalRecords, opportunitiesData: [...(first.data.opportunitiesData ?? [])] };
+    const total = Number(first.data.totalRecords ?? 0) || 0;
+    for (let page = 1; page < Math.max(1, q.maxPages ?? 1) && (data.opportunitiesData?.length ?? 0) < total; page++) {
+      const next = await samGetJson<SamSearchPage>(cred, samUrl(SAM_OPP_BASE, { ...params, offset: String(page * size) }), "oppSearch");
+      if (!next.ok) {
+        if (isKeyOrQuotaFailure(next.cls)) return { ask, r: next };
+        break;
+      }
+      const rows = next.data.opportunitiesData ?? [];
+      if (rows.length === 0) break;
+      data.opportunitiesData!.push(...rows);
+    }
+    return { ask, r: { ok: true as const, data } };
   };
   const pending: Ask[] = codes.length > 0 ? codes.map((code) => ({ code })) : titles.length > 0 ? titles.map((title) => ({ title })) : [{}];
   const answers: Awaited<ReturnType<typeof one>>[] = [];

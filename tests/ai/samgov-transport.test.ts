@@ -274,3 +274,41 @@ describe("BL-STAB-10b — how many requests the key has left", () => {
     expect(quotaLogs(warn, "quota low")).toHaveLength(1);
   });
 });
+
+describe("BL-SCOUT-BACKFILL — reading past the first page", () => {
+  const page = (from: number, n: number, total: number) => json({ totalRecords: total, opportunitiesData: Array.from({ length: n }, (_, i) => op(from + i, "d")) });
+
+  it("reads one page by default, and further pages with offset when asked", async () => {
+    const calls = stubFetch((u) => page(Number(u.searchParams.get("offset") ?? 0), Number(u.searchParams.get("offset") ?? 0) === 0 ? 1000 : 250, 1250));
+    const one = await fetchSamOpportunities(cred, { naicsCodes: ["541512"] });
+    expect(calls).toHaveLength(1);
+    expect(one.ok && one.truncated).toBe(true);
+
+    calls.length = 0;
+    const all = await fetchSamOpportunities(cred, { naicsCodes: ["541512"], maxPages: 5 });
+    expect(calls.map((c) => new URL(c.url).searchParams.get("offset"))).toEqual([null, "1000"]);
+    expect(all.ok && all.rows.length).toBe(1250);
+    expect(all.ok && all.truncated).toBe(false);
+  });
+
+  it("stops at the page cap and says the answer was cut", async () => {
+    const calls = stubFetch((u) => page(Number(u.searchParams.get("offset") ?? 0), 1000, 5000));
+    const r = await fetchSamOpportunities(cred, { naicsCodes: ["541512"], maxPages: 3 });
+    expect(calls).toHaveLength(3);
+    expect(r.ok && r.rows.length).toBe(3000);
+    expect(r.ok && r.truncated).toBe(true);
+  });
+
+  it("keeps what was read when a later page fails, and fails the search when the key does", async () => {
+    let n = 0;
+    stubFetch(() => (++n === 1 ? page(0, 1000, 3000) : new Response("busy", { status: 503 })));
+    const partial = await fetchSamOpportunities(cred, { naicsCodes: ["541512"], maxPages: 3 });
+    expect(partial.ok && partial.rows.length).toBe(1000);
+    expect(partial.ok && partial.truncated).toBe(true);
+
+    n = 0;
+    stubFetch(() => (++n === 1 ? page(0, 1000, 3000) : new Response(OWNER_BODY, { status: 401 })));
+    const failed = await fetchSamOpportunities(cred, { naicsCodes: ["541512"], maxPages: 3 });
+    expect(failed.ok).toBe(false);
+  });
+});
