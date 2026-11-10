@@ -3888,6 +3888,16 @@ Every requirement in the FORGE II document, with its status and phase:
    a Draft from the plan; research cited by URL, search provider still to
    be named; external reviewers wait for phase 8; meeting link + .ics;
    ready for Pink advisory; learning per tenant only).
+   **5a shipped** (this PR): the opportunity's Develop tab, Create a Draft
+   (`src/lib/develop-store.ts`, plan-aware wrapper over `createProposalAction`:
+   leads from the team, Section L outline, charter win themes; idempotent;
+   audit `opportunity.develop.draft_create`), computed Ready for Pink
+   (`src/lib/develop-logic.ts`; sections drafted + requirements mapped,
+   advisory; the AI pre-flight stays at Start review), and the state line
+   and next step on Pipeline → Develop. No migration. Sections' authors and
+   dates are not copied: the parts table lives on a proposal, so a draft
+   made here starts without them. 5b to 5d remain; 5b waits on the search
+   provider.
 6. **Deliver:** submit from the portal by email, sent from a platform
    address with a per-opportunity reply address; replies received in
    FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox

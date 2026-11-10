@@ -10,6 +10,7 @@ const TABS = [
   { key: "capability", label: "Capability" },
   { key: "partners", label: "Partners" },
   { key: "plan", label: "Plan" },
+  { key: "develop", label: "Develop" },
   { key: "competitors", label: "Competitors" },
   { key: "similar", label: "Similar awards" },
   { key: "activity", label: "Activity" },

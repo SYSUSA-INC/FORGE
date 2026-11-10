@@ -126,9 +126,9 @@ Last reviewed 2026-11-06, after PR #457.
 
 | ID | Requirement | Status |
 |---|---|---|
-| D-1 | A **Create a Draft** button on the opportunity page | 🟡 A draft bootstrap exists on proposals. Phase 5 moves it to the opportunity |
+| D-1 | A **Create a Draft** button on the opportunity page | ✅ Phase 5a: the Develop tab, one click from the plan (team, Section L outline, charter win themes) |
 | D-2 | FORGE AI writes the first draft from what it knows of the company **and internet research** | 🟡 The draft uses the company's knowledge today. ⚠️ Internet research is added to phase 5 |
-| D-3 | The first draft is ready for the team to prepare for Pink review | 📋 Phase 5 |
+| D-3 | The first draft is ready for the team to prepare for Pink review | ✅ Phase 5a: computed Ready for Pink (sections drafted, requirements mapped), advisory, with Start Pink review |
 | D-4 | The writer invites **internal and external** users to the whole proposal or to **specific sections** | 🟡 Internal reviewers exist. External users with section-level access are phases 5 and 8 |
 | D-5 | **Teams, Zoom or Webex** in the portal, so the lead can schedule reviews | 📋 Phase 5: the plan says scheduling links. ❓ Owner to confirm whether meetings must open inside FORGE or a calendar invite with the meeting link is enough |
 | D-6 | The Pink draft is complete, **compliant with the RFP** and editable in a word editor in the platform | 🟡 The section editor and compliance matrix exist. Phase 5 |
