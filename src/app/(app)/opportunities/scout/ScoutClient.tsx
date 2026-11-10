@@ -98,7 +98,7 @@ function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: Sc
   const [extraNaics, setExtraNaics] = useState(profile.extraNaics.join(", "));
   const [days, setDays] = useState(profile.postedDaysBack);
   const [busy, start] = useTransition();
-  const [doing, setDoing] = useState<"search" | "save" | null>(null);
+  const [doing, setDoing] = useState<"search" | "save" | "backfill" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   // BL-STAB-10d — what the scout makes of the keywords ("“IT” is in almost every notice").
   const keywordNotes = useMemo(() => scoutKeywordQuery(keywords.split(/[,;\n]+/).map((k) => k.trim()).filter(Boolean))?.notes ?? [], [keywords]);
@@ -114,6 +114,18 @@ function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: Sc
       if (!res.ok) return setNote(res.error);
       const s = res.summary;
       setNote(`Found ${s.found}, ${s.created} new, ${s.triaged} reviewed by the AI${s.errors ? `, ${s.errors} error${s.errors === 1 ? "" : "s"}` : ""}.${s.note ? ` ${s.note}` : ""}`);
+      router.refresh();
+    });
+  }
+  function backfill() {
+    setNote(null);
+    setDoing("backfill");
+    start(async () => {
+      const res = await runScoutNowAction(undefined, { backfill: true });
+      setDoing(null);
+      if (!res.ok) return setNote(res.error);
+      const s = res.summary;
+      setNote(`Read everything still open in your codes: ${s.found} found, ${s.created} new.${s.note ? ` ${s.note}` : ""}`);
       router.refresh();
     });
   }
@@ -156,6 +168,9 @@ function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: Sc
             </button>
             <button type="button" className="aur-btn" disabled={busy || !changed} onClick={save} title="Make this the nightly search">
               {doing === "save" ? "Saving…" : "Save as nightly scout"}
+            </button>
+            <button type="button" className="aur-btn" disabled={busy} onClick={backfill} title="Read every notice SAM.gov still holds as open in your codes (up to a year back), not just the last few days. A new company's first scout does this on its own.">
+              {doing === "backfill" ? "Reading…" : "Search every open notice"}
             </button>
           </div>
         ) : null}

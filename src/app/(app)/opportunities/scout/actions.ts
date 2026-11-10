@@ -54,7 +54,7 @@ export async function saveScoutProfileAction(input: {
  * Run the scout now: with the saved criteria, or (BL-SCOUT-ONEPAGE, the
  * search bar's Search) once with the bar's, which changes nothing saved.
  */
-export async function runScoutNowAction(criteria?: { keywords: string; extraNaics: string; postedDaysBack: number }): Promise<
+export async function runScoutNowAction(criteria?: { keywords: string; extraNaics: string; postedDaysBack: number }, opts?: { backfill?: boolean }): Promise<
   { ok: true; summary: ScoutRunSummary } | { ok: false; error: string }
 > {
   const { organizationId } = await requireCurrentOrg();
@@ -64,6 +64,7 @@ export async function runScoutNowAction(criteria?: { keywords: string; extraNaic
       organizationId,
       trigger: "manual",
       requestedByUserId: actor.id,
+      ...(opts?.backfill && !criteria ? { backfill: true } : {}),
       ...(criteria
         ? {
             criteria: {
@@ -80,7 +81,7 @@ export async function runScoutNowAction(criteria?: { keywords: string; extraNaic
       action: "scout.run",
       resourceType: "scout_run",
       resourceId: summary.runId ?? undefined,
-      metadata: { ...summary, oneOff: !!criteria },
+      metadata: { ...summary, oneOff: !!criteria, backfill: !!opts?.backfill && !criteria },
     });
     revalidatePath("/pipeline/identify");
     return { ok: true, summary };

@@ -91,6 +91,8 @@ export async function findSamOpportunities(
     /** Only notices whose agency is GSA (checked here; SAM.gov's `deptname` is deprecated). */
     gsaOnly?: boolean;
     limit?: number;
+    /** BL-SCOUT-BACKFILL — pages read per code (default 1). */
+    maxPages?: number;
     /** Description reads for this search (default by key; 0 checks titles only). */
     readBudget?: number;
   },
@@ -107,6 +109,7 @@ export async function findSamOpportunities(
     titles,
     postedDaysBack: i.postedDaysBack,
     limit: i.limit,
+    maxPages: i.maxPages,
     department: i.gsaOnly ? "General Services Administration" : undefined,
   });
   if (!r.ok) return r;

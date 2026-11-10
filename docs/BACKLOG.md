@@ -99,6 +99,7 @@ Effort key:
 | 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
 | 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
 | 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
+| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | 🔄 this PR (A); C and D next, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3023,6 +3024,38 @@ keep the exact filter. The owner chose (b).
   passing mention in the company's code is a low-ranked find), and
   `tests/ai/scout-logic.test.ts` for the two pure helpers. USER_MANUAL
   §5.2.1 and What's new.
+
+---
+
+### BL-SCOUT-BACKFILL — Scout reads everything open, not three days
+
+**Owner, 2026-11-10:** "It brings 3-5 opportunities when thousands are out
+there … people want to see opportunities relevant to their capabilities."
+**Assessment (code read, `scout.ts`, `samgov.ts`):** the nightly scout only
+asked SAM.gov for notices posted in the last 3 days (14 at most) in the
+company's exact NAICS codes, one page of up to 1,000 per code. The
+thousands on SAM.gov are everything *currently open*, which it never read;
+a new tenant saw three days of postings. Relevance was keywords and codes
+only. **Owner decisions:** do A (this PR); no wider net by PSC or related
+NAICS (B: "relevant, not junk to sift through"); do C (capability fit from
+the company model) and D (show more by default, found vs shown) next.
+
+**Delivered (A):**
+- `fetchSamOpportunities` pages with SAM.gov's `offset` (`maxPages` per
+  code, default 1, so every other caller is unchanged); a later page that
+  fails keeps what was read and reads as cut off; a key or quota failure
+  fails the search.
+- `runScoutForOrganization`: a tenant with no earlier run, or `backfill:
+  true`, reads a 364-day look-back (SAM.gov's longest range), up to 8
+  pages per code, keeps the 500 best-fitting finds (inserted in chunks of
+  100) and says so in the run note; a one-off search never backfills.
+- The Scout tab: **Search every open notice** (org admins); audit
+  `scout.run` carries `backfill`. No migration.
+- Tests: `samgov-transport` (paging, cap, partial failure),
+  `tests/isolation/scout-backfill.test.ts` (first run pages and caps, the
+  next run is the short window, manual backfill, one-off never).
+
+**Next:** BL-SCOUT-FIT (C), then BL-SCOUT-SHOWN (D).
 
 ---
 

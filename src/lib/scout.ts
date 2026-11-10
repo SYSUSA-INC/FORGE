@@ -134,6 +134,15 @@ const MAX_CUSTOMER_LOOKUPS = 8;
 const WATCHLIST_HORIZON_DAYS = 180;
 /** Rows per NAICS code: everything SAM.gov sends (BL-SCOUT-REACH; it was 100, and the rest went unseen). */
 const SAM_LIMIT = 1000;
+/**
+ * BL-SCOUT-BACKFILL — a tenant's first run (and "Search every open notice") reads
+ * everything SAM.gov still holds as open in the codes, not three days: the look-back is
+ * SAM.gov's longest range (a year), read up to this many pages of 1,000 per code, and at
+ * most this many of the best-fitting finds are kept (the rest are named in the run note).
+ */
+const BACKFILL_DAYS = 364;
+const BACKFILL_MAX_PAGES = 8;
+const BACKFILL_MAX_FINDS = 500;
 /** NAICS codes searched per run (one SAM.gov request each, BL-STAB-10). */
 const MAX_SEARCH_CODES = 10;
 /** A tenant is scouted again once this much time has passed. */
@@ -345,6 +354,8 @@ export async function runScoutForOrganization(input: {
    * clears and re-scores no waiting find, and the nightly criteria stay.
    */
   criteria?: { keywords: string[]; extraNaics: string[]; postedDaysBack: number };
+  /** BL-SCOUT-BACKFILL — read everything still open, not the look-back window. Default: only for a tenant that has never been scouted. */
+  backfill?: boolean;
 }): Promise<ScoutRunSummary> {
   const { organizationId } = input;
   const now = input.now ?? new Date();
@@ -395,6 +406,12 @@ export async function runScoutForOrganization(input: {
   const excludedOnly: KeywordQuery | null =
     rank && query && query.excluded.length > 0 ? { terms: [], anyOf: [], excluded: query.excluded, labels: query.labels, notes: [] } : null;
 
+  // BL-SCOUT-BACKFILL — a tenant never scouted starts with everything open, not the last three days.
+  const neverScouted = oneOff ? false : (await db.select({ id: scoutRuns.id }).from(scoutRuns).where(eq(scoutRuns.organizationId, organizationId)).limit(1)).length === 0;
+  const backfill = !oneOff && (input.backfill ?? neverScouted);
+  const daysBack = backfill ? BACKFILL_DAYS : profile.postedDaysBack;
+  const maxPages = backfill ? BACKFILL_MAX_PAGES : 1;
+
   const [run] = await db
     .insert(scoutRuns)
     .values({ organizationId, trigger: input.trigger, requestedByUserId: input.requestedByUserId ?? null })
@@ -440,8 +457,9 @@ export async function runScoutForOrganization(input: {
         naicsCodes: codes.searched,
         query: searchQuery ?? undefined,
         noticeTypes: OPEN_NOTICE_TYPES,
-        postedDaysBack: profile.postedDaysBack,
+        postedDaysBack: daysBack,
         limit: SAM_LIMIT,
+        maxPages,
         readBudget: 0,
       });
       if (!r.ok) {
@@ -461,7 +479,8 @@ export async function runScoutForOrganization(input: {
             rank && query ? `; every open notice in these codes is a find, and mentioning ${keywordLabel(query)} raises its score` : searchQuery ? `; kept notices that mention ${keywordLabel(searchQuery)}` : ""
           }.`,
         );
-        notes.push(scoutSearchFunnel(r.counts, !!searchQuery, SAM_LIMIT));
+        if (backfill) notes.push(`Everything still open: notices posted in the last ${daysBack} days were read, up to ${BACKFILL_MAX_PAGES * SAM_LIMIT} per code.`);
+        notes.push(scoutSearchFunnel(r.counts, !!searchQuery, SAM_LIMIT * maxPages));
         if (r.warning) notes.push(r.warning);
         let overdue = 0;
         const keep = (o: SamOpportunity, m: NoticeMatch | null) => {
@@ -725,23 +744,29 @@ export async function runScoutForOrganization(input: {
       .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, updatedAt: now })
       .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, replaceFor.get(x.draft.noticeId)!), eq(scoutCandidates.status, "new")));
   }
-  const toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
-  const inserted =
-    toInsert.length === 0
-      ? []
-      : await db
-          .insert(scoutCandidates)
-          .values(
-            toInsert.map((x) => ({
-              ...x.draft,
-              organizationId,
-              runId: run?.id ?? null,
-              fitScore: x.fit.score,
-              signals: x.fit.signals,
-            })),
-          )
-          .onConflictDoNothing()
-          .returning();
+  let toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
+  if (backfill && toInsert.length > BACKFILL_MAX_FINDS) {
+    notes.push(`${toInsert.length} open notices fit the codes; the ${BACKFILL_MAX_FINDS} best-fitting are kept, and a later run raises the rest as they are re-read.`);
+    toInsert = [...toInsert].sort((a, b) => b.fit.score - a.fit.score).slice(0, BACKFILL_MAX_FINDS);
+  }
+  const inserted: (typeof scoutCandidates.$inferSelect)[] = [];
+  // In chunks: a backfill can be hundreds of rows, past one statement's parameter limit.
+  for (let i = 0; i < toInsert.length; i += 100) {
+    const rows = await db
+      .insert(scoutCandidates)
+      .values(
+        toInsert.slice(i, i + 100).map((x) => ({
+          ...x.draft,
+          organizationId,
+          runId: run?.id ?? null,
+          fitScore: x.fit.score,
+          signals: x.fit.signals,
+        })),
+      )
+      .onConflictDoNothing()
+      .returning();
+    inserted.push(...rows);
+  }
   summary.created = inserted.length;
 
   // 6. Triage the best-fitting new finds.
