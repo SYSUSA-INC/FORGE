@@ -3055,7 +3055,9 @@ the company model) and D (show more by default, found vs shown) next.
   `tests/isolation/scout-backfill.test.ts` (first run pages and caps, the
   next run is the short window, manual backfill, one-off never).
 
-**Next:** BL-SCOUT-FIT (C), then BL-SCOUT-SHOWN (D).
+**Next:** BL-SCOUT-FIT (C), then BL-SCOUT-SHOWN (D). C's design is in
+`docs/design/BL-SCOUT-FIT.md` (proposed 2026-11-11, awaiting the owner's
+answers to its §4); learning from outcomes is C2 (BL-SCOUT-LEARN, after C); D is the last step.
 
 ---
 
