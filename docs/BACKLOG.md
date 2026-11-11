@@ -99,7 +99,7 @@ Effort key:
 | 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
 | 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
 | 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
-| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | 🔄 this PR (A); C and D next, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
+| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C (BL-SCOUT-FIT) 🔄 this PR, then C2 (BL-SCOUT-LEARN) and D, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3055,7 +3055,19 @@ the company model) and D (show more by default, found vs shown) next.
   `tests/isolation/scout-backfill.test.ts` (first run pages and caps, the
   next run is the short window, manual backfill, one-off never).
 
-**Next:** BL-SCOUT-FIT (C), then BL-SCOUT-SHOWN (D). C's design is in
+**BL-SCOUT-FIT (C) — delivered (this PR, migration 0168).** Design:
+`docs/design/BL-SCOUT-FIT.md` (merged, #491; all recommended answers).
+`src/lib/scout-fit.ts` (cards, cosine bands, score adjustment; pure),
+`loadFitKit` / `scoreCapabilityFit` in `scout.ts` (cards embedded once per
+run, finds in batches of 100, in memory, per tenant), new finds and every
+waiting find re-banded each run, weak finds out of the AI queue and the
+default views and under a **Weak fit** filter with a count, the run note
+and `scout_run.weak_hidden`; no model, entries, past performance or wins
+means not scored. Tests: `tests/ai/scout-fit.test.ts`, the weak-fit cases
+in `tests/ai/scout-logic.test.ts`, `tests/isolation/scout-fit.test.ts`
+(two tenants, opposite capabilities).
+
+**Next:** BL-SCOUT-LEARN (C2) then BL-SCOUT-SHOWN (D). Earlier note: C's design is in
 `docs/design/BL-SCOUT-FIT.md` (proposed 2026-11-11, awaiting the owner's
 answers to its §4); learning from outcomes is C2 (BL-SCOUT-LEARN, after C); D is the last step.
 

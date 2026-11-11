@@ -34,6 +34,9 @@ export type ScoutCandidateView = {
   uiLink: string;
   fitScore: number;
   signals: string[];
+  /** BL-SCOUT-FIT — how well it matches what the company can do; null = not scored. */
+  capabilityBand: "strong" | "related" | "weak" | null;
+  capabilityBasis: string;
   recommendation: ScoutRecommendation | null;
   /** BL-AIX Phase 1g-2 — its triage is waiting on a batch. */
   triageQueued: boolean;
@@ -72,6 +75,8 @@ export type ScoutRunSummary = {
   skippedGated: number;
   errors: number;
   stubbed: boolean;
+  /** BL-SCOUT-FIT — weak-fit finds waiting after this run (kept, counted, out of the default views). */
+  weakHidden?: number;
   note: string;
 };
 
@@ -529,14 +534,24 @@ export function scoutSearchFunnel(c: KeywordSearchCounts, keyworded: boolean, pe
 
 // ── BL-SCOUT-ONEPAGE ──────────────────────────────────────────────────
 
-export type ScoutListFilter = "recommended" | "unreviewed" | "all" | "skipped";
+export type ScoutListFilter = "recommended" | "unreviewed" | "all" | "skipped" | "weak";
 
 export const SCOUT_LIST_FILTERS: { key: ScoutListFilter; label: string }[] = [
   { key: "recommended", label: "Recommended" },
   { key: "unreviewed", label: "Not yet reviewed" },
   { key: "all", label: "All" },
   { key: "skipped", label: "Skipped" },
+  { key: "weak", label: "Weak fit" },
 ];
+
+/**
+ * BL-SCOUT-FIT — a find that matches nothing the company does and that
+ * the AI has not recommended is set aside: out of the default views and
+ * the AI's queue, but kept and counted under Weak fit.
+ */
+export function isWeakFit(c: Pick<ScoutCandidateView, "capabilityBand" | "recommendation">): boolean {
+  return c.capabilityBand === "weak" && c.recommendation === null;
+}
 
 const CALL_ORDER = (r: ScoutCandidateView["recommendation"]) => (r === "pursue" ? 0 : r === "watch" ? 1 : r === null ? 2 : 3);
 
@@ -547,13 +562,17 @@ const CALL_ORDER = (r: ScoutCandidateView["recommendation"]) => (r === "pursue" 
  */
 export function filterFinds(finds: ScoutCandidateView[], filter: ScoutListFilter): ScoutCandidateView[] {
   const keep = (c: ScoutCandidateView) =>
-    filter === "recommended"
-      ? c.recommendation === "pursue" || c.recommendation === "watch"
-      : filter === "unreviewed"
-        ? c.recommendation === null
-        : filter === "skipped"
-          ? c.recommendation === "skip"
-          : c.recommendation !== "skip";
+    filter === "weak"
+      ? isWeakFit(c)
+      : isWeakFit(c)
+        ? false
+        : filter === "recommended"
+          ? c.recommendation === "pursue" || c.recommendation === "watch"
+          : filter === "unreviewed"
+            ? c.recommendation === null
+            : filter === "skipped"
+              ? c.recommendation === "skip"
+              : c.recommendation !== "skip";
   return finds.filter(keep).sort((a, b) => CALL_ORDER(a.recommendation) - CALL_ORDER(b.recommendation) || b.fitScore - a.fitScore);
 }
 

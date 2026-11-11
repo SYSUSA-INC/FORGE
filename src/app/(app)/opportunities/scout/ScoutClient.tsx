@@ -8,6 +8,7 @@ import { ResultHead, ResultRow, type ResultCall } from "@/components/scout/Resul
 import {
   defaultFindsFilter,
   filterFinds,
+  isWeakFit,
   SCOUT_LIST_FILTERS,
   SCOUT_RECOMMENDATION_LABELS,
   scoutKeywordQuery,
@@ -35,6 +36,7 @@ export function ScoutClient({
   lastRun,
   isAdmin,
   unreviewedTotal,
+  weakTotal,
   waitingTotal,
 }: {
   profile: ScoutProfileView;
@@ -47,12 +49,13 @@ export function ScoutClient({
   isAdmin: boolean;
   /** Every unreviewed find, and every waiting find, when the page loads only the first ones. */
   unreviewedTotal?: number;
+  weakTotal?: number;
   waitingTotal?: number;
 }) {
   return (
     <>
       <SearchBar profile={profile} orgCodes={orgCodes} lastRun={lastRun} track={track} isAdmin={isAdmin} />
-      <FindsList candidates={candidates} lastRun={lastRun} unreviewedTotal={unreviewedTotal ?? 0} waitingTotal={waitingTotal ?? candidates.length} />
+      <FindsList candidates={candidates} lastRun={lastRun} unreviewedTotal={unreviewedTotal ?? 0} weakTotal={weakTotal ?? 0} waitingTotal={waitingTotal ?? candidates.length} />
       {decided.length > 0 ? (
         <details className="mb-6 rounded-md border border-layer/10 px-4 py-3">
           <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-label text-muted">
@@ -205,7 +208,7 @@ function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: Sc
 /** BL-SCOUT-REACH — the not-yet-reviewed view opens on its best 20. */
 const UNREVIEWED_SHOWN = 20;
 
-function FindsList({ candidates, lastRun, unreviewedTotal, waitingTotal }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null; unreviewedTotal: number; waitingTotal: number }) {
+function FindsList({ candidates, lastRun, unreviewedTotal, weakTotal, waitingTotal }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null; unreviewedTotal: number; weakTotal: number; waitingTotal: number }) {
   const [filter, setFilter] = useState<ScoutListFilter>(() => defaultFindsFilter(candidates));
   const [showAll, setShowAll] = useState(false);
   // BL-SCOUT-FILES — what was just added or set aside, kept in view: the
@@ -213,18 +216,19 @@ function FindsList({ candidates, lastRun, unreviewedTotal, waitingTotal }: { can
   const [recent, setRecent] = useState<{ id: string; title: string; status: ScoutDecision; opportunityId: string | null }[]>([]);
   const counts: Record<ScoutListFilter, number> = {
     recommended: candidates.filter((c) => c.recommendation === "pursue" || c.recommendation === "watch").length,
-    unreviewed: Math.max(unreviewedTotal, candidates.filter((c) => !c.recommendation).length),
-    all: Math.max(waitingTotal - candidates.filter((c) => c.recommendation === "skip").length, 0),
+    unreviewed: Math.max(unreviewedTotal, candidates.filter((c) => !c.recommendation && !isWeakFit(c)).length),
+    all: Math.max(waitingTotal - weakTotal - candidates.filter((c) => c.recommendation === "skip").length, 0),
     skipped: candidates.filter((c) => c.recommendation === "skip").length,
+    weak: Math.max(weakTotal, candidates.filter(isWeakFit).length),
   };
   const shown = filterFinds(candidates, filter);
   const capped = (filter === "unreviewed" || filter === "all") && !showAll ? shown.slice(0, filter === "all" ? 50 : UNREVIEWED_SHOWN) : shown;
-  const why = unreviewedReason(candidates.filter((c) => !c.recommendation), lastRun);
+  const why = unreviewedReason(candidates.filter((c) => !c.recommendation && !isWeakFit(c)), lastRun);
 
   return (
     <Panel
       title="Finds"
-      eyebrow={`${waitingTotal} waiting · ${counts.recommended} recommended · best first`}
+      eyebrow={`${waitingTotal} waiting · ${counts.recommended} recommended${counts.weak > 0 ? ` · ${counts.weak} weak fit, not shown` : ""} · best first`}
       actions={
         <nav aria-label="Filter the finds" className="flex flex-wrap gap-1">
           {SCOUT_LIST_FILTERS.map((f) => (
@@ -265,6 +269,7 @@ function FindsList({ candidates, lastRun, unreviewedTotal, waitingTotal }: { can
         </ul>
       ) : null}
       {(filter === "unreviewed" || filter === "all") && why ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">{why}</p> : null}
+      {filter === "weak" ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">These match nothing your company does, so they are kept out of the default views and the AI&apos;s queue. Nothing is deleted: add any that Scout got wrong.</p> : null}
       {filter === "skipped" && shown.length > 0 ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">The AI&apos;s skips, shown so you can overrule it.</p> : null}
       {shown.length === 0 ? (
         <p className="font-body text-[13px] leading-relaxed text-muted">

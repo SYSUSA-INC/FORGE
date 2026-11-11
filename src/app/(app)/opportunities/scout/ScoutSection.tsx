@@ -53,7 +53,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
     safeQuery(() => getScoutTrack({ organizationId }), EMPTY_SCOUT_TRACK, { tag: "scout.track" }),
     safeQuery<ScoutRunView | null>(() => latestScoutRun({ organizationId }), null, { tag: "scout.run" }),
     getSamKeyStatus(organizationId),
-    safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0 }, { tag: "scout.count" }),
+    safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0, weak: 0 }, { tag: "scout.count" }),
   ]);
 
   // The organization's own codes: the scout searches them after the bar's (BL-STAB-10d).
@@ -76,6 +76,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
           orgCodes={orgCodes}
           candidates={fresh}
           unreviewedTotal={waiting.unreviewed}
+          weakTotal={waiting.weak}
           waitingTotal={Math.max(waiting.total, fresh.length)}
           decided={decided}
           track={track}
