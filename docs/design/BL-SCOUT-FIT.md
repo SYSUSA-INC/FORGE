@@ -1,6 +1,7 @@
 # BL-SCOUT-FIT — Plan: design for review
 
 **Status:** proposed, awaiting the owner's answers in §4. Nothing is built.
+Revised 2026-11-11 at the owner's request: adds the learning loop (§2.8, delivery C2, decisions 10 to 13).
 **Backlog:** BL-SCOUT-BACKFILL (3bu), item C; item D (BL-SCOUT-SHOWN) is
 the second delivery step here. **Shape:** the same as
 `BL-NAV-LIFECYCLE_PHASE4_PLAN.md`.
@@ -17,6 +18,7 @@ NAICS; relevance first, nothing crossing the company's own codes.
 | What the company has done and won | `knowledge_entries` (kind capability / past_performance), past performance records, decided pursuits (won / lost, agency, NAICS) feeding the model (`company-model-inputs.ts`) | Evidence, and the won/lost signal (`outcomeBoost` in `brain-rank.ts`) |
 | The brain | `searchBrain` (`brain-retrieval.ts`): hybrid vector + full-text over corpus chunks and curated entries, fused and boosted by outcome; `embedBatch` (`embeddings.ts`, OpenAI `text-embedding-3-small` or a stub when no key); vectors already stored for entries and artifacts | Retrieval by meaning, per tenant (every query takes `organizationId`) |
 | The AI triage | `queueTriageBatch` / `scoutTriageBatchHandler`: Pursue / Watch / Skip with a rationale, grounded in `capabilitiesOf` (the model, else four capability entries); at most `MAX_TRIAGE_PER_RUN` = 25 a run, in fit-score order; capped by `scoutTriageAllowance` (a fifth of the plan's monthly AI requests held back, `SCOUT_AI_RESERVE`) | The only place capability is read today, and only for the 25 best by the heuristic |
+| What happened next | `scout_candidate.status` / `grade` (imported, dismissed, correct / wrong); `opportunity_decision` (go, no_go with `reason_category`, partner, plan; PWin and coverage at the time); the stage an opportunity reached; pursuit outcome won / lost. Only imported and dismissed finds reach the AI today, as six examples each (`learningHistory`, `learningExamples`) | The raw material for learning: which finds went forward, which were refused and why, which won. Nothing scores a *new* find against it |
 | The list | `filterFinds` / `defaultFindsFilter`: Recommended (Pursue + Watch) is the default; All leaves the AI's Skips out; Skipped holds them | A find the AI has not reviewed is outside the default view |
 | The reach | #490: first run and **Search every open notice** read up to 8 pages per code, keep the 500 best by `scoutFit` | A large pool, ranked by the weakest signal |
 
@@ -118,13 +120,57 @@ integer` for the count. No new enum value, no new index (the list is
 filtered in memory over at most a few hundred rows as today).
 `EXPECTED_LATEST_MIGRATION` moves to 0168.
 
+### 2.8 Learning from what happened next (C2)
+
+C2 is a second signal on top of the capability cards, built from the
+tenant's own outcomes and recomputed each run, with no training step.
+
+**Labelled examples.** Each past find or opportunity becomes an example,
+weighted by how far it got: dismissed or No-Go (negative; strongest when
+the No-Go's `reason_category` is about capability or scope), imported
+(weak positive), taken to Capture or a Go decision (positive), partner
+or plan decision (stronger), won (strongest), lost after pursuit
+(weak positive: it was a fair target). A No-Go whose reason is timing,
+teaming or a set-aside is learned from only as a weak negative, because
+it says nothing about capability. Examples are embedded like the cards
+(titles and descriptions already stored per tenant), in one call a run.
+
+**Affinity.** A new find's affinity is how much it resembles the
+positive examples against the negative ones (the weighted nearest
+neighbours, in memory). It adjusts the fit score by at most ±10 points,
+on top of the capability band, so capability and eligibility stay in
+charge. The basis line says why ("Similar to *X*, which you took to Go").
+
+**Guards.**
+- *Cold start:* with fewer than 20 labelled examples (and at least 5
+  positive) the signal is off and the run note says how many it needs.
+  Between 20 and 50 it is capped at ±5.
+- *Echo chamber:* a find Related by capability is never hidden because
+  of affinity alone, and a small exploration slice (the best Related
+  finds that resemble nothing before) is always shown, so Scout can still
+  surface a new line of work.
+- *Visible and reversible:* the Scout tab says how many outcomes it is
+  learning from; an org admin can switch learning off or reset it (it only
+  stops reading the examples; no history is deleted); audited.
+- *Per tenant only:* examples never leave the organization.
+
+No new AI requests; it reuses the embeddings of §2.2. Data: examples are
+read from existing tables, so C2 needs only `scout_candidate.affinity
+integer` (nullable) and a `scout_profile.learning_enabled boolean` (default
+true) in migration 0169, and `scout_run.learned_from integer`.
+
 ## 3. Delivery (one PR each)
 
 1. **C — BL-SCOUT-FIT:** `src/lib/scout-fit.ts` (cards, banding, pure
    and tested), the run integration and `rescoreWaitingFinds`
    re-banding when the model is re-approved, the basis on the card, the
    Weak fit filter and count, migration 0168, docs.
-2. **D — BL-SCOUT-SHOWN** (after C merges): an **All, best first** view
+2. **C2 — BL-SCOUT-LEARN** (after C merges): `src/lib/scout-learn.ts`
+   (examples, weights, affinity, guards; pure and tested), the run
+   integration, the card's basis line, the learning counter and the admin
+   switch and reset, migration 0169, docs. It may need its own short
+   design pass on which decision records and reason categories feed it.
+3. **D — BL-SCOUT-SHOWN** (after C2 merges): an **All, best first** view
    (Pursue, Watch, unreviewed and Related together by combined score),
    the default when few are recommended; "found N, shown M" counts on
    the tab; a run note saying where notices went (outside the codes,
@@ -159,5 +205,15 @@ filtered in memory over at most a few hundred rows as today).
    at best (recommended)? Or ignore gaps in the score.
 8. **Per tenant only.** Confirmed as designed (2.6); no cross-tenant
    learning, including from other tenants' won pursuits (recommended).
-9. **D inside this doc.** Keep D as the second PR here, after C merges
+9. **D inside this doc.** Keep D as the last PR here, after C and C2 merge
    (recommended), or write its own design doc.
+10. **Learning on or off for now.** Build learning as C2, its own PR after
+    C (recommended)? Or fold it into C (a bigger first PR, one delivery).
+11. **Minimum before it acts.** Off below 20 labelled outcomes (5 or more
+    positive), capped at ±5 until 50 and ±10 after (recommended)? Or other
+    numbers.
+12. **Exploration slice.** Always show the best few finds that are
+    Related by capability but resemble nothing before, never hidden by
+    affinity (recommended)? Or let learning hide freely.
+13. **Admin switch and reset.** An org admin can switch learning off or
+    reset what it reads, audited (recommended)? Or no switch.
