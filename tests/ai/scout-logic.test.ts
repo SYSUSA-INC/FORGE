@@ -348,3 +348,20 @@ describe("BL-SCOUT-ONEPAGE — the finds list's filters", () => {
     expect(defaultFindsFilter([find("u", null, 10), find("s", "skip", 5)])).toBe("all");
   });
 });
+
+describe("BL-SCOUT-FIT — weak-fit finds are kept, counted and set aside", () => {
+  const find = (id: string, recommendation: "pursue" | "watch" | "skip" | null, fitScore: number, capabilityBand: "strong" | "related" | "weak" | null) =>
+    ({ id, recommendation, fitScore, capabilityBand }) as unknown as ScoutCandidateView;
+  const finds = [find("w1", null, 40, "weak"), find("w2", null, 10, "weak"), find("r", null, 30, "related"), find("n", null, 20, null), find("wp", "pursue", 50, "weak")];
+  const ids = (f: ScoutListFilter) => filterFinds(finds, f).map((c) => c.id);
+
+  it("leaves weak, unreviewed finds out of every default view and lists them under Weak fit, best first", () => {
+    expect(ids("weak")).toEqual(["w1", "w2"]);
+    expect(ids("all")).toEqual(["wp", "r", "n"]);
+    expect(ids("unreviewed")).toEqual(["r", "n"]);
+  });
+
+  it("trusts the AI over the band: a weak find it recommended stays visible", () => {
+    expect(ids("recommended")).toEqual(["wp"]);
+  });
+});

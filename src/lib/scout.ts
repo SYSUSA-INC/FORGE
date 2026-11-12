@@ -36,7 +36,7 @@
  */
 import "server-only";
 
-import { and, count, desc, eq, inArray, isNotNull, isNull, ne, notInArray, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/db";
 import {
@@ -53,6 +53,19 @@ import {
 } from "@/db/schema";
 import { completeStructuredForTenant, getAIProviderStatus, zodToToolSchema } from "@/lib/ai";
 import { markWatchDue } from "@/lib/amendment-watch";
+import { embedBatch, getEmbeddingProviderStatus } from "@/lib/embeddings";
+import { loadDecidedPursuits } from "@/lib/loss-intelligence";
+import { rowToOrgProfile } from "@/lib/org-types";
+import {
+  applyCapabilityBand,
+  buildFitCards,
+  capabilityFitFor,
+  capabilitySignal,
+  findText,
+  withoutCapabilitySignal,
+  type CapabilityFit,
+  type FitCard,
+} from "@/lib/scout-fit";
 import { batchingAvailable, type BatchRequest } from "@/lib/ai-batch";
 import { queueAiBatch, type BatchHandler } from "@/lib/ai-batch-queue";
 import {
@@ -618,11 +631,14 @@ export async function runScoutForOrganization(input: {
     now,
   };
 
+  // BL-SCOUT-FIT — what the company can do, embedded once for this run.
+  const fitKit = await loadFitKit(organizationId, notes);
+
   // BL-SCOUT-QUALITY — every waiting find is scored again each run, so the
   // deadline, the keyword weighting and the customer record are current; a
   // find that is now only a passing mention of a keyword leaves the list.
   if (!oneOff) try {
-    const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor);
+    const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor, fitKit);
     if (r.dropped > 0) notes.push(`Removed ${r.dropped} waiting find${r.dropped === 1 ? "" : "s"} that only mention${r.dropped === 1 ? "s" : ""} a keyword in passing.`);
   } catch (err) {
     log.warn("[scout]", "re-scoring waiting finds failed", { organizationId, error: err });
@@ -683,7 +699,7 @@ export async function runScoutForOrganization(input: {
     log.warn("[scout]", "recompete flagging failed", { organizationId, error: err });
   }
   // 5. Score and store.
-  type Staged = { draft: CandidateDraft; fit: { score: number; signals: string[] }; flag: RecompeteFlag | null; customer: CustomerCounts | null };
+  type Staged = { draft: CandidateDraft; fit: { score: number; signals: string[] }; cap: CapabilityFit | null; flag: RecompeteFlag | null; customer: CustomerCounts | null };
   const staged: Staged[] = [];
   let passing = 0;
   let excluded = 0;
@@ -715,7 +731,7 @@ export async function runScoutForOrganization(input: {
     }
     // BL-SCOUT-REACH — the keyword the text gave, shown on the card and kept by later runs.
     if (!draft.matchedKeyword && fit.keyword) draft.matchedKeyword = fit.keyword.term.slice(0, 200);
-    staged.push({ draft, fit, flag, customer });
+    staged.push({ draft, fit, cap: null, flag, customer });
   }
   for (const draft of freshAwards) {
     const customer = await customerFor(draft.agency ?? "", draft.naicsCode ?? "");
@@ -731,7 +747,18 @@ export async function runScoutForOrganization(input: {
       },
       { ...ctxBase, keyword: null, recompete: null, customer },
     );
-    staged.push({ draft, fit, flag: null, customer });
+    staged.push({ draft, fit, cap: null, flag: null, customer });
+  }
+  // BL-SCOUT-FIT — each new notice against what the company can do. A watchlisted award is the team's own pick and is not scored.
+  {
+    const samStaged = staged.filter((x) => x.draft.source !== "watchlist_award");
+    const caps = await scoreCapabilityFit(organizationId, fitKit, samStaged.map((x) => ({ title: x.draft.title ?? "", agency: x.draft.agency ?? "", description: x.draft.description ?? "" })));
+    samStaged.forEach((x, i) => {
+      const cap = caps[i] ?? null;
+      if (!cap) return;
+      x.cap = cap;
+      x.fit = { score: applyCapabilityBand(x.fit.score, cap.band), signals: [...x.fit.signals, capabilitySignal(cap)] };
+    });
   }
   if (excluded > 0) notes.push(`Left out ${excluded} notice${excluded === 1 ? "" : "s"} that mention${excluded === 1 ? "s" : ""} a word you excluded.`);
   if (passing > 0) notes.push(`Left out ${passing} notice${passing === 1 ? "" : "s"} that only mention${passing === 1 ? "s" : ""} a keyword in passing.`);
@@ -741,7 +768,7 @@ export async function runScoutForOrganization(input: {
   for (const x of replacements) {
     await db
       .update(scoutCandidates)
-      .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, updatedAt: now })
+      .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, ...capColumns(x.cap), updatedAt: now })
       .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, replaceFor.get(x.draft.noticeId)!), eq(scoutCandidates.status, "new")));
   }
   let toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
@@ -761,6 +788,7 @@ export async function runScoutForOrganization(input: {
           runId: run?.id ?? null,
           fitScore: x.fit.score,
           signals: x.fit.signals,
+          ...capColumns(x.cap),
         })),
       )
       .onConflictDoNothing()
@@ -787,12 +815,13 @@ export async function runScoutForOrganization(input: {
           eq(scoutCandidates.status, "new"),
           isNull(scoutCandidates.recommendation),
           isNull(scoutCandidates.triageBatchId),
+          or(isNull(scoutCandidates.capabilityBand), ne(scoutCandidates.capabilityBand, "weak")),
           inserted.length ? notInArray(scoutCandidates.id, inserted.map((r) => r.id)) : sql`true`,
         ),
       )
       .orderBy(desc(scoutCandidates.fitScore))
       .limit(maxTriage);
-    const ranked = [...inserted, ...backlog].sort((a, b) => b.fitScore - a.fitScore);
+    const ranked = [...inserted.filter((r) => r.capabilityBand !== "weak"), ...backlog].sort((a, b) => b.fitScore - a.fitScore);
     // BL-SCOUT-REACH — never the whole month's AI allowance: a fifth stays for the rest of FORGE.
     const allowed = await triageAllowance(organizationId, Math.min(maxTriage, ranked.length));
     const queue = ranked.slice(0, allowed);
@@ -871,6 +900,13 @@ export async function runScoutForOrganization(input: {
     }
   }
 
+  // BL-SCOUT-FIT — what was set aside as weak fit is kept and counted, never dropped silently.
+  const [weak] = await db
+    .select({ n: count() })
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), eq(scoutCandidates.capabilityBand, "weak"), isNull(scoutCandidates.recommendation)));
+  summary.weakHidden = weak?.n ?? 0;
+  if (summary.weakHidden > 0) notes.push(`${summary.weakHidden} waiting find${summary.weakHidden === 1 ? " matches" : "s match"} nothing your company does; ${summary.weakHidden === 1 ? "it is" : "they are"} kept under Weak fit, out of the AI's queue and the default views.`);
   await finishRun(organizationId, run?.id ?? null, summary, notes, now);
   return summary;
 }
@@ -880,6 +916,10 @@ export async function runScoutForOrganization(input: {
  * plan's monthly requests less the fifth kept for the rest of FORGE. A
  * lookup that fails allows the run's number; `enforceQuota` still stops it.
  */
+function capColumns(cap: CapabilityFit | null): { capabilityFit: number | null; capabilityBand: string | null; capabilityBasis: string } {
+  return cap ? { capabilityFit: cap.score, capabilityBand: cap.band, capabilityBasis: cap.basis } : { capabilityFit: null, capabilityBand: null, capabilityBasis: "" };
+}
+
 async function triageAllowance(organizationId: string, wanted: number): Promise<number> {
   try {
     const tier = await getCurrentTier(organizationId);
@@ -1022,6 +1062,76 @@ export const scoutTriageBatchHandler: BatchHandler<z.infer<typeof scoutTriageSch
  * `capability-statement`), then its best other capability entries; short
  * excerpts, archived entries left out.
  */
+/**
+ * BL-SCOUT-FIT — the tenant's capability cards and their embeddings, built
+ * once per run from this organization's own rows (the approved company
+ * model, past performance, won pursuits; the capability entries when there
+ * is no model). Null, with a note for the run, when nothing can be scored:
+ * the find is then shown as "fit not scored", never penalised.
+ */
+type FitKit = { cards: FitCard[]; vecs: number[][] };
+
+async function loadFitKit(organizationId: string, notes: string[]): Promise<FitKit | null> {
+  try {
+    if (getEmbeddingProviderStatus().active.name === "stub") {
+      notes.push("Capability fit not scored: no embedding provider is configured.");
+      return null;
+    }
+    const model = await getApprovedCompanyModel(organizationId);
+    const [orgRow] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+    const entries = model
+      ? []
+      : (
+          await db
+            .select({ title: knowledgeEntries.title, body: knowledgeEntries.body })
+            .from(knowledgeEntries)
+            .where(and(eq(knowledgeEntries.organizationId, organizationId), eq(knowledgeEntries.kind, "capability"), isNull(knowledgeEntries.archivedAt)))
+            .orderBy(desc(knowledgeEntries.updatedAt))
+            .limit(20)
+        ).map((r) => ({ title: r.title.slice(0, 120), text: readableText(r.body).slice(0, 700) }));
+    const won = (await loadDecidedPursuits(organizationId)).filter((p) => p.outcome === "won").slice(0, 15);
+    const cards = buildFitCards({
+      model: model ? { summary: model.body.summary, capabilities: model.body.capabilities, naicsWork: model.body.naicsWork, gaps: model.body.gaps } : null,
+      entries,
+      pastPerformance: orgRow ? rowToOrgProfile(orgRow).pastPerformance.slice(0, 20) : [],
+      won: won.map((p) => ({ title: p.title, agency: p.agency })),
+    });
+    if (cards.length === 0) {
+      notes.push("Capability fit not scored: no approved company model, capability entries, past performance or won pursuits yet. Build the company model so Scout can judge fit.");
+      return null;
+    }
+    const r = await embedBatch(cards.map((c) => c.text), { organizationId, feature: "embedding" });
+    return { cards, vecs: r.vectors };
+  } catch (err) {
+    log.warn("[scout]", "capability cards failed; fit not scored", { organizationId, error: err });
+    notes.push("Capability fit not scored: the capability cards could not be built this run.");
+    return null;
+  }
+}
+
+/** One band per find, in the order given; null where it could not be scored. */
+async function scoreCapabilityFit(
+  organizationId: string,
+  kit: FitKit | null,
+  finds: { title: string; agency: string; description: string }[],
+): Promise<(CapabilityFit | null)[]> {
+  const out: (CapabilityFit | null)[] = finds.map(() => null);
+  if (!kit || finds.length === 0) return out;
+  try {
+    for (let i = 0; i < finds.length; i += 100) {
+      const chunk = finds.slice(i, i + 100);
+      const r = await embedBatch(chunk.map(findText), { organizationId, feature: "embedding" });
+      chunk.forEach((_, j) => {
+        const v = r.vectors[j];
+        if (v) out[i + j] = capabilityFitFor(v, kit.cards, kit.vecs);
+      });
+    }
+  } catch (err) {
+    log.warn("[scout]", "capability fit scoring failed", { organizationId, error: err });
+  }
+  return out;
+}
+
 async function capabilitiesOf(organizationId: string): Promise<{ title: string; text: string }[]> {
   // BL-COMPANY-MODEL 1c — the approved company model, when there is one,
   // is what the organization says it does; the entries are the fallback.
@@ -1209,6 +1319,7 @@ async function rescoreWaitingFinds(
   organizationId: string,
   ctxBase: Omit<Parameters<typeof scoutFit>[1], "keyword" | "recompete" | "customer">,
   customerFor: (agency: string, naicsCode: string) => Promise<CustomerCounts | null>,
+  kit: FitKit | null,
 ): Promise<{ rescored: number; dropped: number }> {
   const rows = await db
     .select()
@@ -1218,7 +1329,8 @@ async function rescoreWaitingFinds(
     .limit(300);
   const drop: string[] = [];
   let rescored = 0;
-  for (const row of rows) {
+  const caps = await scoreCapabilityFit(organizationId, kit, rows);
+  for (const [idx, row] of rows.entries()) {
     const recompete = recompeteFromSignals(row.signals ?? []);
     const customer = await customerFor(row.agency, row.naicsCode);
     const fit = scoutFit(
@@ -1237,10 +1349,22 @@ async function rescoreWaitingFinds(
       drop.push(row.id);
       continue;
     }
-    if (fit.score !== row.fitScore || JSON.stringify(fit.signals) !== JSON.stringify(row.signals ?? [])) {
+    // BL-SCOUT-FIT — the capability band moves the score; a find that could not be scored keeps its last band.
+    const cap = caps[idx] ?? null;
+    const band = cap ? cap.band : row.capabilityBand === "strong" || row.capabilityBand === "related" || row.capabilityBand === "weak" ? row.capabilityBand : null;
+    const score = applyCapabilityBand(fit.score, band);
+    const oldSignals = row.signals ?? [];
+    const kept = withoutCapabilitySignal(oldSignals);
+    const signals = [...fit.signals, ...(cap ? [capabilitySignal(cap)] : oldSignals.filter((x) => !kept.includes(x)))];
+    if (score !== row.fitScore || JSON.stringify(signals) !== JSON.stringify(oldSignals) || (cap && (cap.band !== row.capabilityBand || cap.score !== row.capabilityFit))) {
       await db
         .update(scoutCandidates)
-        .set({ fitScore: fit.score, signals: fit.signals, updatedAt: new Date() })
+        .set({
+          fitScore: score,
+          signals,
+          ...(cap ? { capabilityFit: cap.score, capabilityBand: cap.band, capabilityBasis: cap.basis } : {}),
+          updatedAt: new Date(),
+        })
         .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, row.id), eq(scoutCandidates.status, "new")));
       rescored += 1;
     }
@@ -1301,6 +1425,7 @@ async function finishRun(
         skippedGated: summary.skippedGated,
         errors: summary.errors,
         stubbed: summary.stubbed,
+        weakHidden: summary.weakHidden ?? 0,
         note: summary.note,
       })
       .where(and(eq(scoutRuns.id, runId), eq(scoutRuns.organizationId, organizationId)));
@@ -1400,6 +1525,8 @@ function toView(row: ScoutCandidate, now: Date): ScoutCandidateView {
     uiLink: row.uiLink,
     fitScore: row.fitScore,
     signals: row.signals ?? [],
+    capabilityBand: row.capabilityBand === "strong" || row.capabilityBand === "related" || row.capabilityBand === "weak" ? row.capabilityBand : null,
+    capabilityBasis: row.capabilityBasis,
     recommendation: isScoutRecommendation(row.recommendation) ? row.recommendation : null,
     triageQueued: !row.recommendation && row.triageBatchId !== null,
     confidence: row.confidence,
@@ -1429,7 +1556,9 @@ export async function listScoutCandidates(input: {
     eq(scoutCandidates.organizationId, organizationId),
     input.status === "new" ? eq(scoutCandidates.status, "new") : ne(scoutCandidates.status, "new"),
   );
-  const q = db.select().from(scoutCandidates).where(base);
+  const isWeak = and(eq(scoutCandidates.capabilityBand, "weak"), isNull(scoutCandidates.recommendation));
+  // BL-SCOUT-FIT — weak-fit finds are loaded apart (their own best 50), so the cap on the list never crowds them out or lets them crowd it.
+  const q = db.select().from(scoutCandidates).where(input.status === "new" ? and(base, sql`not coalesce(${isWeak}, false)`) : base);
   const rows =
     input.status === "new"
       ? await q
@@ -1440,16 +1569,24 @@ export async function listScoutCandidates(input: {
           )
           .limit(input.limit ?? 50)
       : await q.orderBy(desc(scoutCandidates.decidedAt)).limit(input.limit ?? 20);
-  return rows.map((r) => toView(r, now));
+  const weakRows =
+    input.status === "new"
+      ? await db.select().from(scoutCandidates).where(and(base, isWeak)).orderBy(desc(scoutCandidates.fitScore), desc(scoutCandidates.createdAt)).limit(50)
+      : [];
+  return [...rows, ...weakRows].map((r) => toView(r, now));
 }
 
 /** BL-SCOUT-REACH — how many finds are waiting, and how many of them the AI hasn't reviewed, for the page's counts (the list itself is capped). */
-export async function countNewScoutCandidates(input: { organizationId: string }): Promise<{ total: number; unreviewed: number }> {
+export async function countNewScoutCandidates(input: { organizationId: string }): Promise<{ total: number; unreviewed: number; weak: number }> {
   const [row] = await db
-    .select({ total: count(), unreviewed: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} is null)`.mapWith(Number) })
+    .select({
+      total: count(),
+      unreviewed: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} is null and ${scoutCandidates.capabilityBand} is distinct from 'weak')`.mapWith(Number),
+      weak: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} is null and ${scoutCandidates.capabilityBand} = 'weak')`.mapWith(Number),
+    })
     .from(scoutCandidates)
     .where(and(eq(scoutCandidates.organizationId, input.organizationId), eq(scoutCandidates.status, "new")));
-  return { total: row?.total ?? 0, unreviewed: row?.unreviewed ?? 0 };
+  return { total: row?.total ?? 0, unreviewed: row?.unreviewed ?? 0, weak: row?.weak ?? 0 };
 }
 
 export type ScoutDecideResult =
@@ -1601,6 +1738,7 @@ export async function latestScoutRun(input: { organizationId: string }): Promise
     skippedGated: row.skippedGated,
     errors: row.errors,
     stubbed: row.stubbed,
+    weakHidden: row.weakHidden,
     note: row.note,
     startedAt: row.startedAt.toISOString(),
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,

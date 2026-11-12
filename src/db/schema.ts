@@ -5112,6 +5112,8 @@ export const scoutRuns = pgTable(
     skippedGated: integer("skipped_gated").notNull().default(0),
     errors: integer("errors").notNull().default(0),
     stubbed: boolean("stubbed").notNull().default(false),
+    /** BL-SCOUT-FIT — weak-fit finds set aside (kept, counted) this run. */
+    weakHidden: integer("weak_hidden").notNull().default(0),
     note: text("note").notNull().default(""),
     requestedByUserId: text("requested_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -5157,6 +5159,11 @@ export const scoutCandidates = pgTable(
     /** 0..100 heuristic fit before the model's take. */
     fitScore: integer("fit_score").notNull().default(0),
     signals: jsonb("signals").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    /** BL-SCOUT-FIT — the closest capability's similarity, 0..100; null = not scored (drizzle/0168). */
+    capabilityFit: integer("capability_fit"),
+    /** strong | related | weak; null = not scored. Weak finds are kept, counted and left out of the default view. */
+    capabilityBand: text("capability_band"),
+    capabilityBasis: text("capability_basis").notNull().default(""),
     /** pursue | watch | skip; null until triaged. */
     recommendation: text("recommendation"),
     /** 0..1 */
