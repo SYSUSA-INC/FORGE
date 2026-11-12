@@ -99,7 +99,7 @@ Effort key:
 | 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
 | 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
 | 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
-| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C (BL-SCOUT-FIT) 🔄 this PR, then C2 (BL-SCOUT-LEARN) and D, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
+| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C ✅ #492 (BL-SCOUT-FIT); C2 (BL-SCOUT-LEARN) 🔄 this PR, then D, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3067,9 +3067,27 @@ means not scored. Tests: `tests/ai/scout-fit.test.ts`, the weak-fit cases
 in `tests/ai/scout-logic.test.ts`, `tests/isolation/scout-fit.test.ts`
 (two tenants, opposite capabilities).
 
-**Next:** BL-SCOUT-LEARN (C2) then BL-SCOUT-SHOWN (D). Earlier note: C's design is in
-`docs/design/BL-SCOUT-FIT.md` (proposed 2026-11-11, awaiting the owner's
-answers to its §4); learning from outcomes is C2 (BL-SCOUT-LEARN, after C); D is the last step.
+**BL-SCOUT-LEARN (C2) — delivered (this PR, migration 0169).** Design:
+`docs/design/BL-SCOUT-FIT.md` §2.8, decisions 10-13, plus the C2 addendum
+(which records and reason categories feed it). `src/lib/scout-learn.ts`
+(pure): labelled examples from the tenant's own outcomes weighted by how far
+they got (dismissed or No-Go negative, a scope No-Go strongest, timing,
+teaming and set-aside No-Gos weak; imported weak positive; Capture or Go
+positive; partner or plan stronger; won strongest; lost-after-pursuit weak
+positive), the guards (off below 20 outcomes or fewer than 5 positive, ±5
+until 50, ±10 after), affinity from the five nearest examples, and the
+exploration slice. `loadLearnKit` in `scout.ts` embeds the examples once per
+run; new finds and every waiting find carry `scout_candidate.affinity` and a
+"Learned:" line saying why; `scout_run.learned_from`; the Scout tab shows how
+many outcomes it learns from; an org admin switches learning off or resets
+what it reads (`scout_profile.learning_enabled`, `learning_reset_at`;
+audited `scout.learning.switch` / `scout.learning.reset`; no history
+deleted). Per tenant only; no new AI requests. Tests:
+`tests/ai/scout-learn.test.ts`, `tests/isolation/scout-learn.test.ts`.
+
+**Next:** BL-SCOUT-SHOWN (D): an **All, best first** view as the default when
+few are recommended, "found N, shown M" counts, and a run note saying where
+notices went.
 
 ---
 

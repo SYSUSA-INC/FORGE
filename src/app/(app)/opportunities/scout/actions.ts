@@ -5,8 +5,10 @@ import { recordAudit } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import {
   decideScoutCandidate,
+  resetScoutLearning,
   runScoutForOrganization,
   saveScoutProfile,
+  setScoutLearning,
   type ScoutDecideResult,
 } from "@/lib/scout";
 import type { ScoutDecision, ScoutProfileView, ScoutRunSummary } from "@/lib/scout-logic";
@@ -47,6 +49,36 @@ export async function saveScoutProfileAction(input: {
     return { ok: true, profile };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Could not save." };
+  }
+}
+
+/**
+ * BL-SCOUT-LEARN — an org admin switches learning from outcomes on or off,
+ * or resets what it reads. Neither deletes any history; both are audited.
+ */
+export async function setScoutLearningAction(input: { enabled: boolean }): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const actor = await requireOrgAdmin(organizationId);
+  try {
+    await setScoutLearning({ organizationId, enabled: !!input.enabled, actor: { userId: actor.id, email: actor.email } });
+    revalidatePath("/pipeline/identify");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not save." };
+  }
+}
+
+export async function resetScoutLearningAction(): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const actor = await requireOrgAdmin(organizationId);
+  try {
+    await resetScoutLearning({ organizationId, actor: { userId: actor.id, email: actor.email } });
+    revalidatePath("/pipeline/identify");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not reset." };
   }
 }
 

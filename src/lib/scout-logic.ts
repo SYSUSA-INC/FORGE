@@ -77,7 +77,20 @@ export type ScoutRunSummary = {
   stubbed: boolean;
   /** BL-SCOUT-FIT — weak-fit finds waiting after this run (kept, counted, out of the default views). */
   weakHidden?: number;
+  /** BL-SCOUT-LEARN — the outcomes this run learned from (0 = not acting). */
+  learnedFrom?: number;
   note: string;
+};
+
+/** BL-SCOUT-LEARN — what the Scout tab says about learning from outcomes. */
+export type ScoutLearningView = {
+  enabled: boolean;
+  mode: "disabled" | "waiting" | "early" | "full";
+  cap: number;
+  labelled: number;
+  positives: number;
+  negatives: number;
+  line: string;
 };
 
 export type ScoutRunView = ScoutRunSummary & {

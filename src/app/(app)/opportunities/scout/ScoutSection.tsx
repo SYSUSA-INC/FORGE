@@ -4,6 +4,7 @@ import { getSamKeyStatus } from "@/lib/samgov-key";
 import { samKeyNotice } from "@/lib/samgov-key-logic";
 import { safeQuery } from "@/lib/schema-resilience";
 import {
+  getScoutLearning,
   getScoutProfile,
   getScoutTrack,
   latestScoutRun,
@@ -14,6 +15,7 @@ import {
   DEFAULT_SCOUT_PROFILE,
   EMPTY_SCOUT_TRACK,
   type ScoutCandidateView,
+  type ScoutLearningView,
   type ScoutRunView,
 } from "@/lib/scout-logic";
 import { eq } from "drizzle-orm";
@@ -38,7 +40,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
   const { organizationId } = await requireCurrentOrg();
   const isAdmin = user.role === "admin" || !!user.isSuperadmin;
 
-  const [profile, fresh, decided, track, lastRun, sam, waiting] = await Promise.all([
+  const [profile, fresh, decided, track, lastRun, sam, waiting, learning] = await Promise.all([
     safeQuery(() => getScoutProfile({ organizationId }), DEFAULT_SCOUT_PROFILE, { tag: "scout.profile" }),
     safeQuery<ScoutCandidateView[]>(
       () => listScoutCandidates({ organizationId, status: "new", limit: 200 }),
@@ -54,6 +56,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
     safeQuery<ScoutRunView | null>(() => latestScoutRun({ organizationId }), null, { tag: "scout.run" }),
     getSamKeyStatus(organizationId),
     safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0, weak: 0 }, { tag: "scout.count" }),
+    safeQuery<ScoutLearningView | null>(() => getScoutLearning({ organizationId }), null, { tag: "scout.learning" }),
   ]);
 
   // The organization's own codes: the scout searches them after the bar's (BL-STAB-10d).
@@ -81,6 +84,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
           decided={decided}
           track={track}
           lastRun={lastRun}
+          learning={learning}
           isAdmin={isAdmin}
         />
       )}
