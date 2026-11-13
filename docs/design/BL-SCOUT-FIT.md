@@ -159,6 +159,45 @@ read from existing tables, so C2 needs only `scout_candidate.affinity
 integer` (nullable) and a `scout_profile.learning_enabled boolean` (default
 true) in migration 0169, and `scout_run.learned_from integer`.
 
+#### C2 addendum — which records feed it (design pass done in the C2 PR)
+
+Gaps found while building; none changes a decision above.
+
+- **Sources.** `scout_candidate` (status `dismissed` / `imported`),
+  `opportunity` (stage), `opportunity_decision` (latest per opportunity)
+  and `proposal_outcome` (won / lost) joined to `proposal`, each filtered
+  by `organization_id`. An imported find is read through its opportunity,
+  so its decision and outcome count once; a dismissed find, or an import
+  whose opportunity is gone, stands alone. An opportunity nobody picked up
+  from Scout and that has no decision, outcome or stage past Identify is
+  no example.
+- **Precedence per opportunity.** Outcome (won +1, lost +0.3), else the
+  latest decision (a No-Go later reversed to Go counts as Go), else the
+  stage reached (Capture or later +0.5, Qualification +0.3, a find imported
+  and still at Identify +0.2, No bid −0.4).
+- **Weights.** Partner or plan +0.8, Go +0.6, dismissed −0.6. No-Go by
+  `reason_category`: scope −1; "other" and an unknown category −0.5;
+  capacity −0.4; price and competition −0.3; timing, relationship (teaming)
+  and compliance (set-aside) −0.15. The design said "capability or scope"
+  for the strongest negative; the categories have only `scope`, so
+  `capacity` (no staff) is treated as a moderate one, since it is about the
+  company, not the work.
+- **Reset needs a timestamp.** "Reset what it reads" without deleting
+  history needs a cut-off, so migration 0169 also adds
+  `scout_profile.learning_reset_at`; outcomes at or before it (or undated)
+  are not read.
+- **Weak finds are neither raised nor lowered** by affinity: capability
+  stays in charge, and affinity can only reorder what capability keeps.
+- **Neighbours.** The five nearest examples with cosine 0.40 or more; the
+  adjustment is the cap times their similarity-weighted mean weight, scaled
+  down when even the nearest is only just alike. Nothing alike means no
+  adjustment and counts as "resembles nothing".
+- **Exploration.** In each batch (the run's new finds; the waiting list),
+  the three best Related finds that resemble nothing get +5 (never above the
+  cap) and a "New line of work" line.
+- **Cost.** At most 300 examples, embedded in one call a run, with the
+  same embedding provider as the cards; not metered; no new AI requests.
+
 ## 3. Delivery (one PR each)
 
 1. **C — BL-SCOUT-FIT:** `src/lib/scout-fit.ts` (cards, banding, pure

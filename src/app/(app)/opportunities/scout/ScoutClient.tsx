@@ -16,10 +16,11 @@ import {
   type ScoutDecision,
   type ScoutListFilter,
   type ScoutProfileView,
+  type ScoutLearningView,
   type ScoutRunView,
   type ScoutTrack,
 } from "@/lib/scout-logic";
-import { decideScoutCandidateAction, runScoutNowAction, saveScoutProfileAction } from "./actions";
+import { decideScoutCandidateAction, resetScoutLearningAction, runScoutNowAction, saveScoutProfileAction, setScoutLearningAction } from "./actions";
 
 /**
  * BL-SCOUT-ONEPAGE — the All tab of the Scout: the search bar (what the
@@ -34,6 +35,7 @@ export function ScoutClient({
   decided,
   track,
   lastRun,
+  learning,
   isAdmin,
   unreviewedTotal,
   weakTotal,
@@ -46,6 +48,8 @@ export function ScoutClient({
   decided: ScoutCandidateView[];
   track: ScoutTrack;
   lastRun: ScoutRunView | null;
+  /** BL-SCOUT-LEARN — what Scout learns from; null when it could not be read. */
+  learning?: ScoutLearningView | null;
   isAdmin: boolean;
   /** Every unreviewed find, and every waiting find, when the page loads only the first ones. */
   unreviewedTotal?: number;
@@ -54,7 +58,7 @@ export function ScoutClient({
 }) {
   return (
     <>
-      <SearchBar profile={profile} orgCodes={orgCodes} lastRun={lastRun} track={track} isAdmin={isAdmin} />
+      <SearchBar profile={profile} orgCodes={orgCodes} lastRun={lastRun} track={track} learning={learning ?? null} isAdmin={isAdmin} />
       <FindsList candidates={candidates} lastRun={lastRun} unreviewedTotal={unreviewedTotal ?? 0} weakTotal={weakTotal ?? 0} waitingTotal={waitingTotal ?? candidates.length} />
       {decided.length > 0 ? (
         <details className="mb-6 rounded-md border border-layer/10 px-4 py-3">
@@ -94,7 +98,7 @@ const DAYS = [1, 2, 3, 5, 7, 14];
  * what is in the bar (finds join the list; nothing saved changes); Save
  * makes it the nightly search. Org admins change it; members read it.
  */
-function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: ScoutProfileView; orgCodes: string[]; lastRun: ScoutRunView | null; track: ScoutTrack; isAdmin: boolean }) {
+function SearchBar({ profile, orgCodes, lastRun, track, learning, isAdmin }: { profile: ScoutProfileView; orgCodes: string[]; lastRun: ScoutRunView | null; track: ScoutTrack; learning: ScoutLearningView | null; isAdmin: boolean }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(profile.enabled);
   const [keywords, setKeywords] = useState(profile.keywords.join(", "));
@@ -189,6 +193,7 @@ function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: Sc
           Run nightly at 09:00 UTC
         </label>
         <span>{trackLine(track)}</span>
+        {learning ? <LearningStatus learning={learning} isAdmin={isAdmin} /> : null}
         {lastRun ? (
           <details className="min-w-0">
             <summary className="cursor-pointer">
@@ -202,6 +207,37 @@ function SearchBar({ profile, orgCodes, lastRun, track, isAdmin }: { profile: Sc
       </div>
       {note ? <p className="mt-2 font-body text-[12px] leading-[1.5] text-text">{note}</p> : null}
     </section>
+  );
+}
+
+/** BL-SCOUT-LEARN — how many outcomes Scout learns from, and for an org admin the switch and the reset. */
+function LearningStatus({ learning, isAdmin }: { learning: ScoutLearningView; isAdmin: boolean }) {
+  const router = useRouter();
+  const [busy, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done: string) {
+    setMsg(null);
+    start(async () => {
+      const res = await fn();
+      setMsg(res.ok ? done : res.error);
+      if (res.ok) router.refresh();
+    });
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span>{learning.line}</span>
+      {isAdmin ? (
+        <>
+          <button type="button" className="aur-btn" disabled={busy} onClick={() => run(() => setScoutLearningAction({ enabled: !learning.enabled }), learning.enabled ? "Learning is off." : "Learning is on.")} title="Learning only changes how finds are ranked; it never hides a find that fits what you do">
+            {learning.enabled ? "Switch learning off" : "Switch learning on"}
+          </button>
+          <button type="button" className="aur-btn" disabled={busy || learning.labelled === 0} onClick={() => run(() => resetScoutLearningAction(), "Reset: Scout no longer reads the outcomes so far. No history was deleted.")} title="Scout stops reading the outcomes so far and starts again from the next ones. Nothing is deleted.">
+            Reset what it reads
+          </button>
+        </>
+      ) : null}
+      {msg ? <span className="font-body text-text">{msg}</span> : null}
+    </span>
   );
 }
 

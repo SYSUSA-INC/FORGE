@@ -5067,6 +5067,10 @@ export const scoutProfiles = pgTable("scout_profile", {
   extraNaics: text("extra_naics").array().notNull().default(sql`ARRAY[]::text[]`),
   postedDaysBack: integer("posted_days_back").notNull().default(3),
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  /** BL-SCOUT-LEARN — an org admin can switch learning from outcomes off (drizzle/0169). */
+  learningEnabled: boolean("learning_enabled").notNull().default(true),
+  /** BL-SCOUT-LEARN — a reset: outcomes at or before this are no longer read (nothing is deleted). */
+  learningResetAt: timestamp("learning_reset_at", { withTimezone: true }),
   updatedByUserId: text("updated_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -5114,6 +5118,8 @@ export const scoutRuns = pgTable(
     stubbed: boolean("stubbed").notNull().default(false),
     /** BL-SCOUT-FIT — weak-fit finds set aside (kept, counted) this run. */
     weakHidden: integer("weak_hidden").notNull().default(0),
+    /** BL-SCOUT-LEARN — the outcomes the run learned from (0 = not acting). */
+    learnedFrom: integer("learned_from").notNull().default(0),
     note: text("note").notNull().default(""),
     requestedByUserId: text("requested_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -5164,6 +5170,8 @@ export const scoutCandidates = pgTable(
     /** strong | related | weak; null = not scored. Weak finds are kept, counted and left out of the default view. */
     capabilityBand: text("capability_band"),
     capabilityBasis: text("capability_basis").notNull().default(""),
+    /** BL-SCOUT-LEARN — the learned adjustment to fit_score (±10); null = learning was not acting (drizzle/0169). */
+    affinity: integer("affinity"),
     /** pursue | watch | skip; null until triaged. */
     recommendation: text("recommendation"),
     /** 0..1 */

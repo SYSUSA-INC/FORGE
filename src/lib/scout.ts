@@ -45,6 +45,9 @@ import {
   opportunities,
   organizations,
   scoutCandidates,
+  proposalOutcomes,
+  proposals,
+  opportunityDecisions,
   scoutProfiles,
   scoutRuns,
   type NewScoutCandidate,
@@ -63,9 +66,11 @@ import {
   capabilitySignal,
   findText,
   withoutCapabilitySignal,
+  type CapabilityBand,
   type CapabilityFit,
   type FitCard,
 } from "@/lib/scout-fit";
+import { applyLearning, buildLearningExamples, learningLine, learningState, withoutLearnedSignal, type LearnExample, type LearningState } from "@/lib/scout-learn";
 import { batchingAvailable, type BatchRequest } from "@/lib/ai-batch";
 import { queueAiBatch, type BatchHandler } from "@/lib/ai-batch-queue";
 import {
@@ -121,6 +126,7 @@ import {
   summarizeScoutTrack,
   type ScoutCandidateView,
   type ScoutDecision,
+  type ScoutLearningView,
   type ScoutProfileView,
   type ScoutRunSummary,
   type ScoutRunView,
@@ -633,12 +639,15 @@ export async function runScoutForOrganization(input: {
 
   // BL-SCOUT-FIT — what the company can do, embedded once for this run.
   const fitKit = await loadFitKit(organizationId, notes);
+  // BL-SCOUT-LEARN — what happened to earlier finds, embedded once for this run.
+  const learnKit = await loadLearnKit(organizationId, notes);
+  summary.learnedFrom = learnKit?.state.labelled ?? 0;
 
   // BL-SCOUT-QUALITY — every waiting find is scored again each run, so the
   // deadline, the keyword weighting and the customer record are current; a
   // find that is now only a passing mention of a keyword leaves the list.
   if (!oneOff) try {
-    const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor, fitKit);
+    const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor, fitKit, learnKit);
     if (r.dropped > 0) notes.push(`Removed ${r.dropped} waiting find${r.dropped === 1 ? "" : "s"} that only mention${r.dropped === 1 ? "s" : ""} a keyword in passing.`);
   } catch (err) {
     log.warn("[scout]", "re-scoring waiting finds failed", { organizationId, error: err });
@@ -699,7 +708,7 @@ export async function runScoutForOrganization(input: {
     log.warn("[scout]", "recompete flagging failed", { organizationId, error: err });
   }
   // 5. Score and store.
-  type Staged = { draft: CandidateDraft; fit: { score: number; signals: string[] }; cap: CapabilityFit | null; flag: RecompeteFlag | null; customer: CustomerCounts | null };
+  type Staged = { draft: CandidateDraft; fit: { score: number; signals: string[] }; cap: CapabilityFit | null; affinity?: number | null; flag: RecompeteFlag | null; customer: CustomerCounts | null };
   const staged: Staged[] = [];
   let passing = 0;
   let excluded = 0;
@@ -752,12 +761,21 @@ export async function runScoutForOrganization(input: {
   // BL-SCOUT-FIT — each new notice against what the company can do. A watchlisted award is the team's own pick and is not scored.
   {
     const samStaged = staged.filter((x) => x.draft.source !== "watchlist_award");
-    const caps = await scoreCapabilityFit(organizationId, fitKit, samStaged.map((x) => ({ title: x.draft.title ?? "", agency: x.draft.agency ?? "", description: x.draft.description ?? "" })));
+    const vecs = await embedFinds(organizationId, fitKit || learnKit ? samStaged.map((x) => ({ title: x.draft.title ?? "", agency: x.draft.agency ?? "", description: x.draft.description ?? "" })) : []);
     samStaged.forEach((x, i) => {
-      const cap = caps[i] ?? null;
+      const v = vecs[i];
+      const cap = fitKit && v ? capabilityFitFor(v, fitKit.cards, fitKit.vecs) : null;
       if (!cap) return;
       x.cap = cap;
       x.fit = { score: applyCapabilityBand(x.fit.score, cap.band), signals: [...x.fit.signals, capabilitySignal(cap)] };
+    });
+    // BL-SCOUT-LEARN — then what the team has taken forward or set aside, on top of the band.
+    const learned = applyLearning(samStaged.map((x, i) => ({ vec: vecs[i] ?? null, band: x.cap?.band ?? null, score: x.fit.score })), learnKit?.examples ?? [], learnKit?.vecs ?? [], learnKit?.state ?? OFF);
+    samStaged.forEach((x, i) => {
+      const l = learned[i]!;
+      if (l.affinity === null) return;
+      x.affinity = l.affinity;
+      x.fit = { score: l.score, signals: l.signal ? [...x.fit.signals, l.signal] : x.fit.signals };
     });
   }
   if (excluded > 0) notes.push(`Left out ${excluded} notice${excluded === 1 ? "" : "s"} that mention${excluded === 1 ? "s" : ""} a word you excluded.`);
@@ -768,7 +786,7 @@ export async function runScoutForOrganization(input: {
   for (const x of replacements) {
     await db
       .update(scoutCandidates)
-      .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, ...capColumns(x.cap), updatedAt: now })
+      .set({ ...x.draft, fitScore: x.fit.score, signals: x.fit.signals, ...capColumns(x.cap), affinity: x.affinity ?? null, updatedAt: now })
       .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, replaceFor.get(x.draft.noticeId)!), eq(scoutCandidates.status, "new")));
   }
   let toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
@@ -789,6 +807,7 @@ export async function runScoutForOrganization(input: {
           fitScore: x.fit.score,
           signals: x.fit.signals,
           ...capColumns(x.cap),
+          affinity: x.affinity ?? null,
         })),
       )
       .onConflictDoNothing()
@@ -1109,27 +1128,119 @@ async function loadFitKit(organizationId: string, notes: string[]): Promise<FitK
   }
 }
 
-/** One band per find, in the order given; null where it could not be scored. */
-async function scoreCapabilityFit(
-  organizationId: string,
-  kit: FitKit | null,
-  finds: { title: string; agency: string; description: string }[],
-): Promise<(CapabilityFit | null)[]> {
-  const out: (CapabilityFit | null)[] = finds.map(() => null);
-  if (!kit || finds.length === 0) return out;
+/** Each find's embedding, in the order given; null where it could not be embedded. One request-free call per hundred. */
+async function embedFinds(organizationId: string, finds: { title: string; agency: string; description: string }[]): Promise<(number[] | null)[]> {
+  const out: (number[] | null)[] = finds.map(() => null);
+  if (finds.length === 0) return out;
   try {
     for (let i = 0; i < finds.length; i += 100) {
       const chunk = finds.slice(i, i + 100);
       const r = await embedBatch(chunk.map(findText), { organizationId, feature: "embedding" });
       chunk.forEach((_, j) => {
-        const v = r.vectors[j];
-        if (v) out[i + j] = capabilityFitFor(v, kit.cards, kit.vecs);
+        out[i + j] = r.vectors[j] ?? null;
       });
     }
   } catch (err) {
-    log.warn("[scout]", "capability fit scoring failed", { organizationId, error: err });
+    log.warn("[scout]", "embedding the finds failed", { organizationId, error: err });
   }
   return out;
+}
+
+/**
+ * BL-SCOUT-LEARN — the tenant's labelled examples (what happened to its
+ * earlier finds and opportunities), read from its own rows only. A reset
+ * by an org admin hides what came before it.
+ */
+async function loadLearnExamples(organizationId: string): Promise<{ examples: LearnExample[]; enabled: boolean }> {
+  const [profile] = await db.select({ enabled: scoutProfiles.learningEnabled, resetAt: scoutProfiles.learningResetAt }).from(scoutProfiles).where(eq(scoutProfiles.organizationId, organizationId)).limit(1);
+  const enabled = profile?.enabled ?? true;
+  const [finds, opps, decisions, outcomes] = await Promise.all([
+    db
+      .select({ id: scoutCandidates.id, title: scoutCandidates.title, agency: scoutCandidates.agency, description: scoutCandidates.description, status: scoutCandidates.status, opportunityId: scoutCandidates.opportunityId, at: scoutCandidates.decidedAt })
+      .from(scoutCandidates)
+      .where(and(eq(scoutCandidates.organizationId, organizationId), inArray(scoutCandidates.status, ["imported", "dismissed"])))
+      .orderBy(desc(scoutCandidates.decidedAt))
+      .limit(400),
+    db
+      .select({ id: opportunities.id, title: opportunities.title, agency: opportunities.agency, description: opportunities.description, stage: opportunities.stage, at: opportunities.updatedAt })
+      .from(opportunities)
+      .where(eq(opportunities.organizationId, organizationId))
+      .orderBy(desc(opportunities.updatedAt))
+      .limit(500),
+    db
+      .select({ opportunityId: opportunityDecisions.opportunityId, decision: opportunityDecisions.decision, reasonCategory: opportunityDecisions.reasonCategory, at: opportunityDecisions.createdAt })
+      .from(opportunityDecisions)
+      .where(eq(opportunityDecisions.organizationId, organizationId))
+      .orderBy(desc(opportunityDecisions.createdAt))
+      .limit(1000),
+    db
+      .select({ opportunityId: proposals.opportunityId, outcome: proposalOutcomes.outcomeType, at: proposalOutcomes.updatedAt })
+      .from(proposalOutcomes)
+      .innerJoin(proposals, and(eq(proposals.id, proposalOutcomes.proposalId), eq(proposals.organizationId, organizationId)))
+      .where(and(eq(proposalOutcomes.organizationId, organizationId), inArray(proposalOutcomes.outcomeType, ["won", "lost"])))
+      .limit(500),
+  ]);
+  const examples = buildLearningExamples({
+    finds: finds.map((f) => ({ ...f, status: f.status === "dismissed" ? ("dismissed" as const) : ("imported" as const) })),
+    opportunities: opps,
+    decisions,
+    outcomes: outcomes.map((o) => ({ opportunityId: o.opportunityId, outcome: o.outcome === "won" ? ("won" as const) : ("lost" as const), at: o.at })),
+    resetAt: profile?.resetAt ?? null,
+  });
+  return { examples, enabled };
+}
+
+/** What the Scout tab shows: how many outcomes it learns from, and whether it is acting. Reads no embeddings. */
+export async function getScoutLearning(input: { organizationId: string }): Promise<ScoutLearningView> {
+  const { examples, enabled } = await loadLearnExamples(input.organizationId);
+  const state = learningState(examples, enabled);
+  return { enabled, mode: state.mode, cap: state.cap, labelled: state.labelled, positives: state.positives, negatives: state.negatives, line: learningLine(state) };
+}
+
+/** An org admin switches learning on or off. Reading stops or resumes; no history changes. */
+export async function setScoutLearning(input: { organizationId: string; enabled: boolean; actor: Actor }): Promise<void> {
+  const { organizationId } = input;
+  await upsertLearningFields(organizationId, { learningEnabled: input.enabled }, input.actor);
+  await recordAudit({ organizationId, actor: input.actor, action: "scout.learning.switch", resourceType: "scout_profile", resourceId: organizationId, metadata: { enabled: input.enabled } });
+}
+
+/** An org admin resets what Scout reads: outcomes up to now are no longer examples. Nothing is deleted. */
+export async function resetScoutLearning(input: { organizationId: string; actor: Actor }): Promise<void> {
+  const { organizationId } = input;
+  await upsertLearningFields(organizationId, { learningResetAt: new Date() }, input.actor);
+  await recordAudit({ organizationId, actor: input.actor, action: "scout.learning.reset", resourceType: "scout_profile", resourceId: organizationId, metadata: {} });
+}
+
+async function upsertLearningFields(organizationId: string, set: { learningEnabled?: boolean; learningResetAt?: Date }, actor: Actor): Promise<void> {
+  await db
+    .insert(scoutProfiles)
+    .values({ organizationId, ...set, updatedByUserId: actor.userId })
+    .onConflictDoUpdate({ target: scoutProfiles.organizationId, set: { ...set, updatedAt: new Date(), updatedByUserId: actor.userId } });
+}
+
+const OFF: LearningState = { mode: "waiting", cap: 0, labelled: 0, positives: 0, negatives: 0 };
+
+type LearnKit = { examples: LearnExample[]; vecs: number[][]; state: LearningState };
+
+/** The examples embedded once for the run; null (with a run note) when learning is off, still waiting for outcomes, or cannot embed. */
+async function loadLearnKit(organizationId: string, notes: string[]): Promise<LearnKit | null> {
+  try {
+    if (getEmbeddingProviderStatus().active.name === "stub") return null;
+    const { examples, enabled } = await loadLearnExamples(organizationId);
+    const state = learningState(examples, enabled);
+    if (state.mode === "disabled") return null;
+    if (state.cap <= 0) {
+      if (examples.length > 0) notes.push(learningLine(state));
+      return null;
+    }
+    const r = await embedBatch(examples.map((e) => e.text), { organizationId, feature: "embedding" });
+    notes.push(learningLine(state));
+    return { examples, vecs: r.vectors, state };
+  } catch (err) {
+    log.warn("[scout]", "learning from outcomes failed; not applied", { organizationId, error: err });
+    notes.push("Learning from outcomes was not applied this run.");
+    return null;
+  }
 }
 
 async function capabilitiesOf(organizationId: string): Promise<{ title: string; text: string }[]> {
@@ -1320,6 +1431,7 @@ async function rescoreWaitingFinds(
   ctxBase: Omit<Parameters<typeof scoutFit>[1], "keyword" | "recompete" | "customer">,
   customerFor: (agency: string, naicsCode: string) => Promise<CustomerCounts | null>,
   kit: FitKit | null,
+  learn: LearnKit | null,
 ): Promise<{ rescored: number; dropped: number }> {
   const rows = await db
     .select()
@@ -1329,7 +1441,9 @@ async function rescoreWaitingFinds(
     .limit(300);
   const drop: string[] = [];
   let rescored = 0;
-  const caps = await scoreCapabilityFit(organizationId, kit, rows);
+  const vecs = await embedFinds(organizationId, kit || learn ? rows : []);
+  type Pending = { row: (typeof rows)[number]; cap: CapabilityFit | null; band: CapabilityBand | null; score: number; base: string[]; vec: number[] | null };
+  const pending: Pending[] = [];
   for (const [idx, row] of rows.entries()) {
     const recompete = recompeteFromSignals(row.signals ?? []);
     const customer = await customerFor(row.agency, row.naicsCode);
@@ -1350,24 +1464,33 @@ async function rescoreWaitingFinds(
       continue;
     }
     // BL-SCOUT-FIT — the capability band moves the score; a find that could not be scored keeps its last band.
-    const cap = caps[idx] ?? null;
+    const v = vecs[idx] ?? null;
+    const cap = kit && v ? capabilityFitFor(v, kit.cards, kit.vecs) : null;
     const band = cap ? cap.band : row.capabilityBand === "strong" || row.capabilityBand === "related" || row.capabilityBand === "weak" ? row.capabilityBand : null;
-    const score = applyCapabilityBand(fit.score, band);
     const oldSignals = row.signals ?? [];
     const kept = withoutCapabilitySignal(oldSignals);
-    const signals = [...fit.signals, ...(cap ? [capabilitySignal(cap)] : oldSignals.filter((x) => !kept.includes(x)))];
-    if (score !== row.fitScore || JSON.stringify(signals) !== JSON.stringify(oldSignals) || (cap && (cap.band !== row.capabilityBand || cap.score !== row.capabilityFit))) {
-      await db
-        .update(scoutCandidates)
-        .set({
-          fitScore: score,
-          signals,
-          ...(cap ? { capabilityFit: cap.score, capabilityBand: cap.band, capabilityBasis: cap.basis } : {}),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, row.id), eq(scoutCandidates.status, "new")));
-      rescored += 1;
-    }
+    const base = [...fit.signals, ...(cap ? [capabilitySignal(cap)] : oldSignals.filter((x) => !kept.includes(x)))];
+    pending.push({ row, cap, band, score: applyCapabilityBand(fit.score, band), base, vec: v });
+  }
+  // BL-SCOUT-LEARN — then the team's outcomes, over the whole waiting list (one exploration slice for it).
+  const learned = applyLearning(pending.map((p) => ({ vec: p.vec, band: p.band, score: p.score })), learn?.examples ?? [], learn?.vecs ?? [], learn?.state ?? OFF);
+  for (const [i, p] of pending.entries()) {
+    const l = learned[i]!;
+    const signals = withoutLearnedSignal(p.base).concat(l.signal ? [l.signal] : []);
+    const oldSignals = p.row.signals ?? [];
+    const changed = l.score !== p.row.fitScore || JSON.stringify(signals) !== JSON.stringify(oldSignals) || l.affinity !== p.row.affinity || (p.cap && (p.cap.band !== p.row.capabilityBand || p.cap.score !== p.row.capabilityFit));
+    if (!changed) continue;
+    await db
+      .update(scoutCandidates)
+      .set({
+        fitScore: l.score,
+        signals,
+        affinity: l.affinity,
+        ...(p.cap ? { capabilityFit: p.cap.score, capabilityBand: p.cap.band, capabilityBasis: p.cap.basis } : {}),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.id, p.row.id), eq(scoutCandidates.status, "new")));
+    rescored += 1;
   }
   if (drop.length > 0) {
     await db.delete(scoutCandidates).where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), inArray(scoutCandidates.id, drop)));
@@ -1739,6 +1862,7 @@ export async function latestScoutRun(input: { organizationId: string }): Promise
     errors: row.errors,
     stubbed: row.stubbed,
     weakHidden: row.weakHidden,
+    learnedFrom: row.learnedFrom,
     note: row.note,
     startedAt: row.startedAt.toISOString(),
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
