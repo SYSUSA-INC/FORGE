@@ -117,6 +117,7 @@ import {
   recompeteFromSignals,
   SCOUT_DESCRIPTION_CHARS,
   scoutCodes,
+  scoutDispositionLine,
   scoutFit,
   scoutKeywordQuery,
   scoutSearchFunnel,
@@ -124,6 +125,8 @@ import {
   solicitationKey,
   staleReason,
   summarizeScoutTrack,
+  SCOUT_FOUND_CAP,
+  type NoticeDisposition,
   type ScoutCandidateView,
   type ScoutDecision,
   type ScoutLearningView,
@@ -161,7 +164,7 @@ const SAM_LIMIT = 1000;
  */
 const BACKFILL_DAYS = 364;
 const BACKFILL_MAX_PAGES = 8;
-const BACKFILL_MAX_FINDS = 500;
+const BACKFILL_MAX_FINDS = SCOUT_FOUND_CAP;
 /** NAICS codes searched per run (one SAM.gov request each, BL-STAB-10). */
 const MAX_SEARCH_CODES = 10;
 /** A tenant is scouted again once this much time has passed. */
@@ -391,6 +394,8 @@ export async function runScoutForOrganization(input: {
     note: "",
   };
   const notes: string[] = [];
+  // BL-SCOUT-SHOWN — where notices went, summed up in one note line at the end.
+  const gone: NoticeDisposition = { cleared: 0, expired: 0, passing: 0, excluded: 0, pastCap: 0, weak: 0, skipped: 0 };
 
   const [org] = await db
     .select({
@@ -537,6 +542,7 @@ export async function runScoutForOrganization(input: {
             notes.push(`${unsettled} notice${unsettled === 1 ? "" : "s"} couldn't be checked for the keywords (description too long for FORGE's copy, only a link, or newer than it) within this run's ${DESCRIPTION_READS[sam.cred.source]} SAM.gov reads; the next run tries again while ${unsettled === 1 ? "it is" : "they are"} in the look-back window.`);
           }
         }
+        gone.expired += overdue;
         if (overdue > 0) notes.push(`${overdue} notice${overdue === 1 ? "" : "s"} already past the response date left out.`);
       }
     } catch (err) {
@@ -565,6 +571,7 @@ export async function runScoutForOrganization(input: {
   else try {
     // Ranked keywords clear nothing: a find in the codes stays whatever it mentions.
     const cleared = await clearStaleFinds(organizationId, { codes: codes.unreadable.length ? [] : codes.all, query: searchQuery, now }, searched ? keepIds : new Set());
+    gone.cleared += cleared;
     if (cleared > 0) notes.push(`Removed ${cleared} waiting find${cleared === 1 ? "" : "s"} that no longer fit${cleared === 1 ? "s" : ""} your keywords and codes, or ${cleared === 1 ? "is" : "are"} past due.`);
   } catch (err) {
     log.warn("[scout]", "clearing stale finds failed", { organizationId, error: err });
@@ -648,6 +655,7 @@ export async function runScoutForOrganization(input: {
   // find that is now only a passing mention of a keyword leaves the list.
   if (!oneOff) try {
     const r = await rescoreWaitingFinds(organizationId, ctxBase, customerFor, fitKit, learnKit);
+    gone.passing += r.dropped;
     if (r.dropped > 0) notes.push(`Removed ${r.dropped} waiting find${r.dropped === 1 ? "" : "s"} that only mention${r.dropped === 1 ? "s" : ""} a keyword in passing.`);
   } catch (err) {
     log.warn("[scout]", "re-scoring waiting finds failed", { organizationId, error: err });
@@ -778,6 +786,8 @@ export async function runScoutForOrganization(input: {
       x.fit = { score: l.score, signals: l.signal ? [...x.fit.signals, l.signal] : x.fit.signals };
     });
   }
+  gone.excluded += excluded;
+  gone.passing += passing;
   if (excluded > 0) notes.push(`Left out ${excluded} notice${excluded === 1 ? "" : "s"} that mention${excluded === 1 ? "s" : ""} a word you excluded.`);
   if (passing > 0) notes.push(`Left out ${passing} notice${passing === 1 ? "" : "s"} that only mention${passing === 1 ? "s" : ""} a keyword in passing.`);
 
@@ -792,6 +802,7 @@ export async function runScoutForOrganization(input: {
   let toInsert = staged.filter((x) => !replaceFor.has(x.draft.noticeId));
   if (backfill && toInsert.length > BACKFILL_MAX_FINDS) {
     notes.push(`${toInsert.length} open notices fit the codes; the ${BACKFILL_MAX_FINDS} best-fitting are kept, and a later run raises the rest as they are re-read.`);
+    gone.pastCap += toInsert.length - BACKFILL_MAX_FINDS;
     toInsert = [...toInsert].sort((a, b) => b.fit.score - a.fit.score).slice(0, BACKFILL_MAX_FINDS);
   }
   const inserted: (typeof scoutCandidates.$inferSelect)[] = [];
@@ -926,6 +937,15 @@ export async function runScoutForOrganization(input: {
     .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), eq(scoutCandidates.capabilityBand, "weak"), isNull(scoutCandidates.recommendation)));
   summary.weakHidden = weak?.n ?? 0;
   if (summary.weakHidden > 0) notes.push(`${summary.weakHidden} waiting find${summary.weakHidden === 1 ? " matches" : "s match"} nothing your company does; ${summary.weakHidden === 1 ? "it is" : "they are"} kept under Weak fit, out of the AI's queue and the default views.`);
+  // BL-SCOUT-SHOWN — and what the AI said Skip to, then the one line that adds it all up (first, so the 2,000-character note cut never takes it).
+  const [skip] = await db
+    .select({ n: count() })
+    .from(scoutCandidates)
+    .where(and(eq(scoutCandidates.organizationId, organizationId), eq(scoutCandidates.status, "new"), eq(scoutCandidates.recommendation, "skip")));
+  gone.weak = summary.weakHidden;
+  gone.skipped = skip?.n ?? 0;
+  const goneLine = scoutDispositionLine(gone);
+  if (goneLine) notes.unshift(goneLine);
   await finishRun(organizationId, run?.id ?? null, summary, notes, now);
   return summary;
 }
@@ -1700,16 +1720,17 @@ export async function listScoutCandidates(input: {
 }
 
 /** BL-SCOUT-REACH — how many finds are waiting, and how many of them the AI hasn't reviewed, for the page's counts (the list itself is capped). */
-export async function countNewScoutCandidates(input: { organizationId: string }): Promise<{ total: number; unreviewed: number; weak: number }> {
+export async function countNewScoutCandidates(input: { organizationId: string }): Promise<{ total: number; unreviewed: number; weak: number; skipped: number }> {
   const [row] = await db
     .select({
       total: count(),
       unreviewed: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} is null and ${scoutCandidates.capabilityBand} is distinct from 'weak')`.mapWith(Number),
       weak: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} is null and ${scoutCandidates.capabilityBand} = 'weak')`.mapWith(Number),
+      skipped: sql<number>`count(*) filter (where ${scoutCandidates.recommendation} = 'skip')`.mapWith(Number),
     })
     .from(scoutCandidates)
     .where(and(eq(scoutCandidates.organizationId, input.organizationId), eq(scoutCandidates.status, "new")));
-  return { total: row?.total ?? 0, unreviewed: row?.unreviewed ?? 0, weak: row?.weak ?? 0 };
+  return { total: row?.total ?? 0, unreviewed: row?.unreviewed ?? 0, weak: row?.weak ?? 0, skipped: row?.skipped ?? 0 };
 }
 
 export type ScoutDecideResult =

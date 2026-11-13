@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { knowledgeEntries, organizations, samNoticeLoadRuns, samNotices, scoutCandidates } from "@/db/schema";
-import { listScoutCandidates, runScoutForOrganization } from "@/lib/scout";
+import { countNewScoutCandidates, listScoutCandidates, runScoutForOrganization } from "@/lib/scout";
 import { createTwoTenants, type TwoTenantFixture } from "../helpers/fixtures";
 
 vi.mock("@/lib/embeddings", async (importOriginal) => {
@@ -78,6 +78,12 @@ describe("BL-SCOUT-FIT — capability fit, per tenant", () => {
     expect(run.created).toBe(3);
     expect(run.weakHidden).toBe(1);
     expect(run.note).toContain("1 waiting find matches nothing your company does");
+    // BL-SCOUT-SHOWN — the one line that adds up where notices went, first in the note.
+    expect(run.note.startsWith("Where notices went: 1 matching nothing you do (Weak fit).")).toBe(true);
+    const counts = await countNewScoutCandidates({ organizationId: fx.orgA.organizationId });
+    expect(counts).toMatchObject({ total: 3, weak: 1, skipped: 0 });
+    // Another tenant's finds are not counted.
+    expect((await countNewScoutCandidates({ organizationId: fx.orgB.organizationId })).total).toBe(0);
     const list = await listScoutCandidates({ organizationId: fx.orgA.organizationId, status: "new" });
     const weak = list.find((c) => c.capabilityBand === "weak")!;
     const cloud = list.find((c) => c.title.startsWith("Cloud"))!;
