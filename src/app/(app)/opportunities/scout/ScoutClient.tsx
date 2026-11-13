@@ -10,6 +10,7 @@ import {
   filterFinds,
   isWeakFit,
   SCOUT_LIST_FILTERS,
+  scoutFoundShown,
   SCOUT_RECOMMENDATION_LABELS,
   scoutKeywordQuery,
   type ScoutCandidateView,
@@ -39,6 +40,7 @@ export function ScoutClient({
   isAdmin,
   unreviewedTotal,
   weakTotal,
+  skippedTotal,
   waitingTotal,
 }: {
   profile: ScoutProfileView;
@@ -54,12 +56,13 @@ export function ScoutClient({
   /** Every unreviewed find, and every waiting find, when the page loads only the first ones. */
   unreviewedTotal?: number;
   weakTotal?: number;
+  skippedTotal?: number;
   waitingTotal?: number;
 }) {
   return (
     <>
       <SearchBar profile={profile} orgCodes={orgCodes} lastRun={lastRun} track={track} learning={learning ?? null} isAdmin={isAdmin} />
-      <FindsList candidates={candidates} lastRun={lastRun} unreviewedTotal={unreviewedTotal ?? 0} weakTotal={weakTotal ?? 0} waitingTotal={waitingTotal ?? candidates.length} />
+      <FindsList candidates={candidates} lastRun={lastRun} unreviewedTotal={unreviewedTotal ?? 0} weakTotal={weakTotal ?? 0} skippedTotal={skippedTotal ?? 0} waitingTotal={waitingTotal ?? candidates.length} />
       {decided.length > 0 ? (
         <details className="mb-6 rounded-md border border-layer/10 px-4 py-3">
           <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-label text-muted">
@@ -244,27 +247,31 @@ function LearningStatus({ learning, isAdmin }: { learning: ScoutLearningView; is
 /** BL-SCOUT-REACH — the not-yet-reviewed view opens on its best 20. */
 const UNREVIEWED_SHOWN = 20;
 
-function FindsList({ candidates, lastRun, unreviewedTotal, weakTotal, waitingTotal }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null; unreviewedTotal: number; weakTotal: number; waitingTotal: number }) {
+function FindsList({ candidates, lastRun, unreviewedTotal, weakTotal, skippedTotal, waitingTotal }: { candidates: ScoutCandidateView[]; lastRun: ScoutRunView | null; unreviewedTotal: number; weakTotal: number; skippedTotal: number; waitingTotal: number }) {
   const [filter, setFilter] = useState<ScoutListFilter>(() => defaultFindsFilter(candidates));
   const [showAll, setShowAll] = useState(false);
   // BL-SCOUT-FILES — what was just added or set aside, kept in view: the
   // list reloads with waiting finds only, so a decided row leaves it.
   const [recent, setRecent] = useState<{ id: string; title: string; status: ScoutDecision; opportunityId: string | null }[]>([]);
+  const skippedCount = Math.max(skippedTotal, candidates.filter((c) => c.recommendation === "skip").length);
+  const weakCount = Math.max(weakTotal, candidates.filter(isWeakFit).length);
+  const tally = scoutFoundShown(Math.max(waitingTotal, candidates.length), weakCount, skippedCount);
   const counts: Record<ScoutListFilter, number> = {
+    best: tally.shown,
     recommended: candidates.filter((c) => c.recommendation === "pursue" || c.recommendation === "watch").length,
     unreviewed: Math.max(unreviewedTotal, candidates.filter((c) => !c.recommendation && !isWeakFit(c)).length),
-    all: Math.max(waitingTotal - weakTotal - candidates.filter((c) => c.recommendation === "skip").length, 0),
-    skipped: candidates.filter((c) => c.recommendation === "skip").length,
-    weak: Math.max(weakTotal, candidates.filter(isWeakFit).length),
+    all: tally.shown,
+    skipped: skippedCount,
+    weak: weakCount,
   };
   const shown = filterFinds(candidates, filter);
-  const capped = (filter === "unreviewed" || filter === "all") && !showAll ? shown.slice(0, filter === "all" ? 50 : UNREVIEWED_SHOWN) : shown;
+  const capped = (filter === "unreviewed" || filter === "all" || filter === "best") && !showAll ? shown.slice(0, filter === "unreviewed" ? UNREVIEWED_SHOWN : 50) : shown;
   const why = unreviewedReason(candidates.filter((c) => !c.recommendation && !isWeakFit(c)), lastRun);
 
   return (
     <Panel
       title="Finds"
-      eyebrow={`${waitingTotal} waiting · ${counts.recommended} recommended${counts.weak > 0 ? ` · ${counts.weak} weak fit, not shown` : ""} · best first`}
+      eyebrow={`Found ${tally.found} · shown ${tally.shown} · ${counts.recommended} recommended${tally.weak > 0 ? ` · ${tally.weak} weak fit, not shown` : ""}${tally.skipped > 0 ? ` · ${tally.skipped} AI skips, not shown` : ""}`}
       actions={
         <nav aria-label="Filter the finds" className="flex flex-wrap gap-1">
           {SCOUT_LIST_FILTERS.map((f) => (
@@ -304,13 +311,14 @@ function FindsList({ candidates, lastRun, unreviewedTotal, weakTotal, waitingTot
           ))}
         </ul>
       ) : null}
-      {(filter === "unreviewed" || filter === "all") && why ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">{why}</p> : null}
+      {filter === "best" ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">Everything that fits your codes, the AI's Pursue and Watch with the rest, ordered by fit score. The score already counts what your company does and what you have taken forward or set aside.</p> : null}
+      {(filter === "unreviewed" || filter === "all" || filter === "best") && why ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">{why}</p> : null}
       {filter === "weak" ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">These match nothing your company does, so they are kept out of the default views and the AI&apos;s queue. Nothing is deleted: add any that Scout got wrong.</p> : null}
       {filter === "skipped" && shown.length > 0 ? <p className="mb-2 font-body text-[12px] leading-[1.5] text-muted">The AI&apos;s skips, shown so you can overrule it.</p> : null}
       {shown.length === 0 ? (
         <p className="font-body text-[13px] leading-relaxed text-muted">
           {filter === "recommended"
-            ? "Nothing the AI recommends right now. See All for every find, or search with other keywords and codes above."
+            ? "Nothing the AI recommends right now. See Best first for every find, or search with other keywords and codes above."
             : "Nothing here. The scout runs every night; Search above runs it now."}
         </p>
       ) : (
