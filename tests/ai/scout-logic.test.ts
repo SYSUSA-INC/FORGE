@@ -18,6 +18,10 @@ import {
   solicitationKey,
   staleReason,
   defaultFindsFilter,
+  FEW_RECOMMENDED,
+  scoutDispositionLine,
+  scoutFoundShown,
+  SCOUT_LIST_FILTERS,
   filterFinds,
   scoutSearchFunnel,
   scoutTriageAllowance,
@@ -343,9 +347,17 @@ describe("BL-SCOUT-ONEPAGE — the finds list's filters", () => {
     expect(ids("skipped")).toEqual(["s"]);
   });
 
-  it("opens on Recommended when the AI recommends something, else on All", () => {
-    expect(defaultFindsFilter(finds)).toBe("recommended");
-    expect(defaultFindsFilter([find("u", null, 10), find("s", "skip", 5)])).toBe("all");
+  it("opens on Best first unless the AI has recommended plenty, then on Recommended", () => {
+    expect(defaultFindsFilter(finds)).toBe("best");
+    expect(defaultFindsFilter([find("u", null, 10), find("s", "skip", 5)])).toBe("best");
+    const many = Array.from({ length: FEW_RECOMMENDED }, (_, i) => find(`p${i}`, "pursue", 50));
+    expect(defaultFindsFilter(many)).toBe("recommended");
+    expect(defaultFindsFilter(many.slice(1))).toBe("best");
+  });
+
+  it("Best first mixes Pursue, Watch and unreviewed by fit score, leaving the skips out", () => {
+    expect(ids("best")).toEqual(["w", "u2", "p", "u1"]);
+    expect(SCOUT_LIST_FILTERS.map((f) => f.key)).toEqual(["best", "recommended", "unreviewed", "all", "skipped", "weak"]);
   });
 });
 
@@ -361,7 +373,29 @@ describe("BL-SCOUT-FIT — weak-fit finds are kept, counted and set aside", () =
     expect(ids("unreviewed")).toEqual(["r", "n"]);
   });
 
+  it("keeps weak, unreviewed finds out of Best first, and lists a recommended weak one", () => {
+    expect(ids("best")).toEqual(["wp", "r", "n"]);
+  });
+
   it("trusts the AI over the band: a weak find it recommended stays visible", () => {
     expect(ids("recommended")).toEqual(["wp"]);
+  });
+});
+
+describe("BL-SCOUT-SHOWN — found N, shown M, and where notices went", () => {
+  it("adds up: shown is what is left after the weak fits and the AI skips", () => {
+    expect(scoutFoundShown(120, 30, 10)).toEqual({ found: 120, shown: 80, weak: 30, skipped: 10 });
+    expect(scoutFoundShown(5, 9, 9)).toEqual({ found: 5, shown: 0, weak: 5, skipped: 0 });
+  });
+
+  const none = { cleared: 0, expired: 0, passing: 0, excluded: 0, pastCap: 0, weak: 0, skipped: 0 };
+  it("says nothing when nothing was set aside", () => {
+    expect(scoutDispositionLine(none)).toBe("");
+  });
+  it("names every place a notice went", () => {
+    expect(scoutDispositionLine({ cleared: 2, expired: 1, passing: 4, excluded: 3, pastCap: 1200, weak: 30, skipped: 10 })).toBe(
+      "Where notices went: 2 waiting finds no longer in the codes and keywords or past due; 1 already past the response date; 4 mentioning a keyword only in passing; 3 mentioning an excluded word; 1200 past the 500-find cap; 30 matching nothing you do (Weak fit); 10 the AI said Skip to (Skipped).".replace("1200", "1,200"),
+    );
+    expect(scoutDispositionLine({ ...none, cleared: 1 })).toBe("Where notices went: 1 waiting find no longer in the codes and keywords or past due.");
   });
 });

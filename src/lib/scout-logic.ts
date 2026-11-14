@@ -547,9 +547,10 @@ export function scoutSearchFunnel(c: KeywordSearchCounts, keyworded: boolean, pe
 
 // ── BL-SCOUT-ONEPAGE ──────────────────────────────────────────────────
 
-export type ScoutListFilter = "recommended" | "unreviewed" | "all" | "skipped" | "weak";
+export type ScoutListFilter = "best" | "recommended" | "unreviewed" | "all" | "skipped" | "weak";
 
 export const SCOUT_LIST_FILTERS: { key: ScoutListFilter; label: string }[] = [
+  { key: "best", label: "Best first" },
   { key: "recommended", label: "Recommended" },
   { key: "unreviewed", label: "Not yet reviewed" },
   { key: "all", label: "All" },
@@ -569,9 +570,13 @@ export function isWeakFit(c: Pick<ScoutCandidateView, "capabilityBand" | "recomm
 const CALL_ORDER = (r: ScoutCandidateView["recommendation"]) => (r === "pursue" ? 0 : r === "watch" ? 1 : r === null ? 2 : 3);
 
 /**
- * The finds a filter shows, Pursue then Watch then not yet reviewed then
- * Skip, best fit first in each. All leaves the skips out: they are the
- * AI's no, kept under Skipped so a person can overrule it.
+ * The finds a filter shows. Recommended, Not yet reviewed, All and Skipped
+ * order Pursue, then Watch, then not yet reviewed, then Skip, best fit
+ * first in each. Best first (BL-SCOUT-SHOWN) mixes Pursue, Watch, not yet
+ * reviewed and Related finds and orders them by fit score alone, which
+ * already carries the capability band and what Scout learned. Both All
+ * and Best first leave the AI's skips out (kept under Skipped so a person
+ * can overrule it) and the weak fits (kept under Weak fit).
  */
 export function filterFinds(finds: ScoutCandidateView[], filter: ScoutListFilter): ScoutCandidateView[] {
   const keep = (c: ScoutCandidateView) =>
@@ -586,10 +591,64 @@ export function filterFinds(finds: ScoutCandidateView[], filter: ScoutListFilter
             : filter === "skipped"
               ? c.recommendation === "skip"
               : c.recommendation !== "skip";
-  return finds.filter(keep).sort((a, b) => CALL_ORDER(a.recommendation) - CALL_ORDER(b.recommendation) || b.fitScore - a.fitScore);
+  const kept = finds.filter(keep);
+  if (filter === "best") return kept.sort((a, b) => b.fitScore - a.fitScore);
+  return kept.sort((a, b) => CALL_ORDER(a.recommendation) - CALL_ORDER(b.recommendation) || b.fitScore - a.fitScore);
 }
 
-/** The filter the list opens on: what the AI recommends, else everything not skipped. */
+/** Fewer recommended finds than this and the list opens on Best first, so a short Recommended list never hides the rest of what fits. */
+export const FEW_RECOMMENDED = 10;
+
+/** The filter the list opens on: Recommended when the AI has recommended plenty, else Best first. */
 export function defaultFindsFilter(finds: ScoutCandidateView[]): ScoutListFilter {
-  return finds.some((c) => c.recommendation === "pursue" || c.recommendation === "watch") ? "recommended" : "all";
+  const recommended = finds.filter((c) => c.recommendation === "pursue" || c.recommendation === "watch").length;
+  return recommended >= FEW_RECOMMENDED ? "recommended" : "best";
 }
+
+/**
+ * "Found N, shown M": found is every waiting find; shown is what the
+ * default views list (not the AI's skips, not the weak fits); the rest is
+ * counted by where it went, so the two always add up.
+ */
+export function scoutFoundShown(found: number, weak: number, skipped: number): { found: number; shown: number; weak: number; skipped: number } {
+  const w = Math.max(0, Math.min(weak, found));
+  const sk = Math.max(0, Math.min(skipped, found - w));
+  return { found, shown: found - w - sk, weak: w, skipped: sk };
+}
+
+export type NoticeDisposition = {
+  /** Waiting finds removed because they no longer fit the codes and keywords, or went past due. */
+  cleared: number;
+  /** Notices already past the response date when read. */
+  expired: number;
+  /** Notices that only mention a keyword in passing (kept out, or removed from the waiting list). */
+  passing: number;
+  /** Notices that mention an excluded word. */
+  excluded: number;
+  /** Open notices past the backfill's cap of best-fitting finds. */
+  pastCap: number;
+  /** Waiting finds that match nothing the company does. */
+  weak: number;
+  /** Waiting finds the AI said Skip to. */
+  skipped: number;
+};
+
+/**
+ * BL-SCOUT-SHOWN — one run-note line saying where notices went, so a short
+ * list is never a mystery. Empty when nothing was set aside.
+ */
+export function scoutDispositionLine(d: NoticeDisposition): string {
+  const n = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString("en-US")} ${x === 1 ? one : many}`;
+  const parts: string[] = [];
+  if (d.cleared > 0) parts.push(`${n(d.cleared, "waiting find")} no longer in the codes and keywords or past due`);
+  if (d.expired > 0) parts.push(`${d.expired.toLocaleString("en-US")} already past the response date`);
+  if (d.passing > 0) parts.push(`${d.passing.toLocaleString("en-US")} mentioning a keyword only in passing`);
+  if (d.excluded > 0) parts.push(`${d.excluded.toLocaleString("en-US")} mentioning an excluded word`);
+  if (d.pastCap > 0) parts.push(`${d.pastCap.toLocaleString("en-US")} past the ${SCOUT_FOUND_CAP}-find cap`);
+  if (d.weak > 0) parts.push(`${d.weak.toLocaleString("en-US")} matching nothing you do (Weak fit)`);
+  if (d.skipped > 0) parts.push(`${d.skipped.toLocaleString("en-US")} the AI said Skip to (Skipped)`);
+  return parts.length === 0 ? "" : `Where notices went: ${parts.join("; ")}.`;
+}
+
+/** The most finds a backfill keeps (best fitting first). */
+export const SCOUT_FOUND_CAP = 500;

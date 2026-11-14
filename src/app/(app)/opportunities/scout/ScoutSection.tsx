@@ -55,7 +55,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
     safeQuery(() => getScoutTrack({ organizationId }), EMPTY_SCOUT_TRACK, { tag: "scout.track" }),
     safeQuery<ScoutRunView | null>(() => latestScoutRun({ organizationId }), null, { tag: "scout.run" }),
     getSamKeyStatus(organizationId),
-    safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0, weak: 0 }, { tag: "scout.count" }),
+    safeQuery(() => countNewScoutCandidates({ organizationId }), { total: 0, unreviewed: 0, weak: 0, skipped: 0 }, { tag: "scout.count" }),
     safeQuery<ScoutLearningView | null>(() => getScoutLearning({ organizationId }), null, { tag: "scout.learning" }),
   ]);
 
@@ -80,6 +80,7 @@ export async function ScoutSection({ source }: { source: IdentifySource | null }
           candidates={fresh}
           unreviewedTotal={waiting.unreviewed}
           weakTotal={waiting.weak}
+          skippedTotal={waiting.skipped}
           waitingTotal={Math.max(waiting.total, fresh.length)}
           decided={decided}
           track={track}
