@@ -23,6 +23,7 @@ import { extractMentionUserIds } from "@/lib/mentions";
 import { plannedRoundsForProposal } from "@/lib/plan-store";
 import { isPlanColorTeam } from "@/lib/plan-logic";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
+import { sendMeetingInvites, setReviewMeeting } from "@/lib/review-meeting";
 import { runReviewPreflight } from "@/lib/review-preflight";
 import { summarizeReview, type SummarizeReviewResult } from "@/lib/review-summary";
 import { carryOpenComments, setChecklistItem, setReviewerSections } from "@/lib/review-workflow";
@@ -903,4 +904,35 @@ export async function setRoundReminderCadenceAction(input: {
   });
   revalidatePath(`/proposals/${row.proposalId}/reviews/${input.reviewId}`);
   return { ok: true };
+}
+
+/**
+ * BL-NAV-LIFECYCLE 5c — set or clear the round's meeting link and start
+ * time. The lead pastes the link from their own calendar; FORGE creates
+ * no meeting. Same reach as assigning reviewers; audited.
+ */
+export async function setReviewMeetingAction(input: {
+  reviewId: string;
+  url: string;
+  /** An ISO instant, or blank to clear. */
+  at: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await setReviewMeeting({ organizationId, reviewId: input.reviewId, url: input.url, at: input.at, actor: { userId: actor.id, email: actor.email } });
+  if (!res.ok) return res;
+  revalidatePath(`/proposals/${res.proposalId}/reviews/${input.reviewId}`);
+  return { ok: true };
+}
+
+/** "Send invites": a calendar invite (.ics) with the link and each reviewer's sections. */
+export async function sendMeetingInvitesAction(input: {
+  reviewId: string;
+}): Promise<{ ok: true; sent: number; failed: number } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const res = await sendMeetingInvites({ organizationId, reviewId: input.reviewId, actor: { userId: actor.id, email: actor.email } });
+  if (!res.ok) return res;
+  revalidatePath(`/proposals/${res.proposalId}/reviews/${input.reviewId}`);
+  return { ok: true, sent: res.sent, failed: res.failed };
 }

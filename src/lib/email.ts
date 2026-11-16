@@ -30,6 +30,8 @@ export async function sendEmail(opts: {
   from?: string;
   /** Reply-To header — where replies should land. */
   replyTo?: string;
+  /** BL-NAV-LIFECYCLE 5c — files to attach (the review meeting's .ics). */
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
 }): Promise<void> {
   if (!apiKey) {
     log.warn("[email]", "RESEND_API_KEY not set — email skipped (stub mode)", {
@@ -49,6 +51,7 @@ export async function sendEmail(opts: {
     html: opts.html,
     text: opts.text,
     ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+    ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
   });
   if (res?.error) {
     const message = res.error.message || res.error.name || "the email service refused the message";
@@ -236,6 +239,50 @@ export async function sendReviewAssignedEmail(opts: {
     subject: `${opts.reviewColor} review on ${opts.proposalTitle}`,
     html: emailShell(`${opts.reviewColor} review assigned`, body),
     text: `${opts.starterName} added you as a reviewer on a ${opts.reviewColor} review of ${opts.proposalTitle}.\n${due}\nOpen: ${url}`,
+  });
+}
+
+/**
+ * BL-NAV-LIFECYCLE 5c — the review meeting's invite (with the .ics) or
+ * its day-before reminder. Both carry the pasted link and the sections
+ * in this reviewer's scope.
+ */
+export async function sendReviewMeetingEmail(opts: {
+  to: string;
+  kind: "invite" | "reminder";
+  proposalTitle: string;
+  colorLabel: string;
+  start: Date;
+  url: string;
+  sections: string[];
+  reviewUrl: string;
+  ics?: string;
+}): Promise<void> {
+  const when = `${opts.start.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+  const scope = opts.sections.length > 0 ? opts.sections.join(", ") : "the whole proposal";
+  const heading = opts.kind === "invite" ? `${opts.colorLabel} review meeting` : `Tomorrow: ${opts.colorLabel} review meeting`;
+  const lead =
+    opts.kind === "invite"
+      ? "You are invited to the review meeting. The calendar invite is attached."
+      : "A reminder that the review meeting is coming up.";
+  const body = `
+    <h1 style="font-size:20px;font-weight:600;margin:0 0 12px 0;color:${EMAIL_HEX.ink};">${escapeHtml(heading)}</h1>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.55;color:${EMAIL_HEX.muted};">
+      ${escapeHtml(lead)} <strong style="color:${EMAIL_HEX.ink};">${escapeHtml(opts.proposalTitle)}</strong>, ${escapeHtml(when)}.
+      In scope for you: ${escapeHtml(scope)}.
+    </p>
+    <p style="margin:24px 0;">
+      <a href="${escapeHtml(opts.url)}" style="display:inline-block;padding:14px 24px;border-radius:3px;background:${EMAIL_HEX.accent};color:${EMAIL_HEX.card};text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;">Join the meeting</a>
+    </p>
+    <p style="margin:0 0 8px 0;font-size:12px;color:${EMAIL_HEX.muted};word-break:break-all;">Meeting link: ${escapeHtml(opts.url)}</p>
+    <p style="margin:0;font-size:12px;color:${EMAIL_HEX.muted};word-break:break-all;">Review in FORGE: ${escapeHtml(opts.reviewUrl)}</p>
+  `;
+  await sendEmail({
+    to: opts.to,
+    subject: `${heading}: ${opts.proposalTitle}`,
+    html: emailShell(heading, body),
+    text: `${lead}\n${opts.proposalTitle}, ${when}.\nIn scope for you: ${scope}.\nJoin: ${opts.url}\nReview in FORGE: ${opts.reviewUrl}`,
+    ...(opts.ics ? { attachments: [{ filename: "review-meeting.ics", content: Buffer.from(opts.ics, "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" }] } : {}),
   });
 }
 

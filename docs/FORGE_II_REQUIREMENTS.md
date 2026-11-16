@@ -20,7 +20,7 @@ developing").
   added to the plan here.
 - ❓ **Owner to decide**: needs an answer before it can be built.
 
-Last reviewed 2026-11-06, after PR #457.
+Last reviewed 2026-11-16, after PR #494 and Phase 5c (this PR).
 
 ---
 
@@ -58,7 +58,7 @@ Last reviewed 2026-11-06, after PR #457.
 | I-3 | Bring in from SAM.gov on that page | ✅ #453 |
 | I-4 | Bring in from a pasted GSA email | ✅ #453 |
 | I-5 | Bring in from GSA eBuy | ✅ #453 |
-| I-6 | Bring in from **enterprise portals** | 🔄 BL-SCOUT-INBOX. Research found no feeds for state or prime portals (BL-SCOUT-PORTALS). The owner chose a company bid email address that the portals mail directly, with no forwarding (2026-11-06). Phase 1 (receive, Bid inbox) shipped in #460. Phase 2, the AI reading every bid alert into Scout finds, is in this PR. Next: the company's own domain, then dedicated portal readers |
+| I-6 | Bring in from **enterprise portals** | 🔄 BL-SCOUT-INBOX. Research found no feeds for state or prime portals (BL-SCOUT-PORTALS). The owner chose a company bid email address that the portals mail directly, with no forwarding (2026-11-06). Phase 1 (receive, Bid inbox) shipped in #460, phase 2 (the AI reads every bid alert into Scout finds) in #461, and receipt moved to FORGE's Exchange mailbox in #462; eBuy and GSA email results share the one Scout page's rows (#458, #459). Next: dedicated portal readers, once the owner confirms the first connectors |
 | I-7 | Bring in from the **GWACs** a company holds, current and future | 📋 BL-SCOUT-GWAC (backlog by the owner's choice, 2026-11-03). The tab is on the source bar, marked *soon*, and records requests |
 | I-8 | A one-stop, user-friendly experience | ✅ BL-SCOUT-ONEPAGE (#458, and this PR for eBuy and GSA email). #453 put every source on one page, but as two stacked experiences. The page now has one source bar, one search bar, and the same compact rows for every source |
 | I-9 | An **Add to pipeline** button next to every opportunity the scout finds or a search returns | ✅ #453 |
@@ -70,7 +70,7 @@ Last reviewed 2026-11-06, after PR #457.
 | I-15 | Explain what makes a fit score high (owner 2026-11-03) | ✅ #455: the score is earned from zero, and each card lists its reasons |
 | I-16 | Keep **Show skipped** (owner 2026-11-03) | ✅ #455 |
 | I-17 | **Amendment watch:** for every opportunity being pursued, the scout downloads amendments and every other published document, files them on the opportunity and notifies the team (owner 2026-11-03) | ✅ #457, BL-SCOUT-AMEND. Every open opportunity is checked daily and on demand. New documents are filed and read, the due date follows an amendment, and the owner and the proposal and review teams are told in the app and by email |
-| I-18 | The scout must not miss opportunities in the company's codes ("only 3 opportunities … Scout seems to be broken", owner 2026-11-05) | ✅ #456, BL-SCOUT-REACH. There were two causes, both older than #455. (1) Keywords were a hard filter, matched as exact phrases. (2) Only the first 100 notices per NAICS code were read, and the run didn't say when more were cut off. The owner chose to have keywords rank rather than filter. Every open notice in the codes is now a find, up to 1,000 notices are read per code, and the run note shows where the notices went |
+| I-18 | The scout must not miss opportunities in the company's codes ("only 3 opportunities … Scout seems to be broken", owner 2026-11-05) | ✅ #456, BL-SCOUT-REACH. There were two causes, both older than #455. (1) Keywords were a hard filter, matched as exact phrases. (2) Only the first 100 notices per NAICS code were read, and the run didn't say when more were cut off. The owner chose to have keywords rank rather than filter. Every open notice in the codes is now a find, up to 1,000 notices are read per code, and the run note shows where the notices went. It then grew past that fix: BL-SCOUT-BACKFILL (#490) reads a year back, paged past 1,000 notices, keeping the best 500; BL-SCOUT-FIT (#492) scores capability fit from the company model and counts weak fits instead of dropping them; BL-SCOUT-LEARN (#493) lets each find's score learn from the company's own outcomes; BL-SCOUT-SHOWN (#494) adds the Best first view and found-versus-shown counts. The owner declined to widen by PSC or related NAICS (2026-11-10): relevance first |
 
 ## E — Evaluate (footnote 5)
 
@@ -130,7 +130,7 @@ Last reviewed 2026-11-06, after PR #457.
 | D-2 | FORGE AI writes the first draft from what it knows of the company **and internet research** | 🟡 The draft uses the company's knowledge today. ⚠️ Internet research is added to phase 5 |
 | D-3 | The first draft is ready for the team to prepare for Pink review | ✅ Phase 5a: computed Ready for Pink (sections drafted, requirements mapped), advisory, with Start Pink review |
 | D-4 | The writer invites **internal and external** users to the whole proposal or to **specific sections** | 🟡 Internal reviewers exist. External users with section-level access are phases 5 and 8 |
-| D-5 | **Teams, Zoom or Webex** in the portal, so the lead can schedule reviews | 📋 Phase 5: the plan says scheduling links. ❓ Owner to confirm whether meetings must open inside FORGE or a calendar invite with the meeting link is enough |
+| D-5 | **Teams, Zoom or Webex** in the portal, so the lead can schedule reviews | ✅ Phase 5c (this PR, migration 0170). The owner chose the recommended answer on 2026-11-09: a calendar invite with the meeting link is enough. The lead pastes a link and a start time on the review round; **Send invites** emails every reviewer an `.ics` with the link and their sections; the day before, a reminder carries the link. FORGE creates no meeting. External reviewers wait for phase 8 |
 | D-6 | The Pink draft is complete, **compliant with the RFP** and editable in a word editor in the platform | 🟡 The section editor and compliance matrix exist. Phase 5 |
 | D-7 | While the proposal is edited, FORGE AI **learns how the company writes** and suggests improvements through every review to White Gloves and submission | 🟡 Draft insights and the company model exist. ⚠️ Learning from edits through the reviews is added to phase 5 |
 | D-8 | Everything happens in the portal. FORGE AI keeps learning until it can write up to 100% of the proposal, with people validating | ⚠️ A direction, not one feature. Recorded as the measure each phase reports against |
@@ -161,7 +161,7 @@ Last reviewed 2026-11-06, after PR #457.
 The order is serial, one PR at a time, with a design review before each
 phase:
 
-1. **Done:** BL-SCOUT-REACH (I-18, #456), BL-SCOUT-AMEND (I-17, #457). **Now:** BL-SCOUT-ONEPAGE (I-8), its second part. **Then:** BL-SCOUT-PORTALS (I-6), once the owner confirms the first connectors.
+1. **Done:** BL-SCOUT-REACH (I-18, #456), BL-SCOUT-AMEND (I-17, #457), BL-SCOUT-ONEPAGE (I-8, #458, #459), BL-SCOUT-INBOX (I-6, #460 to #462), phases 2 to 4 (Evaluate #463 to #469, Capture #470 to #478, Plan #483 to #487), Develop 5a (#489), and the Scout ask (#490 to #494: backfill, capability fit, learning, Best first). **Now:** Develop 5c, the review meeting and its invite (D-5, this PR). **Then:** 5b (draft all sections with research; waits for the owner to name the search provider), then 5d (learning). BL-SCOUT-PORTALS (I-6) waits for the owner to confirm the first connectors.
 2. **Phase 2, Evaluate:** E-1 to E-15, with the partner hand-off of
    E-13.
 3. **Phase 3, Capture:** C-1 to C-7, C-11, C-12.
