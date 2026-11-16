@@ -740,7 +740,7 @@ export type SectionDraftSnapshot = {
    */
   sources?: {
     index: number;
-    kind: "corpus" | "entry" | "past_performance";
+    kind: "corpus" | "entry" | "past_performance" | "web";
     label: string;
     excerpt: string;
     outcomeLabel?: string;

@@ -4080,6 +4080,13 @@ export type TierQuotas = {
    * `completeForTenant`. 0 = unlimited (Platinum / Enterprise semantics).
    */
   aiTokensPerMonth: number;
+  /**
+   * BL-NAV-LIFECYCLE 5b — web searches included per month for proposal
+   * research (counted in tenant_usage_counter). Unlike every quota above,
+   * a missing key or 0 means NONE included, never unlimited: a search
+   * costs real money.
+   */
+  webSearchesPerMonth?: number;
   seatsIncluded: number;
   storageGb: number;
   proposalsPerMonth: number;
@@ -4165,6 +4172,13 @@ export const tenantSubscriptions = pgTable(
         quotas?: Partial<TierQuotas>;
         aiModels?: Record<string, string>;
         aiBudget?: { tokensPerMonth?: number; requestsPerMonth?: number };
+        /** BL-NAV-LIFECYCLE 5b — the tenant's research switch, domain lists and own monthly search cap (src/lib/research-logic.ts). */
+        research?: {
+          enabled?: boolean;
+          allowedDomains?: string[];
+          blockedDomains?: string[];
+          monthlyCap?: number;
+        };
       }>()
       .notNull()
       .default({}),
@@ -4402,6 +4416,39 @@ export const tenantUsageCounters = pgTable(
 );
 
 export type TenantUsageCounter = typeof tenantUsageCounters.$inferSelect;
+
+/**
+ * BL-NAV-LIFECYCLE 5b — the numbered public sources one research run
+ * gathered for a proposal. The drafter offers them next to the company's
+ * own records; a web claim cites its URL. Search text is untrusted:
+ * stored as quoted data, never as instructions. A new run replaces the
+ * proposal's earlier set. Migration 0171.
+ */
+export const proposalResearchSources = pgTable(
+  "proposal_research_source",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    url: text("url").notNull(),
+    title: text("title").notNull().default(""),
+    excerpt: text("excerpt").notNull().default(""),
+    pageAge: text("page_age"),
+    retrievedAt: timestamp("retrieved_at").notNull().defaultNow(),
+    createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => ({
+    ordinalIdx: uniqueIndex("proposal_research_source_ordinal_idx").on(t.proposalId, t.ordinal),
+    orgIdx: index("proposal_research_source_org_idx").on(t.organizationId, t.proposalId),
+  }),
+);
+
+export type ProposalResearchSource = typeof proposalResearchSources.$inferSelect;
 export type NewTenantUsageCounter = typeof tenantUsageCounters.$inferInsert;
 
 /**

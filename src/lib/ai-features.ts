@@ -73,6 +73,9 @@ export const AI_FEATURES = {
   // BL-AIX Phase 2b — Sections L and M read into volumes, page limits,
   // format rules, factors and their order.
   solicitation_structure: "Sections L and M",
+  // BL-NAV-LIFECYCLE 5b — the web research step before "draft all sections":
+  // public sources about the customer, each cited by URL.
+  develop_research: "Draft research (web)",
 } as const;
 
 export type AiFeature = keyof typeof AI_FEATURES;

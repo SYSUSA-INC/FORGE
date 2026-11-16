@@ -45,6 +45,7 @@ const TierQuotasSchema = z.object({
   seatsIncluded: z.number().int().min(0),
   storageGb: z.number().int().min(0),
   proposalsPerMonth: z.number().int().min(0),
+  webSearchesPerMonth: z.number().int().min(0).optional(),
 }) satisfies z.ZodType<TierQuotas>;
 
 const UpdateTierInputSchema = z.object({

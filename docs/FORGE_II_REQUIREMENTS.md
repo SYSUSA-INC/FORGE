@@ -127,7 +127,7 @@ Last reviewed 2026-11-16, after PR #494 and Phase 5c (this PR).
 | ID | Requirement | Status |
 |---|---|---|
 | D-1 | A **Create a Draft** button on the opportunity page | ✅ Phase 5a: the Develop tab, one click from the plan (team, Section L outline, charter win themes) |
-| D-2 | FORGE AI writes the first draft from what it knows of the company **and internet research** | 🟡 The draft uses the company's knowledge today. ⚠️ Internet research is added to phase 5 |
+| D-2 | FORGE AI writes the first draft from what it knows of the company **and internet research** | 🟡 Phase 5b-1a (this PR, migration 0171): Claude's built-in web search through the AI gateway, a per-tenant switch with domain lists and a monthly search cap on Settings → AI Engine, and a metered search allowance. The research step in draft-all is 5b-1b; paying for extra searches is 5b-2 |
 | D-3 | The first draft is ready for the team to prepare for Pink review | ✅ Phase 5a: computed Ready for Pink (sections drafted, requirements mapped), advisory, with Start Pink review |
 | D-4 | The writer invites **internal and external** users to the whole proposal or to **specific sections** | 🟡 Internal reviewers exist. External users with section-level access are phases 5 and 8 |
 | D-5 | **Teams, Zoom or Webex** in the portal, so the lead can schedule reviews | ✅ Phase 5c (this PR, migration 0170). The owner chose the recommended answer on 2026-11-09: a calendar invite with the meeting link is enough. The lead pastes a link and a start time on the review round; **Send invites** emails every reviewer an `.ics` with the link and their sections; the day before, a reminder carries the link. FORGE creates no meeting. External reviewers wait for phase 8 |

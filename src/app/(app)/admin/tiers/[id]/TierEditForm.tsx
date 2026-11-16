@@ -34,6 +34,7 @@ const QUOTA_LABELS: Record<keyof TierQuotas, string> = {
   seatsIncluded: "Seats included",
   storageGb: "Storage (GB)",
   proposalsPerMonth: "Proposals/month",
+  webSearchesPerMonth: "Web searches/month (0 = none)",
 };
 
 export function TierEditForm({
@@ -272,7 +273,7 @@ export function TierEditForm({
                 type="number"
                 min="0"
                 step="1"
-                value={String(quotas[key])}
+                value={String(quotas[key] ?? 0)}
                 onChange={(e) => updateQuota(key, e.target.value)}
               />
             </label>

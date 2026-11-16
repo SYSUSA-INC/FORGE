@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5c (meeting link on the proposal review and an .ics invite) is shipped in its own PR; Phase 5b waits for the search provider, and 5d comes last.
+**Next:** Phase 5b-1a (web research settings and metering) is in its own PR (migration 0171); 5b-1b (the research job and draft-all wiring) follows once it merges, then 5b-2 (prepaid search packs), and 5d comes last.
 
 ---
 
@@ -4017,6 +4017,46 @@ Every requirement in the FORGE II document, with its status and phase:
    to where that stage's work happens; and the pipeline stage names
    aligned to the seven words (Identified, Evaluated, Captured, Planned,
    Developed, Delivered, Measured, plus Archived).
+
+   **5b-1a shipped** (this PR, migration 0171; the owner's 2026-11-16
+   answers: Claude's built-in web search, not limited to .gov, a per-tenant
+   switch). 5b-1 was split to stay under the diff cap: this PR is the
+   settings, the metering and the gateway; 5b-1b (next, after this merges,
+   migration 0172) is the research job, the draft-all wiring and the
+   sources reaching the drafter. "Draft all sections" already exists as
+   BL-AIX Phase 0c-2 (#338: one durable `section_auto_draft` job per
+   section, a progress waiter, a failed section retried alone, tracked
+   changes and a snapshot over existing text, stub text never written), so
+   5b-1b adds the research step in front of it and does not rebuild it.
+   The gateway (`ai.ts`) takes an optional `webSearch` request: the basic
+   `web_search_20250305` server tool (no code execution; docs checked
+   2026-11-16: $10 per 1,000 searches plus tokens, an allow list or a
+   block list but never both, `max_uses` counted across `pause_turn`
+   continuations, a failed search not billed); Anthropic-only, never moved
+   to a fallback provider, never run in stub mode. **Settings → AI Engine →
+   AI and Search** (`ResearchPanel`, `custom_overrides.research`, audit
+   `ai_engine.research.update`, default off) holds the switch, the allowed
+   and blocked domains and the organization's own monthly search cap, and
+   shows used and remaining; the switch has no effect until 5b-1b.
+   **Metering reuses the AI quota system:** a new tier quota
+   `webSearchesPerMonth` counted in `tenant_usage_counter`; unlike the
+   others a missing key or 0 means none included, never unlimited.
+   `reserveWebSearches` takes searches with one guarded upsert that cannot
+   pass the cap (racing runs cannot overspend) and `releaseWebSearches`
+   gives back the unused. Proposed plan allowances (set by 0171, editable
+   on /admin/tiers): Gold 300 a month (about 60 runs of five searches,
+   about $3 at list price), Platinum 1,000, Bronze, Silver and custom 0
+   (Bronze and Silver cannot auto-draft); a platform admin can override per
+   tenant. `proposal_research_source` (migration 0171: numbered, address,
+   title, the page's own cited text, page age, retrieval date; a new run
+   replaces the set) with `research-store.ts` (org-scoped list, replace and
+   `researchSourcesForDraft`: `DraftSource` kind `web`, used only while the
+   switch is on, read audit `proposal.draft.research`). `research-logic.ts`
+   is the pure core (domains, lists, the cap rules, source selection, the
+   untrusted-text prompt). Feature key `develop_research` (standard class).
+   Tests: `tests/ai/research-logic.test.ts`,
+   `tests/isolation/research.test.ts`. 5b-2 (prepaid search packs through
+   Stripe Checkout, no overage) follows strictly after 5b-1b.
 
 ---
 
