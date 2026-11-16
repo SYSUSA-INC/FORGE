@@ -1853,6 +1853,12 @@ export const proposalReviews = pgTable("proposal_review", {
   /** BL-FB-X-COLOR-TEAM Slice 4 — this round's own reminder cadence (drizzle/0111); null = the tenant's. */
   reminderDaysBefore: integer("reminder_days_before"),
   reminderRepeatDays: integer("reminder_repeat_days"),
+  /** BL-NAV-LIFECYCLE 5c — the meeting link the lead pastes and its start time (drizzle/0170). FORGE creates no meeting. */
+  meetingUrl: text("meeting_url"),
+  meetingAt: timestamp("meeting_at"),
+  /** When "Send invites" last went out, and when the day-before reminder did. */
+  meetingInvitesSentAt: timestamp("meeting_invites_sent_at"),
+  meetingReminderSentAt: timestamp("meeting_reminder_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

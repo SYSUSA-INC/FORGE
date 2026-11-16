@@ -99,7 +99,7 @@ Effort key:
 | 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
 | 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
 | 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
-| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C ✅ #492 (BL-SCOUT-FIT); C2 ✅ #493 (BL-SCOUT-LEARN); D (BL-SCOUT-SHOWN) 🔄 this PR, then Phase 5c, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
+| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C ✅ #492 (BL-SCOUT-FIT); C2 ✅ #493 (BL-SCOUT-LEARN); D (BL-SCOUT-SHOWN) ✅ #494; then Phase 5c (the review meeting) 🔄 its own PR, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
 | 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5c (meeting link on the proposal review and an .ics invite).
+**Next:** Phase 5c (meeting link on the proposal review and an .ics invite) is shipped in its own PR; Phase 5b waits for the search provider, and 5d comes last.
 
 ---
 
@@ -3977,6 +3977,32 @@ Every requirement in the FORGE II document, with its status and phase:
    dates are not copied: the parts table lives on a proposal, so a draft
    made here starts without them. 5b to 5d remain; 5b waits on the search
    provider.
+   **5c shipped** (this PR, migration 0170): a review round's meeting
+   (design §2.4, decision 4 "all recommended"). Four nullable columns on
+   `proposal_review`: `meeting_url` (any http(s) link the lead pastes;
+   FORGE creates no meeting), `meeting_at`, `meeting_invites_sent_at`,
+   `meeting_reminder_sent_at`. `src/lib/review-meeting-logic.ts` (pure:
+   link and time validation, `meetingReminderDue`, `buildIcs`, a
+   one-hour RFC 5545 event with a stable uid per round and a rising
+   sequence so a re-send updates the reviewer's calendar) and
+   `review-meeting.ts` (org-scoped `setReviewMeeting`, `getReviewMeeting`,
+   `sendMeetingInvites`, `deliverMeetingEmails`; each reviewer's mail names
+   only the sections in their scope). `sendEmail` takes attachments;
+   `sendReviewMeetingEmail` carries the link and the `.ics`. The daily
+   08:00 UTC cron (`/api/cron/solicitation-key-dates`) adds
+   `dispatchMeetingReminders`: the day before (or the same day), once per
+   meeting time; moving the meeting earns a fresh reminder. The round's
+   page gains a **Meeting** panel (link, local start time, Save meeting,
+   Send invites). Actions `setReviewMeetingAction` and
+   `sendMeetingInvitesAction` (`requireAuth` + `requireCurrentOrg`, no
+   organization parameter); audit `proposal.review.meeting_set`,
+   `meeting_cleared`, `meeting_invites`. No guest page and no token table:
+   external reviewers wait for phase 8 (decision 3). Tests:
+   `tests/ai/review-meeting-logic.test.ts`,
+   `tests/isolation/review-meeting.test.ts` (tenant B cannot read, set,
+   clear or invite for tenant A's round). Not done: a meeting end time
+   (every meeting is one hour), RSVP tracking. Phase 5b waits on the
+   search provider; 5d (learning) comes last.
 6. **Deliver:** submit from the portal by email, sent from a platform
    address with a per-opportunity reply address; replies received in
    FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox

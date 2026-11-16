@@ -33,6 +33,7 @@ import { ConsolidatedReport } from "./ConsolidatedReport";
 import { CoveragePanel } from "./CoveragePanel";
 import { ReviewSummaryPanel } from "./ReviewSummaryPanel";
 import { ReminderPanel } from "./ReminderPanel";
+import { MeetingPanel } from "./MeetingPanel";
 import { listOrgReviewers } from "../actions";
 import { withAlpha } from "@/lib/theme-colors";
 import { ColorTeamTag } from "@/components/ui/ColorTeamTag";
@@ -283,6 +284,18 @@ export default async function ReviewDetailPage({
               initialVerdict={actorAssignment.verdict ?? null}
               initialSummary={actorAssignment.summary ?? ""}
               alreadySubmitted={!!actorAssignment.submittedAt}
+            />
+          ) : null}
+
+          {canClose || r.meetingUrl ? (
+            <MeetingPanel
+              reviewId={r.id}
+              url={r.meetingUrl}
+              at={r.meetingAt ? r.meetingAt.toISOString() : null}
+              invitesSentAt={r.meetingInvitesSentAt ? r.meetingInvitesSentAt.toISOString() : null}
+              reminderSentAt={r.meetingReminderSentAt ? r.meetingReminderSentAt.toISOString() : null}
+              reviewerCount={assignmentRows.length}
+              canEdit={canClose}
             />
           ) : null}
 

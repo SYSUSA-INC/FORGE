@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { dispatchKeyDateReminders } from "@/lib/solicitation-key-date-cron";
 import { dispatchOpportunityDueSoon } from "@/lib/opportunity-due-soon-cron";
-import { dispatchReviewDueReminders } from "@/lib/review-reminders";
+import { dispatchMeetingReminders, dispatchReviewDueReminders } from "@/lib/review-reminders";
 import { dispatchContactTouchReminders } from "@/lib/crm-reminders";
 import { dispatchMilestoneDueSoon } from "@/lib/milestone-due-soon-cron";
 import { dispatchSectionOverdue } from "@/lib/section-overdue-cron";
@@ -63,11 +63,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const [keyDates, dueSoon, reviewReminders, contactReminders, milestones, sectionsOverdue] = await Promise.allSettled([
+  const [keyDates, dueSoon, reviewReminders, meetingReminders, contactReminders, milestones, sectionsOverdue] = await Promise.allSettled([
     dispatchKeyDateReminders(),
     dispatchOpportunityDueSoon(),
     // BL-FB-X-COLOR-TEAM Slice 2 — day-before nudge to unsubmitted reviewers.
     dispatchReviewDueReminders(),
+    // BL-NAV-LIFECYCLE 5c — the review meeting's day-before reminder, with the pasted link.
+    dispatchMeetingReminders(),
     // BL-FB-X-CRM Slice 2 — follow-up owed to a customer contact's owner.
     dispatchContactTouchReminders(),
     // BL-NAV-LIFECYCLE 4b-1 — a planned milestone's owner, at T-7 / T-3 / T-1.
@@ -91,6 +93,11 @@ export async function GET(req: NextRequest) {
     const message = contactReminders.reason instanceof Error ? contactReminders.reason.message : String(contactReminders.reason);
     log.error("[solicitation-key-date-cron]", "contact reminders failed", { error: message });
     failures.push(`contactReminders: ${message}`);
+  }
+  if (meetingReminders.status === "rejected") {
+    const message = meetingReminders.reason instanceof Error ? meetingReminders.reason.message : String(meetingReminders.reason);
+    log.error("[solicitation-key-date-cron]", "meeting reminders failed", { error: message });
+    failures.push(`meetingReminders: ${message}`);
   }
   if (reviewReminders.status === "rejected") {
     const message = reviewReminders.reason instanceof Error ? reviewReminders.reason.message : String(reviewReminders.reason);
@@ -123,6 +130,7 @@ export async function GET(req: NextRequest) {
     opportunityDueSoon:
       dueSoon.status === "fulfilled" ? dueSoon.value : null,
     reviewReminders: reviewReminders.status === "fulfilled" ? reviewReminders.value : null,
+    meetingReminders: meetingReminders.status === "fulfilled" ? meetingReminders.value : null,
     contactReminders: contactReminders.status === "fulfilled" ? contactReminders.value : null,
     milestoneDueSoon: milestones.status === "fulfilled" ? milestones.value : null,
     sectionOverdue: sectionsOverdue.status === "fulfilled" ? sectionsOverdue.value : null,

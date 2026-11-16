@@ -19,6 +19,8 @@ import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { organizations, proposalReviewAssignments, proposalReviews, proposals } from "@/db/schema";
 import { log } from "@/lib/log";
+import { deliverMeetingEmails } from "@/lib/review-meeting";
+import { meetingReminderDue } from "@/lib/review-meeting-logic";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { REVIEW_COLOR_LABELS } from "@/lib/review-types";
 import { DEFAULT_REMINDER_CADENCE, REMINDER_CADENCE_LIMITS, dueReminderSubject, reviewReminderDue, roundCadence, sanitizeReminderCadence } from "@/lib/review-workflow-logic";
@@ -99,6 +101,57 @@ export async function dispatchReviewDueReminders(now: Date = new Date()): Promis
     } catch (err) {
       summary.errors += 1;
       log.error("[review-reminders]", "dispatch failed", { reviewId: row.id, organizationId, error: err });
+    }
+  }
+  return summary;
+}
+
+export type MeetingReminderSummary = { meetings: number; reminded: number; emails: number; errors: number };
+
+/**
+ * BL-NAV-LIFECYCLE 5c — the day-before reminder for a round's meeting,
+ * carrying the pasted link, to every reviewer on the round. Stamped once
+ * per meeting time (moving the meeting clears the stamp). Cross-org by
+ * design, like the due-date reminder above: a background worker, each
+ * round handled through its own organization.
+ */
+export async function dispatchMeetingReminders(now: Date = new Date()): Promise<MeetingReminderSummary> {
+  const rows = await db
+    .select({
+      id: proposalReviews.id,
+      organizationId: proposals.organizationId,
+      url: proposalReviews.meetingUrl,
+      at: proposalReviews.meetingAt,
+      sentAt: proposalReviews.meetingReminderSentAt,
+    })
+    .from(proposalReviews)
+    .innerJoin(proposals, eq(proposals.id, proposalReviews.proposalId))
+    .innerJoin(organizations, eq(organizations.id, proposals.organizationId))
+    .where(
+      and(
+        eq(proposalReviews.status, "in_progress"),
+        isNotNull(proposalReviews.meetingAt),
+        isNotNull(proposalReviews.meetingUrl),
+        isNull(proposalReviews.meetingReminderSentAt),
+        isNull(organizations.disabledAt),
+      ),
+    );
+  const summary: MeetingReminderSummary = { meetings: 0, reminded: 0, emails: 0, errors: 0 };
+  for (const row of rows) {
+    if (!meetingReminderDue(now, row.at, row.url, row.sentAt)) continue;
+    summary.meetings += 1;
+    try {
+      const result = await deliverMeetingEmails({ organizationId: row.organizationId, reviewId: row.id, kind: "reminder", now });
+      if (result.ok && result.sent > 0) {
+        summary.reminded += 1;
+        summary.emails += result.sent;
+        await db.update(proposalReviews).set({ meetingReminderSentAt: now }).where(eq(proposalReviews.id, row.id));
+      } else if (!result.ok) {
+        summary.errors += 1;
+      }
+    } catch (err) {
+      summary.errors += 1;
+      log.error("[review-reminders]", "meeting reminder failed", { reviewId: row.id, organizationId: row.organizationId, error: err });
     }
   }
   return summary;
