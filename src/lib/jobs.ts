@@ -420,6 +420,8 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   solicitation_document_parse: handleSolicitationDocumentParse,
   proposal_harvest: handleProposalHarvest,
   section_auto_draft: handleSectionAutoDraft,
+  // BL-NAV-LIFECYCLE 5b — loaded when run: the research step imports the AI gateway.
+  proposal_research: async (job) => (await import("@/lib/research-job")).handleProposalResearch(job),
   knowledge_artifact_extract: handleKnowledgeArtifactExtract,
   // BL-SCOUT-INBOX — loaded when run: inbound-bids queues its own jobs through this module.
   inbound_email_parse: async (job) => (await import("@/lib/inbound-bids")).handleInboundEmailParse(job),

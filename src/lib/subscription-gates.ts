@@ -95,6 +95,8 @@ export type CurrentTier = {
      * Engine control panel. Only ever lowers the effective quota.
      */
     aiBudget?: AiBudget;
+    /** BL-NAV-LIFECYCLE 5b — the tenant's web research switch, domain lists and own monthly search cap. */
+    research?: { enabled?: boolean; allowedDomains?: string[]; blockedDomains?: string[]; monthlyCap?: number };
   };
   /** Effective flags = tier × overrides × live add-ons. */
   effectiveFlags: TierFeatureFlags;
@@ -160,6 +162,7 @@ export async function getCurrentTier(
     quotas?: Partial<TierQuotas>;
     aiModels?: Record<string, string>;
     aiBudget?: AiBudget;
+    research?: { enabled?: boolean; allowedDomains?: string[]; blockedDomains?: string[]; monthlyCap?: number };
   };
 
   const trial = trialState(row.status, row.trialUntil);
@@ -275,6 +278,7 @@ function mergeQuotas(
     aiRequestsPerMonth:
       overrides.aiRequestsPerMonth ?? base.aiRequestsPerMonth,
     aiTokensPerMonth: overrides.aiTokensPerMonth ?? base.aiTokensPerMonth,
+    webSearchesPerMonth: overrides.webSearchesPerMonth ?? base.webSearchesPerMonth,
     seatsIncluded: overrides.seatsIncluded ?? base.seatsIncluded,
     storageGb: overrides.storageGb ?? base.storageGb,
     proposalsPerMonth: overrides.proposalsPerMonth ?? base.proposalsPerMonth,
@@ -294,7 +298,8 @@ function mergeQuotas(
 export type CounterQuotaKey =
   | "aiRequestsPerMonth"
   | "aiTokensPerMonth"
-  | "proposalsPerMonth";
+  | "proposalsPerMonth"
+  | "webSearchesPerMonth";
 
 /** Any quota key — counter-backed or live-measured. */
 export type QuotaKey = keyof TierQuotas;
@@ -387,7 +392,7 @@ export async function enforceQuota(
     const ended = AI_QUOTA_KEYS.has(key) ? trialRefusal(tier) : null;
     if (ended) throw new QuotaExceededError(key, 0, 0, tier.tierName, ended);
 
-    const limit = tier.effectiveQuotas[key];
+    const limit = tier.effectiveQuotas[key] ?? 0;
     // Quota = 0 means unlimited (Platinum semantics). Skip the
     // counter increment entirely — saves a write on the hot path.
     if (limit === 0) {
@@ -492,7 +497,7 @@ export async function refundQuota(
   try {
     const tier = await getCurrentTier(organizationId);
     if (!tier) return;
-    if (tier.effectiveQuotas[key] === 0) return;
+    if ((tier.effectiveQuotas[key] ?? 0) === 0) return;
 
     const { periodStart } = currentMonthPeriod();
     await db
@@ -685,5 +690,87 @@ export async function enforceStorageQuota(
       additionalBytes,
     });
     throw new QuotaExceededError("storageGb", 0, 0, null);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BL-NAV-LIFECYCLE 5b — web search allowance
+//
+// A search is billed per search on the Anthropic account, so this quota is
+// strict where the others are advisory: the plan's `webSearchesPerMonth`
+// (a missing key or 0 = none included, never unlimited), lowered by the
+// tenant's own cap, counted in the same `tenant_usage_counter` table as
+// every other monthly quota. A run reserves its searches BEFORE it starts
+// with one atomic statement that refuses to pass the cap, then gives back
+// what it did not use. Two runs racing cannot overspend.
+// ─────────────────────────────────────────────────────────────────────
+
+/** The searches a tenant has this month: the plan's, after the tenant's own cap, and what is used. */
+export async function getWebSearchAllowance(organizationId: string): Promise<{
+  planAllowance: number;
+  cap: number;
+  used: number;
+  remaining: number;
+  trialEnded: boolean;
+}> {
+  const { searchAllowance } = await import("@/lib/research-logic");
+  const tier = await getCurrentTier(organizationId);
+  const used = await getCurrentUsage(organizationId, "webSearchesPerMonth");
+  const a = searchAllowance({
+    planAllowance: tier?.platformQuotas.webSearchesPerMonth,
+    tenantCap: typeof tier?.overrides.research?.monthlyCap === "number" ? tier.overrides.research.monthlyCap : null,
+    used,
+  });
+  const trialEnded = trialRefusal(tier) !== null;
+  return { ...a, remaining: trialEnded ? 0 : a.remaining, trialEnded };
+}
+
+/**
+ * Reserve up to `want` searches (all or fewer: what is left under the cap).
+ * Returns how many were reserved; 0 means do not search. The increment is a
+ * single guarded upsert, so it never takes the counter past the cap.
+ */
+export async function reserveWebSearches(organizationId: string, want: number): Promise<{ reserved: number; cap: number; used: number }> {
+  const { searchesToReserve } = await import("@/lib/research-logic");
+  const allowance = await getWebSearchAllowance(organizationId);
+  const n = searchesToReserve(allowance.remaining, want);
+  if (n <= 0) return { reserved: 0, cap: allowance.cap, used: allowance.used };
+  const { periodStart, periodEnd } = currentMonthPeriod();
+  try {
+    const rows = await db
+      .insert(tenantUsageCounters)
+      .values({ organizationId, key: "webSearchesPerMonth", periodStart, periodEnd, value: n })
+      .onConflictDoUpdate({
+        target: [tenantUsageCounters.organizationId, tenantUsageCounters.key, tenantUsageCounters.periodStart],
+        set: { value: sql`${tenantUsageCounters.value} + ${n}`, updatedAt: new Date() },
+        setWhere: sql`${tenantUsageCounters.value} + ${n} <= ${allowance.cap}`,
+      })
+      .returning({ value: tenantUsageCounters.value });
+    // No row back: another run took the room first; nothing was added.
+    if (rows.length === 0) return { reserved: 0, cap: allowance.cap, used: allowance.used };
+    return { reserved: n, cap: allowance.cap, used: rows[0].value };
+  } catch (err) {
+    log.error("[reserveWebSearches]", "reserve failed", { error: err, organizationId, want });
+    return { reserved: 0, cap: allowance.cap, used: allowance.used };
+  }
+}
+
+/** Give back reserved searches that were not run. Never below zero. */
+export async function releaseWebSearches(organizationId: string, count: number): Promise<void> {
+  if (count <= 0) return;
+  const { periodStart } = currentMonthPeriod();
+  try {
+    await db
+      .update(tenantUsageCounters)
+      .set({ value: sql`GREATEST(0, ${tenantUsageCounters.value} - ${count})`, updatedAt: new Date() })
+      .where(
+        and(
+          eq(tenantUsageCounters.organizationId, organizationId),
+          eq(tenantUsageCounters.key, "webSearchesPerMonth"),
+          eq(tenantUsageCounters.periodStart, periodStart),
+        ),
+      );
+  } catch (err) {
+    log.warn("[releaseWebSearches]", "release failed", { error: err, organizationId, count });
   }
 }

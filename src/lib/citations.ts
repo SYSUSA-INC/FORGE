@@ -103,7 +103,7 @@ export function demoteClaims(text: string, claims: CitedClaim[]): string {
  */
 export type DraftSource = {
   index: number;
-  kind: "corpus" | "entry" | "past_performance";
+  kind: "corpus" | "entry" | "past_performance" | "web";
   label: string;
   excerpt: string;
   outcomeLabel?: "none" | "won" | "lost" | "no_bid" | "withdrawn";

@@ -66,6 +66,12 @@ export async function handleSectionAutoDraft(job: BackgroundJob): Promise<void> 
     return;
   }
 
+  // BL-NAV-LIFECYCLE 5b — drafts wait for the proposal's research step to finish so
+  // they can cite what it found (the pump runs it first; this covers a cron pickup).
+  // A short wait: the job retries after its backoff, and research never blocks it for long.
+  const { researchPending } = await import("@/lib/auto-draft");
+  if (await researchPending(organizationId, proposalId)) throw new Error("Waiting for the research step to finish.");
+
   const limit = await enforceRateLimit({ key: `ai-draft:org:${organizationId}`, limit: ORG_DRAFTS_PER_DAY, windowSeconds: 86_400 });
   if (!limit.ok) throw new JobPermanentError(`Your organization reached its daily AI draft limit (${ORG_DRAFTS_PER_DAY}). Run auto-draft again tomorrow.`);
 

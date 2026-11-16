@@ -11,7 +11,7 @@
  */
 import "server-only";
 
-import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { backgroundJobs, proposalSections, proposals } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
@@ -21,8 +21,18 @@ import { enqueueJob, executeJob } from "@/lib/jobs";
 import { ensureFeature, FeatureGateError } from "@/lib/subscription-gates";
 
 const KIND = "section_auto_draft" as const;
+/** BL-NAV-LIFECYCLE 5b — the research step that runs before the section drafts. */
+const RESEARCH_KIND = "proposal_research" as const;
 /** Keep a pump inside the 300-second function limit. */
 const PUMP_BUDGET_MS = 230_000;
+
+/** The proposal's section drafts and its research step: the pump runs both, oldest first, so research goes first. */
+const pumpableForProposal = (organizationId: string, proposalId: string) =>
+  and(
+    eq(backgroundJobs.organizationId, organizationId),
+    inArray(backgroundJobs.kind, [KIND, RESEARCH_KIND]),
+    sql`${backgroundJobs.payload}->>'proposalId' = ${proposalId}`,
+  );
 
 const forProposal = (organizationId: string, proposalId: string) =>
   and(
@@ -64,6 +74,21 @@ export async function startAutoDraft(input: {
     return { ok: false, error: input.overwrite ? "This proposal has no sections." : "Every section already has text. Tick “Overwrite” to redraft them as suggestions." };
   }
 
+  // BL-NAV-LIFECYCLE 5b — research first, when the organization has it on and
+  // the allowance can pay for it. It is queued before the sections, so the
+  // pump runs it first; a run that cannot search is a finished job with a note,
+  // and the drafts go ahead on the company's own records.
+  const research = await researchCanRun(organizationId);
+  if (research) {
+    await enqueueJob({
+      organizationId,
+      kind: RESEARCH_KIND,
+      resourceId: proposalId,
+      payload: { proposalId },
+      requestedByUserId: input.userId,
+    });
+  }
+
   let queued = 0;
   for (const sectionId of targets) {
     const { reused } = await enqueueJob({
@@ -82,7 +107,7 @@ export async function startAutoDraft(input: {
     action: "proposal.auto_draft.start",
     resourceType: "proposal",
     resourceId: proposalId,
-    metadata: { sections: targets.length, newlyQueued: queued, overwrite: input.overwrite },
+    metadata: { sections: targets.length, newlyQueued: queued, overwrite: input.overwrite, research },
   });
 
   if (input.kick !== false) runInBackground(`[auto-draft:${proposalId}]`, () => pumpAutoDraft({ organizationId, proposalId }));
@@ -110,7 +135,7 @@ export async function pumpAutoDraft(input: {
       .from(backgroundJobs)
       .where(
         and(
-          forProposal(organizationId, input.proposalId),
+          pumpableForProposal(organizationId, input.proposalId),
           eq(backgroundJobs.status, "queued"),
           lte(backgroundJobs.nextAttemptAt, new Date()),
         ),
@@ -154,6 +179,53 @@ export async function autoDraftProgress(input: {
 }
 
 /** Keep a watched run moving: start a pump when work is due and none is running. */
+/** Whether a research step is worth queueing: switched on, the Anthropic provider active, allowance left. */
+async function researchCanRun(organizationId: string): Promise<boolean> {
+  const [{ getResearchSettings }, { getWebSearchAllowance }, { getAIProviderStatus }] = await Promise.all([
+    import("@/lib/research-store"),
+    import("@/lib/subscription-gates"),
+    import("@/lib/ai"),
+  ]);
+  const settings = await getResearchSettings(organizationId);
+  if (!settings.enabled || getAIProviderStatus().active.name !== "anthropic") return false;
+  return (await getWebSearchAllowance(organizationId)).remaining > 0;
+}
+
+/** The newest research step of a proposal: how it stands and what it did or why it did not. */
+export async function researchProgress(input: { organizationId: string; proposalId: string }): Promise<{
+  status: "queued" | "running" | "done" | "failed";
+  note: string;
+  searches: number;
+  sources: number;
+} | null> {
+  const [row] = await db
+    .select({ status: backgroundJobs.status, error: backgroundJobs.error, payload: backgroundJobs.payload })
+    .from(backgroundJobs)
+    .where(
+      and(
+        eq(backgroundJobs.organizationId, input.organizationId),
+        eq(backgroundJobs.kind, RESEARCH_KIND),
+        sql`${backgroundJobs.payload}->>'proposalId' = ${input.proposalId}`,
+      ),
+    )
+    .orderBy(desc(backgroundJobs.createdAt))
+    .limit(1);
+  if (!row) return null;
+  const p = row.payload as Record<string, unknown>;
+  return {
+    status: row.status,
+    note: row.status === "failed" ? row.error : typeof p.skipped === "string" ? p.skipped : "",
+    searches: typeof p.searches === "number" ? p.searches : 0,
+    sources: typeof p.sources === "number" ? p.sources : 0,
+  };
+}
+
+/** Whether the proposal's research step has yet to finish (queued, or running within the stuck window). */
+export async function researchPending(organizationId: string, proposalId: string): Promise<boolean> {
+  const p = await researchProgress({ organizationId, proposalId });
+  return p !== null && (p.status === "queued" || p.status === "running");
+}
+
 export async function continueAutoDraft(input: { organizationId: string; proposalId: string }): Promise<void> {
   const [busy] = await db
     .select({ id: backgroundJobs.id })

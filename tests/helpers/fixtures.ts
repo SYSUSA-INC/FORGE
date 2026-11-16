@@ -154,6 +154,7 @@ export async function createTierAndSubscribe(opts: {
     featureFlags?: Partial<import("@/db/schema").TierFeatureFlags>;
     quotas?: Partial<import("@/db/schema").TierQuotas>;
     aiModels?: Record<string, string>;
+    research?: { enabled?: boolean; allowedDomains?: string[]; blockedDomains?: string[]; monthlyCap?: number };
   };
 }): Promise<{ tierId: string; cleanup: () => Promise<void> }> {
   const { subscriptionTiers, tenantSubscriptions } = await import(

@@ -153,6 +153,23 @@ export type AICompleteOptions = {
    * caller can always render progressively without branching.
    */
   onDelta?: (text: string) => void;
+  /**
+   * BL-NAV-LIFECYCLE 5b — let the model search the web with Anthropic's
+   * server-side search tool (billed per search on the Anthropic account;
+   * `maxUses` bounds the searches of one call, continuations included).
+   * Anthropic only: other providers refuse it, and a call that carries it
+   * is never moved to a fallback provider. Not streamed.
+   */
+  webSearch?: { maxUses: number; allowedDomains?: string[]; blockedDomains?: string[] };
+};
+
+/** BL-NAV-LIFECYCLE 5b — what a web-searching call found: the searches run and the pages cited. */
+export type AIWebSearchOutcome = {
+  /** Searches the provider ran (and bills). */
+  requests: number;
+  citations: { url: string; title: string; citedText: string }[];
+  /** `page_age` per result URL, when the search reported one. */
+  pageAges: Record<string, string>;
 };
 
 export type AICompleteResult = {
@@ -174,6 +191,8 @@ export type AICompleteResult = {
   stopReason?: string;
   /** BL-AI-STREAMING — true when `onDelta` received incremental deltas from the provider. */
   streamed?: boolean;
+  /** BL-NAV-LIFECYCLE 5b — present when the call carried `webSearch`. */
+  webSearch?: AIWebSearchOutcome;
 };
 
 export type AIProviderName = "anthropic" | "bedrock" | "azure" | "vllm" | "stub";
@@ -295,6 +314,18 @@ export function __buildAnthropicBody(
       ? { type: "tool", name: opts.tool.name, disable_parallel_tool_use: true }
       : { type: "auto", disable_parallel_tool_use: true };
   }
+  if (opts.webSearch) {
+    // The API takes an allow list or a block list, never both (a 400).
+    const domains = opts.webSearch.allowedDomains?.length
+      ? { allowed_domains: opts.webSearch.allowedDomains }
+      : opts.webSearch.blockedDomains?.length
+        ? { blocked_domains: opts.webSearch.blockedDomains }
+        : {};
+    body.tools = [
+      ...((body.tools as unknown[] | undefined) ?? []),
+      { type: "web_search_20250305", name: "web_search", max_uses: Math.max(1, Math.floor(opts.webSearch.maxUses)), ...domains },
+    ];
+  }
   return body;
 }
 
@@ -321,12 +352,46 @@ function anthropicPromptUsage(u: AnthropicUsage | undefined): Pick<AICompleteRes
   };
 }
 
+type AnthropicBlock = {
+  type: string;
+  text?: string;
+  name?: string;
+  input?: unknown;
+  content?: unknown;
+  citations?: { type?: string; url?: string; title?: string; cited_text?: string }[];
+};
+
 type AnthropicResponse = {
-  content?: { type: string; text?: string; name?: string; input?: unknown }[];
-  usage?: AnthropicUsage;
+  content?: AnthropicBlock[];
+  usage?: AnthropicUsage & { server_tool_use?: { web_search_requests?: number } };
   model?: string;
   stop_reason?: string;
 };
+
+/**
+ * BL-NAV-LIFECYCLE 5b — the searches and cited pages of one response. A
+ * failed search comes back as an error object, not a list (and is not
+ * billed); only the usage counter and the cited pages are trusted.
+ */
+export function __parseWebSearch(json: AnthropicResponse): AIWebSearchOutcome {
+  const blocks = json.content ?? [];
+  const citations: AIWebSearchOutcome["citations"] = [];
+  const pageAges: Record<string, string> = {};
+  for (const b of blocks) {
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      for (const r of b.content as { url?: string; page_age?: string }[]) {
+        if (r.url && r.page_age) pageAges[r.url] = r.page_age;
+      }
+    }
+    for (const c of b.citations ?? []) {
+      if (c.type === "web_search_result_location" && c.url) {
+        citations.push({ url: c.url, title: c.title ?? "", citedText: c.cited_text ?? "" });
+      }
+    }
+  }
+  const started = blocks.filter((b) => b.type === "server_tool_use" && b.name === "web_search").length;
+  return { requests: Math.max(json.usage?.server_tool_use?.web_search_requests ?? 0, started), citations, pageAges };
+}
 
 export function __parseAnthropicResponse(
   json: AnthropicResponse,
@@ -437,6 +502,8 @@ class AnthropicProvider implements AIProvider {
     const model = opts.model ?? this.defaultModel;
     const body = __buildAnthropicBody(opts, model);
 
+    if (opts.webSearch) return this.completeWithSearch(opts, model, body);
+
     // Structured output is not streamed; everything else can be.
     if (opts.onDelta && !opts.tool) {
       return this.completeStreaming(opts.onDelta, model, body);
@@ -456,6 +523,64 @@ class AnthropicProvider implements AIProvider {
       ...__parseAnthropicResponse(json, model),
       provider: this.name,
       stubbed: false,
+    });
+  }
+
+  /**
+   * BL-NAV-LIFECYCLE 5b — a call with the search tool. The API may pause a
+   * long search turn (`pause_turn`); the paused answer is sent back as it
+   * came, up to three times. `max_uses` counts across the whole turn, so
+   * the cap holds over the continuations. Usage, searches and citations
+   * are summed over every response.
+   */
+  private async completeWithSearch(
+    opts: AICompleteOptions,
+    model: string,
+    body: Record<string, unknown>,
+  ): Promise<AICompleteResult> {
+    const total: AIWebSearchOutcome = { requests: 0, citations: [], pageAges: {} };
+    const texts: string[] = [];
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheRead = 0;
+    let cacheWrite = 0;
+    let last: AnthropicResponse = {};
+    const messages = [...(body.messages as unknown[])];
+    for (let turn = 0; turn < 4; turn++) {
+      const res = await fetchWithRetry(
+        "https://api.anthropic.com/v1/messages",
+        { method: "POST", headers: this.headers(), body: JSON.stringify({ ...body, messages }) },
+        { label: "Anthropic", timeoutMs: COMPLETION_DEADLINE_MS },
+      );
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new ProviderHttpError(`Anthropic ${res.status}: ${errBody.slice(0, 300)}`, res.status);
+      }
+      last = (await res.json()) as AnthropicResponse;
+      const parsed = __parseAnthropicResponse(last, model);
+      const found = __parseWebSearch(last);
+      total.requests += found.requests;
+      total.citations.push(...found.citations);
+      Object.assign(total.pageAges, found.pageAges);
+      if (parsed.text) texts.push(parsed.text);
+      inputTokens += parsed.inputTokens ?? 0;
+      outputTokens += parsed.outputTokens ?? 0;
+      cacheRead += parsed.cacheReadTokens ?? 0;
+      cacheWrite += parsed.cacheWriteTokens ?? 0;
+      if (last.stop_reason !== "pause_turn") break;
+      messages.push({ role: "assistant", content: last.content ?? [] });
+    }
+    return assertAnswered({
+      text: texts.join("\n").trim(),
+      provider: this.name,
+      model: last.model ?? model,
+      inputTokens,
+      outputTokens,
+      ...(cacheRead ? { cacheReadTokens: cacheRead } : {}),
+      ...(cacheWrite ? { cacheWriteTokens: cacheWrite } : {}),
+      stubbed: false,
+      stopReason: last.stop_reason,
+      webSearch: total,
     });
   }
 
@@ -1263,7 +1388,7 @@ async function runTenantCompletion<T>(
     const fallbackModel =
       fallback && routingEnabled() ? (modelTableFor(fallback.name)[AI_FEATURE_MODEL_CLASS[feature]] ?? undefined) : undefined;
     const fallbackCaps = fallback ? capabilitiesFor(fallback.name, fallbackModel ?? defaultModelFor(fallback.name), process.env) : null;
-    const useFallback = Boolean(fallback && fallbackCaps && !delivered && isFallbackEligible(err) && canServe(fallbackCaps, request));
+    const useFallback = Boolean(fallback && fallbackCaps && !delivered && !rest.webSearch && isFallbackEligible(err) && canServe(fallbackCaps, request));
     const message = err instanceof Error ? err.message : String(err);
     await recordAiCall({
       ...telemetryBase,
